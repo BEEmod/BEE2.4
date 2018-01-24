@@ -13,6 +13,7 @@ import conditions
 import instance_traits
 import utils
 import vbsp_options
+import antlines
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple
 
@@ -355,6 +356,7 @@ class Item:
         'inst',
         'ind_panels',
         'antlines', 'shape_signs',
+        'ant_wall_style', 'ant_floor_style',
         'timer',
         'inputs', 'outputs',
         'item_type', 'io_outputs',
@@ -366,6 +368,8 @@ class Item:
         self,
         inst: Entity,
         item_type: Optional[ItemType],
+        ant_floor_style: antlines.AntType,
+        ant_wall_style: antlines.AntType,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Entity]=(),
         shape_signs: Iterable[ShapeSignage]=(),
@@ -381,6 +385,9 @@ class Item:
         self.antlines = set(antlines)  # type: Set[Entity]
         self.shape_signs = list(shape_signs)
 
+        # And the style to use for the antlines.
+        self.ant_floor_style = ant_floor_style
+        self.ant_wall_style = ant_wall_style
         # None = Infinite/normal.
         self.timer = timer_count
 
@@ -548,6 +555,8 @@ def calc_connections(
     vmf: VMF,
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
+    antline_wall: antlines.AntType,
+    antline_floor: antlines.AntType,
 ):
     """Compute item connections from the map file.
 
@@ -595,7 +604,8 @@ def calc_connections(
                 # that'll be a problem later.
                 pass
             else:
-                ITEMS[inst_name] = Item(inst, item_type)
+                # Pass in the defaults for antline styles.
+                ITEMS[inst_name] = Item(inst, item_type, antline_floor, antline_wall)
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
@@ -1173,14 +1183,18 @@ def add_item_indicators(
     inst_type: PanelSwitchingStyle,
     pan_item: ItemType,
 ):
-    """Generate the commands for antlines."""
+    """Generate the commands for antlines, and restyle them."""
     ant_name = '@{}_overlay'.format(item.name)
-    has_ant = len(item.antlines) > 0
     has_sign = len(item.ind_panels) > 0
 
     for ind in item.antlines:
         ind['targetname'] = ant_name
+        antlines.style_antline(ind, item.ant_wall_style, item.ant_floor_style)
 
+    # If the antline material doesn't toggle, the name is removed by
+    # style_antline(). So check if the overlay actually exists still, to
+    # see if we need to add the toggle.
+    has_ant = len(item.inst.map.by_target[ant_name]) > 0
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
@@ -1200,7 +1214,7 @@ def add_item_indicators(
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else ' '
             first_inst = False
         else:
-            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ' '
+            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = '-'
 
         for output, input_cmds in [
             (item.output_act(), pan_item.enable_cmd),

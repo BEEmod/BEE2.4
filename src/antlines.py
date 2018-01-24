@@ -1,18 +1,15 @@
 """Handles restyling antlines."""
 import random
-from typing import NamedTuple, List
+from collections import namedtuple
+from typing import List
 
 from srctools import Vec, Property, conv_float, Entity, VMF
 import srctools.vmf
 import comp_consts as const
 
 
-class AntTex(NamedTuple):
+class AntTex(namedtuple('AntTex', ['texture', 'scale', 'static'])):
     """Represents a single texture, and the parameters it has."""
-    texture: str
-    scale: float
-    static: bool
-
     @staticmethod
     def parse(prop: Property):
         """Parse from property values.
@@ -103,6 +100,15 @@ class AntType:
             broken_chance,
         )
 
+    @classmethod
+    def default(cls):
+        """Make a copy of the original PeTI antline config."""
+        return cls(
+            [AntTex(const.Antlines.STRAIGHT, 0.25, False)],
+            [AntTex(const.Antlines.CORNER, 1, False)],
+            [], [], 0,
+        )
+
 
 def broken_antline_iter(dist, chance):
     """Iterator used in set_antline_mat().
@@ -123,7 +129,7 @@ def broken_antline_iter(dist, chance):
     return
 
 
-def set_antline_mat(vmf: VMF, over: Entity, conf: AntType, floor_conf: AntType):
+def style_antline(over: Entity, conf: AntType, floor_conf: AntType):
     """Retexture an antline.
 
     floor_conf, if set is an alternate texture set to use on floors and ceilings.
@@ -170,7 +176,7 @@ def set_antline_mat(vmf: VMF, over: Entity, conf: AntType, floor_conf: AntType):
 
                 # Make a section - base it off the original, and shrink it
                 new_over = over.copy()
-                vmf.add_ent(new_over)
+                over.map.add_ent(new_over)
 
                 # Repeats lengthways
                 new_over['startV'] = sect_length
@@ -193,7 +199,7 @@ def set_antline_mat(vmf: VMF, over: Entity, conf: AntType, floor_conf: AntType):
 
                 random.choice(sect_mats).apply(new_over)
             # Remove the original overlay
-            vmf.remove_ent(over)
+            over.remove()
             return  # Don't texture the original.
 
     random.choice(mats).apply(over)

@@ -1,6 +1,6 @@
 import utils
 # Do this very early, so we log the startup sequence.
-from antlines import set_antline_mat
+import antlines
 
 
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -73,7 +73,6 @@ TEX_VALVE = {
     consts.Special.SQUAREBEAMS: "special.edge",
     consts.Special.GLASS: "special.glass",
     consts.Special.GRATING: "special.grating",
-    consts.Special.LASERFIELD: "special.laserfield",
 }
 
 
@@ -110,23 +109,6 @@ TEX_DEFAULTS = [
     ('', 'special.goo_floor'),
     ('', 'special.edge_special'),
     ('', 'special.fizz_border'),
-
-    # And these defaults have the extra scale information, which isn't
-    # in the maps.
-    ('0.25|' + consts.Antlines.STRAIGHT, 'overlay.antline'),
-    ('1|' + consts.Antlines.CORNER, 'overlay.antlinecorner'),
-
-    # This is for the P1 style, where antlines use different textures
-    # on the floor and wall.
-    # We just use the regular version if unset.
-    ('', 'overlay.antlinecornerfloor'),
-    ('', 'overlay.antlinefloor'),
-
-    # Broken version of antlines
-    ('', 'overlay.antlinebroken'),
-    ('', 'overlay.antlinebrokencorner'),
-    ('', 'overlay.antlinebrokenfloor'),
-    ('', 'overlay.antlinebrokenfloorcorner'),
 
     # If set and enabled, adds frames for >10 sign pairs
     # to distinguish repeats.
@@ -299,6 +281,22 @@ def load_settings():
         else:
             settings['textures'][key] = value
 
+    # Antline texturing settings.
+    # We optionally allow different ones for floors.
+    ant_wall = ant_floor = None
+    for prop in conf.find_all('Textures', 'Antlines'):
+        if 'floor' in prop:
+            ant_floor = antlines.AntType.parse(prop.find_key('floor'))
+        if 'wall' in prop:
+            ant_wall = antlines.AntType.parse(prop.find_key('wall'))
+        # If both are not there, allow omitting the subkey.
+        if ant_wall is ant_floor is None:
+            ant_wall = ant_floor = antlines.AntType.parse(prop)
+    if ant_wall is None:
+        ant_wall = antlines.AntType.default()
+    if ant_floor is None:
+        ant_floor = ant_wall
+
     # Load in our main configs..
     vbsp_options.load(conf.find_all('Options'))
 
@@ -408,6 +406,7 @@ def load_settings():
         BEE2_config = ConfigFile(None)
 
     LOGGER.info("Settings Loaded!")
+    return ant_floor, ant_wall
 
 
 def load_map(map_path):
@@ -1780,24 +1779,6 @@ def collapse_goo_trig():
     LOGGER.info('Done!')
 
 
-def remove_static_ind_toggles():
-    """Remove indicator_toggle instances that don't have assigned overlays.
-
-    If a style has static overlays, this will make antlines basically free.
-    """
-    LOGGER.info('Removing static indicator toggles...')
-    toggle_file = instanceLocs.resolve('<ITEM_INDICATOR_TOGGLE>')
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() not in toggle_file:
-            continue
-
-        overlay = inst.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
-        # Remove if there isn't an overlay, or no associated ents.
-        if overlay == '' or len(VMF.by_target[overlay]) == 0:
-            inst.remove()
-    LOGGER.info('Done!')
-
-
 @conditions.meta_cond(priority=-50)
 def set_barrier_frame_type():
     """Set a $type instvar on glass frame.
@@ -2248,18 +2229,6 @@ def change_overlays():
     # Grab all the textures we're using...
 
     tex_dict = settings['textures']
-    ant_str = tex_dict['overlay.antline']
-    ant_str_floor = tex_dict['overlay.antlinefloor']
-    ant_corn = tex_dict['overlay.antlinecorner']
-    ant_corn_floor = tex_dict['overlay.antlinecornerfloor']
-
-    broken_ant_str = tex_dict['overlay.antlinebroken']
-    broken_ant_corn = tex_dict['overlay.antlinebrokencorner']
-    broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
-    broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
-
-    broken_chance = vbsp_options.get(float, 'broken_antline_chance')
-    broken_dist = vbsp_options.get(int, 'broken_antline_distance')
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2308,26 +2277,6 @@ def change_overlays():
                     val /= 16
                     val *= sign_size
                     over[prop] = val.join(' ')
-        if case_mat == consts.Antlines.STRAIGHT:
-            set_antline_mat(
-                over,
-                ant_str,
-                ant_str_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_str,
-                broken_ant_str_floor,
-            )
-        elif case_mat == consts.Antlines.CORNER:
-            set_antline_mat(
-                over,
-                ant_corn,
-                ant_corn_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_corn,
-                broken_ant_corn_floor,
-            )
 
 
 def add_extra_ents(mode):
@@ -3309,7 +3258,7 @@ def main():
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        load_settings()
+        ant_floor, ant_wall = load_settings()
 
         load_map(path)
         instance_traits.set_traits(VMF)
@@ -3319,6 +3268,8 @@ def main():
             VMF,
             settings['textures']['overlay.shapeframe'],
             settings['style_vars']['enableshapesignageframe'],
+            ant_floor,
+            ant_wall,
         )
 
         MAP_RAND_SEED = calc_rand_seed()
@@ -3347,7 +3298,6 @@ def main():
         collapse_goo_trig()
         change_func_brush()
         barriers.make_barriers(VMF, get_tex)
-        remove_static_ind_toggles()
         fix_worldspawn()
 
         make_packlist(path)
