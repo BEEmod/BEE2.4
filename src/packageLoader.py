@@ -1666,7 +1666,7 @@ class Item(PakObject):
     @staticmethod
     def convert_item_io(
         item: Property,
-        conv_peti_input: Callable[[Property, str, str], None],
+        conv_peti_input: Callable[[Property, str, str], None]=lambda a, b, c: None,
     ):
         """Convert editoritems configs with the new BEE2 connections format.
 
@@ -1790,8 +1790,7 @@ class Item(PakObject):
             )
         # Fizzlers don't work correctly with outputs - we don't
         # want it in editoritems.
-        if has_output and item[
-            'ItemClass', ''].casefold() != 'itembarrierhazard':
+        if has_output and item['ItemClass', ''].casefold() != 'itembarrierhazard':
             item.ensure_exists('Exporting').ensure_exists('Outputs').append(
                 Property(CONN_NORM, [
                     Property('Activate', 'ON_ACTIVATED'),
