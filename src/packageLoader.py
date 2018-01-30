@@ -25,7 +25,8 @@ from typing import (
     Union, Optional, Any, TYPE_CHECKING,
     Iterator, Iterable, Type,
     Dict, List, Tuple, NamedTuple,
-    Match
+    Match,
+    TypeVar,
 )
 
 if TYPE_CHECKING:
@@ -89,9 +90,9 @@ ExportData = NamedTuple('ExportData', [
 # The desired variant for an item, before we've figured out the dependencies.
 UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
     ('filesys', FileSystem),  # The original filesystem.
-    ('folder', str),  # If set, use the given folder from our package.
-    ('style', str),  # Inherit from a specific style (implies folder is None)
-    ('config', Property),  # Config for editing
+    ('folder', Optional[str]),  # If set, use the given folder from our package.
+    ('style', Optional[str]),  # Inherit from a specific style (implies folder is None)
+    ('config', Optional[Property]),  # Config for editing
 ])
 
 # Finds names surrounded by %s
@@ -122,6 +123,7 @@ VPK_FOLDER = {
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
 
+T = TypeVar('T')
 
 class _PakObjectMeta(type):
     def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
@@ -188,12 +190,12 @@ class PakObject(metaclass=_PakObjectMeta):
         raise NotImplementedError
 
     @classmethod
-    def all(cls: _PakObjectMeta) -> Iterable['PakObject']:
+    def all(cls: Type[T]) -> Iterable[T]:
         """Get the list of objects parsed."""
         return cls._id_to_obj.values()
 
     @classmethod
-    def by_id(cls: _PakObjectMeta, object_id: str) -> 'PakObject':
+    def by_id(cls: Type[T], object_id: str) -> T:
         """Return the object with a given ID."""
         return cls._id_to_obj[object_id.casefold()]
 
@@ -703,7 +705,11 @@ def setup_style_tree(
                     )
 
 
-def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
+def parse_item_folder(
+    folders: Dict[str, Union['ItemVariant', UnParsedItemVariant]],
+    filesystem: FileSystem,
+    pak_id: str,
+):
     """Parse through the data in item/ folders.
 
     folders is a dict, with the keys set to the folder names we want.
@@ -832,6 +838,7 @@ def apply_replacements(conf: Property) -> Property:
             prop.value = RE_PERCENT_VAR.sub(rep_func, prop.value)
 
     return new_conf
+
 
 class ItemVariant:
     """Data required for an item in a particular style."""
@@ -1329,7 +1336,7 @@ class Item(PakObject):
             data.id,
         ))
 
-        for ver in data.info.find_all('version'):  # type: Property
+        for ver in data.info.find_all('version'):
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
