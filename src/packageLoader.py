@@ -710,6 +710,30 @@ def setup_style_tree(
                         else item.def_ver['styles'][sty_id]
                     )
 
+    if utils.DEV_MODE:
+        # Check for outdated connections.
+        with open('../dev/item_conn.md', 'w') as f:
+            for item in sorted(item_data, key=lambda i: i.id):
+                imp = {}
+                for vers in item.versions.values():
+                    variants = {}  # type: Dict[int, Tuple[str, Property]]
+                    for sty_id, variant in vers['styles'].items():
+                        if id(variant.editor) not in variants:
+                            variants[id(variant.editor)] = sty_id, variant.editor
+
+                    for sty_id, editor in variants.values():
+                        for io_block in editor.find_all('Exporting', 'Inputs'):
+                            if 'CONNECTION_STANDARD' in io_block:
+                                imp[sty_id] = False
+                                break
+                            elif 'BEE2' in io_block:
+                                imp[sty_id] = True
+
+                if imp:
+                    f.write('\t* `<{}>`:\n'.format(item.id))
+                    for sty_id, has_imp in sorted(imp.items()):
+                        f.write('\t\t* [{}] `{}`\n'.format('x' if has_imp else ' ', sty_id))
+
 
 def parse_item_folder(
     folders: Dict[str, Union['ItemVariant', UnParsedItemVariant]],
