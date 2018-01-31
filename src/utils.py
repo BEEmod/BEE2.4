@@ -839,18 +839,18 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         # We rotate through logs of 500kb each, so it doesn't increase too much.
         log_handler = handlers.RotatingFileHandler(
             filename,
-            maxBytes=500 * 1024,
-            backupCount=1,
+            backupCount=5,
         )
+        log_handler.doRollover()
         log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
         logger.addHandler(log_handler)
 
         err_log_handler = handlers.RotatingFileHandler(
             filename[:-3] + 'error.' + filename[-3:],
-            maxBytes=500 * 1024,
-            backupCount=1,
+            backupCount=5,
         )
+        err_log_handler.doRollover()
         err_log_handler.setLevel(logging.WARNING)
         err_log_handler.setFormatter(long_log_format)
 

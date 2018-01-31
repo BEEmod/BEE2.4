@@ -1352,7 +1352,7 @@ def get_map_info():
         # later
 
         file = item['file'].casefold()
-        LOGGER.debug('File:', file)
+        LOGGER.debug('File: "{}"', file)
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
             # In SP mode the same instance is used for entry and exit door
