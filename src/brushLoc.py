@@ -190,12 +190,12 @@ class Grid(Dict[_grid_keys, Block]):
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
 
-    def __getitem__(self, pos: _grid_keys):
+    def __getitem__(self, pos: _grid_keys) -> Block:
         return super().get(self._conv_key(pos), Block.VOID)
 
     get = __getitem__
 
-    def __setitem__(self, pos: _grid_keys, value: Block):
+    def __setitem__(self, pos: _grid_keys, value: Block) -> None:
         if type(value) is not Block:
             raise ValueError('Must be set to a Block item, not "{}"!'.format(
                 type(value).__name__,
