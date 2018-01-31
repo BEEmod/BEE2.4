@@ -2,12 +2,13 @@ from collections import namedtuple, defaultdict
 import os
 import math
 
+import connections
 from conditions import (
     make_result, make_result_setup, meta_cond, RES_EXHAUSTED,
     local_name
 )
 import instanceLocs
-from srctools import Property, Vec, Entity, VMF
+from srctools import Property, Vec, Entity, VMF, Output
 import srctools
 import vbsp_options
 import utils
@@ -103,7 +104,6 @@ def res_monitor(inst: Entity, res: Property):
         MONITOR_RELATIONSHIP_ENTS.append(relation)
 
 
-
 @make_result_setup('Camera')
 def res_camera_setup(res: Property):
     return {
@@ -111,7 +111,6 @@ def res_camera_setup(res: Property):
         'yaw_off': Vec.from_str(res['YawOff', '']),
         'pitch_off': Vec.from_str(res['PitchOff', '']),
 
-        'io_inst': instanceLocs.resolve_one(res['IO_inst'], error=True),
         'yaw_inst': instanceLocs.resolve_one(res['yawInst', '']),
         'pitch_inst': instanceLocs.resolve_one(res['pitchInst', '']),
 
@@ -200,8 +199,6 @@ def mon_remove_bullseyes(inst: Entity):
     if inst['file'].casefold() not in instanceLocs.resolve('<ITEM_CATAPULT_TARGET>'):
         return
 
-    LOGGER.info('Bullseye {}', BULLSYE_LOCS)
-
     origin = Vec(0, 0, -64)
     origin.localise(Vec.from_str(inst['origin']), Vec.from_str(inst['angles']))
     origin = origin.as_tuple()
@@ -216,7 +213,7 @@ def mon_remove_bullseyes(inst: Entity):
 #  Note that we happen after voiceline adding!
 
 
-@meta_cond(priority=150, only_once=True)
+@meta_cond(priority=-275, only_once=True)
 def mon_camera_link():
     """Link cameras to monitors."""
     import vbsp
@@ -239,10 +236,21 @@ def mon_camera_link():
         if srctools.conv_int(cam.inst.fixup['$connectioncount']) == 0:
             continue
 
-        io_ent = cam.inst.copy()
-        io_ent.map.add_ent(io_ent)
-        io_ent['file'] = cam.config['io_inst']
-        io_ent.fixup['$toggle_func'] = 'ToggleCam({})'.format(index)
+        conn_item = connections.ITEMS[cam.inst['targetname']]
+        # Generate an input to the VScript which turns on/off this camera.
+        # Everything's by index.
+        conn_item.enable_cmd = (Output(
+            '',
+            '@camera',
+            'RunScriptCode',
+            'CamEnable({})'.format(index),
+        ), )
+        conn_item.disable_cmd = (Output(
+            '',
+            '@camera',
+            'RunScriptCode',
+            'CamDisable({})'.format(index),
+        ), )
 
     for is_act, cam in zip(active_counts, ALL_CAMERAS):
         if is_act:
