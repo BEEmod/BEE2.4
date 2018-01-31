@@ -4,10 +4,9 @@ from conditions import (
     INST_ANGLE,
 )
 import instanceLocs
-from srctools import Vec, Property
+from srctools import Vec, Property, VMF
 import conditions
 import utils
-import vbsp
 
 COND_MOD_NAME = None
 
@@ -23,7 +22,7 @@ CATWALK_TYPES = {
 }
 
 
-def place_catwalk_connections(instances, point_a, point_b):
+def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
     """Place catwalk sections to connect two straight points."""
     diff = point_b - point_a
 
@@ -39,10 +38,10 @@ def place_catwalk_connections(instances, point_a, point_b):
         for stair_pos in range(0, int(diff.z), 128):
             # Move twice the vertical horizontally
             # plus 128 so we don't start in point A
-            loc = point_a + (2 * stair_pos + 128) * direction  # type: Vec
+            loc = point_a + (2 * stair_pos + 128) * direction
             # Do the vertical offset
             loc.z += stair_pos
-            vbsp.VMF.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 origin=loc.join(' '),
                 angles=angle,
@@ -63,7 +62,7 @@ def place_catwalk_connections(instances, point_a, point_b):
             # Do the vertical offset plus additional 128 units
             # to account for the moved instance
             loc.z -= (stair_pos + 128)
-            vbsp.VMF.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 origin=loc.join(' '),
                 angles=angle,
@@ -84,7 +83,7 @@ def place_catwalk_connections(instances, point_a, point_b):
             distance,
             [512, 256, 128]
             ):
-        vbsp.VMF.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             origin=loc.join(' '),
             angles=angle,
@@ -94,7 +93,7 @@ def place_catwalk_connections(instances, point_a, point_b):
 
 
 @make_result('makeCatwalk')
-def res_make_catwalk(res: Property):
+def res_make_catwalk(vmf: VMF, res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
@@ -137,7 +136,7 @@ def res_make_catwalk(res: Property):
     markers = {}
 
     # Find all our markers, so we can look them up by targetname.
-    for inst in vbsp.VMF.by_class['func_instance']:
+    for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in marker:
             continue
         #                   [North, South, East,  West ]
@@ -169,7 +168,7 @@ def res_make_catwalk(res: Property):
             if conn.output != output_target or conn.input != output_target:
                 # Indicator toggles or similar, delete these entities.
                 # Find the associated overlays too.
-                for del_inst in vbsp.VMF.by_target[conn.target]:
+                for del_inst in vmf.by_target[conn.target]:
                     conditions.remove_ant_toggle(del_inst)
                 continue
 
@@ -198,7 +197,7 @@ def res_make_catwalk(res: Property):
 
             if dist > 128:
                 # add straight sections in between
-                place_catwalk_connections(instances, origin1, origin2)
+                place_catwalk_connections(vmf, instances, origin1, origin2)
 
             # Update the lists based on the directions that were set
             conn_lst1 = connections[inst]
@@ -264,7 +263,7 @@ def res_make_catwalk(res: Property):
             supp = instances['support_wall']
 
         if supp:
-            vbsp.VMF.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 origin=inst['origin'],
                 angles=INST_ANGLE[normal.as_tuple()],
