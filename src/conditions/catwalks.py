@@ -6,6 +6,7 @@ from conditions import (
 import instanceLocs
 from srctools import Vec, Property
 import conditions
+from connections import ITEMS
 import utils
 import vbsp
 
@@ -115,7 +116,6 @@ def res_make_catwalk(res: Property):
     """
     LOGGER.info("Starting catwalk generator...")
     marker = instanceLocs.resolve(res['markerInst'])
-    output_target = res['output_name', 'MARKER']
 
     instances = {
         name: instanceLocs.resolve_one(res[name, ''], error=True)
@@ -164,17 +164,17 @@ def res_make_catwalk(res: Property):
     LOGGER.info('Markers: {}', markers)
 
     # First loop through all the markers, adding connecting sections
-    for inst in markers.values():
-        for conn in inst.outputs:
-            if conn.output != output_target or conn.input != output_target:
-                # Indicator toggles or similar, delete these entities.
-                # Find the associated overlays too.
-                for del_inst in vbsp.VMF.by_target[conn.target]:
-                    conditions.remove_ant_toggle(del_inst)
-                continue
+    for marker_name, inst in markers.items():
+        mark_item = ITEMS[marker_name]
+        mark_item.delete_antlines()
+        for conn in list(mark_item.outputs):
+            try:
+                inst2 = markers[conn.to_item.name]
+            except KeyError:
+                LOGGER.warning('Catwalk connected to non-catwalk!')
 
-            inst2 = markers[conn.target]
-            LOGGER.debug('{} <-> {}', inst['targetname'], inst2['targetname'])
+            conn.remove()
+
             origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
             if origin1.x != origin2.x and origin1.y != origin2.y:
@@ -216,8 +216,6 @@ def res_make_catwalk(res: Property):
             elif origin2.y < origin1.y:
                 conn_lst1[1] = True  # S
                 conn_lst2[0] = True  # N
-
-        inst.outputs.clear()  # Remove the outputs now, they're useless
 
     for inst, dir_mask in connections.items():
         # Set the marker instances based on the attached walkways.
