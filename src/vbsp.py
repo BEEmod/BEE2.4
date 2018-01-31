@@ -1070,6 +1070,7 @@ def set_player_portalgun():
                     'true' if has_btn_onoff else 'false',
                 ),
                 delay=0.1,
+                only_once=True,
             ))
 
         # Shuts down various parts when you've reached the exit.
@@ -1177,24 +1178,28 @@ def add_fog_ents():
             '@tonemapper',
             'SetTonemapPercentBrightPixels',
             fog_opt['tonemap_brightpixels'],
+            only_once=True,
         ),
         VLib.Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetTonemapRate',
             fog_opt['tonemap_rate'],
+            only_once=True,
         ),
         VLib.Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetAutoExposureMin',
             fog_opt['tonemap_exp_min'],
+            only_once=True,
         ),
         VLib.Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetAutoExposureMax',
             fog_opt['tonemap_exp_max'],
+            only_once=True,
         ),
     ])
 
@@ -1204,6 +1209,7 @@ def add_fog_ents():
             '@tonemapper',
             'SetBloomScale',
             fog_opt['tonemap_bloom_scale'],
+            only_once=True,
         ))
 
     if GAME_MODE == 'SP':
@@ -1212,6 +1218,7 @@ def add_fog_ents():
             '!player',
             'SetFogController',
             '@fog_controller',
+            only_once=True,
         ))
     else:
         GLOBAL_OUTPUTS.append(VLib.Output(
@@ -1219,12 +1226,14 @@ def add_fog_ents():
             '!player_blue',
             'SetFogController',
             '@fog_controller',
+            only_once=True,
         ))
         GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '!player_orange',
             'SetFogController',
             '@fog_controller',
+            only_once=True,
         ))
 
 

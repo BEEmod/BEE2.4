@@ -1,14 +1,16 @@
-
+"""Implement Catwalks."""
+import brushLoc
 from conditions import (
     make_result, RES_EXHAUSTED,
     INST_ANGLE,
 )
 import instanceLocs
-from srctools import Vec, Property
+from srctools import Vec, Property, VMF, Entity
 import conditions
 from connections import ITEMS
 import utils
-import vbsp
+
+from typing import Dict, Tuple
 
 COND_MOD_NAME = None
 
@@ -24,7 +26,28 @@ CATWALK_TYPES = {
 }
 
 
-def place_catwalk_connections(instances, point_a, point_b):
+class Link:
+    """Record the directions a catwalk connects in."""
+    __slots__ = ['N', 'S', 'E', 'W']
+    def __init__(self):
+        self.N = self.S = self.E = self.W = False
+
+    def __len__(self): return 4
+
+    def as_tuple(self) -> Tuple[bool, bool, bool, bool]:
+        """Convert to a tuple."""
+        return self.N, self.S, self.E, self.W
+
+    def conn_dir(self) -> Vec:
+        """Get the direction the connections point."""
+        # If set, the bools are equivalent to 1. So subtract negative directions.
+        return Vec(
+            x=self.E - self.W,
+            y=self.N - self.S,
+        )
+
+
+def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
     """Place catwalk sections to connect two straight points."""
     diff = point_b - point_a
 
@@ -40,10 +63,10 @@ def place_catwalk_connections(instances, point_a, point_b):
         for stair_pos in range(0, int(diff.z), 128):
             # Move twice the vertical horizontally
             # plus 128 so we don't start in point A
-            loc = point_a + (2 * stair_pos + 128) * direction  # type: Vec
+            loc = point_a + (2 * stair_pos + 128) * direction
             # Do the vertical offset
             loc.z += stair_pos
-            vbsp.VMF.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 origin=loc.join(' '),
                 angles=angle,
@@ -64,7 +87,7 @@ def place_catwalk_connections(instances, point_a, point_b):
             # Do the vertical offset plus additional 128 units
             # to account for the moved instance
             loc.z -= (stair_pos + 128)
-            vbsp.VMF.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 origin=loc.join(' '),
                 angles=angle,
@@ -85,7 +108,7 @@ def place_catwalk_connections(instances, point_a, point_b):
             distance,
             [512, 256, 128]
             ):
-        vbsp.VMF.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             origin=loc.join(' '),
             angles=angle,
@@ -95,7 +118,7 @@ def place_catwalk_connections(instances, point_a, point_b):
 
 
 @make_result('makeCatwalk')
-def res_make_catwalk(res: Property):
+def res_make_catwalk(vmf: VMF, res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
@@ -133,23 +156,23 @@ def res_make_catwalk(res: Property):
     if instances['end_wall'] == '':
         instances['end_wall'] = instances['end']
 
-    connections = {}  # The directions this instance is connected by (NSEW)
+    # The directions this instance is connected by (NSEW)
+    links = {}  # type: Dict[Entity, Link]
     markers = {}
 
     # Find all our markers, so we can look them up by targetname.
-    for inst in vbsp.VMF.by_class['func_instance']:
+    for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in marker:
             continue
-        #                   [North, South, East,  West ]
-        connections[inst] = [False, False, False, False]
+        links[inst] = Link()
         markers[inst['targetname']] = inst
 
         # Snap the markers to the grid. If on glass it can become offset...
         origin = Vec.from_str(inst['origin'])
-        origin = origin // 128 * 128  # type: Vec
+        origin = origin // 128 * 128
         origin += 64
 
-        while origin.as_tuple() in conditions.GOO_LOCS:
+        while brushLoc.POS['world': origin].is_goo:
             # The instance is in goo! Switch to floor orientation, and move
             # up until it's in air.
             inst['angles'] = '0 0 0'
@@ -160,7 +183,7 @@ def res_make_catwalk(res: Property):
     if not markers:
         return RES_EXHAUSTED
 
-    LOGGER.info('Connections: {}', connections)
+    LOGGER.info('Connections: {}', links)
     LOGGER.info('Markers: {}', markers)
 
     # First loop through all the markers, adding connecting sections
@@ -188,8 +211,6 @@ def res_make_catwalk(res: Property):
                 dist = abs(origin1.x - origin2.x)
             vert_dist = origin1.z - origin2.z
 
-            LOGGER.debug('Dist = {}, Vert = {}', dist, vert_dist)
-
             if (dist - 128) // 2 < abs(vert_dist):
                 # The stairs are 2 long, 1 high. Check there's enough room
                 # Subtract the last block though, since that's a corner.
@@ -198,43 +219,32 @@ def res_make_catwalk(res: Property):
 
             if dist > 128:
                 # add straight sections in between
-                place_catwalk_connections(instances, origin1, origin2)
+                place_catwalk_connections(vmf, instances, origin1, origin2)
 
             # Update the lists based on the directions that were set
-            conn_lst1 = connections[inst]
-            conn_lst2 = connections[inst2]
+            conn_lst1 = links[inst]
+            conn_lst2 = links[inst2]
             if origin1.x < origin2.x:
-                conn_lst1[2] = True  # E
-                conn_lst2[3] = True  # W
+                conn_lst1.E = conn_lst2.W = True
             elif origin2.x < origin1.x:
-                conn_lst1[3] = True  # W
-                conn_lst2[2] = True  # E
+                conn_lst1.W = conn_lst2.E = True
 
             if origin1.y < origin2.y:
-                conn_lst1[0] = True  # N
-                conn_lst2[1] = True  # S
+                conn_lst1.N = conn_lst2.S = True
             elif origin2.y < origin1.y:
-                conn_lst1[1] = True  # S
-                conn_lst2[0] = True  # N
+                conn_lst1.S = conn_lst2.N = True
 
-    for inst, dir_mask in connections.items():
+    for inst, dir_mask in links.items():
         # Set the marker instances based on the attached walkways.
         normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
 
-        new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
+        new_type, inst['angles'] = utils.CONN_LOOKUP[dir_mask.as_tuple()]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
 
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
             if normal.z == 0:
-                # Treat booleans as ints to get the direction the connection is
-                # in - True == 1, False == 0
-                conn_dir = Vec(
-                    x=dir_mask[2] - dir_mask[3],  # +E, -W
-                    y=dir_mask[0] - dir_mask[1],  # +N, -S,
-                    z=0,
-                )
-                if normal == conn_dir:
+                if normal == dir_mask.conn_dir():
                     inst['file'] = instances['end_wall']
             continue  # We never have normal supports on end pieces
         elif new_type is utils.CONN_TYPES.none:
@@ -248,11 +258,12 @@ def res_make_catwalk(res: Property):
             continue  # These don't get supports otherwise
 
         # Add regular supports
+        supp = None
         if normal == (0, 0, 1):
             # If in goo, use different supports!
             origin = Vec.from_str(inst['origin'])
             origin.z -= 128
-            if origin.as_tuple() in conditions.GOO_LOCS:
+            if brushLoc.POS['world': origin].is_goo:
                 supp = instances['support_goo']
             else:
                 supp = instances['support_floor']
@@ -262,7 +273,7 @@ def res_make_catwalk(res: Property):
             supp = instances['support_wall']
 
         if supp:
-            vbsp.VMF.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 origin=inst['origin'],
                 angles=INST_ANGLE[normal.as_tuple()],

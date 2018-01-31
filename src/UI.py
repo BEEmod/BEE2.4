@@ -1339,7 +1339,7 @@ def init_option(f):
         text=_("{arr} Use Suggested {arr}").format(arr='\u2193'),
         command=suggested_style_set,
         )
-    UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
+    UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
     UI['suggested_style'].bind('<Enter>', suggested_style_mousein)
     UI['suggested_style'].bind('<Leave>', suggested_style_mouseout)
 
@@ -1375,14 +1375,21 @@ def init_option(f):
         _('Enable or disable particular voice lines, to prevent them from '
           'being added.'),
     )
+    
+    if utils.WIN:
+        # On windows, the buttons get inset on the left a bit. Inset everything
+        # else to adjust.
+        left_pad = (1, 0)
+    else:
+        left_pad = 0
 
     # Make all the selector window textboxes
-    style_win.widget(props).grid(row=0, column=1, sticky='EW')
-    music_win.widget(props).grid(row=2, column=1, sticky='EW')
+    style_win.widget(props).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    music_win.widget(props).grid(row=2, column=1, sticky='EW', padx=left_pad)
     voice_frame.grid(row=3, column=1, sticky='EW')
-    skybox_win.widget(props).grid(row=4, column=1, sticky='EW')
-    elev_win.widget(props).grid(row=5, column=1, sticky='EW')
-    voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW')
+    skybox_win.widget(props).grid(row=4, column=1, sticky='EW', padx=left_pad)
+    elev_win.widget(props).grid(row=5, column=1, sticky='EW', padx=left_pad)
+    voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if utils.USE_SIZEGRIP:
         ttk.Sizegrip(

@@ -759,12 +759,29 @@ def parse_item_folder(
                 'Folder likely missing! '
             ) from err
 
-        editor_iter = Property.find_all(editor, 'Item')
+        try:
+            editoritems, *editor_extra = Property.find_all(editor, 'Item')
+        except ValueError:
+            raise ValueError(
+                '"{}:items/{}/editoritems.txt has no '
+                '"Item" block!'.format(pak_id, fold)
+            )
+
+        # editor_extra is any extra blocks (offset catchers, extent items).
+        # These must not have a palette section - it'll override any the user
+        # chooses.
+        for item_block in editor_extra:  # type: Property
+            for subtype in item_block.find_all('Editor', 'SubType'):
+                while 'palette' in subtype:
+                    LOGGER.warning(
+                        '"{}:items/{}/editoritems.txt has palette set for extra'
+                        ' item blocks. Deleting.'.format(pak_id, fold)
+                    )
+                    del subtype['palette']
+
         folders[fold] = ItemVariant(
-            # The first Item block found
-            editoritems=next(editor_iter),
-            # Any extra blocks (offset catchers, extent items)
-            editor_extra=editor_iter,
+            editoritems=editoritems,
+            editor_extra=editor_extra,
 
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
