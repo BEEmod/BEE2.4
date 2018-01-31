@@ -327,7 +327,7 @@ E = "0 0 0"
 W = "0 180 0"
 # Lookup values for joining things together.
 CONN_LOOKUP = {
-    # N S  E  W : (Type, Rotation)
+    #N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),
     (0, 0, 1, 0): (CONN_TYPES.side, E),
@@ -873,7 +873,8 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
 
     if sys.stdout:
         stdout_loghandler = logging.StreamHandler(sys.stdout)
-        stdout_loghandler.setLevel(logging.INFO)
+        # When run from source, dump debug output.
+        stdout_loghandler.setLevel(logging.DEBUG if DEV_MODE else logging.INFO)
         stdout_loghandler.setFormatter(long_log_format)
         logger.addHandler(stdout_loghandler)
 
