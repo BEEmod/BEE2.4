@@ -1,12 +1,15 @@
+"""Implement Catwalks."""
 import brushLoc
 from conditions import (
     make_result, RES_EXHAUSTED,
     INST_ANGLE,
 )
 import instanceLocs
-from srctools import Vec, Property, VMF
+from srctools import Vec, Property, VMF, Entity
 import conditions
 import utils
+
+from typing import Dict, Tuple
 
 COND_MOD_NAME = None
 
@@ -20,6 +23,27 @@ CATWALK_TYPES = {
     utils.CONN_TYPES.triple: 'tjunction',
     utils.CONN_TYPES.none: 'NONE',
 }
+
+
+class Link:
+    """Record the directions a catwalk connects in."""
+    __slots__ = ['N', 'S', 'E', 'W']
+    def __init__(self):
+        self.N = self.S = self.E = self.W = False
+
+    def __len__(self): return 4
+
+    def as_tuple(self) -> Tuple[bool, bool, bool, bool]:
+        """Convert to a tuple."""
+        return self.N, self.S, self.E, self.W
+
+    def conn_dir(self) -> Vec:
+        """Get the direction the connections point."""
+        # If set, the bools are equivalent to 1. So subtract negative directions.
+        return Vec(
+            x=self.E - self.W,
+            y=self.N - self.S,
+        )
 
 
 def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
@@ -132,15 +156,15 @@ def res_make_catwalk(vmf: VMF, res: Property):
     if instances['end_wall'] == '':
         instances['end_wall'] = instances['end']
 
-    connections = {}  # The directions this instance is connected by (NSEW)
+    # The directions this instance is connected by (NSEW)
+    links = {}  # type: Dict[Entity, Link]
     markers = {}
 
     # Find all our markers, so we can look them up by targetname.
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in marker:
             continue
-        #                   [North, South, East,  West ]
-        connections[inst] = [False, False, False, False]
+        links[inst] = Link()
         markers[inst['targetname']] = inst
 
         # Snap the markers to the grid. If on glass it can become offset...
@@ -159,7 +183,7 @@ def res_make_catwalk(vmf: VMF, res: Property):
     if not markers:
         return RES_EXHAUSTED
 
-    LOGGER.info('Connections: {}', connections)
+    LOGGER.info('Connections: {}', links)
     LOGGER.info('Markers: {}', markers)
 
     # First loop through all the markers, adding connecting sections
@@ -187,8 +211,6 @@ def res_make_catwalk(vmf: VMF, res: Property):
                 dist = abs(origin1.x - origin2.x)
             vert_dist = origin1.z - origin2.z
 
-            LOGGER.debug('Dist = {}, Vert = {}', dist, vert_dist)
-
             if (dist - 128) // 2 < abs(vert_dist):
                 # The stairs are 2 long, 1 high. Check there's enough room
                 # Subtract the last block though, since that's a corner.
@@ -200,42 +222,31 @@ def res_make_catwalk(vmf: VMF, res: Property):
                 place_catwalk_connections(vmf, instances, origin1, origin2)
 
             # Update the lists based on the directions that were set
-            conn_lst1 = connections[inst]
-            conn_lst2 = connections[inst2]
+            conn_lst1 = links[inst]
+            conn_lst2 = links[inst2]
             if origin1.x < origin2.x:
-                conn_lst1[2] = True  # E
-                conn_lst2[3] = True  # W
+                conn_lst1.E = conn_lst2.W = True
             elif origin2.x < origin1.x:
-                conn_lst1[3] = True  # W
-                conn_lst2[2] = True  # E
+                conn_lst1.W = conn_lst2.E = True
 
             if origin1.y < origin2.y:
-                conn_lst1[0] = True  # N
-                conn_lst2[1] = True  # S
+                conn_lst1.N = conn_lst2.S = True
             elif origin2.y < origin1.y:
-                conn_lst1[1] = True  # S
-                conn_lst2[0] = True  # N
+                conn_lst1.S = conn_lst2.N = True
 
         inst.outputs.clear()  # Remove the outputs now, they're useless
 
-    for inst, dir_mask in connections.items():
+    for inst, dir_mask in links.items():
         # Set the marker instances based on the attached walkways.
         normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
 
-        new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
+        new_type, inst['angles'] = utils.CONN_LOOKUP[dir_mask.as_tuple()]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
 
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
             if normal.z == 0:
-                # Treat booleans as ints to get the direction the connection is
-                # in - True == 1, False == 0
-                conn_dir = Vec(
-                    x=dir_mask[2] - dir_mask[3],  # +E, -W
-                    y=dir_mask[0] - dir_mask[1],  # +N, -S,
-                    z=0,
-                )
-                if normal == conn_dir:
+                if normal == dir_mask.conn_dir():
                     inst['file'] = instances['end_wall']
             continue  # We never have normal supports on end pieces
         elif new_type is utils.CONN_TYPES.none:
