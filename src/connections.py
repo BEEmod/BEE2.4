@@ -760,6 +760,13 @@ def res_change_io_type(inst: Entity, res: Property):
 
     item.item_type = res.value
 
+    # Overwrite these as well.
+    item.enable_cmd = res.value.enable_cmd
+    item.disable_cmd = res.value.disable_cmd
+
+    item.sec_enable_cmd = res.value.sec_enable_cmd
+    item.sec_disable_cmd = res.value.sec_disable_cmd
+
 
 def do_item_optimisation(vmf: VMF):
     """Optimise redundant logic items."""
