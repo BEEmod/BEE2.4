@@ -519,12 +519,6 @@ def check_all():
 
 def check_flag(flag: Property, inst: Entity):
     """Determine the result for a condition flag."""
-    LOGGER.debug(
-        'Checking {} ({!s}) on {}',
-        flag.real_name,
-        flag.value,
-        inst['file'],
-    )
     name = flag.name
     # If starting with '!', invert the result.
     if name[:1] == '!':
