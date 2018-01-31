@@ -1,4 +1,4 @@
-
+import brushLoc
 from conditions import (
     make_result, RES_EXHAUSTED,
     INST_ANGLE,
@@ -145,10 +145,10 @@ def res_make_catwalk(vmf: VMF, res: Property):
 
         # Snap the markers to the grid. If on glass it can become offset...
         origin = Vec.from_str(inst['origin'])
-        origin = origin // 128 * 128  # type: Vec
+        origin = origin // 128 * 128
         origin += 64
 
-        while origin.as_tuple() in conditions.GOO_LOCS:
+        while brushLoc.POS['world': origin].is_goo:
             # The instance is in goo! Switch to floor orientation, and move
             # up until it's in air.
             inst['angles'] = '0 0 0'
@@ -249,11 +249,12 @@ def res_make_catwalk(vmf: VMF, res: Property):
             continue  # These don't get supports otherwise
 
         # Add regular supports
+        supp = None
         if normal == (0, 0, 1):
             # If in goo, use different supports!
             origin = Vec.from_str(inst['origin'])
             origin.z -= 128
-            if origin.as_tuple() in conditions.GOO_LOCS:
+            if brushLoc.POS['world': origin].is_goo:
                 supp = instances['support_goo']
             else:
                 supp = instances['support_floor']
