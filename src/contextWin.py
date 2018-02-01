@@ -295,7 +295,7 @@ def load_item_data():
 
     if has_inputs:
         if has_secondary:
-            set_sprite(SPR.INPUT, 'in_secondary')
+            set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
                 wid['sprite', SPR.INPUT].tooltip_text = _(
