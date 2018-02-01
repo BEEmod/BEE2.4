@@ -118,13 +118,13 @@ def broken_antline_iter(dist, chance):
     """
     run_start = 0
     last_type = random.randrange(100) < chance
-    for i in range(1, dist):
+    for i in range(1, int(dist)):
         next_type = random.randrange(100) < chance
         if next_type != last_type:
             yield run_start, i, last_type
             last_type = next_type
             run_start = i
-    yield run_start, dist, last_type
+    yield run_start, int(dist), last_type
 
     return
 
@@ -158,7 +158,7 @@ def style_antline(over: Entity, conf: AntType, floor_conf: AntType):
 
         # It's a corner or short antline - replace instead of adding more
         if length <= 48:
-            if random.randrange(100) < conf.broken_corner:
+            if random.randrange(100) < conf.broken_chance:
                 mats = broken_mats
         else:
             # Generate multiple for broken overlays.
