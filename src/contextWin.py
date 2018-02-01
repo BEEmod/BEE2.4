@@ -8,6 +8,8 @@ various item properties.
   clicked widget from the event
 """
 from tkinter import *
+
+from srctools import Property
 from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
@@ -269,14 +271,15 @@ def load_item_data():
         wid['moreinfo'].state(['!disabled'])
     wid['moreinfo'].tooltip_text = selected_item.url
 
-    editor_data = item_data.editor
+    editor_data = item_data.editor.copy()
 
+    comm_block = Property(editor_data['Type'], [])
     (
-        unused_comm,
         has_inputs,
         has_outputs,
         has_secondary,
-    ) = packageLoader.Item.convert_item_io(editor_data)
+    ) = packageLoader.Item.convert_item_io(comm_block, editor_data)
+    del comm_block  # We don't use the config.
 
     has_timer = any(editor_data.find_all("Properties", "TimerDelay"))
 

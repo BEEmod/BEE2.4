@@ -808,21 +808,21 @@ class Game:
         # so make those blank.
         output_format = ',{},,0.0,-1'.replace(',', Output.SEP).format
 
-        old_items = set()
-
         def conv_peti_input(block: Property, key: str, name: str):
             """Do comm_block[key] = block[name], but convert the formats.
 
             comm_block expects a full VMF output value, but PeTI just has the IO
             component (instance:x;blah).
             """
+            if key in block:
+                # Do not add from editoritems if the new style is set.
+                return
             try:
-                comm_block[key] = output_format(block[name])
-            except IndexError:
+                full_value = output_format(block[name])
+            except IndexError:  # No key
                 pass
-            if item_id not in old_items:
-                old_items.add(item_id)
-                LOGGER.warning('<{}> using old logic..', item_id)
+            else:
+                comm_block.append(Property(key, full_value))
 
         for item in editoritems.find_all("Item"):
             item_id = item['Type']
@@ -855,12 +855,13 @@ class Game:
                             inst['name'] if inst.has_children() else inst.value,
                         )
 
+            comm_block = Property(item['Type'], [])
+
             (
-                comm_block,
                 has_input,
                 has_output,
                 has_secondary,
-            ) = packageLoader.Item.convert_item_io(item, conv_peti_input)
+            ) = packageLoader.Item.convert_item_io(comm_block, item, conv_peti_input)
 
             # Record the itemClass for each item type.
             # 'ItemBase' is the default class.

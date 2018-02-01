@@ -1110,6 +1110,7 @@ class ItemVariant:
                     del io_block['bee2']
 
             io_conf = props.find_key('IOConf')
+            io_conf = props.find_key('IOConf')
             io_conf.name = 'BEE2'
             (
                 variant.editor.
@@ -1721,6 +1722,7 @@ class Item(PakObject):
 
     @staticmethod
     def convert_item_io(
+        comm_block: Property,
         item: Property,
         conv_peti_input: Callable[[Property, str, str], None]=lambda a, b, c: None,
     ):
@@ -1730,8 +1732,7 @@ class Item(PakObject):
         The config block for instances.cfg, and if inputs, outputs, and the
         secondary input are present.
         """
-        item_id = item['Type']
-        comm_block = Property(item['Type'], [])
+        item_id = comm_block.name
         # Look in the Inputs and Outputs blocks to find the io definitions.
         # Copy them to property names like 'Input_Activate'.
         has_input = False
@@ -1764,17 +1765,22 @@ class Item(PakObject):
                 comm_block['out_' + io_prop.name] = io_prop.value
         # The funnel item type is special, having the additional input type.
         # Handle that specially.
-        if item['type'].casefold() == 'item_tbeam':
+        if item_id == 'item_tbeam':
             for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
                 has_secondary = True
                 conv_peti_input(block, 'sec_enable_cmd', 'activate')
                 conv_peti_input(block, 'sec_disable_cmd', 'deactivate')
+
         # For special situations, allow forcing that we have these.
-        force_io = comm_block['force', ''].casefold()
+        force_io = ''
+        while 'force' in comm_block:
+            force_io = comm_block['force', ''].casefold()
+            del comm_block['force']
         if 'in' in force_io:
             has_input = True
         if 'out' in force_io:
             has_output = True
+
         if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
             has_input = True
         inp_type = comm_block['type', ''].casefold()
@@ -1807,7 +1813,7 @@ class Item(PakObject):
             has_input = has_output = True
         elif 'out_activate' in comm_block or 'out_deactivate' in comm_block:
             has_output = True
-        if item_id.casefold() in (
+        if item_id in (
             'item_indicator_panel',
             'item_indicator_panel_timer',
             'item_indicator_toggle',
@@ -1816,6 +1822,7 @@ class Item(PakObject):
             # the real instance doesn't. We need the fake ones to match
             # instances to items.
             has_input = True
+
         # Remove all the IO blocks from editoritems, and replace with
         # dummy ones.
         # Then remove the config blocks.
@@ -1853,7 +1860,7 @@ class Item(PakObject):
                     Property('Deactivate', 'ON_DEACTIVATED'),
                 ])
             )
-        return comm_block, has_input, has_output, has_secondary
+        return has_input, has_output, has_secondary
 
 
 class ItemConfig(PakObject, allow_mult=True, has_img=False):
