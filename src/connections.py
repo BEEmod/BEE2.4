@@ -1253,6 +1253,7 @@ def add_item_indicators(
                         cmd.input,
                         cmd.params,
                         inst_out=out_name,
+                        inst_in=cmd.inst_in,
                         times=cmd.times,
                     )
                 )
