@@ -14,7 +14,9 @@ from conditions import (
 import instanceLocs
 import instance_traits
 from srctools import Property, Vec, Entity, Output, VMF
+import utils
 
+LOGGER = utils.getLogger(__name__, 'cond.instances')
 
 COND_MOD_NAME = 'Instances'
 
@@ -293,14 +295,21 @@ GLOBAL_INPUT_ENTS = {}  # type: Dict[Optional[str], Entity]
 
 @make_result_setup('GlobalInput')
 def res_global_input_setup(res: Property):
-    target = res['target', ''] or None
-    name = res['name', ''] or None
-    output = res['output', 'OnTrigger']
-    param = res['param', '']
-    delay = srctools.conv_float(res['delay', ''])
-    inp_name, inp_command = Output.parse_name(res['input'])
-
-    return name, inp_name, inp_command, output, delay, param, target
+    if res.has_children():
+        name = res['name', '']
+        inp_name, inp_command = Output.parse_name(res['input'])
+        return name, Output(
+            out=res['output', 'OnTrigger'],
+            targ=res['target', ''],
+            inp=inp_command,
+            inst_in=inp_name,
+            delay=srctools.conv_float(res['delay', '']),
+            param=res['param', ''],
+        )
+    else:
+        out = Output.parse(res)
+        out.output = ''  # Don't need to store GlobalInput...
+        return '', out
 
 
 @make_result('GlobalInput')
@@ -317,26 +326,22 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
     - `Output`: The name of the output, defaulting to `OnTrigger`. Ignored
         if Name is not set.
     - `Param`: The parameter for the output.
+
+    Alternatively pass a string VMF-style output, which only provides
+    OnMapSpawn functionality.
     """
-    relay_name, proxy_name, command, relay_out, delay, param, target = res.value
+    relay_name, out = res.value
 
-    if relay_name is not None:
-        relay_name = conditions.resolve_value(inst, relay_name)
-    if target is not None:
-        target = conditions.resolve_value(inst, target)
+    output = out.copy()  # type: Output
 
-    output = Output(
-        out=relay_out,
-        targ=(
-            conditions.local_name(inst, target)
-            if target else
-            inst['targetname']
-        ),
-        inp=command,
-        inst_in=proxy_name,
-        delay=delay,
-        param=conditions.resolve_value(inst, param),
-    )
+    if output.target:
+        output.target = conditions.local_name(
+            inst,
+            conditions.resolve_value(inst, output.target)
+        )
+
+    relay_name = conditions.resolve_value(inst, relay_name)
+    output.params = conditions.resolve_value(inst, output.params)
 
     global_input(vmf, inst['origin'], output, relay_name)
 
@@ -347,12 +352,15 @@ def global_input(
     output: Output,
     relay_name: str=None,
 ):
-    """Create a global input."""
+    """Create a global input, either from a relay or logic_auto.
+
+    The position is used to place the relay if this is the first time.
+    """
     try:
         glob_ent = GLOBAL_INPUT_ENTS[relay_name]
     except KeyError:
-        if relay_name is None:
-            glob_ent = GLOBAL_INPUT_ENTS[None] = vmf.create_ent(
+        if relay_name == '':
+            glob_ent = GLOBAL_INPUT_ENTS[''] = vmf.create_ent(
                 classname='logic_auto',
                 spawnflags='1',  # Remove on fire
                 origin=pos,
@@ -363,9 +371,10 @@ def global_input(
                 targetname=relay_name,
                 origin=pos,
             )
-    if relay_name is None:
+    if not relay_name:
         output.output = 'OnMapSpawn'
         output.only_once = True
+    output.comma_sep = False
     glob_ent.add_out(output)
 
 
