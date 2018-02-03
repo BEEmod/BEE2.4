@@ -17,6 +17,7 @@ import antlines
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple
 
+COND_MOD_NAME = "Item Connections"
 
 LOGGER = utils.getLogger(__name__)
 

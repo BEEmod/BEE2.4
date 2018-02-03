@@ -5,6 +5,7 @@ import connections
 import utils
 from srctools import Property, Entity, VMF, Vec, Output
 
+COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__, alias='cond.sendtor')
 
