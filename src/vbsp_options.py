@@ -388,6 +388,18 @@ DEFAULTS = [
         proxy).
         """),
 
+    Opt('timer_sound', 'Portal.room1_TickTock',
+        """The soundscript used for timer tick-tock sounds. 
+        
+        Re-played every second, so it should not loop."""),
+
+    Opt('timer_sound_cc', TYPE.STR,
+        """Closed caption soundscript for tick-tock sounds.
+        
+        We mimic this soundscript when `timer_sound` is played.
+        Set to "" to disable adding additional closed captions. 
+        """),
+
     Opt('signInst', TYPE.STR,
         """Adds this instance on all the signs.
 

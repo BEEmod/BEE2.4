@@ -2936,9 +2936,9 @@ def make_vrad_config(is_peti: bool):
         import cubes
         import conditions.piston_platform
 
+        # These generate scripts, so they might need to tell VRAD.
         cubes.write_vscripts(conf)
         conditions.piston_platform.write_vscripts(conf)
-
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():

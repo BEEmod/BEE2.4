@@ -35,6 +35,17 @@ COUNTER_OR_ON = 'OnChangedFromMin'
 COUNTER_OR_OFF = 'OnHitMin'
 
 
+# A script to play timer sounds - avoids needing the ambient_generic.
+TIMER_SOUND_SCRIPT = '''
+function Precache() {{
+    self.PrecacheSoundScript("{snd}");
+}}
+function snd() {{
+    self.EmitSound("{snd}");
+}}
+'''
+
+
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
     DEFAULT = 'default'  # Normal / unconfigured input
@@ -196,6 +207,9 @@ class ItemType:
         output_lock: Optional[Tuple[Optional[str], str]]=None,
         output_unlock: Optional[Tuple[Optional[str], str]]=None,
         inf_lock_only: bool=False,
+
+        timer_sound_pos: Optional[Vec] = None,
+        timer_done_cmd: List[Output]=(),
     ):
         self.id = id
 
@@ -248,6 +262,11 @@ class ItemType:
             else:
                 self.output_deact = output_deact
 
+        # If set, automatically play tick-tock sounds when output is on.
+        self.timer_sound_pos = timer_sound_pos
+        # These are fired when the time elapses.
+        self.timer_done_cmd = timer_done_cmd
+
         # For locking buttons, this is the command to reactivate,
         # and force-lock it.
         # If both aren't present, erase both.
@@ -284,6 +303,12 @@ class ItemType:
         unlock_cmd = get_outputs('unlock_cmd')
 
         inf_lock_only = conf.bool('inf_lock_only')
+
+        timer_done_cmd = get_outputs('timer_done_cmd')
+        if 'timer_sound_pos' in conf:
+            timer_sound_pos = conf.vec('timer_sound_pos')
+        else:
+            timer_sound_pos = None
 
         try:
             input_type = InputType(
@@ -350,6 +375,7 @@ class ItemType:
             sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
+            timer_sound_pos, timer_done_cmd,
         )
 
 
@@ -855,11 +881,21 @@ def gen_item_outputs(vmf: VMF):
 
     do_item_optimisation(vmf)
 
+    has_timer_relay = False
+
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
         if item.item_type is None:
             continue
+
+        # Check we actually have timers, and that we want the relay.
+        if item.timer is not None and (
+            item.item_type.timer_sound_pos is not None or
+            item.item_type.timer_done_cmd
+        ):
+            add_timer_relay(item)
+            has_timer_relay = True
 
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
@@ -928,6 +964,11 @@ def gen_item_outputs(vmf: VMF):
             pan['file'] = desired_panel_inst
             pan.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
 
+    if has_timer_relay:
+        # Write this VScript out.
+        with open('BEE2/inject/timer_sound.nut', 'w') as f:
+            f.write(TIMER_SOUND_SCRIPT.format(snd=vbsp_options.get(str, 'timer_sound')))
+
     LOGGER.info('Item IO generated.')
 
 
@@ -980,6 +1021,78 @@ def add_locking(item: Item):
                     inst_out=out_name,
                 )
             )
+
+
+def add_timer_relay(item: Item):
+    """Make a relay to play timer sounds, or fire once the outputs are done."""
+    rl_name = item.name + '_timer_rl'
+
+    relay = item.inst.map.create_ent(
+        'logic_relay',
+        vscripts='BEE2/timer_sound.nut',
+        targetname=rl_name,
+        startDisabled=0,
+        spawnflags=0,
+    )
+
+    if item.item_type.timer_sound_pos:
+        relay_loc = item.item_type.timer_sound_pos.copy()
+        relay_loc.localise(
+            Vec.from_str(item.inst['origin']),
+            Vec.from_str(item.inst['angles']),
+        )
+        relay['origin'] = relay_loc
+    else:
+        relay['origin'] = item.inst['origin']
+
+    for cmd in item.item_type.timer_done_cmd:
+        if cmd:
+            relay.add_out(Output(
+                'OnTrigger',
+                conditions.local_name(item.inst, cmd.target) or item.inst,
+                cmd.input,
+                cmd.params,
+                inst_in=cmd.inst_in,
+                delay=item.timer + cmd.delay,
+                times=cmd.times,
+            ))
+
+    if item.item_type.timer_sound_pos is not None:
+        timer_sound = vbsp_options.get(str, 'timer_sound')
+        timer_cc = vbsp_options.get(str, 'timer_sound_cc')
+
+        # The default sound has 'ticking' closed captions.
+        # So reuse that if the style doesn't specify a different noise.
+        # If explicitly set to '', we don't use this at all!
+        if timer_cc is None and timer_sound != 'Portal.room1_TickTock':
+            timer_cc = 'Portal.room1_TickTock'
+        if timer_cc:
+            timer_cc = 'cc_emit ' + timer_cc
+
+        for delay in range(item.timer):
+            relay.add_out(Output(
+                'OnTrigger',
+                '!self',
+                'CallScriptFunction',
+                'snd',
+                delay=delay,
+            ))
+            if timer_cc:
+                relay.add_out(Output(
+                    'OnTrigger',
+                    '@command',
+                    'Command',
+                    timer_cc,
+                    delay=delay,
+                ))
+
+    for output, cmd in [
+        (item.output_act(), 'Trigger'),
+        (item.output_deact(), 'CancelPending')
+    ]:
+        if output:
+            out_name, out_cmd = output
+            item.inst.add_out(Output(out_cmd, rl_name, cmd, inst_out=out_name))
 
 
 def add_item_inputs(
