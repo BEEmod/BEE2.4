@@ -77,13 +77,6 @@ def on_error(exc_type, exc_value, exc_tb):
     # except Exception.
     import traceback
 
-    # Close loading screens if they're visible..
-    try:
-        import loadScreen
-        loadScreen.close_all()
-    except Exception:
-        pass
-
     err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
     # Grab and release the grab so nothing else can block the error message.
