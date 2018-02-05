@@ -5,10 +5,6 @@ the main process is busy loading.
 
 The id() of the main-process object is used to identify loadscreens.
 """
-from tkinter import *
-from tk_tools import TK_ROOT
-from tkinter import ttk
-
 from weakref import WeakSet
 from abc import abstractmethod
 import contextlib
@@ -96,7 +92,12 @@ class LoadScreen:
     The title can be blank.
     """
 
-    def __init__(self, *stages: Tuple[str, str], title_text: str, is_splash: bool=False):
+    def __init__(
+        self,
+        *stages: Tuple[str, str],
+        title_text: str,
+        is_splash: bool=False,
+    ):
         self.stages = list(stages)
         self.labels = {}
         self.bar_val = {}
@@ -182,53 +183,6 @@ class LoadScreen:
     def unsuppress(self):
         """Undo temporarily hiding the screen."""
         self._send_msg('show')
-
-
-class OldScreen:
-
-    def set_nums(self, stage):
-        """Set the fraction text for a stage."""
-        max_val = self.maxes[stage]
-        if max_val == 0:  # 0/0 sections are skipped automatically.
-            self.bar_var[stage].set(1000)
-        else:
-            self.bar_var[stage].set(
-                1000 * self.bar_val[stage] / max_val
-            )
-        self.labels[stage]['text'] = '{!s}/{!s}'.format(
-            self.bar_val[stage],
-            max_val,
-        )
-
-    def reset(self):
-        """Hide the loading screen, and reset stages to zero."""
-        self.withdraw()
-        self.active = False
-        for stage, _ in self.stages:
-            self.maxes[stage] = 10
-            self.bar_val[stage] = 0
-            self.bar_var[stage].set(0)
-            self.labels[stage]['text'] = '0/??'
-            self.set_nums(stage)
-
-    def destroy(self):
-        """Delete all parts of the loading screen."""
-        if self.active:
-            super().destroy()
-            del self.widgets
-            del self.maxes
-            del self.bar_var
-            del self.bar_val
-            self.active = False
-            _ALL_SCREENS.discard(self)
-
-    def suppress(self):
-        """Temporarily hide the screen."""
-        self.withdraw()
-
-    def unsuppress(self):
-        """Undo temporarily hiding the screen."""
-        self.deiconify()
 
 
 # Initialise the daemon.

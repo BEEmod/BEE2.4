@@ -89,6 +89,7 @@ class BaseLoadScreen:
         self.win.withdraw()
 
     def op_reset(self):
+        self.op_hide()
         for stage in self.values.keys():
             self.maxes[stage] = 10
             self.values[stage] = 0
@@ -97,6 +98,15 @@ class BaseLoadScreen:
     def op_step(self, stage):
         self.values[stage] += 1
         self.update_stage(stage)
+
+    def op_set_length(self, stage, num):
+        """Set the number of items in a stage."""
+        self.maxes[stage] = num
+        self.update_stage(stage)
+
+    def op_skip_stage(self, stage):
+        """Skip over this stage of the loading process."""
+        raise NotImplementedError
 
     def update_stage(self, stage):
         """Update the UI for the given stage."""
@@ -171,7 +181,6 @@ class LoadScreen(BaseLoadScreen):
         """Put the stage in the initial state, before maxes are provided."""
         for stage in self.values.keys():
             self.bar_var[stage].set(0)
-            self.bars[stage]['indeterminate'] = 1
             self.labels[stage]['text'] = '0/??'
 
     def update_stage(self, stage):
@@ -183,7 +192,6 @@ class LoadScreen(BaseLoadScreen):
             self.bar_var[stage].set(
                 1000 * self.values[stage] / max_val
             )
-        self.bars[stage]['indeterminate'] = 0
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.values[stage],
             max_val,
@@ -191,7 +199,7 @@ class LoadScreen(BaseLoadScreen):
 
     def op_skip_stage(self, stage):
         """Skip over this stage of the loading process."""
-        self.labels[stage]['text'] = _('Skipped!')
+        self.labels[stage]['text'] = TRANSLATION['skip']
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 
 

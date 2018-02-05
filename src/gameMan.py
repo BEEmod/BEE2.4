@@ -555,7 +555,6 @@ class Game:
         # those can take time to compute.
 
         export_screen.show()
-        export_screen.grab_set_global()  # Stop interaction with other windows
 
         if should_refresh:
             # Count the files.
@@ -702,7 +701,6 @@ class Game:
                 except PermissionError:
                     # We might not have permissions, if the compiler is currently
                     # running.
-                    export_screen.grab_release()
                     export_screen.reset()
                     messagebox.showerror(
                         title=_('BEE2 - Export Failed!'),
@@ -732,7 +730,6 @@ class Game:
             with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
                 TAG_COOP_INST_VMF.export(f)
 
-        export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
         return True, vpk_success
 
