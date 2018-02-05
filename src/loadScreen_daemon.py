@@ -21,6 +21,7 @@ PIPE_SEND = ...  # type: multiprocessing.Connection
 TRANSLATION = {
     'skip': 'Skipped',
     'version': 'Version: 2.4.389',
+    'cancel': 'Cancel',
 }
 
 
@@ -54,6 +55,12 @@ class BaseLoadScreen:
         self.win.bind('<Button-1>', self.move_start)
         self.win.bind('<ButtonRelease-1>', self.move_stop)
         self.win.bind('<B1-Motion>', self.move_motion)
+        self.win.bind('<esc>', self.cancel)
+
+    def cancel(self, event=None):
+        """User pressed the cancel button."""
+        self.op_reset()
+        PIPE_SEND.send(('cancel', self.scr_id))
 
     def move_start(self, event):
         """Record offset of mouse on click."""
@@ -89,6 +96,7 @@ class BaseLoadScreen:
         self.win.withdraw()
 
     def op_reset(self):
+        """Hide and reset values in all bars."""
         self.op_hide()
         for stage in self.values.keys():
             self.maxes[stage] = 10
@@ -96,6 +104,7 @@ class BaseLoadScreen:
         self.reset_stages()
 
     def op_step(self, stage):
+        """Increment the specified value."""
         self.values[stage] += 1
         self.update_stage(stage)
 
@@ -137,12 +146,18 @@ class LoadScreen(BaseLoadScreen):
             text=self.title_text + '...',
             font=("Helvetica", 12, "bold"),
             cursor=utils.CURSORS['wait'],
-        ).grid(columnspan=2)
+        ).grid(row=0, column=0)
         ttk.Separator(
             self.frame,
             orient=tk.HORIZONTAL,
             cursor=utils.CURSORS['wait'],
         ).grid(row=1, sticky="EW", columnspan=2)
+
+        ttk.Button(
+            self.frame,
+            text=TRANSLATION['cancel'],
+            command=self.cancel,
+        ).grid(row=0, column=1)
 
         self.bar_var = {}
         self.bars = {}
@@ -251,13 +266,49 @@ class SplashScreen(BaseLoadScreen):
             text1_bbox=canvas.bbox(text1),
             text2_bbox=canvas.bbox(text2),
         )
+        self.splash_img = splash  # Keep this alive
         canvas['width'], canvas['height'] = self.lrg_width, self.lrg_height
         canvas.tag_lower(canvas.create_image(
             0, 0,
             anchor='nw',
             image=splash,
         ))
-        canvas.splash_img = splash  # Keep this alive
+
+        canvas.create_rectangle(
+            self.lrg_width-20,
+            0,
+            self.lrg_width,
+            20,
+            fill='#00785A',
+            width=0,
+            tags='quit_button',
+        )
+        canvas.create_rectangle(
+            self.lrg_width-20,
+            0,
+            self.lrg_width,
+            20,
+            fill='#00785A',
+            width=0,
+            tags='quit_button',
+        )
+        # 150, 120, 64
+        canvas.create_line(
+            self.lrg_width-16, 4,
+            self.lrg_width-4, 16,
+            fill='black',
+            width=2,
+            tags='quit_button',
+        )
+        canvas.create_line(
+            self.lrg_width-4, 4,
+            self.lrg_width-16, 16,
+            fill='black',
+            width=2,
+            tags='quit_button',
+        )
+        canvas.tag_bind('quit_button', '<Button-1>', self.cancel)
+        canvas.tag_bind('quit_button', '<B1-enter>')
 
         for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
             canvas.create_rectangle(

@@ -126,8 +126,6 @@ class LoadScreen:
         """Hide the loading screen, and passthrough execptions.
         """
         self.reset()
-        # When cancelled, suppress that.
-        return exc_type is Cancelled
 
     def _send_msg(self, command, *args):
         """Send a message to the daemon."""
