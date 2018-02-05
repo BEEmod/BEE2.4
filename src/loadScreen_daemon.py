@@ -429,7 +429,9 @@ def run_screen(
 
     def check_queue():
         """Update stages from the parent process."""
+        had_values = False
         while PIPE_REC.poll():  # Pop off all the values.
+            had_values = True
             operation, scr_id, args = PIPE_REC.recv()
             if operation == 'init':
                 # Create a new loadscreen.
@@ -447,7 +449,9 @@ def run_screen(
                     raise Exception(operation)
 
         # Continually re-run this function in the TK loop.
-        root.after(1, check_queue)
+        # If we didn't find anything in the pipe, wait longer.
+        # Otherwise we hog the CPU.
+        root.after(1 if had_values else 200, check_queue)
     
     root.after(10, check_queue)
     root.mainloop()  # Infinite loop, until the entire process tree quits.
