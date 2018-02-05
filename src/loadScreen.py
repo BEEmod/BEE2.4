@@ -1,4 +1,10 @@
-"""Displays a loading menu while packages, palettes, etc are being loaded."""
+"""Displays a loading menu while packages, palettes, etc are being loaded.
+
+All the actual display is done in a subprocess, so we can allow interaction while
+the main process is busy loading.
+
+The id() of the main-process object is used to identify loadscreens.
+"""
 from tkinter import *
 from tk_tools import TK_ROOT
 from tkinter import ttk
@@ -9,12 +15,27 @@ import contextlib
 import multiprocessing
 
 from loadScreen_daemon import run_screen as _splash_daemon
+from BEE2_config import GEN_OPTS
 import utils
 
-from typing import Set
+from typing import Set, Tuple
+
 
 # Keep a reference to all loading screens, so we can close them globally.
-_ALL_SCREENS = WeakSet()  # type: Set[BaseLoadScreen]
+_ALL_SCREENS = WeakSet()  # type: Set[LoadScreen]
+
+# For each loadscreen ID, record if the cancel button was pressed. We then raise
+# Cancelled upon the next interaction with it to stop operation.
+_SCREEN_CANCEL_FLAG = {}
+
+# Pairs of pipe ends we use to send data to the daemon and vice versa.
+# DAEMON is sent over to the other process.
+_PIPE_MAIN_REC, _PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
+_PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
+
+
+class Cancelled(SystemExit):
+    """Raised when the user cancels the loadscreen."""
 
 LOGGER = utils.getLogger(__name__)
 
@@ -25,9 +46,18 @@ def close_all():
         screen.reset()
 
 
+def show_main_loader():
+    """Special function, which sets the splash screen compactness."""
+    main_loader._send_msg(
+        'set_is_compact',
+        GEN_OPTS.get_bool('General', 'compact_splash'),
+    )
+    main_loader.show()
+
+
 @contextlib.contextmanager
 def surpress_screens():
-    """A context manager to supress loadscreens while the body is active."""
+    """A context manager to surpress loadscreens while the body is active."""
     active = []
     for screen in _ALL_SCREENS:
         if not screen.active:
@@ -51,16 +81,22 @@ def patch_tk_dialogs():
 
     # contextlib managers can also be used as decorators.
     supressor = surpress_screens()  # type: contextlib.ContextDecorator
-    # Mesageboxes, file dialogs and colorchooser all inherit from Dialog,
+    # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
     # so patching .show() will fix them all.
     commondialog.Dialog.show = supressor(commondialog.Dialog.show)
 
 patch_tk_dialogs()
 
 
-class BaseLoadScreen:
-    """Code common to both loading screen types."""
-    def __init__(self, stages):
+class LoadScreen:
+    """LoadScreens show a loading screen for items.
+
+    stages should be (id, title) pairs for each screen stage.
+    Each stage can be stepped independently, referenced by the given ID.
+    The title can be blank.
+    """
+
+    def __init__(self, *stages: Tuple[str, str], title_text: str, is_splash: bool=False):
         self.stages = list(stages)
         self.labels = {}
         self.bar_val = {}
@@ -72,10 +108,15 @@ class BaseLoadScreen:
 
         _ALL_SCREENS.add(self)
 
+        # Order the daemon to make this screen.
+        _SCREEN_CANCEL_FLAG[id(self)] = False
+        self._send_msg('init', is_splash, title_text, stages)
+
     def __enter__(self):
         """LoadScreen can be used as a context manager.
 
-        Inside the block, the screen will be visible.
+        Inside the block, the screen will be visible. Cancelling will exit
+        to the end of the with block.
         """
         self.show()
         return self
@@ -84,136 +125,66 @@ class BaseLoadScreen:
         """Hide the loading screen, and passthrough execptions.
         """
         self.reset()
+        # When cancelled, suppress that.
+        return exc_type is Cancelled
 
-    # Methods the subclasses must implement.
-    
-    @abstractmethod
+    def _send_msg(self, command, *args):
+        """Send a message to the daemon."""
+        _PIPE_MAIN_SEND.send((command, id(self), args))
+        # Check the messages coming back as well.
+        while _PIPE_MAIN_REC.poll():
+            command, arg = _PIPE_MAIN_REC.recv()
+            if command == 'main_toggle':
+                # Save the compact state to the config.
+                GEN_OPTS['General']['compact_splash'] = '1' if arg else '0'
+            elif command == 'cancel':
+                # Mark this loadscreen as cancelled.
+                _SCREEN_CANCEL_FLAG[arg] = True
+
+        # If the flag was set for us, raise an exception - the loading thing
+        # will then stop.
+        if _SCREEN_CANCEL_FLAG[id(self)]:
+            _SCREEN_CANCEL_FLAG[id(self)] = False
+            raise Cancelled
+
     def set_length(self, stage: str, num: int):
-        pass
+        """Set the maximum value for the specified stage."""
+        self._send_msg('set_length', stage, num)
 
-    @abstractmethod
     def step(self, stage: str):
-        pass
+        """Increment the specified stage."""
+        self._send_msg('step', stage)
 
-    @abstractmethod
     def skip_stage(self, stage: str):
         """Skip over this stage of the loading process."""
-        pass
-        
-    @abstractmethod
+        self._send_msg('skip_stage', stage)
+
     def show(self):
         """Display the loading screen."""
-        pass
+        self._send_msg('reset')
+        self._send_msg('show')
 
-    @abstractmethod
     def reset(self):
         """Hide the loading screen and reset all the progress bars."""
-        pass
+        self._send_msg('reset')
+
+    def destroy(self):
+        """Permanently destroy this screen and cleanup."""
+        self._send_msg('destroy')
+        _ALL_SCREENS.remove(self)
 
     @abstractmethod
     def suppress(self):
         """Temporarily hide the screen."""
+        self._send_msg('hide')
 
     @abstractmethod
     def unsuppress(self):
         """Undo temporarily hiding the screen."""
+        self._send_msg('show')
 
 
-class LoadScreen(BaseLoadScreen, Toplevel):
-    """LoadScreens show a loading screen for items.
-
-    stages should be (id, title) pairs for each screen stage.
-    Each stage can be stepped independently, referenced by the given ID.
-    The title can be blank.
-    """
-    def __init__(self, *stages, title_text):
-        BaseLoadScreen.__init__(self, stages)
-        self.bar_var = {}
-        self.widgets = {}
-        
-        # Initialise the window
-        Toplevel.__init__(
-            self,
-            TK_ROOT,
-            cursor=utils.CURSORS['wait'],
-        )
-        self.withdraw()
-
-        
-        # this prevents stuff like the title bar, normal borders etc from
-        # appearing in this window.
-        self.overrideredirect(1)
-        self.resizable(False, False)
-        self.attributes('-topmost', 1)
-
-        self.frame = ttk.Frame(self, cursor=utils.CURSORS['wait'])
-        self.frame.grid(row=0, column=0)
-
-        ttk.Label(
-            self.frame,
-            text=title_text + '...',
-            font=("Helvetica", 12, "bold"),
-            cursor=utils.CURSORS['wait'],
-            ).grid(columnspan=2)
-        ttk.Separator(
-            self.frame,
-            orient=HORIZONTAL,
-            cursor=utils.CURSORS['wait'],
-            ).grid(row=1, sticky="EW", columnspan=2)
-
-        for ind, (st_id, stage_name) in enumerate(self.stages):
-            if stage_name:
-                # If stage name is blank, don't add a caption
-                ttk.Label(
-                    self.frame,
-                    text=stage_name + ':',
-                    cursor=utils.CURSORS['wait'],
-                    ).grid(
-                        row=ind*2+2,
-                        columnspan=2,
-                        sticky="W",
-                        )
-            self.bar_var[st_id] = IntVar()
-            self.bar_val[st_id] = 0
-            self.maxes[st_id] = 10
-
-            self.widgets[st_id] = ttk.Progressbar(
-                self.frame,
-                length=210,
-                maximum=1000,
-                variable=self.bar_var[st_id],
-                cursor=utils.CURSORS['wait'],
-                )
-            self.labels[st_id] = ttk.Label(
-                self.frame,
-                text='0/??',
-                cursor=utils.CURSORS['wait'],
-            )
-            self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
-            self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
-            
-    def show(self):
-        """Display this loading screen."""
-        self.active = True
-        self.deiconify()
-        self.lift()
-        self.update()  # Force an update so the reqwidth is correct
-        loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
-        loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
-        self.geometry('+' + str(loc_x) + '+' + str(loc_y))
-        self.update()  # Force an update of the window to position it
-
-    def step(self, stage):
-        """Increment a stage by one."""
-        self.bar_val[stage] += 1
-        self.set_nums(stage)
-        if self.active:
-            self.widgets[stage].update()
-            
-    def set_length(self, stage, num):
-        """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.set_nums(stage)
+class OldScreen:
 
     def set_nums(self, stage):
         """Set the fraction text for a stage."""
@@ -228,14 +199,6 @@ class LoadScreen(BaseLoadScreen, Toplevel):
             self.bar_val[stage],
             max_val,
         )
-
-    def skip_stage(self, stage):
-        """Skip over this stage of the loading process."""
-        self.labels[stage]['text'] = _('Skipped!')
-        self.bar_var[stage].set(1000)  # Make sure it fills to max
-
-        if self.active:
-            self.widgets[stage].update()
 
     def reset(self):
         """Hide the loading screen, and reset stages to zero."""
@@ -267,89 +230,30 @@ class LoadScreen(BaseLoadScreen, Toplevel):
         """Undo temporarily hiding the screen."""
         self.deiconify()
 
-class SplashScreen(BaseLoadScreen):
-    """The screen shown for the main loading screen. It only works once.
-    
-    This is implemented as a subprocess, to enable interacting with
-    the UI while loading occurs. TKinter does not play well with 
-    multiple threads, and Python's GIL makes that difficult as well.
-    """
 
-    def __init__(self, *stages):
-        super().__init__(stages)
-        self.values = {
-            stage_id: 0 
-            for stage_id, disp_name in 
-            stages
+# Initialise the daemon.
+_daemon = multiprocessing.Process(
+    target=_splash_daemon,
+    args=(
+        _PIPE_DAEMON_SEND,
+        _PIPE_DAEMON_REC,
+        # Pass translation strings.
+        {
+            'skip': _('Skipped!'),
+            'version': _('Version: ') + utils.BEE_VERSION,
         }
-        
-        self.maxes = {
-            stage_id: 10 
-            for stage_id, disp_name in 
-            stages
-        }
-        
-        # self.pipe -> sub_conn
-        sub_conn, self._pipe = multiprocessing.Pipe(duplex=False)
-        
-        self._subproc = multiprocessing.Process(
-            target=_splash_daemon,
-            # Pass lots of data along, so it doesn't have to import
-            # things to calculate those itself.
-            args=(
-                sub_conn,
-                stages,
-                _('Better Extended Editor for Portal 2'),
-                _('Version: ') + utils.BEE_VERSION,
-                _('Skipped!'),
-            ),
-            name='BEE2_splashscreen',
-        )
-        # Destroy when we quit, in case of errors
-        self._subproc.daemon = True
-        
-        self.active = True
-            
-    def show(self):
-        """Start the process."""
-        self._subproc.start()
+    ),
+    name='loadscreen_daemon',
+)
+# Destroy when we quit.
+_daemon.daemon = True
+_daemon.start()
 
-    def step(self, stage):
-        """Increment a step by one."""
-        self.values[stage] += 1
-        self._pipe.send((stage, 'value', self.values[stage]))
-
-    def set_length(self, stage, num):
-        """Set the number of items in a stage."""
-        self._pipe.send((stage, 'length', num))
-
-    def skip_stage(self, stage: str):
-        """Skip over this stage of the loading process."""
-        self._pipe.send((stage, 'skip', None))
-
-    def destroy(self):
-        """Delete all parts of the loading screen."""
-        if self.active:
-            del self.values
-            del self.maxes
-            self._pipe.send((None, 'kill', None))  # Instruct subprocess to self-destruct.
-            self.active = False
-            _ALL_SCREENS.discard(self)
-            self._subproc.join()  # Wait until quit.
-
-    reset = destroy
-
-    def suppress(self):
-        """Temporarily hide the screen."""
-        self._pipe.send((None, 'hide', None))
-
-    def unsuppress(self):
-        """Undo temporarily hiding the screen."""
-        self._pipe.send((None, 'show', None))
-
-main_loader = SplashScreen(
+main_loader = LoadScreen(
     ('PAK', _('Packages')),
     ('OBJ', _('Loading Objects')),
     ('IMG', _('Loading Images')),
     ('UI', _('Initialising UI')),
+    title_text=_('Better Extended Editor for Portal 2'),
+    is_splash=True,
 )
