@@ -144,6 +144,7 @@ class LoadScreen:
         # will then stop.
         if _SCREEN_CANCEL_FLAG[id(self)]:
             _SCREEN_CANCEL_FLAG[id(self)] = False
+            LOGGER.info('User cancelled loading screen.')
             raise Cancelled
 
     def set_length(self, stage: str, num: int):
@@ -193,6 +194,7 @@ _daemon = multiprocessing.Process(
         {
             'skip': _('Skipped!'),
             'version': _('Version: ') + utils.BEE_VERSION,
+            'cancel': _('Cancel'),
         }
     ),
     name='loadscreen_daemon',

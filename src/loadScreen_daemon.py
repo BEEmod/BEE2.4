@@ -55,7 +55,7 @@ class BaseLoadScreen:
         self.win.bind('<Button-1>', self.move_start)
         self.win.bind('<ButtonRelease-1>', self.move_stop)
         self.win.bind('<B1-Motion>', self.move_motion)
-        self.win.bind('<esc>', self.cancel)
+        self.win.bind('<Escape>', self.cancel)
 
     def cancel(self, event=None):
         """User pressed the cancel button."""
@@ -308,7 +308,6 @@ class SplashScreen(BaseLoadScreen):
             tags='quit_button',
         )
         canvas.tag_bind('quit_button', '<Button-1>', self.cancel)
-        canvas.tag_bind('quit_button', '<B1-enter>')
 
         for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
             canvas.create_rectangle(
