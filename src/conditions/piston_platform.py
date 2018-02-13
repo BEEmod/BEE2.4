@@ -1,11 +1,12 @@
 """Handles generating Piston Platforms with specific logic."""
 from typing import Tuple, Dict, List
 
+import conditions
 import utils
 from conditions import make_result, make_result_setup, local_name
 from srctools import Entity, VMF, Property, Output, Vec, Solid
 from instanceLocs import resolve_one as resolve_single
-from template_brush import Template, get_template
+import template_brush
 from connections import ITEMS
 from comp_consts import FixupVars
 import vbsp
@@ -63,12 +64,13 @@ def res_piston_plat_setup(res: Property):
             raise ValueError('No "{}" specified!'.format(name))
         inst[name] = resolve_single(lookup, error=True)
 
-    template = get_template(res['template'])
+    template = template_brush.get_template(res['template'])
 
     return (
         template,
         inst,
         res['auto_var', ''],
+        res['color_var', ''],
         res['source_ent', ''],
         res['snd_start', ''],
         res['snd_loop', ''],
@@ -83,11 +85,12 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         template,
         inst_filenames,
         automatic_var,
+        color_var,
         source_ent,
         snd_start,
         snd_loop,
         snd_stop,
-    ) = res.value  # type: Tuple[Template, Dict[str, str], str, str, str, str, str]
+    ) = res.value  # type: Tuple[template_brush.Template, Dict[str, str], str, str, str, str, str, str]
 
     min_pos = inst.fixup.int(FixupVars.PIST_BTM)
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
@@ -155,6 +158,15 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
 
     static_ent = vmf.create_ent('func_brush', origin=origin)
 
+    color_var = conditions.resolve_value(inst, color_var).casefold()
+
+    if color_var == 'white':
+        top_color = template_brush.MAT_TYPES.white
+    elif color_var == 'black':
+        top_color = template_brush.MAT_TYPES.black
+    else:
+        top_color = None
+
     for pist_ind in range(1, 5):
         pist_ent = inst.copy()
         vmf.add_ent(pist_ent)
@@ -201,13 +213,24 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
                         pist_ent, 'pist' + str(pist_ind - 1),
                     )
 
-        world, detail, overlays = template.visgrouped({'pist_' + str(pist_ind)})
-        temp_brushes = world + detail  # type: List[Solid]
+        temp_result = template_brush.import_template(
+            template,
+            brush_pos,
+            angles,
+            force_type=template_brush.TEMP_TYPES.world,
+            add_to_map=False,
+            additional_visgroups={'pist_' + str(pist_ind)},
+        )
+        temp_targ.solids.extend(temp_result.world)
 
-        for orig_brush in temp_brushes:
-            new_brush = orig_brush.copy(map=vmf)
-            new_brush.localise(brush_pos, angles)
-            temp_targ.solids.append(new_brush)
+        template_brush.retexture_template(
+            temp_result,
+            origin,
+            pist_ent.fixup,
+            force_colour=top_color,
+            force_grid='special',
+            no_clumping=True,
+        )
 
     if not static_ent.solids:
         static_ent.remove()
