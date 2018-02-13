@@ -74,6 +74,7 @@ def flag_instvar(inst: Entity, flag: Property):
     if len(values) == 3:
         variable, op, comp_val = values
         value = inst.fixup[variable]
+        comp_val = conditions.resolve_value(inst, comp_val)
         try:
             # Convert to floats if possible, otherwise handle both as strings.
             # That ensures we normalise different number formats (1 vs 1.0)
