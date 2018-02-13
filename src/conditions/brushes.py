@@ -671,6 +671,8 @@ def res_import_template(inst: Entity, res: Property):
         replace_tex,
         force_colour,
         force_grid,
+        # Don't allow clumping if using custom keyvalues - then it won't be edited.
+        no_clumping=key_block is not None,
     )
 
 

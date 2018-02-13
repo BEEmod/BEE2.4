@@ -606,14 +606,15 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 
 
 def retexture_template(
-        template_data: ExportedTemplate,
-        origin: Vec,
-        fixup: srctools.vmf.EntityFixup=None,
-        replace_tex: dict= srctools.EmptyMapping,
-        force_colour: MAT_TYPES=None,
-        force_grid: str=None,
-        use_bullseye=False,
-        ):
+    template_data: ExportedTemplate,
+    origin: Vec,
+    fixup: srctools.vmf.EntityFixup=None,
+    replace_tex: dict= srctools.EmptyMapping,
+    force_colour: MAT_TYPES=None,
+    force_grid: str=None,
+    use_bullseye=False,
+    no_clumping=False,
+):
     """Retexture a template at the given location.
 
     - Only textures in the TEMPLATE_RETEXTURE dict will be replaced.
@@ -630,6 +631,9 @@ def retexture_template(
     - If use_bullseye is true, the bullseye textures will be used for all panel
       sides instead of the normal textures. (This overrides force_grid.)
     - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
+    - Set no_clump if the brush is used on a special entity, and therefore
+      won't get retextured by the main code. That means we need to directly
+      retexture here.
     """
     import vbsp
 
@@ -834,7 +838,7 @@ def retexture_template(
             if norm.z < -floor_tolerance:
                 grid_size = 'floor'
 
-            if can_clump:
+            if can_clump and not no_clumping:
                 # For the clumping algorithm, set to Valve PeTI and let
                 # clumping handle retexturing.
                 vbsp.IGNORED_FACES.remove(face)
