@@ -10,6 +10,7 @@ otherwise.
 """
 
 import utils
+import gettext
 from srctools.filesys import RawFileSystem
 
 
@@ -18,7 +19,7 @@ utils.fix_cur_directory()
 # prompt.
 LOGGER = utils.init_logging(main_logger=__name__)
 # This is needed to allow us to import things properly.
-utils.setup_localisations(LOGGER)
+gettext.NullTranslations().install(['gettext', 'ngettext'])
 
 import os
 import sys
