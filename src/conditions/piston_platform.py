@@ -66,8 +66,16 @@ def res_piston_plat_setup(res: Property):
 
     template = template_brush.get_template(res['template'])
 
+    visgroup_names = [
+        res['visgroup_1', 'pist_1'],
+        res['visgroup_2', 'pist_2'],
+        res['visgroup_3', 'pist_3'],
+        res['visgroup_top', 'pist_4'],
+    ]
+
     return (
         template,
+        visgroup_names,
         inst,
         res['auto_var', ''],
         res['color_var', ''],
@@ -83,6 +91,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
     """Generates piston platforms with optimized logic."""
     (
         template,
+        visgroup_names,
         inst_filenames,
         automatic_var,
         color_var,
@@ -90,7 +99,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         snd_start,
         snd_loop,
         snd_stop,
-    ) = res.value  # type: Tuple[template_brush.Template, Dict[str, str], str, str, str, str, str, str]
+    ) = res.value  # type: Tuple[template_brush.Template, List[str], Dict[str, str], str, str, str, str, str, str]
 
     min_pos = inst.fixup.int(FixupVars.PIST_BTM)
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
@@ -219,7 +228,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
             angles,
             force_type=template_brush.TEMP_TYPES.world,
             add_to_map=False,
-            additional_visgroups={'pist_' + str(pist_ind)},
+            additional_visgroups={visgroup_names[pist_ind - 1]},
         )
         temp_targ.solids.extend(temp_result.world)
 
