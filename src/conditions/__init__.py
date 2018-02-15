@@ -9,7 +9,9 @@ from enum import Enum
 
 from typing import (
     Callable, Any, Iterable, Optional,
-    Dict, List, Tuple, NamedTuple, )
+    Dict, List, Tuple, NamedTuple, TypeVar,
+    Union,
+)
 
 import comp_consts as consts
 import srctools
@@ -839,7 +841,7 @@ def local_name(inst: Entity, name: str):
         return name + '-' + targ_name
 
 
-def widen_fizz_brush(brush, thickness, bounds=None):
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=None):
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.
@@ -855,7 +857,7 @@ def widen_fizz_brush(brush, thickness, bounds=None):
     else:
         # Allow passing these in
         bound_min, bound_max = bounds
-    origin = (bound_max + bound_min) / 2  # type: Vec
+    origin = (bound_max + bound_min) / 2
     size = bound_max - bound_min
     for axis in 'xyz':
         # One of the directions will be thinner than 32, that's the fizzler
@@ -895,7 +897,7 @@ def reallocate_overlays(mapping: Dict[str, Optional[List[str]]]):
 
     The IDs should be strings.
     """
-    for overlay in VMF.by_class['info_overlay']:  # type: Entity
+    for overlay in VMF.by_class['info_overlay']:
         sides = overlay['sides', ''].split(' ')
         for side in sides[:]:
             try:
@@ -961,7 +963,12 @@ def steal_from_brush(
         })
 
 
-def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
+def set_ent_keys(
+    ent: Entity,
+    inst: Entity,
+    prop_block: Property,
+    block_name: str='Keys',
+) -> None:
     """Copy the given key prop block to an entity.
 
     This uses the keys and 'localkeys' properties on the prop_block.
@@ -982,8 +989,10 @@ def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
         else:
             ent[prop.real_name] = local_name(inst, val)
 
+T = TypeVar('T')
 
-def resolve_value(inst: Entity, value: str):
+
+def resolve_value(inst: Entity, value: T) -> Union[str, T]:
     """If a value starts with '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
