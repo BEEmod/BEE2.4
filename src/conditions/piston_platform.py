@@ -58,6 +58,10 @@ def res_piston_plat_setup(res: Property):
     for name in INST_NAMES:
         if name in res:
             lookup = res[name]
+            if lookup == '':
+                # Special case, allow blank for no instance.
+                inst[name] = ''
+                continue
         elif item_id is not None:
             lookup = '<{}:bee2_pist_{}>'.format(item_id, name)
         else:
@@ -221,6 +225,10 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
                     pistons[pist_ind]['parentname'] = local_name(
                         pist_ent, 'pist' + str(pist_ind - 1),
                     )
+
+        if not pist_ent['file']:
+            # No actual instance, remove.
+            pist_ent.remove()
 
         temp_result = template_brush.import_template(
             template,
