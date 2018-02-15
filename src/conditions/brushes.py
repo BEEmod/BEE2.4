@@ -558,7 +558,16 @@ def res_import_template(inst: Entity, res: Property):
         visgroup_force_var,
         key_block,
     ) = res.value
-    temp_id = conditions.resolve_value(inst, orig_temp_id)
+
+    if ':' in orig_temp_id:
+        # Split, resolve each part, then recombine.
+        temp_id, visgroup = orig_temp_id.split(':', 1)
+        temp_id = (
+            conditions.resolve_value(inst, temp_id) + ':' +
+            conditions.resolve_value(inst, visgroup)
+        )
+    else:
+        temp_id = conditions.resolve_value(inst, orig_temp_id)
 
     if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
         def visgroup_func(group):
@@ -569,9 +578,7 @@ def res_import_template(inst: Entity, res: Property):
     try:
         template = template_brush.get_template(temp_name)
     except template_brush.InvalidTemplateName:
-        # The template map is read in after setup is performed, so
-        # it must be checked here!
-        # We don't want an error, just quit
+        # If we did lookup, display both forms.
         if temp_id != orig_temp_id:
             LOGGER.warning(
                 '{} -> "{}" is not a valid template!',
@@ -583,6 +590,7 @@ def res_import_template(inst: Entity, res: Property):
                 '"{}" is not a valid template!',
                 temp_name
             )
+        # We don't want an error, just quit.
         return
 
     if color_var.casefold() == '<editor>':
