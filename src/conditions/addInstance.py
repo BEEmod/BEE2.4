@@ -128,36 +128,8 @@ def res_add_overlay_inst(inst: Entity, res: Property):
         inst.outputs = []
 
     if 'offset' in res:
-        folded_off = res['offset'].casefold()
-        # Offset the overlay by the given distance
-        # Some special placeholder values:
-        if folded_off == '<piston_start>':
-            if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
-                folded_off = '<piston_top>'
-            else:
-                folded_off = '<piston_bottom>'
-        elif folded_off == '<piston_end>':
-            if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
-                folded_off = '<piston_bottom>'
-            else:
-                folded_off = '<piston_top>'
+        overlay_inst['origin'] = conditions.resolve_offset(inst, res['offset'])
 
-        if folded_off == '<piston_bottom>':
-            offset = Vec(
-                z=inst.fixup.int(const.FixupVars.PIST_BTM) * 128,
-            )
-        elif folded_off == '<piston_top>':
-            offset = Vec(
-                z=inst.fixup.int(const.FixupVars.PIST_TOP) * 128,
-            )
-        else:
-            # Regular vector
-            offset = Vec.from_str(conditions.resolve_value(inst, res['offset']))
-
-        offset.rotate_by_str(
-            inst['angles', '0 0 0']
-        )
-        overlay_inst['origin'] = offset + Vec.from_str(inst['origin'])
     return overlay_inst
 
 

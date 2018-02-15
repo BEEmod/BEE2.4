@@ -15,6 +15,7 @@ import comp_consts as consts
 import srctools
 import template_brush
 import utils
+import comp_consts as const
 import instanceLocs
 from srctools import (
     Property,
@@ -1001,6 +1002,52 @@ def resolve_value(inst: Entity, value: str):
             return ''
     else:
         return value
+
+
+def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
+    """Retrieve an offset from an instance var. This allows several special values:
+
+    * $var to read from a variable
+    * <piston_start> or <piston> to get the unpowered position of a piston plat
+    * <piston_end> to get the powered position of a piston plat
+    * <piston_top> to get the extended position of a piston plat
+    * <piston_bottom> to get the retracted position of a piston plat
+
+    If scale is set, read values are multiplied by this, and zoff is added to Z.
+    """
+    value = value.casefold()
+    # Offset the overlay by the given distance
+    # Some special placeholder values:
+    if value == '<piston_start>' or value == '<piston>':
+        if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
+            value = '<piston_top>'
+        else:
+            value = '<piston_bottom>'
+    elif value == '<piston_end>':
+        if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
+            value = '<piston_bottom>'
+        else:
+            value = '<piston_top>'
+
+    if value == '<piston_bottom>':
+        offset = Vec(
+            z=inst.fixup.int(const.FixupVars.PIST_BTM) * 128,
+        )
+    elif value == '<piston_top>':
+        offset = Vec(
+            z=inst.fixup.int(const.FixupVars.PIST_TOP) * 128,
+        )
+    else:
+        # Regular vector
+        offset = Vec.from_str(resolve_value(inst, value)) * scale
+    offset.z += zoff
+
+    offset.localise(
+        Vec.from_str(inst['origin']),
+        Vec.from_str(inst['angles']),
+    )
+
+    return offset
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
