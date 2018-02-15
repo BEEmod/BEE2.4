@@ -109,6 +109,12 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
     start_up = inst.fixup.bool(FixupVars.PIST_IS_UP)
 
+    # Allow doing variable lookups here.
+    visgroup_names = [
+        conditions.resolve_value(inst, name)
+        for name in visgroup_names
+    ]
+
     if len(ITEMS[inst['targetname']].inputs) == 0:
         # No inputs. Check for the 'auto' var if applicable.
         if automatic_var and inst.fixup.bool(automatic_var):
