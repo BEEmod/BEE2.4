@@ -6,6 +6,7 @@ import itertools
 import operator
 import random
 
+import music_conf
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -459,13 +460,13 @@ def load_settings():
     optionWindow.load()
 
 
-def load_packages(data, package_systems: Iterable[FileSystem]):
+def load_packages(data):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     """
-    global skybox_win, voice_win, music_win, style_win, elev_win
+    global skybox_win, voice_win, style_win, elev_win
     global item_list
     global selected_style
 
@@ -486,7 +487,6 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
     sky_list   = []  # type: List[selWinItem]
     voice_list = []  # type: List[selWinItem]
     style_list = []  # type: List[selWinItem]
-    music_list = []  # type: List[selWinItem]
     elev_list  = []  # type: List[selWinItem]
 
     # These don't need special-casing, and act the same.
@@ -504,12 +504,6 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
         }),
         (style_list, styles, 'Style', {
             'VID': 'has_video',
-        }),
-        (music_list, musics, 'Music', {
-            'TBEAM': 'has_tbeam',
-            'TBEAM_SYNC': 'has_synced_tbeam',
-            'GEL_BOUNCE': 'has_bouncegel',
-            'GEL_SPEED': 'has_speedgel',
         }),
         (elev_list, elevators, 'Elevator', {
             'ORIENT': 'has_orient',
@@ -541,9 +535,7 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
             # Every item has an image
             loader.step("IMG")
 
-    # Set the 'sample' value for music items
-    for sel_item in music_list:  # type: selWinItem
-        sel_item.snd_sample = musics[sel_item.name].sample
+    music_conf.load_selitems(loader)
 
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
@@ -614,32 +606,6 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
         ],
     )
 
-    # Build a chain of the package systems, in the music sample directory
-    # to play sounds from.
-    music_sys = FileSystemChain()
-    for system in package_systems:
-        music_sys.add_sys(system, prefix='resources/music_samp/')
-
-    music_win = selWin(
-        TK_ROOT,
-        music_list,
-        title=_('Select Background Music'),
-        desc=_('This controls the background music used for a map. Some '
-               'tracks have variations which are played when interacting '
-               'with certain testing elements.'),
-        has_none=True,
-        sound_sys=music_sys,
-        none_desc=_('Add no music to the map at all.'),
-        callback=win_callback,
-        callback_params=['Music'],
-        attributes=[
-            SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX')),
-            SelAttr.bool('GEL_BOUNCE', _('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', _('Excursion Funnel Music')),
-            SelAttr.bool('TBEAM_SYNC', _('Synced Funnel Music')),
-        ],
-    )
-
     style_win = selWin(
         TK_ROOT,
         style_list,
@@ -688,7 +654,6 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
 
     obj_types = [
         (voice_win, 'Voice'),
-        (music_win, 'Music'),
         (skybox_win, 'Skybox'),
         (elev_win, 'Elevator'),
         ]
@@ -755,7 +720,7 @@ def suggested_refresh():
     if 'suggested_style' in UI:
         if (
                 voice_win.is_suggested() and
-                music_win.is_suggested() and
+                music_conf.is_suggested() and
                 skybox_win.is_suggested() and
                 elev_win.is_suggested()
                 ):
@@ -837,7 +802,7 @@ def export_editoritems(e=None):
         style=chosen_style,
         selected_objects={
             # Specify the 'chosen item' for each object type
-            'Music': music_win.chosen_id,
+            'Music': music_conf.selected_ids(),
             'Skybox': skybox_win.chosen_id,
             'QuotePack': voice_win.chosen_id,
             'Elevator': elev_win.chosen_id,
@@ -1284,12 +1249,12 @@ def init_palette(f):
         ttk.Sizegrip(f).grid(row=2, column=1)
 
 
-def init_option(f):
+def init_option(pane: SubPane):
     """Initialise the options pane."""
-    f.columnconfigure(0, weight=1)
-    f.rowconfigure(0, weight=1)
+    pane.columnconfigure(0, weight=1)
+    pane.rowconfigure(0, weight=1)
 
-    frame = ttk.Frame(f)
+    frame = ttk.Frame(pane)
     frame.grid(row=0, column=0, sticky=NSEW)
     frame.columnconfigure(0, weight=1)
 
@@ -1312,6 +1277,9 @@ def init_option(f):
     props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=4, sticky="EW")
+
+    music_frame = ttk.Labelframe(props, text=_('Music: '))
+    music_win = music_conf.make_widgets(music_frame, pane)
 
     def suggested_style_set():
         """Set music, skybox, voices, etc to the settings defined for a style.
@@ -1351,7 +1319,6 @@ def init_option(f):
     for ind, name in enumerate([
             _("Style: "),
             None,
-            _("Music: "),
             _("Voice: "),
             _("Skybox: "),
             _("Elev Vid: "),
@@ -1385,10 +1352,12 @@ def init_option(f):
 
     # Make all the selector window textboxes
     style_win.widget(props).grid(row=0, column=1, sticky='EW', padx=left_pad)
-    music_win.widget(props).grid(row=2, column=1, sticky='EW', padx=left_pad)
-    voice_frame.grid(row=3, column=1, sticky='EW')
-    skybox_win.widget(props).grid(row=4, column=1, sticky='EW', padx=left_pad)
-    elev_win.widget(props).grid(row=5, column=1, sticky='EW', padx=left_pad)
+    # row=1: Suggested.
+    voice_frame.grid(row=2, column=1, sticky='EW')
+    skybox_win.widget(props).grid(row=3, column=1, sticky='EW', padx=left_pad)
+    elev_win.widget(props).grid(row=4, column=1, sticky='EW', padx=left_pad)
+    music_frame.grid(row=5, column=0, sticky='EW', columnspan=2)
+
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if utils.USE_SIZEGRIP:
@@ -1983,7 +1952,7 @@ def init_windows():
         CompilerPane.set_corr_values('coop', style_obj.corridor_names)
 
         sugg = style_obj.suggested
-        win_types = (voice_win, music_win, skybox_win, elev_win)
+        win_types = (voice_win, music_conf, skybox_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.set_suggested(sugg_val)
         suggested_refresh()

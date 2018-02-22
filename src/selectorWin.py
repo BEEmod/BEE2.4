@@ -261,7 +261,6 @@ class Item:
         'win',
         'snd_sample',
         'context_lbl',
-        'ico_file',
         'attrs',
         'win_x',
         'win_y',
@@ -341,6 +340,27 @@ class Item:
             self.button.lift()  # Force a particular stacking order for widgets
             self.win_x = x
             self.win_y = y
+        
+    def copy(self) -> 'Item':
+        """Duplicate an item."""
+        item = Item.__new__(Item)
+        item.name = self.name
+        item.shortName = self.shortName
+        item.longName = self.longName
+        item.icon = self.icon
+        item.large_icon = self.large_icon
+        item.desc = self.desc.copy()
+        item.authors = self.authors.copy()
+        item.group = self.group
+        item.sort_key = self.sort_key
+        item.button = self.button
+        item.snd_sample = self.snd_sample
+        item.context_lbl = self.context_lbl
+        item.attrs = self.attrs
+
+        item.win = item.button = None
+        item.win_x = item.win_y = None
+        return item
 
 
 class selWin:
