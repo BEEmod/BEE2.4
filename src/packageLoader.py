@@ -2057,7 +2057,7 @@ class Music(PakObject):
         """Parse a music definition."""
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
-        sound = data.info.find_key('soundscript', '')  # type: Property
+        sound = data.info.find_key('soundscript', [])  # type: Property
 
         if sound.has_children():
             sounds = {}
