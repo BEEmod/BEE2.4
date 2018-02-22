@@ -718,12 +718,13 @@ def reset_panes():
 def suggested_refresh():
     """Enable or disable the suggestion setting button."""
     if 'suggested_style' in UI:
-        if (
-                voice_win.is_suggested() and
-                music_conf.is_suggested() and
-                skybox_win.is_suggested() and
-                elev_win.is_suggested()
-                ):
+        windows = [
+            voice_win,
+            skybox_win,
+            elev_win,
+        ]
+        windows.extend(music_conf.WINDOWS.values())
+        if all(win.is_suggested() for win in windows):
             UI['suggested_style'].state(['disabled'])
         else:
             UI['suggested_style'].state(['!disabled'])
@@ -1952,7 +1953,12 @@ def init_windows():
         CompilerPane.set_corr_values('coop', style_obj.corridor_names)
 
         sugg = style_obj.suggested
-        win_types = (voice_win, music_conf, skybox_win, elev_win)
+        win_types = (
+            voice_win,
+            music_conf.WINDOWS[music_conf.MusicChannel.BASE],
+            skybox_win,
+            elev_win,
+        )
         for win, sugg_val in zip(win_types, sugg):
             win.set_suggested(sugg_val)
         suggested_refresh()

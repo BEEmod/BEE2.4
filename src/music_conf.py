@@ -41,18 +41,19 @@ def set_suggested(music_id: str, *, sel_item: bool=False):
     if music_id is None or music_id.casefold() == '<none>':
         # No music, special.
         for channel in MusicChannel:
-            if sel_item and channel is not MusicChannel.BASE:
+            if channel is MusicChannel.BASE:
+                continue
+            if sel_item:
                 WINDOWS[channel].sel_item_id('<none>')
             WINDOWS[channel].set_suggested()
     else:
         music = Music.by_id(music_id)
         for channel in MusicChannel:
-            sugg = (
-                music_id
-                if channel is MusicChannel.BASE else
-                music.get_suggestion(channel)
-            )
-            if sel_item and channel is not MusicChannel.BASE:
+            if channel is MusicChannel.BASE:
+                continue
+
+            sugg = music.get_suggestion(channel)
+            if sel_item:
                 WINDOWS[channel].sel_item_id(sugg)
             WINDOWS[channel].set_suggested(sugg)
 
@@ -251,7 +252,3 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         win.sel_item_id(last_selected[channel])
 
     return base_win
-
-
-def is_suggested():
-    return None
