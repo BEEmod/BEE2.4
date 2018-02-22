@@ -2148,6 +2148,15 @@ class Music(PakObject):
     def __repr__(self):
         return '<Music ' + self.id + '>'
 
+    def provides_channel(self, channel: MusicChannel):
+        """Check if this music has this channel."""
+        if self.sound[channel]:
+            return True
+        if channel is MusicChannel.BASE and self.inst:
+            # The instance provides the base track.
+            return True
+        return False
+
     def has_channel(self, channel: MusicChannel):
         """Check if this track or its children has a channel."""
         if self.sound[channel]:

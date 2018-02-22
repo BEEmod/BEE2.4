@@ -70,7 +70,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         return [
             SEL_ITEMS[music.id].copy()
             for music in Music.all()
-            if music.has_channel(channel)
+            if music.provides_channel(channel)
         ]
 
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
@@ -95,7 +95,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
 
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(
         TK_ROOT,
-        for_channel(MusicChannel.BASE),
+        for_channel(MusicChannel.TBEAM),
         title=_('Select Excursion Funnel Music'),
         desc=_('This controls the background music used for a map. Some '
                'tracks have variations which are played when interacting '
