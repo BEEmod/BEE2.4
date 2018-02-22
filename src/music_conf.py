@@ -39,6 +39,7 @@ def set_suggested(music_id: str):
     for channel in MusicChannel:
         WINDOWS[channel].set_suggested(music.get_suggestion(channel))
 
+
 def selwin_callback(music_id: Optional[str], channel: MusicChannel):
     """Callback for the selector windows.
 
@@ -46,8 +47,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel):
     """
     if music_id is None:
         music_id = '<NONE>'
-    GEN_OPTS['Last_Selected']['music_' + channel.value] = music_id
-
+    GEN_OPTS['Last_Selected']['music_' + channel.name.casefold()] = music_id
 
 
 def load_selitems(loader: LoadScreen):

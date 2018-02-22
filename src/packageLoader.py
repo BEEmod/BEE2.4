@@ -128,8 +128,8 @@ class MusicChannel(Enum):
     """Categories that can have music."""
     BASE = 'base'  # Main track
     TBEAM = 'tbeam'  # Funnel audio
-    BOUNCE = 'bounce'  # Jumping on repulsion gel.
-    SPEED = 'speed'  # Moving fast horizontally
+    BOUNCE = 'BounceGel'  # Jumping on repulsion gel.
+    SPEED = 'SpeedGel'  # Moving fast horizontally
 
 
 class NoVPKExport(Exception):
