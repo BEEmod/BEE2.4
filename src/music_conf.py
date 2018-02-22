@@ -73,6 +73,15 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
             if music.provides_channel(channel)
         ]
 
+    # This gets overwritten when making windows.
+    last_selected = {
+        channel: GEN_OPTS.get_val(
+            'Last_Selected',
+            'music_' + channel.name.casefold(),
+            '<NONE>',
+        ) for channel in MusicChannel
+    }
+
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
@@ -149,7 +158,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         """Configure for the collapsed state."""
         global is_collapsed
         is_collapsed = True
-        GEN_OPTS['Last_Selected']['music_collapsed'] = '0'
+        GEN_OPTS['Last_Selected']['music_collapsed'] = '1'
         base_lbl['text'] = _('Music: ')
         toggle_btn_exit()
         for wid in exp_widgets:
@@ -159,7 +168,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         """Configure for the expanded state."""
         global is_collapsed
         is_collapsed = False
-        GEN_OPTS['Last_Selected']['music_collapsed'] = '1'
+        GEN_OPTS['Last_Selected']['music_collapsed'] = '0'
         base_lbl['text'] = _('Base: ')
         toggle_btn_exit()
         for wid in exp_widgets:
@@ -200,6 +209,9 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         label = ttk.Label(frame, text=text)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
+
+    for channel, win in WINDOWS.items():
+        win.sel_item_id(last_selected[channel])
 
     if GEN_OPTS.get_bool('Last_Selected', 'music_collapsed', True):
         set_collapsed()
