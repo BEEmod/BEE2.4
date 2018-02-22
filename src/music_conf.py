@@ -57,6 +57,14 @@ def set_suggested(music_id: str, *, sel_item: bool=False):
             WINDOWS[channel].set_suggested(sugg)
 
 
+def export_data():
+    """Return the data used to export this."""
+    return {
+        channel: Music.by_id(win.chosen_id)
+        for channel, win in WINDOWS.items()
+    }
+
+
 def selwin_callback(music_id: Optional[str], channel: MusicChannel):
     """Callback for the selector windows.
 
@@ -243,10 +251,6 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         win.sel_item_id(last_selected[channel])
 
     return base_win
-
-
-def selected_ids():
-    return None
 
 
 def is_suggested():

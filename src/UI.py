@@ -802,7 +802,7 @@ def export_editoritems(e=None):
         style=chosen_style,
         selected_objects={
             # Specify the 'chosen item' for each object type
-            'Music': music_conf.selected_ids(),
+            'Music': music_conf.export_data(),
             'Skybox': skybox_win.chosen_id,
             'QuotePack': voice_win.chosen_id,
             'Elevator': elev_win.chosen_id,

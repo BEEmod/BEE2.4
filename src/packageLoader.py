@@ -2191,48 +2191,47 @@ class Music(PakObject):
     @staticmethod
     def export(exp_data: ExportData):
         """Export the selected music."""
-        if exp_data.selected is None:
-            return  # No music..
+        selected = exp_data.selected  # type: Dict[MusicChannel, Music]
 
-        try:
-            music = Music.by_id(exp_data.selected)  # type: Music
-        except KeyError:
-            raise Exception(
-                "Selected music ({}) doesn't exist?".format(exp_data.selected)
-            ) from None
+        base_music = selected[MusicChannel.BASE]
 
         vbsp_config = exp_data.vbsp_conf
 
-        if isinstance(music.sound, Property):
-            # We want to generate the soundscript - copy over the configs.
-            vbsp_config.append(Property('MusicScript', music.sound.value))
-            script = 'music.BEE2'
-        else:
-            script = music.sound
+        vbsp_config += base_music.config.copy()
 
-        # Set the instance/ambient_generic file that should be used.
-        if script is not None:
-            vbsp_config.set_key(
-                ('Options', 'music_SoundScript'),
-                script,
-            )
+        music_conf = Property('MusicScript', [])
+        vbsp_config.append(music_conf)
+
+        for channel, music in selected.items():
+            sounds = music.sound[channel]
+            if len(sounds) == 1:
+                music_conf.append(Property(channel.value, sounds[0]))
+            else:
+                music_conf.append(Property(channel.value, [
+                    Property('snd', snd)
+                    for snd in sounds
+                ]))
+
         vbsp_config.set_key(
             ('Options', 'music_looplen'),
-            str(music.len),
+            str(base_music.len),
+        )
+
+        vbsp_config.set_key(
+            ('Options', 'music_sync_tbeam'),
+            srctools.bool_as_int(base_music.has_synced_tbeam),
         )
 
         # If we need to pack, add the files to be unconditionally packed.
-        if music.packfiles:
+        if base_music.packfiles:
             vbsp_config.set_key(
                 ('PackTriggers', 'Forced'),
                 [
                     Property('File', file)
                     for file in
-                    music.packfiles
+                    base_music.packfiles
                 ],
             )
-
-        vbsp_config += music.config.copy()
 
 
 class StyleVar(PakObject, allow_mult=True, has_img=False):
