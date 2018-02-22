@@ -33,11 +33,28 @@ def load_filesystems(systems: Iterable[FileSystem]):
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(music_id: str):
-    """Set the music ID that is suggested for the base."""
-    music = Music.by_id(music_id)
-    for channel in MusicChannel:
-        WINDOWS[channel].set_suggested(music.get_suggestion(channel))
+def set_suggested(music_id: str, *, sel_item: bool=False):
+    """Set the music ID that is suggested for the base.
+
+    If sel_item is true, select the suggested item as well.
+    """
+    if music_id is None or music_id.casefold() == '<none>':
+        # No music, special.
+        for channel in MusicChannel:
+            if sel_item and channel is not MusicChannel.BASE:
+                WINDOWS[channel].sel_item_id('<none>')
+            WINDOWS[channel].set_suggested()
+    else:
+        music = Music.by_id(music_id)
+        for channel in MusicChannel:
+            sugg = (
+                music_id
+                if channel is MusicChannel.BASE else
+                music.get_suggestion(channel)
+            )
+            if sel_item and channel is not MusicChannel.BASE:
+                WINDOWS[channel].sel_item_id(sugg)
+            WINDOWS[channel].set_suggested(sugg)
 
 
 def selwin_callback(music_id: Optional[str], channel: MusicChannel):
@@ -48,6 +65,9 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel):
     if music_id is None:
         music_id = '<NONE>'
     GEN_OPTS['Last_Selected']['music_' + channel.name.casefold()] = music_id
+    # If collapsed, the hidden ones follow the base always.
+    if channel is channel.BASE:
+        set_suggested(music_id, sel_item=is_collapsed)
 
 
 def load_selitems(loader: LoadScreen):
@@ -65,7 +85,7 @@ def load_selitems(loader: LoadScreen):
 def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     """Generate the UI components, and return the base window."""
 
-    def for_channel(channel):
+    def for_channel(channel: MusicChannel) -> List[SelItem]:
         """Get the items needed for a specific channel."""
         return [
             SEL_ITEMS[music.id].copy()
@@ -161,6 +181,10 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         GEN_OPTS['Last_Selected']['music_collapsed'] = '1'
         base_lbl['text'] = _('Music: ')
         toggle_btn_exit()
+
+        # Set all music to the children - so those are used.
+        set_suggested(WINDOWS[MusicChannel.BASE].chosen_id, sel_item=True)
+
         for wid in exp_widgets:
             wid.grid_remove()
 
@@ -210,13 +234,13 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 
-    for channel, win in WINDOWS.items():
-        win.sel_item_id(last_selected[channel])
-
     if GEN_OPTS.get_bool('Last_Selected', 'music_collapsed', True):
         set_collapsed()
     else:
         set_expanded()
+
+    for channel, win in WINDOWS.items():
+        win.sel_item_id(last_selected[channel])
 
     return base_win
 
