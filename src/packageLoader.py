@@ -2232,8 +2232,6 @@ class Music(PakObject):
                 ],
             )
 
-        # Allow flags to detect the music that's used
-        vbsp_config.set_key(('Options', 'music_ID'), music.id)
         vbsp_config += music.config.copy()
 
 

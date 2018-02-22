@@ -486,9 +486,6 @@ DEFAULTS = [
     Opt('game_id', "620",
         """(Automatic) The game's steam ID.
         """),
-    Opt('music_id', "<NONE>",
-        """The ID of the selected music.
-        """),
     Opt('music_instance', TYPE.STR,
         """The instance for the chosen music.
         """),

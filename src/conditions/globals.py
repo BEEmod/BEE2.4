@@ -8,6 +8,8 @@ from conditions import (
 )
 import vbsp
 
+LOGGER = utils.getLogger(__name__, alias='cond.globals')
+
 COND_MOD_NAME = 'Global Properties'
 
 
@@ -30,12 +32,13 @@ def flag_voice_has(flag: Property):
 
 
 @make_flag('has_music')
-def flag_music(flag: Property):
+def flag_music():
     """Checks the selected music ID.
 
     Use `<NONE>` for no music.
     """
-    return vbsp_options.get(str, 'music_id') == flag.value
+    LOGGER.warning('Checking for selected music is no longer possible!')
+    return False
 
 
 @make_flag('Game')
