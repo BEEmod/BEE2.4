@@ -78,6 +78,17 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel):
     if channel is channel.BASE:
         set_suggested(music_id, sel_item=is_collapsed)
 
+        # If we have an instance, it's "custom" behaviour, and so disable
+        # all the subparts.
+        try:
+            has_inst = bool(Music.by_id(music_id).inst)
+        except KeyError:  # <none>
+            has_inst = False
+
+        for win_chan, win in WINDOWS.items():
+            if win_chan is not channel.BASE:
+                win.readonly = has_inst
+
 
 def load_selitems(loader: LoadScreen):
     """Load the selector items early, to correspond with the loadscreen order."""
@@ -115,12 +126,12 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         TK_ROOT,
         for_channel(MusicChannel.BASE),
         title=_('Select Background Music - Base'),
-        desc=_('This controls the background music used for a map. Some '
-               'tracks have variations which are played when interacting '
-               'with certain testing elements.'),
+        desc=_('This controls the background music used for a map. Expand '
+               'the dropdown to set tracks for specific test elements.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=_('Add no music to the map at all.'),
+        none_desc=_('Add no music to the map at all. Testing Element-specific '
+                    'music may still be added.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.BASE],
         attributes=[
@@ -135,9 +146,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         TK_ROOT,
         for_channel(MusicChannel.TBEAM),
         title=_('Select Excursion Funnel Music'),
-        desc=_('This controls the background music used for a map. Some '
-               'tracks have variations which are played when interacting '
-               'with certain testing elements.'),
+        desc=_('Set the music used while inside Excursion Funnels.'),
         has_none=True,
         sound_sys=filesystem,
         none_desc=_('Have no music playing when inside funnels.'),

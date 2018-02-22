@@ -911,6 +911,10 @@ class selWin:
 
         add_tooltip(self.display, self.description, show_when_disabled=True)
 
+        # Set this property again, which updates the description if we actually
+        # are readonly.
+        self.readonly = self._readonly
+
         self.save()
 
         return self.display
@@ -926,6 +930,11 @@ class selWin:
     @readonly.setter
     def readonly(self, value):
         self._readonly = bool(value)
+        if self.display is None:
+            # Widget hasn't been added yet, stop.
+            # We update in the widget() method.
+            return
+
         if value:
             new_st = ['disabled']
             self.display.tooltip_text = self.readonly_description
