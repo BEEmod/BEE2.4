@@ -244,7 +244,7 @@ def res_translate_inst(inst: Entity, res: Property):
     used to offset it based on the starting position, bottom or top position
     of a piston platform.
     """
-    inst['origin'] = resolve_offset(inst, res.value, scale=128, zoff=-128)
+    inst['origin'] = resolve_offset(inst, res.value)
 
 
 @make_result('OppositeWallDist')
