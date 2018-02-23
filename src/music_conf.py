@@ -61,7 +61,10 @@ def set_suggested(music_id: str, *, sel_item: bool=False):
 def export_data():
     """Return the data used to export this."""
     return {
-        channel: Music.by_id(win.chosen_id)
+        channel:
+            None if
+            win.chosen_id is None
+            else Music.by_id(win.chosen_id)
         for channel, win in WINDOWS.items()
     }
 
