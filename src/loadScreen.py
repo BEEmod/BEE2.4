@@ -53,7 +53,7 @@ def show_main_loader():
 
 @contextlib.contextmanager
 def surpress_screens():
-    """A context manager to surpress loadscreens while the body is active."""
+    """A context manager to suppress loadscreens while the body is active."""
     active = []
     for screen in _ALL_SCREENS:
         if not screen.active:
@@ -161,7 +161,6 @@ class LoadScreen:
 
     def show(self):
         """Display the loading screen."""
-        self._send_msg('reset')
         self._send_msg('show')
 
     def reset(self):

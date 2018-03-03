@@ -4,6 +4,8 @@ During package loading, we are busy performing tasks in the main thread.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
+from typing import Optional
+
 from tkinter import ttk
 from tkinter.font import Font
 import tkinter as tk
@@ -43,6 +45,7 @@ class BaseLoadScreen:
         self.maxes = {}
         self.names = {}
         self.stages = stages
+        self.is_shown = False
 
         for st_id, stage_name in stages:
             self.values[st_id] = 0
@@ -50,30 +53,30 @@ class BaseLoadScreen:
             self.names[st_id] = stage_name
 
         # Because of wm_overrideredirect, we have to manually do dragging.
-        self.drag_x = self.drag_y = None
+        self.drag_x = self.drag_y = None  # type: Optional[int]
 
         self.win.bind('<Button-1>', self.move_start)
         self.win.bind('<ButtonRelease-1>', self.move_stop)
         self.win.bind('<B1-Motion>', self.move_motion)
         self.win.bind('<Escape>', self.cancel)
 
-    def cancel(self, event=None):
+    def cancel(self, event: tk.Event=None):
         """User pressed the cancel button."""
         self.op_reset()
         PIPE_SEND.send(('cancel', self.scr_id))
 
-    def move_start(self, event):
+    def move_start(self, event: tk.Event):
         """Record offset of mouse on click."""
         self.drag_x = event.x
         self.drag_y = event.y
         self.win['cursor'] = utils.CURSORS['move_item']
 
-    def move_stop(self, event):
+    def move_stop(self, event: tk.Event):
         """Clear values when releasing."""
         self.win['cursor'] = utils.CURSORS['wait']
         self.drag_x = self.drag_y = None
 
-    def move_motion(self, event):
+    def move_motion(self, event: tk.Event):
         """Move the window when moving the mouse."""
         if self.drag_x is None or self.drag_y is None:
             return
@@ -84,6 +87,7 @@ class BaseLoadScreen:
 
     def op_show(self):
         """Show the window."""
+        self.is_shown = True
         self.win.deiconify()
         self.win.lift()
         self.win.update()  # Force an update so the reqwidth is correct
@@ -93,6 +97,7 @@ class BaseLoadScreen:
         ))
 
     def op_hide(self):
+        self.is_shown = False
         self.win.withdraw()
 
     def op_reset(self):
@@ -224,18 +229,7 @@ class SplashScreen(BaseLoadScreen):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.is_compact = False
-        # Must be done late, so we know TK is initialised.
-        import img
-
-        logo_img = img.png('BEE2/splash_logo')
-
-        self.lrg_canvas = canvas = tk.Canvas(self.win)
-        canvas.create_image(
-            10, 10,
-            anchor='nw',
-            image=logo_img,
-        )
+        self.is_compact = True
 
         font = Font(
             family='Times',  # Generic special case
@@ -243,14 +237,49 @@ class SplashScreen(BaseLoadScreen):
             weight='bold',
         )
 
-        text1 = canvas.create_text(
+        # Must be done late, so we know TK is initialised.
+        import img
+
+        logo_img = img.png('BEE2/splash_logo')
+
+        self.lrg_canvas = tk.Canvas(self.win)
+        self.sml_canvas = tk.Canvas(
+            self.win,
+            background='#009678',  # 0, 150, 120
+        )
+
+        sml_width = int(min(self.win.winfo_screenwidth() * 0.5, 400))
+        sml_height = int(min(self.win.winfo_screenheight() * 0.5, 175))
+
+        self.lrg_canvas.create_image(
+            10, 10,
+            anchor='nw',
+            image=logo_img,
+        )
+
+        self.sml_canvas.create_text(
+            sml_width / 2, 40,
+            anchor='n',
+            text=self.title_text,
+            fill='white',
+            font=font,
+        )
+        self.sml_canvas.create_text(
+            sml_width / 2, 60,
+            anchor='n',
+            text=TRANSLATION['version'],
+            fill='white',
+            font=font,
+        )
+
+        text1 = self.lrg_canvas.create_text(
             10, 125,
             anchor='nw',
             text=self.title_text,
             fill='white',
             font=font,
         )
-        text2 = canvas.create_text(
+        text2 = self.lrg_canvas.create_text(
             10, 145,
             anchor='nw',
             text=TRANSLATION['version'],
@@ -259,132 +288,143 @@ class SplashScreen(BaseLoadScreen):
         )
 
         # Now add shadows behind the text, and draw to the canvas.
-        splash, self.lrg_width, self.lrg_height = img.make_splash_screen(
+        splash, lrg_width, lrg_height = img.make_splash_screen(
             max(self.win.winfo_screenwidth() * 0.6, 500),
             max(self.win.winfo_screenheight() * 0.6, 500),
             base_height=len(self.stages) * 20,
-            text1_bbox=canvas.bbox(text1),
-            text2_bbox=canvas.bbox(text2),
+            text1_bbox=self.lrg_canvas.bbox(text1),
+            text2_bbox=self.lrg_canvas.bbox(text2),
         )
         self.splash_img = splash  # Keep this alive
-        canvas['width'], canvas['height'] = self.lrg_width, self.lrg_height
-        canvas.tag_lower(canvas.create_image(
+        self.lrg_canvas.tag_lower(self.lrg_canvas.create_image(
             0, 0,
             anchor='nw',
             image=splash,
         ))
 
-        canvas.create_rectangle(
-            self.lrg_width-20,
-            0,
-            self.lrg_width,
-            20,
-            fill='#00785A',
-            width=0,
-            tags='quit_button',
-        )
-        canvas.create_rectangle(
-            self.lrg_width-20,
-            0,
-            self.lrg_width,
-            20,
-            fill='#00785A',
-            width=0,
-            tags='quit_button',
-        )
-        # 150, 120, 64
-        canvas.create_line(
-            self.lrg_width-16, 4,
-            self.lrg_width-4, 16,
-            fill='black',
-            width=2,
-            tags='quit_button',
-        )
-        canvas.create_line(
-            self.lrg_width-4, 4,
-            self.lrg_width-16, 16,
-            fill='black',
-            width=2,
-            tags='quit_button',
-        )
-        canvas.tag_bind('quit_button', '<Button-1>', self.cancel)
+        self.canvas = [
+            (self.lrg_canvas, lrg_width, lrg_height),
+            (self.sml_canvas, sml_width, sml_height),
+        ]
 
-        for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
+        for canvas, width, height in self.canvas:
+            canvas['width'] = width
+            canvas['height'] = height
+            canvas.bind(utils.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
+
             canvas.create_rectangle(
+                width-20,
+                0,
+                width,
                 20,
-                self.lrg_height - (ind + 0.5) * 20,
-                20,
-                self.lrg_height - (ind - 0.5) * 20,
-                fill='#00785A',  # 0, 120, 90
+                fill='#00785A',
                 width=0,
-                tags='bar_' + st_id,
+                tags='quit_button',
             )
-            # Border
             canvas.create_rectangle(
+                width-20,
+                0,
+                width,
                 20,
-                self.lrg_height - (ind + 0.5) * 20,
-                self.lrg_width - 20,
-                self.lrg_height - (ind - 0.5) * 20,
-                outline='#00785A',
+                fill='#00785A',
+                width=0,
+                tags='quit_button',
+            )
+            # 150, 120, 64
+            canvas.create_line(
+                width-16, 4,
+                width-4, 16,
+                fill='black',
                 width=2,
+                tags='quit_button',
             )
-            canvas.create_text(
-                25,
-                self.lrg_height - ind * 20,
-                anchor='w',
-                text=stage_name + ': (0/???)',
-                fill='white',
-                tags='text_' + st_id,
+            canvas.create_line(
+                width-4, 4,
+                width-16, 16,
+                fill='black',
+                width=2,
+                tags='quit_button',
             )
+            canvas.tag_bind('quit_button', '<Button-1>', self.cancel)
+
+            for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
+                canvas.create_rectangle(
+                    20,
+                    height - (ind + 0.5) * 20,
+                    20,
+                    height - (ind - 0.5) * 20,
+                    fill='#00785A',  # 0, 120, 90
+                    width=0,
+                    tags='bar_' + st_id,
+                )
+                # Border
+                canvas.create_rectangle(
+                    20,
+                    height - (ind + 0.5) * 20,
+                    width - 20,
+                    height - (ind - 0.5) * 20,
+                    outline='#00785A',
+                    width=2,
+                )
+                canvas.create_text(
+                    25,
+                    height - ind * 20,
+                    anchor='w',
+                    text=stage_name + ': (0/???)',
+                    fill='white',
+                    tags='text_' + st_id,
+                )
 
     def update_stage(self, stage):
-        self.lrg_canvas.itemconfig(
-            'text_' + stage,
-            text='{}: ({}/{})'.format(
-                self.names[stage],
-                self.values[stage],
-                self.maxes[stage],
-            )
+        text = '{}: ({}/{})'.format(
+            self.names[stage],
+            self.values[stage],
+            self.maxes[stage],
         )
+        self.sml_canvas.itemconfig('text_' + stage, text=text)
+        self.lrg_canvas.itemconfig('text_' + stage, text=text)
         self.set_bar(stage, self.values[stage] / self.maxes[stage])
 
     def set_bar(self, stage, fraction):
         """Set a progress bar to this fractional length."""
-        x1, y1, x2, y2 = self.lrg_canvas.coords('bar_' + stage)
-        self.lrg_canvas.coords(
-            'bar_' + stage,
-            20,
-            y1,
-            20 + round(fraction * (self.lrg_width - 40)),
-            y2,
-        )
+        for canvas, width, height in self.canvas:
+            x1, y1, x2, y2 = canvas.coords('bar_' + stage)
+            canvas.coords(
+                'bar_' + stage,
+                20,
+                y1,
+                20 + round(fraction * (width - 40)),
+                y2,
+            )
 
     def op_set_length(self, stage, num):
         """Set the number of items in a stage."""
         self.maxes[stage] = num
         self.update_stage(stage)
 
-        self.lrg_canvas.delete('tick_' + stage)
+        for canvas, width, height in self.canvas:
 
-        if num == 0:
-            return  # No ticks
+            canvas.delete('tick_' + stage)
 
-        # Draw the ticks in...
-        _, y1, _, y2 = self.lrg_canvas.coords('bar_' + stage)
+            if num == 0:
+                return  # No ticks
 
-        dist = (self.lrg_width - 40) / num
-        if round(dist) <= 1:
-            # Don't have ticks if they're right next to each other
-            return
-        tag = 'tick_' + stage
-        for i in range(num):
-            pos = int(20 + dist * i)
-            self.lrg_canvas.create_line(
-                pos, y1, pos, y2,
-                fill='#00785A',
-                tags=tag,
-            )
-        self.lrg_canvas.tag_lower('tick_' + stage, 'bar_' + stage)
+            # Draw the ticks in...
+            _, y1, _, y2 = canvas.coords('bar_' + stage)
+
+            dist = (width - 40) / num
+            if round(dist) <= 1:
+                # Don't have ticks if they're right next to each other
+                return
+            tag = 'tick_' + stage
+            for i in range(num):
+                pos = int(20 + dist * i)
+                canvas.create_line(
+                    pos, y1, pos, y2,
+                    fill='#00785A',
+                    tags=tag,
+                )
+            canvas.tag_lower('tick_' + stage, 'bar_' + stage)
 
     def reset_stages(self):
         pass
@@ -393,22 +433,34 @@ class SplashScreen(BaseLoadScreen):
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
-        self.lrg_canvas.itemconfig(
-            'text_' + stage,
-            text=self.names[stage] + ': ' + TRANSLATION['skip'],
-        )
+        for canvas, width, height in self.canvas:
+            canvas.itemconfig(
+                'text_' + stage,
+                text=self.names[stage] + ': ' + TRANSLATION['skip'],
+            )
         self.set_bar(stage, 1.0)  # Force stage to be max filled.
-        self.lrg_canvas.delete('tick_' + stage)
-        self.lrg_canvas.update()
 
     # Operations:
     def op_set_is_compact(self, is_compact):
+        """Set the display mode."""
         self.is_compact = is_compact
-        print('IS_COMPACE: ', is_compact)
         if is_compact:
             self.lrg_canvas.grid_remove()
+            self.sml_canvas.grid(row=0, column=0)
         else:
+            self.sml_canvas.grid_remove()
             self.lrg_canvas.grid(row=0, column=0)
+
+    def toggle_compact(self, event: tk.Event):
+        """Toggle when the splash screen is double-clicked."""
+        self.op_set_is_compact(not self.is_compact)
+
+        # Snap to the center of the window.
+        canvas = self.sml_canvas if self.is_compact else self.lrg_canvas
+        self.win.wm_geometry('+{:g}+{:g}'.format(
+            event.x_root - int(canvas['width']) // 2,
+            event.y_root - int(canvas['height']) // 2,
+        ))
 
 
 def run_screen(
