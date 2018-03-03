@@ -60,7 +60,7 @@ DEFAULT_SETTINGS = {
 }
 
 loadScreen.main_loader.set_length('UI', 15)
-loadScreen.main_loader.show()
+loadScreen.show_main_loader()
 
 # OS X starts behind other windows, fix that.
 if utils.MAC:

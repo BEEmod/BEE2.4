@@ -553,188 +553,187 @@ class Game:
 
         # Do this before setting music and resources,
         # those can take time to compute.
-
         export_screen.show()
-        export_screen.grab_set_global()  # Stop interaction with other windows
+        try:
 
-        if should_refresh:
-            # Count the files.
-            export_screen.set_length(
-                'RES',
-                sum(1 for file in res_system.walk_folder_repeat()),
-            )
-        else:
-            export_screen.skip_stage('RES')
-            export_screen.skip_stage('MUS')
+            if should_refresh:
+                # Count the files.
+                export_screen.set_length(
+                    'RES',
+                    sum(1 for file in res_system.walk_folder_repeat()),
+                )
+            else:
+                export_screen.skip_stage('RES')
+                export_screen.skip_stage('MUS')
 
-        # Make the folders we need to copy files to, if desired.
-        os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
+            # Make the folders we need to copy files to, if desired.
+            os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
 
-        # Start off with the style's data.
-        editoritems, vbsp_config = style.export()
-        export_screen.step('EXP')
-
-        vpk_success = True
-
-        # Export each object type.
-        for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
-            if obj_name == 'Style':
-                continue  # Done above already
-
-            LOGGER.info('Exporting "{}"', obj_name)
-            selected = selected_objects.get(obj_name, None)
-
-            try:
-                obj_data.cls.export(packageLoader.ExportData(
-                    game=self,
-                    selected=selected,
-                    editoritems=editoritems,
-                    vbsp_conf=vbsp_config,
-                    selected_style=style,
-                ))
-            except packageLoader.NoVPKExport:
-                # Raised by StyleVPK to indicate it failed to copy.
-                vpk_success = False
-
+            # Start off with the style's data.
+            editoritems, vbsp_config = style.export()
             export_screen.step('EXP')
 
-        vbsp_config.set_key(
-            ('Options', 'BEE2_loc'),
-            os.path.dirname(os.getcwd())  # Go up one dir to our actual location
-        )
-        vbsp_config.set_key(
-            ('Options', 'Game_ID'),
-            self.steamID,
-        )
+            vpk_success = True
 
-        # If there are multiple of these blocks, merge them together.
-        # They will end up in this order.
-        vbsp_config.merge_children(
-            'Textures',
-            'Fizzlers',
-            'Options',
-            'StyleVars',
-            'DropperItems',
-            'Conditions',
-            'Quotes',
-            'PackTriggers',
-        )
+            # Export each object type.
+            for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
+                if obj_name == 'Style':
+                    continue  # Done above already
 
-        for name, file, ext in FILES_TO_BACKUP:
-            item_path = self.abs_path(file + ext)
-            backup_path = self.abs_path(file + '_original' + ext)
-            if os.path.isfile(item_path) and not os.path.isfile(backup_path):
-                LOGGER.info('Backing up original {}!', name)
-                shutil.copy(item_path, backup_path)
-            export_screen.step('BACK')
-
-        # Backup puzzles, if desired
-        backup.auto_backup(selected_game, export_screen)
-
-        # This is the connection "heart" and "error" models.
-        # These have to come last, so we need to special case it.
-        editoritems += style.editor.find_key("Renderables", []).copy()
-
-        # Special-case: implement the UnlockDefault stlylevar here,
-        # so all items are modified.
-        if selected_objects['StyleVar']['UnlockDefault']:
-            LOGGER.info('Unlocking Items!')
-            for item in editoritems.find_all('Item'):
-                # If the Unlock Default Items stylevar is enabled, we
-                # want to force the corridors and obs room to be
-                # deletable and copyable
-                # Also add DESIRES_UP, so they place in the correct orientation
-                if item['type', ''] in _UNLOCK_ITEMS:
-                    editor_section = item.find_key("Editor", [])
-                    editor_section['deletable'] = '1'
-                    editor_section['copyable'] = '1'
-                    editor_section['DesiredFacing'] = 'DESIRES_UP'
-
-        LOGGER.info('Editing Gameinfo!')
-        self.edit_gameinfo(True)
-
-        LOGGER.info('Writing instance list!')
-        with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
-            for line in self.build_instance_data(editoritems):
-                inst_file.write(line)
-        export_screen.step('EXP')
-
-        # AtomicWriter writes to a temporary file, then renames in one step.
-        # This ensures editoritems won't be half-written.
-        LOGGER.info('Writing Editoritems!')
-        with srctools.AtomicWriter(self.abs_path(
-                'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
-            for line in editoritems.export():
-                editor_file.write(line)
-        export_screen.step('EXP')
-
-        LOGGER.info('Writing VBSP Config!')
-        os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
-        with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w', encoding='utf8') as vbsp_file:
-            for line in vbsp_config.export():
-                vbsp_file.write(line)
-        export_screen.step('EXP')
-
-        if num_compiler_files > 0:
-            LOGGER.info('Copying Custom Compiler!')
-            for file in os.listdir('../compiler'):
-                # Ignore these dummy executables.
-                if 'original' in file:
-                    continue
-
-                src_path = os.path.join('../compiler', file)
-                if not os.path.isfile(src_path):
-                    continue
-
-                dest = self.abs_path('bin/' + file)
-
-                LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+                LOGGER.info('Exporting "{}"', obj_name)
+                selected = selected_objects.get(obj_name, None)
 
                 try:
-                    if os.path.isfile(dest):
-                        # First try and give ourselves write-permission,
-                        # if it's set read-only.
-                        utils.unset_readonly(dest)
-                    shutil.copy(
-                        src_path,
-                        self.abs_path('bin/')
-                    )
-                except PermissionError:
-                    # We might not have permissions, if the compiler is currently
-                    # running.
-                    export_screen.grab_release()
-                    export_screen.reset()
-                    messagebox.showerror(
-                        title=_('BEE2 - Export Failed!'),
-                        message=_('Copying compiler file {file} failed.'
-                                  'Ensure the {game} is not running.').format(
-                                    file=file,
-                                    game=self.name,
-                                ),
-                        master=TK_ROOT,
-                    )
-                    return False, vpk_success
-                export_screen.step('COMP')
+                    obj_data.cls.export(packageLoader.ExportData(
+                        game=self,
+                        selected=selected,
+                        editoritems=editoritems,
+                        vbsp_conf=vbsp_config,
+                        selected_style=style,
+                    ))
+                except packageLoader.NoVPKExport:
+                    # Raised by StyleVPK to indicate it failed to copy.
+                    vpk_success = False
 
-        if should_refresh:
-            LOGGER.info('Copying Resources!')
-            music_files = self.copy_mod_music()
-            self.refresh_cache(music_files)
+                export_screen.step('EXP')
 
-        LOGGER.info('Optimizing editor models...')
-        self.clean_editor_models(editoritems)
-        export_screen.step('EXP')
+            vbsp_config.set_key(
+                ('Options', 'BEE2_loc'),
+                os.path.dirname(os.getcwd())  # Go up one dir to our actual location
+            )
+            vbsp_config.set_key(
+                ('Options', 'Game_ID'),
+                self.steamID,
+            )
 
-        self.generate_fizzler_sides(vbsp_config)
+            # If there are multiple of these blocks, merge them together.
+            # They will end up in this order.
+            vbsp_config.merge_children(
+                'Textures',
+                'Fizzlers',
+                'Options',
+                'StyleVars',
+                'DropperItems',
+                'Conditions',
+                'Quotes',
+                'PackTriggers',
+            )
 
-        if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
-            os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
-            with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
-                TAG_COOP_INST_VMF.export(f)
+            for name, file, ext in FILES_TO_BACKUP:
+                item_path = self.abs_path(file + ext)
+                backup_path = self.abs_path(file + '_original' + ext)
+                if os.path.isfile(item_path) and not os.path.isfile(backup_path):
+                    LOGGER.info('Backing up original {}!', name)
+                    shutil.copy(item_path, backup_path)
+                export_screen.step('BACK')
 
-        export_screen.grab_release()
-        export_screen.reset()  # Hide loading screen, we're done
-        return True, vpk_success
+            # Backup puzzles, if desired
+            backup.auto_backup(selected_game, export_screen)
+
+            # This is the connection "heart" and "error" models.
+            # These have to come last, so we need to special case it.
+            editoritems += style.editor.find_key("Renderables", []).copy()
+
+            # Special-case: implement the UnlockDefault stlylevar here,
+            # so all items are modified.
+            if selected_objects['StyleVar']['UnlockDefault']:
+                LOGGER.info('Unlocking Items!')
+                for item in editoritems.find_all('Item'):
+                    # If the Unlock Default Items stylevar is enabled, we
+                    # want to force the corridors and obs room to be
+                    # deletable and copyable
+                    # Also add DESIRES_UP, so they place in the correct orientation
+                    if item['type', ''] in _UNLOCK_ITEMS:
+                        editor_section = item.find_key("Editor", [])
+                        editor_section['deletable'] = '1'
+                        editor_section['copyable'] = '1'
+                        editor_section['DesiredFacing'] = 'DESIRES_UP'
+
+            LOGGER.info('Editing Gameinfo!')
+            self.edit_gameinfo(True)
+
+            LOGGER.info('Writing instance list!')
+            with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
+                for line in self.build_instance_data(editoritems):
+                    inst_file.write(line)
+            export_screen.step('EXP')
+
+            # AtomicWriter writes to a temporary file, then renames in one step.
+            # This ensures editoritems won't be half-written.
+            LOGGER.info('Writing Editoritems!')
+            with srctools.AtomicWriter(self.abs_path(
+                    'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
+                for line in editoritems.export():
+                    editor_file.write(line)
+            export_screen.step('EXP')
+
+            LOGGER.info('Writing VBSP Config!')
+            os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
+            with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w', encoding='utf8') as vbsp_file:
+                for line in vbsp_config.export():
+                    vbsp_file.write(line)
+            export_screen.step('EXP')
+
+            if num_compiler_files > 0:
+                LOGGER.info('Copying Custom Compiler!')
+                for file in os.listdir('../compiler'):
+                    # Ignore these dummy executables.
+                    if 'original' in file:
+                        continue
+
+                    src_path = os.path.join('../compiler', file)
+                    if not os.path.isfile(src_path):
+                        continue
+
+                    dest = self.abs_path('bin/' + file)
+
+                    LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+
+                    try:
+                        if os.path.isfile(dest):
+                            # First try and give ourselves write-permission,
+                            # if it's set read-only.
+                            utils.unset_readonly(dest)
+                        shutil.copy(
+                            src_path,
+                            self.abs_path('bin/')
+                        )
+                    except PermissionError:
+                        # We might not have permissions, if the compiler is currently
+                        # running.
+                        export_screen.reset()
+                        messagebox.showerror(
+                            title=_('BEE2 - Export Failed!'),
+                            message=_('Copying compiler file {file} failed.'
+                                      'Ensure the {game} is not running.').format(
+                                        file=file,
+                                        game=self.name,
+                                    ),
+                            master=TK_ROOT,
+                        )
+                        return False, vpk_success
+                    export_screen.step('COMP')
+
+            if should_refresh:
+                LOGGER.info('Copying Resources!')
+                music_files = self.copy_mod_music()
+                self.refresh_cache(music_files)
+
+            LOGGER.info('Optimizing editor models...')
+            self.clean_editor_models(editoritems)
+            export_screen.step('EXP')
+
+            self.generate_fizzler_sides(vbsp_config)
+
+            if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+                os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
+                with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
+                    TAG_COOP_INST_VMF.export(f)
+
+            export_screen.reset()  # Hide loading screen, we're done
+            return True, vpk_success
+        except loadScreen.Cancelled:
+            return False, False
 
     def clean_editor_models(self, editoritems: Property):
         """The game is limited to having 1024 models loaded at once.

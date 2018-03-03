@@ -32,7 +32,7 @@ from zipfile import ZipFile, ZIP_LZMA
 from tooltip import add_tooltip
 from srctools import Property, KeyValError
 from CheckDetails import CheckDetails, Item as CheckItem
-from loadScreen import LoadScreen
+import loadScreen
 import img
 import tk_tools
 import gameMan
@@ -86,17 +86,17 @@ backup_name = tk.StringVar()
 game_name = tk.StringVar()
 
 # Loadscreens used as basic progress bars
-copy_loader = LoadScreen(
+copy_loader = loadScreen.LoadScreen(
     ('COPY', ''),
     title_text=_('Copying maps'),
 )
 
-reading_loader = LoadScreen(
+reading_loader = loadScreen.LoadScreen(
     ('READ', ''),
     title_text=_('Loading maps'),
 )
 
-deleting_loader = LoadScreen(
+deleting_loader = loadScreen.LoadScreen(
     ('DELETE', ''),
     title_text=_('Deleting maps'),
 )
@@ -292,11 +292,14 @@ def load_game(game: 'gameMan.Game'):
 
     puzz_path = find_puzzles(game)
     if puzz_path:
-        BACKUPS['game_path'] = puzz_path
-        BACKUPS['game_zip'] = zip_file = FakeZip(puzz_path)
-        maps = load_backup(zip_file)
+        zip_file = FakeZip(puzz_path)
+        try:
+            BACKUPS['game'] = load_backup(zip_file)
+        except loadScreen.Cancelled:
+            return
 
-        BACKUPS['game'] = maps
+        BACKUPS['game_path'] = puzz_path
+        BACKUPS['game_zip'] = zip_file
         refresh_game_details()
 
 
@@ -357,7 +360,7 @@ def backup_maps(maps):
     refresh_back_details()
 
 
-def auto_backup(game: 'gameMan.Game', loader: LoadScreen):
+def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
     """Perform an automatic backup for the given game.
 
     We do this seperately since we don't need to read the property files.
@@ -581,17 +584,21 @@ def ui_load_backup():
         data = f.read()
         BACKUPS['unsaved_file'] = unsaved = BytesIO(data)
 
-    BACKUPS['backup_zip'] = zip_file = ZipFile(
+    zip_file = ZipFile(
         unsaved,
         mode='a',
         compression=ZIP_LZMA,
     )
-    BACKUPS['back'] = load_backup(zip_file)
+    try:
+        BACKUPS['back'] = load_backup(zip_file)
+        BACKUPS['backup_zip'] = zip_file
 
-    BACKUPS['backup_name'] = os.path.basename(file)
-    backup_name.set(BACKUPS['backup_name'])
+        BACKUPS['backup_name'] = os.path.basename(file)
+        backup_name.set(BACKUPS['backup_name'])
 
-    refresh_back_details()
+        refresh_back_details()
+    except loadScreen.Cancelled:
+        zip_file.close()
 
 
 def ui_new_backup():
@@ -615,7 +622,10 @@ def ui_save_backup():
         ui_save_backup_as()
         return
 
-    save_backup()
+    try:
+        save_backup()
+    except loadScreen.Cancelled:
+        pass
 
 
 def ui_save_backup_as():
@@ -729,23 +739,27 @@ def ui_delete_game():
         return
 
     deleting_loader.set_length('DELETE', len(to_delete))
-    with deleting_loader:
-        for p2c in to_delete:  # type: P2C
-            scr_path = p2c.filename + '.jpg'
-            map_path = p2c.filename + '.p2c'
-            abs_scr = os.path.join(game_dir, scr_path)
-            abs_map = os.path.join(game_dir, map_path)
-            try:
-                os.remove(abs_scr)
-            except FileNotFoundError:
-                LOGGER.info('{} not present!', abs_scr)
-            try:
-                os.remove(abs_map)
-            except FileNotFoundError:
-                LOGGER.info('{} not present!', abs_map)
+    try:
+        with deleting_loader:
+            for p2c in to_delete:  # type: P2C
+                scr_path = p2c.filename + '.jpg'
+                map_path = p2c.filename + '.p2c'
+                abs_scr = os.path.join(game_dir, scr_path)
+                abs_map = os.path.join(game_dir, map_path)
+                try:
+                    os.remove(abs_scr)
+                except FileNotFoundError:
+                    LOGGER.info('{} not present!', abs_scr)
+                try:
+                    os.remove(abs_map)
+                except FileNotFoundError:
+                    LOGGER.info('{} not present!', abs_map)
 
-    BACKUPS['game'] = to_keep
+        BACKUPS['game'] = to_keep
+    except loadScreen.Cancelled:
+        pass
     refresh_game_details()
+
 
 def init():
     """Initialise all widgets in the given window."""
