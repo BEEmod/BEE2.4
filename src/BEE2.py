@@ -59,15 +59,15 @@ DEFAULT_SETTINGS = {
     },
 }
 
+GEN_OPTS.load()
+GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
+
 loadScreen.main_loader.set_length('UI', 15)
-loadScreen.show_main_loader()
+loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
 # OS X starts behind other windows, fix that.
 if utils.MAC:
     TK_ROOT.lift()
-
-GEN_OPTS.load()
-GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
 logWindow.init(
     GEN_OPTS.get_bool('Debug', 'show_log_win'),

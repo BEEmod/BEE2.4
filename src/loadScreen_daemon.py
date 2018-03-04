@@ -450,6 +450,7 @@ class SplashScreen(BaseLoadScreen):
         else:
             self.sml_canvas.grid_remove()
             self.lrg_canvas.grid(row=0, column=0)
+        PIPE_SEND.send(('main_set_compact', is_compact))
 
     def toggle_compact(self, event: tk.Event):
         """Toggle when the splash screen is double-clicked."""

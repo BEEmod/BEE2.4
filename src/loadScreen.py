@@ -42,12 +42,9 @@ def close_all():
         screen.reset()
 
 
-def show_main_loader():
+def show_main_loader(is_compact: bool):
     """Special function, which sets the splash screen compactness."""
-    main_loader._send_msg(
-        'set_is_compact',
-        GEN_OPTS.get_bool('General', 'compact_splash'),
-    )
+    main_loader._send_msg('set_is_compact', is_compact)
     main_loader.show()
 
 
@@ -133,12 +130,15 @@ class LoadScreen:
         # Check the messages coming back as well.
         while _PIPE_MAIN_REC.poll():
             command, arg = _PIPE_MAIN_REC.recv()
-            if command == 'main_toggle':
+            if command == 'main_set_compact':
                 # Save the compact state to the config.
                 GEN_OPTS['General']['compact_splash'] = '1' if arg else '0'
+                GEN_OPTS.save_check()
             elif command == 'cancel':
                 # Mark this loadscreen as cancelled.
                 _SCREEN_CANCEL_FLAG[arg] = True
+            else:
+                raise ValueError('Bad command from daemon: ' + repr(command))
 
         # If the flag was set for us, raise an exception - the loading thing
         # will then stop.
