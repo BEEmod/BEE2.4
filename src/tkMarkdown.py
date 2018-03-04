@@ -98,7 +98,9 @@ def iter_elemtext(
 
     yield path, TAG.END
 
-    if elem.tail is not None:  # Text after this element..
+    # Text after this element..
+    # Do not return if we are the root element - "</div>\n"
+    if elem.tail is not None and parent_path:
         yield parent_path, elem.tail.replace('\n', '')
 
 
@@ -123,7 +125,7 @@ def parse_html(element: etree.Element):
             blocks.append((BlockTags.TEXT, tuple(cur_text_block)))
             cur_text_block.clear()
 
-    for path, text in iter_elemtext(element, parent_path=[element]):
+    for path, text in iter_elemtext(element, parent_path=[]):
         last = path[-1]
 
         if last.tag == 'div':
