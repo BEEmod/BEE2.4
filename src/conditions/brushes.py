@@ -217,7 +217,6 @@ def res_set_texture(inst: Entity, res: Property):
                 pos[axis] += 64
 
     brush = SOLIDS.get(pos.as_tuple(), None)
-    ':type brush: solidGroup'
 
     if not brush or brush.normal != norm:
         return
@@ -511,7 +510,8 @@ def res_import_template(inst: Entity, res: Property):
             'detail' is present, the brush will be forced to that type.
     - replace: A block of template material -> replacement textures.
             This is case insensitive - any texture here will not be altered
-            otherwise.
+            otherwise. If the material starts with a '#', it is instead a
+            face ID.
     - replaceBrush: The position of a brush to replace (0 0 0=the surface).
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal. Can alternately be a block:
