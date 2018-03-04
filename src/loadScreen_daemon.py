@@ -308,6 +308,63 @@ class SplashScreen(BaseLoadScreen):
         ]
 
         for canvas, width, height in self.canvas:
+            canvas.create_rectangle(
+                width - 40,
+                0,
+                width - 20,
+                20,
+                fill='#00785A',
+                width=0,
+                tags='resize_button',
+            )
+            # 150, 120, 64
+            # Diagonal part of arrow.
+            canvas.create_line(
+                width - 20 - 4, 4,
+                width - 20 - 16, 16,
+                fill='black',
+                width=2,
+                tags='resize_button',
+            )
+            canvas.tag_bind(
+                'resize_button',
+                '<Button-1>',
+                self.compact_button(
+                    canvas is self.lrg_canvas,
+                    width,
+                    lrg_width if width == sml_width else sml_width,
+                ),
+            )
+        self.sml_canvas.create_line(
+            sml_width - 20 - 4, 4,
+            sml_width - 20 - 16, 4,
+            fill='black',
+            width=2,
+            tags='resize_button',
+        )
+        self.sml_canvas.create_line(
+            sml_width - 20 - 4, 4,
+            sml_width - 20 - 4, 16,
+            fill='black',
+            width=2,
+            tags='resize_button',
+        )
+        self.lrg_canvas.create_line(
+            lrg_width - 20 - 16, 16,
+            lrg_width - 20 - 4, 16,
+            fill='black',
+            width=2,
+            tags='resize_button',
+        )
+        self.lrg_canvas.create_line(
+            lrg_width - 20 - 16, 16,
+            lrg_width - 20 - 16, 4,
+            fill='black',
+            width=2,
+            tags='resize_button',
+        )
+
+        for canvas, width, height in self.canvas:
             canvas['width'] = width
             canvas['height'] = height
             canvas.bind(utils.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
@@ -462,6 +519,20 @@ class SplashScreen(BaseLoadScreen):
             event.x_root - int(canvas['width']) // 2,
             event.y_root - int(canvas['height']) // 2,
         ))
+
+    def compact_button(self, compact: bool, old_width, new_width):
+        """Make the event function to set values."""
+        offset = old_width - new_width
+
+        def func(event=None):
+            """Event handler."""
+            self.op_set_is_compact(compact)
+            # Snap to where the button is.
+            self.win.wm_geometry('+{:g}+{:g}'.format(
+                self.win.winfo_x() + offset,
+                self.win.winfo_y(),
+            ))
+        return func
 
 
 def run_screen(
