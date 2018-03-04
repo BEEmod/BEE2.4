@@ -34,7 +34,6 @@ SIMPLE_TAGS = {
 
 UL_START = '\u2022 '
 OL_START = '{}. '
-HRULE_TEXT = ('\n ', ('hrule', ))
 
 LINK_TAG_START = 'link_callback_'
 
@@ -155,6 +154,13 @@ def parse_html(element: etree.Element):
                 ol_nums[-1] += 1
                 cur_text_block.append(OL_START.format(ol_nums[-1]))
                 cur_text_block.append(('list_start', 'indent'))
+
+        if last.tag == 'hr' and text == '':
+            cur_text_block.extend((
+                '\n', (),
+                '\n', ('hrule', ),
+                '\n', (),
+            ))
 
         if last.tag == 'li' and text is TAG.END:
             cur_text_block.append('\n')
