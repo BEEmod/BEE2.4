@@ -1152,23 +1152,25 @@ def pal_shuffle():
     if len(pal_picked) == 32:
         return
 
-    shuff_item_dict = item_list.copy()
-    for palitem in pal_picked:
-        # Don't add items that are already on the palette!
-        try:
-            del shuff_item_dict[palitem.id]
-        except KeyError:
-            # We might try removing it multiple times
-            pass
+    palette_set = {
+        item.id
+        for item in pal_picked
+    }
 
-    shuff_items = list(shuff_item_dict.values())
+    # Use a set to eliminate duplicates.
+    shuff_items = list({
+        item.id
+        # Only consider visible items, not on the palette.
+        for item in pal_items
+        if item.visible and item.id not in palette_set
+    })
 
     random.shuffle(shuff_items)
 
-    for item in shuff_items[:32-len(pal_picked)]:
+    for item_id in shuff_items[:32-len(pal_picked)]:
         pal_picked.append(PalItem(
             frames['preview'],
-            item,
+            item_list[item_id],
             sub=0,  # Use the first subitem
             is_pre=True,
         ))
