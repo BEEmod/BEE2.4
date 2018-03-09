@@ -78,8 +78,8 @@ except ImportError:
         """Block fx_blockable() for a short time."""
 
     initiallised = False
-    pyglet = avbin = None
-    SamplePlayer = None
+    pyglet = avbin = None  # type: ignore
+    SamplePlayer = None  # type: ignore
 else:
     # Succeeded in loading PyGame
     from pyglet.media import Source, MediaFormatException, CannotSeekException
