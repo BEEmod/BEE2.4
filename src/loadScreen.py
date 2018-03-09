@@ -95,11 +95,6 @@ class LoadScreen:
         title_text: str,
         is_splash: bool=False,
     ):
-        self.stages = list(stages)
-        self.labels = {}
-        self.bar_val = {}
-        self.maxes = {}
-
         self.active = False
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
