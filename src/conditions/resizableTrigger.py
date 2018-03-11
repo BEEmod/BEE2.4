@@ -181,7 +181,12 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
                 origin=origin,
             )
 
-            item = connections.Item(out_ent, item_type_coop)
+            item = connections.Item(
+                out_ent,
+                item_type_coop,
+                mark1.ant_floor_style,
+                mark1.ant_wall_style,
+            )
 
             if coop_only_once:
                 # Kill all the ents when both players are present.
@@ -196,7 +201,12 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
                 Output('OnEndTouchOrangePlayer', manager, 'SetStateBFalse'),
             )
         else:
-            item = connections.Item(trig_ent, item_type_sp)
+            item = connections.Item(
+                trig_ent,
+                item_type_sp,
+                mark1.ant_floor_style,
+                mark1.ant_wall_style,
+            )
 
         # Register, and copy over all the antlines.
         connections.ITEMS[item.name] = item
