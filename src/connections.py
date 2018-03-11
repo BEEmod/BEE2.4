@@ -635,7 +635,8 @@ def calc_connections(
             # Normal item.
             try:
                 item_type = ITEM_TYPES[instance_traits.get_item_id(inst).casefold()]
-            except KeyError:
+            except (KeyError, AttributeError):
+                # KeyError from no item type, AttributeError from None.casefold()
                 # These aren't made for non-io items. If it has outputs,
                 # that'll be a problem later.
                 pass
