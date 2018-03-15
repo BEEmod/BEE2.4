@@ -412,10 +412,11 @@ class FizzlerBrush:
         keys: Dict[str, str],
         local_keys: Dict[str, str],
         outputs: List[Output],
-        thickness=2.0,
+        thickness: float=2.0,
         stretch_center: bool=True,
         side_color: Vec=None,
         singular: bool=False,
+        set_axis_var: bool=False,
         mat_mod_name: str=None,
         mat_mod_var: str=None,
     ):
@@ -433,6 +434,9 @@ class FizzlerBrush:
 
         # If set, stretch the center to the brush size.
         self.stretch_center = stretch_center
+
+        # If set, store a 'axis' variable in VScript to the plane.
+        self.set_axis_var = set_axis_var
 
         # If set, add a material_modify_control to control these brushes.
         if mat_mod_var is not None and not mat_mod_var.startswith('$'):
@@ -488,17 +492,18 @@ class FizzlerBrush:
             )
 
         return FizzlerBrush(
-            conf['name'],
-            textures,
-            keys,
-            local_keys,
-            outputs,
-            conf.float('thickness', 2.0),
-            conf.bool('stretch_center', True),
-            side_color,
-            conf.bool('singular'),
-            conf['mat_mod_name', None],
-            conf['mat_mod_var', None],
+            name=conf['name'],
+            textures=textures,
+            keys=keys,
+            local_keys=local_keys,
+            outputs=outputs,
+            thickness=conf.float('thickness', 2.0),
+            stretch_center=conf.bool('stretch_center', True),
+            side_color=side_color,
+            singular=conf.bool('singular'),
+            mat_mod_name=conf['mat_mod_name', None],
+            mat_mod_var=conf['mat_mod_var', None],
+            set_axis_var=conf.bool('set_axis_var'),
         )
 
     def _side_color(self, side: Side, normal: Vec, min_pos: Vec, used_tex_func):
@@ -936,7 +941,7 @@ def generate_fizzlers(vmf: VMF):
     After this is done, fizzler-related conditions will not function correctly.
     However the model instances are now available for modification.
     """
-    from vbsp import MAP_RAND_SEED, TO_PACK
+    from vbsp import MAP_RAND_SEED, TO_PACK, PACK_FILES
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -999,7 +1004,7 @@ def generate_fizzlers(vmf: VMF):
 
         if not model_min or not model_max:
             raise ValueError(
-                'No model specified a side of "{}"'
+                'No model specified for one side of "{}"'
                 ' fizzlers'.format(fizz_type.id),
             )
 
@@ -1146,6 +1151,13 @@ def generate_fizzlers(vmf: VMF):
 
                     if brush_ent['classname'] == 'trigger_hurt':
                         trigger_hurt_name = brush_ent['targetname']
+
+                    if brush_type.set_axis_var:
+                        axis_script = 'BEE2/fizzler_axis_{}.nut'.format(fizz.normal().axis())
+                        scripts = brush_ent['vscripts'].split()
+                        scripts.insert(0, axis_script)
+                        brush_ent['vscripts'] = ' '.join(scripts)
+                        PACK_FILES.add('scripts/vscripts/' + axis_script)
 
                     for out in brush_type.outputs:
                         new_out = out.copy()
