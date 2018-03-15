@@ -563,7 +563,7 @@ def import_conditions():
         modules = [
             module
             for loader, module, is_package in
-            pkgutil.iter_modules(['conditions'])
+            pkgutil.iter_modules(__path__)
         ]
 
     for module in modules:
