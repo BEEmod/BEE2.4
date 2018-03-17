@@ -81,7 +81,7 @@ class FizzInst(Enum):
     BASE = 'base_inst'  # If set, swap the instance to this.
 
 MatModify = namedtuple('MatModify', 'name mat_var')
-
+FizzBeam = namedtuple('FizzBeam', 'offset keys speed_min speed_max')
 
 def read_configs(conf: Property):
     """Read in the fizzler data."""
@@ -157,6 +157,7 @@ class FizzlerType:
         out_activate: Optional[Tuple[Optional[str], str]],
         out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
+        beams: List['FizzBeam'],
         inst: Dict[Tuple[FizzInst, bool], List[str]],
 
         temp_brush_keys: Property,
@@ -173,6 +174,9 @@ class FizzlerType:
 
         # The brushes to generate.
         self.brushes = brushes
+
+        # Beams to generate.
+        self.beams = beams
 
         self.voice_attrs = voice_attrs
 
@@ -250,8 +254,6 @@ class FizzlerType:
             else:
                 voice_attrs.append(prop.value.casefold())
 
-
-
         out_activate = conf['OutActivate', None]
         if out_activate is not None:
             out_activate = Output.parse_name(out_activate)
@@ -276,6 +278,24 @@ class FizzlerType:
             for prop in
             conf.find_all('Brush')
         ]
+
+        beams = []  # type: List[FizzBeam]
+        for beam_prop in conf.find_all('Beam'):
+            offsets = [
+                Vec.from_str(off.value)
+                for off in
+                beam_prop.find_all('pos')
+            ]
+            keys = Property('', [
+                beam_prop.find_key('Keys', []),
+                beam_prop.find_key('LocalKeys', [])
+            ])
+            beams.append(FizzBeam(
+                offsets,
+                keys,
+                beam_prop.int('RandSpeedMin', 0),
+                beam_prop.int('RandSpeedMax', 0),
+            ))
 
         try:
             temp_conf = conf.find_key('TemplateBrush')
@@ -303,6 +323,7 @@ class FizzlerType:
             out_activate,
             out_deactivate,
             brushes,
+            beams,
             inst,
             temp_brush_keys,
             temp_min,
@@ -1039,12 +1060,46 @@ def generate_fizzlers(vmf: VMF):
         else:
             raise ValueError('Bad ModelName?')
 
+        # Generate env_beam pairs.
+        for beam in fizz_type.beams:
+            beam_template = Entity(vmf)
+            conditions.set_ent_keys(beam_template, fizz.base_inst, beam.keys)
+            beam_template['classname'] = 'env_beam'
+            del beam_template['LightningEnd']  # Don't allow users to set end pos.
+            name = beam_template['targetname'] + '_'
+
+            counter = 1
+            for seg_min, seg_max in fizz.emitters:
+                for offset in beam.offset:  # type: Vec
+                    min_off = offset.copy()
+                    max_off = offset.copy()
+                    min_off.localise(seg_min, min_angles)
+                    max_off.localise(seg_max, max_angles)
+                    beam_ent = beam_template.copy()
+                    vmf.add_ent(beam_ent)
+
+                    # Allow randomising speed and direction.
+                    if 0 < beam.speed_min  < beam.speed_max:
+                        random.seed('{}{}{}'.format(MAP_RAND_SEED, min_off, max_off))
+                        beam_ent['TextureScroll'] = random.randint(beam.speed_min, beam.speed_max)
+                        if random.choice((False, True)):
+                            # Flip to reverse direction.
+                            min_off, max_off = max_off, min_off
+
+                    beam_ent['origin'] = min_off
+                    beam_ent['LightningStart'] = beam_ent['targetname'] = (
+                        name + str(counter)
+                    )
+                    counter += 1
+                    beam_ent['targetpoint'] = max_off
+
         mat_mod_tex = {}  # type: Dict[FizzlerBrush, Set[str]]
         for brush_type in fizz_type.brushes:
             if brush_type.mat_mod_var is not None:
                 mat_mod_tex[brush_type] = set()
 
         trigger_hurt_name = ''
+
 
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
