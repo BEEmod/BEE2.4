@@ -421,11 +421,14 @@ class PalItem(Label):
         return '<' + str(self.id) + ":" + str(self.subKey) + '>'
 
 
-def quit_application():
+def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
     import sys
-    GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
-    GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
+    # If our window isn't actually visible, this is set to nonsense -
+    # ignore those values.
+    if TK_ROOT.winfo_viewable():
+        GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
+        GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
     GEN_OPTS.save_check()
     item_opts.save_check()
