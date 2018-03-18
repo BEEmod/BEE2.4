@@ -441,12 +441,6 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-def load_palette(data):
-    """Import in all defined palettes."""
-    global palettes
-    palettes = data
-
-
 def load_settings():
     """Load options from the general config file."""
     global selectedPalette
@@ -760,13 +754,13 @@ def suggested_refresh():
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
     global selectedPalette
-    cur_palette = palettes[selectedPalette]
-    palettes.sort(key=str)  # sort by name
-    selectedPalette = palettes.index(cur_palette)
+    cur_palette = paletteLoader.pal_list[selectedPalette]
+    paletteLoader.pal_list.sort(key=str)  # sort by name
+    selectedPalette = paletteLoader.pal_list.index(cur_palette)
 
     listbox = UI['palette']  # type: Listbox
     listbox.delete(0, END)
-    for i, pal in enumerate(palettes):
+    for i, pal in enumerate(paletteLoader.pal_list):
         listbox.insert(i, pal.name)
         if pal.prevent_overwrite:
             listbox.itemconfig(i, foreground='grey', background='white')
@@ -779,7 +773,7 @@ def refresh_pal_ui():
         if menus['pal'].type(ind) == RADIOBUTTON:
             menus['pal'].delete(ind)
     # Add a set of options to pick the palette into the menu system
-    for val, pal in enumerate(palettes):
+    for val, pal in enumerate(paletteLoader.pal_list):
         menus['pal'].add_radiobutton(
             label=pal.name,
             variable=selectedPalette_radio,
@@ -852,9 +846,9 @@ def export_editoritems(e=None):
 
     export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
 
-    for pal in palettes[:]:
+    for pal in paletteLoader.pal_list[:]:
         if pal.filename == export_filename:
-            palettes.remove(pal)
+            paletteLoader.pal_list.remove(pal)
 
     new_pal = paletteLoader.Palette(
         '??',
@@ -867,7 +861,7 @@ def export_editoritems(e=None):
         # And prevent overwrite
         prevent_overwrite=True,
         )
-    palettes.append(new_pal)
+    paletteLoader.pal_list.append(new_pal)
     new_pal.save(ignore_readonly=True)
 
     # Update corridor configs for standalone mode..
@@ -905,8 +899,8 @@ def export_editoritems(e=None):
         raise ValueError('Unknown action "{}"'.format(chosen_action))
 
     # Select the last_export palette, so reloading loads this item selection.
-    palettes.sort(key=str)
-    selectedPalette_radio.set(palettes.index(new_pal))
+    paletteLoader.pal_list.sort(key=str)
+    selectedPalette_radio.set(paletteLoader.pal_list.index(new_pal))
     set_pal_radio()
 
     # Re-set this, so we clear the '*' on buttons if extracting cache.
@@ -1085,14 +1079,14 @@ def set_pal_radio():
 
 def set_pal_listbox_selection(e=None):
     """Select the currently chosen palette in the listbox."""
-    UI['palette'].selection_clear(0, len(palettes))
+    UI['palette'].selection_clear(0, len(paletteLoader.pal_list))
     UI['palette'].selection_set(selectedPalette)
 
 
 def set_palette(e=None):
     """Select a palette."""
     global selectedPalette
-    if selectedPalette >= len(palettes) or selectedPalette < 0:
+    if selectedPalette >= len(paletteLoader.pal_list) or selectedPalette < 0:
         LOGGER.warning('Invalid palette index!')
         selectedPalette = 0
 
@@ -1100,9 +1094,9 @@ def set_palette(e=None):
     pal_clear()
     menus['pal'].entryconfigure(
         1,
-        label=_('Delete Palette "{}"').format(palettes[selectedPalette].name),
+        label=_('Delete Palette "{}"').format(paletteLoader.pal_list[selectedPalette].name),
     )
-    for item, sub in palettes[selectedPalette].pos:
+    for item, sub in paletteLoader.pal_list[selectedPalette].pos:
         try:
             item_group = item_list[item]
         except KeyError:
@@ -1123,7 +1117,7 @@ def set_palette(e=None):
             is_pre=True,
         ))
 
-    if len(palettes) < 2 or palettes[selectedPalette].prevent_overwrite:
+    if len(paletteLoader.pal_list) < 2 or paletteLoader.pal_list[selectedPalette].prevent_overwrite:
         UI['pal_remove'].state(('disabled',))
         menus['pal'].entryconfigure(1, state=DISABLED)
     else:
@@ -1197,7 +1191,7 @@ def pal_save_as(e: Event=None):
 
 
 def pal_save(e=None):
-    pal = palettes[selectedPalette]
+    pal = paletteLoader.pal_list[selectedPalette]
     paletteLoader.save_pal(
         [(it.id, it.subKey) for it in pal_picked],
         pal.name,
@@ -1207,8 +1201,8 @@ def pal_save(e=None):
 
 def pal_remove():
     global selectedPalette
-    if len(palettes) >= 2:
-        pal = palettes[selectedPalette]
+    if len(paletteLoader.pal_list) >= 2:
+        pal = paletteLoader.pal_list[selectedPalette]
         if messagebox.askyesno(
                 title='BEE2',
                 message=_('Are you sure you want to delete "{}"?').format(
@@ -1217,7 +1211,7 @@ def pal_remove():
                 parent=TK_ROOT,
                 ):
             pal.delete_from_disk()
-            del palettes[selectedPalette]
+            del paletteLoader.pal_list[selectedPalette]
             selectedPalette -= 1
             selectedPalette_radio.set(selectedPalette)
             refresh_pal_ui()
