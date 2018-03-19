@@ -649,6 +649,9 @@ class Game:
                         editor_section['copyable'] = '1'
                         editor_section['DesiredFacing'] = 'DESIRES_UP'
 
+            for item_prop in editoritems.find_all('Item'):
+                improve_item(item_prop)
+
             LOGGER.info('Editing Gameinfo!')
             self.edit_gameinfo(True)
 
@@ -1091,6 +1094,75 @@ def scan_music_locs():
 
         if MUSIC_MEL_VPK is not None and found_tag:
             break
+
+
+def improve_item(item: Property) -> None:
+    """Improve editoritems formats in various ways.
+
+    This operates inplace.
+    """
+    # OccupiedVoxels does not allow specifying 'volume' regions like
+    # EmbeddedVoxel. Implement that.
+
+    # First for 32^2 cube sections.
+    for voxel_part in item.find_all("Exporting", "OccupiedVoxels", "SurfaceVolume"):
+        if 'subpos1' not in voxel_part or 'subpos2' not in voxel_part:
+            LOGGER.warning(
+                'Item {} has invalid OccupiedVoxels part '
+                '(needs SubPos1 and SubPos2)!',
+                item['type'],
+            )
+            continue
+        voxel_part.name = "Voxel"
+        pos_1 = None
+        voxel_subprops = list(voxel_part)
+        voxel_part.clear()
+        for prop in voxel_subprops:
+            if prop.name not in ('subpos', 'subpos1', 'subpos2'):
+                voxel_part.append(prop)
+                continue
+            pos_2 = Vec.from_str(prop.value)
+            if pos_1 is None:
+                pos_1 = pos_2
+                continue
+
+            bbox_min, bbox_max = Vec.bbox(pos_1, pos_2)
+            pos_1 = None
+            for pos in Vec.iter_grid(bbox_min, bbox_max):
+                voxel_part.append(Property(
+                    "Surface", [
+                        Property("Pos", str(pos)),
+                    ])
+                )
+        if pos_1 is not None:
+            LOGGER.warning(
+                'Item {} has only half of SubPos bbox!',
+                item['type'],
+            )
+
+    # Full blocks
+    for occu_voxels in item.find_all("Exporting", "OccupiedVoxels"):
+        for voxel_part in list(occu_voxels.find_all("Volume")):
+            del occu_voxels['Volume']
+
+            if 'pos1' not in voxel_part or 'pos2' not in voxel_part:
+                LOGGER.warning(
+                    'Item {} has invalid OccupiedVoxels part '
+                    '(needs Pos1 and Pos2)!',
+                    item['type']
+                )
+                continue
+            voxel_part.name = "Voxel"
+            bbox_min, bbox_max = Vec.bbox(
+                voxel_part.vec('pos1'),
+                voxel_part.vec('pos2'),
+            )
+            del voxel_part['pos1']
+            del voxel_part['pos2']
+            for pos in Vec.iter_grid(bbox_min, bbox_max):
+                new_part = voxel_part.copy()
+                new_part['Pos'] = str(pos)
+                occu_voxels.append(new_part)
 
 
 def make_tag_coop_inst(tag_loc: str):
