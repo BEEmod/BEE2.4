@@ -34,6 +34,16 @@ COUNTER_AND_OFF = 'OnChangedFromMax'
 COUNTER_OR_ON = 'OnChangedFromMin'
 COUNTER_OR_OFF = 'OnHitMin'
 
+# We need different names for each kind of input type, so they don't
+# interfere with each other. We use the 'inst_local' pattern not 'inst-local'
+# deliberately so the actual item can't affect the IO input.
+COUNTER_NAME = {
+    const.FixupVars.CONN_COUNT: '_counter',
+    const.FixupVars.CONN_COUNT_TBEAM: '_counter_polarity',
+    const.FixupVars.BEE_CONN_COUNT_A: '_counter_a',
+    const.FixupVars.BEE_CONN_COUNT_B: '_counter_b',
+}
+
 
 # A script to play timer sounds - avoids needing the ambient_generic.
 TIMER_SOUND_SCRIPT = '''
@@ -1148,7 +1158,7 @@ def add_item_inputs(
         counter.clear_keys()
 
         counter['origin'] = orig_inst['origin']
-        counter['targetname'] = conditions.local_name(orig_inst, 'counter')
+        counter['targetname'] = orig_inst['targetname'] + COUNTER_NAME[count_var]
         counter['classname'] = 'math_counter'
         counter['min'] = 0
         counter['max'] = len(inputs) + 1
@@ -1221,7 +1231,7 @@ def add_item_inputs(
     elif needs_counter:
         counter = item.inst.map.create_ent(
             classname='math_counter',
-            targetname=conditions.local_name(item.inst, 'counter'),
+            targetname=item.name + COUNTER_NAME[count_var],
             origin=item.inst['origin'],
         )
     else:
