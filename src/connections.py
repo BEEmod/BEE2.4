@@ -1051,8 +1051,8 @@ def add_timer_relay(item: Item):
             relay.add_out(Output(
                 'OnTrigger',
                 conditions.local_name(item.inst, cmd.target) or item.inst,
-                cmd.input,
-                cmd.params,
+                conditions.resolve_value(item.inst, cmd.input),
+                conditions.resolve_value(item.inst, cmd.params),
                 inst_in=cmd.inst_in,
                 delay=item.timer + cmd.delay,
                 times=cmd.times,
@@ -1125,7 +1125,8 @@ def add_item_inputs(
                         Output(
                             out_cmd,
                             item.inst,
-                            cmd.input,
+                            conditions.resolve_value(item.inst, cmd.input),
+                            conditions.resolve_value(item.inst, cmd.params),
                             inst_out=out_name,
                             inst_in=cmd.inst_in,
                             delay=cmd.delay,
@@ -1275,9 +1276,12 @@ def add_item_inputs(
                 counter.add_out(
                     Output(
                         output_name,
-                        conditions.local_name(item.inst, cmd.target) or item.inst,
-                        cmd.input,
-                        cmd.params,
+                        conditions.local_name(
+                            item.inst,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or item.inst,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
                         delay=cmd.delay,
                         times=cmd.times,
                     )
@@ -1298,9 +1302,12 @@ def add_item_inputs(
                     inp_item.inst.add_out(
                         Output(
                             out_cmd,
-                            conditions.local_name(item.inst, cmd.target) or item.inst,
-                            cmd.input,
-                            cmd.params,
+                            conditions.local_name(
+                                item.inst,
+                                conditions.resolve_value(item.inst, cmd.target),
+                            ) or item.inst,
+                            conditions.resolve_value(item.inst, cmd.input),
+                            conditions.resolve_value(item.inst, cmd.params),
                             inst_out=out_name,
                             delay=cmd.delay,
                             times=cmd.times,
@@ -1364,9 +1371,12 @@ def add_item_indicators(
                 item.inst.add_out(
                     Output(
                         out,
-                        conditions.local_name(pan, cmd.target) or pan,
-                        cmd.input,
-                        cmd.params,
+                        conditions.local_name(
+                            pan,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or pan,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
                         inst_out=out_name,
                         inst_in=cmd.inst_in,
                         times=cmd.times,
