@@ -12,8 +12,11 @@ from conditions import (
     ALL_INST,
 )
 import instanceLocs
+import instance_traits
 from srctools import Property, Vec, Entity, Output, VMF
+import utils
 
+LOGGER = utils.getLogger(__name__, 'cond.instances')
 
 COND_MOD_NAME = 'Instances'
 
@@ -39,6 +42,65 @@ def flag_has_inst(flag: Property):
         for inst in
         ALL_INST
     )
+
+
+@make_flag('hasTrait')
+def flag_has_trait(inst: Entity, flag: Property):
+    """Check if the instance has a specific 'trait', which is set by code.
+
+    Current traits:
+        * `white`, `black`: If editoritems indicates the colour of the item.
+        * `arrival_departure_transition`: `arrival_departure_transition_ents`.
+        * `barrier`: Glass/grating instances:
+            * `barrier_128`: Segment instance.
+            * `barrier_frame`: Any frame part.
+                * `frame_convex_corner`: Convex corner (unused).
+                * `frame_short`: Shortened frame to fit a corner.
+                * `frame_straight`: Straight frame section.
+                * `frame_corner`: Frame corner section.
+                * `frame_left`: Left half of the frame.
+                * `frame_right`: Right half of the frame.
+        * `floor_button`: ItemButtonFloor type item:
+            * `btn_ball`: Button Type = Sphere.
+            * `btn_cube`: Button Type = Cube
+            * `weighted`: Button Type = Weighted
+        * `dropperless`: A dropperless Cube:
+            * `cube_standard`: Normal Cube.
+            * `cube_companion`: Companion Cube.
+            * `cube_ball`: Edgeless Safety Cube.
+            * `cube_reflect`: Discouragment Redirection Cube.
+            * `cube_franken`: FrankenTurret.
+        * `coop_corridor`: A Coop exit Corridor.
+        * `sp_corridor`: SP entry or exit corridor.
+        * `corridor_frame`: White/black door frame.
+        * `corridor_1`-`7`: The specified entry/exit corridor.
+        * `elevator`: An elevator instance.
+        * `entry_elevator`: Entry Elevator.
+        * `exit_elevator`: Exit Elevator.
+        * `entry_corridor`: Entry SP Corridor.
+        * `exit_corridor`: Exit SP/Coop Corridor.
+        * `fizzler`: A fizzler item:
+            * `fizzler_base`: Logic instance.
+            * `fizzler_model`: Model instance.
+        * `locking_targ`: Target of a locking pedestal button.
+        * `locking_btn`: Locking pedestal button.
+        * `paint_dropper`: Gel Dropper:
+            * `paint_dropper_bomb`: Bomb-type dropper.
+            * `paint_dropper_sprayer`: Sprayer-type dropper.
+        * `panel_angled`: Angled Panel-type item.
+        * `track_platform`: Track Platform-style item:
+            * `plat_bottom`: Bottom frame.
+            * `plat_bottom_grate`: Grating.
+            * `plat_middle`: Middle frame.
+            * `plat_single`: One-long frame.
+            * `plat_top`: Top frame.
+            * `plat_non_osc`: Non-oscillating platform.
+            * `plat_osc`: Oscillating platform.
+        * `tbeam_emitter`: Funnel emitter.
+        * `tbeam_frame`: Funnel frame.
+    """
+    return flag.value.casefold() in instance_traits.get(inst)
+
 
 INSTVAR_COMP = {
     '=': operator.eq,
@@ -72,6 +134,7 @@ def flag_instvar(inst: Entity, flag: Property):
     if len(values) == 3:
         variable, op, comp_val = values
         value = inst.fixup[variable]
+        comp_val = conditions.resolve_value(inst, comp_val)
         try:
             # Convert to floats if possible, otherwise handle both as strings.
             # That ensures we normalise different number formats (1 vs 1.0)
@@ -233,14 +296,21 @@ GLOBAL_INPUT_ENTS = {}  # type: Dict[Optional[str], Entity]
 
 @make_result_setup('GlobalInput')
 def res_global_input_setup(res: Property):
-    target = res['target', ''] or None
-    name = res['name', ''] or None
-    output = res['output', 'OnTrigger']
-    param = res['param', '']
-    delay = srctools.conv_float(res['delay', ''])
-    inp_name, inp_command = Output.parse_name(res['input'])
-
-    return name, inp_name, inp_command, output, delay, param, target
+    if res.has_children():
+        name = res['name', '']
+        inp_name, inp_command = Output.parse_name(res['input'])
+        return name, Output(
+            out=res['output', 'OnTrigger'],
+            targ=res['target', ''],
+            inp=inp_command,
+            inst_in=inp_name,
+            delay=srctools.conv_float(res['delay', '']),
+            param=res['param', ''],
+        )
+    else:
+        out = Output.parse(res)
+        out.output = ''  # Don't need to store GlobalInput...
+        return '', out
 
 
 @make_result('GlobalInput')
@@ -257,26 +327,22 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
     - `Output`: The name of the output, defaulting to `OnTrigger`. Ignored
         if Name is not set.
     - `Param`: The parameter for the output.
+
+    Alternatively pass a string VMF-style output, which only provides
+    OnMapSpawn functionality.
     """
-    relay_name, proxy_name, command, relay_out, delay, param, target = res.value
+    relay_name, out = res.value
 
-    if relay_name is not None:
-        relay_name = conditions.resolve_value(inst, relay_name)
-    if target is not None:
-        target = conditions.resolve_value(inst, target)
+    output = out.copy()  # type: Output
 
-    output = Output(
-        out=relay_out,
-        targ=(
-            conditions.local_name(inst, target)
-            if target else
-            inst['targetname']
-        ),
-        inp=command,
-        inst_in=proxy_name,
-        delay=delay,
-        param=conditions.resolve_value(inst, param),
-    )
+    if output.target:
+        output.target = conditions.local_name(
+            inst,
+            conditions.resolve_value(inst, output.target)
+        )
+
+    relay_name = conditions.resolve_value(inst, relay_name)
+    output.params = conditions.resolve_value(inst, output.params)
 
     global_input(vmf, inst['origin'], output, relay_name)
 
@@ -287,12 +353,15 @@ def global_input(
     output: Output,
     relay_name: str=None,
 ):
-    """Create a global input."""
+    """Create a global input, either from a relay or logic_auto.
+
+    The position is used to place the relay if this is the first time.
+    """
     try:
         glob_ent = GLOBAL_INPUT_ENTS[relay_name]
     except KeyError:
-        if relay_name is None:
-            glob_ent = GLOBAL_INPUT_ENTS[None] = vmf.create_ent(
+        if relay_name == '':
+            glob_ent = GLOBAL_INPUT_ENTS[''] = vmf.create_ent(
                 classname='logic_auto',
                 spawnflags='1',  # Remove on fire
                 origin=pos,
@@ -303,9 +372,10 @@ def global_input(
                 targetname=relay_name,
                 origin=pos,
             )
-    if relay_name is None:
+    if not relay_name:
         output.output = 'OnMapSpawn'
         output.only_once = True
+    output.comma_sep = False
     glob_ent.add_out(output)
 
 

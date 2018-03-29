@@ -217,7 +217,6 @@ def res_set_texture(inst: Entity, res: Property):
                 pos[axis] += 64
 
     brush = SOLIDS.get(pos.as_tuple(), None)
-    ':type brush: solidGroup'
 
     if not brush or brush.normal != norm:
         return
@@ -511,7 +510,8 @@ def res_import_template(inst: Entity, res: Property):
             'detail' is present, the brush will be forced to that type.
     - replace: A block of template material -> replacement textures.
             This is case insensitive - any texture here will not be altered
-            otherwise.
+            otherwise. If the material starts with a '#', it is instead a
+            face ID.
     - replaceBrush: The position of a brush to replace (0 0 0=the surface).
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal. Can alternately be a block:
@@ -558,7 +558,16 @@ def res_import_template(inst: Entity, res: Property):
         visgroup_force_var,
         key_block,
     ) = res.value
-    temp_id = conditions.resolve_value(inst, orig_temp_id)
+
+    if ':' in orig_temp_id:
+        # Split, resolve each part, then recombine.
+        temp_id, visgroup = orig_temp_id.split(':', 1)
+        temp_id = (
+            conditions.resolve_value(inst, temp_id) + ':' +
+            conditions.resolve_value(inst, visgroup)
+        )
+    else:
+        temp_id = conditions.resolve_value(inst, orig_temp_id)
 
     if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
         def visgroup_func(group):
@@ -569,9 +578,7 @@ def res_import_template(inst: Entity, res: Property):
     try:
         template = template_brush.get_template(temp_name)
     except template_brush.InvalidTemplateName:
-        # The template map is read in after setup is performed, so
-        # it must be checked here!
-        # We don't want an error, just quit
+        # If we did lookup, display both forms.
         if temp_id != orig_temp_id:
             LOGGER.warning(
                 '{} -> "{}" is not a valid template!',
@@ -583,6 +590,7 @@ def res_import_template(inst: Entity, res: Property):
                 '"{}" is not a valid template!',
                 temp_name
             )
+        # We don't want an error, just quit.
         return
 
     if color_var.casefold() == '<editor>':
@@ -671,6 +679,8 @@ def res_import_template(inst: Entity, res: Property):
         replace_tex,
         force_colour,
         force_grid,
+        # Don't allow clumping if using custom keyvalues - then it won't be edited.
+        no_clumping=key_block is not None,
     )
 
 

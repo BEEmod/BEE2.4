@@ -46,7 +46,8 @@ EXCLUDES = [
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
 import logging.handlers
-if not hasattr(logging.handlers, 'socket'):
+import logging.config
+if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'socket'):
     EXCLUDES.append('socket')
     # Subprocess uses this in UNIX-style OSes, but not Windows.
     if utils.WIN:

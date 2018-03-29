@@ -399,8 +399,10 @@ def convert_floor(
     noise_func: SimplexNoise,
 ):
     """Cut out tiles at the specified location."""
+    # We pop it, so the face isn't detected by other logic - otherwise it'll
+    # be retextured and whatnot, which we don't want.
     try:
-        brush = conditions.SOLIDS[loc.as_tuple()]
+        brush = conditions.SOLIDS.pop(loc.as_tuple())
     except KeyError:
         return False  # No tile here!
 

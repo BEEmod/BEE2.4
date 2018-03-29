@@ -35,8 +35,6 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionType = Union[str, int, float, bool, Vec]
-
 
 class Opt:
     def __init__(self, id: str, default, doc, fallback=None):
@@ -137,6 +135,8 @@ def set_opt(opt_name: str, value: str):
             SETTINGS[opt.id] = opt.type.value(value)
         except (ValueError, TypeError):
             pass
+
+OptionType = TypeVar('OptionType')
 
 
 def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:

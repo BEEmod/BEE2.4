@@ -270,7 +270,7 @@ if MAC:
             # e.state is a set of binary flags
             # Don't run the event if control is held!
             if e.state & 4 == 0:
-                func()
+                func(e)
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @bind_event_handler
@@ -282,7 +282,7 @@ if MAC:
             # e.state is a set of binary flags
             # Don't run the event if control is held!
             if e.state & 4 == 0:
-                func()
+                func(e)
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @bind_event_handler
@@ -306,7 +306,7 @@ else:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
-USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
+USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget.
 
 
 class CONN_TYPES(Enum):
@@ -327,7 +327,7 @@ E = "0 0 0"
 W = "0 180 0"
 # Lookup values for joining things together.
 CONN_LOOKUP = {
-    # N S  E  W : (Type, Rotation)
+    #N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),
     (0, 0, 1, 0): (CONN_TYPES.side, E),
@@ -839,18 +839,18 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         # We rotate through logs of 500kb each, so it doesn't increase too much.
         log_handler = handlers.RotatingFileHandler(
             filename,
-            maxBytes=500 * 1024,
-            backupCount=1,
+            backupCount=5,
         )
+        log_handler.doRollover()
         log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
         logger.addHandler(log_handler)
 
         err_log_handler = handlers.RotatingFileHandler(
             filename[:-3] + 'error.' + filename[-3:],
-            maxBytes=500 * 1024,
-            backupCount=1,
+            backupCount=5,
         )
+        err_log_handler.doRollover()
         err_log_handler.setLevel(logging.WARNING)
         err_log_handler.setFormatter(long_log_format)
 
@@ -873,7 +873,8 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
 
     if sys.stdout:
         stdout_loghandler = logging.StreamHandler(sys.stdout)
-        stdout_loghandler.setLevel(logging.INFO)
+        # When run from source, dump debug output.
+        stdout_loghandler.setLevel(logging.DEBUG if DEV_MODE else logging.INFO)
         stdout_loghandler.setFormatter(long_log_format)
         logger.addHandler(stdout_loghandler)
 
