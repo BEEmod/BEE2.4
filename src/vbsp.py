@@ -994,9 +994,11 @@ def set_player_portalgun():
             spawnflags=1,  # Players
             KillWeapons=1,
         )
+        # Max map size is +-16384, for some reason we can't have a brush bigger than
+        # that in any dimension?
         whole_map = VMF.make_prism(
-            Vec(-4096, -4096, -4096),
-            Vec(4096, 4096, 4096),
+            Vec(-8192, -8192, -8192),
+            Vec(8192, 8192, 8192),
             mat=consts.Tools.TRIGGER,
         ).solid
 
