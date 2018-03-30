@@ -221,6 +221,9 @@ class ItemType:
         timer_sound_pos: Optional[Vec] = None,
         timer_done_cmd: List[Output]=(),
         force_timer_sound: bool=False,
+
+        timer_start: Optional[List[Tuple[Optional[str], str]]]=None,
+        timer_stop: Optional[List[Tuple[Optional[str], str]]]=None,
     ):
         self.id = id
 
@@ -280,6 +283,11 @@ class ItemType:
         # If True, always add tick-tock sounds. If false, only when we have
         # a timer dial.
         self.force_timer_sound = force_timer_sound
+
+        # If set, these allow alternate inputs for controlling timers.
+        # Multiple can be given. If None, we use the normal output.
+        self.timer_start = timer_start
+        self.timer_stop = timer_stop
 
         # For locking buttons, this is the command to reactivate,
         # and force-lock it.
@@ -377,6 +385,20 @@ class ItemType:
         out_lock = get_input('out_lock')
         out_unlock = get_input('out_unlock')
 
+        timer_start = timer_stop = None
+        if 'out_timer_start' in conf:
+            timer_start = [
+                Output.parse_name(prop.value)
+                for prop in conf.find_all('out_timer_start')
+                if prop.value
+            ]
+        if 'out_timer_stop' in conf:
+            timer_stop = [
+                Output.parse_name(prop.value)
+                for prop in conf.find_all('out_timer_stop')
+                if prop.value
+            ]
+
         return ItemType(
             item_id, default_dual, input_type,
             invert_var, enable_cmd, disable_cmd,
@@ -384,6 +406,7 @@ class ItemType:
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
             timer_sound_pos, timer_done_cmd, force_timer_sound,
+            timer_start, timer_stop,
         )
 
 
@@ -482,6 +505,20 @@ class Item:
             if self.inputs:
                 return None, COUNTER_AND_OFF
         return self.item_type.output_deact
+
+    def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
+        """Return the output to use for starting timers."""
+        if self.item_type.timer_start is None:
+            out = self.output_act()
+            return [] if out is None else out
+        return self.item_type.timer_start
+
+    def timer_output_stop(self) -> List[Tuple[Optional[str], str]]:
+        """Return the output to use for stopping timers."""
+        if self.item_type.timer_stop is None:
+            out = self.output_deact()
+            return [] if out is None else out
+        return self.item_type.timer_stop
 
     def delete_antlines(self):
         """Delete the antlines and checkmarks outputting from this item."""
@@ -1106,12 +1143,11 @@ def add_timer_relay(item: Item, has_sounds:bool):
                     delay=delay,
                 ))
 
-    for output, cmd in [
-        (item.output_act(), 'Trigger'),
-        (item.output_deact(), 'CancelPending')
+    for outputs, cmd in [
+        (item.timer_output_start(), 'Trigger'),
+        (item.timer_output_stop(), 'CancelPending')
     ]:
-        if output:
-            out_name, out_cmd = output
+        for out_name, out_cmd in outputs:
             item.inst.add_out(Output(out_cmd, rl_name, cmd, inst_out=out_name))
 
 
@@ -1363,7 +1399,16 @@ def add_item_indicators(
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
         needs_toggle = has_ant or has_sign
     elif inst_type is PanelSwitchingStyle.INTERNAL:
-        needs_toggle = has_ant and not has_sign
+        if (
+            item.item_type.timer_start is not None or
+            item.item_type.timer_stop is not None
+        ):
+            # The item is doing custom control over the timer, so
+            # don't tie antline control to the timer.
+            needs_toggle = has_ant
+            inst_type = PanelSwitchingStyle.CUSTOM
+        else:
+            needs_toggle = has_ant and not has_sign
     else:
         raise ValueError('Bad switch style ' + repr(inst_type))
 
@@ -1377,30 +1422,32 @@ def add_item_indicators(
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else ' '
             first_inst = False
         else:
+            # VBSP and/or Hammer seems to get confused with totally empty
+            # instance var, so give it a blank name.
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = '-'
 
-        for output, input_cmds in [
-            (item.output_act(), pan_item.enable_cmd),
-            (item.output_deact(), pan_item.disable_cmd)
+        for outputs, input_cmds in [
+            (item.timer_output_start(), pan_item.enable_cmd),
+            (item.timer_output_stop(), pan_item.disable_cmd)
         ]:
-            if not output or not input_cmds:
+            if not input_cmds:
                 continue
-            out_name, out = output
-            for cmd in input_cmds:
-                item.inst.add_out(
-                    Output(
-                        out,
-                        conditions.local_name(
-                            pan,
-                            conditions.resolve_value(item.inst, cmd.target),
-                        ) or pan,
-                        conditions.resolve_value(item.inst, cmd.input),
-                        conditions.resolve_value(item.inst, cmd.params),
-                        inst_out=out_name,
-                        inst_in=cmd.inst_in,
-                        times=cmd.times,
+            for out_name, out in outputs:
+                for cmd in input_cmds:
+                    item.inst.add_out(
+                        Output(
+                            out,
+                            conditions.local_name(
+                                pan,
+                                conditions.resolve_value(item.inst, cmd.target),
+                            ) or pan,
+                            conditions.resolve_value(item.inst, cmd.input),
+                            conditions.resolve_value(item.inst, cmd.params),
+                            inst_out=out_name,
+                            inst_in=cmd.inst_in,
+                            times=cmd.times,
+                        )
                     )
-                )
 
     if needs_toggle:
         toggle = item.inst.map.create_ent(
@@ -1409,6 +1456,7 @@ def add_item_indicators(
             targetname='toggle_' + item.name,
             target=ant_name,
         )
+        # Don't use the configurable inputs - if they want that, use custAntline.
         for output, skin in [
             (item.output_act(), '1'),
             (item.output_deact(), '0')
