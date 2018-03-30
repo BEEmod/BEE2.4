@@ -10,16 +10,16 @@ otherwise.
 """
 
 import utils
+import gettext
 from srctools.filesys import RawFileSystem
 
 
 utils.fix_cur_directory()
-LOGGER = utils.init_logging(
-    '../logs/packages_sync.log',
-    __name__,
-)
+# Don't write to a log file, users of this should be able to handle a command
+# prompt.
+LOGGER = utils.init_logging(main_logger=__name__)
 # This is needed to allow us to import things properly.
-utils.setup_localisations(LOGGER)
+gettext.NullTranslations().install(['gettext', 'ngettext'])
 
 import os
 import sys

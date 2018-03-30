@@ -606,14 +606,15 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 
 
 def retexture_template(
-        template_data: ExportedTemplate,
-        origin: Vec,
-        fixup: srctools.vmf.EntityFixup=None,
-        replace_tex: dict= srctools.EmptyMapping,
-        force_colour: MAT_TYPES=None,
-        force_grid: str=None,
-        use_bullseye=False,
-        ):
+    template_data: ExportedTemplate,
+    origin: Vec,
+    fixup: srctools.vmf.EntityFixup=None,
+    replace_tex: dict= srctools.EmptyMapping,
+    force_colour: MAT_TYPES=None,
+    force_grid: str=None,
+    use_bullseye=False,
+    no_clumping=False,
+):
     """Retexture a template at the given location.
 
     - Only textures in the TEMPLATE_RETEXTURE dict will be replaced.
@@ -630,6 +631,9 @@ def retexture_template(
     - If use_bullseye is true, the bullseye textures will be used for all panel
       sides instead of the normal textures. (This overrides force_grid.)
     - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
+    - Set no_clump if the brush is used on a special entity, and therefore
+      won't get retextured by the main code. That means we need to directly
+      retexture here.
     """
     import vbsp
 
@@ -720,9 +724,17 @@ def retexture_template(
                     face.uaxis = uaxis.copy()
                     face.vaxis = vaxis.copy()
 
-            if folded_mat in replace_tex:
+            try:
+                override_mat = replace_tex['#' + orig_id]
+            except KeyError:
+                try:
+                    override_mat = replace_tex[folded_mat]
+                except KeyError:
+                    override_mat = None
+
+            if override_mat is not None:
                 # Replace_tex overrides everything.
-                mat = random.choice(replace_tex[folded_mat])
+                mat = random.choice(override_mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
                 if mat.startswith('<') or mat.endswith('>'):
@@ -731,9 +743,9 @@ def retexture_template(
                 face.mat = mat
                 continue
 
-            tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
-
-            if tex_type is None:
+            try:
+                tex_type = TEMPLATE_RETEXTURE[folded_mat]
+            except KeyError:
                 continue  # It's nodraw, or something we shouldn't change
 
             if isinstance(tex_type, str):
@@ -834,7 +846,7 @@ def retexture_template(
             if norm.z < -floor_tolerance:
                 grid_size = 'floor'
 
-            if can_clump:
+            if can_clump and not no_clumping:
                 # For the clumping algorithm, set to Valve PeTI and let
                 # clumping handle retexturing.
                 vbsp.IGNORED_FACES.remove(face)

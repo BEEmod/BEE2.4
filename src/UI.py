@@ -33,7 +33,8 @@ import helpMenu
 import backup as backup_win
 import tooltip
 
-from typing import Iterable, List
+from typing import Iterable, List, Dict
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -43,10 +44,14 @@ frames = {}
 UI = {}
 menus = {}
 
-pal_picked = []  # array of the picker icons
-pal_items = []  # array of the "all items" icons
-pal_picked_fake = []  # Labels used for the empty palette positions
-pal_items_fake = []  # Labels for empty picker positions
+# Items chosen for the palette.
+pal_picked = []   # type: List[PalItem]
+# Array of the "all items" icons
+pal_items = []  # type: List[PalItem]
+# Labels used for the empty palette positions
+pal_picked_fake = []  # type: List[ttk.Label]
+# Labels for empty picker positions
+pal_items_fake = []  # type: List[ttk.Label]
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -58,15 +63,8 @@ selectedPalette_radio = IntVar(value=0)
 # Variable used for export button (changes to include game name)
 EXPORT_CMD_VAR = StringVar(value=_('Export...'))
 
-# All the stuff we've loaded in
-item_list = {}
-skyboxes = {}
-voices = {}
-styles = {}
-musics = {}
-elevators = {}
-pack_lists = {}
-editor_sounds = {}
+# Maps item IDs to our wrapper for the object.
+item_list = {}  # type: Dict[str, Item]
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -282,7 +280,7 @@ class Item:
 
 class PalItem(Label):
     """The icon and associated data for a single subitem."""
-    def __init__(self, frame, item, sub, is_pre):
+    def __init__(self, frame, item: Item, sub: int, is_pre):
         """Create a label to show an item onscreen."""
         super().__init__(frame)
         self.item = item
@@ -423,11 +421,14 @@ class PalItem(Label):
         return '<' + str(self.id) + ":" + str(self.subKey) + '>'
 
 
-def quit_application():
+def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
     import sys
-    GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
-    GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
+    # If our window isn't actually visible, this is set to nonsense -
+    # ignore those values.
+    if TK_ROOT.winfo_viewable():
+        GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
+        GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
     GEN_OPTS.save_check()
     item_opts.save_check()
@@ -438,12 +439,6 @@ def quit_application():
     sys.exit(0)
 
 gameMan.quit_application = quit_application
-
-
-def load_palette(data):
-    """Import in all defined palettes."""
-    global palettes
-    palettes = data
 
 
 def load_settings():
@@ -466,22 +461,13 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
     This must be called before initMain() can run.
     """
     global skybox_win, voice_win, music_win, style_win, elev_win
-    global item_list
     global selected_style
 
     for item in data['Item']:
-        it = Item(item)
-        item_list[it.id] = it
+        item_list[item.id] = Item(item)
         loader.step("IMG")
 
     StyleVarPane.add_vars(data['StyleVar'], data['Style'])
-
-    # THese item types don't appear anywhere in the UI, so we just save them.
-    for packlist in data['PackList']:
-        pack_lists[packlist.id] = packlist
-
-    for editor_sound in data['EditorSound']:
-        editor_sounds[editor_sound.id] = editor_sound
 
     sky_list   = []  # type: List[selWinItem]
     voice_list = []  # type: List[selWinItem]
@@ -493,30 +479,30 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, skyboxes, 'Skybox', {
+        (sky_list, 'Skybox', {
             '3D': 'config.value',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, voices, 'QuotePack', {
+        (voice_list, 'QuotePack', {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, styles, 'Style', {
+        (style_list, 'Style', {
             'VID': 'has_video',
         }),
-        (music_list, musics, 'Music', {
+        (music_list, 'Music', {
             'TBEAM': 'has_tbeam',
             'TBEAM_SYNC': 'has_synced_tbeam',
             'GEL_BOUNCE': 'has_bouncegel',
             'GEL_SPEED': 'has_speedgel',
         }),
-        (elev_list, elevators, 'Elevator', {
+        (elev_list, 'Elevator', {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, obj_list, name, attrs in obj_types:
+    for sel_list, name, attrs in obj_types:
         attr_commands = [
             # cache the operator.attrgetter funcs
             (key, operator.attrgetter(value))
@@ -537,13 +523,12 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
                     attr_commands
                 }
             ))
-            obj_list[obj.id] = obj
             # Every item has an image
             loader.step("IMG")
 
     # Set the 'sample' value for music items
     for sel_item in music_list:  # type: selWinItem
-        sel_item.snd_sample = musics[sel_item.name].sample
+        sel_item.snd_sample = packageLoader.Music.by_id(sel_item.name).sample
 
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
@@ -692,16 +677,18 @@ def load_packages(data, package_systems: Iterable[FileSystem]):
         (skybox_win, 'Skybox'),
         (elev_win, 'Elevator'),
         ]
-    for (sel_win, opt_name), default in zip(
-            obj_types,
-            styles[selected_style].suggested,
-            ):
+    for (sel_win, opt_name), default in zip(obj_types, current_style().suggested):
         sel_win.sel_item_id(
             GEN_OPTS.get_val('Last_Selected', opt_name, default)
         )
 
 
-def reposition_panes():
+def current_style() -> packageLoader.Style:
+    """Return the currently selected style."""
+    return packageLoader.Style.by_id(selected_style)
+
+
+def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
     style_win = StyleVarPane.window
@@ -767,13 +754,13 @@ def suggested_refresh():
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
     global selectedPalette
-    cur_palette = palettes[selectedPalette]
-    palettes.sort(key=str)  # sort by name
-    selectedPalette = palettes.index(cur_palette)
+    cur_palette = paletteLoader.pal_list[selectedPalette]
+    paletteLoader.pal_list.sort(key=str)  # sort by name
+    selectedPalette = paletteLoader.pal_list.index(cur_palette)
 
     listbox = UI['palette']  # type: Listbox
     listbox.delete(0, END)
-    for i, pal in enumerate(palettes):
+    for i, pal in enumerate(paletteLoader.pal_list):
         listbox.insert(i, pal.name)
         if pal.prevent_overwrite:
             listbox.itemconfig(i, foreground='grey', background='white')
@@ -786,7 +773,7 @@ def refresh_pal_ui():
         if menus['pal'].type(ind) == RADIOBUTTON:
             menus['pal'].delete(ind)
     # Add a set of options to pick the palette into the menu system
-    for val, pal in enumerate(palettes):
+    for val, pal in enumerate(paletteLoader.pal_list):
         menus['pal'].add_radiobutton(
             label=pal.name,
             variable=selectedPalette_radio,
@@ -801,7 +788,7 @@ def export_editoritems(e=None):
 
     # Convert IntVar to boolean, and only export values in the selected style
     style_vals = StyleVarPane.tk_vars
-    chosen_style = styles[selected_style]
+    chosen_style = current_style()
     style_vars = {
         var.id: (style_vals[var.id].get() == 1)
         for var in
@@ -859,9 +846,9 @@ def export_editoritems(e=None):
 
     export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
 
-    for pal in palettes[:]:
+    for pal in paletteLoader.pal_list[:]:
         if pal.filename == export_filename:
-            palettes.remove(pal)
+            paletteLoader.pal_list.remove(pal)
 
     new_pal = paletteLoader.Palette(
         '??',
@@ -874,7 +861,7 @@ def export_editoritems(e=None):
         # And prevent overwrite
         prevent_overwrite=True,
         )
-    palettes.append(new_pal)
+    paletteLoader.pal_list.append(new_pal)
     new_pal.save(ignore_readonly=True)
 
     # Update corridor configs for standalone mode..
@@ -912,8 +899,8 @@ def export_editoritems(e=None):
         raise ValueError('Unknown action "{}"'.format(chosen_action))
 
     # Select the last_export palette, so reloading loads this item selection.
-    palettes.sort(key=str)
-    selectedPalette_radio.set(palettes.index(new_pal))
+    paletteLoader.pal_list.sort(key=str)
+    selectedPalette_radio.set(paletteLoader.pal_list.index(new_pal))
     set_pal_radio()
 
     # Re-set this, so we clear the '*' on buttons if extracting cache.
@@ -1092,14 +1079,14 @@ def set_pal_radio():
 
 def set_pal_listbox_selection(e=None):
     """Select the currently chosen palette in the listbox."""
-    UI['palette'].selection_clear(0, len(palettes))
+    UI['palette'].selection_clear(0, len(paletteLoader.pal_list))
     UI['palette'].selection_set(selectedPalette)
 
 
 def set_palette(e=None):
     """Select a palette."""
     global selectedPalette
-    if selectedPalette >= len(palettes) or selectedPalette < 0:
+    if selectedPalette >= len(paletteLoader.pal_list) or selectedPalette < 0:
         LOGGER.warning('Invalid palette index!')
         selectedPalette = 0
 
@@ -1107,9 +1094,9 @@ def set_palette(e=None):
     pal_clear()
     menus['pal'].entryconfigure(
         1,
-        label=_('Delete Palette "{}"').format(palettes[selectedPalette].name),
+        label=_('Delete Palette "{}"').format(paletteLoader.pal_list[selectedPalette].name),
     )
-    for item, sub in palettes[selectedPalette].pos:
+    for item, sub in paletteLoader.pal_list[selectedPalette].pos:
         try:
             item_group = item_list[item]
         except KeyError:
@@ -1130,7 +1117,7 @@ def set_palette(e=None):
             is_pre=True,
         ))
 
-    if len(palettes) < 2 or palettes[selectedPalette].prevent_overwrite:
+    if len(paletteLoader.pal_list) < 2 or paletteLoader.pal_list[selectedPalette].prevent_overwrite:
         UI['pal_remove'].state(('disabled',))
         menus['pal'].entryconfigure(1, state=DISABLED)
     else:
@@ -1152,30 +1139,32 @@ def pal_shuffle():
     if len(pal_picked) == 32:
         return
 
-    shuff_item_dict = item_list.copy()
-    for palitem in pal_picked:
-        # Don't add items that are already on the palette!
-        try:
-            del shuff_item_dict[palitem.id]
-        except KeyError:
-            # We might try removing it multiple times
-            pass
+    palette_set = {
+        item.id
+        for item in pal_picked
+    }
 
-    shuff_items = list(shuff_item_dict.values())
+    # Use a set to eliminate duplicates.
+    shuff_items = list({
+        item.id
+        # Only consider visible items, not on the palette.
+        for item in pal_items
+        if item.visible and item.id not in palette_set
+    })
 
     random.shuffle(shuff_items)
 
-    for item in shuff_items[:32-len(pal_picked)]:
+    for item_id in shuff_items[:32-len(pal_picked)]:
         pal_picked.append(PalItem(
             frames['preview'],
-            item,
+            item_list[item_id],
             sub=0,  # Use the first subitem
             is_pre=True,
         ))
     flow_preview()
 
 
-def pal_save_as(e=None):
+def pal_save_as(e: Event=None):
     name = ""
     while True:
         name = ask_string(
@@ -1202,7 +1191,7 @@ def pal_save_as(e=None):
 
 
 def pal_save(e=None):
-    pal = palettes[selectedPalette]
+    pal = paletteLoader.pal_list[selectedPalette]
     paletteLoader.save_pal(
         [(it.id, it.subKey) for it in pal_picked],
         pal.name,
@@ -1212,8 +1201,8 @@ def pal_save(e=None):
 
 def pal_remove():
     global selectedPalette
-    if len(palettes) >= 2:
-        pal = palettes[selectedPalette]
+    if len(paletteLoader.pal_list) >= 2:
+        pal = paletteLoader.pal_list[selectedPalette]
         if messagebox.askyesno(
                 title='BEE2',
                 message=_('Are you sure you want to delete "{}"?').format(
@@ -1222,7 +1211,7 @@ def pal_remove():
                 parent=TK_ROOT,
                 ):
             pal.delete_from_disk()
-            del palettes[selectedPalette]
+            del paletteLoader.pal_list[selectedPalette]
             selectedPalette -= 1
             selectedPalette_radio.set(selectedPalette)
             refresh_pal_ui()
@@ -1317,7 +1306,7 @@ def init_option(f):
         """Set music, skybox, voices, etc to the settings defined for a style.
 
         """
-        sugg = styles[selected_style].suggested
+        sugg = current_style().suggested
         win_types = (voice_win, music_win, skybox_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.sel_item_id(sugg_val)
@@ -1345,9 +1334,12 @@ def init_option(f):
 
     def configure_voice():
         """Open the voiceEditor window to configure a Quote Pack."""
-        chosen = voices.get(voice_win.chosen_id, None)
-        if chosen is not None:
-            voiceEditor.show(chosen)
+        try:
+            chosen_voice = packageLoader.QuotePack.by_id(voice_win.chosen_id)
+        except KeyError:
+            pass
+        else:
+            voiceEditor.show(chosen_voice)
     for ind, name in enumerate([
             _("Style: "),
             None,
@@ -1432,7 +1424,6 @@ def init_preview(f):
 
      This shows the items that will export to the palette.
     """
-    global pal_picked_fake
     UI['pre_bg_img'] = Label(
         f,
         bg=ItemsBG,
@@ -1454,13 +1445,13 @@ def init_preview(f):
         borderwidth=0,
         relief="solid",
         )
-    pal_picked_fake = [
+    pal_picked_fake.extend([
         ttk.Label(
             frames['preview'],
             image=img.PAL_BG_64,
             )
         for _ in range(32)
-        ]
+    ])
 
     UI['pre_moving'] = ttk.Label(
         f,
@@ -1684,7 +1675,7 @@ def init_menu_bar(win):
         )
     pal_menu.add_command(
         # Placeholder..
-        label=_('Delete Palette'), # This name is overwritten later
+        label=_('Delete Palette'),  # This name is overwritten later
         command=pal_remove,
         )
     pal_menu.add_command(
@@ -1964,7 +1955,7 @@ def init_windows():
         selected_style = style_id
         GEN_OPTS['Last_Selected']['Style'] = style_id
 
-        style_obj = styles[selected_style]
+        style_obj = current_style()
 
         for item in itertools.chain(item_list.values(), pal_picked, pal_items):
             item.load_data()  # Refresh everything

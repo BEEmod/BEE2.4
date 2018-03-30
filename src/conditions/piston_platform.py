@@ -1,11 +1,12 @@
 """Handles generating Piston Platforms with specific logic."""
 from typing import Tuple, Dict, List
 
+import conditions
 import utils
 from conditions import make_result, make_result_setup, local_name
 from srctools import Entity, VMF, Property, Output, Vec, Solid
 from instanceLocs import resolve_one as resolve_single
-from template_brush import Template, get_template
+import template_brush
 from connections import ITEMS
 from comp_consts import FixupVars
 import vbsp
@@ -57,18 +58,31 @@ def res_piston_plat_setup(res: Property):
     for name in INST_NAMES:
         if name in res:
             lookup = res[name]
+            if lookup == '':
+                # Special case, allow blank for no instance.
+                inst[name] = ''
+                continue
         elif item_id is not None:
             lookup = '<{}:bee2_pist_{}>'.format(item_id, name)
         else:
             raise ValueError('No "{}" specified!'.format(name))
         inst[name] = resolve_single(lookup, error=True)
 
-    template = get_template(res['template'])
+    template = template_brush.get_template(res['template'])
+
+    visgroup_names = [
+        res['visgroup_1', 'pist_1'],
+        res['visgroup_2', 'pist_2'],
+        res['visgroup_3', 'pist_3'],
+        res['visgroup_top', 'pist_4'],
+    ]
 
     return (
         template,
+        visgroup_names,
         inst,
         res['auto_var', ''],
+        res['color_var', ''],
         res['source_ent', ''],
         res['snd_start', ''],
         res['snd_loop', ''],
@@ -81,17 +95,25 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
     """Generates piston platforms with optimized logic."""
     (
         template,
+        visgroup_names,
         inst_filenames,
         automatic_var,
+        color_var,
         source_ent,
         snd_start,
         snd_loop,
         snd_stop,
-    ) = res.value  # type: Tuple[Template, Dict[str, str], str, str, str, str, str]
+    ) = res.value  # type: Tuple[template_brush.Template, List[str], Dict[str, str], str, str, str, str, str, str]
 
     min_pos = inst.fixup.int(FixupVars.PIST_BTM)
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
     start_up = inst.fixup.bool(FixupVars.PIST_IS_UP)
+
+    # Allow doing variable lookups here.
+    visgroup_names = [
+        conditions.resolve_value(inst, name)
+        for name in visgroup_names
+    ]
 
     if len(ITEMS[inst['targetname']].inputs) == 0:
         # No inputs. Check for the 'auto' var if applicable.
@@ -155,6 +177,15 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
 
     static_ent = vmf.create_ent('func_brush', origin=origin)
 
+    color_var = conditions.resolve_value(inst, color_var).casefold()
+
+    if color_var == 'white':
+        top_color = template_brush.MAT_TYPES.white
+    elif color_var == 'black':
+        top_color = template_brush.MAT_TYPES.black
+    else:
+        top_color = None
+
     for pist_ind in range(1, 5):
         pist_ent = inst.copy()
         vmf.add_ent(pist_ent)
@@ -201,13 +232,28 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
                         pist_ent, 'pist' + str(pist_ind - 1),
                     )
 
-        world, detail, overlays = template.visgrouped({'pist_' + str(pist_ind)})
-        temp_brushes = world + detail  # type: List[Solid]
+        if not pist_ent['file']:
+            # No actual instance, remove.
+            pist_ent.remove()
 
-        for orig_brush in temp_brushes:
-            new_brush = orig_brush.copy(map=vmf)
-            new_brush.localise(brush_pos, angles)
-            temp_targ.solids.append(new_brush)
+        temp_result = template_brush.import_template(
+            template,
+            brush_pos,
+            angles,
+            force_type=template_brush.TEMP_TYPES.world,
+            add_to_map=False,
+            additional_visgroups={visgroup_names[pist_ind - 1]},
+        )
+        temp_targ.solids.extend(temp_result.world)
+
+        template_brush.retexture_template(
+            temp_result,
+            origin,
+            pist_ent.fixup,
+            force_colour=top_color,
+            force_grid='special',
+            no_clumping=True,
+        )
 
     if not static_ent.solids:
         static_ent.remove()

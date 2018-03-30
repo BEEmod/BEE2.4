@@ -82,7 +82,7 @@ class FizzInst(Enum):
     BASE = 'base_inst'  # If set, swap the instance to this.
 
 MatModify = namedtuple('MatModify', 'name mat_var')
-
+FizzBeam = namedtuple('FizzBeam', 'offset keys speed_min speed_max')
 
 def read_configs(conf: Property):
     """Read in the fizzler data."""
@@ -156,6 +156,7 @@ class FizzlerType:
         model_local_name: str,
         model_name_type: ModelName,
         brushes: List['FizzlerBrush'],
+        beams: List['FizzBeam'],
         inst: Dict[Tuple[FizzInst, bool], List[str]],
 
         temp_brush_keys: Property,
@@ -172,6 +173,9 @@ class FizzlerType:
 
         # The brushes to generate.
         self.brushes = brushes
+
+        # Beams to generate.
+        self.beams = beams
 
         self.voice_attrs = voice_attrs
 
@@ -262,6 +266,24 @@ class FizzlerType:
             conf.find_all('Brush')
         ]
 
+        beams = []  # type: List[FizzBeam]
+        for beam_prop in conf.find_all('Beam'):
+            offsets = [
+                Vec.from_str(off.value)
+                for off in
+                beam_prop.find_all('pos')
+            ]
+            keys = Property('', [
+                beam_prop.find_key('Keys', []),
+                beam_prop.find_key('LocalKeys', [])
+            ])
+            beams.append(FizzBeam(
+                offsets,
+                keys,
+                beam_prop.int('RandSpeedMin', 0),
+                beam_prop.int('RandSpeedMax', 0),
+            ))
+
         try:
             temp_conf = conf.find_key('TemplateBrush')
         except NoKeyError:
@@ -286,6 +308,7 @@ class FizzlerType:
             model_local_name,
             model_name_type,
             brushes,
+            beams,
             inst,
             temp_brush_keys,
             temp_min,
@@ -395,10 +418,11 @@ class FizzlerBrush:
         keys: Dict[str, str],
         local_keys: Dict[str, str],
         outputs: List[Output],
-        thickness=2.0,
+        thickness: float=2.0,
         stretch_center: bool=True,
         side_color: Vec=None,
         singular: bool=False,
+        set_axis_var: bool=False,
         mat_mod_name: str=None,
         mat_mod_var: str=None,
     ):
@@ -416,6 +440,9 @@ class FizzlerBrush:
 
         # If set, stretch the center to the brush size.
         self.stretch_center = stretch_center
+
+        # If set, store a 'axis' variable in VScript to the plane.
+        self.set_axis_var = set_axis_var
 
         # If set, add a material_modify_control to control these brushes.
         if mat_mod_var is not None and not mat_mod_var.startswith('$'):
@@ -471,17 +498,18 @@ class FizzlerBrush:
             )
 
         return FizzlerBrush(
-            conf['name'],
-            textures,
-            keys,
-            local_keys,
-            outputs,
-            conf.float('thickness', 2.0),
-            conf.bool('stretch_center', True),
-            side_color,
-            conf.bool('singular'),
-            conf['mat_mod_name', None],
-            conf['mat_mod_var', None],
+            name=conf['name'],
+            textures=textures,
+            keys=keys,
+            local_keys=local_keys,
+            outputs=outputs,
+            thickness=conf.float('thickness', 2.0),
+            stretch_center=conf.bool('stretch_center', True),
+            side_color=side_color,
+            singular=conf.bool('singular'),
+            mat_mod_name=conf['mat_mod_name', None],
+            mat_mod_var=conf['mat_mod_var', None],
+            set_axis_var=conf.bool('set_axis_var'),
         )
 
     def _side_color(self, side: Side, normal: Vec, min_pos: Vec, used_tex_func):
@@ -904,6 +932,9 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             del connections.ITEMS[relay_item.name]
             continue
 
+        # Copy over fixup values
+        fizz.base_inst.fixup.update(inst.fixup)
+
         # Copy over the timer delay set in the relay.
         fizz_item.timer = relay_item.timer
         # Transfer over antlines.
@@ -925,7 +956,7 @@ def generate_fizzlers(vmf: VMF):
     After this is done, fizzler-related conditions will not function correctly.
     However the model instances are now available for modification.
     """
-    from vbsp import MAP_RAND_SEED, TO_PACK
+    from vbsp import MAP_RAND_SEED, TO_PACK, PACK_FILES
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -988,7 +1019,7 @@ def generate_fizzlers(vmf: VMF):
 
         if not model_min or not model_max:
             raise ValueError(
-                'No model specified a side of "{}"'
+                'No model specified for one side of "{}"'
                 ' fizzlers'.format(fizz_type.id),
             )
 
@@ -1023,12 +1054,46 @@ def generate_fizzlers(vmf: VMF):
         else:
             raise ValueError('Bad ModelName?')
 
+        # Generate env_beam pairs.
+        for beam in fizz_type.beams:
+            beam_template = Entity(vmf)
+            conditions.set_ent_keys(beam_template, fizz.base_inst, beam.keys)
+            beam_template['classname'] = 'env_beam'
+            del beam_template['LightningEnd']  # Don't allow users to set end pos.
+            name = beam_template['targetname'] + '_'
+
+            counter = 1
+            for seg_min, seg_max in fizz.emitters:
+                for offset in beam.offset:  # type: Vec
+                    min_off = offset.copy()
+                    max_off = offset.copy()
+                    min_off.localise(seg_min, min_angles)
+                    max_off.localise(seg_max, max_angles)
+                    beam_ent = beam_template.copy()
+                    vmf.add_ent(beam_ent)
+
+                    # Allow randomising speed and direction.
+                    if 0 < beam.speed_min  < beam.speed_max:
+                        random.seed('{}{}{}'.format(MAP_RAND_SEED, min_off, max_off))
+                        beam_ent['TextureScroll'] = random.randint(beam.speed_min, beam.speed_max)
+                        if random.choice((False, True)):
+                            # Flip to reverse direction.
+                            min_off, max_off = max_off, min_off
+
+                    beam_ent['origin'] = min_off
+                    beam_ent['LightningStart'] = beam_ent['targetname'] = (
+                        name + str(counter)
+                    )
+                    counter += 1
+                    beam_ent['targetpoint'] = max_off
+
         mat_mod_tex = {}  # type: Dict[FizzlerBrush, Set[str]]
         for brush_type in fizz_type.brushes:
             if brush_type.mat_mod_var is not None:
                 mat_mod_tex[brush_type] = set()
 
         trigger_hurt_name = ''
+
 
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
@@ -1142,6 +1207,13 @@ def generate_fizzlers(vmf: VMF):
 
                     if brush_ent['classname'] == 'trigger_hurt':
                         trigger_hurt_name = brush_ent['targetname']
+
+                    if brush_type.set_axis_var:
+                        axis_script = 'BEE2/fizzler_axis_{}.nut'.format(fizz.normal().axis())
+                        scripts = brush_ent['vscripts'].split()
+                        scripts.insert(0, axis_script)
+                        brush_ent['vscripts'] = ' '.join(scripts)
+                        PACK_FILES.add('scripts/vscripts/' + axis_script)
 
                     for out in brush_type.outputs:
                         new_out = out.copy()

@@ -1,8 +1,8 @@
 import math
 
 from conditions import (
-    make_flag, make_result,
-    DIRECTIONS, SOLIDS, GOO_LOCS,
+    make_flag, make_result, resolve_offset,
+    DIRECTIONS, SOLIDS,
 )
 import brushLoc
 from srctools import Vec, Entity, Property, VMF
@@ -133,14 +133,9 @@ def flag_goo_at_loc(inst: Entity, flag: Property):
 
     `0 0 0` is the origin of the instance, values are in `128` increments.
     """
-    pos = Vec.from_str(flag.value).rotate_by_str(inst['angles', '0 0 0'])
-    pos *= 128
-    pos += Vec.from_str(inst['origin'])
-
-    # Round to 128 units, then offset to the center
-    pos = pos // 128 * 128 + 64  # type: Vec
-    val = pos.as_tuple() in GOO_LOCS
-    return val
+    offset = resolve_offset(inst, flag.value, scale=128)
+    block = brushLoc.POS['world': offset]
+    return block.is_goo
 
 
 @make_flag('BlockType')
@@ -173,26 +168,15 @@ def flag_blockpos_type(inst: Entity, flag: Property):
     pos2 = None
 
     if flag.has_children():
-        pos1 = flag.vec('offset') * 128
+        pos1 = resolve_offset(inst, flag['offset', '0 0 0'], scale=128, zoff=-128)
         types = flag['type'].split()
         if 'offset2' in flag:
-            pos2 = flag.vec('offset2') * 128
+            pos2 = resolve_offset(inst, flag.value, scale=128, zoff=-128)
     else:
         types = flag.value.split()
         pos1 = Vec()
 
-    pos1.z -= 128
-    pos1.localise(
-        Vec.from_str(inst['origin']),
-        Vec.from_str(inst['angles']),
-    )
-
     if pos2 is not None:
-        pos2.z -= 128
-        pos2.localise(
-            Vec.from_str(inst['origin']),
-            Vec.from_str(inst['angles']),
-        )
         bbox = Vec.iter_grid(*Vec.bbox(pos1, pos2), stride=128)
     else:
         bbox = [pos1]
@@ -218,7 +202,6 @@ def res_set_block(inst: Entity, res: Property):
     This should be used only if you know what is in the position.
     The offset is in block increments, with `0 0 0` equal to the mounting surface.
     """
-    pos = res.vec('offset') * 128
     try:
         new_vals = brushLoc.BLOCK_LOOKUP[res['type'].casefold()]
     except KeyError:
@@ -229,11 +212,7 @@ def res_set_block(inst: Entity, res: Property):
     except ValueError:
         raise ValueError("Can't use compound block types ({})!".format(res['type']))
 
-    pos.z -= 128
-    pos.localise(
-        Vec.from_str(inst['origin']),
-        Vec.from_str(inst['angles']),
-    )
+    pos = resolve_offset(inst, res['offset', '0 0 0'], scale=128, zoff=-128)
     brushLoc.POS['world': pos] = new_val
 
 
@@ -265,23 +244,7 @@ def res_translate_inst(inst: Entity, res: Property):
     used to offset it based on the starting position, bottom or top position
     of a piston platform.
     """
-    folded_val = res.value.casefold()
-    if folded_val == '<piston>':
-        folded_val = (
-            '<piston_top>' if
-            srctools.conv_bool(inst.fixup['$start_up'])
-            else '<piston_bottom>'
-        )
-
-    if folded_val == '<piston_top>':
-        val = Vec(z=128 * srctools.conv_int(inst.fixup['$top_level', '1'], 1))
-    elif folded_val == '<piston_bottom>':
-        val = Vec(z=128 * srctools.conv_int(inst.fixup['$bottom_level', '0'], 0))
-    else:
-        val = Vec.from_str(res.value)
-
-    offset = val.rotate_by_str(inst['angles'])
-    inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
+    inst['origin'] = resolve_offset(inst, res.value)
 
 
 @make_result('OppositeWallDist')

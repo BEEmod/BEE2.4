@@ -10,6 +10,7 @@ import utils
 
 from typing import Union, Tuple, TypeVar, Type, Optional, Iterator
 
+
 LOGGER = utils.getLogger(__name__)
 
 SETTINGS = {}
@@ -34,8 +35,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionType = TypeVar('OptionType')
-
+OptionT = TypeVar('OptionT', str, int, float, bool, Vec, Enum)
 
 class Opt:
     def __init__(self, id: str, default, doc, fallback=None):
@@ -137,8 +137,7 @@ def set_opt(opt_name: str, value: str):
         except (ValueError, TypeError):
             pass
 
-
-def get(expected_type: Type[OptionType], name: str) -> Optional[OptionType]:
+def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
     """Get the given option. 
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
@@ -190,9 +189,9 @@ def get(expected_type: Type[OptionType], name: str) -> Optional[OptionType]:
 
 def get_itemconf(
     name: Union[str, Tuple[str, str]],
-    default: Optional[OptionType],
+    default: Optional[OptionT],
     timer_delay: int=None,
-) -> Optional[OptionType]:
+) -> Optional[OptionT]:
     """Get an itemconfig value.
 
     The name should be an 'ID:Section', or a tuple of the same.

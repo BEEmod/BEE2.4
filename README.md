@@ -14,9 +14,10 @@ bugfixes and improvements.
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
 ## Download and Use (Recommended, for using the BEE2.4)
-Download the latest releases of the BEE2.4 and items from the following pages:
-- [Application](https://github.com/BEEmod/BEE2.4/releases)
-- [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
+- Download and install the latest version of [Python3](https://www.python.org/downloads/).
+- Download the latest releases of the BEE2.4 and items from the following pages:
+  - [Application](https://github.com/BEEmod/BEE2.4/releases)
+  - [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
 - Extract the contents of the Application release anywhere you like. _e.g. C:\BEE2.4_
 - Place extracted package folder in the root BEE2 folder. _e.g. C:\BEE2.4\packages_
 - To run, locate the BEE2.exe in the bin folder and execute it. _e.g. C:\BEE2.4\bin\BEE2.exe_

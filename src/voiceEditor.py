@@ -67,13 +67,19 @@ win = Toplevel(TK_ROOT, name='voiceEditor')
 win.withdraw()
 
 
+def quit(event=None):
+    """Close the window."""
+    win.grab_release()
+    win.wm_withdraw()
+
+
 def init_widgets():
     """Make all the window components."""
     win.columnconfigure(0, weight=1)
     win.transient(master=TK_ROOT)
     tk_tools.set_window_icon(win)
-    win.protocol("WM_DELETE_WINDOW", win.withdraw)
-    win.bind("<Escape>", lambda event: win.withdraw())
+    win.protocol("WM_DELETE_WINDOW", quit)
+    win.bind("<Escape>", quit)
 
     pane = PanedWindow(
         win,
@@ -173,18 +179,6 @@ def check_toggled(var, config_section, quote_id):
     config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
-def configure_canv(e):
-    canvas = e.widget
-    frame = canvas.frame
-    canvas['scrollregion'] = (
-        4,
-        0,
-        canvas.winfo_reqwidth(),
-        frame.winfo_reqheight(),
-        )
-    frame['width'] = canvas.winfo_reqwidth()
-
-
 def save():
     global voice_item
     if voice_item is not None:
@@ -193,6 +187,7 @@ def save():
         config.save_check()
         config_mid.save_check()
         config_resp.save_check()
+        win.grab_release()
         win.withdraw()
 
 
@@ -240,6 +235,7 @@ def show(quote_pack):
     voice_item = quote_pack
 
     win.title(_('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
+    win.grab_set()
     notebook = UI['tabs']
 
     quote_data = quote_pack.config
@@ -370,10 +366,6 @@ def make_tab(group, config: ConfigFile, tab_type):
     frame.columnconfigure(0, weight=1)
     canv.create_window(0, 0, window=frame, anchor="nw")
 
-    # We do this so we can adjust the scrollregion later in
-    # <Configure>.
-    canv.frame = frame
-
     ttk.Label(
         frame,
         text=group_name,
@@ -484,6 +476,17 @@ def make_tab(group, config: ConfigFile, tab_type):
                 column=len(badges),
             )
             check.bind("<Enter>", show_trans)
+
+    def configure_canv(e):
+        """Allow resizing the windows."""
+        canv['scrollregion'] = (
+            4,
+            0,
+            canv.winfo_reqwidth(),
+            frame.winfo_reqheight(),
+        )
+        frame['width'] = canv.winfo_reqwidth()
+
     canv.bind('<Configure>', configure_canv)
 
     return outer_frame

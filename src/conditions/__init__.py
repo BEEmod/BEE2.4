@@ -9,12 +9,15 @@ from enum import Enum
 
 from typing import (
     Callable, Any, Iterable, Optional,
-    Dict, List, Tuple, NamedTuple, )
+    Dict, List, Tuple, NamedTuple, TypeVar,
+    Union,
+)
 
 import comp_consts as consts
 import srctools
 import template_brush
 import utils
+import comp_consts as const
 import instanceLocs
 from srctools import (
     Property,
@@ -550,7 +553,7 @@ def import_conditions():
         modules = [
             module
             for loader, module, is_package in
-            pkgutil.iter_modules(['conditions'])
+            pkgutil.iter_modules(__path__)
         ]
 
     for module in modules:
@@ -803,7 +806,7 @@ def local_name(inst: Entity, name: str):
         return name + '-' + targ_name
 
 
-def widen_fizz_brush(brush, thickness, bounds=None):
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=None):
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.
@@ -819,7 +822,7 @@ def widen_fizz_brush(brush, thickness, bounds=None):
     else:
         # Allow passing these in
         bound_min, bound_max = bounds
-    origin = (bound_max + bound_min) / 2  # type: Vec
+    origin = (bound_max + bound_min) / 2
     size = bound_max - bound_min
     for axis in 'xyz':
         # One of the directions will be thinner than 32, that's the fizzler
@@ -859,7 +862,7 @@ def reallocate_overlays(mapping: Dict[str, Optional[List[str]]]):
 
     The IDs should be strings.
     """
-    for overlay in VMF.by_class['info_overlay']:  # type: Entity
+    for overlay in VMF.by_class['info_overlay']:
         sides = overlay['sides', ''].split(' ')
         for side in sides[:]:
             try:
@@ -925,7 +928,12 @@ def steal_from_brush(
         })
 
 
-def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
+def set_ent_keys(
+    ent: Entity,
+    inst: Entity,
+    prop_block: Property,
+    block_name: str='Keys',
+) -> None:
     """Copy the given key prop block to an entity.
 
     This uses the keys and 'localkeys' properties on the prop_block.
@@ -946,8 +954,10 @@ def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
         else:
             ent[prop.real_name] = local_name(inst, val)
 
+T = TypeVar('T')
 
-def resolve_value(inst: Entity, value: str):
+
+def resolve_value(inst: Entity, value: T) -> Union[str, T]:
     """If a value starts with '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
@@ -978,6 +988,52 @@ def resolve_value(inst: Entity, value: str):
             return srctools.bool_as_int(not srctools.conv_bool(value))
     
     return value
+
+
+def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
+    """Retrieve an offset from an instance var. This allows several special values:
+
+    * $var to read from a variable
+    * <piston_start> or <piston> to get the unpowered position of a piston plat
+    * <piston_end> to get the powered position of a piston plat
+    * <piston_top> to get the extended position of a piston plat
+    * <piston_bottom> to get the retracted position of a piston plat
+
+    If scale is set, read values are multiplied by this, and zoff is added to Z.
+    """
+    value = value.casefold()
+    # Offset the overlay by the given distance
+    # Some special placeholder values:
+    if value == '<piston_start>' or value == '<piston>':
+        if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
+            value = '<piston_top>'
+        else:
+            value = '<piston_bottom>'
+    elif value == '<piston_end>':
+        if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
+            value = '<piston_bottom>'
+        else:
+            value = '<piston_top>'
+
+    if value == '<piston_bottom>':
+        offset = Vec(
+            z=inst.fixup.int(const.FixupVars.PIST_BTM) * 128,
+        )
+    elif value == '<piston_top>':
+        offset = Vec(
+            z=inst.fixup.int(const.FixupVars.PIST_TOP) * 128,
+        )
+    else:
+        # Regular vector
+        offset = Vec.from_str(resolve_value(inst, value)) * scale
+    offset.z += zoff
+
+    offset.localise(
+        Vec.from_str(inst['origin']),
+        Vec.from_str(inst['angles']),
+    )
+
+    return offset
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
