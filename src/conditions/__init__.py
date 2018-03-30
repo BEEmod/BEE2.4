@@ -11,6 +11,8 @@ from typing import (
     Callable, Any, Iterable, Optional,
     Dict, List, Tuple, NamedTuple, TypeVar,
     Union,
+    Set,
+    TextIO,
 )
 
 import comp_consts as consts
@@ -30,8 +32,8 @@ COND_MOD_NAME = 'Main Conditions'
 LOGGER = utils.getLogger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
-GLOBAL_INSTANCES = set()
-ALL_INST = set()
+GLOBAL_INSTANCES = set()  # type: Set[str]
+ALL_INST = set()  # type: Set[Entity]
 VMF = None  # type: srctools.VMF
 
 conditions = []
@@ -163,12 +165,12 @@ class Condition:
 
     def __init__(
         self,
-        flags=None,
-        results=None,
-        else_results=None,
-        priority=Decimal('0'),
-        source=None,
-    ):
+        flags: List[Property]=None,
+        results: List[Property]=None,
+        else_results: List[Property]=None,
+        priority: Decimal=Decimal(),
+        source: str=None,
+    ) -> None:
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
@@ -189,12 +191,12 @@ class Condition:
         )
 
     @classmethod
-    def parse(cls, prop_block: Property):
+    def parse(cls, prop_block: Property) -> 'Condition':
         """Create a condition from a Property block."""
         flags = []
         results = []
         else_results = []
-        priority = Decimal('0')
+        priority = Decimal()
         source = None
         for prop in prop_block:
             if prop.name == 'result':
@@ -231,7 +233,7 @@ class Condition:
             source,
         )
 
-    def setup(self):
+    def setup(self) -> None:
         """Some results need some pre-processing before they can be used.
 
         """
@@ -242,7 +244,7 @@ class Condition:
             self.setup_result(self.else_results, res, self.source)
 
     @staticmethod
-    def setup_result(res_list, result, source=''):
+    def setup_result(res_list: List[Property], result: Property, source: str='') -> None:
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
@@ -267,7 +269,7 @@ class Condition:
                 res_list.remove(result)
 
     @staticmethod
-    def test_result(inst: Entity, res: Property):
+    def test_result(inst: Entity, res: Property) -> Union[bool, RES_EXHAUSTED]:
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
@@ -285,7 +287,7 @@ class Condition:
         else:
             return func(VMF, inst, res)
 
-    def test(self, inst):
+    def test(self, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance."""
         success = True
         for flag in self.flags:
@@ -299,7 +301,13 @@ class Condition:
                 results.remove(res)
 
 
-def annotation_caller(func, *parms):
+AnnCallT = TypeVar('AnnCallT')
+
+
+def annotation_caller(
+    func: Callable[..., AnnCallT],
+    *parms: type,
+) -> Callable[..., AnnCallT]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
@@ -308,7 +316,10 @@ def annotation_caller(func, *parms):
     with the parms arguments, but delegates to func. (This could be the
     function itself).
     """
-    allowed_kinds = [inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    allowed_kinds = [
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    ]
     type_to_parm = dict.fromkeys(parms, None)
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
@@ -340,7 +351,7 @@ def annotation_caller(func, *parms):
         if out_name is not None:
             outputs[parm_order[out_name]] = var_name
 
-    assert '_' not in outputs
+    assert '_' not in outputs, 'Need more variables!'
 
     if inputs == outputs:
         # Matches already, don't need to do anything.
@@ -358,8 +369,8 @@ def annotation_caller(func, *parms):
     )
 
 
-def add_meta(func, priority, only_once=True):
-    """Add a metacondtion, which executes a function at a priority level.
+def add_meta(func, priority: Union[Decimal, int], only_once=True):
+    """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
@@ -377,7 +388,7 @@ def add_meta(func, priority, only_once=True):
 
     cond = Condition(
         results=[Property(name, '')],
-        priority=priority,
+        priority=Decimal(priority),
         source='MetaCondition {}'.format(name)
     )
 
@@ -397,9 +408,9 @@ def meta_cond(priority=0, only_once=True):
     return x
 
 
-def make_flag(orig_name, *aliases):
+def make_flag(orig_name: str, *aliases: str):
     """Decorator to add flags to the lookup."""
-    def x(func: Callable[[Entity, Property], bool]):
+    def x(func):
         try:
             func.group = func.__globals__['COND_MOD_NAME']
         except KeyError:
@@ -417,9 +428,9 @@ def make_flag(orig_name, *aliases):
     return x
 
 
-def make_result(orig_name, *aliases):
+def make_result(orig_name: str, *aliases: str):
     """Decorator to add results to the lookup."""
-    def x(func: Callable[..., Any]):
+    def x(func):
         try:
             func.group = func.__globals__['COND_MOD_NAME']
         except KeyError:
@@ -437,7 +448,7 @@ def make_result(orig_name, *aliases):
     return x
 
 
-def make_result_setup(*names):
+def make_result_setup(*names: str):
     """Decorator to do setup for this result."""
     def x(func: Callable[..., Any]):
         wrapper = annotation_caller(func, srctools.VMF, Property)
@@ -454,7 +465,7 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed, inst_list, vmf_file):
+def init(seed: str, inst_list: Set[Entity], vmf_file: srctools.vmf.VMF) -> None:
     """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED, ALL_INST, VMF
@@ -469,7 +480,7 @@ def init(seed, inst_list, vmf_file):
     build_solid_dict()
 
 
-def check_all():
+def check_all() -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     for condition in conditions:
@@ -535,37 +546,23 @@ def check_flag(flag: Property, inst: Entity):
     return res == desired_result
 
 
-def import_conditions():
+def import_conditions() -> None:
     """Import all the components of the conditions package.
 
     This ensures everything gets registered.
     """
     import importlib
+    import pkgutil
     # Find the modules in the conditions package...
-
-    # pkgutil doesn't work when frozen, so we need to use a hardcoded list.
-    try:
-        # noinspection PyUnresolvedReferences
-        from BUILD_CONSTANTS import cond_modules
-        modules = cond_modules.split(';')
-    except ImportError:
-        import pkgutil
-        modules = [
-            module
-            for loader, module, is_package in
-            pkgutil.iter_modules(__path__)
-        ]
-
-    for module in modules:
+    for loader, module, is_package in pkgutil.iter_modules(__path__):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
         importlib.import_module('conditions.' + module)
-        LOGGER.debug('Imported {} conditions module', module)
     LOGGER.info('Imported all conditions modules!')
 
 
-def build_solid_dict():
+def build_solid_dict() -> None:
     """Build a dictionary mapping origins to brush faces.
 
     This allows easily finding brushes that are at certain locations.
@@ -655,7 +652,7 @@ They have limited utility otherwise.
 '''
 
 
-def dump_conditions(file):
+def dump_conditions(file: TextIO) -> None:
     """Dump docs for all the condition flags, results and metaconditions."""
 
     LOGGER.info('Dumping conditions...')
@@ -718,7 +715,7 @@ def dump_conditions(file):
                 file.write('\n')
 
 
-def dump_func_docs(file, func):
+def dump_func_docs(file: TextIO, func: Callable):
     import inspect
     docs = inspect.getdoc(func)
     if docs:
@@ -727,7 +724,7 @@ def dump_func_docs(file, func):
         print('**No documentation!**', file=file)
 
 
-def weighted_random(count: int, weights: str):
+def weighted_random(count: int, weights: str) -> List[int]:
     """Generate random indexes with weights.
 
     This produces a list intended to be fed to random.choice(), with
@@ -762,7 +759,7 @@ def weighted_random(count: int, weights: str):
     return weight
 
 
-def add_output(inst, prop, target):
+def add_output(inst: Entity, prop: Property, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(
         prop['output', ''],
@@ -773,7 +770,7 @@ def add_output(inst, prop, target):
         ))
 
 
-def add_suffix(inst, suff):
+def add_suffix(inst: Entity, suff: str) -> None:
     """Append the given suffix to the instance.
     """
     file = inst['file']
@@ -781,7 +778,7 @@ def add_suffix(inst, suff):
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
-def local_name(inst: Entity, name: str):
+def local_name(inst: Entity, name: str) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
@@ -842,7 +839,7 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=Non
                     v[axis] = bound_min[axis]
 
 
-def remove_ant_toggle(toggle_ent):
+def remove_ant_toggle(toggle_ent: Entity):
     """Remove a texture_toggle instance , plus the associated antline.
 
     For non-toggle instances, they will just be removed.
