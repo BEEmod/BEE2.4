@@ -510,14 +510,14 @@ class Item:
         """Return the output to use for starting timers."""
         if self.item_type.timer_start is None:
             out = self.output_act()
-            return [] if out is None else out
+            return [] if out is None else [out]
         return self.item_type.timer_start
 
     def timer_output_stop(self) -> List[Tuple[Optional[str], str]]:
         """Return the output to use for stopping timers."""
         if self.item_type.timer_stop is None:
             out = self.output_deact()
-            return [] if out is None else out
+            return [] if out is None else [out]
         return self.item_type.timer_stop
 
     def delete_antlines(self):
