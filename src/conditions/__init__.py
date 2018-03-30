@@ -269,7 +269,7 @@ class Condition:
                 res_list.remove(result)
 
     @staticmethod
-    def test_result(inst: Entity, res: Property) -> Union[bool, RES_EXHAUSTED]:
+    def test_result(inst: Entity, res: Property) -> Union[bool, object]:
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
