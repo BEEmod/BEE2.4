@@ -551,31 +551,17 @@ def import_conditions():
     This ensures everything gets registered.
     """
     import importlib
+    import pkgutil
     # Find the modules in the conditions package...
-
-    # pkgutil doesn't work when frozen, so we need to use a hardcoded list.
-    try:
-        # noinspection PyUnresolvedReferences
-        from BUILD_CONSTANTS import cond_modules
-        modules = cond_modules.split(';')
-    except ImportError:
-        import pkgutil
-        modules = [
-            module
-            for loader, module, is_package in
-            pkgutil.iter_modules(__path__)
-        ]
-
-    for module in modules:
+    for loader, module, is_package in pkgutil.iter_modules(__path__):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
         importlib.import_module('conditions.' + module)
-        LOGGER.debug('Imported {} conditions module', module)
     LOGGER.info('Imported all conditions modules!')
 
 
-def build_solid_dict():
+def build_solid_dict() -> None:
     """Build a dictionary mapping origins to brush faces.
 
     This allows easily finding brushes that are at certain locations.
