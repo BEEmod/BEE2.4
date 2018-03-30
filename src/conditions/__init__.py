@@ -956,13 +956,13 @@ def resolve_value(inst: Entity, value: str):
     if not isinstance(value, str):
         return value
 
-    if value.startswith('!'):
-        inverted = True
-        value = value[1:]
-    else:
-        inverted = False
-
     if value.startswith('$'):
+        if value.startswith('!'):
+            inverted = True
+            value = value[1:]
+        else:
+            inverted = False
+
         if value in inst.fixup:
             value = inst.fixup[value]
         else:
@@ -974,10 +974,10 @@ def resolve_value(inst: Entity, value: str):
                 inst.fixup._fixup
             )
             value = ''
-    if inverted:
-        return srctools.bool_as_int(not srctools.conv_bool(value))
-    else:
-        return value
+        if inverted:
+            return srctools.bool_as_int(not srctools.conv_bool(value))
+    
+    return value
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
