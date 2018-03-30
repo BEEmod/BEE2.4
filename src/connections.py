@@ -686,6 +686,14 @@ def calc_connections(
         # Remove the original outputs, we've consumed those already.
         item.inst.outputs.clear()
 
+        # Pre-set the timer value, for items without antlines but with an output.
+        if const.FixupVars.TIM_DELAY in item.inst.fixup:
+            if item.item_type.output_act or item.item_type.output_deact:
+                item.timer = tim = item.inst.fixup.int(const.FixupVars.TIM_DELAY)
+                if not (1 <= tim <= 30):
+                    # These would be infinite.
+                    item.timer = None
+
         for out_name in inputs:
             # Fizzler base -> model/brush outputs, ignore these (discard).
             # fizzler.py will regenerate as needed.
