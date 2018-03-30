@@ -220,6 +220,7 @@ class ItemType:
 
         timer_sound_pos: Optional[Vec] = None,
         timer_done_cmd: List[Output]=(),
+        force_timer_sound: bool=False,
     ):
         self.id = id
 
@@ -276,6 +277,9 @@ class ItemType:
         self.timer_sound_pos = timer_sound_pos
         # These are fired when the time elapses.
         self.timer_done_cmd = timer_done_cmd
+        # If True, always add tick-tock sounds. If false, only when we have
+        # a timer dial.
+        self.force_timer_sound = force_timer_sound
 
         # For locking buttons, this is the command to reactivate,
         # and force-lock it.
@@ -317,8 +321,10 @@ class ItemType:
         timer_done_cmd = get_outputs('timer_done_cmd')
         if 'timer_sound_pos' in conf:
             timer_sound_pos = conf.vec('timer_sound_pos')
+            force_timer_sound = conf.bool('force_timer_sound')
         else:
             timer_sound_pos = None
+            force_timer_sound = False
 
         try:
             input_type = InputType(
@@ -377,7 +383,7 @@ class ItemType:
             sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
-            timer_sound_pos, timer_done_cmd,
+            timer_sound_pos, timer_done_cmd, force_timer_sound,
         )
 
 
@@ -905,8 +911,9 @@ def gen_item_outputs(vmf: VMF):
             item.item_type.timer_sound_pos is not None or
             item.item_type.timer_done_cmd
         ):
-            add_timer_relay(item)
-            has_timer_relay = True
+            has_sound = item.item_type.force_timer_sound or len(item.ind_panels) > 0
+            add_timer_relay(item, has_sound)
+            has_timer_relay = has_timer_relay or has_sound
 
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
@@ -1034,17 +1041,19 @@ def add_locking(item: Item):
             )
 
 
-def add_timer_relay(item: Item):
+def add_timer_relay(item: Item, has_sounds:bool):
     """Make a relay to play timer sounds, or fire once the outputs are done."""
     rl_name = item.name + '_timer_rl'
 
     relay = item.inst.map.create_ent(
         'logic_relay',
-        vscripts='BEE2/timer_sound.nut',
         targetname=rl_name,
         startDisabled=0,
         spawnflags=0,
     )
+
+    if has_sounds:
+        relay['vscripts'] = 'BEE2/timer_sound.nut'
 
     if item.item_type.timer_sound_pos:
         relay_loc = item.item_type.timer_sound_pos.copy()
@@ -1068,7 +1077,7 @@ def add_timer_relay(item: Item):
                 times=cmd.times,
             ))
 
-    if item.item_type.timer_sound_pos is not None:
+    if item.item_type.timer_sound_pos is not None and has_sounds:
         timer_sound = vbsp_options.get(str, 'timer_sound')
         timer_cc = vbsp_options.get(str, 'timer_sound_cc')
 
@@ -1401,8 +1410,8 @@ def add_item_indicators(
             target=ant_name,
         )
         for output, skin in [
-            (item.output_act(), 1),
-            (item.output_deact(), 0)
+            (item.output_act(), '1'),
+            (item.output_deact(), '0')
         ]:
             if not output:
                 continue
