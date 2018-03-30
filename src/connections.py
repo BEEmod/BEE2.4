@@ -359,25 +359,17 @@ class ItemType:
                 item_id, conf['DualType'],
             )) from None
 
-        try:
-            out_act = Output.parse_name(conf['out_activate'])
-        except IndexError:
-            out_act = None
+        def get_input(prop_name: str):
+            """Parse an input command."""
+            try:
+                return Output.parse_name(conf[prop_name])
+            except IndexError:
+                return None
 
-        try:
-            out_deact = Output.parse_name(conf['out_deactivate'])
-        except IndexError:
-            out_deact = None
-
-        try:
-            out_lock = Output.parse_name(conf['out_lock'])
-        except IndexError:
-            out_lock = None
-
-        try:
-            out_unlock = Output.parse_name(conf['out_unlock'])
-        except IndexError:
-            out_unlock = None
+        out_act = get_input('out_activate')
+        out_deact = get_input('out_deactivate')
+        out_lock = get_input('out_lock')
+        out_unlock = get_input('out_unlock')
 
         return ItemType(
             item_id, default_dual, input_type,
