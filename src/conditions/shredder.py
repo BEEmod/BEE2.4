@@ -146,11 +146,14 @@ def make_shredder_factory(
     # We place the trigger rather high up, so it always hits no matter where
     # on the grinder. But then delay the dissolve output, so it can roll around
     # a bit and maybe get caught.
+    # Except if it leaves, then immediately fizzle.
+    # Detonate turrets immediately, it's more satisfying.
     trigger_physics.add_out(
-        Output('OnStartTouch', '!activator', 'DisablePickup'),
-        Output('OnStartTouch', '!activator', 'SelfDestructImmediately', delay=0.35),
+        Output('OnStartTouch', '!activator', 'SelfDestructImmediately'),
         Output('OnStartTouch', '!activator', 'Dissolve', delay=0.35),
         Output('OnStartTouch', '!activator', 'Break', delay=0.40),
+        Output('OnEndTouch', '!activator', 'Dissolve'),
+        Output('OnEndTouch', '!activator', 'Break', delay=0.1),
     )
 
     for col_num, side_off in enumerate(range(
