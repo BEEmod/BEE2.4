@@ -227,6 +227,20 @@ def make_shredder_factory(
             trigger_hurt.solids.append(trigger_brush.solid)
             trigger_physics.solids.append(trigger_brush.solid.copy())
 
+            # Add a block-light brush below the center, to make the walls fade
+            # out.
+            vmf.add_brush(vmf.make_prism(
+                column_pos + Vec.with_axes(
+                    side_ax, 63,
+                    forward_ax, min_off - 63,
+                ) - 4 * normal,
+                column_pos + Vec.with_axes(
+                    side_ax, -63,
+                    forward_ax, max_off + 63,
+                ) - 12 * normal,
+                mat=const.Tools.BLOCK_LIGHT,
+            ).solid)
+
             model_sizes = utils.fit(max_off - min_off + 128, (1024, 512, 256, 128))
             model_off = min_off - 64
             for model_size in model_sizes:
