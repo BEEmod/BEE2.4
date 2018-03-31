@@ -95,8 +95,7 @@ def make_shredder_factory(
 ):
     """Make BTS-style shredders."""
     bbox_min, bbox_max = Vec.bbox(positions)
-    norm_ax = normal.axis()
-    norm_off = positions[0][norm_ax]
+    norm_off = positions[0][normal.axis()]
     forward_ax = forward.axis()
     side_ax = side.axis()
 
@@ -107,6 +106,7 @@ def make_shredder_factory(
     trigger_hurt = vmf.create_ent(
         classname='trigger_hurt',
         targetname=conditions.local_name(inst, 'trigger'),
+        origin=positions[0],
         damage=10000,
         damagetype=4+1,  # CRUSH + SLASH
         spawnflags=1,  # Clients
@@ -116,6 +116,7 @@ def make_shredder_factory(
     trigger_physics = vmf.create_ent(
         classname='trigger_multiple',
         targetname=conditions.local_name(inst, 'trigger'),
+        origin=positions[0],
         startdisabled=0,
         spawnflags=72,  # Physics Objects + NPCs + Everything
     )
@@ -152,7 +153,7 @@ def make_shredder_factory(
             spawnflags += 2  # Reverse.
 
         column_pos = Vec.with_axes(
-            norm_ax, norm_off,
+            normal.axis(), norm_off,
             side_ax, side_off,
         ) - 64 * normal
 
@@ -169,8 +170,9 @@ def make_shredder_factory(
         for min_off, max_off in group_lengths(columns):
             cylinder = template_brush.import_template(
                 rotator_template,
+                column_pos + Vec.with_axes(forward_ax, min_off),
+                grinder_angles,
                 add_to_map=False,
-                origin=column_pos + Vec.with_axes(forward_ax, min_off),
                 force_type=template_brush.TEMP_TYPES.world,
             )
             rotator.solids.extend(cylinder.world)
@@ -187,14 +189,12 @@ def make_shredder_factory(
             trigger_brush = vmf.make_prism(
                 column_pos + Vec.with_axes(
                     side_ax, 64,
-                    norm_ax, 70,
                     forward_ax, min_off-64,
-                ),
+                ) + 70 * normal,
                 column_pos + Vec.with_axes(
                     side_ax, -64,
-                    norm_ax, -128,
                     forward_ax, max_off+64,
-                ),
+                ) - 128 * normal,
                 mat=const.Tools.TRIGGER,
             )
             trigger_hurt.solids.append(trigger_brush.solid)
