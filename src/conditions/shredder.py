@@ -8,6 +8,7 @@ from typing import Set, List, Tuple, Iterable
 import conditions
 import template_brush
 import utils
+import vbsp
 import comp_consts as const
 from brushLoc import POS as BLOCK_POS, Block
 from conditions import make_result
@@ -39,8 +40,10 @@ def group_lengths(pos: List[float]):
 
 
 def get_factory_model(model_type: str, side: str, size: int) -> str:
-    """Get the BTS model for a specific size and type."""
-    return f'models/BEE2/props_bts/shredder/{side}_{model_type}_{size//128}.mdl'
+    """Get the BTS model for a specific size and type, and pack it."""
+    model = f'models/BEE2/props_bts/shredder/{side}_{model_type}_{size//128}.mdl'
+    vbsp.PACK_FILES.add(model)
+    return model
 
 
 @make_result('Shredder')
