@@ -10,6 +10,8 @@ from enum import Enum
 
 from typing import (
     Tuple, List, Union, Iterator,
+    SupportsInt,
+    Sequence,
 )
 
 
@@ -517,8 +519,11 @@ def append_bothsides(deq):
         deq.appendleft((yield))
 
 
-def fit(dist, obj):
-    """Figure out the smallest number of parts to stretch a distance."""
+def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
+    """Figure out the smallest number of parts to stretch a distance.
+
+    The list should be a series of sizes, from largest to smallest.
+    """
     # If dist is a float the outputs will become floats as well
     # so ensure it's an int.
     dist = int(dist)
@@ -537,6 +542,8 @@ def fit(dist, obj):
                 adder.send(item)
                 dist -= item
                 break
+        else:
+            raise ValueError(f'No section for dist of {dist}!')
     if dist > 0:
         adder.send(dist)
 
