@@ -11,8 +11,8 @@ import utils
 import vbsp
 import comp_consts as const
 from brushLoc import POS as BLOCK_POS, Block
-from conditions import make_result
-from srctools import Property, VMF, Entity, Solid, Output, Vec
+from conditions import make_result, SOLIDS
+from srctools import Property, VMF, Entity, Side, Output, Vec
 
 
 COND_MOD_NAME = 'Main Conditions'
@@ -53,13 +53,16 @@ def res_shredder(vmf: VMF, inst: Entity, res: Property):
     Parameters:
         "type": "factory", "furnace", or "spikepit"
     """
-    normal = Vec(x=-1).rotate_by_str(inst['angles'])
-    forward = Vec(z=1).rotate_by_str(inst['angles'])
-    side = Vec(y=1).rotate_by_str(inst['angles'])
+    inst_pos = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+
+    normal = Vec(x=-1).rotate(*angles)
+    forward = Vec(z=1).rotate(*angles)
+    side = Vec(y=1).rotate(*angles)
 
     # Recursively add all neighbours to positions.
-    positions = [Vec.from_str(inst['origin'])]  # type: List[Vec]
-    if positions[0].as_tuple() in ALL_SHREDDERS:
+    positions = [inst_pos]  # type: List[Vec]
+    if inst_pos.as_tuple() in ALL_SHREDDERS:
         # Another shredder was placed here. Quit.
         inst.remove()
         return
@@ -77,6 +80,23 @@ def res_shredder(vmf: VMF, inst: Entity, res: Property):
                     if BLOCK_POS['world': neighbour - 128*normal] is Block.AIR:
                         ALL_SHREDDERS.add(neighbour.as_tuple())
                         positions.append(neighbour)
+
+    side_template = template_brush.get_scaling_template(res['side_temp'])
+    side_template = side_template.rotate(angles, inst_pos)
+
+    for top_pos in positions:
+        for pos in (top_pos, top_pos - 128 * normal):
+            for axis in 'xyz':
+                for mag in (-64, +64):
+                    try:
+                        face = SOLIDS.pop(
+                            (pos + Vec.with_axes(axis, mag)).as_tuple()
+                        ).face  # type: Side
+                    except KeyError:
+                        pass
+                    else:
+                        side_template.apply(face)
+                        vbsp.IGNORED_FACES.add(face)
 
     shred_type = res['type'].casefold()
     try:
