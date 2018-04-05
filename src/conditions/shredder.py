@@ -52,6 +52,8 @@ def res_shredder(vmf: VMF, inst: Entity, res: Property):
 
     Parameters:
         "type": "factory", "furnace", or "spikepit"
+        "side_temp": Scaling template for walls around shredders.
+        "skin": Skin to use for the factory models.
     """
     inst_pos = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
@@ -125,6 +127,8 @@ def make_shredder_factory(
     grinder_angles = Vec.with_axes(forward_ax, 1).to_angle()
 
     rotator_template = template_brush.get_template('BEE2_SHREDDER_FACTORY_ROT')
+
+    mdl_skin = res['skin', '0']
 
     trigger_hurt = vmf.create_ent(
         classname='trigger_hurt',
@@ -253,6 +257,7 @@ def make_shredder_factory(
                         forward_ax,
                         model_off + model_size / 2,
                     ),
+                    skin=mdl_skin,
                     model=get_factory_model('grind', side, model_size),
                     # The original model does a full rotation, and is 1024 units
                     # long. So figure out an appropriate rotation for this offset.
