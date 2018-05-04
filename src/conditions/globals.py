@@ -129,9 +129,8 @@ def res_set_option(res: Property):
     return RES_EXHAUSTED
 
 
-
 @make_flag('ItemConfig')
-def res_get_item_config(inst: Entity, res: Property):
+def res_match_item_config(inst: Entity, res: Property):
     """Check if an item config panel value matches another value.
 
     * `ID` is the ID of the group.
@@ -228,7 +227,7 @@ def precache_model(vmf: VMF, mdl_name: str):
 
 
 @make_result('GetItemConfig')
-def res_get_item_config(inst: Entity, res: Property):
+def res_item_config_to_fixup(inst: Entity, res: Property):
     """Load a config from the item config panel onto a fixup.
 
     * `ID` is the ID of the group.

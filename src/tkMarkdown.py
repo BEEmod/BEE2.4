@@ -34,7 +34,6 @@ SIMPLE_TAGS = {
 
 UL_START = '\u2022 '
 OL_START = '{}. '
-HRULE_TEXT = ('\n ', ('hrule', ))
 
 LINK_TAG_START = 'link_callback_'
 
@@ -99,7 +98,9 @@ def iter_elemtext(
 
     yield path, TAG.END
 
-    if elem.tail is not None:  # Text after this element..
+    # Text after this element..
+    # Do not return if we are the root element - "</div>\n"
+    if elem.tail is not None and parent_path:
         yield parent_path, elem.tail.replace('\n', '')
 
 
@@ -124,7 +125,7 @@ def parse_html(element: etree.Element):
             blocks.append((BlockTags.TEXT, tuple(cur_text_block)))
             cur_text_block.clear()
 
-    for path, text in iter_elemtext(element, parent_path=[element]):
+    for path, text in iter_elemtext(element, parent_path=[]):
         last = path[-1]
 
         if last.tag == 'div':
@@ -155,6 +156,13 @@ def parse_html(element: etree.Element):
                 ol_nums[-1] += 1
                 cur_text_block.append(OL_START.format(ol_nums[-1]))
                 cur_text_block.append(('list_start', 'indent'))
+
+        if last.tag == 'hr' and text == '':
+            cur_text_block.extend((
+                '\n', (),
+                '\n', ('hrule', ),
+                '\n', (),
+            ))
 
         if last.tag == 'li' and text is TAG.END:
             cur_text_block.append('\n')

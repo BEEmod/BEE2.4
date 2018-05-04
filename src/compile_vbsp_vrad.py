@@ -28,7 +28,6 @@ EXCLUDES = [
     'optparse',  # Used in calendar.__main__
     'pprint',  # From pickle, not needed
     'textwrap',  # Used in zipfile.__main__
-    'pkgutil',  # Used by conditions only when unfrozen
 
     # We don't localise the compiler, but utils imports the modules.
     'locale', 'gettext',
@@ -43,6 +42,7 @@ EXCLUDES = [
     'smtplib',
     'http',
 ]
+
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
 import logging.handlers
@@ -62,23 +62,11 @@ if utils.MAC or utils.LINUX:
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
 
-
-# Additional modules to include:
+# Include the condition sub-modules that are dynamically imported.
 INCLUDES = [
-
-]
-
-# Get the list of condition sub-modules that we need to also include.
-condition_modules = [
-    name
-    for loader, name, is_package in
-    pkgutil.iter_modules(['conditions'])
-]
-
-INCLUDES += [
     'conditions.' + module
-    for module in
-    condition_modules
+    for loader, module, is_package in
+    pkgutil.iter_modules(['conditions'])
 ]
 
 bee_version = input('BEE2 Version (or blank for dev): ')
@@ -92,11 +80,8 @@ setup(
             'excludes': EXCLUDES,
             'includes': INCLUDES,
             # These values are added to the generated BUILD_CONSTANTS module.
-            'constants': 'BEE_VERSION={ver!r},cond_modules={cond!r}'.format(
+            'constants': 'BEE_VERSION={ver!r}'.format(
                 ver=bee_version,
-                # Pass on the list of frozen constants so we can import them
-                # later.
-                cond=';'.join(condition_modules),
             ),
 
             # Include all modules in the zip..

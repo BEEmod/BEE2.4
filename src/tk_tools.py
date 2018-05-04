@@ -2,6 +2,8 @@
 General code used for tkinter portions.
 
 """
+from typing import Union, Callable
+
 from tkinter import ttk
 from tkinter import font as _tk_font
 from tkinter import filedialog
@@ -15,7 +17,7 @@ try:
     from idlelib.redirector import WidgetRedirector
 except ImportError:
     # Python 3.5 and below
-    # noinspection PyCompatibility
+    # noinspection PyCompatibility, PyUnresolvedReferences
     from idlelib.WidgetRedirector import WidgetRedirector
 
 import utils
@@ -45,7 +47,7 @@ if utils.WIN:
     except (AttributeError, WindowsError, ValueError):
         pass  # It's not too bad if it fails.
 elif utils.MAC:
-    def set_window_icon(window: tk.Toplevel):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
         """ Call OS-X's specific api for setting the window icon."""
         TK_ROOT.tk.call(
             'tk::mac::iconBitmap',
@@ -76,13 +78,6 @@ def on_error(exc_type, exc_value, exc_tb):
     # We don't want this to fail, so import everything here, and wrap in
     # except Exception.
     import traceback
-
-    # Close loading screens if they're visible..
-    try:
-        import loadScreen
-        loadScreen.close_all()
-    except Exception:
-        pass
 
     err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
@@ -198,12 +193,12 @@ class ReadOnlyEntry(ttk.Entry):
 
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     """This is missing from ttk, but still exists."""
-    def __init__(self, master, range=None, **kw):
+    def __init__(self, master, range: Union[range, slice]=None, **kw):
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
             values: A list of values to use
-            wrap: Wether to loop at max/min
+            wrap: Whether to loop at max/min
             format: A specifier of the form ' %<pad>.<pad>f'
             command: A command to run whenever the value changes
         """
@@ -249,9 +244,9 @@ class FileField(ttk.Frame):
     def __init__(
         self,
         master,
-        is_dir=False,
-        loc='',
-        callback=None,
+        is_dir: bool=False,
+        loc: str='',
+        callback: Callable[[str], None]=None,
     ):
         """Initialise the field.
 
@@ -281,7 +276,6 @@ class FileField(ttk.Frame):
 
         if callback is not None:
             self.callback = callback
-
 
         self.textbox = ReadOnlyEntry(
             self,

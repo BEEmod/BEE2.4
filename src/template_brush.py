@@ -724,9 +724,17 @@ def retexture_template(
                     face.uaxis = uaxis.copy()
                     face.vaxis = vaxis.copy()
 
-            if folded_mat in replace_tex:
+            try:
+                override_mat = replace_tex['#' + orig_id]
+            except KeyError:
+                try:
+                    override_mat = replace_tex[folded_mat]
+                except KeyError:
+                    override_mat = None
+
+            if override_mat is not None:
                 # Replace_tex overrides everything.
-                mat = random.choice(replace_tex[folded_mat])
+                mat = random.choice(override_mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
                 if mat.startswith('<') or mat.endswith('>'):
@@ -735,9 +743,9 @@ def retexture_template(
                 face.mat = mat
                 continue
 
-            tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
-
-            if tex_type is None:
+            try:
+                tex_type = TEMPLATE_RETEXTURE[folded_mat]
+            except KeyError:
                 continue  # It's nodraw, or something we shouldn't change
 
             if isinstance(tex_type, str):

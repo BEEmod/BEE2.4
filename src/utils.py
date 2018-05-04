@@ -10,6 +10,8 @@ from enum import Enum
 
 from typing import (
     Tuple, List, Union, Iterator,
+    SupportsInt,
+    Sequence,
 )
 
 
@@ -270,7 +272,7 @@ if MAC:
             # e.state is a set of binary flags
             # Don't run the event if control is held!
             if e.state & 4 == 0:
-                func()
+                func(e)
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @bind_event_handler
@@ -282,7 +284,7 @@ if MAC:
             # e.state is a set of binary flags
             # Don't run the event if control is held!
             if e.state & 4 == 0:
-                func()
+                func(e)
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @bind_event_handler
@@ -306,7 +308,7 @@ else:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
-USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
+USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget.
 
 
 class CONN_TYPES(Enum):
@@ -517,8 +519,11 @@ def append_bothsides(deq):
         deq.appendleft((yield))
 
 
-def fit(dist, obj):
-    """Figure out the smallest number of parts to stretch a distance."""
+def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
+    """Figure out the smallest number of parts to stretch a distance.
+
+    The list should be a series of sizes, from largest to smallest.
+    """
     # If dist is a float the outputs will become floats as well
     # so ensure it's an int.
     dist = int(dist)
@@ -537,6 +542,8 @@ def fit(dist, obj):
                 adder.send(item)
                 dist -= item
                 break
+        else:
+            raise ValueError(f'No section for dist of {dist}!')
     if dist > 0:
         adder.send(dist)
 
