@@ -96,12 +96,11 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel):
 def load_selitems(loader: LoadScreen):
     """Load the selector items early, to correspond with the loadscreen order."""
     for item in Music.all():
-        sel_item = SEL_ITEMS[item.id] = SelItem.from_data(
+        SEL_ITEMS[item.id] = SelItem.from_data(
             item.id,
             item.selitem_data,
             item.get_attrs()
         )
-        sel_item.snd_sample = item.sample
         loader.step('IMG')
 
 
@@ -110,11 +109,13 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
 
     def for_channel(channel: MusicChannel) -> List[SelItem]:
         """Get the items needed for a specific channel."""
-        return [
-            SEL_ITEMS[music.id].copy()
-            for music in Music.all()
-            if music.provides_channel(channel)
-        ]
+        music_list = []
+        for music in Music.all():
+            if music.provides_channel(channel):
+                selitem = SEL_ITEMS[music.id].copy()
+                selitem.snd_sample = music.get_sample(channel)
+                music_list.append(selitem)
+        return music_list
 
     # This gets overwritten when making windows.
     last_selected = {

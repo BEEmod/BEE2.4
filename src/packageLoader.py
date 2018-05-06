@@ -1975,7 +1975,7 @@ class Music(PakObject):
         children: Dict[MusicChannel, str],
         config: Property=None,
         inst=None,
-        sample=None,
+        sample: Dict[MusicChannel, Optional[str]]=None,
         pack=(),
         loop_len=0,
         synch_tbeam=False,
@@ -2027,17 +2027,33 @@ class Music(PakObject):
             synch_tbeam = False
 
         # The sample music file to play, if found.
-        sample = data.info['sample', '']
-        if sample:
-            zip_sample = 'resources/music_samp/' + sample
-            if zip_sample not in data.fsys:
-                LOGGER.warning(
-                    'Music sample for <{}> does not exist in zip: "{}"',
-                    data.id,
-                    zip_sample,
-                )
+        sample_block = data.info.find_key('sample', '')  # type: Property
+        if sample_block.has_children():
+            sample = {}  # type: Dict[MusicChannel, Optional[str]]
+            for channel in MusicChannel:
+                chan_sample = sample[channel] = sample_block[channel.value, '']
+                if chan_sample:
+                    zip_sample = (
+                        'resources/music_samp/' +
+                        chan_sample
+                    )
+                    if zip_sample not in data.fsys:
+                        LOGGER.warning(
+                            'Music sample for <{}>{} does not exist in zip: "{}"',
+                            data.id,
+                            ('' if
+                             channel is MusicChannel.BASE
+                             else f' ({channel.value})'),
+                            zip_sample,
+                        )
+                else:
+                    sample[channel] = None
         else:
-            sample = None
+            # Single value, fill it into all channels we define.
+            sample = {
+                channel: sample_block.value if sounds[channel] else None
+                for channel in MusicChannel
+            }
 
         snd_length = data.info['loop_len', '0']
         if ':' in snd_length:
@@ -2129,6 +2145,15 @@ class Music(PakObject):
             return child.id
         return None
 
+    def get_sample(self, channel: MusicChannel) -> Optional[str]:
+        """Get the path to the sample file, if present."""
+        if self.sample[channel]:
+            return self.sample[channel]
+        try:
+            children = Music.by_id(self.children[channel])
+        except KeyError:
+            return None
+        return children.sample[channel]
 
     @staticmethod
     def export(exp_data: ExportData):
