@@ -487,6 +487,9 @@ def load_packages(
         data.items()
     ))
 
+    LOGGER.info('Checking music objects...')
+    Music.check_objects()
+
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
         Item.all(),
@@ -2204,6 +2207,45 @@ class Music(PakObject):
                         base_music.packfiles
                     ],
                 )
+
+    @classmethod
+    def check_objects(cls):
+        """Check children of each music item actually exist.
+
+        This must be done after they all were parsed.
+        """
+        sounds = {}  # type: Dict[str, str]
+        for music in cls.all():
+            for channel in MusicChannel:
+                # Base isn't present in this.
+                child_id = music.children.get(channel, '')
+                if child_id:
+                    try:
+                        child = cls.by_id(child_id)
+                    except KeyError:
+                        LOGGER.warning(
+                            'Music "{}" refers to nonexistent'
+                            ' "{}" for {} channel!',
+                            music.id,
+                            child_id,
+                            channel.value,
+                        )
+                # Look for tracks used in two items, indicates
+                # they should be children of one...
+                for sound in music.sound[channel]:
+                    sound = sound.casefold()
+                    try:
+                        other_id = sounds[sound]
+                    except KeyError:
+                        sounds[sound] = music.id
+                    else:
+                        if music.id != other_id:
+                            LOGGER.warning(
+                                'Sound "{}" was reused in "{}" <> "{}".',
+                                sound,
+                                music.id,
+                                other_id
+                            )
 
 
 class StyleVar(PakObject, allow_mult=True, has_img=False):
