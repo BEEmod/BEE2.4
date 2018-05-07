@@ -117,10 +117,12 @@ class SubPane(Toplevel):
         Effectively an easier-to-use form of Toplevel.geometry(), that
         also updates relX and relY.
         """
+        # If we're resizable, keep the current size. Otherwise autosize to
+        # contents.
         if width is None:
-            width = self.winfo_reqwidth()
+            width = self.winfo_width() if self.can_resize_x else self.winfo_reqwidth()
         if height is None:
-            height = self.winfo_reqheight()
+            height = self.winfo_height() if self.can_resize_y else self.winfo_reqheight()
         if x is None:
             x = self.winfo_x()
         if y is None:

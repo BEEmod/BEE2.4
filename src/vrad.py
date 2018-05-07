@@ -689,7 +689,7 @@ def pack_content(bsp_file: BSP, path: str, is_peti: bool):
     # Only generate a soundscript for PeTI maps..
     if is_peti:
         music_data = CONF.find_key('MusicScript', [])
-        if music_data.value:
+        if music_data:
             generate_music_script(music_data, files)
             # Add the new script to the manifest file..
             soundscripts.add('scripts/BEE2_generated_music.txt')

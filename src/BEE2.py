@@ -24,6 +24,7 @@ import gameMan
 import logWindow
 import sound
 import img
+import music_conf
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -99,10 +100,11 @@ pack_data, package_sys = packageLoader.load_packages(
 )
 
 # Load filesystems into various modules
+music_conf.load_filesystems(package_sys)
 img.load_filesystems(package_sys)
 gameMan.load_filesystems(package_sys)
 
-UI.load_packages(pack_data, package_sys)
+UI.load_packages(pack_data)
 LOGGER.info('Done!')
 
 LOGGER.info('Loading Palettes...')
