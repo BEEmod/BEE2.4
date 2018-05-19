@@ -63,7 +63,7 @@ DEFAULT_SETTINGS = {
 GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
-loadScreen.main_loader.set_length('UI', 15)
+loadScreen.main_loader.set_length('UI', 14)
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
 # OS X starts behind other windows, fix that.
@@ -115,10 +115,6 @@ LOGGER.info('Done!')
 LOGGER.info('Loading Item Translations...')
 for game in gameMan.all_games:
     game.init_trans()
-
-LOGGER.info('Loading sound FX...')
-sound.load_snd()
-loadScreen.main_loader.step('UI')
 
 LOGGER.info('Initialising UI...')
 UI.init_windows()  # create all windows
