@@ -102,6 +102,7 @@ TEMPLATE_RETEXTURE = {
     consts.Special.BACKPANELS: 'special.behind',
     consts.Special.BACKPANELS_CHEAP: 'special.behind',
     consts.Special.SQUAREBEAMS: 'special.edge',
+    consts.Special.PED_SIDE: 'special.pedestalside',
     consts.Special.GLASS: 'special.glass',
     consts.Special.GRATING: 'special.grating',
 
