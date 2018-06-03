@@ -506,6 +506,15 @@ def generate_music_script(data: Property, pack_list):
     bounce = data.find_key('bouncegel', '')
     speed = data.find_key('speedgel', '')
 
+    sync_funnel = data.bool('sync_funnel')
+
+    if 'base' not in data:
+        base = Property('base', 'BEE2/silent_lp.wav')
+        # Don't sync to a 2-second sound.
+        sync_funnel = False
+    else:
+        base = data.find_key('base')
+
     # The sounds must be present, and the items should be in the map.
     has_funnel = funnel.value and (
         'funnel' in voice_attr or
@@ -520,7 +529,7 @@ def generate_music_script(data: Property, pack_list):
     with open(os.path.join('bee2', 'inject', 'music_script.txt'), 'w') as file:
         # Write the base music track
         file.write(MUSIC_START.format(name='', vol='1'))
-        write_sound(file, data.find_key('base'), pack_list, snd_prefix='#*')
+        write_sound(file, base, pack_list, snd_prefix='#*')
         file.write(MUSIC_BASE)
         # The 'soundoperators' section is still open now.
 
@@ -544,7 +553,7 @@ def generate_music_script(data: Property, pack_list):
             # track, others randomly choose a start.
             file.write(
                 MUSIC_FUNNEL_SYNC_STACK
-                if data.bool('sync_funnel') else
+                if sync_funnel else
                 MUSIC_FUNNEL_RAND_STACK
             )
             file.write(MUSIC_FUNNEL_UPDATE_STACK)

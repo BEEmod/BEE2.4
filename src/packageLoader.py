@@ -2172,6 +2172,7 @@ class Music(PakObject):
 
         music_conf = Property('MusicScript', [])
         vbsp_config.append(music_conf)
+        to_pack = set()
 
         for channel, music in selected.items():
             if music is None:
@@ -2186,6 +2187,8 @@ class Music(PakObject):
                     for snd in sounds
                 ]))
 
+            to_pack.update(music.packfiles)
+
         if base_music is not None:
             vbsp_config.set_key(
                 ('Options', 'music_looplen'),
@@ -2197,16 +2200,16 @@ class Music(PakObject):
                 srctools.bool_as_int(base_music.has_synced_tbeam),
             )
 
-            # If we need to pack, add the files to be unconditionally packed.
-            if base_music.packfiles:
-                vbsp_config.set_key(
-                    ('PackTriggers', 'Forced'),
-                    [
-                        Property('File', file)
-                        for file in
-                        base_music.packfiles
-                    ],
-                )
+        # If we need to pack, add the files to be unconditionally
+        # packed.
+        if to_pack:
+            vbsp_config.set_key(
+                ('PackTriggers', 'Forced'),
+                [
+                    Property('File', file)
+                    for file in to_pack
+                ],
+            )
 
     @classmethod
     def check_objects(cls):
