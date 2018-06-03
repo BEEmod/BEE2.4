@@ -320,7 +320,7 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
     Arguments:  
     
     - `Input`: the input to use, either a name or an `instance:` command.
-    - `Target`: If set, a local name to send commands to.
+    - `Target`: If set, a local name to send commands to. Otherwise, the instance itself.
     - `Delay`: Number of seconds to delay the input.
     - `Name`: If set the name of the `logic_relay` which must be triggered.
         If not set the output will fire `OnMapSpawn`.
@@ -340,6 +340,8 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
             inst,
             conditions.resolve_value(inst, output.target)
         )
+    else:
+        output.target = inst['targetname']
 
     relay_name = conditions.resolve_value(inst, relay_name)
     output.params = conditions.resolve_value(inst, output.params)

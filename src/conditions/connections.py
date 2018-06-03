@@ -19,7 +19,7 @@ def res_add_output_setup(res: Property):
     input_name = res['input']
     inst_in = res['inst_in', '']
     inst_out = res['inst_out', '']
-    targ = res['target']
+    targ = res['target', '']
     only_once = srctools.conv_bool(res['only_once', None])
     times = 1 if only_once else srctools.conv_int(res['times', None], -1)
     delay = res['delay', '0.0']
@@ -30,7 +30,8 @@ def res_add_output_setup(res: Property):
         out_id = out_id.casefold()
         out_type = out_type.strip().casefold()
     else:
-        out_id, out_type = output, 'const'
+        out_id = output
+        out_type = 'const'
 
     return (
         out_type,
@@ -92,7 +93,7 @@ def res_add_output(inst: Entity, res: Property):
 
     inst.add_out(Output(
         resolve_value(inst, output),
-        local_name(inst, resolve_value(inst, targ)),
+        local_name(inst, resolve_value(inst, targ)) or inst['targetname'],
         resolve_value(inst, input_name),
         resolve_value(inst, parm),
         srctools.conv_float(resolve_value(inst, delay)),
