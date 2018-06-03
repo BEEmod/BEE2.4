@@ -40,49 +40,25 @@ def optimise(grid: Dict[Tuple[int, int], bool]):
     x_len = int(x_len) + 1
     y_len = int(y_len) + 1
 
-    # Run in ascending and descending order, to see which is best.
-    grid_forward = {
+    full_grid = {
         (x, y): Pos(bool(grid.get((x, y), False)))
         for x in range(x_len)
         for y in range(y_len)
-    }
-    grid_backward = {
-        (x, y): Pos(bool(grid.get((x_len - x, y_len - y), False)))
-        for x in range(x_len)
-        for y in range(y_len)
-    }
+    }  # type: Dict[Tuple[int, int], Pos]
 
-    forward = list(_optimise_single(grid_forward, x_len, y_len))
-    backward = list(_optimise_single(grid_backward, x_len, y_len))
-    if len(backward) > len(forward):
-        for min_x, min_y, max_x, max_y in backward:
-            yield (
-                x_len - min_x,
-                y_len - min_y,
-                x_len - max_x,
-                y_len - max_y,
-            )
-    else:
-        yield from forward
-
-
-def _optimise_single(grid: Dict[Tuple[int, int], Pos], x_len, y_len):
-    """Optimise in one direction. This edits `grid`."""
     # Add guard data at the edge of the grid.
     for x in range(x_len):
-        grid[x, y_len] = Pos.VOID
+        full_grid[x, y_len] = Pos.VOID
     for y in range(y_len):
-        grid[x_len, y] = Pos.VOID
-
-    assert all(isinstance(v, Pos) for v in grid.values())
+        full_grid[x_len, y] = Pos.VOID
 
     for x in range(x_len):
         for y in range(y_len):
-            if grid[x, y] is not Pos.TO_SET:
+            if full_grid[x, y] is not Pos.TO_SET:
                 continue
-            yield _do_cell(grid, x, y, x_len, y_len)
+            yield _do_cell(full_grid, x, y, x_len, y_len)
 
-    assert all(v is not Pos.TO_SET for v in grid.values())
+    assert all(v is not Pos.TO_SET for v in full_grid.values())
 
 
 def _do_cell(

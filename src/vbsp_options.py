@@ -541,17 +541,14 @@ DEFAULTS = [
     Opt('game_id', "620",
         """(Automatic) The game's steam ID.
         """),
-    Opt('music_id', "<NONE>",
-        """The ID of the selected music.
-        """),
     Opt('music_instance', TYPE.STR,
         """The instance for the chosen music.
         """),
-    Opt('music_soundscript', TYPE.STR,
-        """The soundscript for the chosen music.
-        """),
     Opt('music_looplen', 0,
         """If set, re-trigger music after this number of seconds.
+        """),
+    Opt('music_sync_tbeam', False,
+        """If set, funnel music syncs with the main track.
         """),
     Opt('skybox', 'sky_black',
         """The skybox name to use for the map.

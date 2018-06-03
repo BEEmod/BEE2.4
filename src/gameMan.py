@@ -993,7 +993,7 @@ class Game:
             appman = Property.parse(appman_file, 'appmanifest_620.acf')
         try:
             lang = appman.find_key('AppState').find_key('UserConfig')['language']
-        except NoKeyError:
+        except LookupError:
             return
 
         self.load_trans(lang)

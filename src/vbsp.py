@@ -2298,18 +2298,18 @@ def add_extra_ents(mode):
 
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
-    sound = vbsp_options.get(str, 'music_soundscript')
     inst = vbsp_options.get(str, 'music_instance')
     snd_length = vbsp_options.get(int, 'music_looplen')
 
     # Don't add our logic if an instance was provided.
-    if sound and not inst:
+    # If this settings is set, we have a music config.
+    if settings['music_conf'] and not inst:
         music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
             targetname='@music',
             origin=loc,
-            message=sound,
+            message='music.BEE2',
             health='10',  # Volume
         )
 
