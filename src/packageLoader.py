@@ -903,19 +903,19 @@ class ItemVariant:
     """Data required for an item in a particular style."""
 
     def __init__(
-            self,
-            editoritems: Property,
-            vbsp_config: Property,
-            editor_extra: Iterable[Property],
-            authors: List[str],
-            tags: List[str],
-            desc: tkMarkdown.MarkdownData,
-            icons: Dict[str, str],
-            ent_count: str='',
-            url: str = None,
-            all_name: str=None,
-            all_icon: str=None,
-            source: str='',
+        self,
+        editoritems: Property,
+        vbsp_config: Property,
+        editor_extra: Iterable[Property],
+        authors: List[str],
+        tags: List[str],
+        desc: tkMarkdown.MarkdownData,
+        icons: Dict[str, str],
+        ent_count: str='',
+        url: str = None,
+        all_name: str=None,
+        all_icon: str=None,
+        source: str='',
     ):
         self.editor = editoritems
         self.editor_extra = Property(None, list(editor_extra))
@@ -1126,7 +1126,6 @@ class ItemVariant:
                 while 'bee2' in io_block:
                     del io_block['bee2']
 
-            io_conf = props.find_key('IOConf')
             io_conf = props.find_key('IOConf')
             io_conf.name = 'BEE2'
             (
