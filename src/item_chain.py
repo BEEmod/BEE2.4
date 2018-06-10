@@ -8,9 +8,12 @@ import connections
 from srctools import Entity, VMF
 from connections import Item
 
+__all__ = ['Node', 'chain']
+
 
 class Node:
     """Represents a single node in the chain."""
+    __slots__ = ['item', 'prev', 'next', 'conf']
     def __init__(self, item: Item):
         self.item = item
         self.conf = None  # type: Any
@@ -30,7 +33,7 @@ def chain(
     """Evaluate the chain of items.
 
     inst is the instances that are part of this chain.
-    Lists of nodes are yielded, for each seperate track.
+    Lists of nodes are yielded, for each separate track.
     """
     # Name -> node
     nodes = {}  # type: Dict[str, Node]
