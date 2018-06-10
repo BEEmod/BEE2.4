@@ -603,7 +603,6 @@ class selWin:
             name_frame,
             text="Item",
             justify=CENTER,
-            width=-10,
             font=("Helvetica", 12, "bold"),
         )
         name_frame.grid(row=1, column=0, columnspan=4)
