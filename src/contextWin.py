@@ -106,7 +106,7 @@ def set_sprite(pos, sprite):
     """Set one of the property sprites to a value."""
     widget = wid['sprite', pos]
     widget['image'] = img.spr(sprite)
-    widget.tooltip_text = SPRITE_TOOL.get(sprite, '')
+    tooltip.set_tooltip(widget, SPRITE_TOOL.get(sprite, ''))
 
 
 def pos_for_item():
@@ -265,7 +265,7 @@ def load_item_data():
         wid['moreinfo'].state(['disabled'])
     else:
         wid['moreinfo'].state(['!disabled'])
-    wid['moreinfo'].tooltip_text = selected_item.url
+    tooltip.set_tooltip(wid['moreinfo'], selected_item.url)
 
     editor_data = item_data.editor
 
@@ -349,7 +349,13 @@ def load_item_data():
         set_sprite(SPR.COLLISION, 'space_embed')
         set_sprite(SPR.OUTPUT, 'out_none')
         set_sprite(SPR.ROTATION, 'rot_36')
-        wid['sprite', SPR.ROTATION].tooltip_text += _('\n(Reflection Cube only)')
+        tooltip.set_tooltip(
+            wid['sprite', SPR.ROTATION],
+            SPRITE_TOOL['rot_36'] + _(
+                'This item can be rotated on the floor to face 360 '
+                'degrees, for Reflection Cubes only.'
+            ),
+        )
 
     item_class = editor_data['ItemClass', ''].casefold()
     if item_class == "itempaintsplat":

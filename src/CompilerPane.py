@@ -25,7 +25,7 @@ import os.path
 import img as png
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from tooltip import add_tooltip
+from tooltip import add_tooltip, set_tooltip
 import SubPane
 
 # The size of PeTI screenshots
@@ -270,12 +270,12 @@ def refresh_counts(reload=True):
             bar_var.should_flash = False
             bar_var.set(100 * value / max_value)
 
-        UI['count_' + name].tooltip_text = '{}/{} ({:.2%}):\n{}'.format(
+        set_tooltip(UI['count_' + name], '{}/{} ({:.2%}):\n{}'.format(
             value,
             max_value,
             value / max_value,
             tip_blurb,
-        )
+        ))
 
     if run_flash:
         flash_count()

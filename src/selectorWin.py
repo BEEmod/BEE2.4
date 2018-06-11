@@ -18,7 +18,7 @@ import math
 
 import img  # png library for TKinter
 from richTextBox import tkRichText
-from tooltip import add_tooltip
+from tooltip import add_tooltip, set_tooltip
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
 import tkMarkdown
@@ -936,10 +936,10 @@ class selWin:
 
         if value:
             new_st = ['disabled']
-            self.display.tooltip_text = self.readonly_description
+            set_tooltip(self.display, self.readonly_description)
         else:
             new_st = ['!disabled']
-            self.display.tooltip_text = self.description
+            set_tooltip(self.display, self.description)
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
@@ -1114,9 +1114,9 @@ class selWin:
                     label['image'] = img.color_square(val, size=16)
                     # Display the full color when hovering..
                     # i18n: Tooltip for colour swatch.
-                    label.tooltip_text = _('Color: R={r}, G={g}, B={b}').format(
+                    set_tooltip(label, _('Color: R={r}, G={g}, B={b}').format(
                         r=int(val.x), g=int(val.y), b=int(val.z),
-                    )
+                    ))
                 elif label.type is AttrTypes.LIST:
                     # Join the values (in alphabetical order)
                     label['text'] = ', '.join(sorted(val))
