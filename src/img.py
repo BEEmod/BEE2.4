@@ -53,7 +53,7 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
       to the Python object), and subsequent calls don't touch the hard disk.
     """
     path = path.casefold().replace('\\', '/')
-    if not path.endswith(".png"):
+    if path[-4:-3] != '.':
         path += ".png"
 
     orig_path = path
