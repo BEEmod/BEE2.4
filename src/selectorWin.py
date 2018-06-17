@@ -1057,11 +1057,12 @@ class selWin:
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
-        self.prop_author['text'] = ngettext(
-            'Author: {}', 'Authors: {}', len(item.authors),
-        ).format(
-            ', '.join(item.authors)
-        )
+        else:
+            self.prop_author['text'] = ngettext(
+                'Author: {}', 'Authors: {}', len(item.authors),
+            ).format(
+                ', '.join(item.authors)
+            )
         if item.large_icon is not None:
             # We have a large icon, use it.
             self.prop_icon['image'] = item.large_icon
