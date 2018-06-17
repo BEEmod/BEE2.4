@@ -20,6 +20,15 @@ from typing import (
 from tkMarkdown import MarkdownData
 from tk_tools import HidingScroll
 
+__all__ = [
+    'ICON_SIZE', 'ICON_SIZE_LRG',
+    'NAV_KEYS', 'AttrTypes', 'AttrDef',
+    'SelitemData',
+    'selWin', 'Item',
+]
+
+ICON_SIZE = ...  # type: int
+ICON_SIZE_LRG = ...  # type: Tuple[int, int]
 
 class NAV_KEYS(Enum):
     """Enum representing keys used for shifting through items.
