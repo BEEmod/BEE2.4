@@ -59,7 +59,7 @@ TEMPLATE_FILE = VMF(preserve_ids=True)
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
 
-# Tempory data stored when parsing info.txt, but before .parse() is called.
+# Temporary data stored when parsing info.txt, but before .parse() is called.
 # This allows us to parse all packages before loading objects.
 ObjData = NamedTuple('ObjData', [
     ('fsys', FileSystem),
@@ -97,6 +97,20 @@ UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
     ('style', Optional[str]),  # Inherit from a specific style (implies folder is None)
     ('config', Optional[Property]),  # Config for editing
 ])
+
+# Name, description and icon for each corridor in a style.
+CorrDesc = NamedTuple('CorrDesc', [
+    ('name', str),
+    ('icon', str),
+    ('desc', str),
+])
+
+# Corridor type to size.
+CORRIDOR_COUNTS = {
+    'sp_entry': 7,
+    'sp_exit': 4,
+    'coop': 4,
+}
 
 # Finds names surrounded by %s
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
@@ -1165,7 +1179,7 @@ class Style(PakObject):
         suggested=None,
         has_video=True,
         vpk_name='',
-        corridor_names=EmptyMapping,
+        corridors: Property=None,
     ):
         self.id = style_id
         self.selitem_data = selitem_data
@@ -1177,11 +1191,7 @@ class Style(PakObject):
         self.suggested = suggested or {}
         self.has_video = has_video
         self.vpk_name = vpk_name
-        self.corridor_names = {
-            'sp_entry': corridor_names.get('sp_entry', Property('', [])),
-            'sp_exit':  corridor_names.get('sp_exit', Property('', [])),
-            'coop':     corridor_names.get('coop', Property('', [])),
-        }
+        self.corridors = corridors or Property('Corridor', [])
         if config is None:
             self.config = Property(None, [])
         else:
@@ -1219,12 +1229,25 @@ class Style(PakObject):
                 sugg['elev', '<NONE>'],
             )
 
-        corridors = info.find_key('corridors', [])
-        corridors = {
-            'sp_entry': corridors.find_key('sp_entry', []),
-            'sp_exit':  corridors.find_key('sp_exit', []),
-            'coop':     corridors.find_key('coop', []),
-        }
+        corr_conf = info.find_key('corridors', [])
+        corridors = {}
+
+        for group, length in CORRIDOR_COUNTS.items():
+            group_prop = corr_conf.find_key(group, [])
+            for i in range(1, length + 1):
+                prop = group_prop.find_key(str(i), '')  # type: Property
+                if prop.has_children():
+                    corridors[group, i] = CorrDesc(
+                        name=prop['name', ''],
+                        icon=prop['icon', ''],
+                        desc=prop['Desc', ''],
+                    )
+                else:
+                    corridors[group, i] = CorrDesc(
+                        name=prop.value,
+                        icon='',
+                        desc='',
+                    )
 
         if base == '':
             base = None
@@ -1254,9 +1277,10 @@ class Style(PakObject):
             base_style=base,
             suggested=sugg,
             has_video=has_video,
-            corridor_names=corridors,
+            corridors=corridors,
             vpk_name=vpk_name,
         )
+
 
     def add_over(self, override: 'Style'):
         """Add the additional commands to ourselves."""
@@ -3031,7 +3055,12 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
             yield ent.solids.copy(), True, ent.visgroup_ids
 
 
-def desc_parse(info, id='', *, prop_name='description'):
+def desc_parse(
+    info: Property,
+    id: str='',
+    *,
+    prop_name: str='description',
+) -> tkMarkdown.MarkdownData:
     """Parse the description blocks, to create data which matches richTextBox.
 
     """

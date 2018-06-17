@@ -1939,9 +1939,7 @@ def init_windows():
 
         tagsPane.filter_items()  # Update filters (authors may have changed)
 
-        CompilerPane.set_corr_values('sp_entry', style_obj.corridor_names)
-        CompilerPane.set_corr_values('sp_exit', style_obj.corridor_names)
-        CompilerPane.set_corr_values('coop', style_obj.corridor_names)
+        CompilerPane.set_corridors(style_obj.corridors)
 
         sugg = style_obj.suggested
         win_types = (
