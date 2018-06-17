@@ -353,7 +353,6 @@ class Item:
         item.authors = self.authors.copy()
         item.group = self.group
         item.sort_key = self.sort_key
-        item.button = self.button
         item.snd_sample = self.snd_sample
         item.context_lbl = self.context_lbl
         item.attrs = self.attrs
@@ -391,7 +390,10 @@ class selWin:
             modal=False,
             # i18n: 'None' item description
             none_desc=_('Do not add anything.'),
-            none_attrs: dict=EmptyMapping,
+            none_attrs=EmptyMapping,
+            none_icon='BEE2/none_96.png',
+            # i18n: 'None' item name.
+            none_name=_("<None>"),
             title='BEE2',
             desc='',
             readonly_desc='',
@@ -416,6 +418,8 @@ class selWin:
           The value should be a FileSystem to look for samples in.
         - none_desc holds an optional description for the <none> Item,
           which can be used to describe what it results in.
+        - none_icon allows changing the icon for the <none> Item.
+        - none_name allows setting the name shown for the <none> Item.
         - title is the title of the selector window.
         - callback is a function to be called whenever the selected item
          changes.
@@ -434,9 +438,9 @@ class selWin:
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
-            name=_('NONE'),
+            name='<NONE>',
             short_name='',
-            icon='BEE2/none_96.png',
+            icon=none_icon,
             desc=none_desc,
             attributes=dict(none_attrs),
         )
@@ -738,7 +742,7 @@ class selWin:
                     self.pal_frame,
                     image=item.icon,
                 )
-                item.context_lbl = '<None>'
+                item.context_lbl = none_name
             else:
                 item.button = ttk.Button(
                     self.pal_frame,
@@ -813,9 +817,6 @@ class selWin:
             )
             self.group_widgets[group_key].should_show = True
 
-        self.flow_items(None)
-        self.wid_canvas.bind("<Configure>", self.flow_items)
-
         self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
 
@@ -876,7 +877,11 @@ class selWin:
                     sticky=W,
                 )
         else:
-            self.attr = None
+            self.attr = self.desc_label = None
+
+        self.flow_items()
+        self.wid_canvas.bind("<Configure>", self.flow_items)
+
 
     def widget(self, frame) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
@@ -978,12 +983,11 @@ class selWin:
                 self.display['font'] = self.norm_font
 
         if self.selected == self.noneItem:
-            # i18n: 'None' item name.
-            self.disp_label.set(_("<None>"))
             self.chosen_id = None
         else:
-            self.disp_label.set(self.selected.context_lbl)
             self.chosen_id = self.selected.name
+
+        self.disp_label.set(self.selected.context_lbl)
         self.orig_selected = self.selected
         self.context_var.set(self.item_list.index(self.selected))
         return "break"  # stop the entry widget from continuing with this event
@@ -1316,6 +1320,8 @@ class selWin:
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
+                item.button['text'] = item.shortName
+                item.button['image'] = item.icon
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5

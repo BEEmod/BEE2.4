@@ -224,6 +224,8 @@ class selWin:
         modal: bool=...,
         none_desc: Union[str, MarkdownData]=...,
         none_attrs: Dict[str, _Attr_Values]=...,
+        none_icon: str=...,
+        none_name: str=...,
         title: Any=...,
         desc: Optional[str]=...,
         readonly_desc: Optional[str]=...,
