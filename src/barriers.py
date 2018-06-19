@@ -287,7 +287,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
             off_min = min(off1, off2)
             off_max = max(off1, off2)
             new_brushes = [
-                brush.copy(map=vmf)
+                brush.copy(vmf_file=vmf)
                 for brush in hole_temp
             ]
 
@@ -567,7 +567,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 for plane in beam_end_face.planes:
                     plane.x = beam_end_off
 
-                new_beam = beam_template.copy(map=vmf)
+                new_beam = beam_template.copy(vmf_file=vmf)
                 new_beam.localise(min_pos, rot)
                 detail.solids.append(new_beam)
 

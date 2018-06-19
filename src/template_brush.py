@@ -484,7 +484,7 @@ def import_template(
         ]:
         for old_brush in orig_list:
             brush = old_brush.copy(
-                map=vbsp.VMF,
+                vmf_file=vbsp.VMF,
                 side_mapping=id_mapping,
                 keep_vis=False,
             )
@@ -493,7 +493,7 @@ def import_template(
 
     for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(
-            map=vbsp.VMF,
+            vmf_file=vbsp.VMF,
             keep_vis=False,
         )
         del new_overlay['template_id']  # Remove this, it's not part of overlays

@@ -2861,7 +2861,7 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
             elif config['temp_type'] == 'world':
                 force_is_detail = False
             # Add to the exported map as well.
-            export_config = config.copy(map=TEMPLATE_FILE, keep_vis=False)
+            export_config = config.copy(vmf_file=TEMPLATE_FILE, keep_vis=False)
             # Remove the configs we've parsed
             for key in (
                 'temp_type',
@@ -2961,14 +2961,14 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
                 ent.visgroup_ids.add(temp_visgroup_id)
                 for brush in brushes:
                     ent.solids.append(
-                        brush.copy(map=TEMPLATE_FILE, keep_vis=False)
+                        brush.copy(vmf_file=TEMPLATE_FILE, keep_vis=False)
                     )
 
         self.temp_overlays = []
 
         # Transfer this configuration ent over.
         for color_picker in vmf_file.by_class['bee2_template_colorpicker']:
-            new_ent = color_picker.copy(map=TEMPLATE_FILE, keep_vis=False)
+            new_ent = color_picker.copy(vmf_file=TEMPLATE_FILE, keep_vis=False)
             new_ent['template_id'] = temp_id
             TEMPLATE_FILE.add_ent(new_ent)
 
@@ -2984,7 +2984,7 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
                     self.id,
                 ))
             new_overlay = overlay.copy(
-                map=TEMPLATE_FILE,
+                vmf_file=TEMPLATE_FILE,
                 keep_vis=False
             )
             new_overlay.visgroup_ids.add(temp_visgroup_id)
