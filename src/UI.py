@@ -579,6 +579,8 @@ def load_packages(data):
                ' present in the map. The additional "Multiverse" Cave lines'
                ' are controlled separately in Style Properties.'),
         has_none=True,
+        none_name=_('Random'),
+        none_icon='BEE2/random.png',
         none_desc=_('Add no extra voice lines.'),
         none_attrs={
             'CHAR': [_('<Multiverse Cave only>')],
@@ -829,9 +831,6 @@ def export_editoritems(e=None):
         )
     paletteLoader.pal_list.append(new_pal)
     new_pal.save(ignore_readonly=True)
-
-    # Update corridor configs for standalone mode..
-    CompilerPane.save_corridors()
 
     # Save the configs since we're writing to disk lots anyway.
     GEN_OPTS.save_check()
@@ -1586,7 +1585,7 @@ def init_menu_bar(win):
     bar = Menu(win)
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
-    win.option_add('*tearOff', False)
+    win.option_add('*tearOff', '0')
     if utils.MAC:
         # Name is used to make this the special 'BEE2' menu item
         file_menu = menus['file'] = Menu(bar, name='apple')

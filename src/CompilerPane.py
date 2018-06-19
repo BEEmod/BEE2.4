@@ -246,7 +246,8 @@ def make_corr_wid(corr_name: str):
             'This is saved in the puzzle data '
             'and will not change.'
         ),
-        none_icon='BEE2/random_corridor.png',
+        none_icon='BEE2/random.png',
+        none_name=_('Random'),
         callback=sel_corr_callback,
         callback_params=[corr_name],
     )
