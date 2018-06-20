@@ -1232,20 +1232,32 @@ class Style(PakObject):
         corr_conf = info.find_key('corridors', [])
         corridors = {}
 
+        icon_folder = corr_conf['icon_folder', '']
+
         for group, length in CORRIDOR_COUNTS.items():
             group_prop = corr_conf.find_key(group, [])
             for i in range(1, length + 1):
                 prop = group_prop.find_key(str(i), '')  # type: Property
+
+                if icon_folder:
+                    icon = '{}/{}/{}.jpg'.format(icon_folder, group, i)
+                    # If this doesn't actually exist, don't use this.
+                    if 'resources/BEE2/corr/' + icon not in data.fsys:
+                        LOGGER.debug('No "resources/BEE2/{}"!', icon)
+                        icon = ''
+                else:
+                    icon = ''
+
                 if prop.has_children():
                     corridors[group, i] = CorrDesc(
                         name=prop['name', ''],
-                        icon=prop['icon', ''],
+                        icon=prop['icon', icon],
                         desc=prop['Desc', ''],
                     )
                 else:
                     corridors[group, i] = CorrDesc(
                         name=prop.value,
-                        icon='',
+                        icon=icon,
                         desc='',
                     )
 
