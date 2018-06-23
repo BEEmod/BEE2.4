@@ -371,11 +371,11 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
     )
     # Speed-gel sounds also play when flinging, so keep it always.
 
-    file = BytesIO()
+    file = StringIO()
 
     # Write the base music track
     file.write(MUSIC_START.format(name='', vol='1'))
-    write_sound(file, data.find_key('base'), pack_list, snd_prefix='#*')
+    write_sound(file, base, pack_list, snd_prefix='#*')
     file.write(MUSIC_BASE)
     # The 'soundoperators' section is still open now.
 
@@ -399,7 +399,7 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
         # track, others randomly choose a start.
         file.write(
             MUSIC_FUNNEL_SYNC_STACK
-            if data.bool('sync_funnel') else
+            if sync_funnel else
             MUSIC_FUNNEL_RAND_STACK
         )
         file.write(MUSIC_FUNNEL_UPDATE_STACK)
@@ -421,7 +421,7 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
         # up to speed). We stop almost immediately on gel too.
         file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
 
-    return file.getvalue()
+    return file.getvalue().encode()
 
 
 def write_sound(file, snds: Property, pack_list: PackList, snd_prefix='*'):
