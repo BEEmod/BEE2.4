@@ -3,23 +3,20 @@ import os.path
 import shutil
 import subprocess
 import sys
-import logging
 from datetime import datetime
-from io import BytesIO
-from pathlib import Path
+from io import BytesIO, StringIO
 from zipfile import ZipFile
 
 import srctools
 import utils
 from srctools import Property
+from srctools.logger import init_logging
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, VPKFileSystem
-from srctools.packlist import PackFile, PackList, FileType as PackType
-from srctools.scripts.vrad import load_fgd
-from srctools.game import Game, find_gameinfo
+from srctools.packlist import PackList, FileType as PackType, load_fgd
+from srctools.game import find_gameinfo
 
-
-LOGGER = utils.init_logging('bee2/VRAD.log')
+LOGGER = init_logging('bee2/VRAD.log')
 
 CONF = Property('Config', [])
 
@@ -774,8 +771,12 @@ def main(argv):
     fsys_tag = fsys_mel = None
     if is_peti and 'mel_vpk' in CONF:
         fsys_mel = VPKFileSystem(CONF['mel_vpk'])
+        fsys.add_sys(fsys_mel)
     if is_peti and 'tag_dir' in CONF:
         fsys_tag = RawFileSystem(CONF['tag_dir'])
+        fsys.add_sys(fsys_tag)
+
+    fsys.open_ref()
 
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
@@ -796,6 +797,9 @@ def main(argv):
     packlist.load_soundscript_manifest(
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
+
+    LOGGER.info('Adding known packed files:')
+    pack_content(packlist, path, is_peti)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
