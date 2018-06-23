@@ -13,9 +13,9 @@ import srctools
 import utils
 from srctools import Property
 from srctools.bsp import BSP, BSP_LUMPS
-from srctools.filesys import FileSystemChain, RawFileSystem, VPKFileSystem
-from seecompiler.packlist import PackFile, PackList, FileType as PackType
-from seecompiler.vrad import load_fgd
+from srctools.filesys import RawFileSystem, VPKFileSystem
+from srctools.packlist import PackFile, PackList, FileType as PackType
+from srctools.scripts.vrad import load_fgd
 from srctools.game import Game, find_gameinfo
 
 
