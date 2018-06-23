@@ -24,10 +24,7 @@ EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
     'distutils',  # Found in shutil, used if zipfile is not availible
     'doctest',  # Used in __main__ of decimal and heapq
-    'lzma',  # We use this for packages, but not in VBSP & VRAD
     'optparse',  # Used in calendar.__main__
-    'pprint',  # From pickle, not needed
-    'textwrap',  # Used in zipfile.__main__
 
     # We don't localise the compiler, but utils imports the modules.
     'locale', 'gettext',
@@ -38,20 +35,25 @@ EXCLUDES = [
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',
-    'email',
     'smtplib',
     'http',
 ]
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
+# Additionally we need to block email in pkg_resources.
 import logging.handlers
 import logging.config
-if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'socket'):
-    EXCLUDES.append('socket')
-    # Subprocess uses this in UNIX-style OSes, but not Windows.
-    if utils.WIN:
-        EXCLUDES += ['selectors', 'select']
+import pkg_resources
+
+if not hasattr(pkg_resources, 'email'):  # This imports socket.
+    EXCLUDES.append('email')
+    if not hasattr(logging.handlers, 'socket'):
+        if not hasattr(logging.config, 'socket'):
+            EXCLUDES.append('socket')
+            # Subprocess uses this in UNIX-style OSes, but not Windows.
+            if utils.WIN:
+                EXCLUDES += ['selectors', 'select']
 if not hasattr(logging.handlers, 'pickle'):
     EXCLUDES.append('pickle')
 del logging
@@ -69,11 +71,22 @@ INCLUDES = [
     pkgutil.iter_modules(['conditions'])
 ]
 
+# These are included inside pkg_resources, but we want to just use the existing
+# ones.
+INCLUDES += [
+    'packaging.version',
+    'packaging.specifiers',
+    'packaging.requirements',
+    'packaging.markers',
+    'six',
+    'appdirs',
+]
+
 bee_version = input('BEE2 Version (or blank for dev): ')
 
-import seecompiler
+import srctools
 
-[seecomp_loc] = seecompiler.__path__
+[srctools_loc] = srctools.__path__
 
 setup(
     name='VBSP_VRAD',
@@ -93,7 +106,7 @@ setup(
             'zip_exclude_packages': '',
             'zip_includes': [
                 # Add the FGD data for us.
-                (seecomp_loc + '/fgd.lzma', 'seecompiler/fgd.lzma')
+                (os.path.join(srctools_loc, 'fgd.lzma'), 'srctools/fgd.lzma')
             ],
         },
     },
