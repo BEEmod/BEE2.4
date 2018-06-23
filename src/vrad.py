@@ -497,12 +497,12 @@ def pack_content(packlist: PackList, path: str, is_peti: bool):
 
                 elif line[:1] == '#':
                     try:
-                        file = packlist.fsys[line[2:]]
+                        file = packlist.fsys[line[1:]]
                     except FileNotFoundError:
-                        LOGGER.warning('No soundscript "{}"!', line[2:])
+                        LOGGER.warning('No soundscript "{}"!', line[1:])
                     else:
                         packlist.load_soundscript(file, always_include=True)
-                        packlist.pack_file(line[2:])
+                        packlist.pack_file(line[1:])
                 else:
                     packlist.pack_file(line)
 
@@ -586,7 +586,7 @@ def mod_screenshots():
                 playtested = True
                 continue
             elif filename.startswith('bee2_screenshot'):
-                continue # Ignore other screenshots
+                continue  # Ignore other screenshots
 
             # We have a screenshot. Check to see if it's
             # not too old. (Old is > 2 hours)
