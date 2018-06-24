@@ -14,6 +14,7 @@ from conditions import (
     PETI_INST_ANGLE, RES_EXHAUSTED,
     local_name
 )
+from connections import ITEMS, Item
 from fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 from srctools import Vec, Property, VMF, Entity, Output
 
@@ -178,26 +179,28 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         return
 
     fizzler = None
+    fizzler_item = None  # type: Item
 
-    # Look for the fizzler instance we want to replace
-    for targetname in inst.output_targets():
-        try:
-            fizzler = FIZZLERS[targetname]
-        except KeyError:
-            # Not a fizzler.
+    # Look for the fizzler instance we want to replace.
+    sign_item = ITEMS[inst['targetname']]
+    for conn in sign_item.outputs[:]:
+        if conn.to_item.name in FIZZLERS:
+            if fizzler is None:
+                fizzler = FIZZLERS[conn.to_item.name]
+                fizzler_item = conn.to_item
+            else:
+                raise ValueError('Multiple fizzlers attached to a sign!')
 
-            # It's an indicator toggle, remove it and the antline to clean up.
-            for ent in vmf.by_target[targetname]:
-                remove_ant_toggle(ent)
+        conn.remove()  # Regardless, remove the useless output.
 
-    inst.outputs.clear()  # Remove the outputs now, they're not valid anyway.
+    sign_item.delete_antlines()
 
     if fizzler is None:
         # No fizzler - remove this sign
         inst.remove()
         return
 
-    if fizzler.fizz_type.id == 'TAG_FIZZ_ID':
+    if fizzler.fizz_type.id == TAG_FIZZ_ID:
         LOGGER.warning('Two tag signs attached to one fizzler...')
         inst.remove()
         return
@@ -350,7 +353,6 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # Signs will associate with the given side!
 
     bbox_min, bbox_max = fizzler.emitters[0]
-    fizz_field_axis = (bbox_max-bbox_min).norm()
     fizz_norm_axis = fizzler.normal().axis()
 
     sign_center = (bbox_min[fizz_norm_axis] + bbox_max[fizz_norm_axis]) / 2

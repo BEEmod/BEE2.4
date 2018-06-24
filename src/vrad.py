@@ -67,6 +67,9 @@ INJECT_FILES = {
 
     # Script for setting model types on cubes.
     'cube_setmodel.nut': 'scripts/vscripts/BEE2/cube_setmodel.nut',
+
+    # Plays the tick-tock timer sound.
+    'timer_sound.nut': 'scripts/vscripts/BEE2/timer_sound.nut',
 }
 
 # Additional parts to add if we have a mdl file.

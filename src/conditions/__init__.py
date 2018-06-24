@@ -3,7 +3,7 @@ import inspect
 import itertools
 import math
 import random
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
 
@@ -70,23 +70,13 @@ solidGroup = NamedTuple('solidGroup', [
 ])
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
-# The input/output connection values defined for each item.
-# Each is a tuple of (inst_name, command) values, ready to be passed to
-# VLib.Output().
-# If the command is '', no in/output is present.
-ItemConnections = namedtuple('ItemConnections', [
-    'in_act', 'in_deact', 'out_act', 'out_deact',
-])
-CONNECTIONS = {}
 
 # For each class, a list of item IDs of that type.
 ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
 # For each item Id, the item class for it.
 CLASS_FOR_ITEM = {}  # type: Dict[str, consts.ItemClass]
 
-# The special tbeam polarity input from ITEM_TBEAM. Works like above.
-TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
-
+CONNECTIONS = {}  # TODO: Remove and remove everyone using this!
 
 xp = Vec_tuple(1, 0, 0)
 xn = Vec_tuple(-1, 0, 0)
@@ -625,31 +615,6 @@ def build_solid_dict() -> None:
                 )
 
 
-def build_connections_dict(prop_block: Property):
-    """Load in the dictionary mapping item ids to connections."""
-    global TBEAM_CONN_ACT, TBEAM_CONN_DEACT
-
-    def parse(item, key):
-        """Parse the output value, handling values that aren't present."""
-        val = item[key, '']
-        if not val:
-            return None, ''
-        return Output.parse_name(val)
-
-    for item_data in prop_block.find_key('Connections', []):
-        CONNECTIONS[item_data.name] = ItemConnections(
-            in_act=parse(item_data, 'input_activate'),
-            in_deact=parse(item_data, 'input_deactivate'),
-
-            out_act=parse(item_data, 'output_activate'),
-            out_deact=parse(item_data, 'output_deactivate'),
-        )
-
-        if item_data.name == 'item_tbeam':
-            TBEAM_CONN_ACT = parse(item_data, 'tbeam_activate')
-            TBEAM_CONN_DEACT = parse(item_data, 'tbeam_deactivate')
-
-
 def build_itemclass_dict(prop_block: Property):
     """Load in the dictionary mapping item classes to item ids"""
     for prop in prop_block.find_children('ItemClasses'):
@@ -993,10 +958,20 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
     """If a value starts with '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
+    If it starts with '!' (before '$'), invert boolean values.
     """
-    if isinstance(value, str) and value.startswith('$'):
+    if not isinstance(value, str):
+        return value
+
+    if value.startswith('$'):
+        if value.startswith('!'):
+            inverted = True
+            value = value[1:]
+        else:
+            inverted = False
+
         if value in inst.fixup:
-            return inst.fixup[value]
+            value = inst.fixup[value]
         else:
             LOGGER.warning(
                 'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
@@ -1005,9 +980,11 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
                 inst,
                 inst.fixup._fixup
             )
-            return ''
-    else:
-        return value
+            value = ''
+        if inverted:
+            return srctools.bool_as_int(not srctools.conv_bool(value))
+    
+    return value
 
 
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:

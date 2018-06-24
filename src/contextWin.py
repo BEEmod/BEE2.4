@@ -8,6 +8,8 @@ various item properties.
   clicked widget from the event
 """
 from tkinter import *
+
+from srctools import Property
 from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
@@ -25,6 +27,7 @@ import tkMarkdown
 import tooltip
 import tk_tools
 import utils
+import packageLoader
 
 import UI
 
@@ -61,6 +64,7 @@ ROT_TYPES = {
     "handle_catapult":      "rot_catapult"
 }
 
+
 class SPR(Enum):
     """The slots for property-indicating sprites. The value is the column."""
     INPUT = 0
@@ -82,7 +86,7 @@ SPRITE_TOOL = {
 
     'in_none': _('This item does not accept any inputs.'),
     'in_norm': _('This item accepts inputs.'),
-    'in_polarity': _('Excursion Funnels accept a on/off input and a directional input.'),
+    'in_dual': _('This item has two input types (A and B), using the Input A and B items.'),
 
     'out_none': _('This item does not output.'),
     'out_norm': _('This item has an output.'),
@@ -267,22 +271,16 @@ def load_item_data():
         wid['moreinfo'].state(['!disabled'])
     tooltip.set_tooltip(wid['moreinfo'], selected_item.url)
 
-    editor_data = item_data.editor
+    editor_data = item_data.editor.copy()
 
-    has_inputs = False
-    has_polarity = False
-    has_outputs = False
-    for inp_list in editor_data.find_all("Exporting", "Inputs"):
-        for inp in inp_list:
-            if inp.name == "connection_standard":
-                has_inputs = True
-            elif inp.name == "connection_tbeam_polarity":
-                has_polarity = True
-    for out_list in editor_data.find_all("Exporting", "Outputs"):
-        for out in out_list:
-            if out.name == "connection_standard":
-                has_outputs = True
-                break
+    comm_block = Property(editor_data['Type'], [])
+    (
+        has_inputs,
+        has_outputs,
+        has_secondary,
+    ) = packageLoader.Item.convert_item_io(comm_block, editor_data)
+    del comm_block  # We don't use the config.
+
     has_timer = any(editor_data.find_all("Properties", "TimerDelay"))
 
     editor_bit = next(editor_data.find_all("Editor"))
@@ -296,8 +294,14 @@ def load_item_data():
     is_embed = any(editor_data.find_all("Exporting", "EmbeddedVoxels"))
 
     if has_inputs:
-        if has_polarity:
-            set_sprite(SPR.INPUT, 'in_polarity')
+        if has_secondary:
+            set_sprite(SPR.INPUT, 'in_dual')
+            # Real funnels work slightly differently.
+            if selected_item.id.casefold() == 'item_tbeam':
+                wid['sprite', SPR.INPUT].tooltip_text = _(
+                    'Excursion Funnels accept a on/off '
+                    'input and a directional input.'
+                )
         else:
             set_sprite(SPR.INPUT, 'in_norm')
     else:

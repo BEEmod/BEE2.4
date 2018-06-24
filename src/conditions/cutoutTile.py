@@ -1,8 +1,10 @@
 """Generate random quarter tiles, like in Destroyed or Retro maps."""
 import random
 from collections import defaultdict, namedtuple
+from typing import Tuple, Set
 
 import conditions
+import connections
 import srctools
 import template_brush
 import utils
@@ -36,8 +38,6 @@ FORCE_TILE_MATS = {
     if key.startswith('overlay.')
 }
 
-FORCE_LOCATIONS = set()
-
 # The template used to seal sides open to the void.
 FLOOR_TEMP_SIDE_WORLD = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_WORLD'
 FLOOR_TEMP_SIDE_DETAIL = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_DETAIL'
@@ -45,30 +45,23 @@ FLOOR_TEMP_SIDE_DETAIL = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_DETAIL'
 # Template used to seal floor sections 'covered' by a block.
 FLOOR_TEMP_PILLAR = 'BEE2_CUTOUT_TILE_FLOOR_PILLAR'
 
-BEAM_ROT_PRECISION = 100  # How many DP to use for the random digits.
+BEAM_ROT_PRECISION = 10**2  # How many DP to use for the random digits.
 
 BorderPoints = namedtuple('BorderPoints', 'wall ceil rot')
 
 FLOOR_DEPTH = 8  # Distance we drop the floor
 
 
-@conditions.meta_cond(priority=-1000, only_once=False)
-def find_indicator_panels(inst: Entity):
-    """We need to locate indicator panels, so they aren't overwritten.
-    """
-    if inst['file'].casefold() not in instanceLocs.resolve('[indpan]'):
-        return
-    loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
-    loc += Vec.from_str(inst['origin'])
-
+def add_signage_loc(sign_locs: Set[Tuple[float, float, float]], loc: Vec):
+    """Blacklist a point for cutout tiles."""
     # Sometimes (light bridges etc) a sign will be halfway between
     # tiles, so in that case we need to force 2 tiles.
-    loc_min = (loc - (15, 15, 0)) // 32 * 32  # type: Vec
-    loc_max = (loc + (15, 15, 0)) // 32 * 32  # type: Vec
+    loc_min = (loc - (15, 15, 0)) // 32 * 32
+    loc_max = (loc + (15, 15, 0)) // 32 * 32
     loc_min += (16, 16, 0)
     loc_max += (16, 16, 0)
-    FORCE_LOCATIONS.add(loc_min.as_tuple())
-    FORCE_LOCATIONS.add(loc_max.as_tuple())
+    sign_locs.add(loc_min.as_tuple())
+    sign_locs.add(loc_max.as_tuple())
 
 
 @conditions.make_result('CutOutTile')
@@ -89,7 +82,7 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
     - "Floor4x4Black", "Ceil2x2White" and other combinations can be used to
        override the textures used.
     """
-    item = instanceLocs.resolve(res['markeritem'])
+    marker_filenames = instanceLocs.resolve(res['markeritem'])
 
     INST_LOCS = {}  # Map targetnames -> surface loc
     CEIL_IO = []  # Pairs of ceil inst corners to cut out.
@@ -101,7 +94,7 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
     MATS.clear()
     floor_edges = []  # Values to pass to add_floor_sides() at the end
 
-    sign_loc = set(FORCE_LOCATIONS)
+    sign_locs = set()
     # If any signage is present in the map, we need to force tiles to
     # appear at that location!
     for over in vmf.by_class['info_overlay']:
@@ -110,15 +103,16 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
                 # Only check floor/ceiling overlays
                 over['basisnormal'] in ('0 0 1', '0 0 -1')
                 ):
-            loc = Vec.from_str(over['origin'])
-            # Sometimes (light bridges etc) a sign will be halfway between
-            # tiles, so in that case we need to force 2 tiles.
-            loc_min = (loc - (15, 15, 0)) // 32 * 32  # type: Vec
-            loc_max = (loc + (15, 15, 0)) // 32 * 32  # type: Vec
-            loc_min += (16, 16, 0)
-            loc_max += (16, 16, 0)
-            FORCE_LOCATIONS.add(loc_min.as_tuple())
-            FORCE_LOCATIONS.add(loc_max.as_tuple())
+            add_signage_loc(sign_locs, Vec.from_str(over['origin']))
+
+    for item in connections.ITEMS.values():
+        for ind_pan in item.ind_panels:
+            loc = Vec(0, 0, -64)
+            loc.localise(
+                Vec.from_str(ind_pan['origin']),
+                Vec.from_str(ind_pan['angles']),
+            )
+            add_signage_loc(sign_locs, loc)
 
     SETTINGS = {
         'floor_chance': srctools.conv_int(
@@ -168,36 +162,40 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
 
     # Find our marker ents
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in item:
+        if inst['file'].casefold() not in marker_filenames:
             continue
         targ = inst['targetname']
-        orient = Vec(0, 0, 1).rotate_by_str(inst['angles', '0 0 0'])
+        normal = Vec(0, 0, 1).rotate_by_str(inst['angles', '0 0 0'])
         # Check the orientation of the marker to figure out what to generate
-        if orient == (0, 0, 1):
+        if normal == (0, 0, 1):
             io_list = FLOOR_IO
         else:
             io_list = CEIL_IO
 
         # Reuse orient to calculate where the solid face will be.
-        loc = (orient * -64) + Vec.from_str(inst['origin'])
+        loc = Vec.from_str(inst['origin']) - 64 * normal
         INST_LOCS[targ] = loc
 
-        for out in inst.output_targets():
-            io_list.append((targ, out))
+        item = connections.ITEMS[targ]
+        item.delete_antlines()
 
-        if not inst.outputs and inst.fixup['$connectioncount'] == '0':
+        if item.outputs:
+            for conn in list(item.outputs):
+                if conn.to_item.inst['file'].casefold() in marker_filenames:
+                    io_list.append((targ, conn.to_item.name))
+                else:
+                    LOGGER.warning('Cutout tile connected to non-cutout!')
+                conn.remove()  # Delete the connection.
+        else:
             # If the item doesn't have any connections, 'connect'
             # it to itself so we'll generate a 128x128 tile segment.
             io_list.append((targ, targ))
-        inst.remove()  # Remove the instance itself from the map.
+
+        # Remove all traces of this item (other than in connections lists).
+        inst.remove()
+        del connections.ITEMS[targ]
 
     for start_floor, end_floor in FLOOR_IO:
-        if end_floor not in INST_LOCS:
-            # Not a marker - remove this and the antline.
-            for toggle in vmf.by_target[end_floor]:
-                conditions.remove_ant_toggle(toggle)
-            continue
-
         box_min = Vec(INST_LOCS[start_floor])
         box_min.min(INST_LOCS[end_floor])
 
@@ -300,9 +298,9 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
                 rot=0,
             ))
 
-    # Now count boundries near tiles, then generate them.
+    # Now count boundaries near tiles, then generate them.
 
-    # Do it seperately for each z-level:
+    # Do it separately for each z-level:
     for z, xy_dict in floor_neighbours.items():  # type: float, dict
         for x, y in xy_dict:  # type: float, float
             # We want to count where there aren't any tiles
@@ -360,7 +358,7 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
                 overlay_ids,
                 MATS,
                 SETTINGS,
-                sign_loc,
+                sign_locs,
                 detail_ent,
                 noise_weight=weights[x, y],
                 noise_func=noise,
@@ -405,7 +403,6 @@ def convert_floor(
         brush = conditions.SOLIDS.pop(loc.as_tuple())
     except KeyError:
         return False  # No tile here!
-
 
     if brush.normal == (0, 0, 1):
         # This is a pillar block - there isn't actually tiles here!

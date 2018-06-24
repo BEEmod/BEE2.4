@@ -2,7 +2,6 @@
 from enum import Enum
 
 import inspect
-import io
 
 from srctools import Property, Vec, parse_vec_str
 from BEE2_config import ConfigFile
@@ -10,6 +9,7 @@ import srctools
 import utils
 
 from typing import Union, Tuple, TypeVar, Type, Optional, Iterator
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -35,6 +35,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
+OptionT = TypeVar('OptionT', str, int, float, bool, Vec, Enum)
 
 class Opt:
     def __init__(self, id: str, default, doc, fallback=None):
@@ -94,7 +95,7 @@ def load(opt_blocks: Iterator[Property]):
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:
             SETTINGS[opt.id] = srctools.conv_bool(val, opt.default)
-        else: # int, float, str - no special handling...
+        else:  # int, float, str - no special handling...
             try:
                 SETTINGS[opt.id] = opt.type.value(val)
             except (ValueError, TypeError):
@@ -136,29 +137,49 @@ def set_opt(opt_name: str, value: str):
         except (ValueError, TypeError):
             pass
 
-OptionType = TypeVar('OptionType')
-
-
-def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
+def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
     """Get the given option. 
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
+
+    If expected_type is an Enum, this will be used to convert the output.
+    If it fails, a warning is produced and the first value in the enum is
+    returned.
     """
     try:
         val = SETTINGS[name.casefold()]
     except KeyError:
         raise TypeError('Option "{}" does not exist!'.format(name)) from None
-    
+
     if val is None:
         return None
+
+    if issubclass(expected_type, Enum):
+        enum_type = expected_type
+        expected_type = str
+    else:
+        enum_type = None
         
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
         raise ValueError('Option "{}" is {} (expected {})'.format(
-            name, 
-            type(val), 
+            name,
+            type(val),
             expected_type,
         ))
+
+    if enum_type is not None:
+        try:
+            return enum_type(val)
+        except ValueError:
+            LOGGER.warning(
+                'Option "{}" is not a valid value. '
+                'Allowed values are:\n{}',
+                name,
+                '\n'.join([mem.value for mem in enum_type])
+            )
+            return next(iter(enum_type))
+
     # Vec is mutable, don't allow modifying the original.
     if expected_type is Vec:
         return val.copy()
@@ -168,9 +189,9 @@ def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
 
 def get_itemconf(
     name: Union[str, Tuple[str, str]],
-    default: Optional[OptionType],
+    default: Optional[OptionT],
     timer_delay: int=None,
-) -> Optional[OptionType]:
+) -> Optional[OptionT]:
     """Get an itemconfig value.
 
     The name should be an 'ID:Section', or a tuple of the same.
@@ -342,6 +363,40 @@ DEFAULTS = [
         """The local name that the panel func_brush should parent to.
         Adding the attachment name to the parent after a comma
         automatically sets the attachment point for the brush.
+        """),
+
+    Opt('ind_pan_check_switching', 'custom',
+        """Specify the type of switching behaviour used in the instance.
+        
+        This can allow optimising control of antlines. The $indicator_name
+        fixup value should be used for the names of overlays. If the option is
+        set to 'internal', one instance contains the toggle/panel entity. If it 
+        is set to 'external', one is generated for the instance(s). If set to 
+        'custom' (default), no optimisation is done (other than skipping the
+        proxy).
+        """),
+
+    Opt('ind_pan_timer_switching', 'custom',
+        """Specify the type of switching behaviour used in the instance.
+        
+        This can allow optimising control of antlines. The $indicator_name
+        fixup value should be used for the names of overlays. If the option is
+        set to 'internal', one instance contains the toggle/panel entity. If it 
+        is set to 'external', one is generated for the instance(s). If set to 
+        'custom' (default), no optimisation is done (other than skipping the
+        proxy).
+        """),
+
+    Opt('timer_sound', 'Portal.room1_TickTock',
+        """The soundscript used for timer tick-tock sounds. 
+        
+        Re-played every second, so it should not loop."""),
+
+    Opt('timer_sound_cc', TYPE.STR,
+        """Closed caption soundscript for tick-tock sounds.
+        
+        We mimic this soundscript when `timer_sound` is played.
+        Set to "" to disable adding additional closed captions. 
         """),
 
     Opt('signInst', TYPE.STR,

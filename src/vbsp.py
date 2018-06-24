@@ -1,5 +1,8 @@
 import utils
 # Do this very early, so we log the startup sequence.
+import antlines
+
+
 LOGGER = utils.init_logging('bee2/vbsp.log')
 
 import os
@@ -70,7 +73,6 @@ TEX_VALVE = {
     consts.Special.SQUAREBEAMS: "special.edge",
     consts.Special.GLASS: "special.glass",
     consts.Special.GRATING: "special.grating",
-    consts.Special.LASERFIELD: "special.laserfield",
 }
 
 
@@ -107,23 +109,6 @@ TEX_DEFAULTS = [
     ('', 'special.goo_floor'),
     ('', 'special.edge_special'),
     ('', 'special.fizz_border'),
-
-    # And these defaults have the extra scale information, which isn't
-    # in the maps.
-    ('0.25|' + consts.Antlines.STRAIGHT, 'overlay.antline'),
-    ('1|' + consts.Antlines.CORNER, 'overlay.antlinecorner'),
-
-    # This is for the P1 style, where antlines use different textures
-    # on the floor and wall.
-    # We just use the regular version if unset.
-    ('', 'overlay.antlinecornerfloor'),
-    ('', 'overlay.antlinefloor'),
-
-    # Broken version of antlines
-    ('', 'overlay.antlinebroken'),
-    ('', 'overlay.antlinebrokencorner'),
-    ('', 'overlay.antlinebrokenfloor'),
-    ('', 'overlay.antlinebrokenfloorcorner'),
 
     # If set and enabled, adds frames for >10 sign pairs
     # to distinguish repeats.
@@ -197,11 +182,6 @@ GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
 TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
 PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
-
-# Names initially assigned to toggles and panels.
-IND_TOGGLE_NAMES = set()
-IND_PANEL_NAMES = set()
-IND_ITEM_NAMES = set() # And both combined
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
@@ -301,6 +281,22 @@ def load_settings():
         else:
             settings['textures'][key] = value
 
+    # Antline texturing settings.
+    # We optionally allow different ones for floors.
+    ant_wall = ant_floor = None
+    for prop in conf.find_all('Textures', 'Antlines'):
+        if 'floor' in prop:
+            ant_floor = antlines.AntType.parse(prop.find_key('floor'))
+        if 'wall' in prop:
+            ant_wall = antlines.AntType.parse(prop.find_key('wall'))
+        # If both are not there, allow omitting the subkey.
+        if ant_wall is ant_floor is None:
+            ant_wall = ant_floor = antlines.AntType.parse(prop)
+    if ant_wall is None:
+        ant_wall = antlines.AntType.default()
+    if ant_floor is None:
+        ant_floor = ant_wall
+
     # Load in our main configs..
     vbsp_options.load(conf.find_all('Options'))
 
@@ -325,8 +321,8 @@ def load_settings():
         )
     # Parse that data in the relevant modules.
     instanceLocs.load_conf(instance_file)
-    conditions.build_connections_dict(instance_file)
     conditions.build_itemclass_dict(instance_file)
+    connections.read_configs(instance_file)
 
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
@@ -410,6 +406,7 @@ def load_settings():
         BEE2_config = ConfigFile(None)
 
     LOGGER.info("Settings Loaded!")
+    return ant_floor, ant_wall
 
 
 def load_map(map_path):
@@ -1316,9 +1313,6 @@ def get_map_info():
     file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
     file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
 
-    file_ind_panel = instanceLocs.get_special_inst('indpan')
-    file_ind_toggle = instanceLocs.get_special_inst('indtoggle')
-
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
 
@@ -1435,13 +1429,6 @@ def get_map_info():
         elif file in file_coop_door_frame:
             # The coop frame must be the exit door...
             exit_door_frame = item
-        # Record the names of toggle or indicator panel instances.
-        elif file in file_ind_panel:
-            IND_PANEL_NAMES.add(item['targetname'])
-            IND_ITEM_NAMES.add(item['targetname'])
-        elif file in file_ind_toggle:
-            IND_TOGGLE_NAMES.add(item['targetname'])
-            IND_ITEM_NAMES.add(item['targetname'])
 
         inst_files.add(item['file'])
 
@@ -1800,24 +1787,6 @@ def collapse_goo_trig():
             ),
         )
 
-    LOGGER.info('Done!')
-
-
-def remove_static_ind_toggles():
-    """Remove indicator_toggle instances that don't have assigned overlays.
-
-    If a style has static overlays, this will make antlines basically free.
-    """
-    LOGGER.info('Removing static indicator toggles...')
-    toggle_file = instanceLocs.resolve('<ITEM_INDICATOR_TOGGLE>')
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() not in toggle_file:
-            continue
-
-        overlay = inst.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
-        # Remove if there isn't an overlay, or no associated ents.
-        if overlay == '' or len(VMF.by_target[overlay]) == 0:
-            inst.remove()
     LOGGER.info('Done!')
 
 
@@ -2255,148 +2224,6 @@ def get_face_orient(face):
     return ORIENT.wall
 
 
-def broken_antline_iter(dist, max_step, chance):
-    """Iterator used in set_antline_mat().
-
-    This produces min,max pairs which fill the space from 0-dist.
-    Their width is random, from 1-max_step.
-    Neighbouring sections will be merged when they have the same type.
-    """
-    last_val = next_val = 0
-    last_type = random.randrange(100) < chance
-
-    while True:
-        is_broken = (random.randrange(100) < chance)
-
-        next_val += random.randint(1, max_step)
-
-        if next_val >= dist:
-            # We hit the end - make sure we don't overstep.
-            yield last_val, dist, is_broken
-            return
-
-        if is_broken == last_type:
-            # Merge the two sections - don't make more overlays
-            # than needed..
-            continue
-
-        yield last_val, next_val, last_type
-        last_type = is_broken
-        last_val = next_val
-
-
-def set_antline_mat(
-        over,
-        mats: list,
-        floor_mats: list=(),
-        broken_chance=0,
-        broken_dist=0,
-        broken: list=(),
-        broken_floor: list=(),
-        ):
-    """Retexture an antline, with various options encoded into the material.
-
-    floor_mat, if set is an alternate material to use for floors.
-    The material is split into 3 parts, separated by '|':
-    - Scale: the u-axis width of the material, used for clean antlines.
-    - Material: the material
-    - Static: if 'static', the antline will lose the targetname. This
-      makes it non-dynamic, and removes the info_overlay_accessor
-      entity from the compiled map.
-    If only 2 parts are given, the overlay is assumed to be dynamic.
-    If one part is given, the scale is assumed to be 0.25.
-
-    For broken antlines,  'broken_chance' is the percentage chance for
-    brokenness. broken_dist is the largest run of lights that can be broken.
-    broken and broken_floor are the textures used for the broken lights.
-    """
-    # Choose a random one
-    random.seed(over['origin'])
-
-    if broken_chance and any(broken):  # We can have `broken` antlines.
-        bbox_min, bbox_max = VLib.overlay_bounds(over)
-        # Number of 'circles' and the length-wise axis
-        length = max(bbox_max - bbox_min)
-        long_axis = Vec(0, 1, 0).rotate_by_str(over['angles']).axis()
-
-        # It's a corner or short antline - replace instead of adding more
-        if length // 16 < broken_dist:
-            if random.randrange(100) < broken_chance:
-                mats = broken
-                floor_mats = broken_floor
-        else:
-            min_origin = Vec.from_str(over['origin'])
-            min_origin[long_axis] -= length / 2
-
-            broken_iter = broken_antline_iter(
-                length // 16,
-                broken_dist,
-                broken_chance,
-            )
-            for sect_min, sect_max, is_broken in broken_iter:
-
-                if is_broken:
-                    tex, floor_tex = broken, broken_floor
-                else:
-                    tex, floor_tex = mats, floor_mats
-
-                sect_length = sect_max - sect_min
-
-                # Make a section - base it off the original, and shrink it
-                new_over = over.copy()
-                VMF.add_ent(new_over)
-                # Make sure we don't restyle this twice.
-                IGNORED_OVERLAYS.add(new_over)
-
-                # Repeats lengthways
-                new_over['startV'] = str(sect_length)
-                sect_center = (sect_min + sect_max) / 2
-
-                sect_origin = min_origin.copy()
-                sect_origin[long_axis] += sect_center * 16
-                new_over['basisorigin'] = new_over['origin'] = sect_origin.join(' ')
-
-                # Set the 4 corner locations to determine the overlay size.
-                # They're in local space - x is -8/+8, y=length, z=0
-                # Match the sign of the current value
-                for axis in '0123':
-                    pos = Vec.from_str(new_over['uv' + axis])
-                    if pos.y < 0:
-                        pos.y = -8 * sect_length
-                    else:
-                        pos.y = 8 * sect_length
-                    new_over['uv' + axis] = pos.join(' ')
-
-                # Recurse to allow having values in the material value
-                set_antline_mat(new_over, tex, floor_tex, broken_chance=0)
-            # Remove the original overlay
-            VMF.remove_ent(over)
-
-    if any(floor_mats):  # Ensure there's actually a value
-        # For P1 style, check to see if the antline is on the floor or
-        # walls.
-        if Vec.from_str(over['basisNormal']).z != 0:
-            mats = floor_mats
-
-    mat = random.choice(mats).split('|')
-    opts = []
-
-    if len(mat) == 2:
-        # rescale antlines if needed
-        over['endu'], over['material'] = mat
-    elif len(mat) > 2:
-        over['endu'], over['material'], *opts = mat
-    else:
-        # Unpack to ensure it only has 1 section
-        over['material'], = mat
-        over['endu'] = '0.25'
-
-    if 'static' in opts:
-        # If specified, remove the targetname so the overlay
-        # becomes static.
-        del over['targetname']
-
-
 def change_overlays():
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
@@ -2405,26 +2232,14 @@ def change_overlays():
     sign_inst = vbsp_options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size =  vbsp_options.get(int, 'signSize') / 2
+    sign_size = vbsp_options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack =  vbsp_options.get(str, 'signPack')
+    sign_inst_pack = vbsp_options.get(str, 'signPack')
 
     # Grab all the textures we're using...
 
     tex_dict = settings['textures']
-    ant_str = tex_dict['overlay.antline']
-    ant_str_floor = tex_dict['overlay.antlinefloor']
-    ant_corn = tex_dict['overlay.antlinecorner']
-    ant_corn_floor = tex_dict['overlay.antlinecornerfloor']
-
-    broken_ant_str = tex_dict['overlay.antlinebroken']
-    broken_ant_corn = tex_dict['overlay.antlinebrokencorner']
-    broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
-    broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
-
-    broken_chance = vbsp_options.get(float, 'broken_antline_chance')
-    broken_dist = vbsp_options.get(int, 'broken_antline_distance')
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2473,26 +2288,6 @@ def change_overlays():
                     val /= 16
                     val *= sign_size
                     over[prop] = val.join(' ')
-        if case_mat == consts.Antlines.STRAIGHT:
-            set_antline_mat(
-                over,
-                ant_str,
-                ant_str_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_str,
-                broken_ant_str_floor,
-            )
-        elif case_mat == consts.Antlines.CORNER:
-            set_antline_mat(
-                over,
-                ant_corn,
-                ant_corn_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_corn,
-                broken_ant_corn_floor,
-            )
 
 
 def add_extra_ents(mode):
@@ -3142,9 +2937,9 @@ def make_vrad_config(is_peti: bool):
         import cubes
         import conditions.piston_platform
 
+        # These generate scripts, so they might need to tell VRAD.
         cubes.write_vscripts(conf)
         conditions.piston_platform.write_vscripts(conf)
-
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
@@ -3473,7 +3268,7 @@ def main():
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        load_settings()
+        ant_floor, ant_wall = load_settings()
 
         load_map(path)
         instance_traits.set_traits(VMF)
@@ -3483,6 +3278,8 @@ def main():
             VMF,
             settings['textures']['overlay.shapeframe'],
             settings['style_vars']['enableshapesignageframe'],
+            ant_floor,
+            ant_wall,
         )
 
         MAP_RAND_SEED = calc_rand_seed()
@@ -3511,7 +3308,6 @@ def main():
         collapse_goo_trig()
         change_func_brush()
         barriers.make_barriers(VMF, get_tex)
-        remove_static_ind_toggles()
         fix_worldspawn()
 
         make_packlist(path)

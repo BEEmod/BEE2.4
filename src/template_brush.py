@@ -755,7 +755,7 @@ def retexture_template(
                 face.mat = vbsp.get_tex(tex_type)
 
                 if tex_type == 'special.goo_cheap':
-                    if norm != (0, 0, 1):
+                    if norm != (0, 0, -1):
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
                         # all faces goo to work in multiple orientations.

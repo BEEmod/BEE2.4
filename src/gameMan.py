@@ -108,10 +108,6 @@ GAMEINFO_LINE = 'Game\t"BEE2"'
 # them.
 EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 
-# The name given to standard connections - regular input/outputs in editoritems.
-CONN_NORM = 'CONNECTION_STANDARD'
-CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
-
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
     ('BACK', 'Backup Original Files'),
@@ -809,11 +805,32 @@ class Game:
             commands,
         ])
 
-        for item in editoritems.find_all("Item"):
-            instance_block = Property(item['Type'], [])
-            instance_locs.append(instance_block)
+        # Produce the VMF output command we want - all PeTI outputs are simply
+        # just the input part, no delays, counts, parameter or target instance.
+        # so make those blank.
+        output_format = ',{},,0.0,-1'.replace(',', Output.SEP).format
 
-            comm_block = Property(item['Type'], [])
+        def conv_peti_input(block: Property, key: str, name: str):
+            """Do comm_block[key] = block[name], but convert the formats.
+
+            comm_block expects a full VMF output value, but PeTI just has the IO
+            component (instance:x;blah).
+            """
+            if key in block:
+                # Do not add from editoritems if the new style is set.
+                return
+            try:
+                full_value = output_format(block[name])
+            except IndexError:  # No key
+                pass
+            else:
+                comm_block.append(Property(key, full_value))
+
+        for item in editoritems.find_all("Item"):
+            item_id = item['Type']
+
+            instance_block = Property(item_id, [])
+            instance_locs.append(instance_block)
 
             for inst_block in item.find_all("Exporting", "instances"):
                 for inst in inst_block.value[:]:  # type: Property
@@ -833,46 +850,33 @@ class Game:
                             name = name[5:]
 
                         cust_inst.set_key(
-                            (item['type'], name),
+                            (item_id, name),
                             # Allow using either the normal block format,
                             # or just providing the file - we don't use the
                             # other values.
                             inst['name'] if inst.has_children() else inst.value,
                         )
 
-            # Look in the Inputs and Outputs blocks to find the io definitions.
-            # Copy them to property names like 'Input_Activate'.
-            for io_type in ('Inputs', 'Outputs'):
-                for block in item.find_all('Exporting', io_type, CONN_NORM):
-                    for io_prop in block:
-                        comm_block[
-                            io_type[:-1] + '_' + io_prop.real_name
-                        ] = io_prop.value
+            comm_block = Property(item['Type'], [])
 
-            # The funnel item type is special, having the additional input type.
-            # Handle that specially.
-            if item['type'].casefold() == 'item_tbeam':
-                for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
-                    for io_prop in block:
-                        comm_block['TBeam_' + io_prop.real_name] = io_prop.value
-
-            # Fizzlers don't work correctly with outputs. This is a signal to
-            # conditions.fizzler, but it must be removed in editoritems.
-            if item['ItemClass', ''].casefold() == 'itembarrierhazard':
-                for block in item.find_all('Exporting', 'Outputs'):
-                    if CONN_NORM in block:
-                        del block[CONN_NORM]
+            (
+                has_input,
+                has_output,
+                has_secondary,
+            ) = packageLoader.Item.convert_item_io(comm_block, item, conv_peti_input)
 
             # Record the itemClass for each item type.
-            item_classes[item['type']] = item['ItemClass', 'ItemBase']
+            # 'ItemBase' is the default class.
+            item_classes[item_id] = item['ItemClass', 'ItemBase']
 
             # Only add the block if the item actually has IO.
-            if comm_block.value:
+            if has_input or has_secondary or has_output:
                 commands.append(comm_block)
 
         return root_block.export()
 
     def generate_fizzler_sides(self, conf: Property):
+        """Create the VMTs used for fizzler sides."""
         fizz_colors = {}
         mat_path = self.abs_path('bee2/materials/BEE2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):

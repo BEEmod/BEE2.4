@@ -28,8 +28,11 @@ from typing import (
     Dict, List, Tuple, NamedTuple,
     Match,
     TypeVar,
+    Callable,
 )
 
+
+# noinspection PyUnresolvedReferences
 if TYPE_CHECKING:
     from gameMan import Game
     from selectorWin import SelitemData
@@ -43,8 +46,6 @@ all_obj = {}
 obj_override = {}
 packages = {}  # type: Dict[str, Package]
 OBJ_TYPES = {}
-
-data = {}
 
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS = {}  # type: Dict[str, FileSystem]
@@ -83,7 +84,7 @@ ObjType = NamedTuple('ObjType', [
 ])
 # The arguments to pak_object.export().
 ExportData = NamedTuple('ExportData', [
-    ('selected', str),
+    ('selected', Any),  # Usually str, but some items pass other things.
     ('selected_style', 'Style'),  # Some items need to know which style is selected
     ('editoritems', Property),
     ('vbsp_conf', Property),
@@ -126,6 +127,11 @@ Files in this folder will be written to the VPK during every BEE2 export.
 Use to override resources as you please.
 """
 
+# The name given to standard connections - regular input/outputs in editoritems.
+CONN_NORM = 'CONNECTION_STANDARD'
+CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
+
+
 # The folder we want to copy our VPKs to.
 VPK_FOLDER = {
     # The last DLC released by Valve - this is the one that we
@@ -151,6 +157,7 @@ class NoVPKExport(Exception):
 
 T = TypeVar('T')
 
+
 class _PakObjectMeta(type):
     def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
         """Adds a PakObject to the list of objects.
@@ -158,7 +165,7 @@ class _PakObjectMeta(type):
         Making a metaclass allows us to hook into the creation of all subclasses.
         """
         # Defer to type to create the class..
-        cls = type.__new__(mcs, name, bases, namespace)
+        cls = type.__new__(mcs, name, bases, namespace)  # type: Type[PakObject]
 
         # Only register subclasses of PakObject - those with a parent class.
         # PakObject isn't created yet so we can't directly check that.
@@ -186,6 +193,13 @@ class PakObject(metaclass=_PakObjectMeta):
     Set 'has_img' to control whether the object will count towards the images
     loading bar - this should be stepped in the UI.load_packages() method.
     """
+    # ID of the object
+    id = ...  # type: str
+    # ID of the package.
+    pak_id = ...  # type: str
+    # Display name of the package.
+    pak_name = ...  # type: str
+
     @classmethod
     def parse(cls, data: ParseData) -> 'PakObject':
         """Parse the package object from the info.txt block.
@@ -338,7 +352,7 @@ def find_packages(pak_dir):
             continue
         try:
             pak_id = info['ID']
-        except:
+        except IndexError:
             # Close the ref we've gotten, since it's not in the dict
             # it won't be done by load_packages().
             filesys.close_ref()
@@ -422,6 +436,8 @@ def load_packages(
                 'essential resources and objects.'
             )
 
+        data = {}  # type: Dict[str, List[PakObject]]
+
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
             obj_override[obj_type] = defaultdict(list)
@@ -478,6 +494,7 @@ def load_packages(
                         '"{}" object {} has no ID!'.format(obj_type, object_)
                     )
 
+                # Store in this database so we can find all objects for each type.
                 obj_class._id_to_obj[object_.id.casefold()] = object_
 
                 object_.pak_id = obj_data.pak_id
@@ -620,7 +637,7 @@ def setup_style_tree(
             # We need to repeatedly loop to handle the chains of
             # dependencies. This is a list of (style_id, UnParsed).
             to_change = []  # type: List[Tuple[str, UnParsedItemVariant]]
-            styles = vers['styles']  # type:  Dict[str, Optional[ItemVariant]]
+            styles = vers['styles']  # type:  Dict[str, Union[UnParsedItemVariant, ItemVariant]]
             for sty_id, conf in styles.items():
                 to_change.append((sty_id, conf))
                 # Not done yet
@@ -735,6 +752,30 @@ def setup_style_tree(
                         item.isolate_versions or vers['isolate']
                         else item.def_ver['styles'][sty_id]
                     )
+
+    if utils.DEV_MODE:
+        # Check for outdated connections.
+        with open('../dev/item_conn.md', 'w') as f:
+            for item in sorted(item_data, key=lambda i: i.id):
+                imp = {}
+                for vers in item.versions.values():
+                    variants = {}  # type: Dict[int, Tuple[str, Property]]
+                    for sty_id, variant in vers['styles'].items():
+                        if id(variant.editor) not in variants:
+                            variants[id(variant.editor)] = sty_id, variant.editor
+
+                    for sty_id, editor in variants.values():
+                        for io_block in editor.find_all('Exporting', 'Inputs'):
+                            if 'CONNECTION_STANDARD' in io_block:
+                                imp[sty_id] = False
+                                break
+                            elif 'BEE2' in io_block:
+                                imp[sty_id] = True
+
+                if imp:
+                    f.write('\t* `<{}>`:\n'.format(item.id))
+                    for sty_id, has_imp in sorted(imp.items()):
+                        f.write('\t\t* [{}] `{}`\n'.format('x' if has_imp else ' ', sty_id))
 
 
 def parse_item_folder(
@@ -876,19 +917,19 @@ class ItemVariant:
     """Data required for an item in a particular style."""
 
     def __init__(
-            self,
-            editoritems: Property,
-            vbsp_config: Property,
-            editor_extra: Iterable[Property],
-            authors: List[str],
-            tags: List[str],
-            desc: tkMarkdown.MarkdownData,
-            icons: Dict[str, str],
-            ent_count: str='',
-            url: str = None,
-            all_name: str=None,
-            all_icon: str=None,
-            source: str='',
+        self,
+        editoritems: Property,
+        vbsp_config: Property,
+        editor_extra: Iterable[Property],
+        authors: List[str],
+        tags: List[str],
+        desc: tkMarkdown.MarkdownData,
+        icons: Dict[str, str],
+        ent_count: str='',
+        url: str = None,
+        all_name: str=None,
+        all_icon: str=None,
+        source: str='',
     ):
         self.editor = editoritems
         self.editor_extra = Property(None, list(editor_extra))
@@ -1091,6 +1132,23 @@ class ItemVariant:
         for key, prop in sorted(inst_children.items(), key=operator.itemgetter(0)):
             instances.append(prop)
 
+        # Override IO commands.
+        if 'IOConf' in props:
+            for io_block in variant.editor.find_children('Exporting'):
+                if io_block.name not in ('outputs', 'inputs'):
+                    continue
+                while 'bee2' in io_block:
+                    del io_block['bee2']
+
+            io_conf = props.find_key('IOConf')
+            io_conf.name = 'BEE2'
+            (
+                variant.editor.
+                ensure_exists('Exporting').
+                ensure_exists('Inputs').
+                append(io_conf)
+            )
+
         return variant
 
     @staticmethod
@@ -1137,6 +1195,7 @@ class Package:
         return PACK_CONFIG.get_bool(self.id, 'Enabled', default=True)
 
     def set_enabled(self, value: bool):
+        """Enable or disable the package."""
         if self.id == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
@@ -1169,6 +1228,7 @@ class Package:
 
 
 class Style(PakObject):
+    """Represents a style, specifying the era a test was built in."""
     def __init__(
         self,
         style_id,
@@ -1648,6 +1708,148 @@ class Item(PakObject):
             self.all_conf + item_data.vbsp_config,
         )
 
+    @staticmethod
+    def convert_item_io(
+        comm_block: Property,
+        item: Property,
+        conv_peti_input: Callable[[Property, str, str], None]=lambda a, b, c: None,
+    ):
+        """Convert editoritems configs with the new BEE2 connections format.
+
+        This produces (conf,  has_input, has_output, has_secondary):
+        The config block for instances.cfg, and if inputs, outputs, and the
+        secondary input are present.
+        """
+        item_id = comm_block.name
+        # Look in the Inputs and Outputs blocks to find the io definitions.
+        # Copy them to property names like 'Input_Activate'.
+        has_input = False
+        has_secondary = False
+        has_output = False
+        try:
+            [input_conf] = item.find_all('Exporting', 'Inputs', 'BEE2')
+        except ValueError:
+            pass
+        else:
+            input_conf = input_conf.copy()
+            input_conf.name = None
+            comm_block += input_conf
+        try:
+            [output_conf] = item.find_all('Exporting', 'Outputs', 'BEE2')
+            output_conf.name = None
+        except ValueError:
+            pass
+        else:
+            output_conf = output_conf.copy()
+            output_conf.name = None
+            comm_block += output_conf
+        for block in item.find_all('Exporting', 'Inputs', CONN_NORM):
+            has_input = True
+            conv_peti_input(block, 'enable_cmd', 'activate')
+            conv_peti_input(block, 'disable_cmd', 'deactivate')
+        for block in item.find_all('Exporting', 'Outputs', CONN_NORM):
+            has_output = True
+            for io_prop in block:
+                comm_block['out_' + io_prop.name] = io_prop.value
+        # The funnel item type is special, having the additional input type.
+        # Handle that specially.
+        if item_id == 'item_tbeam':
+            for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
+                has_secondary = True
+                conv_peti_input(block, 'sec_enable_cmd', 'activate')
+                conv_peti_input(block, 'sec_disable_cmd', 'deactivate')
+
+        # For special situations, allow forcing that we have these.
+        force_io = ''
+        while 'force' in comm_block:
+            force_io = comm_block['force', ''].casefold()
+            del comm_block['force']
+        if 'in' in force_io:
+            has_input = True
+        if 'out' in force_io:
+            has_output = True
+
+        if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
+            has_input = True
+        inp_type = comm_block['type', ''].casefold()
+        if inp_type == 'dual':
+            has_secondary = True
+        elif inp_type == 'daisychain':
+            # We specify this.
+            if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
+                LOGGER.warning(
+                    'DAISYCHAIN items cannot have inputs specified.'
+                )
+            # The item has an input, but the instance never gets it.
+            has_input = True
+            if not has_output:
+                LOGGER.warning(
+                    'DAISYCHAIN items need an output to make sense!'
+                )
+        elif inp_type.endswith('_logic'):
+            if 'out_activate' in comm_block or 'out_deactivate' in comm_block:
+                LOGGER.warning(
+                    'AND_LOGIC or OR_LOGIC items cannot '
+                    'have outputs specified.'
+                )
+            if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
+                LOGGER.warning(
+                    'AND_LOGIC or OR_LOGIC items cannot '
+                    'have inputs specified.'
+                )
+            # These logically always have both.
+            has_input = has_output = True
+        elif 'out_activate' in comm_block or 'out_deactivate' in comm_block:
+            has_output = True
+        if item_id in (
+            'item_indicator_panel',
+            'item_indicator_panel_timer',
+            'item_indicator_toggle',
+        ):
+            # Force the antline instances to have inputs, so we can specify
+            # the real instance doesn't. We need the fake ones to match
+            # instances to items.
+            has_input = True
+
+        # Remove all the IO blocks from editoritems, and replace with
+        # dummy ones.
+        # Then remove the config blocks.
+        for io_type in ('Inputs', 'Outputs'):
+            for block in item.find_all('Exporting', io_type):
+                while CONN_NORM in block:
+                    del block[CONN_NORM]
+                while 'BEE2' in block:
+                    del block['BEE2']
+        if has_input:
+            item.ensure_exists('Exporting').ensure_exists('Inputs').append(
+                Property(CONN_NORM, [
+                    Property('Activate', 'ACTIVATE'),
+                    Property('Deactivate', 'DEACTIVATE'),
+                ])
+            )
+        # Add the secondary for funnels only.
+        if item_id.casefold() == 'item_tbeam':
+            if not has_secondary:
+                LOGGER.warning(
+                    "No dual input for TBeam, these won't function."
+                )
+            item.ensure_exists('Exporting').ensure_exists('Inputs').append(
+                Property(CONN_FUNNEL, [
+                    Property('Activate', 'ACTIVATE_SECONDARY'),
+                    Property('Deactivate', 'DEACTIVATE_SECONDARY'),
+                ])
+            )
+        # Fizzlers don't work correctly with outputs - we don't
+        # want it in editoritems.
+        if has_output and item['ItemClass', ''].casefold() != 'itembarrierhazard':
+            item.ensure_exists('Exporting').ensure_exists('Outputs').append(
+                Property(CONN_NORM, [
+                    Property('Activate', 'ON_ACTIVATED'),
+                    Property('Deactivate', 'ON_DEACTIVATED'),
+                ])
+            )
+        return has_input, has_output, has_secondary
+
 
 class ItemConfig(PakObject, allow_mult=True, has_img=False):
     """Allows adding additional configuration for items.
@@ -1661,6 +1863,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data: ParseData):
+        """Parse from config files."""
         filesystem = data.fsys  # type: FileSystem
         vers = {}
 
@@ -1696,6 +1899,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
         )
 
     def add_over(self, override: 'ItemConfig'):
+        """Add additional style configs to the original config."""
         self.all_conf += override.all_conf.copy()
 
         for vers_id, styles in override.versions.items():
@@ -1716,6 +1920,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 
 
 class QuotePack(PakObject):
+    """Adds lists of voice lines which are automatically chosen."""
     def __init__(
             self,
             quote_id,
@@ -1820,7 +2025,6 @@ class QuotePack(PakObject):
             self.cam_pitch = override.cam_pitch
             self.cam_yaw = override.cam_yaw
             self.turret_hate = override.turret_hate
-
 
     def __repr__(self):
         return '<Voice:' + self.id + '>'
@@ -2006,6 +2210,12 @@ class Skybox(PakObject):
 
 class Music(PakObject):
     """Allows specifying background music for the map."""
+
+    has_base = False
+    has_tbeam = False
+    has_bouncegel = False
+    has_speedgel = False
+
     def __init__(
         self,
         music_id,
@@ -2309,6 +2519,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data: 'ParseData'):
+        """Parse StyleVars from configs."""
         name = data.info['name', '']
 
         unstyled = srctools.conv_bool(data.info['unstyled', '0'])
@@ -2419,26 +2630,26 @@ class StyleVPK(PakObject, has_img=False):
 
     @classmethod
     def parse(cls, data: ParseData):
+        """Read the VPK file from the package."""
         vpk_name = data.info['filename']
-
-        filesystem = data.fsys  # type: FileSystem
 
         source_folder = os.path.normpath('vpk/' + vpk_name)
 
         # At least one exists?
-        if not any(filesystem.walk_folder(source_folder)):
+        if not any(data.fsys.walk_folder(source_folder)):
             raise Exception(
                 'VPK object "{}" has no associated files!'.format(data.id)
             )
 
-        return cls(data.id, filesystem, source_folder)
+        return cls(data.id, data.fsys, source_folder)
 
     @staticmethod
     def export(exp_data: ExportData):
-        sel_vpk = exp_data.selected_style.vpk_name  # type: Style
+        """Generate the VPK file in the game folder."""
+        sel_vpk = exp_data.selected_style.vpk_name
 
         if sel_vpk:
-            for vpk in StyleVPK.all():  # type: StyleVPK
+            for vpk in StyleVPK.all():
                 if vpk.id.casefold() == sel_vpk:
                     sel_vpk = vpk
                     break
@@ -2450,7 +2661,7 @@ class StyleVPK(PakObject, has_img=False):
         try:
             dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
         except PermissionError:
-            raise NoVPKExport() # We can't edit the VPK files - P2 is open..
+            raise NoVPKExport()  # We can't edit the VPK files - P2 is open..
 
         if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
             # In Portal 2, we make a dlc3 folder - this changes priorities,
@@ -2499,7 +2710,6 @@ class StyleVPK(PakObject, has_img=False):
             del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
-
 
     @staticmethod
     def iter_vpk_names():
@@ -2567,6 +2777,7 @@ class Elevator(PakObject):
 
     @classmethod
     def parse(cls, data):
+        """Read elevator videos from the package."""
         info = data.info
         selitem_data = get_selitem_data(info)
 
@@ -2639,6 +2850,7 @@ class Elevator(PakObject):
 
 
 class PackList(PakObject, allow_mult=True, has_img=False):
+    """Specifies a group of resources which can be packed together."""
     def __init__(self, pak_id, files, mats):
         self.id = pak_id
         self.files = files
@@ -2646,6 +2858,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data):
+        """Read pack lists from packages."""
         filesystem = data.fsys  # type: FileSystem
         conf = data.info.find_key('Config', '')
         mats = [
@@ -2782,6 +2995,7 @@ class EditorSound(PakObject, has_img=False):
 
     @classmethod
     def parse(cls, data):
+        """Parse editor sounds from the package."""
         return cls(
             snd_name=data.id,
             data=data.info.find_key('keys', [])
@@ -2939,13 +3153,13 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
                 else:
                     export_detail = is_detail
                 if len(vis_ids) > 1:
-                    raise ValueError('Template "{}" has brush with two'
-                                     ' visgroups!'.format(
-                        temp_id
-                    ))
+                    raise ValueError(
+                        'Template "{}" has brush with two '
+                        'visgroups!'.format(temp_id)
+                    )
                 visgroups = [
-                    visgroup_names[id]
-                    for id in
+                    visgroup_names[vis_id]
+                    for vis_id in
                     vis_ids
                 ]
                 # No visgroup = ''
@@ -2986,15 +3200,15 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
 
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
             visgroups = [
-                visgroup_names[id]
-                for id in
+                visgroup_names[vis_id]
+                for vis_id in
                 overlay.visgroup_ids
                 ]
             if len(visgroups) > 1:
-                raise ValueError('Template "{}" has overlay with two'
-                                 ' visgroups!'.format(
-                    self.id,
-                ))
+                raise ValueError(
+                    'Template "{}" has overlay with two '
+                    'visgroups!'.format(self.id)
+                )
             new_overlay = overlay.copy(
                 vmf_file=TEMPLATE_FILE,
                 keep_vis=False
@@ -3013,6 +3227,7 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
 
     @classmethod
     def parse(cls, data: ParseData):
+        """Read templates from a package."""
         file = get_config(
             prop_block=data.info,
             fsys=data.fsys,
@@ -3055,21 +3270,21 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
             TEMPLATE_FILE.export(temp_file, inc_version=False)
 
     @staticmethod
-    def yield_world_detail(map: VMF) -> Iterator[Tuple[List[Solid], bool, set]]:
+    def yield_world_detail(vmf: VMF) -> Iterator[Tuple[List[Solid], bool, set]]:
         """Yield all world/detail solids in the map.
 
         This also indicates if it's a func_detail, and the visgroup IDs.
         (Those are stored in the ent for detail, and the solid for world.)
         """
-        for brush in map.brushes:
+        for brush in vmf.brushes:
             yield [brush], False, brush.visgroup_ids
-        for ent in map.by_class['func_detail']:
+        for ent in vmf.by_class['func_detail']:
             yield ent.solids.copy(), True, ent.visgroup_ids
 
 
 def desc_parse(
     info: Property,
-    id: str='',
+    desc_id: str='',
     *,
     prop_name: str='description',
 ) -> tkMarkdown.MarkdownData:
@@ -3082,7 +3297,7 @@ def desc_parse(
         if prop.has_children():
             for line in prop:
                 if line.name and not has_warning:
-                    LOGGER.warning('Old desc format: {}', id)
+                    LOGGER.warning('Old desc format: {}', desc_id)
                     has_warning = True
                 lines.append(line.value)
         else:
@@ -3103,7 +3318,7 @@ def get_selitem_data(info):
     large_icon = info['iconlarge', None]
     group = info['group', '']
     sort_key = info['sort_key', '']
-    desc = desc_parse(info, id=info['id'])
+    desc = desc_parse(info, info['id'])
     if not group:
         group = None
     if not short_name:
@@ -3181,5 +3396,3 @@ def sep_values(string, delimiters=',;/'):
         if stripped
     ]
 
-if __name__ == '__main__':
-    load_packages('packages//', False)
