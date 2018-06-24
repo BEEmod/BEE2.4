@@ -15,6 +15,7 @@ from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, VPKFileSystem
 from srctools.packlist import PackList, FileType as PackType, load_fgd
 from srctools.game import find_gameinfo
+from srctools.bsp_transform import run_transformations
 
 LOGGER = init_logging('bee2/VRAD.log')
 
@@ -805,6 +806,9 @@ def main(argv: List[str]) -> None:
 
     LOGGER.info('Adding known packed files:')
     pack_content(packlist, path, is_peti)
+
+    LOGGER.info('Run transformations...')
+    run_transformations(bsp_ents, fsys)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
