@@ -1,11 +1,11 @@
 import os
-import os.path
 import shutil
 import subprocess
 import sys
 from datetime import datetime
 from io import BytesIO, StringIO
 from zipfile import ZipFile
+from typing import Iterator, List, Tuple
 
 import srctools
 import utils
@@ -421,7 +421,12 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
     return file.getvalue().encode()
 
 
-def write_sound(file, snds: Property, pack_list: PackList, snd_prefix='*'):
+def write_sound(
+    file: StringIO,
+    snds: Property,
+    pack_list: PackList,
+    snd_prefix: str='*',
+) -> None:
     """Write either a single sound, or multiple rndsound.
 
     snd_prefix is the prefix for each filename - *, #, @, etc.
@@ -447,7 +452,7 @@ def write_sound(file, snds: Property, pack_list: PackList, snd_prefix='*'):
         pack_list.pack_file('sound/' + snds.value.casefold())
 
 
-def inject_files():
+def inject_files() -> Iterator[Tuple[str, str]]:
     """Generate the names of files to inject, if they exist.."""
     for filename, arcname in INJECT_FILES.items():
         filename = os.path.join('bee2', 'inject', filename)
@@ -526,7 +531,7 @@ def pack_content(packlist: PackList, path: str, is_peti: bool):
             packlist.pack_file(arcname, data=f.read())
 
 
-def find_screenshots():
+def find_screenshots() -> Iterator[str]:
     """Find candidate screenshots to overwrite."""
     # Inside SCREENSHOT_DIR, there should be 1 folder with a
     # random name which contains the user's puzzles. Just
@@ -541,7 +546,7 @@ def find_screenshots():
                 yield screenshot
 
 
-def mod_screenshots():
+def mod_screenshots() -> None:
     """Modify the map's screenshot."""
     mod_type = CONF['screenshot_type', 'PETI'].lower()
 
@@ -644,8 +649,8 @@ def mod_screenshots():
             utils.unset_readonly(screen)
 
 
-def run_vrad(args):
-    "Execute the original VRAD."
+def run_vrad(args: List[str]) -> None:
+    """Execute the original VRAD."""
 
     suffix = ''
     if utils.MAC:
@@ -682,7 +687,7 @@ def run_vrad(args):
         sys.exit(code)
 
 
-def main(argv):
+def main(argv: List[str]) -> None:
     LOGGER.info('BEE2 VRAD hook started!')
         
     args = " ".join(argv)
@@ -704,7 +709,7 @@ def main(argv):
 
     # The path is the last argument to vrad
     # P2 adds wrong slashes sometimes, so fix that.
-    fast_args[-1] = path = os.path.normpath(argv[-1])
+    fast_args[-1] = path = os.path.normpath(argv[-1])  # type: str
 
     LOGGER.info("Map path is " + path)
 
