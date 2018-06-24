@@ -963,13 +963,13 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
     if not isinstance(value, str):
         return value
 
-    if value.startswith('$'):
-        if value.startswith('!'):
-            inverted = True
-            value = value[1:]
-        else:
-            inverted = False
+    if value.startswith('!'):
+        inverted = True
+        value = value[1:]
+    else:
+        inverted = False
 
+    if value.startswith('$'):
         if value in inst.fixup:
             value = inst.fixup[value]
         else:
@@ -981,10 +981,11 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
                 inst.fixup._fixup
             )
             value = ''
-        if inverted:
-            return srctools.bool_as_int(not srctools.conv_bool(value))
-    
-    return value
+
+    if inverted:
+        return srctools.bool_as_int(not srctools.conv_bool(value))
+    else:
+        return value
 
 
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
