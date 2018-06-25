@@ -811,7 +811,7 @@ def main(argv: List[str]) -> None:
     pack_content(packlist, path, is_peti)
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_ents, fsys)
+    run_transformations(bsp_ents, fsys, packlist)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
