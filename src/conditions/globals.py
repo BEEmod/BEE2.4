@@ -210,19 +210,9 @@ def precache_model(vmf: VMF, mdl_name: str):
 
     CACHED_MODELS.add(mdl_name)
     vmf.create_ent(
-        classname='prop_dynamic_override',
-        targetname='@precache',
+        classname='comp_precache_model',
         origin=vbsp_options.get(Vec, 'global_ents_loc'),
         model=mdl_name,
-
-        # Disable shadows and similar things, it shouldn't ever be in
-        # PVS but we might as well.
-        rendermode=10,
-        disableshadowdepth=1,
-        disableshadows=1,
-        solid=0,
-        shadowdepthnocache=2,
-        spawnflags=256,  # Start with collision off.
     )
 
 
