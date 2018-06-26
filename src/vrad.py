@@ -813,6 +813,12 @@ def main(argv: List[str]) -> None:
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
 
+    # We nee to add all soundscripts in scripts/bee2_snd/
+    # This way we can pack those, if required.
+    for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
+        if soundscript.path.endswith('.txt'):
+            packlist.load_soundscript(soundscript, always_include=False)
+
     LOGGER.info('Adding known packed files:')
     pack_content(packlist, path, is_peti)
 
