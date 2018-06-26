@@ -326,18 +326,24 @@ def dump_files(zipfile: ZipFile):
 
     # Delete files in the folder, but don't delete the folder itself.
     try:
-        dump_files = os.listdir(dump_folder)
+        files = os.listdir(dump_folder)
     except FileNotFoundError:
-        pass
-    else:
-        for name in dump_files:
-            name = os.path.join(dump_folder, name)
-            if os.path.isdir(name):
+        return
+
+    for name in files:
+        name = os.path.join(dump_folder, name)
+        if os.path.isdir(name):
+            try:
                 shutil.rmtree(name)
-            else:
-                os.remove(name)
-                
-    zipfile.extractall(dump_folder)
+            except OSError:
+                # It's possible to fail here, if the window is open elsewhere.
+                # If so, just skip removal and fill the folder.
+                pass
+        else:
+            os.remove(name)
+
+    for zipinfo in zipfile.infolist():
+        zipfile.extract(zipinfo, dump_folder)
 
 
 def generate_music_script(data: Property, pack_list: PackList) -> bytes:
