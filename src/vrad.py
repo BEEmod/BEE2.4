@@ -846,9 +846,12 @@ def main(argv: List[str]) -> None:
             RawFileSystem(root_folder / 'portal2_dlc2'),
             RawFileSystem(root_folder / 'portal2_dlc1'),
             RawFileSystem(root_folder / 'portal2'),
+            RawFileSystem(root_folder / 'platform'),
+            RawFileSystem(root_folder / 'update'),
         }
         pack_whitelist.add(fsys_mel)
         pack_whitelist.add(fsys_tag)
+        # If those weren't present, we added a None.
         pack_whitelist.discard(None)
 
     packlist.pack_into_zip(
