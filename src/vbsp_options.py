@@ -1,5 +1,5 @@
 """Manages reading general options from vbsp_config."""
-from enum import Enum
+from enum import Enum, EnumMeta
 
 import inspect
 
@@ -8,7 +8,7 @@ from BEE2_config import ConfigFile
 import srctools
 import utils
 
-from typing import Union, Tuple, TypeVar, Type, Optional, Iterator
+from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO
 
 
 LOGGER = utils.getLogger(__name__)
@@ -26,6 +26,10 @@ class TYPE(Enum):
     FLOAT = float
     BOOL = bool
     VEC = Vec
+
+    def convert(self, value: str) -> Any:
+        """Convert a string to the desired argument type."""
+        return self.value(value)
     
 TYPE_NAMES = {
     TYPE.STR: 'Text',
@@ -37,16 +41,24 @@ TYPE_NAMES = {
 
 OptionT = TypeVar('OptionT', str, int, float, bool, Vec, Enum)
 
+
 class Opt:
-    def __init__(self, id: str, default, doc, fallback=None):
+    """A type of option that can be chosen."""
+    def __init__(
+        self,
+        opt_id: str,
+        default: Union[TYPE, OptionT],
+        doc: str,
+        fallback: str=None,
+    ) -> None:
         if isinstance(default, TYPE):
             self.type = default
             self.default = None
         else:
             self.type = TYPE(type(default))
             self.default = default
-        self.id = id.casefold()
-        self.name = id
+        self.id = opt_id.casefold()
+        self.name = opt_id
         self.fallback = fallback
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
@@ -56,7 +68,7 @@ class Opt:
             )
 
 
-def load(opt_blocks: Iterator[Property]):
+def load(opt_blocks: Iterator[Property]) -> None:
     """Read settings from the given property block."""
     SETTINGS.clear()
     set_vals = {}
@@ -97,7 +109,7 @@ def load(opt_blocks: Iterator[Property]):
             SETTINGS[opt.id] = srctools.conv_bool(val, opt.default)
         else:  # int, float, str - no special handling...
             try:
-                SETTINGS[opt.id] = opt.type.value(val)
+                SETTINGS[opt.id] = opt.type.convert(val)
             except (ValueError, TypeError):
                 SETTINGS[opt.id] = opt.default
 
@@ -113,7 +125,7 @@ def load(opt_blocks: Iterator[Property]):
         LOGGER.warning('Extra config options: {}', set_vals)
 
 
-def set_opt(opt_name: str, value: str):
+def set_opt(opt_name: str, value: str) -> None:
     """Set an option to a specific value."""
     folded_name = opt_name.casefold()
     for opt in DEFAULTS:
@@ -133,9 +145,10 @@ def set_opt(opt_name: str, value: str):
         SETTINGS[opt.id] = srctools.conv_bool(value, SETTINGS[opt.id])
     else:  # int, float, str - no special handling...
         try:
-            SETTINGS[opt.id] = opt.type.value(value)
+            SETTINGS[opt.id] = opt.type.convert(value)
         except (ValueError, TypeError):
             pass
+
 
 def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
     """Get the given option. 
@@ -154,7 +167,7 @@ def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
     if val is None:
         return None
 
-    if issubclass(expected_type, Enum):
+    if isinstance(expected_type, EnumMeta):
         enum_type = expected_type
         expected_type = str
     else:
@@ -252,7 +265,7 @@ This is a list of all current options for the config.
 '''
 
 
-def dump_info(file):
+def dump_info(file: TextIO) -> None:
     """Create the wiki page for item options, given a file to write to."""
     print(DOC_HEADER, file=file)
     
@@ -295,8 +308,8 @@ DEFAULTS = [
         """Set the offset of squarebeams to 0.
         """),
     Opt('edge_scale', 0.15,
-       """The scale on squarebeams textures.
-       """),
+        """The scale on squarebeams textures.
+        """),
     Opt('rotate_edge_special', TYPE.BOOL,
         """Rotate squarebeams textures on angled/flip panels 90 degrees.
         """, fallback='rotate_edge'),
