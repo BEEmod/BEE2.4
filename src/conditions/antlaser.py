@@ -13,7 +13,7 @@ from srctools import VMF, Property, Output, Vec
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.antlaser')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlaser')
 
 AntLaserType = connections.ItemType(
     '<AntLaser>',

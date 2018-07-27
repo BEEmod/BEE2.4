@@ -16,7 +16,7 @@ import instance_traits
 from srctools import Property, Vec, Entity, Output, VMF
 import utils
 
-LOGGER = utils.getLogger(__name__, 'cond.instances')
+LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 
 COND_MOD_NAME = 'Instances'
 

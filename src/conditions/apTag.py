@@ -20,7 +20,7 @@ from srctools import Vec, Property, VMF, Entity, Output
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Fizzler type ID for Gel Gun Activator.
 TAG_FIZZ_ID = 'TAG_GEL_GUN'

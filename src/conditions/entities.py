@@ -15,7 +15,7 @@ from srctools import Property, Vec, VMF, Entity
 
 COND_MOD_NAME = 'Entities'
 
-LOGGER = utils.getLogger(__name__, alias='cond.entities')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
 @make_result_setup('TemplateOverlay')

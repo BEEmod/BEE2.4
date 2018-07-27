@@ -1,7 +1,6 @@
 """Conditions relating to track platforms."""
 import conditions
-import srctools
-import utils
+import srctools.logger
 import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
@@ -12,7 +11,7 @@ from srctools import Vec, Property, Entity
 COND_MOD_NAME = 'Track Platforms'
 
 
-LOGGER = utils.getLogger(__name__, alias='cond.trackPlat')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.trackPlat')
 
 
 @make_result('trackPlatform')

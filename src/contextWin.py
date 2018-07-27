@@ -17,6 +17,7 @@ from tkinter import messagebox
 from enum import Enum
 import functools
 import webbrowser
+import srctools.logger
 
 from richTextBox import tkRichText
 import img
@@ -31,7 +32,7 @@ import packageLoader
 
 import UI
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 OPEN_IN_TAB = 2
 

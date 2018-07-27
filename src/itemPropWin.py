@@ -13,13 +13,15 @@ import srctools
 import contextWin
 import gameMan
 import tk_tools
+import srctools.logger
 
 from typing import Dict, List, Union, Any
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class PropTypes(Enum):
+    """Type of property to display."""
     NONE = 'none'
     CHECKBOX = 'checkbox'
     SUB_TYPE = 'subtype'
@@ -31,10 +33,11 @@ class PropTypes(Enum):
     OSCILLATE = 'track'
     
     @property
-    def is_editable(self):
+    def is_editable(self) -> bool:
+        """Check if the user can change this property type."""
         return self.value not in ('none', 'subtype')
 
-# all properties in editoritems, Valve probably isn't going to
+# All properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
     'toplevel':                 (PropTypes.PISTON, _('Start Position')),

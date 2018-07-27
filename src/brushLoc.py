@@ -3,16 +3,16 @@
 """
 from collections import deque
 
-from srctools import Vec, Vec_tuple, Property, Entity, VMF
+from srctools import Vec, Vec_tuple, VMF
 from enum import Enum
 
-import utils
+import srctools.logger
 import bottomlessPit
 
 from typing import Dict, Union, Set, Iterator, Tuple, Iterable
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # The attribute to set if these are in the map.
 VOICE_ATTR_GOO = 'goo'

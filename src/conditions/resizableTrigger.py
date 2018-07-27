@@ -3,7 +3,7 @@ from contextlib import suppress
 
 import conditions
 import instanceLocs
-import utils
+import srctools.logger
 import vbsp
 import vbsp_options
 import comp_consts as const
@@ -16,7 +16,7 @@ from srctools import Property, Vec, Output, VMF
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 
 @make_result('ResizeableTrigger')

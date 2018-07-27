@@ -9,9 +9,9 @@ from enum import Enum
 import srctools
 import vbsp_options
 
-from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec, VMF
+from srctools import Entity, Solid, Side, Property, UVAxis, Vec, VMF
 import comp_consts as consts
-import utils
+import srctools.logger
 import conditions
 
 from typing import (
@@ -20,7 +20,7 @@ from typing import (
     Dict, List, Set,
 )
 
-LOGGER = utils.getLogger(__name__, alias='template')
+LOGGER = srctools.logger.get_logger(__name__, alias='template')
 
 # A lookup for templates.
 TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]

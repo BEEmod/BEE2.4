@@ -5,12 +5,11 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 import shutil
-import os.path
+import os
 
-from srctools import VPK
 from tk_tools import TK_ROOT
 from srctools.filesys import RawFileSystem, FileSystemChain
-import utils
+import srctools.logger
 
 __all__ = [
     'SOUNDS', 'SamplePlayer',
@@ -20,7 +19,7 @@ __all__ = [
     'fx_blockable', 'block_fx',
 ]
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 play_sound = True
 

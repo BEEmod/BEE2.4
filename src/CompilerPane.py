@@ -1,16 +1,17 @@
 import tkMarkdown
-import utils
+from srctools.logger import init_logging, get_logger
 import tk_tools
+import utils
 if __name__ == '__main__':
     utils.fix_cur_directory()
-    LOGGER = utils.init_logging(
+    LOGGER = init_logging(
         '../logs/compiler_pane.log',
         __name__,
         on_error=tk_tools.on_error
     )
     utils.setup_localisations(LOGGER)
 else:
-    LOGGER = utils.getLogger(__name__)
+    LOGGER = get_logger(__name__)
 
 
 from tkinter import *
@@ -18,14 +19,12 @@ from tk_tools import TK_ROOT, FileField
 from tkinter import ttk
 from tkinter import filedialog
 
-from functools import partial
 from PIL import Image, ImageTk
 from typing import Dict, Tuple
 
-import os.path
+import os
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from srctools import Property
 from packageLoader import CORRIDOR_COUNTS, CorrDesc
 from tooltip import add_tooltip, set_tooltip
 import selectorWin

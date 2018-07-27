@@ -1,9 +1,8 @@
-import utils
+"""Implements the BEE2 VBSP compiler replacement."""
 # Do this very early, so we log the startup sequence.
-import antlines
+from srctools.logger import init_logging
 
-
-LOGGER = utils.init_logging('bee2/vbsp.log')
+LOGGER = init_logging('bee2/vbsp.log')
 
 import os
 import sys
@@ -17,8 +16,11 @@ from collections import defaultdict, namedtuple, Counter
 
 from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
+import utils
 import srctools.vmf as VLib
 import srctools.run
+import srctools.logger
+import antlines
 import voiceLine
 import vbsp_options
 import instanceLocs
@@ -125,6 +127,10 @@ TEX_DEFAULTS = [
 
 
 class ORIENT(Enum):
+    """The different orientations a surface can have.
+
+    This mainly affects which textures are added.
+    """
     floor = 1
     wall = 2
     ceiling = 3

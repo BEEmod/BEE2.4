@@ -2,12 +2,12 @@ from typing import Tuple, Dict
 
 import conditions
 import connections
-import utils
+import srctools.logger
 from srctools import Property, Entity, VMF, Vec, Output
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.sendtor')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 # Laser name -> offset, normal
 SENDTOR_TARGETS = {}  # type: Dict[str, Tuple[Vec, Vec]]

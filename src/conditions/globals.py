@@ -8,7 +8,7 @@ from conditions import (
 )
 import vbsp
 
-LOGGER = utils.getLogger(__name__, alias='cond.globals')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.globals')
 
 COND_MOD_NAME = 'Global Properties'
 

@@ -3,7 +3,6 @@ Handles scanning through the zip packages to find all items, styles, etc.
 """
 import operator
 import os
-import os.path
 import shutil
 import math
 import re
@@ -21,6 +20,7 @@ from srctools import (
     VPK,
 )
 from srctools.filesys import FileSystem, get_filesystem, RawFileSystem
+import srctools.logger
 
 from typing import (
     Union, Optional, Any, TYPE_CHECKING,
@@ -39,8 +39,7 @@ if TYPE_CHECKING:
     from loadScreen import BaseLoadScreen
 
 
-
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 all_obj = {}
 obj_override = {}

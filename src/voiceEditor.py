@@ -1,3 +1,4 @@
+"""Allows enabling and disabling specific voicelines."""
 import functools
 import itertools
 import os
@@ -10,7 +11,7 @@ from tkinter import font
 from tkinter import ttk
 
 import img
-import srctools
+import srctools.logger
 import tk_tools
 import utils
 from BEE2_config import ConfigFile
@@ -19,7 +20,7 @@ from srctools import Property
 from tk_tools import TK_ROOT
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 voice_item = None
 

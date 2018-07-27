@@ -13,6 +13,7 @@ import multiprocessing
 from loadScreen_daemon import run_screen as _splash_daemon
 from BEE2_config import GEN_OPTS
 import utils
+import srctools.logger
 
 from typing import Set, Tuple
 
@@ -33,7 +34,7 @@ _PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 class Cancelled(SystemExit):
     """Raised when the user cancels the loadscreen."""
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 def close_all():

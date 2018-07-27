@@ -10,13 +10,14 @@ import conditions
 import connections
 import utils
 import vbsp_options
+import srctools.logger
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
 import comp_consts as const
 import instance_traits
 import instanceLocs
 import template_brush
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 FIZZ_TYPES = {}  # type: Dict[str, FizzlerType]
 

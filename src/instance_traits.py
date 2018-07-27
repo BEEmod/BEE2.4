@@ -1,15 +1,14 @@
 """Adds various traits to instances, based on item classes."""
 from srctools import Entity
 from srctools import VMF
+import srctools.logger
 from comp_consts import ItemClass
 from conditions import CLASS_FOR_ITEM
 from instanceLocs import ITEM_FOR_FILE
 
-import utils
-
 from typing import Optional, Callable, Dict, Set
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Special case - specific attributes..
 ID_ATTRS = {

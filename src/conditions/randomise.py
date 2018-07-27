@@ -11,6 +11,7 @@ from conditions import (
 
 COND_MOD_NAME = 'Randomisation'
 
+
 @make_flag('random')
 def flag_random(inst: Entity, res: Property):
     """Randomly is either true or false."""

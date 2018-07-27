@@ -14,7 +14,7 @@ from typing import Dict, Tuple
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.catwalks')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.catwalks')
 
 CATWALK_TYPES = {
     utils.CONN_TYPES.straight: 'straight_128',

@@ -15,13 +15,13 @@ from srctools import (
     Property, NoKeyError, VMF, Entity, Vec, Output,
     EmptyMapping
 )
-import utils
+import srctools.logger
 import conditions.globals
 import vbsp
 from srctools.vmf import EntityFixup
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 COND_MOD_NAME = 'Cubes/Droppers'
 

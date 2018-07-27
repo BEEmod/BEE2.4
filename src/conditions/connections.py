@@ -10,7 +10,7 @@ from srctools import Property, Entity, Output
 
 COND_MOD_NAME = 'I/O'
 
-LOGGER = utils.getLogger(__name__, alias='cond.connections')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.connections')
 
 
 @make_result_setup('AddOutput')

@@ -20,6 +20,7 @@ import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip, set_tooltip
 from srctools import Vec, EmptyMapping
+import srctools.logger
 from srctools.filesys import FileSystemChain
 import tkMarkdown
 import sound
@@ -27,7 +28,7 @@ import utils
 import tk_tools
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 ICON_SIZE = 96  # Size of the selector win icons
 ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.

@@ -8,7 +8,7 @@ import utils
 
 COND_MOD_NAME = 'Fizzlers'
 
-LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
 @make_flag('FizzlerType')

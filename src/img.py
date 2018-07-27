@@ -4,16 +4,16 @@ The image is saved in the dictionary, so it stays in memory. Otherwise
 it could get deleted, which will make the rendered image vanish.
 """
 
-from PIL import ImageTk, Image, ImageDraw, ImageFont
-import os.path
+from PIL import ImageTk, Image, ImageDraw
+import os
 
 from srctools import Vec
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
-import utils
+import srctools.logger
 
 from typing import Iterable, Union, Dict, Tuple
 
-LOGGER = utils.getLogger('img')
+LOGGER = srctools.logger.get_logger('img')
 
 cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image

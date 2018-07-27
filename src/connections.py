@@ -11,7 +11,7 @@ import comp_consts as const
 import instanceLocs
 import conditions
 import instance_traits
-import utils
+import srctools.logger
 import vbsp_options
 import antlines
 
@@ -19,7 +19,7 @@ from typing import Optional, Iterable, Dict, List, Set, Tuple
 
 COND_MOD_NAME = "Item Connections"
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 ITEM_TYPES = {}  # type: Dict[str, ItemType]
 

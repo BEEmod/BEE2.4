@@ -9,15 +9,14 @@ from conditions import (
 )
 import instanceLocs
 from srctools import Property, Vec, Entity, VMF, Output
-import srctools
+import srctools.logger
 import vbsp_options
-import utils
 
 from typing import List
 
 COND_MOD_NAME = 'Monitors'
 
-LOGGER = utils.getLogger(__name__, 'cond.monitor')
+LOGGER = srctools.logger.get_logger(__name__, 'cond.monitor')
 
 ALL_MONITORS = []  # type: List[Monitor]
 ALL_CAMERAS = []  # type: List[Camera]

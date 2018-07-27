@@ -14,7 +14,7 @@ from typing import Optional, Tuple
 
 COND_MOD_NAME = 'Custom Items'
 
-LOGGER = utils.getLogger(__name__, alias='cond.custItems')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.custItems')
 
 
 @conditions.make_result_setup('custAntline')

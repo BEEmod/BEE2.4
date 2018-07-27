@@ -11,7 +11,7 @@ from typing import Iterator, Any, Tuple, Dict, List
 
 COND_MOD_NAME = 'Breakable Glass'
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 BREAKABLE_GLASS_CONF = {}
 

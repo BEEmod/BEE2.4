@@ -17,7 +17,7 @@ from srctools import Vec, Entity, Property, NoKeyError, VMF
 
 COND_MOD_NAME = 'Instance Generation'
 
-LOGGER = utils.getLogger(__name__, 'cond.addInstance')
+LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
 @make_result('addGlobal')

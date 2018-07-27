@@ -1,4 +1,4 @@
-# coding=utf-8
+"""Adds voicelines dynamically into the map."""
 import itertools
 import os
 import random
@@ -7,15 +7,14 @@ from decimal import Decimal
 from typing import List, Set
 
 import conditions.monitor
-import srctools
-import utils
+import srctools.logger
 import vbsp
 import vbsp_options
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output, Entity
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
 
 map_attr = {}

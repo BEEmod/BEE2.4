@@ -1,19 +1,19 @@
 """Implements Glass and Grating."""
-from enum import Enum
-from typing import Dict, Tuple, List, Set, Callable, Iterable
-
 from collections import defaultdict
+from enum import Enum
+from typing import Dict, Tuple, List, Set, Callable
 
-from grid_optim import optimise as grid_optimise
+import comp_consts as consts
+import srctools.logger
 import template_brush
 import vbsp_options
-from srctools import VMF, Vec, Solid, Side, Property, Entity
-import utils
-import comp_consts as consts
-from instanceLocs import resolve_one
 from conditions import make_result
+from grid_optim import optimise as grid_optimise
+from instanceLocs import resolve_one
+from srctools import VMF, Vec, Solid, Property, Entity
 
-LOGGER = utils.getLogger(__name__)
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 COND_MOD_NAME = None

@@ -5,13 +5,12 @@ import inspect
 
 from srctools import Property, Vec, parse_vec_str
 from BEE2_config import ConfigFile
-import srctools
-import utils
+import srctools.logger
 
 from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 SETTINGS = {}
 

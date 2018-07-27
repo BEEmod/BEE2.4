@@ -1,4 +1,4 @@
-# coding=utf-8
+"""Main UI module, brings everything together."""
 from tkinter import *  # ui library
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -13,7 +13,7 @@ from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
-from srctools.filesys import FileSystem, FileSystemChain
+import srctools.logger
 import sound as snd
 import paletteLoader
 import packageLoader
@@ -34,10 +34,10 @@ import helpMenu
 import backup as backup_win
 import tooltip
 
-from typing import Iterable, List, Dict
+from typing import List, Dict
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}

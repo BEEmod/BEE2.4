@@ -4,20 +4,20 @@ from typing import Dict, Iterable, Optional, List
 from BEE2_config import GEN_OPTS
 from SubPane import SubPane
 from loadScreen import LoadScreen
-from packageLoader import Music, MusicChannel, Style
-import tkinter
-import utils
+from packageLoader import Music, MusicChannel
 from tkinter import ttk
 from selectorWin import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr
 from srctools import FileSystemChain, FileSystem
 from tk_tools import TK_ROOT
+import tkinter
+import srctools.logger
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
 BTN_CONTRACT = '△'
 BTN_CONTRACT_HOVER = '▲'
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 WINDOWS = {}  # type: Dict[MusicChannel, SelectorWin]
 SEL_ITEMS = {}  # type: Dict[str, SelItem]

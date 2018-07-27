@@ -20,7 +20,7 @@ from typing import Dict, Tuple
 
 COND_MOD_NAME = 'Brushes'
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 # The spawnflags that we need to toggle for each classname

@@ -29,7 +29,7 @@ from srctools import (
 
 COND_MOD_NAME = 'Main Conditions'
 
-LOGGER = utils.getLogger(__name__, alias='cond.core')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()  # type: Set[str]

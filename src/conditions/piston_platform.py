@@ -2,18 +2,19 @@
 from typing import Tuple, Dict, List
 
 import conditions
-import utils
-from conditions import make_result, make_result_setup, local_name
-from srctools import Entity, VMF, Property, Output, Vec, Solid
-from instanceLocs import resolve_one as resolve_single
+import srctools.logger
 import template_brush
-from connections import ITEMS
-from comp_consts import FixupVars
 import vbsp
+from comp_consts import FixupVars
+from conditions import make_result, make_result_setup, local_name
+from connections import ITEMS
+from instanceLocs import resolve_one as resolve_single
+from srctools import Entity, VMF, Property, Output, Vec
+
 
 COND_MOD_NAME = 'Piston Platform'
 
-LOGGER = utils.getLogger(__name__, 'cond.piston_plat')
+LOGGER = srctools.logger.get_logger(__name__, 'cond.piston_plat')
 
 INST_NAMES = [
     # Static bottom pistons

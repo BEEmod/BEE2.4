@@ -17,7 +17,7 @@ from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis, VMF
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.cutoutTile')
 
 TEX_DEFAULT = [
     ('squarebeams', consts.Special.SQUAREBEAMS),

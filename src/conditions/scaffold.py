@@ -1,13 +1,12 @@
 """The result used to generate unstationary scaffolds."""
 import math
-from typing import Tuple, Any, Dict
+from typing import Tuple
 
 from enum import Enum
 
 import instanceLocs
 import item_chain
-import srctools
-import utils
+import srctools.logger
 import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
@@ -24,7 +23,7 @@ class LinkType(Enum):
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.scaffold')
 
 
 def scaff_scan(inst_list, start_ent):

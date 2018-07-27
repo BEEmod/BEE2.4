@@ -11,13 +11,14 @@ from BEE2_config import ConfigFile
 from tooltip import add_tooltip
 import tkMarkdown
 import utils
+import srctools.logger
 import img
 import sound
 
-from typing import Union, Callable, List, Dict, Optional, Tuple
+from typing import Union, Callable, List, Dict, Tuple
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Functions for each widget.
 # The function is passed a parent frame, StringVar, and Property block.

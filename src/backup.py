@@ -2,13 +2,14 @@
 
 """
 import utils
+import srctools.logger
 import tk_tools
 if __name__ == '__main__':
     utils.fix_cur_directory()
-    LOGGER = utils.init_logging('../logs/backup.log', __name__, on_error=tk_tools.on_error)
+    LOGGER = srctools.logger.init_logging('../logs/backup.log', __name__, on_error=tk_tools.on_error)
     utils.setup_localisations(LOGGER)
 else:
-    LOGGER = utils.getLogger(__name__)
+    LOGGER = srctools.logger.get_logger(__name__)
 
 
 import tkinter as tk

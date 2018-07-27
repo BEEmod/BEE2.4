@@ -12,7 +12,7 @@ from tkinter import messagebox  # simple, standard modal dialogs
 from tk_tools import TK_ROOT
 
 import os
-import os.path
+import os
 import shutil
 import math
 
@@ -24,6 +24,7 @@ from srctools import (
     VMF, Output,
     FileSystemChain,
 )
+import srctools.logger
 import backup
 import loadScreen
 import packageLoader
@@ -33,7 +34,7 @@ import srctools
 from typing import List, Tuple, Set
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 all_games = []  # type: List[Game]
 selected_game = None  # type: Game

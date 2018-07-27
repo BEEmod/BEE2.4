@@ -3,13 +3,11 @@
 from collections import namedtuple
 
 import connections
-import srctools
+import srctools.logger
 import template_brush
-import utils
 import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    remove_ant_toggle,
     GOO_LOCS, SOLIDS
 )
 import instanceLocs
@@ -20,7 +18,7 @@ from srctools import (
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.vactubes')
 
 PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity

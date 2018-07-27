@@ -1,10 +1,15 @@
-import os.path
+"""Modified version of ConfigParser that can be easily resaved.
+
+It only saves if the values are modified.
+Most functions are also altered to allow defaults instead of erroring.
+"""
 from configparser import ConfigParser, NoOptionError
 
-import srctools
-import utils
+import os
+import srctools.logger
 
-LOGGER = utils.getLogger(__name__)
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class ConfigFile(ConfigParser):
@@ -144,6 +149,6 @@ class ConfigFile(ConfigParser):
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
     set.__doc__ = ConfigParser.set.__doc__
 
-# Define this here so app modules can easily acess the config
+# Define this here so app modules can easily access the config
 # Don't load it though, since this is imported by VBSP too.
 GEN_OPTS = ConfigFile('config.cfg', auto_load=False)
