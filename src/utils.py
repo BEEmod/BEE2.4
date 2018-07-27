@@ -9,10 +9,10 @@ import sys
 from enum import Enum
 
 from typing import (
-    Tuple, List,  Set, Sequence,
+    Tuple, List, Set, Sequence,
     Iterator, Iterable, SupportsInt,
-    TypeVar, Union,
-    Any, NoReturn, Callable,
+    TypeVar, Any, NoReturn,
+    Union, Callable, Generator,
 )
 
 
@@ -590,7 +590,7 @@ def quit_app(status=0) -> NoReturn:
     sys.exit(status)
 
 
-def set_readonly(file: os.PathLike) -> None:
+def set_readonly(file: Union[bytes, str]) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
