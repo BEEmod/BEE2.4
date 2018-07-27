@@ -934,7 +934,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             continue
 
         # Copy over fixup values
-        fizz.base_inst.fixup.update(inst.fixup)
+        fizz_item.inst.fixup.update(inst.fixup)
 
         # Copy over the timer delay set in the relay.
         fizz_item.timer = relay_item.timer
