@@ -1,17 +1,18 @@
-# coding=utf-8
+"""Various functions shared among the compiler and application."""
 import collections.abc
 import functools
 import logging
-import os.path
+import os
 import stat
 import shutil
 import sys
 from enum import Enum
 
 from typing import (
-    Tuple, List, Union, Iterator,
-    SupportsInt,
-    Sequence,
+    Tuple, List,  Set, Sequence,
+    Iterator, Iterable, SupportsInt,
+    TypeVar, Union,
+    Any, NoReturn, Callable,
 )
 
 
@@ -58,7 +59,7 @@ STEAM_IDS = {
 }
 
 
-def fix_cur_directory():
+def fix_cur_directory() -> None:
     """Change directory to the location of the executable.
 
     Otherwise we can't find our files!
@@ -347,6 +348,8 @@ CONN_LOOKUP = {
 
 del N, S, E, W
 
+RetT = TypeVar('RetT')
+
 
 class FuncLookup(collections.abc.Mapping):
     """A dict for holding callback functions.
@@ -357,13 +360,19 @@ class FuncLookup(collections.abc.Mapping):
     Additionally overwriting names is not allowed.
     Iteration yields all functions.
     """
-    def __init__(self, name, *, casefold=True, attrs=()):
+    def __init__(
+        self,
+        name: str,
+        *,
+        casefold: bool=True,
+        attrs: Iterable[str]=(),
+    ) -> None:
         self.casefold = casefold
         self.__name__ = name
         self._registry = {}
         self.allowed_attrs = set(attrs)
 
-    def __call__(self, *names: str, **kwargs):
+    def __call__(self, *names: str, **kwargs) -> Callable[[Callable[..., RetT]], Callable[..., RetT]]:
         """Add a function to the dict."""
         if not names:
             raise TypeError('No names passed!')
@@ -372,7 +381,7 @@ class FuncLookup(collections.abc.Mapping):
         if bad_keywords:
             raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
 
-        def callback(func):
+        def callback(func: 'Callable[..., RetT]') -> 'Callable[..., RetT]':
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
@@ -383,20 +392,20 @@ class FuncLookup(collections.abc.Mapping):
 
         return callback
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, FuncLookup):
             return self._registry == other._registry
         if not isinstance(other, collections.abc.Mapping):
             return NotImplemented
         return self._registry == dict(other.items())
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Callable[..., Any]]:
         yield from self.values()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(set(self._registry.values()))
 
-    def __getitem__(self, names: Union[str, Tuple[str]]):
+    def __getitem__(self, names: Union[str, Tuple[str]]) -> Callable[..., Any]:
         if isinstance(names, str):
             names = names,
 
@@ -412,7 +421,11 @@ class FuncLookup(collections.abc.Mapping):
                 ', '.join(names),
             ))
 
-    def __setitem__(self, names: Union[str, Tuple[str]], func):
+    def __setitem__(
+        self,
+        names: Union[str, Tuple[str]],
+        func: Callable[..., Any],
+    ) -> None:
         if isinstance(names, str):
             names = names,
 
@@ -423,28 +436,28 @@ class FuncLookup(collections.abc.Mapping):
                 raise ValueError('Overwrote {!r}!'.format(name))
             self._registry[name] = func
 
-    def __delitem__(self, name: str):
+    def __delitem__(self, name: str) -> None:
         if self.casefold:
             name = name.casefold()
         del self._registry[name]
 
-    def __contains__(self, name):
+    def __contains__(self, name: str) -> bool:
         if self.casefold:
             name = name.casefold()
         return name in self._registry
 
-    def functions(self):
+    def functions(self) -> Set[Callable[..., Any]]:
         """Return the set of functions in this mapping."""
         return set(self._registry.values())
 
     values = functions
 
-    def clear(self):
+    def clear(self) -> None:
         """Delete all functions."""
         self._registry.clear()
 
 
-def get_indent(line: str):
+def get_indent(line: str) -> str:
     """Return the whitespace which this line starts with.
 
     """
@@ -457,12 +470,12 @@ def get_indent(line: str):
 
 
 def iter_grid(
-        max_x: int,
-        max_y: int,
-        min_x: int=0,
-        min_y: int=0,
-        stride: int=1,
-        ) -> Iterator[Tuple[int, int]]:
+    max_x: int,
+    max_y: int,
+    min_x: int=0,
+    min_y: int=0,
+    stride: int=1,
+) -> Iterator[Tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
         for y in range(min_y, max_y, stride):
@@ -472,8 +485,18 @@ def iter_grid(
 DISABLE_ADJUST = False
 
 
-def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
-    """Adjust a window position to ensure it fits inside the screen."""
+def adjust_inside_screen(
+    x: int,
+    y: int,
+    win,
+    horiz_bound: int=14,
+    vert_bound: int=45,
+) -> Tuple[int, int]:
+    """Adjust a window position to ensure it fits inside the screen.
+
+    The new value is returned.
+    If utils.DISABLE_ADJUST is set to True, this is disabled.
+    """
     if DISABLE_ADJUST:  # Allow disabling this adjustment
         return x, y     # for multi-window setups
     max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
@@ -504,7 +527,7 @@ def center_win(window, parent=None):
     window.geometry('+' + str(x) + '+' + str(y))
 
 
-def append_bothsides(deq):
+def _append_bothsides(deq: collections.deque) -> Generator[None, Any, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
@@ -526,7 +549,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
     items = collections.deque()
 
     # We use this so the small sections appear on both sides of the area.
-    adder = append_bothsides(items)
+    adder = _append_bothsides(items)
     next(adder)
     while dist >= smallest:
         for item in obj:
@@ -543,7 +566,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
     return list(items)  # Dump the deque
 
 
-def restart_app():
+def restart_app() -> NoReturn:
     """Restart this python application.
 
     This will not return!
@@ -561,13 +584,13 @@ def restart_app():
     os.execv(sys.executable, args)
 
 
-def quit_app(status=0):
+def quit_app(status=0) -> NoReturn:
     """Quit the application."""
     logging.shutdown()
     sys.exit(status)
 
 
-def set_readonly(file):
+def set_readonly(file: os.PathLike) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
@@ -581,7 +604,7 @@ def set_readonly(file):
     )
 
 
-def unset_readonly(file):
+def unset_readonly(file: os.PathLike) -> None:
     """Set the writeable flag on a file."""
     # Get the old flags
     flags = os.stat(file).st_mode
@@ -595,7 +618,11 @@ def unset_readonly(file):
     )
 
 
-def merge_tree(src, dst, copy_function=shutil.copy2):
+def merge_tree(
+    src: str,
+    dst: str,
+    copy_function=shutil.copy2,
+) -> None:
     """Recursively copy a directory tree to a destination, which may exist.
 
     This is a modified version of shutil.copytree(), with the difference that
@@ -643,7 +670,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
         raise shutil.Error(errors)
 
 
-def setup_localisations(logger: logging.Logger):
+def setup_localisations(logger: logging.Logger) -> None:
     """Setup gettext localisations."""
     from srctools.property_parser import PROP_FLAGS_DEFAULT
     import gettext
