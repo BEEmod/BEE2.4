@@ -1,3 +1,12 @@
+"""Replacement for Valve's VRAD.
+
+This allows us to change the arguments passed in,
+edit the BSP after instances are collapsed, and pack files.
+"""
+# Run as early as possible to catch errors in imports.
+from srctools.logger import init_logging
+LOGGER = init_logging('bee2/VRAD.log')
+
 import os
 import shutil
 import subprocess
@@ -10,14 +19,12 @@ from typing import Iterator, List, Tuple
 import srctools
 import utils
 from srctools import Property
-from srctools.logger import init_logging
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, VPKFileSystem
 from srctools.packlist import PackList, FileType as PackType, load_fgd
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
 
-LOGGER = init_logging('bee2/VRAD.log')
 
 CONF = Property('Config', [])
 
