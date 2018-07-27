@@ -743,7 +743,7 @@ def main(argv: List[str]) -> None:
             # remove final parameters from the modified arguments
             fast_args.remove(a)
         elif a in ('-force_peti', '-force_hammer', '-no_pack'):
-            # we need to strip these out, otherwise VBSP will get confused
+            # we need to strip these out, otherwise VRAD will get confused
             fast_args.remove(a)
             full_args.remove(a)
 
@@ -861,14 +861,14 @@ def main(argv: List[str]) -> None:
         # If those weren't present, we added a None.
         pack_whitelist.discard(None)
 
-    packlist.pack_into_zip(
-        zipfile,
-        ignore_vpk=True,
-        whitelist=pack_whitelist,
-        blacklist=pack_blacklist,
-    )
-
-    LOGGER.info('Writing to BSP...')
+    if '-no_pack' not in args:
+        LOGGER.info('Writing to BSP...')
+        packlist.pack_into_zip(
+            zipfile,
+            ignore_vpk=True,
+            whitelist=pack_whitelist,
+            blacklist=pack_blacklist,
+        )
 
     dump_files(zipfile)
 
