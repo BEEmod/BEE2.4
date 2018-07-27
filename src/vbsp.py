@@ -6,19 +6,19 @@ import antlines
 LOGGER = utils.init_logging('bee2/vbsp.log')
 
 import os
-import os.path
 import sys
-import subprocess
 import shutil
 import random
 import itertools
+import logging
 from enum import Enum
+from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
 from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
 import srctools.vmf as VLib
-import srctools
+import srctools.run
 import voiceLine
 import vbsp_options
 import instanceLocs
@@ -2977,7 +2977,7 @@ def save(path):
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, path, new_path=None):
+def run_vbsp(vbsp_args, path, new_path=None) -> None:
     """Execute the original VBSP, copying files around so it works correctly.
 
     vbsp_args are the arguments to pass.
@@ -2997,69 +2997,35 @@ def run_vbsp(vbsp_args, path, new_path=None):
                 path.replace(".vmf", ".log"),
                 new_path.replace(".vmf", ".log"),
             )
-    # Put quotes around args which contain spaces, and remove blank args.
-    vbsp_args = [
-        ('"' + x + '"' if " " in x else x)
-        for x in
-        vbsp_args
-        if x
-    ]
 
-    # VBSP is named _osx or _linux for those platforms, and has no extension.
-    # Windows uses the exe extension.
-    ext = ''
-    if utils.MAC:
-        os_suff = '_osx'
-    elif utils.LINUX:
-        os_suff = '_linux'
-    else:
-        os_suff = ''
-        ext = '.exe'
+    # Remove blank args.
+    vbsp_args = [x for x in vbsp_args if x and not x.isspace()]
 
     # Ensure we've fixed the instance/ folder so instances are found.
     if utils.MAC or utils.LINUX and is_peti:
         instance_symlink()
 
-    arg = (
-        '"' +
-        os.path.normpath(
-            os.path.join(
-                os.getcwd(),
-                "vbsp" + os_suff + "_original" + ext
-            )
-        ) +
-        '" ' +
-        " ".join(vbsp_args)
-    )
-
     # Use a special name for VBSP's output..
-    vbsp_logger = utils.getLogger('valve.VBSP', alias='<Valve>')
+    vbsp_logger = srctools.logger.get_logger('valve.VBSP', alias='<Valve>')
 
-    LOGGER.info("Calling original VBSP...")
-    LOGGER.info("Arguments: {}", arg)
-    try:
-        output = subprocess.check_output(
-            arg,
-            stderr=subprocess.PIPE,
-            shell=True,
-        )
-    except subprocess.CalledProcessError as err:
-        # VBSP didn't suceed. Print the error log..
-        vbsp_logger.error(err.output.decode('ascii', errors='replace'))
+    # And also save a copy for us to analyse.
+    buff = StringIO()
+    vbsp_logger.addHandler(logging.StreamHandler(buff))
 
+    code = srctools.run.run_compiler('vbsp', vbsp_args, vbsp_logger)
+    if code != 0:
+        # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
-            process_vbsp_fail(err.output)
+            process_vbsp_fail(buff.getvalue())
 
-        LOGGER.error("VBSP failed! ({})", err.returncode)
-        # Propagate the fail code to Portal 2.
-        sys.exit(err.returncode)
+        # Propagate the fail code to Portal 2, and quit.
+        sys.exit(code)
 
     # Print output
-    vbsp_logger.info(output.decode('ascii', errors='replace'))
     LOGGER.info("VBSP Done!")
 
     if is_peti:  # Ignore Hammer maps
-        process_vbsp_log(output)
+        process_vbsp_log(buff.getvalue())
 
     # Copy over the real files so vvis/vrad can read them
         for ext in (".bsp", ".log", ".prt"):
@@ -3070,7 +3036,7 @@ def run_vbsp(vbsp_args, path, new_path=None):
                 )
 
 
-def process_vbsp_log(output: bytes):
+def process_vbsp_log(output: str):
     """Read through VBSP's log, extracting entity counts.
 
     This is then passed back to the main BEE2 application for display.
@@ -3086,9 +3052,9 @@ def process_vbsp_log(output: bytes):
 
     desired_vals = [
         # VBSP values -> config names
-        (b'nummapbrushes:', 'brush'),
-        (b'num_map_overlays:', 'overlay'),
-        (b'num_entities:', 'entity'),
+        ('nummapbrushes:', 'brush'),
+        ('num_map_overlays:', 'overlay'),
+        ('num_entities:', 'entity'),
     ]
     # The other options rarely hit the limits, so we don't track them.
 
@@ -3099,20 +3065,20 @@ def process_vbsp_log(output: bytes):
     }
 
     for line in output.splitlines():
-        line = line.lstrip()
+        line = line.lstrip(' \t[|')
         for name, conf in desired_vals:
             if not line.startswith(name):
                 continue
             # Grab the value from ( onwards
-            fraction = line.split(b'(', 1)[1]
+            fraction = line.split('(', 1)[1]
             # Grab the two numbers, convert to ascii and strip
             # whitespace.
-            count_num, count_max = fraction.split(b'/')
+            count_num, count_max = fraction.split('/')
             counts[conf] = (
-                count_num.strip(b' \t\n').decode('ascii'),
+                count_num.strip(' \t\n'),
                 # Strip the ending ) off the max. We have the value, so
                 # we might as well tell the BEE2 if it changes..
-                count_max.strip(b') \t\n').decode('ascii')
+                count_max.strip(') \t\n'),
             )
 
     LOGGER.info('Retrieved counts: {}', counts)
@@ -3123,7 +3089,7 @@ def process_vbsp_log(output: bytes):
     BEE2_config.save()
 
 
-def process_vbsp_fail(output: bytes):
+def process_vbsp_fail(output: str):
     """Read through VBSP's logs when failing, to update counts."""
     # VBSP doesn't output the actual entity counts, so set the errorred
     # one to max and the others to zero.
@@ -3133,21 +3099,22 @@ def process_vbsp_fail(output: bytes):
     count_section['max_entity'] = '2048'
     count_section['max_overlay'] = '512'
 
-    for line in reversed(output.splitlines()):  # type: bytes
-        if b'MAX_MAP_OVERLAYS' in line:
+    for line in reversed(output.splitlines()):
+        if 'MAX_MAP_OVERLAYS' in line:
             count_section['entity'] = '0'
             count_section['brush'] = '0'
-            count_section['overlay'] = '512'
             # The line is like 'MAX_MAP_OVER = 512', pull out the number from
             # the end and decode it.
-            count_section['max_overlay'] = line.split(b'=')[1].strip().decode('ascii')
+            over_count = line.rsplit('=')[1].strip()
+            count_section['overlay'] = over_count
+            count_section['max_overlay'] = over_count
             break
-        if b'MAX_MAP_BRUSHSIDES' in line or b'MAX_MAP_PLANES' in line:
+        if 'MAX_MAP_BRUSHSIDES' in line or 'MAX_MAP_PLANES' in line:
             count_section['entity'] = '0'
             count_section['overlay'] = '0'
             count_section['brush'] = '8192'
             break
-        if b'MAX_MAP_ENTITIES' in line:
+        if 'MAX_MAP_ENTITIES' in line:
             count_section['entity'] = count_section['overlay'] = '0'
             count_section['brush'] = '8192'
             break
@@ -3158,7 +3125,7 @@ def process_vbsp_fail(output: bytes):
     BEE2_config.save_check()
 
 
-def main():
+def main() -> None:
     """Main program code.
 
     """
