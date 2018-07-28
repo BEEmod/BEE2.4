@@ -176,9 +176,13 @@ def init(start_open: bool, log_level: str='info') -> None:
         log_handler.setLevel(log_level)
     except ValueError:
         log_level = logging.INFO
-    log_handler.setFormatter(utils.short_log_format)
+    log_handler.setFormatter(logging.Formatter(
+        # One letter for level name
+        '[{levelname[0]}] {module}.{funcName}(): {message}',
+        style='{',
+    ))
 
-    logging.getLogger('BEE2').addHandler(log_handler)
+    logging.getLogger().addHandler(log_handler)
 
     scroll = tk_tools.HidingScroll(
         window,
@@ -253,7 +257,7 @@ def init(start_open: bool, log_level: str='info') -> None:
 
 
 if __name__ == '__main__':
-    utils.init_logging()
+    srctools.logger.init_logging()
     LOGGER = srctools.logger.get_logger('BEE2')
     init(True, log_level='DEBUG')
 

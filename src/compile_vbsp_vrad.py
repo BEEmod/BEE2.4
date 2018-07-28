@@ -32,6 +32,10 @@ EXCLUDES = [
     # This isn't ever used in the compiler.
     'tkinter',
 
+    'win32api',
+    'win32com',
+    'win32wnet'
+
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',

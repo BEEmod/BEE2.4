@@ -2,12 +2,13 @@
 
 # First do a few things as early as possible.
 import utils
+import srctools.logger
 
 utils.fix_cur_directory()
 # We need to initialise logging as early as possible - that way
 # it can record any errors in the initialisation of modules.
 import tk_tools
-LOGGER = utils.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
+LOGGER = srctools.logger.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
 
 utils.setup_localisations(LOGGER)
 
@@ -22,7 +23,6 @@ import paletteLoader
 import packageLoader
 import gameMan
 import logWindow
-import sound
 import img
 import music_conf
 
