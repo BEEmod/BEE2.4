@@ -1,6 +1,5 @@
 """Results relating to item connections."""
-import srctools
-import utils
+import srctools.logger
 import connections
 from conditions import (
     make_flag, make_result, make_result_setup,

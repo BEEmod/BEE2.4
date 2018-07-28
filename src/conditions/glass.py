@@ -3,7 +3,7 @@ from conditions import make_result_setup, make_result, RES_EXHAUSTED, local_name
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, VMF, Solid, Side, Entity, Output
 
-import utils
+import srctools.logger
 import comp_consts as const
 import template_brush
 

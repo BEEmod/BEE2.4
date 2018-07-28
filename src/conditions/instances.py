@@ -6,7 +6,7 @@ import operator
 from typing import Dict, Optional, Union
 
 import conditions
-import srctools
+import srctools.logger
 from conditions import (
     make_flag, make_result, make_result_setup,
     ALL_INST,
@@ -14,7 +14,6 @@ from conditions import (
 import instanceLocs
 import instance_traits
 from srctools import Property, Vec, Entity, Output, VMF
-import utils
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 

@@ -4,9 +4,8 @@ from collections import defaultdict
 
 import brushLoc
 import conditions
-import srctools
+import srctools.logger
 import template_brush
-import utils
 import vbsp
 import vbsp_options
 import comp_consts as const

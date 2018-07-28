@@ -4,7 +4,7 @@ from srctools import Property, Entity, Vec, VMF
 from instanceLocs import resolve as resolve_inst
 import connections
 import fizzler
-import utils
+import srctools.logger
 
 COND_MOD_NAME = 'Fizzlers'
 

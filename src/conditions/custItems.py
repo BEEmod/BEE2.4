@@ -4,9 +4,8 @@
 import antlines
 import connections
 import conditions
-import srctools
+import srctools.logger
 import template_brush
-import utils
 import vbsp
 from srctools import Property, Vec, Entity
 

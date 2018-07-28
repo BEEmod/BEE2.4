@@ -3,14 +3,13 @@ import math
 import os
 import itertools
 
-import srctools
+import srctools.logger
 import instanceLocs
 import utils
 import vbsp_options
 import vbsp
 from conditions import (
     meta_cond, make_result,
-    remove_ant_toggle,
     PETI_INST_ANGLE, RES_EXHAUSTED,
     local_name
 )

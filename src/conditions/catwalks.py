@@ -6,7 +6,7 @@ from conditions import (
 )
 import instanceLocs
 from srctools import Vec, Property, VMF, Entity
-import conditions
+import srctools.logger
 from connections import ITEMS
 import utils
 

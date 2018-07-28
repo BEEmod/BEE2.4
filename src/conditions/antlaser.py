@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Set, Optional, Callable
 
 import conditions
 import instanceLocs
-import utils
+import srctools.logger
 from conditions import make_result
 import connections
 from connections import Item

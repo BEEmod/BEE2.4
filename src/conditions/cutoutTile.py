@@ -5,7 +5,7 @@ from typing import Tuple, Set
 
 import conditions
 import connections
-import srctools
+import srctools.logger
 import template_brush
 import utils
 import vbsp

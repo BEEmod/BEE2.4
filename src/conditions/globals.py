@@ -7,6 +7,7 @@ from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
 )
 import vbsp
+import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.globals')
 
