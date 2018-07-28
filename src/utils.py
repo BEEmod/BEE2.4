@@ -11,9 +11,14 @@ from enum import Enum
 from typing import (
     Tuple, List, Set, Sequence,
     Iterator, Iterable, SupportsInt,
-    TypeVar, Any, NoReturn,
+    TypeVar, Any,
     Union, Callable, Generator,
 )
+
+try:
+    from typing import NoReturn
+except ImportError:  # py < 3.6.5
+    NoReturn = None  # type: ignore
 
 
 try:
