@@ -11,7 +11,9 @@ __all__ = [
     'Signage', 'Antlines',
     'Goo', 'Fizzler',
     'Special', 'Tools',
+    'FixupVars'
 ]
+
 
 class MaterialGroupMeta(EnumMeta):
     @classmethod
