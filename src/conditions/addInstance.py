@@ -3,16 +3,14 @@
 """
 import conditions
 import instanceLocs
-import srctools
+import srctools.logger
 import vbsp
 import vbsp_options
-import utils
-import comp_consts as const
 from conditions import (
-    make_result, meta_cond, RES_EXHAUSTED,
+    make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
 )
-from srctools import Vec, Entity, Property, NoKeyError, VMF
+from srctools import Vec, Entity, Property
 
 
 COND_MOD_NAME = 'Instance Generation'

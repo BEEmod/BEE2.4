@@ -3,9 +3,8 @@ import random
 from collections import defaultdict
 
 import conditions
-import srctools
+import srctools.logger
 import template_brush
-import utils
 from conditions import (
     make_result, make_result_setup,
     SOLIDS

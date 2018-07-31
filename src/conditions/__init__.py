@@ -16,7 +16,7 @@ from typing import (
 )
 
 import comp_consts as consts
-import srctools
+import srctools.logger
 import template_brush
 import utils
 import comp_consts as const
