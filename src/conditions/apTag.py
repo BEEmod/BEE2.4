@@ -182,7 +182,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
 
     # Look for the fizzler instance we want to replace.
     sign_item = ITEMS[inst['targetname']]
-    for conn in sign_item.outputs[:]:
+    for conn in list(sign_item.outputs):
         if conn.to_item.name in FIZZLERS:
             if fizzler is None:
                 fizzler = FIZZLERS[conn.to_item.name]
