@@ -13,6 +13,8 @@ from tk_tools import TK_ROOT
 import os
 import shutil
 import math
+import re
+
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
@@ -30,6 +32,12 @@ import utils
 import srctools
 
 from typing import List, Tuple, Set, Iterable, Iterator, Dict
+
+try:
+    from importlib.resources import read_text as imp_res_read_text
+except ImportError:
+    # Backport module for before Python 3.7
+    from importlib_resources import read_text as imp_res_read_text
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -409,6 +417,49 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
+    def edit_fgd(self, add_lines: bool=False) -> None:
+        """Add our FGD files to the game folder.
+
+        This is necessary so that VBSP offsets the entities properly,
+        if they're in instances.
+        Add_line determines if we are adding or removing it.
+        """
+        fgd_path = self.abs_path('bin/portal2.fgd')
+        try:
+            with open(fgd_path, 'r', encoding='utf8') as file:
+                data = list(file)
+        except FileNotFoundError:
+            LOGGER.warning('No FGD file? ("{}")', fgd_path)
+            return
+
+        for i, line in enumerate(data):
+            match = re.match(
+                r'// BEE\W*2 EDIT FLAG\W*=\W*([01])',
+                line,
+                re.IGNORECASE | re.UNICODE,
+            )
+            if match:
+                if match.group(0) == '0':
+                    return  # User specifically disabled us.
+                # Delete all data after this line.
+                del data[i:]
+                break
+
+        with srctools.AtomicWriter(fgd_path) as file:
+            for line in data:
+                file.write(line)
+            if add_lines:
+                file.write(
+                    '// BEE 2 EDIT FLAG = 1 \n'
+                    '// Added automatically by BEE2. Set above to "0" to '
+                    'allow editing below text without being overwritten.\n'
+                    '\n\n'
+                )
+                with open('../BEE2.fgd', 'r') as bee2_fgd:
+                    for line in bee2_fgd:
+                        file.write(line)
+                file.write(imp_res_read_text(srctools, 'srctools.fgd'))
+
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
         if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
@@ -555,7 +606,9 @@ class Game:
         # VBSP_config
         # Instance list
         # Editor models.
-        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 4)
+        # FGD file
+        # Gameinfo
+        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 6)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -660,6 +713,11 @@ class Game:
 
             LOGGER.info('Editing Gameinfo...')
             self.edit_gameinfo(True)
+            export_screen.step('EXP')
+
+            LOGGER.info('Adding ents to FGD.')
+            self.edit_fgd(True)
+            export_screen.step('EXP')
 
             LOGGER.info('Writing instance list...')
             with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
@@ -1358,6 +1416,7 @@ def remove_game(e=None):
         )
     if confirm:
         selected_game.edit_gameinfo(add_line=False)
+        selected_game.edit_fgd(add_lines=False)
 
         all_games.remove(selected_game)
         CONFIG.remove_section(selected_game.name)

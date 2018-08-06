@@ -1,21 +1,20 @@
-// Definitions for BEE2-specific entities
-@include "portal2.fgd"
+// This is injected at the end of Portal2.fgd.
  
-@BaseClass = TemplateEnt
+@BaseClass = BEETemplateEnt
 	[
 	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
 	visgroup(string): "Visgroup" : "" : "The visgroup this brush/overlay was contained in (in the combined file)."
 	]
 
-@SolidClass base(TemplateEnt) = bee2_template_world: "A set of world brushes which will be templated into a map."
+@SolidClass base(BEETemplateEnt) = bee2_template_world: "A set of world brushes which will be templated into a map."
 	[
 	]
 
-@SolidClass base(TemplateEnt) = bee2_template_detail: "A set of detail brushes which will be templated into a map."
+@SolidClass base(BEETemplateEnt) = bee2_template_detail: "A set of detail brushes which will be templated into a map."
 	[
 	]
 
-@PointClass base(TemplateEnt, info_overlay) 
+@PointClass base(BEETemplateEnt, info_overlay) 
 	size(-1 -1 0, 1 1 1)
 	color(80 150 225)
 	studio("models/editor/overlay_helper.mdl")
@@ -28,7 +27,7 @@
 	[
 	]
 	
-@PointClass base(TemplateEnt) iconsprite("BEE2/editor/bee2_icon.vmt") = bee2_template_scaling:
+@PointClass base(BEETemplateEnt) iconsprite("BEE2/editor/bee2_icon.vmt") = bee2_template_scaling:
 	"Used to store the values for a scaling template."
 	[
 	up_tex(material): "Up Texture" : "" : "Texture for the upward-pointing face."
