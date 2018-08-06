@@ -5,13 +5,11 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
-import itertools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
 from tk_tools import TK_ROOT
 
-import os
 import os
 import shutil
 import math
@@ -20,9 +18,9 @@ from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
 from srctools import (
     Vec, VPK,
-    Property, NoKeyError,
+    Property,
     VMF, Output,
-    FileSystemChain,
+    FileSystem, FileSystemChain,
 )
 import srctools.logger
 import backup
@@ -31,7 +29,7 @@ import packageLoader
 import utils
 import srctools
 
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Iterable, Iterator, Dict
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -207,13 +205,13 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
-def load_filesystems(package_sys):
+def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
     """Load package filesystems into a chain."""
     for system in package_sys:
         res_system.add_sys(system, prefix='resources/')
 
 
-def translate(string):
+def translate(string: str) -> str:
     """Translate the string using Portal 2's language files.
 
     This is needed for Valve items, since they translate automatically.
@@ -236,7 +234,13 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id: str, folder, mod_times):
+    def __init__(
+        self,
+        name: str,
+        steam_id: str,
+        folder: str,
+        mod_times: Dict[str, int],
+    ) -> None:
         self.name = name
         self.steamID = steam_id
         self.root = folder
@@ -244,7 +248,8 @@ class Game:
         self.mod_times = mod_times
 
     @classmethod
-    def parse(cls, gm_id, config: ConfigFile):
+    def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
+        """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():
             raise ValueError(
@@ -264,7 +269,7 @@ class Game:
 
         return cls(gm_id, steam_id, folder, mod_times)
 
-    def save(self):
+    def save(self) -> None:
         """Write a game into the config page."""
         # Wipe the original configs
         CONFIG[self.name] = {}
@@ -273,7 +278,7 @@ class Game:
         for pack, mod_time in self.mod_times.items():
             CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
-    def dlc_priority(self):
+    def dlc_priority(self) -> Iterator[str]:
         """Iterate through all subfolders, in order of high to low priority.
 
         We assume the priority follows:
@@ -298,10 +303,14 @@ class Game:
                     folder not in blacklist):
                 yield folder
 
-    def abs_path(self, path):
+    def abs_path(self, path: str) -> str:
+        """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
 
-    def add_editor_sounds(self, sounds):
+    def add_editor_sounds(
+        self,
+        sounds: Iterable[packageLoader.EditorSound],
+    ) -> None:
         """Add soundscript items so they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
         # First find the highest-priority file
@@ -340,7 +349,7 @@ class Game:
                     f.write(line)
                 f.write('\n')  # Add a little spacing
 
-    def edit_gameinfo(self, add_line=False):
+    def edit_gameinfo(self, add_line=False) -> None:
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
@@ -400,7 +409,7 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
-    def cache_invalid(self):
+    def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
         if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
             # Skipped always
@@ -418,7 +427,7 @@ class Game:
         ):
             return True
 
-    def refresh_cache(self, already_copied: Set[str]):
+    def refresh_cache(self, already_copied: Set[str]) -> None:
         """Copy over the resource files into this game.
 
         already_copied is passed from copy_mod_music(), to
@@ -478,7 +487,7 @@ class Game:
         self.save()
         CONFIG.save_check()
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Remove all resources from the game."""
         shutil.rmtree(self.abs_path(INST_PATH), ignore_errors=True)
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
@@ -496,7 +505,7 @@ class Game:
         style: packageLoader.Style,
         selected_objects: dict,
         should_refresh=False,
-        ) -> Tuple[bool, bool]:
+    ) -> Tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -649,10 +658,10 @@ class Game:
             for item_prop in editoritems.find_all('Item'):
                 improve_item(item_prop)
 
-            LOGGER.info('Editing Gameinfo!')
+            LOGGER.info('Editing Gameinfo...')
             self.edit_gameinfo(True)
 
-            LOGGER.info('Writing instance list!')
+            LOGGER.info('Writing instance list...')
             with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
                 for line in self.build_instance_data(editoritems):
                     inst_file.write(line)
@@ -660,7 +669,7 @@ class Game:
 
             # AtomicWriter writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
-            LOGGER.info('Writing Editoritems!')
+            LOGGER.info('Writing Editoritems...')
             with srctools.AtomicWriter(self.abs_path(
                     'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
                 for line in editoritems.export():
