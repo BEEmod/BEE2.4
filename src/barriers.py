@@ -593,11 +593,6 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec):
             normal = (0, 0, -1)
         import vbsp
         for pos in min_pos.iter_line(max_pos, 128):
-            vbsp.VMF.create_ent(
-                'info_particle_system',
-                origin=Vec(pos.x, pos.y, grid_height),
-                angles=Vec(normal).to_angle(),
-            )
             try:
                 hole_type = HOLES[(pos.x, pos.y, grid_height), normal]
             except KeyError:
