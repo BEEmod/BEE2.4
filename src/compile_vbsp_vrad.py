@@ -25,12 +25,17 @@ EXCLUDES = [
     'distutils',  # Found in shutil, used if zipfile is not availible
     'doctest',  # Used in __main__ of decimal and heapq
     'optparse',  # Used in calendar.__main__
+    'pprint',  # From pickle, not needed
+    'textwrap',  # Used in zipfile.__main__
 
     # We don't localise the compiler, but utils imports the modules.
     'locale', 'gettext',
 
     # This isn't ever used in the compiler.
     'tkinter',
+
+    # We aren't using the Python 2 code, for obvious reasons.
+    'importlib_resources._py2',
 
     'win32api',
     'win32com',
@@ -45,19 +50,14 @@ EXCLUDES = [
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
-# Additionally we need to block email in pkg_resources.
 import logging.handlers
 import logging.config
-import pkg_resources
 
-if not hasattr(pkg_resources, 'email'):  # This imports socket.
-    EXCLUDES.append('email')
-    if not hasattr(logging.handlers, 'socket'):
-        if not hasattr(logging.config, 'socket'):
-            EXCLUDES.append('socket')
-            # Subprocess uses this in UNIX-style OSes, but not Windows.
-            if utils.WIN:
-                EXCLUDES += ['selectors', 'select']
+if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'socket'):
+    EXCLUDES.append('socket')
+    # Subprocess uses this in UNIX-style OSes, but not Windows.
+    if utils.WIN:
+        EXCLUDES += ['selectors', 'select']
 if not hasattr(logging.handlers, 'pickle'):
     EXCLUDES.append('pickle')
 del logging
@@ -73,17 +73,6 @@ INCLUDES = [
     'conditions.' + module
     for loader, module, is_package in
     pkgutil.iter_modules(['conditions'])
-]
-
-# These are included inside pkg_resources, but we want to just use the existing
-# ones.
-INCLUDES += [
-    'packaging.version',
-    'packaging.specifiers',
-    'packaging.requirements',
-    'packaging.markers',
-    'six',
-    'appdirs',
 ]
 
 bee_version = input('BEE2 Version (or blank for dev): ')
