@@ -34,10 +34,10 @@ import srctools
 from typing import List, Tuple, Set, Iterable, Iterator, Dict
 
 try:
-    from importlib.resources import read_text as imp_res_read_text
+    from importlib.resources import read_binary as imp_res_read_binary
 except ImportError:
     # Backport module for before Python 3.7
-    from importlib_resources import read_text as imp_res_read_text
+    from importlib_resources import read_binary as imp_res_read_binary
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -424,19 +424,22 @@ class Game:
         if they're in instances.
         Add_line determines if we are adding or removing it.
         """
+        # We do this in binary to ensure non-ASCII characters pass though
+        # untouched.
+
         fgd_path = self.abs_path('bin/portal2.fgd')
         try:
-            with open(fgd_path, 'r', encoding='utf8') as file:
-                data = list(file)
+            with open(fgd_path, 'rb') as file:
+                data = file.readlines()
         except FileNotFoundError:
             LOGGER.warning('No FGD file? ("{}")', fgd_path)
             return
 
         for i, line in enumerate(data):
             match = re.match(
-                r'// BEE\W*2 EDIT FLAG\W*=\W*([01])',
+                br'// BEE\W*2 EDIT FLAG\W*=\W*([01])',
                 line,
-                re.IGNORECASE | re.UNICODE,
+                re.IGNORECASE,
             )
             if match:
                 if match.group(0) == '0':
@@ -445,20 +448,19 @@ class Game:
                 del data[i:]
                 break
 
-        with srctools.AtomicWriter(fgd_path) as file:
+        with srctools.AtomicWriter(fgd_path, is_bytes=True) as file:
             for line in data:
                 file.write(line)
             if add_lines:
                 file.write(
-                    '// BEE 2 EDIT FLAG = 1 \n'
-                    '// Added automatically by BEE2. Set above to "0" to '
-                    'allow editing below text without being overwritten.\n'
-                    '\n\n'
+                    b'// BEE 2 EDIT FLAG = 1 \n'
+                    b'// Added automatically by BEE2. Set above to "0" to '
+                    b'allow editing below text without being overwritten.\n'
+                    b'\n\n'
                 )
-                with open('../BEE2.fgd', 'r') as bee2_fgd:
-                    for line in bee2_fgd:
-                        file.write(line)
-                file.write(imp_res_read_text(srctools, 'srctools.fgd'))
+                with open('../BEE2.fgd', 'rb') as bee2_fgd:
+                    shutil.copyfileobj(bee2_fgd, file)
+                file.write(imp_res_read_binary(srctools, 'srctools.fgd'))
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
