@@ -5,7 +5,7 @@ edit the BSP after instances are collapsed, and pack files.
 """
 # Run as early as possible to catch errors in imports.
 from srctools.logger import init_logging
-LOGGER = init_logging('bee2/VRAD.log')
+LOGGER = init_logging('bee2/vrad.log')
 
 import os
 import shutil
@@ -506,7 +506,7 @@ def pack_content(packlist: PackList, path: str, is_peti: bool):
                     continue  # Skip blanks or comments
 
                 if line[:8] == 'precache':
-                    LOGGER.warning('Precache command in file...')
+                    LOGGER.warning('Precache command in file: "{}"', line[8:])
 
                 elif line.endswith('*'):
                     LOGGER.warning('* command: "{}"', line)
