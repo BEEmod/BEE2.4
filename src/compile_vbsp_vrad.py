@@ -79,7 +79,22 @@ bee_version = input('BEE2 Version (or blank for dev): ')
 
 import srctools
 
-[srctools_loc] = srctools.__path__
+zip_includes = [
+    # Add the FGD data for us.
+    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools/fgd.lzma'),
+]
+# We need to include this version data.
+try:
+    import importlib_resources
+    zip_includes.append(
+        (
+            os.path.join(importlib_resources.__path__[0], 'version.txt'),
+            'importlib_resources/version.txt',
+         )
+    )
+except ImportError:
+    pass
+
 
 setup(
     name='VBSP_VRAD',
@@ -97,10 +112,7 @@ setup(
             # Include all modules in the zip..
             'zip_include_packages': '*',
             'zip_exclude_packages': '',
-            'zip_includes': [
-                # Add the FGD data for us.
-                (os.path.join(srctools_loc, 'fgd.lzma'), 'srctools/fgd.lzma')
-            ],
+            'zip_includes': zip_includes,
         },
     },
     description='BEE2 VBSP and VRAD compilation hooks, '
