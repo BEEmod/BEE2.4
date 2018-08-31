@@ -173,24 +173,24 @@ def res_set_texture(inst: Entity, res: Property):
      the 128 brushes (Useful with fizzler/light strip items).
 
     tex is the texture used.
-    If tex begins and ends with '<>', certain
+    If tex begins and ends with `<>`, certain
     textures will be used based on style:
-    - '<delete>' will remove the brush entirely (it should be hollow).
+    - `<delete>` will remove the brush entirely (it should be hollow).
       Caution should be used to ensure no leaks occur.
-    - '<special>' the brush will be given a special texture
+    - `<special>` the brush will be given a special texture
       like angled and flip panels.
-    - '<white>' and '<black>' will use the regular textures for the
+    - `<white>` and `<black>` will use the regular textures for the
       given color.
-    - '<white-2x2>', '<white-4x4>', '<black-2x2>', '<black-4x4'> will use
+    - `<white-2x2>`, `<white-4x4>`, `<black-2x2>`, `<black-4x4>` will use
       the given wall-sizes. If on floors or ceilings these always use 4x4.
-    - '<2x2>' or '<4x4>' will force to the given wall-size, keeping color.
-    - '<special-white>' and '<special-black>' will use a special texture
+    - `<2x2>` or `<4x4>` will force to the given wall-size, keeping color.
+    - `<special-white>` and `<special-black>` will use a special texture
        of the given color.
-    If tex begins and ends with '[]', it is an option in the 'Textures' list.
-    These are composed of a group and texture, separated by '.'. 'white.wall'
-    are the white wall textures; 'special.goo' is the goo texture.
+    If tex begins and ends with `[]`, it is an option in the `Textures` list.
+    These are composed of a group and texture, separated by `.`. `white.wall`
+    are the white wall textures; `special.goo` is the goo texture.
 
-    If 'template' is set, the template should be an axis aligned cube. This
+    If `template` is set, the template should be an axis aligned cube. This
     will be rotated by the instance angles, and then the face with the same
     orientation will be applied to the face (with the rotation and texture).
     """
@@ -291,10 +291,10 @@ def res_set_texture(inst: Entity, res: Property):
 def res_add_brush(inst: Entity, res: Property):
     """Spawn in a brush at the indicated points.
 
-    - point1 and point2 are locations local to the instance, with `0 0 0`
+    - `point1` and `point2` are locations local to the instance, with `0 0 0`
       as the floor-position.
-    - type is either `black` or `white`.
-    - detail should be set to True/False. If true the brush will be a
+    - `type` is either `black` or `white`.
+    - detail should be set to `1/0`. If true the brush will be a
       func_detail instead of a world brush.
 
     The sides will be textured with 1x1, 2x2 or 4x4 wall, ceiling and floor
@@ -502,7 +502,7 @@ def res_import_template(inst: Entity, res: Property):
     - ID: The ID of the template to be inserted. Add visgroups to additionally
             add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
-             present, the colour of tiles will be overridden. If 'invert' is
+             present, the colour of tiles will be overridden. If `invert` is
             added, white/black tiles will be swapped. If a tile size
             ('2x2', '4x4', 'wall', 'special') is included, all tiles will
             be switched to that size (if not a floor/ceiling). If 'world' or
