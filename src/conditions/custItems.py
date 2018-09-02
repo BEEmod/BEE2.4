@@ -88,16 +88,17 @@ def res_faith_mods(inst: Entity, res: Property):
     """Modify the `trigger_catapult` that is created for `ItemFaithPlate` items.
 
     Values:
-        - `raise_trig`: Raise or lower the `trigger_catapult`s by this amount.
-        - `angled_targ`, `angled_in`: Instance entity and input for angled plates
-        - `straight_targ`, `straight_in`: Instance entity and input for
-            straight plates
-        - `instvar`: A $replace value to set to either 'angled' or '
-            'straight'.
-        - `enabledVar`: A `$replace` value which will be copied to the main
-            trigger's Start Disabled value (and inverted).
-        - `trig_temp`: An ID for a template brush to add. This will be offset by
-            the trigger's position (in the case of the `helper` trigger).
+      
+    - `raise_trig`: Raise or lower the `trigger_catapult`s by this amount.
+    - `angled_targ`, `angled_in`: Instance entity and input for angled plates
+    - `straight_targ`, `straight_in`: Instance entity and input for
+      straight plates
+    - `instvar`: A $replace value to set to either 'angled' or '
+      'straight'.
+    - `enabledVar`: A `$replace` value which will be copied to the main
+      trigger's Start Disabled value (and inverted).
+    - `trig_temp`: An ID for a template brush to add. This will be offset by
+      the trigger's position (in the case of the `helper` trigger).
     """
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
