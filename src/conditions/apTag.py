@@ -27,10 +27,11 @@ TAG_FIZZ_ID = 'TAG_GEL_GUN'
 
 @make_result('ATLAS_SpawnPoint')
 def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
-    """Create the spawn point for ATLAS, in Aperture Tag.
+    """Create the spawn point for ATLAS in the entry corridor.
 
-    This creates an instance with the desired orientation.
-    The two parameters 'origin' and 'angles' must be set.
+    It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
+    The two parameters `origin` and `facing` must be set to determine the required position.
+    If `global` is set, the spawn point will be absolute instead of relative to the current instance.
     """
     if vbsp.GAME_MODE != 'COOP':
         return RES_EXHAUSTED
@@ -88,12 +89,11 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
 @meta_cond(priority=200, only_once=True)
 def ap_tag_modifications(vmf: VMF):
     """Perform modifications for Aperture Tag.
-
-    * All fizzlers will be combined with a trigger_paint_cleanser
+    
     * Paint is always present in every map!
-    * Suppress ATLAS's Portalgun in coop
-    * Override the transition ent instance to have the Gel Gun
-    * Create subdirectories with the user's steam ID
+    * Suppress ATLAS's Portalgun in coop.
+    * In singleplayer, override the transition ent instance to have the Gel Gun.
+    * Create subdirectories with the user's steam ID to fix a workshop compile bug.
     """
     if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
