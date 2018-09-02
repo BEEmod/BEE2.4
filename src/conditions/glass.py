@@ -225,12 +225,13 @@ def res_breakable_glass_setup(res: Property):
 def res_breakable_glass(inst: Entity, res: Property):
     """Adds breakable glass to the map.
 
-    Paramters:
-        * thickness: Thickness of the collision brushes.
-        * offset: Distance into the block to place the surface.
-        * border_size: Distance on borders to inset by (so the shatter effects
-          appear.)
-        * material: Name of the func_breakable_surf material.
+    Parameters:
+    
+    * `thickness`: Thickness of the collision brushes.
+    * `offset`: Distance into the block to place the surface.
+    * `border_size`: Distance on borders to inset by (so the shatter effects
+          appear on the border.)
+    * `material`: Name of the func_breakable_surf material.
     """
     vmf = inst.map
 
