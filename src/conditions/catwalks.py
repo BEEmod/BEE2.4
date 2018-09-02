@@ -122,20 +122,21 @@ def res_make_catwalk(vmf: VMF, res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
-    Instances:
-        MarkerInst: The instance set in editoritems.
-        Straight_128/256/512: Straight sections. Extends East
-        Corner: A corner piece. Connects on N and W sides.
-        TJunction; A T-piece. Connects on all but the East side.
-        CrossJunction: A X-piece. Connects on all sides.
-        End: An end piece. Connects on the East side.
-        Stair: A stair. Starts East and goes Up and West.
-        End_wall: Connects a West wall to a East catwalk.
-        Support_Wall: A support extending from the East wall.
-        Support_Ceil: A support extending from the ceiling.
-        Support_Floor: A support extending from the floor.
-        Support_Goo: A floor support, designed for goo pits.
-        Single_Wall: A section connecting to an East wall.
+    
+    * Instances:
+        * `markerInst: The instance set in editoritems.
+        * `straight_128`/`256`/`512`: Straight sections. Extends East.
+        * `corner: An L-corner piece. Connects on North and West sides.
+        * `TJunction`: A T-piece. Connects on all but the East side.
+        * `crossJunction`: A X-piece. Connects on all sides.
+        * `end`: An end piece. Connects on the East side.
+        * `stair`: A stair. Starts East and goes Up and West.
+        * `end_wall`: Connects a West wall to a East catwalk.
+        * `support_wall`: A support extending from the East wall.
+        * `support_ceil`: A support extending from the ceiling.
+        * `support_floor`: A support extending from the floor.
+        * `support_goo`: A floor support, designed for goo pits.
+        * `single_wall`: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
     marker = instanceLocs.resolve(res['markerInst'])
