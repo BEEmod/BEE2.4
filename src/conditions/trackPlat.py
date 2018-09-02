@@ -22,18 +22,18 @@ def res_track_plat(res: Property):
     is horizontal or vertical and sets the track
     targetnames to a useful value.
     Values:
-        - Orig_item: The "<ITEM_ID>" for the track platform, with angle brackets
-        - Single_plat: An instance used for platform with 1 rail
-        - Track_name: The name to give to the tracks.
-        - Vert_suffix: Add suffixes to vertical tracks
-            (_vert)
-        - Horiz_suffix: Add suffixes to horizontal tracks
+    
+    * `orig_item`: The "<ITEM_ID>" for the track platform, with angle brackets. This is used to determine all the instance filenames.
+    * `single_plat`: An instance used for the entire platform, if it's one rail long (and therefore can't move). 
+    * `track_name`: If set, rename track instances following the pattern `plat_name-track_nameXX`. Otherwise all tracks will receive the name of the platform.
+    * `vert_suffix`: If set, add `_vert` suffixes to vertical track instance names.
+    * `horiz_suffix`: Add suffixes to horizontal tracks
             (_horiz, _horiz_mirrored)
-        - plat_suffix: Also add the above _vert or _horiz suffixes to
-            the platform.
-        - vert_bottom_suffix: Add '_bottom' / '_vert_bottom' to the track at the
+    * `plat_suffix`: If set, also add the above `_vert` or `_horiz` suffixes 
+      to the platform.
+    * `vert_bottom_suffix`: If set, add '_bottom' / '_vert_bottom' to the track at the
             bottom of vertical platforms.
-        - plat_var: If set, save the orientation to the given $fixup variable
+    * `plat_var`: If set, save the orientation (`vert`/`horiz`) to the provided $fixup variable.
     """
     # Get the instances from editoritems
     (
