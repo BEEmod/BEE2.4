@@ -611,10 +611,11 @@ def parse_conf(conf: Property):
     )
 
     # Check we have the Valve cube definitions - if we don't, something's
-    # wrong.
+    # wrong. However don't error out, in case the user really didn't enable
+    # the droppers.
     for cube_id in VALVE_CUBE_IDS.values():
         if cube_id not in CUBE_TYPES:
-            raise Exception('Cube type "{}" is missing!'.format(cube_id))
+            LOGGER.warning('Valve Cube type "{}" is missing!', cube_id)
 
 
 def write_vscripts(vrad_conf: Property):
@@ -623,7 +624,6 @@ def write_vscripts(vrad_conf: Property):
         with open('BEE2/inject/cube_setmodel.nut', 'w') as f:
             for func_name_model in SETMODEL_FUNCS.items():
                 f.write(SETMODEL_TEMP % func_name_model)
-
 
     if CUBE_SCRIPT_FILTERS:
         conf_block = vrad_conf.ensure_exists('InjectFiles')
@@ -1155,11 +1155,18 @@ def link_cubes(vmf: VMF):
             continue
         cube_type_num = dropper.fixup.int('$cube_type')
         try:
-            cube_type = CUBE_TYPES[VALVE_CUBE_IDS[cube_type_num]]
+            cube_type_id = VALVE_CUBE_IDS[cube_type_num]
         except KeyError:
             raise ValueError('Bad cube type "{}"!'.format(
                 dropper.fixup['$cube_type']
             )) from None
+        try:
+            cube_type = CUBE_TYPES[cube_type_id]
+        except KeyError:
+            raise ValueError(
+                'No Valve cube type "{}" available!'.format(cube_type_id)
+            ) from None
+
         PAIRS.append(CubePair(
             cube_type,
             inst_to_type[dropper['file'].casefold()],
