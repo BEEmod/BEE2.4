@@ -853,7 +853,12 @@ class Game:
                         os.path.join(mdl_folder, file_no_ext + new_ext),
                     )
 
-        LOGGER.info('{}/{} editor models used.', len(used_models), mdl_count)
+        LOGGER.info(
+            '{}/{} ({:.0%})editor models used.',
+            len(used_models),
+            mdl_count,
+            len(used_models) / mdl_count,
+        )
 
     @staticmethod
     def build_instance_data(editoritems: Property):
