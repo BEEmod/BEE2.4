@@ -20,7 +20,7 @@ import srctools
 import utils
 from srctools import Property
 from srctools.bsp import BSP, BSP_LUMPS
-from srctools.filesys import RawFileSystem, VPKFileSystem
+from srctools.filesys import RawFileSystem, VPKFileSystem, ZipFileSystem
 from srctools.packlist import PackList, FileType as PackType, load_fgd
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
@@ -522,8 +522,10 @@ def pack_content(packlist: PackList, path: str, is_peti: bool):
                     else:
                         packlist.load_soundscript(file, always_include=True)
                         packlist.pack_file(line[1:])
+                        LOGGER.info('- ' + line[1:])
                 else:
                     packlist.pack_file(line)
+                    LOGGER.info('- ' + line)
 
     # Only generate a soundscript for PeTI maps..
     if is_peti:
@@ -798,8 +800,6 @@ def main(argv: List[str]) -> None:
         fsys_tag = RawFileSystem(CONF['tag_dir'])
         fsys.add_sys(fsys_tag)
 
-    fsys.open_ref()
-
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
     bsp_file.read_header()
@@ -809,6 +809,11 @@ def main(argv: List[str]) -> None:
     zip_data = BytesIO()
     zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
     zipfile = ZipFile(zip_data, mode='a')
+
+    # Mount the existing packfile, so the cubemap files are recognised.
+    fsys.systems.append((ZipFileSystem('', zipfile), ''))
+
+    fsys.open_ref()
 
     LOGGER.info('Done!')
 
@@ -844,7 +849,6 @@ def main(argv: List[str]) -> None:
         # Write with the map name, so it loads directly.
         packlist.write_manifest(os.path.basename(path)[:-4])
 
-    LOGGER.info('Adding packed files...')
     # We need to disallow Valve folders.
     pack_whitelist = set()
     pack_blacklist = set()
@@ -862,6 +866,9 @@ def main(argv: List[str]) -> None:
         pack_whitelist.discard(None)
 
     if '-no_pack' not in args:
+        # Cubemap files packed into the map already.
+        existing = set(zipfile.infolist())
+
         LOGGER.info('Writing to BSP...')
         packlist.pack_into_zip(
             zipfile,
@@ -869,6 +876,12 @@ def main(argv: List[str]) -> None:
             whitelist=pack_whitelist,
             blacklist=pack_blacklist,
         )
+
+        LOGGER.info('Packed files:\n{}', '\n'.join([
+            zipinfo.filename
+            for zipinfo in zipfile.infolist()
+            if zipinfo.filename not in existing
+        ]))
 
     dump_files(zipfile)
 
