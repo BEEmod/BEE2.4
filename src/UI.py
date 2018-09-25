@@ -847,11 +847,16 @@ def export_editoritems(e=None):
         optionWindow.AFTER_EXPORT_ACTION.get()
     )
 
-    messagebox.showinfo('BEEMOD2', message)
-
     # Launch first so quitting doesn't affect this.
     if optionWindow.LAUNCH_AFTER_EXPORT.get():
-        gameMan.selected_game.launch()
+        if messagebox.askyesno(
+            'BEEMOD2',
+            message + _('\n Launch Game?'),
+            parent=TK_ROOT,
+        ):
+            gameMan.selected_game.launch()
+    else:
+        messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
 
     # Do the desired action - if quit, we don't bother to update UI.
     if chosen_action is optionWindow.AfterExport.NORMAL:
@@ -1861,7 +1866,8 @@ def init_windows():
 
     optionWindow.reset_all_win = reset_panes
 
-    # Save and load to properly apply config settings.
+    # Load to properly apply config settings, then save to ensure
+    # the file has any defaults applied.
     optionWindow.load()
     optionWindow.save()
 
