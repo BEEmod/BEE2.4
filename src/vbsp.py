@@ -198,14 +198,18 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 ##################
 
 
-def get_tex(name):
+def get_tex(name: str) -> str:
     if name in settings['textures']:
         return random.choice(settings['textures'][name])
     else:
         raise Exception('No texture "' + name + '"!')
 
 
-def alter_mat(face, seed=None, texture_lock=True):
+def alter_mat(
+    face: VLib.Side,
+    seed: str=None,
+    texture_lock: bool=True,
+) -> bool:
     """Randomise the texture used for a face, based on configured textures.
 
     This uses the TEX_VALVE dict to identify the kind of texture, but
@@ -3079,12 +3083,6 @@ def main() -> None:
             'determine if the map is PeTI or not.'
         )
         sys.exit()
-
-    # The first is just for us, the second is also for VBSP. We'll switch to
-    # verbose mode if VBSP is set to do so as well.
-    if '-bee2_verbose' in folded_args or '-verbose' in folded_args:
-        utils.stdout_loghandler.setLevel('DEBUG')
-        LOGGER.info('Switched to verbose logging.')
 
     if not path.endswith(".vmf"):
         path += ".vmf"
