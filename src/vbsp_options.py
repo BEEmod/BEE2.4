@@ -38,7 +38,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionT = TypeVar('OptionT', str, int, float, bool, Vec, Enum)
+OptionT = TypeVar('OptionT')
 
 
 class Opt:

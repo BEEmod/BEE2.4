@@ -1,4 +1,3 @@
-# coding: utf-8
 import inspect
 import itertools
 import math
@@ -33,7 +32,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()  # type: Set[str]
-ALL_INST = set()  # type: Set[Entity]
+ALL_INST = set()  # type: Set[str]
 VMF = None  # type: srctools.VMF
 
 conditions = []
@@ -76,7 +75,6 @@ ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
 # For each item Id, the item class for it.
 CLASS_FOR_ITEM = {}  # type: Dict[str, consts.ItemClass]
 
-CONNECTIONS = {}  # TODO: Remove and remove everyone using this!
 
 xp = Vec_tuple(1, 0, 0)
 xn = Vec_tuple(-1, 0, 0)
@@ -465,7 +463,7 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: Set[Entity], vmf_file: srctools.vmf.VMF) -> None:
+def init(seed: str, inst_list: Set[str], vmf_file: srctools.vmf.VMF) -> None:
     """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED, ALL_INST, VMF

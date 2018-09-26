@@ -1,4 +1,4 @@
-"""Flags related to global properties - stylevars, music, which game, etc."""
+"""Conditions related to global properties - stylevars, music, which game, etc."""
 import utils
 import vbsp_options
 
@@ -15,7 +15,7 @@ COND_MOD_NAME = 'Global Properties'
 
 
 @make_flag('styleVar')
-def flag_stylevar(flag: Property):
+def flag_stylevar(flag: Property) -> bool:
     """Checks if the given Style Var is true.
 
     Use the NOT flag to invert if needed.
@@ -24,7 +24,7 @@ def flag_stylevar(flag: Property):
 
 
 @make_flag('has')
-def flag_voice_has(flag: Property):
+def flag_voice_has(flag: Property) -> bool:
     """Checks if the given Voice Attribute is present.
 
     Use the NOT flag to invert if needed.
@@ -33,7 +33,7 @@ def flag_voice_has(flag: Property):
 
 
 @make_flag('has_music')
-def flag_music():
+def flag_music() -> bool:
     """Checks the selected music ID.
 
     Use `<NONE>` for no music.
@@ -43,7 +43,7 @@ def flag_music():
 
 
 @make_flag('Game')
-def flag_game(flag: Property):
+def flag_game(flag: Property) -> bool:
     """Checks which game is being modded.
 
     Accepts the following aliases instead of a Steam ID:
@@ -64,7 +64,7 @@ def flag_game(flag: Property):
 
 
 @make_flag('has_char')
-def flag_voice_char(flag: Property):
+def flag_voice_char(flag: Property) -> bool:
     """Checks to see if the given charcter is present in the voice pack.
 
     `<NONE>` means no voice pack is chosen.
@@ -81,7 +81,7 @@ def flag_voice_char(flag: Property):
 
 
 @make_flag('HasCavePortrait')
-def res_cave_portrait():
+def res_cave_portrait() -> bool:
     """Checks to see if the Cave Portrait option is set for the given
 
     voice pack.
@@ -90,7 +90,7 @@ def res_cave_portrait():
 
 
 @make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(flag: Property):
+def flag_game_mode(flag: Property) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
     """
     import vbsp
@@ -98,7 +98,7 @@ def flag_game_mode(flag: Property):
 
 
 @make_flag('ifPreview', 'preview')
-def flag_is_preview(flag: Property):
+def flag_is_preview(flag: Property) -> bool:
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -111,7 +111,7 @@ def flag_is_preview(flag: Property):
 
 
 @make_flag('hasExitSignage')
-def flag_has_exit_signage(vmf: VMF):
+def flag_has_exit_signage(vmf: VMF) -> bool:
     """Check to see if either exit sign is present."""
     for over in vmf.by_class['info_overlay']:
         if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
@@ -120,7 +120,7 @@ def flag_has_exit_signage(vmf: VMF):
 
 
 @make_result('setOption')
-def res_set_option(res: Property):
+def res_set_option(res: Property) -> bool:
     """Set a value in the "options" part of VBSP_config.
 
     Each child property will be set.
@@ -131,7 +131,7 @@ def res_set_option(res: Property):
 
 
 @make_flag('ItemConfig')
-def res_match_item_config(inst: Entity, res: Property):
+def res_match_item_config(inst: Entity, res: Property) -> bool:
     """Check if an item config panel value matches another value.
 
     * `ID` is the ID of the group.
@@ -155,7 +155,7 @@ def res_match_item_config(inst: Entity, res: Property):
 
 
 @make_result('styleVar')
-def res_set_style_var(res: Property):
+def res_set_style_var(res: Property) -> bool:
     """Set Style Vars.
 
     The value should be a set of `SetTrue` and `SetFalse` keyvalues.
