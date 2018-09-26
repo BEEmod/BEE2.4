@@ -963,7 +963,7 @@ class ItemVariant:
             self.source,
         )
 
-    def can_group(self):
+    def can_group(self) -> bool:
         """Does this variant have the data needed to group?"""
         return (
             'all' in self.icons and
@@ -971,7 +971,7 @@ class ItemVariant:
             self.all_name is not None
         )
 
-    def override_from_folder(self, other: 'ItemVariant'):
+    def override_from_folder(self, other: 'ItemVariant') -> None:
         """Perform the override from another item folder."""
         self.authors.extend(other.authors)
         self.tags.extend(self.tags)
@@ -1050,19 +1050,46 @@ class ItemVariant:
             all_icon=self.all_icon,
             source='{} from {}'.format(source, self.source),
         )
-        subtypes = list(variant.editor.find_all('Editor', 'SubType'))
+        variant._modify_editoritems(props, variant.editor, source)
+        if 'Item' in variant.editor_extra and 'extra' in props:
+            variant._modify_editoritems(
+                props.find_key('extra'),
+                variant.editor_extra.find_key('Item'),
+                source,
+            )
+
+        return variant
+
+    def _modify_editoritems(
+        self,
+        props: Property,
+        editor: Property,
+        source: str,
+    ) -> None:
+        """Modify either the base or extra editoritems block."""
+        is_extra = editor is self.editor_extra
+
+        subtypes = list(editor.find_all('Editor', 'SubType'))
+
         # Implement overriding palette items
         for item in props.find_children('Palette'):
             pal_icon = item['icon', None]
             pal_name = item['pal_name', None]  # Name for the palette icon
             bee2_icon = item['bee2', None]
+
             if item.name == 'all':
-                if pal_icon:
-                    variant.all_icon = pal_icon
-                if pal_name:
-                    variant.all_name = pal_name
-                if bee2_icon:
-                    variant.icons['all'] = bee2_icon
+                if is_extra:
+                    raise Exception(
+                        'Cannot specify "all" for hidden '
+                        'editoritems blocks in {}!'.format(source)
+                    )
+                else:
+                    if pal_icon:
+                        self.all_icon = pal_icon
+                    if pal_name:
+                        self.all_name = pal_name
+                    if bee2_icon:
+                        self.icons['all'] = bee2_icon
                 continue
 
             try:
@@ -1087,6 +1114,7 @@ class ItemVariant:
                 if model_prop.has_children():
                     models = [prop.value for prop in model_prop]
                 else:
+                    # Special case - one model, for the entire subtype.
                     models = [model_prop.value]
                 for model in models:
                     subtype.append(Property('Model', [
@@ -1097,7 +1125,13 @@ class ItemVariant:
                 subtype['name'] = item['name']  # Name for the subtype
 
             if bee2_icon:
-                variant.icons[item.name] = bee2_icon
+                if is_extra:
+                    raise Exception(
+                        'Cannot specify BEE2 icons for hidden '
+                        'editoritems blocks in {}!'.format(source)
+                    )
+                else:
+                    self.icons[item.name] = bee2_icon
 
             if pal_name or pal_icon:
                 palette = subtype.ensure_exists('Palette')
@@ -1107,7 +1141,7 @@ class ItemVariant:
                     palette['Image'] = pal_icon
 
         # Allow overriding the instance blocks.
-        instances = variant.editor.ensure_exists('Exporting').ensure_exists('Instances')
+        instances = editor.ensure_exists('Exporting').ensure_exists('Instances')
         inst_children = {
             self._inst_block_key(prop): prop
             for prop in
@@ -1133,7 +1167,7 @@ class ItemVariant:
 
         # Override IO commands.
         if 'IOConf' in props:
-            for io_block in variant.editor.find_children('Exporting'):
+            for io_block in editor.find_children('Exporting'):
                 if io_block.name not in ('outputs', 'inputs'):
                     continue
                 while 'bee2' in io_block:
@@ -1141,14 +1175,7 @@ class ItemVariant:
 
             io_conf = props.find_key('IOConf')
             io_conf.name = 'BEE2'
-            (
-                variant.editor.
-                ensure_exists('Exporting').
-                ensure_exists('Inputs').
-                append(io_conf)
-            )
-
-        return variant
+            editor.ensure_exists('Exporting').ensure_exists('Inputs').append(io_conf)
 
     @staticmethod
     def _inst_block_key(prop: Property):
