@@ -26,6 +26,7 @@ import vbsp_options
 import instanceLocs
 import brushLoc
 import bottomlessPit
+import packing
 import conditions
 import connections
 import instance_traits
@@ -36,7 +37,8 @@ import cubes
 import barriers
 
 from typing import (
-    Dict, Tuple, List
+    Dict, Tuple, List,
+    Set,
 )
 
 COND_MOD_NAME = 'VBSP'
@@ -330,6 +332,14 @@ def load_settings():
     conditions.build_itemclass_dict(instance_file)
     connections.read_configs(instance_file)
 
+    # Parse packlist data.
+    with open('bee2/pack_list.cfg') as f:
+        props = Property.parse(
+            f,
+            'bee2/pack_list.cfg'
+        )
+    packing.parse_packlists(props)
+
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
@@ -339,19 +349,6 @@ def load_settings():
 
     # Fizzler data
     fizzler.read_configs(conf)
-
-    # These are custom textures we need to pack, if they're in the map.
-    # (World brush textures, antlines, signage, glass...)
-    for trigger in conf.find_all('PackTriggers', 'material'):
-        mat = trigger['texture', ''].casefold()
-        packlist = trigger['packlist', '']
-        if mat and packlist:
-            settings['packtrigger'][mat].append(packlist)
-
-    # Files that the BEE2.4 app knows we need to pack - music, style, etc.
-    # This is a bit better than a lot of extra conditions.
-    for force_files in conf.find_all('PackTriggers', 'Forced', 'File'):
-        PACK_FILES.add(force_files.value)
 
     # Get configuration for the elevator, defaulting to ''.
     elev = conf.find_key('elevator', [])
@@ -955,7 +952,6 @@ def set_player_portalgun():
             vscripts='bee2/portal_man.nut',
             origin=ent_pos,
         )
-        PACK_FILES.add('scripts/vscripts/bee2/portal_man.nut')
 
         if GAME_MODE == 'SP':
             VMF.create_ent(
@@ -1246,7 +1242,7 @@ def add_fog_ents():
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos():
+def set_elev_videos() -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -1289,11 +1285,9 @@ def set_elev_videos():
             vscripts=script,
             origin=inst['origin'],
         )
-    # Ensure the script gets packed.
-    PACK_FILES.add('scripts/vscripts/' + script)
 
 
-def get_map_info():
+def get_map_info() -> Set[str]:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -2475,7 +2469,6 @@ def add_extra_ents(mode):
         ]
         if voiceLine.has_responses():
             glados_scripts.append('bee2/coop_responses.nut')
-            PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
 
         global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
 
@@ -2798,97 +2791,6 @@ def fix_worldspawn():
             vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
     VMF.spawn['skyname'] = vbsp_options.get(str, 'skybox')
-
-
-@conditions.make_result('Pack')
-def packlist_cond(res: Property):
-    """Add the files in the given packlist to the map."""
-    TO_PACK.add(res.value.casefold())
-
-    return conditions.RES_EXHAUSTED
-
-
-@conditions.make_result('PackFile')
-def pack_file_cond(res: Property):
-    """Adda single file to the map."""
-    PACK_FILES.add(res.value)
-
-    return conditions.RES_EXHAUSTED
-
-
-@conditions.make_result('PackRename')
-def packlist_cond_rename(res: Property):
-    """Add a file to the packlist, saved under a new name."""
-    PACK_RENAME[res['dest']] = res['file']
-    return conditions.RES_EXHAUSTED
-
-
-def make_packlist(map_path):
-    """Write the list of files that VRAD should pack."""
-
-    # Scan map materials for marked materials
-    # This way world-brush materials can be packed.
-    pack_triggers = settings['packtrigger']
-
-    if pack_triggers:
-        def face_iter():
-            """Check all these locations for the target textures."""
-            # We need the iterator to allow breaking out of the loop.
-            for face in VMF.iter_wfaces():
-                yield face.mat.casefold()
-            for ent in (
-                VMF.by_class['func_brush'] |
-                VMF.by_class['func_door_rotating'] |
-                VMF.by_class['trigger_portal_cleanser']
-                    ):
-                for side in ent.sides():
-                    yield side.mat.casefold()
-
-            for overlay in VMF.by_class['info_overlay']:
-                # Check overlays too
-                yield overlay['material', ''].casefold()
-
-        for mat in face_iter():
-            if mat in pack_triggers:
-                TO_PACK.update(pack_triggers[mat])
-                del pack_triggers[mat]
-                if not pack_triggers:
-                    break  # No more left
-
-    if not TO_PACK and not PACK_FILES:
-        # Nothing to pack - wipe the packfile!
-        open(map_path[:-4] + '.filelist.txt', 'w').close()
-
-    LOGGER.info('Making Pack list...')
-
-    with open('bee2/pack_list.cfg') as f:
-        props = Property.parse(
-            f,
-            'bee2/pack_list.cfg'
-        ).find_key('PackList', [])
-
-    for pack_id in TO_PACK:
-        try:
-            files = props[pack_id]
-        except IndexError:
-            LOGGER.warning('Packlist "{}" does not exist!', pack_id.upper())
-            continue
-
-        PACK_FILES.update(
-            prop.value
-            for prop in
-            files
-        )
-
-    with open(map_path[:-4] + '.filelist.txt', 'w') as f:
-        for file in sorted(PACK_FILES):
-            f.write(file + '\n')
-            LOGGER.info('"{}"', file)
-        for dest, file in sorted(PACK_RENAME.items()):
-            f.write('{}\t{}\n'.format(file, dest))
-            LOGGER.info('"{}" as "{}"', file, dest)
-
-    LOGGER.info('Packlist written!')
 
 
 def make_vrad_config(is_peti: bool):
@@ -3282,8 +3184,6 @@ def main() -> None:
         change_func_brush()
         barriers.make_barriers(VMF, get_tex)
         fix_worldspawn()
-
-        make_packlist(path)
 
         save(new_path)
         run_vbsp(
