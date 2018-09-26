@@ -3161,8 +3161,8 @@ def main() -> None:
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
-        barriers.parse_map(VMF, settings['has_attr'], TO_PACK)
         fizzler.parse_map(VMF, settings['has_attr'])
+        barriers.parse_map(VMF, settings['has_attr'])
 
         conditions.init(
             seed=MAP_RAND_SEED,

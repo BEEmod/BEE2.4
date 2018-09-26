@@ -7,6 +7,7 @@ import comp_consts as consts
 import srctools.logger
 import template_brush
 import vbsp_options
+import packing
 from conditions import make_result
 from grid_optim import optimise as grid_optimise
 from instanceLocs import resolve_one
@@ -42,7 +43,7 @@ def get_pos_norm(origin: Vec):
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
-def parse_map(vmf: VMF, has_attr: Dict[str, bool], pack_list: Set[str]):
+def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
     """Remove instances from the map, and store off the positions."""
     glass_inst = resolve_one('[glass_128]')
 
@@ -77,7 +78,7 @@ def parse_map(vmf: VMF, has_attr: Dict[str, bool], pack_list: Set[str]):
             inst.remove()
 
     if vbsp_options.get(str, 'glass_pack') and has_attr['glass']:
-        pack_list.add(vbsp_options.get(str, 'glass_pack').casefold())
+        packing.pack_list(vmf, vbsp_options.get(str, 'glass_pack'))
 
 
 def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
