@@ -579,9 +579,7 @@ def load_packages(data):
                ' present in the map. The additional "Multiverse" Cave lines'
                ' are controlled separately in Style Properties.'),
         has_none=True,
-        none_name=_('Random'),
-        none_icon='BEE2/random.png',
-        none_desc=_('Add no extra voice lines.'),
+        none_desc=_('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
             'CHAR': [_('<Multiverse Cave only>')],
         },
