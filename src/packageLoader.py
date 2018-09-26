@@ -1729,7 +1729,7 @@ class Item(PakObject):
                     item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
         return (
             new_editor,
-            item_data.editor_extra,
+            item_data.editor_extra.copy(),
             # Add all_conf first so it's conditions run first by default
             self.all_conf + item_data.vbsp_config,
         )
