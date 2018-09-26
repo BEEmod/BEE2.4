@@ -936,7 +936,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         fizz_item.timer = relay_item.timer
         # Transfer over antlines.
         fizz_item.antlines |= relay_item.antlines
-        fizz_item.shape_signs |= relay_item.shape_signs
+        fizz_item.shape_signs += relay_item.shape_signs
         fizz_item.ind_panels |= relay_item.ind_panels
 
         # Remove the relay item so it doesn't get added to the map.
