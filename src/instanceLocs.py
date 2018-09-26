@@ -220,6 +220,16 @@ def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
 
+    # Extra definitions: key -> filename.
+    # Make sure to do this first, so numbered instances are set in
+    # ITEM_FOR_FILE.
+    for prop in prop_block.find_key('CustInstances', []):
+        CUST_INST_FILES[prop.name] = special_inst = {}
+        for inst in prop:
+            file = inst.value.casefold()
+            special_inst[inst.name] = file
+            ITEM_FOR_FILE[file] = (prop.name, inst.name)
+
     # Normal instances: index -> filename
     for prop in prop_block.find_key('Allinstances', []):
         INSTANCE_FILES[prop.name] = inst_list = []
@@ -227,14 +237,6 @@ def load_conf(prop_block: Property):
             file = inst.value.casefold()
             inst_list.append(file)
             ITEM_FOR_FILE[file] = (prop.name, ind)
-
-    # Extra definitions: key -> filename
-    for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.name] = special_inst = {}
-        for inst in prop:
-            file = inst.value.casefold()
-            special_inst[inst.name] = file
-            ITEM_FOR_FILE[file] = (prop.name, inst.name)
 
     INST_SPECIAL = {
         key.casefold(): resolve(val_string, silent=True)
