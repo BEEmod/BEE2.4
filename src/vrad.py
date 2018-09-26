@@ -483,73 +483,6 @@ def inject_files() -> Iterator[Tuple[str, str]]:
             yield filename, prop.value
 
 
-def pack_content(packlist: PackList, path: str, is_peti: bool):
-    """Pack any custom content into the map.
-
-    Filelist format: "[control char]filename[\t packname]"
-    Filename is the name of the actual file. If given packname is the
-    name to save it into the packfile as. If the first character of the
-    filename is '#', the file will be added to the soundscript manifest too.
-    """
-    rem_soundscripts = set()  # Soundscripts to exclude, so we can override the sounds.
-
-    try:
-        pack_list = open(path[:-4] + '.filelist.txt')
-    except (IOError, FileNotFoundError):
-        pass  # Assume no files if missing..
-        # There might still be things to inject.
-    else:
-        with pack_list:
-            for line in pack_list:
-                line = line.strip().lower()
-                if not line or line.startswith('//'):
-                    continue  # Skip blanks or comments
-
-                if line[:8] == 'precache':
-                    LOGGER.warning('Precache command in file: "{}"', line[8:])
-
-                elif line.endswith('*'):
-                    LOGGER.warning('* command: "{}"', line)
-
-                elif line[:2] == '-#':
-                    rem_soundscripts.add(line[2:])
-
-                elif line[:1] == '#':
-                    try:
-                        file = packlist.fsys[line[1:]]
-                    except FileNotFoundError:
-                        LOGGER.warning('No soundscript "{}"!', line[1:])
-                    else:
-                        packlist.load_soundscript(file, always_include=True)
-                        packlist.pack_file(line[1:])
-                        LOGGER.info('- ' + line[1:])
-                else:
-                    packlist.pack_file(line)
-                    LOGGER.info('- ' + line)
-
-    # Only generate a soundscript for PeTI maps..
-    if is_peti:
-        music_data = CONF.find_key('MusicScript', [])
-        if music_data:
-            packlist.pack_file(
-                'scripts/BEE2_generated_music.txt',
-                PackType.SOUNDSCRIPT,
-                data=generate_music_script(music_data, packlist)
-            )
-
-    # We still generate these in hammer-mode - it's still useful there.
-    for soundscript in rem_soundscripts:
-        # Prevent these from being added to the manifest.
-        packlist.soundscript_files[soundscript] = False
-
-    inject_names = list(inject_files())
-
-    for filename, arcname in inject_names:
-        LOGGER.info('Injecting "{}" into packfile.', arcname)
-        with open(filename, 'rb') as f:
-            packlist.pack_file(arcname, data=f.read())
-
-
 def find_screenshots() -> Iterator[str]:
     """Find candidate screenshots to overwrite."""
     # Inside SCREENSHOT_DIR, there should be 1 folder with a
@@ -831,8 +764,20 @@ def main(argv: List[str]) -> None:
         if soundscript.path.endswith('.txt'):
             packlist.load_soundscript(soundscript, always_include=False)
 
-    LOGGER.info('Adding known packed files:')
-    pack_content(packlist, path, is_peti)
+    if is_peti:
+        LOGGER.info('Adding special packed files:')
+        music_data = CONF.find_key('MusicScript', [])
+        if music_data:
+            packlist.pack_file(
+                'scripts/BEE2_generated_music.txt',
+                PackType.SOUNDSCRIPT,
+                data=generate_music_script(music_data, packlist)
+            )
+
+        for filename, arcname in inject_files():
+            LOGGER.info('Injecting "{}" into packfile.', arcname)
+            with open(filename, 'rb') as f:
+                packlist.pack_file(arcname, data=f.read())
 
     LOGGER.info('Run transformations...')
     run_transformations(bsp_ents, fsys, packlist)
