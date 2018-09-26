@@ -2877,21 +2877,23 @@ class Elevator(PakObject):
 
 class PackList(PakObject, allow_mult=True, has_img=False):
     """Specifies a group of resources which can be packed together."""
-    def __init__(self, pak_id, files, mats):
+    def __init__(self, pak_id, files) -> None:
         self.id = pak_id
         self.files = files
-        self.trigger_mats = mats
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Read pack lists from packages."""
         filesystem = data.fsys  # type: FileSystem
         conf = data.info.find_key('Config', '')
-        mats = [
-            prop.value
-            for prop in
-            data.info.find_all('AddIfMat')
-        ]
+
+        if 'AddIfMat' in data.info:
+            LOGGER.warning(
+                '{}:{}: AddIfMat is no '
+                'longer used.',
+                data.pak_id,
+                data.id,
+            )
 
         files = []
 
@@ -2912,10 +2914,9 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                     if line:
                         files.append(line)
 
-        # We know that if it's a material, it must be packing the VMT at the
-        # very least.
-        for mat in mats:
-            files.append('materials/' + mat + '.vmt')
+        # Deprecated old option.
+        for prop in data.info.find_all('AddIfMat'):
+            files.append('materials/' + prop.value + '.vmt')
 
         if not files:
             raise ValueError('"{}" has no files to pack!'.format(data.id))
@@ -2944,31 +2945,20 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                         pak_id=data.pak_id,
                     )
 
-        return cls(
-            data.id,
-            files,
-            mats,
-        )
+        return cls(data.id, files)
 
-    def add_over(self, override):
+    def add_over(self, override: 'PackList') -> None:
         """Override items just append to the list of files."""
         # Don't copy over if it's already present
         for item in override.files:
             if item not in self.files:
                 self.files.append(item)
 
-        for item in override.trigger_mats:
-            if item not in self.trigger_mats:
-                self.trigger_mats.append(item)
-
     @staticmethod
     def export(exp_data: ExportData):
         """Export all the packlists."""
 
         pack_block = Property('PackList', [])
-
-        # A list of materials which will casue a specific packlist to be used.
-        pack_triggers = Property('PackTriggers', [])
 
         for pack in PackList.all():  # type: PackList
             # Build a
@@ -2987,18 +2977,6 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                 pack.id,
                 files,
             ))
-
-            for trigger_mat in pack.trigger_mats:
-                pack_triggers.append(
-                    Property('Material', [
-                        Property('Texture', trigger_mat),
-                        Property('PackList', pack.id),
-                    ])
-                )
-
-        # Only add packtriggers if there's actually a value
-        if pack_triggers.value:
-            exp_data.vbsp_conf.append(pack_triggers)
 
         LOGGER.info('Writing packing list!')
         with open(exp_data.game.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
