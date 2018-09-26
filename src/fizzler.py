@@ -8,6 +8,7 @@ from enum import Enum
 
 import conditions
 import connections
+import packing
 import utils
 import vbsp_options
 import srctools.logger
@@ -782,7 +783,7 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
-def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
+def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
     """Analyse fizzler instances to assign fizzler types.
 
     Instance traits are required.
@@ -957,7 +958,7 @@ def generate_fizzlers(vmf: VMF):
     After this is done, fizzler-related conditions will not function correctly.
     However the model instances are now available for modification.
     """
-    from vbsp import MAP_RAND_SEED, TO_PACK, PACK_FILES
+    from vbsp import MAP_RAND_SEED
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -974,9 +975,13 @@ def generate_fizzlers(vmf: VMF):
             and fizz.base_inst.fixup.bool('$start_enabled', 1)
         )
 
-        if is_static:
-            TO_PACK |= fizz.fizz_type.pack_lists_static
-        TO_PACK |= fizz.fizz_type.pack_lists
+        pack_list = (
+            fizz.fizz_type.pack_lists_static
+            if is_static else
+            fizz.fizz_type.pack_lists
+        )
+        for pack in pack_list:
+            packing.pack_list(vmf, pack)
 
         if fizz_type.inst[FizzInst.BASE, is_static]:
             random.seed('{}_fizz_base_{}'.format(MAP_RAND_SEED, fizz_name))
@@ -1210,11 +1215,11 @@ def generate_fizzlers(vmf: VMF):
                         trigger_hurt_name = brush_ent['targetname']
 
                     if brush_type.set_axis_var:
-                        axis_script = 'BEE2/fizzler_axis_{}.nut'.format(fizz.normal().axis())
-                        scripts = brush_ent['vscripts'].split()
-                        scripts.insert(0, axis_script)
-                        brush_ent['vscripts'] = ' '.join(scripts)
-                        PACK_FILES.add('scripts/vscripts/' + axis_script)
+                        brush_ent['vscript_init_code'] = (
+                            'axis <- `{}`;'.format(
+                                fizz.normal().axis(),
+                            )
+                        )
 
                     for out in brush_type.outputs:
                         new_out = out.copy()
