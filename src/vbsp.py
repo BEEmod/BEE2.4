@@ -187,9 +187,6 @@ IGNORED_BRUSH_ENTS = set()
 
 GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
 
-TO_PACK = set()  # The packlists we want to pack.
-PACK_FILES = set()  # Raw files we force pack
-PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
@@ -2275,7 +2272,7 @@ def change_overlays():
                     file=sign_inst,
                 )
                 if sign_inst_pack:
-                    TO_PACK.add(sign_inst_pack.casefold())
+                    packing.pack_list(VMF, sign_inst_pack)
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
             # Delete the overlay's targetname - signs aren't ever dynamic
             # This also means items set to signage only won't get toggle
@@ -2634,10 +2631,10 @@ def change_func_brush():
                 # overlay instance!
 
     if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
-        TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
+        packing.pack_list(VMF, vbsp_options.get(str, 'grating_pack'))
 
 
-def alter_flip_panel():
+def alter_flip_panel() -> None:
     flip_panel_start = vbsp_options.get(str, 'flip_sound_start')
     flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop')
     if flip_panel_start is not None or flip_panel_stop is not None:
@@ -2849,9 +2846,8 @@ def make_vrad_config(is_peti: bool):
         import cubes
         import conditions.piston_platform
 
-        # These generate scripts, so they might need to tell VRAD.
+        # This generates scripts and might need to tell VRAD.
         cubes.write_vscripts(conf)
-        conditions.piston_platform.write_vscripts(conf)
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():

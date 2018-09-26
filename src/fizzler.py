@@ -531,11 +531,6 @@ class FizzlerBrush:
         )
         used_tex_func(side.mat)
 
-        # Pack the file.
-        vbsp.PACK_FILES.add('materials/{}.vmt'.format(side.mat))
-        # Pack the auxiliary texture needed.
-        vbsp.PACK_FILES.add('materials/BEE2/fizz/fizz_side.vtf')
-
         # FLip orientation if needed.
         if not side.uaxis.vec().dot(normal):
             side.vaxis, side.uaxis = side.uaxis, side.vaxis

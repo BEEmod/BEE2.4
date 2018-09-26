@@ -287,7 +287,7 @@ def mon_camera_link():
         fogColor=fog_opt['primary'],
         fogStart=fog_opt['start'],
         fogEnd=fog_opt['end'],
-    )
+    )  # type: Entity
 
     if not ALL_CAMERAS:
         # No cameras in the map - we don't move at all.
@@ -297,8 +297,6 @@ def mon_camera_link():
     # Set the vscripts
     cam['vscripts'] = 'BEE2/mon_camera_args.nut BEE2/mon_camera.nut'
     cam['thinkfunction'] = 'Think'
-
-    vbsp.PACK_FILES.add('scripts/vscripts/BEE2/mon_camera.nut')
 
     # Write out a script containing the arguments to the camera.
     with open(MON_ARGS_SCRIPT, 'w') as scr:

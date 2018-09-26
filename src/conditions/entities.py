@@ -253,8 +253,6 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
     if min(pos1.z, pos2.z) > water_pos.z + 8:
         return
 
-    import vbsp
-
     # Pass along the water_pos encoded into the targetname.
     # Restrict the number of characters to allow direct slicing
     # in the script.
@@ -273,8 +271,6 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
         thinkfunction='Think',
         spawnflags='1',  # Trace downward to water surface.
     )
-
-    vbsp.PACK_FILES.add('scripts/vscripts/BEE2/water_splash.nut')
 
 
 @make_result('FunnelLight')
