@@ -31,6 +31,8 @@ def pack_list(
     file_type: str='generic',
 ) -> None:
     """Pack the given packing list."""
+    if not packlist_name:
+        return
     try:
         packlist = PACKLISTS[packlist_name.casefold()]
     except KeyError:
@@ -48,7 +50,7 @@ def pack_files(
 
     packlist = set(files) - _PACKED_FILES
 
-    if not files:
+    if not packlist:
         return
 
     ent = vmf.create_ent(
