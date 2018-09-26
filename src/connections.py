@@ -70,7 +70,11 @@ class ConnType(Enum):
 CONN_TYPE_NAMES = {
     'none': ConnType.DEFAULT,
     'a': ConnType.PRIMARY,
+    'prim': ConnType.PRIMARY,
+
     'b': ConnType.SECONDARY,
+    'sec': ConnType.SECONDARY,
+
     'ab': ConnType.BOTH,
     'a+b': ConnType.BOTH,
 }  # type: Dict[str, ConnType]
@@ -351,11 +355,17 @@ class ItemType:
 
             try:
                 default_dual = CONN_TYPE_NAMES[
-                    conf['DefaultDual', 'default'].casefold()
+                    conf['Default_Dual', 'primary'].casefold()
                 ]
             except KeyError:
                 raise ValueError('Invalid default type for "{}": {}'.format(
-                    item_id, conf['DefaultDual'],
+                    item_id, conf['Default_Dual'],
+                )) from None
+
+            # We need an affinity to use when nothing else specifies it.
+            if default_dual is ConnType.DEFAULT:
+                raise ValueError('Must specify a default type for "{}"!'.format(
+                    item_id,
                 )) from None
 
             sec_invert_var = conf['sec_invertVar', '0']
