@@ -73,18 +73,3 @@ def pack_file_cond(vmf: VMF, res: Property):
     pack_files(vmf, res.value)
     return conditions.RES_EXHAUSTED
 
-
-@conditions.make_result('PackRename')
-def packlist_cond_rename(vmf: VMF, res: Property):
-    """Add a file to the packlist, saved under a new name."""
-    # Don't do duplicate checks, these are rare enough that it shouldn't
-    # be a problem. Srctools can handle that correctly in all cases.
-    vmf.create_ent(
-        classname='comp_pack_rename',
-        filesrc=res['file'],
-        filedest=res['dest'],
-        filetype=res['type', 'generic'].casefold(),
-    )
-
-    return conditions.RES_EXHAUSTED
-
