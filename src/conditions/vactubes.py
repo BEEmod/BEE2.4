@@ -156,10 +156,9 @@ def res_vactube_setup(res: Property):
 
 @make_result('CustVactube')
 def res_make_vactubes(res: Property):
-    """Speciallised result to generate vactubes from markers.
+    """Specialised result to generate vactubes from markers.
 
     Only runs once, and then quits the condition list.
-    Instances:
     """
     if res.value not in VAC_CONFIGS:
         # We've already executed this config group

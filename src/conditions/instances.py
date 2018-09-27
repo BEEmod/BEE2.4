@@ -262,7 +262,7 @@ def res_replace_instance(inst: Entity, res: Property):
     `keys` and `localkeys` defines the new keyvalues used.
     `targetname` and `angles` are preset, and `origin` will be used to offset
     the given amount from the current location.
-    If keep_instance` is true, the instance entity will be kept instead of
+    If `keep_instance` is true, the instance entity will be kept instead of
     removed.
     """
     import vbsp

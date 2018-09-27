@@ -23,15 +23,15 @@ def res_add_global_inst(res: Property):
     """Add one instance in a specific location.
 
     Options:
-        allow_multiple: Allow multiple copies of this instance. If 0, the
+        `allow_multiple`: Allow multiple copies of this instance. If 0, the
             instance will not be added if it was already added.
-        name: The targetname of the instance. IF blank, the instance will
-              be given a name of the form 'inst_1234'.
-        file: The filename for the instance.
-        Angles: The orientation of the instance (defaults to '0 0 0').
-        Fixup_style: The Fixup style for the instance. '0' (default) is
-            Prefix, '1' is Suffix, and '2' is None.
-        Position: The location of the instance. If not set, it will be placed
+        `name`: The targetname of the instance. If blank, the instance will
+              be given a name of the form `inst_1234`.
+        `file`: The filename for the instance.
+        `angles`: The orientation of the instance (defaults to `0 0 0`).
+        `fixup_style`: The Fixup style for the instance. `0` (default) is
+            Prefix, `1` is Suffix, and `2` is None.
+        `position`: The location of the instance. If not set, it will be placed
             in a 128x128 nodraw room somewhere in the map. Objects which can
             interact with nearby object should not be placed there.
     """
@@ -67,21 +67,21 @@ def res_add_overlay_inst(inst: Entity, res: Property):
 
     If a single value, this sets only the filename.
     Values:
-        File: The filename.
-        Fixup Style: The Fixup style for the instance. '0' (default) is
+        `file`: The filename.
+        `fixup_style`: The Fixup style for the instance. '0' (default) is
             Prefix, '1' is Suffix, and '2' is None.
-        Copy_Fixup: If true, all the $replace values from the original
+        `copy_fixup`: If true, all the $replace values from the original
             instance will be copied over.
-        move_outputs: If true, outputs will be moved to this instance.
-        offset: The offset (relative to the base) that the instance
+        `move_outputs`: If true, outputs will be moved to this instance.
+        `offset`: The offset (relative to the base) that the instance
             will be placed. Can be set to '<piston_top>' and
             '<piston_bottom>' to offset based on the configuration.
             '<piston_start>' will set it to the starting position, and
             '<piston_end>' will set it to the ending position.
             of piston platform handles.
-        angles: If set, overrides the base instance angles. This does
+        `angles`: If set, overrides the base instance angles. This does
             not affect the offset property.
-        fixup/localfixup: Keyvalues in this block will be copied to the
+        `fixup`/`localfixup`: Keyvalues in this block will be copied to the
             overlay entity.
             If the value starts with $, the variable will be copied over.
             If this is present, copy_fixup will be disabled.

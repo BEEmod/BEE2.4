@@ -1421,17 +1421,16 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
         vmf.add_ent(grate_ent)
 
 
-
 @make_result('GooDebris')
 def res_goo_debris(res: Property):
     """Add random instances to goo squares.
 
     Options:
         - file: The filename for the instance. The variant files should be
-            suffixed with '_1.vmf', '_2.vmf', etc.
+            suffixed with `_1.vmf`, `_2.vmf`, etc.
         - space: the number of border squares which must be filled with goo
                  for a square to be eligible - defaults to 1.
-        - weight, number: see the 'Variant' result, a set of weights for the
+        - weight, number: see the `Variant` result, a set of weights for the
                 options
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.

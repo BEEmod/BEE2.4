@@ -137,17 +137,17 @@ def res_add_variant_setup(res: Property):
 def res_add_variant(inst: Entity, res: Property):
     """This allows using a random instance from a weighted group.
 
-    A suffix will be added in the form "_var4".
+    A suffix will be added in the form `_var4`.
     Two properties should be given:
         Number: The number of random instances.
         Weights: A comma-separated list of weights for each instance.
     Any variant has a chance of weight/sum(weights) of being chosen:
-    A weight of "2, 1, 1" means the first instance has a 2/4 chance of
+    A weight of `2, 1, 1` means the first instance has a 2/4 chance of
     being chosen, and the other 2 have a 1/4 chance of being chosen.  
     The chosen variant depends on the position, direction and name of
     the instance.
 
-    Alternatively, you can use "variant" "number" to choose from equally-weighted
+    Alternatively, you can use `"variant" "number"` to choose from equally-weighted
     options.
     """
     import vbsp
