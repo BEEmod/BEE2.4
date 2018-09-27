@@ -1,4 +1,5 @@
 import inspect
+import io
 import itertools
 import math
 import random
@@ -626,20 +627,17 @@ def build_itemclass_dict(prop_block: Property):
         CLASS_FOR_ITEM[prop.name] = it_class
 
 
-DOC_HEADER = '''\
-<!-- Don't edit. This is generated from text in the compiler code. -->
+DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
-# Conditions List
+DOC_META_COND = '''
 
-This is a list of all condition flags and results in the current release.
-'''
-
-DOC_META_COND = '''\
 ### Meta-Conditions
 
 Metaconditions are conditions run automatically by the compiler. These exist
 so package conditions can choose a priority to run before or after these 
 operations.
+
+
 '''
 
 DOC_SPECIAL_GROUP = '''\
@@ -647,6 +645,7 @@ DOC_SPECIAL_GROUP = '''\
 
 These are used to implement complex items which need their own code.
 They have limited utility otherwise.
+
 '''
 
 
@@ -655,9 +654,20 @@ def dump_conditions(file: TextIO) -> None:
 
     LOGGER.info('Dumping conditions...')
 
-    print(DOC_HEADER, file=file)
+    # Delete existing data, after the marker.
+    file.seek(0, io.SEEK_SET)
 
-    print('#\n', file=file)
+    for line in file:
+        if DOC_MARKER in line:
+            file.truncate()
+            break
+    else:
+        # No marker, blank the whole thing.
+        LOGGER.warning('No intro text before marker!')
+        file.truncate(0)
+        file.write(DOC_MARKER + '\n\n')
+
+    print(DOC_META_COND, file=file)
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
@@ -696,7 +706,7 @@ def dump_conditions(file: TextIO) -> None:
 
             if header_ind:
                 # Not before the first one...
-                print('\n---------\n', file=file)
+                print('---------\n', file=file)
 
             if group == '00special':
                 print(DOC_SPECIAL_GROUP, file=file)
@@ -1084,7 +1094,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             for new_face in brush.sides:
                 # The SKIP brush is the surface, all the others are nodraw.
                 if new_face.mat.casefold() != 'tools/toolsskip':
-                    continue
+                     continue
 
                 # Overwrite all the properties, to make the new brush
                 # the same as the original.

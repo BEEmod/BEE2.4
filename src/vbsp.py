@@ -3048,7 +3048,7 @@ def main() -> None:
         LOGGER.info('Writing Wiki text...')
         with open(os.environ['BEE2_WIKI_OPT_LOC'], 'w') as f:
             vbsp_options.dump_info(f)
-        with open(os.environ['BEE2_WIKI_COND_LOC'], 'w') as f:
+        with open(os.environ['BEE2_WIKI_COND_LOC'], 'a+') as f:
             conditions.dump_conditions(f)
         LOGGER.info('Done. Exiting now!')
         sys.exit()
