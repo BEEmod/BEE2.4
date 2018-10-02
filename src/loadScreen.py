@@ -57,14 +57,12 @@ def surpress_screens():
         if not screen.active:
             continue
         screen.suppress()
-        screen.active = False
         active.append(screen)
 
     yield
 
     for screen in active:
         screen.unsuppress()
-        screen.active = True
 
 
 def patch_tk_dialogs():
@@ -157,25 +155,30 @@ class LoadScreen:
 
     def show(self):
         """Display the loading screen."""
+        self.active = True
         self._send_msg('show')
 
     def reset(self):
         """Hide the loading screen and reset all the progress bars."""
+        self.active = False
         self._send_msg('reset')
 
     def destroy(self):
         """Permanently destroy this screen and cleanup."""
+        self.active = False
         self._send_msg('destroy')
         _ALL_SCREENS.remove(self)
 
     @abstractmethod
     def suppress(self):
         """Temporarily hide the screen."""
+        self.active = False
         self._send_msg('hide')
 
     @abstractmethod
     def unsuppress(self):
         """Undo temporarily hiding the screen."""
+        self.active = True
         self._send_msg('show')
 
 
