@@ -32,7 +32,9 @@ LVL_TEXT = {
     logging.WARNING: _('Warnings Only'),
 }
 
-window = None  # type: tk.Toplevel
+window = tk.Toplevel(TK_ROOT)
+window.wm_withdraw()
+
 log_handler = None  # type: TextHandler
 text_box = None  # type: tk.Text
 level_selector = None  # type: ttk.Combobox
@@ -151,10 +153,8 @@ def set_level(event):
 
 def init(start_open: bool, log_level: str='info') -> None:
     """Initialise the window."""
-    global window, log_handler, text_box, level_selector
+    global log_handler, text_box, level_selector
 
-    window = tk.Toplevel(TK_ROOT, name='console_win')
-    window.withdraw()
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     window.title(_('Logs - {}').format(utils.BEE_VERSION))
