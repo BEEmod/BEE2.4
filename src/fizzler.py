@@ -106,10 +106,19 @@ def read_configs(conf: Property):
         for brush in fizz.brushes:
             if brush.keys['classname'].casefold() == 'trigger_portal_cleanser':
                 brush_name = brush.name
-                break
+                # Retrieve what key is used for start-disabled.
+                brush_start_disabled = None
+                for key_map in [brush.keys, brush.local_keys]:
+                    if brush_start_disabled is None:
+                        for key, value in key_map.items():
+                            if key.casefold() == 'startdisabled':
+                                brush_start_disabled = value
+                                break
+                break  # Jump past else.
         else:
             # No fizzlers in this item.
             continue
+
         # Add a paint fizzler brush to these fizzlers.
         fizz.brushes.append(FizzlerBrush(
             brush_name,
@@ -118,7 +127,7 @@ def read_configs(conf: Property):
             },
             keys={
                 'classname': 'trigger_paint_cleanser',
-                'startdisabled': '0',
+                'startdisabled': brush_start_disabled or '0',
                 'spawnflags': '9',
             },
             local_keys={},
@@ -127,7 +136,7 @@ def read_configs(conf: Property):
         ))
 
 
-def _calc_fizz_angles():
+def _calc_fizz_angles() -> None:
     """Generate FIZZ_ANGLES."""
     it = itertools.product('xyz', (-1, 1), 'xyz', (-1, 1))
     for norm_axis, norm_mag, roll_axis, roll_mag in it:

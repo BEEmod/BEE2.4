@@ -11,9 +11,10 @@ import vbsp
 from conditions import (
     meta_cond, make_result,
     PETI_INST_ANGLE, RES_EXHAUSTED,
-    local_name
+    local_name,
+    make_result_setup,
 )
-from connections import ITEMS, Item
+from connections import ITEMS, Item, ItemType
 from fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 from srctools import Vec, Property, VMF, Entity, Output
 
@@ -164,13 +165,46 @@ def calc_fizzler_orient(fizzler: Fizzler):
         )
 
 
+@make_result_setup('TagFizzler')
+def res_make_tag_fizzler_setup(res: Property):
+    """We need this to pre-parse the fizzler type."""
+    if 'ioconf' in res:
+        fizz_type = ItemType.parse('<TAG_FIZZER>', res.find_key('ioconf'))
+    else:
+        fizz_type = None
+
+    # The distance from origin the double signs are seperated by.
+    sign_offset = res.int('signoffset', 16)
+
+    return (
+        sign_offset,
+        fizz_type,
+        res['frame_double'],
+        res['frame_single'],
+        res['blue_sign', ''],
+        res['blue_off_sign', ''],
+        res['oran_sign', ''],
+        res['oran_off_sign', ''],
+    )
+
+
 @make_result('TagFizzler')
 def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
-    MUST be priority -100 so it runs before fizzlers!
+    This must be before -250 so it runs before fizzlers and connections.
     """
+    (
+        sign_offset,
+        fizz_io_type,
+        inst_frame_double,
+        inst_frame_single,
+        blue_sign_on,
+        blue_sign_off,
+        oran_sign_on,
+        oran_sign_off,
+    ) = res.value  # type: int, ItemType, str, str, str, str, str, str
     import vbsp
     if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
@@ -178,7 +212,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         return
 
     fizzler = None
-    fizzler_item = None  # type: Item
+    fizzler_item = None
 
     # Look for the fizzler instance we want to replace.
     sign_item = ITEMS[inst['targetname']]
@@ -207,8 +241,12 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # Swap to the special Tag Fizzler type.
     fizzler.fizz_type = FIZZ_TYPES[TAG_FIZZ_ID]
 
-    # The distance from origin the double signs are seperated by.
-    sign_offset = res.int('signoffset', 16)
+    # And also swap the connection's type.
+    fizzler_item.item_type = fizz_io_type
+    fizzler_item.enable_cmd = fizz_io_type.enable_cmd
+    fizzler_item.disable_cmd = fizz_io_type.disable_cmd
+    fizzler_item.sec_enable_cmd = fizz_io_type.sec_enable_cmd
+    fizzler_item.sec_disable_cmd = fizz_io_type.sec_disable_cmd
 
     sign_loc = (
         # The actual location of the sign - on the wall
@@ -241,7 +279,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     loc = Vec.from_str(inst['origin'])
 
     if disable_other or (blue_enabled and oran_enabled):
-        inst['file'] = res['frame_double']
+        inst['file'] = inst_frame_double
         # On a wall, and pointing vertically
         if inst_normal.z == 0 and Vec(y=1).rotate(*inst_angle).z:
             # They're vertical, make sure blue's on top!
@@ -257,7 +295,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
             blue_loc = loc + offset
             oran_loc = loc - offset
     else:
-        inst['file'] = res['frame_single']
+        inst['file'] = inst_frame_single
         # They're always centered
         blue_loc = loc
         oran_loc = loc
@@ -318,13 +356,13 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
 
     # If disable_other, we show off signs. Otherwise we don't use that sign.
-    blue_sign = 'blue_sign' if blue_enabled else 'blue_off_sign' if disable_other else None
-    oran_sign = 'oran_sign' if oran_enabled else 'oran_off_sign' if disable_other else None
+    blue_sign = blue_sign_on if blue_enabled else blue_sign_off if disable_other else None
+    oran_sign = oran_sign_on if oran_enabled else oran_sign_off if disable_other else None
 
     if blue_sign:
         vmf.create_ent(
             classname='func_instance',
-            file=res[blue_sign, ''],
+            file=blue_sign,
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=blue_loc.join(' '),
@@ -333,7 +371,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     if oran_sign:
         vmf.create_ent(
             classname='func_instance',
-            file=res[oran_sign, ''],
+            file=oran_sign,
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=oran_loc.join(' '),
@@ -345,7 +383,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # zero
     fizzler.base_inst.fixup['$connectioncount'] = str(max(
         0,
-        srctools.conv_int(fizzler.base_inst.fixup['$connectioncount', ''], 0) - 1
+        srctools.conv_int(fizzler.base_inst.fixup['$connectioncount', '']) - 1
     ))
 
     # Find the direction the fizzler normal is.
@@ -400,6 +438,10 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
 
     pos_trig['targetname'] = local_name(fizzler.base_inst, 'trig_pos')
     neg_trig['targetname'] = local_name(fizzler.base_inst, 'trig_neg')
+
+    pos_trig['startdisabled'] = neg_trig['startdisabled'] = (
+        not fizzler.base_inst.fixup.bool('start_enabled')
+    )
 
     pos_trig.outputs = [
         Output(output, neg_trig, 'Enable'),
