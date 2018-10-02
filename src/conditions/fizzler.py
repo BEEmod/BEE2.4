@@ -70,7 +70,6 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         # We create the fizzler instance, Fizzler object, and Item object
         # matching it.
         # This is hardcoded to use regular Emancipation Fields.
-        conn = None
         base_inst = vmf.create_ent(
             targetname=shape_name,
             classname='func_instance',
@@ -87,6 +86,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         fizz_item = connections.Item(
             base_inst,
             connections.ITEM_TYPES['item_barrier_hazard'],
+            shape_item.ant_floor_style,
+            shape_item.ant_wall_style,
         )
         connections.ITEMS[shape_name] = fizz_item
 

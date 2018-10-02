@@ -86,7 +86,8 @@ class FizzInst(Enum):
 MatModify = namedtuple('MatModify', 'name mat_var')
 FizzBeam = namedtuple('FizzBeam', 'offset keys speed_min speed_max')
 
-def read_configs(conf: Property):
+
+def read_configs(conf: Property) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
         fizz = FizzlerType.parse(fizz_conf)
@@ -336,7 +337,7 @@ class Fizzler:
         up_axis: Vec,
         base_inst: Entity,
         emitters: List[Tuple[Vec, Vec]]
-    ):
+    ) -> None:
         self.fizz_type = fizz_type
         self.base_inst = base_inst
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
@@ -354,7 +355,7 @@ class Fizzler:
         """The axis moving in and out of the surface."""
         return abs(self.up_axis.cross(self.forward()))
 
-    def gen_flinch_trigs(self, vmf: VMF, name: str):
+    def gen_flinch_trigs(self, vmf: VMF, name: str) -> None:
         """For deadly fizzlers optionally make them safer.
 
         This adds logic to force players
@@ -436,7 +437,7 @@ class FizzlerBrush:
         set_axis_var: bool=False,
         mat_mod_name: str=None,
         mat_mod_var: str=None,
-    ):
+    ) -> None:
         self.keys = keys
         self.local_keys = local_keys
         self.name = name  # Local name of the fizzler brush.
@@ -472,7 +473,7 @@ class FizzlerBrush:
             self.textures[group] = textures.get(group, None)
 
     @classmethod
-    def parse(cls, conf: Property):
+    def parse(cls, conf: Property) -> 'FizzlerBrush':
         """Parse from a config file."""
         if 'side_color' in conf:
             side_color = conf.vec('side_color')
@@ -523,14 +524,21 @@ class FizzlerBrush:
             set_axis_var=conf.bool('set_axis_var'),
         )
 
-    def _side_color(self, side: Side, normal: Vec, min_pos: Vec, used_tex_func):
-        """Output the side texture for fields."""
+    def _side_color(
+        self,
+        side: Side,
+        normal: Vec,
+        min_pos: Vec,
+        used_tex_func: Callable[[str], None],
+    ) -> None:
+        """Output the side texture for fields.
+
+        used_tex_func is called with each material we use.
+        """
         if not self.side_color:
             # Just apply nodraw.
             side.mat = const.Tools.NODRAW
             return
-
-        import vbsp
 
         # Produce a hex colour string, and use that as the material name.
         side.mat = 'BEE2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
@@ -759,7 +767,7 @@ class FizzlerBrush:
         neg: Vec,
         pos: Vec,
         is_laserfield=False,
-    ):
+    ) -> None:
         """Calculate the texture offsets required for fitting a texture."""
         if side.vaxis.vec() != -fizz.up_axis:
             # Rotate it
