@@ -1,9 +1,9 @@
-# coding: utf-8
 import inspect
+import io
 import itertools
 import math
 import random
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
 
@@ -11,10 +11,12 @@ from typing import (
     Callable, Any, Iterable, Optional,
     Dict, List, Tuple, NamedTuple, TypeVar,
     Union,
+    Set,
+    TextIO,
 )
 
 import comp_consts as consts
-import srctools
+import srctools.logger
 import template_brush
 import utils
 import comp_consts as const
@@ -27,11 +29,11 @@ from srctools import (
 
 COND_MOD_NAME = 'Main Conditions'
 
-LOGGER = utils.getLogger(__name__, alias='cond.core')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
-GLOBAL_INSTANCES = set()
-ALL_INST = set()
+GLOBAL_INSTANCES = set()  # type: Set[str]
+ALL_INST = set()  # type: Set[str]
 VMF = None  # type: srctools.VMF
 
 conditions = []
@@ -68,22 +70,11 @@ solidGroup = NamedTuple('solidGroup', [
 ])
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
-# The input/output connection values defined for each item.
-# Each is a tuple of (inst_name, command) values, ready to be passed to
-# VLib.Output().
-# If the command is '', no in/output is present.
-ItemConnections = namedtuple('ItemConnections', [
-    'in_act', 'in_deact', 'out_act', 'out_deact',
-])
-CONNECTIONS = {}
 
 # For each class, a list of item IDs of that type.
 ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
 # For each item Id, the item class for it.
 CLASS_FOR_ITEM = {}  # type: Dict[str, consts.ItemClass]
-
-# The special tbeam polarity input from ITEM_TBEAM. Works like above.
-TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
 
 
 xp = Vec_tuple(1, 0, 0)
@@ -173,12 +164,12 @@ class Condition:
 
     def __init__(
         self,
-        flags=None,
-        results=None,
-        else_results=None,
-        priority=Decimal('0'),
-        source=None,
-    ):
+        flags: List[Property]=None,
+        results: List[Property]=None,
+        else_results: List[Property]=None,
+        priority: Decimal=Decimal(),
+        source: str=None,
+    ) -> None:
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
@@ -199,12 +190,12 @@ class Condition:
         )
 
     @classmethod
-    def parse(cls, prop_block: Property):
+    def parse(cls, prop_block: Property) -> 'Condition':
         """Create a condition from a Property block."""
         flags = []
         results = []
         else_results = []
-        priority = Decimal('0')
+        priority = Decimal()
         source = None
         for prop in prop_block:
             if prop.name == 'result':
@@ -241,7 +232,7 @@ class Condition:
             source,
         )
 
-    def setup(self):
+    def setup(self) -> None:
         """Some results need some pre-processing before they can be used.
 
         """
@@ -252,7 +243,7 @@ class Condition:
             self.setup_result(self.else_results, res, self.source)
 
     @staticmethod
-    def setup_result(res_list, result, source=''):
+    def setup_result(res_list: List[Property], result: Property, source: str='') -> None:
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
@@ -277,7 +268,7 @@ class Condition:
                 res_list.remove(result)
 
     @staticmethod
-    def test_result(inst: Entity, res: Property):
+    def test_result(inst: Entity, res: Property) -> Union[bool, object]:
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
@@ -295,7 +286,7 @@ class Condition:
         else:
             return func(VMF, inst, res)
 
-    def test(self, inst):
+    def test(self, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance."""
         success = True
         for flag in self.flags:
@@ -309,7 +300,13 @@ class Condition:
                 results.remove(res)
 
 
-def annotation_caller(func, *parms):
+AnnCallT = TypeVar('AnnCallT')
+
+
+def annotation_caller(
+    func: Callable[..., AnnCallT],
+    *parms: type,
+) -> Callable[..., AnnCallT]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
@@ -318,7 +315,10 @@ def annotation_caller(func, *parms):
     with the parms arguments, but delegates to func. (This could be the
     function itself).
     """
-    allowed_kinds = [inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    allowed_kinds = [
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    ]
     type_to_parm = dict.fromkeys(parms, None)
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
@@ -350,7 +350,7 @@ def annotation_caller(func, *parms):
         if out_name is not None:
             outputs[parm_order[out_name]] = var_name
 
-    assert '_' not in outputs
+    assert '_' not in outputs, 'Need more variables!'
 
     if inputs == outputs:
         # Matches already, don't need to do anything.
@@ -368,8 +368,8 @@ def annotation_caller(func, *parms):
     )
 
 
-def add_meta(func, priority, only_once=True):
-    """Add a metacondtion, which executes a function at a priority level.
+def add_meta(func, priority: Union[Decimal, int], only_once=True):
+    """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
@@ -387,7 +387,7 @@ def add_meta(func, priority, only_once=True):
 
     cond = Condition(
         results=[Property(name, '')],
-        priority=priority,
+        priority=Decimal(priority),
         source='MetaCondition {}'.format(name)
     )
 
@@ -407,9 +407,9 @@ def meta_cond(priority=0, only_once=True):
     return x
 
 
-def make_flag(orig_name, *aliases):
+def make_flag(orig_name: str, *aliases: str):
     """Decorator to add flags to the lookup."""
-    def x(func: Callable[[Entity, Property], bool]):
+    def x(func):
         try:
             func.group = func.__globals__['COND_MOD_NAME']
         except KeyError:
@@ -427,9 +427,9 @@ def make_flag(orig_name, *aliases):
     return x
 
 
-def make_result(orig_name, *aliases):
+def make_result(orig_name: str, *aliases: str):
     """Decorator to add results to the lookup."""
-    def x(func: Callable[..., Any]):
+    def x(func):
         try:
             func.group = func.__globals__['COND_MOD_NAME']
         except KeyError:
@@ -447,7 +447,7 @@ def make_result(orig_name, *aliases):
     return x
 
 
-def make_result_setup(*names):
+def make_result_setup(*names: str):
     """Decorator to do setup for this result."""
     def x(func: Callable[..., Any]):
         wrapper = annotation_caller(func, srctools.VMF, Property)
@@ -464,7 +464,7 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed, inst_list, vmf_file):
+def init(seed: str, inst_list: Set[str], vmf_file: srctools.vmf.VMF) -> None:
     """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED, ALL_INST, VMF
@@ -479,7 +479,7 @@ def init(seed, inst_list, vmf_file):
     build_solid_dict()
 
 
-def check_all():
+def check_all() -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     for condition in conditions:
@@ -545,37 +545,23 @@ def check_flag(flag: Property, inst: Entity):
     return res == desired_result
 
 
-def import_conditions():
+def import_conditions() -> None:
     """Import all the components of the conditions package.
 
     This ensures everything gets registered.
     """
     import importlib
+    import pkgutil
     # Find the modules in the conditions package...
-
-    # pkgutil doesn't work when frozen, so we need to use a hardcoded list.
-    try:
-        # noinspection PyUnresolvedReferences
-        from BUILD_CONSTANTS import cond_modules
-        modules = cond_modules.split(';')
-    except ImportError:
-        import pkgutil
-        modules = [
-            module
-            for loader, module, is_package in
-            pkgutil.iter_modules(__path__)
-        ]
-
-    for module in modules:
+    for loader, module, is_package in pkgutil.iter_modules(__path__):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
         importlib.import_module('conditions.' + module)
-        LOGGER.debug('Imported {} conditions module', module)
     LOGGER.info('Imported all conditions modules!')
 
 
-def build_solid_dict():
+def build_solid_dict() -> None:
     """Build a dictionary mapping origins to brush faces.
 
     This allows easily finding brushes that are at certain locations.
@@ -628,31 +614,6 @@ def build_solid_dict():
                 )
 
 
-def build_connections_dict(prop_block: Property):
-    """Load in the dictionary mapping item ids to connections."""
-    global TBEAM_CONN_ACT, TBEAM_CONN_DEACT
-
-    def parse(item, key):
-        """Parse the output value, handling values that aren't present."""
-        val = item[key, '']
-        if not val:
-            return None, ''
-        return Output.parse_name(val)
-
-    for item_data in prop_block.find_key('Connections', []):
-        CONNECTIONS[item_data.name] = ItemConnections(
-            in_act=parse(item_data, 'input_activate'),
-            in_deact=parse(item_data, 'input_deactivate'),
-
-            out_act=parse(item_data, 'output_activate'),
-            out_deact=parse(item_data, 'output_deactivate'),
-        )
-
-        if item_data.name == 'item_tbeam':
-            TBEAM_CONN_ACT = parse(item_data, 'tbeam_activate')
-            TBEAM_CONN_DEACT = parse(item_data, 'tbeam_deactivate')
-
-
 def build_itemclass_dict(prop_block: Property):
     """Load in the dictionary mapping item classes to item ids"""
     for prop in prop_block.find_children('ItemClasses'):
@@ -666,20 +627,17 @@ def build_itemclass_dict(prop_block: Property):
         CLASS_FOR_ITEM[prop.name] = it_class
 
 
-DOC_HEADER = '''\
-<!-- Don't edit. This is generated from text in the compiler code. -->
+DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
-# Conditions List
+DOC_META_COND = '''
 
-This is a list of all condition flags and results in the current release.
-'''
-
-DOC_META_COND = '''\
 ### Meta-Conditions
 
 Metaconditions are conditions run automatically by the compiler. These exist
 so package conditions can choose a priority to run before or after these 
 operations.
+
+
 '''
 
 DOC_SPECIAL_GROUP = '''\
@@ -687,17 +645,29 @@ DOC_SPECIAL_GROUP = '''\
 
 These are used to implement complex items which need their own code.
 They have limited utility otherwise.
+
 '''
 
 
-def dump_conditions(file):
+def dump_conditions(file: TextIO) -> None:
     """Dump docs for all the condition flags, results and metaconditions."""
 
     LOGGER.info('Dumping conditions...')
 
-    print(DOC_HEADER, file=file)
+    # Delete existing data, after the marker.
+    file.seek(0, io.SEEK_SET)
 
-    print('#\n', file=file)
+    for line in file:
+        if DOC_MARKER in line:
+            file.truncate()
+            break
+    else:
+        # No marker, blank the whole thing.
+        LOGGER.warning('No intro text before marker!')
+        file.truncate(0)
+        file.write(DOC_MARKER + '\n\n')
+
+    print(DOC_META_COND, file=file)
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
@@ -736,7 +706,7 @@ def dump_conditions(file):
 
             if header_ind:
                 # Not before the first one...
-                print('\n---------\n', file=file)
+                print('---------\n', file=file)
 
             if group == '00special':
                 print(DOC_SPECIAL_GROUP, file=file)
@@ -753,7 +723,7 @@ def dump_conditions(file):
                 file.write('\n')
 
 
-def dump_func_docs(file, func):
+def dump_func_docs(file: TextIO, func: Callable):
     import inspect
     docs = inspect.getdoc(func)
     if docs:
@@ -762,7 +732,7 @@ def dump_func_docs(file, func):
         print('**No documentation!**', file=file)
 
 
-def weighted_random(count: int, weights: str):
+def weighted_random(count: int, weights: str) -> List[int]:
     """Generate random indexes with weights.
 
     This produces a list intended to be fed to random.choice(), with
@@ -797,7 +767,7 @@ def weighted_random(count: int, weights: str):
     return weight
 
 
-def add_output(inst, prop, target):
+def add_output(inst: Entity, prop: Property, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(
         prop['output', ''],
@@ -808,7 +778,7 @@ def add_output(inst, prop, target):
         ))
 
 
-def add_suffix(inst, suff):
+def add_suffix(inst: Entity, suff: str) -> None:
     """Append the given suffix to the instance.
     """
     file = inst['file']
@@ -816,7 +786,7 @@ def add_suffix(inst, suff):
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
-def local_name(inst: Entity, name: str):
+def local_name(inst: Entity, name: str) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
@@ -877,7 +847,7 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=Non
                     v[axis] = bound_min[axis]
 
 
-def remove_ant_toggle(toggle_ent):
+def remove_ant_toggle(toggle_ent: Entity):
     """Remove a texture_toggle instance , plus the associated antline.
 
     For non-toggle instances, they will just be removed.
@@ -996,10 +966,20 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
     """If a value starts with '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
+    If it starts with '!' (before '$'), invert boolean values.
     """
-    if isinstance(value, str) and value.startswith('$'):
+    if not isinstance(value, str):
+        return value
+
+    if value.startswith('!'):
+        inverted = True
+        value = value[1:]
+    else:
+        inverted = False
+
+    if value.startswith('$'):
         if value in inst.fixup:
-            return inst.fixup[value]
+            value = inst.fixup[value]
         else:
             LOGGER.warning(
                 'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
@@ -1008,7 +988,10 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
                 inst,
                 inst.fixup._fixup
             )
-            return ''
+            value = ''
+
+    if inverted:
+        return srctools.bool_as_int(not srctools.conv_bool(value))
     else:
         return value
 
@@ -1111,7 +1094,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             for new_face in brush.sides:
                 # The SKIP brush is the surface, all the others are nodraw.
                 if new_face.mat.casefold() != 'tools/toolsskip':
-                    continue
+                     continue
 
                 # Overwrite all the properties, to make the new brush
                 # the same as the original.
@@ -1448,17 +1431,16 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
         vmf.add_ent(grate_ent)
 
 
-
 @make_result('GooDebris')
 def res_goo_debris(res: Property):
     """Add random instances to goo squares.
 
     Options:
         - file: The filename for the instance. The variant files should be
-            suffixed with '_1.vmf', '_2.vmf', etc.
+            suffixed with `_1.vmf`, `_2.vmf`, etc.
         - space: the number of border squares which must be filled with goo
                  for a square to be eligible - defaults to 1.
-        - weight, number: see the 'Variant' result, a set of weights for the
+        - weight, number: see the `Variant` result, a set of weights for the
                 options
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.

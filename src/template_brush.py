@@ -9,9 +9,9 @@ from enum import Enum
 import srctools
 import vbsp_options
 
-from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec, VMF
+from srctools import Entity, Solid, Side, Property, UVAxis, Vec, VMF
 import comp_consts as consts
-import utils
+import srctools.logger
 import conditions
 
 from typing import (
@@ -20,7 +20,7 @@ from typing import (
     Dict, List, Set,
 )
 
-LOGGER = utils.getLogger(__name__, alias='template')
+LOGGER = srctools.logger.get_logger(__name__, alias='template')
 
 # A lookup for templates.
 TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]
@@ -102,6 +102,7 @@ TEMPLATE_RETEXTURE = {
     consts.Special.BACKPANELS: 'special.behind',
     consts.Special.BACKPANELS_CHEAP: 'special.behind',
     consts.Special.SQUAREBEAMS: 'special.edge',
+    consts.Special.PED_SIDE: 'special.pedestalside',
     consts.Special.GLASS: 'special.glass',
     consts.Special.GRATING: 'special.grating',
 
@@ -483,7 +484,7 @@ def import_template(
         ]:
         for old_brush in orig_list:
             brush = old_brush.copy(
-                map=vbsp.VMF,
+                vmf_file=vbsp.VMF,
                 side_mapping=id_mapping,
                 keep_vis=False,
             )
@@ -492,7 +493,7 @@ def import_template(
 
     for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(
-            map=vbsp.VMF,
+            vmf_file=vbsp.VMF,
             keep_vis=False,
         )
         del new_overlay['template_id']  # Remove this, it's not part of overlays
@@ -754,7 +755,7 @@ def retexture_template(
                 face.mat = vbsp.get_tex(tex_type)
 
                 if tex_type == 'special.goo_cheap':
-                    if norm != (0, 0, 1):
+                    if norm != (0, 0, -1):
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
                         # all faces goo to work in multiple orientations.

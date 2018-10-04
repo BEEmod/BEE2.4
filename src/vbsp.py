@@ -1,26 +1,32 @@
-import utils
+"""Implements the BEE2 VBSP compiler replacement."""
 # Do this very early, so we log the startup sequence.
-LOGGER = utils.init_logging('bee2/vbsp.log')
+from srctools.logger import init_logging
+
+LOGGER = init_logging('bee2/vbsp.log')
 
 import os
-import os.path
 import sys
-import subprocess
 import shutil
 import random
 import itertools
+import logging
 from enum import Enum
+from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
 from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
+import utils
 import srctools.vmf as VLib
-import srctools
+import srctools.run
+import srctools.logger
+import antlines
 import voiceLine
 import vbsp_options
 import instanceLocs
 import brushLoc
 import bottomlessPit
+import packing
 import conditions
 import connections
 import instance_traits
@@ -31,7 +37,8 @@ import cubes
 import barriers
 
 from typing import (
-    Dict, Tuple, List
+    Dict, Tuple, List,
+    Set,
 )
 
 COND_MOD_NAME = 'VBSP'
@@ -70,7 +77,6 @@ TEX_VALVE = {
     consts.Special.SQUAREBEAMS: "special.edge",
     consts.Special.GLASS: "special.glass",
     consts.Special.GRATING: "special.grating",
-    consts.Special.LASERFIELD: "special.laserfield",
 }
 
 
@@ -108,23 +114,6 @@ TEX_DEFAULTS = [
     ('', 'special.edge_special'),
     ('', 'special.fizz_border'),
 
-    # And these defaults have the extra scale information, which isn't
-    # in the maps.
-    ('0.25|' + consts.Antlines.STRAIGHT, 'overlay.antline'),
-    ('1|' + consts.Antlines.CORNER, 'overlay.antlinecorner'),
-
-    # This is for the P1 style, where antlines use different textures
-    # on the floor and wall.
-    # We just use the regular version if unset.
-    ('', 'overlay.antlinecornerfloor'),
-    ('', 'overlay.antlinefloor'),
-
-    # Broken version of antlines
-    ('', 'overlay.antlinebroken'),
-    ('', 'overlay.antlinebrokencorner'),
-    ('', 'overlay.antlinebrokenfloor'),
-    ('', 'overlay.antlinebrokenfloorcorner'),
-
     # If set and enabled, adds frames for >10 sign pairs
     # to distinguish repeats.
     ('', 'overlay.shapeframe'),
@@ -140,6 +129,10 @@ TEX_DEFAULTS = [
 
 
 class ORIENT(Enum):
+    """The different orientations a surface can have.
+
+    This mainly affects which textures are added.
+    """
     floor = 1
     wall = 2
     ceiling = 3
@@ -194,14 +187,6 @@ IGNORED_BRUSH_ENTS = set()
 
 GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
 
-TO_PACK = set()  # The packlists we want to pack.
-PACK_FILES = set()  # Raw files we force pack
-PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
-
-# Names initially assigned to toggles and panels.
-IND_TOGGLE_NAMES = set()
-IND_PANEL_NAMES = set()
-IND_ITEM_NAMES = set() # And both combined
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
@@ -210,14 +195,18 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 ##################
 
 
-def get_tex(name):
+def get_tex(name: str) -> str:
     if name in settings['textures']:
         return random.choice(settings['textures'][name])
     else:
         raise Exception('No texture "' + name + '"!')
 
 
-def alter_mat(face, seed=None, texture_lock=True):
+def alter_mat(
+    face: VLib.Side,
+    seed: str=None,
+    texture_lock: bool=True,
+) -> bool:
     """Randomise the texture used for a face, based on configured textures.
 
     This uses the TEX_VALVE dict to identify the kind of texture, but
@@ -301,6 +290,22 @@ def load_settings():
         else:
             settings['textures'][key] = value
 
+    # Antline texturing settings.
+    # We optionally allow different ones for floors.
+    ant_wall = ant_floor = None
+    for prop in conf.find_all('Textures', 'Antlines'):
+        if 'floor' in prop:
+            ant_floor = antlines.AntType.parse(prop.find_key('floor'))
+        if 'wall' in prop:
+            ant_wall = antlines.AntType.parse(prop.find_key('wall'))
+        # If both are not there, allow omitting the subkey.
+        if ant_wall is ant_floor is None:
+            ant_wall = ant_floor = antlines.AntType.parse(prop)
+    if ant_wall is None:
+        ant_wall = antlines.AntType.default()
+    if ant_floor is None:
+        ant_floor = ant_wall
+
     # Load in our main configs..
     vbsp_options.load(conf.find_all('Options'))
 
@@ -325,8 +330,16 @@ def load_settings():
         )
     # Parse that data in the relevant modules.
     instanceLocs.load_conf(instance_file)
-    conditions.build_connections_dict(instance_file)
     conditions.build_itemclass_dict(instance_file)
+    connections.read_configs(instance_file)
+
+    # Parse packlist data.
+    with open('bee2/pack_list.cfg') as f:
+        props = Property.parse(
+            f,
+            'bee2/pack_list.cfg'
+        )
+    packing.parse_packlists(props)
 
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
@@ -337,19 +350,6 @@ def load_settings():
 
     # Fizzler data
     fizzler.read_configs(conf)
-
-    # These are custom textures we need to pack, if they're in the map.
-    # (World brush textures, antlines, signage, glass...)
-    for trigger in conf.find_all('PackTriggers', 'material'):
-        mat = trigger['texture', ''].casefold()
-        packlist = trigger['packlist', '']
-        if mat and packlist:
-            settings['packtrigger'][mat].append(packlist)
-
-    # Files that the BEE2.4 app knows we need to pack - music, style, etc.
-    # This is a bit better than a lot of extra conditions.
-    for force_files in conf.find_all('PackTriggers', 'Forced', 'File'):
-        PACK_FILES.add(force_files.value)
 
     # Get configuration for the elevator, defaulting to ''.
     elev = conf.find_key('elevator', [])
@@ -410,6 +410,7 @@ def load_settings():
         BEE2_config = ConfigFile(None)
 
     LOGGER.info("Settings Loaded!")
+    return ant_floor, ant_wall
 
 
 def load_map(map_path):
@@ -952,7 +953,6 @@ def set_player_portalgun():
             vscripts='bee2/portal_man.nut',
             origin=ent_pos,
         )
-        PACK_FILES.add('scripts/vscripts/bee2/portal_man.nut')
 
         if GAME_MODE == 'SP':
             VMF.create_ent(
@@ -1243,7 +1243,7 @@ def add_fog_ents():
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos():
+def set_elev_videos() -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -1286,11 +1286,9 @@ def set_elev_videos():
             vscripts=script,
             origin=inst['origin'],
         )
-    # Ensure the script gets packed.
-    PACK_FILES.add('scripts/vscripts/' + script)
 
 
-def get_map_info():
+def get_map_info() -> Set[str]:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -1315,9 +1313,6 @@ def get_map_info():
     file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr')
     file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
     file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
-
-    file_ind_panel = instanceLocs.get_special_inst('indpan')
-    file_ind_toggle = instanceLocs.get_special_inst('indtoggle')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1435,13 +1430,6 @@ def get_map_info():
         elif file in file_coop_door_frame:
             # The coop frame must be the exit door...
             exit_door_frame = item
-        # Record the names of toggle or indicator panel instances.
-        elif file in file_ind_panel:
-            IND_PANEL_NAMES.add(item['targetname'])
-            IND_ITEM_NAMES.add(item['targetname'])
-        elif file in file_ind_toggle:
-            IND_TOGGLE_NAMES.add(item['targetname'])
-            IND_ITEM_NAMES.add(item['targetname'])
 
         inst_files.add(item['file'])
 
@@ -1800,24 +1788,6 @@ def collapse_goo_trig():
             ),
         )
 
-    LOGGER.info('Done!')
-
-
-def remove_static_ind_toggles():
-    """Remove indicator_toggle instances that don't have assigned overlays.
-
-    If a style has static overlays, this will make antlines basically free.
-    """
-    LOGGER.info('Removing static indicator toggles...')
-    toggle_file = instanceLocs.resolve('<ITEM_INDICATOR_TOGGLE>')
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() not in toggle_file:
-            continue
-
-        overlay = inst.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
-        # Remove if there isn't an overlay, or no associated ents.
-        if overlay == '' or len(VMF.by_target[overlay]) == 0:
-            inst.remove()
     LOGGER.info('Done!')
 
 
@@ -2255,148 +2225,6 @@ def get_face_orient(face):
     return ORIENT.wall
 
 
-def broken_antline_iter(dist, max_step, chance):
-    """Iterator used in set_antline_mat().
-
-    This produces min,max pairs which fill the space from 0-dist.
-    Their width is random, from 1-max_step.
-    Neighbouring sections will be merged when they have the same type.
-    """
-    last_val = next_val = 0
-    last_type = random.randrange(100) < chance
-
-    while True:
-        is_broken = (random.randrange(100) < chance)
-
-        next_val += random.randint(1, max_step)
-
-        if next_val >= dist:
-            # We hit the end - make sure we don't overstep.
-            yield last_val, dist, is_broken
-            return
-
-        if is_broken == last_type:
-            # Merge the two sections - don't make more overlays
-            # than needed..
-            continue
-
-        yield last_val, next_val, last_type
-        last_type = is_broken
-        last_val = next_val
-
-
-def set_antline_mat(
-        over,
-        mats: list,
-        floor_mats: list=(),
-        broken_chance=0,
-        broken_dist=0,
-        broken: list=(),
-        broken_floor: list=(),
-        ):
-    """Retexture an antline, with various options encoded into the material.
-
-    floor_mat, if set is an alternate material to use for floors.
-    The material is split into 3 parts, separated by '|':
-    - Scale: the u-axis width of the material, used for clean antlines.
-    - Material: the material
-    - Static: if 'static', the antline will lose the targetname. This
-      makes it non-dynamic, and removes the info_overlay_accessor
-      entity from the compiled map.
-    If only 2 parts are given, the overlay is assumed to be dynamic.
-    If one part is given, the scale is assumed to be 0.25.
-
-    For broken antlines,  'broken_chance' is the percentage chance for
-    brokenness. broken_dist is the largest run of lights that can be broken.
-    broken and broken_floor are the textures used for the broken lights.
-    """
-    # Choose a random one
-    random.seed(over['origin'])
-
-    if broken_chance and any(broken):  # We can have `broken` antlines.
-        bbox_min, bbox_max = VLib.overlay_bounds(over)
-        # Number of 'circles' and the length-wise axis
-        length = max(bbox_max - bbox_min)
-        long_axis = Vec(0, 1, 0).rotate_by_str(over['angles']).axis()
-
-        # It's a corner or short antline - replace instead of adding more
-        if length // 16 < broken_dist:
-            if random.randrange(100) < broken_chance:
-                mats = broken
-                floor_mats = broken_floor
-        else:
-            min_origin = Vec.from_str(over['origin'])
-            min_origin[long_axis] -= length / 2
-
-            broken_iter = broken_antline_iter(
-                length // 16,
-                broken_dist,
-                broken_chance,
-            )
-            for sect_min, sect_max, is_broken in broken_iter:
-
-                if is_broken:
-                    tex, floor_tex = broken, broken_floor
-                else:
-                    tex, floor_tex = mats, floor_mats
-
-                sect_length = sect_max - sect_min
-
-                # Make a section - base it off the original, and shrink it
-                new_over = over.copy()
-                VMF.add_ent(new_over)
-                # Make sure we don't restyle this twice.
-                IGNORED_OVERLAYS.add(new_over)
-
-                # Repeats lengthways
-                new_over['startV'] = str(sect_length)
-                sect_center = (sect_min + sect_max) / 2
-
-                sect_origin = min_origin.copy()
-                sect_origin[long_axis] += sect_center * 16
-                new_over['basisorigin'] = new_over['origin'] = sect_origin.join(' ')
-
-                # Set the 4 corner locations to determine the overlay size.
-                # They're in local space - x is -8/+8, y=length, z=0
-                # Match the sign of the current value
-                for axis in '0123':
-                    pos = Vec.from_str(new_over['uv' + axis])
-                    if pos.y < 0:
-                        pos.y = -8 * sect_length
-                    else:
-                        pos.y = 8 * sect_length
-                    new_over['uv' + axis] = pos.join(' ')
-
-                # Recurse to allow having values in the material value
-                set_antline_mat(new_over, tex, floor_tex, broken_chance=0)
-            # Remove the original overlay
-            VMF.remove_ent(over)
-
-    if any(floor_mats):  # Ensure there's actually a value
-        # For P1 style, check to see if the antline is on the floor or
-        # walls.
-        if Vec.from_str(over['basisNormal']).z != 0:
-            mats = floor_mats
-
-    mat = random.choice(mats).split('|')
-    opts = []
-
-    if len(mat) == 2:
-        # rescale antlines if needed
-        over['endu'], over['material'] = mat
-    elif len(mat) > 2:
-        over['endu'], over['material'], *opts = mat
-    else:
-        # Unpack to ensure it only has 1 section
-        over['material'], = mat
-        over['endu'] = '0.25'
-
-    if 'static' in opts:
-        # If specified, remove the targetname so the overlay
-        # becomes static.
-        del over['targetname']
-
-
 def change_overlays():
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
@@ -2405,26 +2233,14 @@ def change_overlays():
     sign_inst = vbsp_options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size =  vbsp_options.get(int, 'signSize') / 2
+    sign_size = vbsp_options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack =  vbsp_options.get(str, 'signPack')
+    sign_inst_pack = vbsp_options.get(str, 'signPack')
 
     # Grab all the textures we're using...
 
     tex_dict = settings['textures']
-    ant_str = tex_dict['overlay.antline']
-    ant_str_floor = tex_dict['overlay.antlinefloor']
-    ant_corn = tex_dict['overlay.antlinecorner']
-    ant_corn_floor = tex_dict['overlay.antlinecornerfloor']
-
-    broken_ant_str = tex_dict['overlay.antlinebroken']
-    broken_ant_corn = tex_dict['overlay.antlinebrokencorner']
-    broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
-    broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
-
-    broken_chance = vbsp_options.get(float, 'broken_antline_chance')
-    broken_dist = vbsp_options.get(int, 'broken_antline_distance')
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2456,7 +2272,7 @@ def change_overlays():
                     file=sign_inst,
                 )
                 if sign_inst_pack:
-                    TO_PACK.add(sign_inst_pack.casefold())
+                    packing.pack_list(VMF, sign_inst_pack)
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
             # Delete the overlay's targetname - signs aren't ever dynamic
             # This also means items set to signage only won't get toggle
@@ -2473,26 +2289,6 @@ def change_overlays():
                     val /= 16
                     val *= sign_size
                     over[prop] = val.join(' ')
-        if case_mat == consts.Antlines.STRAIGHT:
-            set_antline_mat(
-                over,
-                ant_str,
-                ant_str_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_str,
-                broken_ant_str_floor,
-            )
-        elif case_mat == consts.Antlines.CORNER:
-            set_antline_mat(
-                over,
-                ant_corn,
-                ant_corn_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_corn,
-                broken_ant_corn_floor,
-            )
 
 
 def add_extra_ents(mode):
@@ -2503,18 +2299,18 @@ def add_extra_ents(mode):
 
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
-    sound = vbsp_options.get(str, 'music_soundscript')
     inst = vbsp_options.get(str, 'music_instance')
     snd_length = vbsp_options.get(int, 'music_looplen')
 
     # Don't add our logic if an instance was provided.
-    if sound and not inst:
+    # If this settings is set, we have a music config.
+    if settings['music_conf'] and not inst:
         music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
             targetname='@music',
             origin=loc,
-            message=sound,
+            message='music.BEE2',
             health='10',  # Volume
         )
 
@@ -2671,11 +2467,9 @@ def add_extra_ents(mode):
         # events we might want to track - death, pings, camera taunts, etc.
         glados_scripts = [
             'choreo/glados.nut',  # Implements Multiverse Cave..
-            'bee2/auto_run.nut',  # Automatically run to cache sounds.
         ]
         if voiceLine.has_responses():
             glados_scripts.append('bee2/coop_responses.nut')
-            PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
 
         global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
 
@@ -2837,10 +2631,10 @@ def change_func_brush():
                 # overlay instance!
 
     if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
-        TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
+        packing.pack_list(VMF, vbsp_options.get(str, 'grating_pack'))
 
 
-def alter_flip_panel():
+def alter_flip_panel() -> None:
     flip_panel_start = vbsp_options.get(str, 'flip_sound_start')
     flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop')
     if flip_panel_start is not None or flip_panel_stop is not None:
@@ -3000,97 +2794,6 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = vbsp_options.get(str, 'skybox')
 
 
-@conditions.make_result('Pack')
-def packlist_cond(res: Property):
-    """Add the files in the given packlist to the map."""
-    TO_PACK.add(res.value.casefold())
-
-    return conditions.RES_EXHAUSTED
-
-
-@conditions.make_result('PackFile')
-def pack_file_cond(res: Property):
-    """Adda single file to the map."""
-    PACK_FILES.add(res.value)
-
-    return conditions.RES_EXHAUSTED
-
-
-@conditions.make_result('PackRename')
-def packlist_cond_rename(res: Property):
-    """Add a file to the packlist, saved under a new name."""
-    PACK_RENAME[res['dest']] = res['file']
-    return conditions.RES_EXHAUSTED
-
-
-def make_packlist(map_path):
-    """Write the list of files that VRAD should pack."""
-
-    # Scan map materials for marked materials
-    # This way world-brush materials can be packed.
-    pack_triggers = settings['packtrigger']
-
-    if pack_triggers:
-        def face_iter():
-            """Check all these locations for the target textures."""
-            # We need the iterator to allow breaking out of the loop.
-            for face in VMF.iter_wfaces():
-                yield face.mat.casefold()
-            for ent in (
-                VMF.by_class['func_brush'] |
-                VMF.by_class['func_door_rotating'] |
-                VMF.by_class['trigger_portal_cleanser']
-                    ):
-                for side in ent.sides():
-                    yield side.mat.casefold()
-
-            for overlay in VMF.by_class['info_overlay']:
-                # Check overlays too
-                yield overlay['material', ''].casefold()
-
-        for mat in face_iter():
-            if mat in pack_triggers:
-                TO_PACK.update(pack_triggers[mat])
-                del pack_triggers[mat]
-                if not pack_triggers:
-                    break  # No more left
-
-    if not TO_PACK and not PACK_FILES:
-        # Nothing to pack - wipe the packfile!
-        open(map_path[:-4] + '.filelist.txt', 'w').close()
-
-    LOGGER.info('Making Pack list...')
-
-    with open('bee2/pack_list.cfg') as f:
-        props = Property.parse(
-            f,
-            'bee2/pack_list.cfg'
-        ).find_key('PackList', [])
-
-    for pack_id in TO_PACK:
-        try:
-            files = props[pack_id]
-        except IndexError:
-            LOGGER.warning('Packlist "{}" does not exist!', pack_id.upper())
-            continue
-
-        PACK_FILES.update(
-            prop.value
-            for prop in
-            files
-        )
-
-    with open(map_path[:-4] + '.filelist.txt', 'w') as f:
-        for file in sorted(PACK_FILES):
-            f.write(file + '\n')
-            LOGGER.info('"{}"', file)
-        for dest, file in sorted(PACK_RENAME.items()):
-            f.write('{}\t{}\n'.format(file, dest))
-            LOGGER.info('"{}" as "{}"', file, dest)
-
-    LOGGER.info('Packlist written!')
-
-
 def make_vrad_config(is_peti: bool):
     """Generate a config file for VRAD from our configs.
 
@@ -3143,9 +2846,8 @@ def make_vrad_config(is_peti: bool):
         import cubes
         import conditions.piston_platform
 
+        # This generates scripts and might need to tell VRAD.
         cubes.write_vscripts(conf)
-        conditions.piston_platform.write_vscripts(conf)
-
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
@@ -3183,7 +2885,7 @@ def save(path):
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, path, new_path=None):
+def run_vbsp(vbsp_args, path, new_path=None) -> None:
     """Execute the original VBSP, copying files around so it works correctly.
 
     vbsp_args are the arguments to pass.
@@ -3203,69 +2905,35 @@ def run_vbsp(vbsp_args, path, new_path=None):
                 path.replace(".vmf", ".log"),
                 new_path.replace(".vmf", ".log"),
             )
-    # Put quotes around args which contain spaces, and remove blank args.
-    vbsp_args = [
-        ('"' + x + '"' if " " in x else x)
-        for x in
-        vbsp_args
-        if x
-    ]
 
-    # VBSP is named _osx or _linux for those platforms, and has no extension.
-    # Windows uses the exe extension.
-    ext = ''
-    if utils.MAC:
-        os_suff = '_osx'
-    elif utils.LINUX:
-        os_suff = '_linux'
-    else:
-        os_suff = ''
-        ext = '.exe'
+    # Remove blank args.
+    vbsp_args = [x for x in vbsp_args if x and not x.isspace()]
 
     # Ensure we've fixed the instance/ folder so instances are found.
     if utils.MAC or utils.LINUX and is_peti:
         instance_symlink()
 
-    arg = (
-        '"' +
-        os.path.normpath(
-            os.path.join(
-                os.getcwd(),
-                "vbsp" + os_suff + "_original" + ext
-            )
-        ) +
-        '" ' +
-        " ".join(vbsp_args)
-    )
-
     # Use a special name for VBSP's output..
-    vbsp_logger = utils.getLogger('valve.VBSP', alias='<Valve>')
+    vbsp_logger = srctools.logger.get_logger('valve.VBSP', alias='<Valve>')
 
-    LOGGER.info("Calling original VBSP...")
-    LOGGER.info("Arguments: {}", arg)
-    try:
-        output = subprocess.check_output(
-            arg,
-            stderr=subprocess.PIPE,
-            shell=True,
-        )
-    except subprocess.CalledProcessError as err:
-        # VBSP didn't suceed. Print the error log..
-        vbsp_logger.error(err.output.decode('ascii', errors='replace'))
+    # And also save a copy for us to analyse.
+    buff = StringIO()
+    vbsp_logger.addHandler(logging.StreamHandler(buff))
 
+    code = srctools.run.run_compiler('vbsp', vbsp_args, vbsp_logger)
+    if code != 0:
+        # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
-            process_vbsp_fail(err.output)
+            process_vbsp_fail(buff.getvalue())
 
-        LOGGER.error("VBSP failed! ({})", err.returncode)
-        # Propagate the fail code to Portal 2.
-        sys.exit(err.returncode)
+        # Propagate the fail code to Portal 2, and quit.
+        sys.exit(code)
 
     # Print output
-    vbsp_logger.info(output.decode('ascii', errors='replace'))
     LOGGER.info("VBSP Done!")
 
     if is_peti:  # Ignore Hammer maps
-        process_vbsp_log(output)
+        process_vbsp_log(buff.getvalue())
 
     # Copy over the real files so vvis/vrad can read them
         for ext in (".bsp", ".log", ".prt"):
@@ -3276,7 +2944,7 @@ def run_vbsp(vbsp_args, path, new_path=None):
                 )
 
 
-def process_vbsp_log(output: bytes):
+def process_vbsp_log(output: str):
     """Read through VBSP's log, extracting entity counts.
 
     This is then passed back to the main BEE2 application for display.
@@ -3292,9 +2960,9 @@ def process_vbsp_log(output: bytes):
 
     desired_vals = [
         # VBSP values -> config names
-        (b'nummapbrushes:', 'brush'),
-        (b'num_map_overlays:', 'overlay'),
-        (b'num_entities:', 'entity'),
+        ('nummapbrushes:', 'brush'),
+        ('num_map_overlays:', 'overlay'),
+        ('num_entities:', 'entity'),
     ]
     # The other options rarely hit the limits, so we don't track them.
 
@@ -3305,20 +2973,20 @@ def process_vbsp_log(output: bytes):
     }
 
     for line in output.splitlines():
-        line = line.lstrip()
+        line = line.lstrip(' \t[|')
         for name, conf in desired_vals:
             if not line.startswith(name):
                 continue
             # Grab the value from ( onwards
-            fraction = line.split(b'(', 1)[1]
+            fraction = line.split('(', 1)[1]
             # Grab the two numbers, convert to ascii and strip
             # whitespace.
-            count_num, count_max = fraction.split(b'/')
+            count_num, count_max = fraction.split('/')
             counts[conf] = (
-                count_num.strip(b' \t\n').decode('ascii'),
+                count_num.strip(' \t\n'),
                 # Strip the ending ) off the max. We have the value, so
                 # we might as well tell the BEE2 if it changes..
-                count_max.strip(b') \t\n').decode('ascii')
+                count_max.strip(') \t\n'),
             )
 
     LOGGER.info('Retrieved counts: {}', counts)
@@ -3329,7 +2997,7 @@ def process_vbsp_log(output: bytes):
     BEE2_config.save()
 
 
-def process_vbsp_fail(output: bytes):
+def process_vbsp_fail(output: str):
     """Read through VBSP's logs when failing, to update counts."""
     # VBSP doesn't output the actual entity counts, so set the errorred
     # one to max and the others to zero.
@@ -3339,21 +3007,22 @@ def process_vbsp_fail(output: bytes):
     count_section['max_entity'] = '2048'
     count_section['max_overlay'] = '512'
 
-    for line in reversed(output.splitlines()):  # type: bytes
-        if b'MAX_MAP_OVERLAYS' in line:
+    for line in reversed(output.splitlines()):
+        if 'MAX_MAP_OVERLAYS' in line:
             count_section['entity'] = '0'
             count_section['brush'] = '0'
-            count_section['overlay'] = '512'
             # The line is like 'MAX_MAP_OVER = 512', pull out the number from
             # the end and decode it.
-            count_section['max_overlay'] = line.split(b'=')[1].strip().decode('ascii')
+            over_count = line.rsplit('=')[1].strip()
+            count_section['overlay'] = over_count
+            count_section['max_overlay'] = over_count
             break
-        if b'MAX_MAP_BRUSHSIDES' in line or b'MAX_MAP_PLANES' in line:
+        if 'MAX_MAP_BRUSHSIDES' in line or 'MAX_MAP_PLANES' in line:
             count_section['entity'] = '0'
             count_section['overlay'] = '0'
             count_section['brush'] = '8192'
             break
-        if b'MAX_MAP_ENTITIES' in line:
+        if 'MAX_MAP_ENTITIES' in line:
             count_section['entity'] = count_section['overlay'] = '0'
             count_section['brush'] = '8192'
             break
@@ -3364,7 +3033,7 @@ def process_vbsp_fail(output: bytes):
     BEE2_config.save_check()
 
 
-def main():
+def main() -> None:
     """Main program code.
 
     """
@@ -3379,7 +3048,7 @@ def main():
         LOGGER.info('Writing Wiki text...')
         with open(os.environ['BEE2_WIKI_OPT_LOC'], 'w') as f:
             vbsp_options.dump_info(f)
-        with open(os.environ['BEE2_WIKI_COND_LOC'], 'w') as f:
+        with open(os.environ['BEE2_WIKI_COND_LOC'], 'a+') as f:
             conditions.dump_conditions(f)
         LOGGER.info('Done. Exiting now!')
         sys.exit()
@@ -3410,12 +3079,6 @@ def main():
             'determine if the map is PeTI or not.'
         )
         sys.exit()
-
-    # The first is just for us, the second is also for VBSP. We'll switch to
-    # verbose mode if VBSP is set to do so as well.
-    if '-bee2_verbose' in folded_args or '-verbose' in folded_args:
-        utils.stdout_loghandler.setLevel('DEBUG')
-        LOGGER.info('Switched to verbose logging.')
 
     if not path.endswith(".vmf"):
         path += ".vmf"
@@ -3474,7 +3137,7 @@ def main():
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        load_settings()
+        ant_floor, ant_wall = load_settings()
 
         load_map(path)
         instance_traits.set_traits(VMF)
@@ -3484,6 +3147,8 @@ def main():
             VMF,
             settings['textures']['overlay.shapeframe'],
             settings['style_vars']['enableshapesignageframe'],
+            ant_floor,
+            ant_wall,
         )
 
         MAP_RAND_SEED = calc_rand_seed()
@@ -3492,8 +3157,8 @@ def main():
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
-        fizzler.parse_map(VMF, settings['has_attr'], TO_PACK)
-        barriers.parse_map(VMF, settings['has_attr'], TO_PACK)
+        fizzler.parse_map(VMF, settings['has_attr'])
+        barriers.parse_map(VMF, settings['has_attr'])
 
         conditions.init(
             seed=MAP_RAND_SEED,
@@ -3512,10 +3177,7 @@ def main():
         collapse_goo_trig()
         change_func_brush()
         barriers.make_barriers(VMF, get_tex)
-        remove_static_ind_toggles()
         fix_worldspawn()
-
-        make_packlist(path)
 
         save(new_path)
         run_vbsp(

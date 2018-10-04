@@ -5,7 +5,7 @@ import tkinter as tk
 
 import logging
 
-import srctools
+import srctools.logger
 from tk_tools import TK_ROOT
 from BEE2_config import GEN_OPTS
 import tk_tools
@@ -32,7 +32,9 @@ LVL_TEXT = {
     logging.WARNING: _('Warnings Only'),
 }
 
-window = None  # type: tk.Toplevel
+window = tk.Toplevel(TK_ROOT)
+window.wm_withdraw()
+
 log_handler = None  # type: TextHandler
 text_box = None  # type: tk.Text
 level_selector = None  # type: ttk.Combobox
@@ -75,7 +77,7 @@ class TextHandler(logging.Handler):
         """Add a logging message."""
 
         msg = record.msg
-        if isinstance(record.msg, utils.LogMessage):
+        if isinstance(record.msg, srctools.logger.LogMessage):
             # Ensure we don't use the extra ASCII indents here.
             record.msg = record.msg.format_msg()
 
@@ -149,12 +151,10 @@ def set_level(event):
     GEN_OPTS['Debug']['window_log_level'] = logging.getLevelName(level)
 
 
-def init(start_open, log_level='info'):
+def init(start_open: bool, log_level: str='info') -> None:
     """Initialise the window."""
-    global window, log_handler, text_box, level_selector
+    global log_handler, text_box, level_selector
 
-    window = tk.Toplevel(TK_ROOT, name='console_win')
-    window.withdraw()
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     window.title(_('Logs - {}').format(utils.BEE_VERSION))
@@ -176,9 +176,13 @@ def init(start_open, log_level='info'):
         log_handler.setLevel(log_level)
     except ValueError:
         log_level = logging.INFO
-    log_handler.setFormatter(utils.short_log_format)
+    log_handler.setFormatter(logging.Formatter(
+        # One letter for level name
+        '[{levelname[0]}] {module}.{funcName}(): {message}',
+        style='{',
+    ))
 
-    logging.getLogger('BEE2').addHandler(log_handler)
+    logging.getLogger().addHandler(log_handler)
 
     scroll = tk_tools.HidingScroll(
         window,
@@ -253,8 +257,8 @@ def init(start_open, log_level='info'):
 
 
 if __name__ == '__main__':
-    utils.init_logging()
-    LOGGER = utils.getLogger('BEE2')
+    srctools.logger.init_logging()
+    LOGGER = srctools.logger.get_logger('BEE2')
     init(True, log_level='DEBUG')
 
     # Generate a bunch of log messages to test the window.

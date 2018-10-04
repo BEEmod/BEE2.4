@@ -1,20 +1,15 @@
 """Results relating to item connections."""
-import srctools
-import utils
-import instance_traits
+import srctools.logger
+import connections
 from conditions import (
     make_flag, make_result, make_result_setup,
     resolve_value, local_name,
-    CONNECTIONS,
 )
-from conditions.instances import GLOBAL_INPUT_ENTS
 from srctools import Property, Entity, Output
-
-from typing import Optional, Dict, Tuple
 
 COND_MOD_NAME = 'I/O'
 
-LOGGER = utils.getLogger(__name__, alias='cond.connections')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.connections')
 
 
 @make_result_setup('AddOutput')
@@ -23,7 +18,7 @@ def res_add_output_setup(res: Property):
     input_name = res['input']
     inst_in = res['inst_in', '']
     inst_out = res['inst_out', '']
-    targ = res['target']
+    targ = res['target', '']
     only_once = srctools.conv_bool(res['only_once', None])
     times = 1 if only_once else srctools.conv_int(res['times', None], -1)
     delay = res['delay', '0.0']
@@ -34,7 +29,8 @@ def res_add_output_setup(res: Property):
         out_id = out_id.casefold()
         out_type = out_type.strip().casefold()
     else:
-        out_id, out_type = output, 'const'
+        out_id = output
+        out_type = 'const'
 
     return (
         out_type,
@@ -77,21 +73,26 @@ def res_add_output(inst: Entity, res: Property):
 
     if out_type in ('activate', 'deactivate'):
         try:
-            connection = CONNECTIONS[out_id]
+            item_type = connections.ITEM_TYPES[out_id.casefold()]
         except KeyError:
             LOGGER.warning('"{}" has no connections!', out_id)
             return
         if out_type[0] == 'a':
-            inst_out, output = connection.out_act
+            if item_type.output_act is None:
+                return
+
+            inst_out, output = item_type.output_act
         else:
-            inst_out, output = connection.out_deact
+            if item_type.output_deact is None:
+                return
+            inst_out, output = item_type.output_deact
     else:
         output = resolve_value(inst, out_id)
         inst_out = resolve_value(inst, inst_out)
 
     inst.add_out(Output(
         resolve_value(inst, output),
-        local_name(inst, resolve_value(inst, targ)),
+        local_name(inst, resolve_value(inst, targ)) or inst['targetname'],
         resolve_value(inst, input_name),
         resolve_value(inst, parm),
         srctools.conv_float(resolve_value(inst, delay)),
@@ -100,94 +101,16 @@ def res_add_output(inst: Entity, res: Property):
         inst_in=resolve_value(inst, inst_in) or None,
     ))
 
-# Locking Input/Output items.
-# This makes for example pedestal buttons lock down until the target
-# item shuts itself off.
-
-# targetname -> inst, out_name, out_output, out_relay
-LOCKABLE_ITEMS = {}  # type: Dict[str, Tuple[Entity, Optional[str], str, str]]
-
 
 @make_result('MarkLocking')
-def res_locking_output(inst: Entity, res: Property):
-    """Marks an output item for locked connections.
-
-    The parameter is an `instance:name;Output` value, which is fired when the
-    item resets. This must be executed before `LockingIO`.
-
-    This only applies if `$connectioncount` is 1.
-    """
-    # Items with more than one connection have AND logic in the mix - it makes
-    # it unsafe to lock the input item.
-    if inst.fixup['$connectioncount'] != '1':
-        return
-
-    if res.has_children():
-        name, output = Output.parse_name(res['output'])
-        relay_name = res['rl_name', None]
-    else:
-        name, output = Output.parse_name(res.value)
-        relay_name = None
-
-    LOCKABLE_ITEMS[inst['targetname']] = inst, name, output, relay_name
+def res_locking_output():
+    """This result is no longer used."""
+    LOGGER.warning('MarkLocking is no longer used. Configure locking items in the enhanced editoritems configuration.')
 
 
 @make_flag('LockingIO')
-def res_locking_input(inst: Entity, res: Property):
-    """Executed on the input item, and evaluates to True if successful.
+def res_locking_input():
+    """This flag is no longer used."""
+    LOGGER.warning('LockingIO is no longer used. Configure locking items in the enhanced editoritems configuration.')
+    return False
 
-    The parameter is an `instance:name;Input` value, which resets the item.
-    This must be executed after the `MarkLocking` results have run.
-    """
-    from vbsp import IND_ITEM_NAMES, IND_PANEL_NAMES, VMF
-    in_name, in_inp = Output.parse_name(res.value)
-
-    targets = {
-        out.target
-        for out in
-        inst.outputs
-        # Skip toggle or indicator panel items.
-        if out.target not in IND_ITEM_NAMES
-    }
-    # No outputs, or 2+ - we can't convert in that case
-    if len(targets) != 1:
-        return False
-
-    target, = targets
-    try:
-        targ_inst, targ_out_name, targ_out, out_relay = LOCKABLE_ITEMS[target]
-    except KeyError:
-        # Some other item...
-        return False
-
-    # Remove the indicator panel instances.
-    ind_panels = {
-        out.target
-        for out in
-        inst.outputs
-        # Skip toggle or indicator panel items.
-        if out.target in IND_PANEL_NAMES
-    }
-    for pan_inst in VMF.by_class['func_instance']:
-        if pan_inst['targetname'] in ind_panels:
-            pan_inst.remove()
-
-    # Add an output pointing in the opposite direction.
-    if out_relay is None:
-        targ_inst.add_out(Output(
-            out=targ_out,
-            inst_out=targ_out_name,
-            targ=inst['targetname'],
-            inp=in_inp,
-            inst_in=in_name,
-        ))
-    else:
-        from conditions.instances import add_global_input
-        add_global_input(
-            inst,
-            in_name,
-            in_inp,
-            rl_name=out_relay,
-            output=targ_out,
-        )
-    return True

@@ -6,7 +6,7 @@ import operator
 from typing import Dict, Optional, Union
 
 import conditions
-import srctools
+import srctools.logger
 from conditions import (
     make_flag, make_result, make_result_setup,
     ALL_INST,
@@ -14,9 +14,8 @@ from conditions import (
 import instanceLocs
 import instance_traits
 from srctools import Property, Vec, Entity, Output, VMF
-import utils
 
-LOGGER = utils.getLogger(__name__, 'cond.instances')
+LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 
 COND_MOD_NAME = 'Instances'
 
@@ -49,55 +48,56 @@ def flag_has_trait(inst: Entity, flag: Property):
     """Check if the instance has a specific 'trait', which is set by code.
 
     Current traits:
-        * `white`, `black`: If editoritems indicates the colour of the item.
-        * `arrival_departure_transition`: `arrival_departure_transition_ents`.
-        * `barrier`: Glass/grating instances:
-            * `barrier_128`: Segment instance.
-            * `barrier_frame`: Any frame part.
-                * `frame_convex_corner`: Convex corner (unused).
-                * `frame_short`: Shortened frame to fit a corner.
-                * `frame_straight`: Straight frame section.
-                * `frame_corner`: Frame corner section.
-                * `frame_left`: Left half of the frame.
-                * `frame_right`: Right half of the frame.
-        * `floor_button`: ItemButtonFloor type item:
-            * `btn_ball`: Button Type = Sphere.
-            * `btn_cube`: Button Type = Cube
-            * `weighted`: Button Type = Weighted
-        * `dropperless`: A dropperless Cube:
-            * `cube_standard`: Normal Cube.
-            * `cube_companion`: Companion Cube.
-            * `cube_ball`: Edgeless Safety Cube.
-            * `cube_reflect`: Discouragment Redirection Cube.
-            * `cube_franken`: FrankenTurret.
-        * `coop_corridor`: A Coop exit Corridor.
-        * `sp_corridor`: SP entry or exit corridor.
-        * `corridor_frame`: White/black door frame.
-        * `corridor_1`-`7`: The specified entry/exit corridor.
-        * `elevator`: An elevator instance.
-        * `entry_elevator`: Entry Elevator.
-        * `exit_elevator`: Exit Elevator.
-        * `entry_corridor`: Entry SP Corridor.
-        * `exit_corridor`: Exit SP/Coop Corridor.
-        * `fizzler`: A fizzler item:
-            * `fizzler_base`: Logic instance.
-            * `fizzler_model`: Model instance.
-        * `locking_targ`: Target of a locking pedestal button.
-        * `locking_btn`: Locking pedestal button.
-        * `paint_dropper`: Gel Dropper:
-            * `paint_dropper_bomb`: Bomb-type dropper.
-            * `paint_dropper_sprayer`: Sprayer-type dropper.
-        * `panel_angled`: Angled Panel-type item.
-        * `track_platform`: Track Platform-style item:
-            * `plat_bottom`: Bottom frame.
-            * `plat_bottom_grate`: Grating.
-            * `plat_middle`: Middle frame.
-            * `plat_single`: One-long frame.
-            * `plat_top`: Top frame.
-            * `plat_non_osc`: Non-oscillating platform.
-            * `plat_osc`: Oscillating platform.
-        * `tbeam_emitter`: Funnel emitter.
-        * `tbeam_frame`: Funnel frame.
+
+    * `white`, `black`: If editoritems indicates the colour of the item.
+    * `arrival_departure_transition`: `arrival_departure_transition_ents`.
+    * `barrier`: Glass/grating instances:
+        * `barrier_128`: Segment instance.
+        * `barrier_frame`: Any frame part.
+            * `frame_convex_corner`: Convex corner (unused).
+            * `frame_short`: Shortened frame to fit a corner.
+            * `frame_straight`: Straight frame section.
+            * `frame_corner`: Frame corner section.
+            * `frame_left`: Left half of the frame.
+            * `frame_right`: Right half of the frame.
+    * `floor_button`: ItemButtonFloor type item:
+        * `btn_ball`: Button Type = Sphere.
+        * `btn_cube`: Button Type = Cube
+        * `weighted`: Button Type = Weighted
+    * `dropperless`: A dropperless Cube:
+        * `cube_standard`: Normal Cube.
+        * `cube_companion`: Companion Cube.
+        * `cube_ball`: Edgeless Safety Cube.
+        * `cube_reflect`: Discouragment Redirection Cube.
+        * `cube_franken`: FrankenTurret.
+    * `coop_corridor`: A Coop exit Corridor.
+    * `sp_corridor`: SP entry or exit corridor.
+    * `corridor_frame`: White/black door frame.
+    * `corridor_1`-`7`: The specified entry/exit corridor.
+    * `elevator`: An elevator instance.
+    * `entry_elevator`: Entry Elevator.
+    * `exit_elevator`: Exit Elevator.
+    * `entry_corridor`: Entry SP Corridor.
+    * `exit_corridor`: Exit SP/Coop Corridor.
+    * `fizzler`: A fizzler item:
+        * `fizzler_base`: Logic instance.
+        * `fizzler_model`: Model instance.
+    * `locking_targ`: Target of a locking pedestal button.
+    * `locking_btn`: Locking pedestal button.
+    * `paint_dropper`: Gel Dropper:
+        * `paint_dropper_bomb`: Bomb-type dropper.
+        * `paint_dropper_sprayer`: Sprayer-type dropper.
+    * `panel_angled`: Angled Panel-type item.
+    * `track_platform`: Track Platform-style item:
+        * `plat_bottom`: Bottom frame.
+        * `plat_bottom_grate`: Grating.
+        * `plat_middle`: Middle frame.
+        * `plat_single`: One-long frame.
+        * `plat_top`: Top frame.
+        * `plat_non_osc`: Non-oscillating platform.
+        * `plat_osc`: Oscillating platform.
+    * `tbeam_emitter`: Funnel emitter.
+    * `tbeam_frame`: Funnel frame.
     """
     return flag.value.casefold() in instance_traits.get(inst)
 
@@ -263,7 +263,7 @@ def res_replace_instance(inst: Entity, res: Property):
     `keys` and `localkeys` defines the new keyvalues used.
     `targetname` and `angles` are preset, and `origin` will be used to offset
     the given amount from the current location.
-    If keep_instance` is true, the instance entity will be kept instead of
+    If `keep_instance` is true, the instance entity will be kept instead of
     removed.
     """
     import vbsp
@@ -320,7 +320,7 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
     Arguments:  
     
     - `Input`: the input to use, either a name or an `instance:` command.
-    - `Target`: If set, a local name to send commands to.
+    - `Target`: If set, a local name to send commands to. Otherwise, the instance itself.
     - `Delay`: Number of seconds to delay the input.
     - `Name`: If set the name of the `logic_relay` which must be triggered.
         If not set the output will fire `OnMapSpawn`.
@@ -340,6 +340,8 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
             inst,
             conditions.resolve_value(inst, output.target)
         )
+    else:
+        output.target = inst['targetname']
 
     relay_name = conditions.resolve_value(inst, relay_name)
     output.params = conditions.resolve_value(inst, output.params)

@@ -8,15 +8,15 @@ import re
 from collections import defaultdict
 from functools import lru_cache
 
-import utils
 from srctools import Property
+import srctools.logger
 
 from typing import (
-    Optional, Union, T,
-    List, Dict, Tuple,
+    Optional, Union,
+    List, Dict, Tuple, TypeVar
 )
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # The list of instance each item uses.
 INSTANCE_FILES = {}
@@ -220,6 +220,16 @@ def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
 
+    # Extra definitions: key -> filename.
+    # Make sure to do this first, so numbered instances are set in
+    # ITEM_FOR_FILE.
+    for prop in prop_block.find_key('CustInstances', []):
+        CUST_INST_FILES[prop.name] = special_inst = {}
+        for inst in prop:
+            file = inst.value.casefold()
+            special_inst[inst.name] = file
+            ITEM_FOR_FILE[file] = (prop.name, inst.name)
+
     # Normal instances: index -> filename
     for prop in prop_block.find_key('Allinstances', []):
         INSTANCE_FILES[prop.name] = inst_list = []
@@ -228,14 +238,6 @@ def load_conf(prop_block: Property):
             inst_list.append(file)
             ITEM_FOR_FILE[file] = (prop.name, ind)
 
-    # Extra definitions: key -> filename
-    for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.name] = special_inst = {}
-        for inst in prop:
-            file = inst.value.casefold()
-            special_inst[inst.name] = file
-            ITEM_FOR_FILE[file] = (prop.name, inst.name)
-
     INST_SPECIAL = {
         key.casefold(): resolve(val_string, silent=True)
         for key, val_string in
@@ -243,7 +245,7 @@ def load_conf(prop_block: Property):
     }
 
 
-def resolve(path, silent=False) -> List[str]:
+def resolve(path: str, silent: bool=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
 
     Valid paths:
@@ -275,8 +277,10 @@ def resolve(path, silent=False) -> List[str]:
     else:
         return _resolve(path)
 
+Default_T = TypeVar('Default_T')
 
-def resolve_one(path, default: T='', error=False) -> Union[str, T]:
+
+def resolve_one(path, default: Default_T='', error=False) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -297,7 +301,7 @@ def resolve_one(path, default: T='', error=False) -> Union[str, T]:
 
 # Cache the return values, since they're constant.
 @lru_cache(maxsize=256)
-def _resolve(path):
+def _resolve(path: str) -> List[str]:
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
     """

@@ -9,22 +9,27 @@ import srctools
 
 COND_MOD_NAME = None
 
+
 @conditions.make_result('ConveyorBelt')
 def res_conveyor_belt(inst: Entity, res: Property):
     """Create a conveyor belt.
 
-    Options:
-        SegmentInst: Generated at each square. ('track' is the name of the path.)
-        TrackTeleport: Set the track points so they teleport trains to the start.
-        Speed: The fixup or number for the train speed.
-        MotionTrig: If set, a trigger_multiple will be spawned that EnableMotions
+    * Options:
+        * `SegmentInst`: Generated at each square. (`track` is the name of the path to attach to.)
+        * `TrackTeleport`: Set the track points so they teleport trains to the start.
+        * `Speed`: The fixup or number for the train speed.
+        * `MotionTrig`: If set, a trigger_multiple will be spawned that `EnableMotion`s
           weighted cubes. The value is the name of the relevant filter.
-        EndOutput: Adds an output to the last track. The value is the same as
+        * `EndOutput`: Adds an output to the last track. The value is the same as
           outputs in VMFs.
-        RotateSegments: If true (default), force segments to face in the
-          direction of movement
-        RailTemplate: A template for the railings. This is made into a non-solid
+        `RotateSegments`: If true (default), force segments to face in the
+          direction of movement.
+        * `BeamKeys`: If set, a list of keyvalues to use to generate an env_beam 
+          travelling from start to end.
+        `RailTemplate`: A template for the track sections. This is made into a non-solid
           func_brush, combining all sections.
+        * `NoPortalFloor`: If set, add a `func_noportal_volume` on the floor under the track.
+        * `PaintFizzler`: If set, add a paint fizzler underneath the belt.
     """
     move_dist = srctools.conv_int(inst.fixup['$travel_distance'])
 

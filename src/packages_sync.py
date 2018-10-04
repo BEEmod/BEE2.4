@@ -12,12 +12,13 @@ otherwise.
 import utils
 import gettext
 from srctools.filesys import RawFileSystem
+import srctools.logger
 
 
 utils.fix_cur_directory()
 # Don't write to a log file, users of this should be able to handle a command
 # prompt.
-LOGGER = utils.init_logging(main_logger=__name__)
+LOGGER = srctools.logger.init_logging(main_logger=__name__)
 # This is needed to allow us to import things properly.
 gettext.NullTranslations().install(['gettext', 'ngettext'])
 

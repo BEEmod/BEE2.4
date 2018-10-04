@@ -1,17 +1,16 @@
 """Manages reading general options from vbsp_config."""
-from enum import Enum
+from enum import Enum, EnumMeta
 
 import inspect
-import io
 
 from srctools import Property, Vec, parse_vec_str
 from BEE2_config import ConfigFile
-import srctools
-import utils
+import srctools.logger
 
-from typing import Union, Tuple, TypeVar, Type, Optional, Iterator
+from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO
 
-LOGGER = utils.getLogger(__name__)
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 SETTINGS = {}
 
@@ -26,6 +25,10 @@ class TYPE(Enum):
     FLOAT = float
     BOOL = bool
     VEC = Vec
+
+    def convert(self, value: str) -> Any:
+        """Convert a string to the desired argument type."""
+        return self.value(value)
     
 TYPE_NAMES = {
     TYPE.STR: 'Text',
@@ -35,17 +38,26 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
+OptionT = TypeVar('OptionT')
+
 
 class Opt:
-    def __init__(self, id: str, default, doc, fallback=None):
+    """A type of option that can be chosen."""
+    def __init__(
+        self,
+        opt_id: str,
+        default: Union[TYPE, OptionT],
+        doc: str,
+        fallback: str=None,
+    ) -> None:
         if isinstance(default, TYPE):
             self.type = default
             self.default = None
         else:
             self.type = TYPE(type(default))
             self.default = default
-        self.id = id.casefold()
-        self.name = id
+        self.id = opt_id.casefold()
+        self.name = opt_id
         self.fallback = fallback
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
@@ -55,7 +67,7 @@ class Opt:
             )
 
 
-def load(opt_blocks: Iterator[Property]):
+def load(opt_blocks: Iterator[Property]) -> None:
     """Read settings from the given property block."""
     SETTINGS.clear()
     set_vals = {}
@@ -94,9 +106,9 @@ def load(opt_blocks: Iterator[Property]):
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:
             SETTINGS[opt.id] = srctools.conv_bool(val, opt.default)
-        else: # int, float, str - no special handling...
+        else:  # int, float, str - no special handling...
             try:
-                SETTINGS[opt.id] = opt.type.value(val)
+                SETTINGS[opt.id] = opt.type.convert(val)
             except (ValueError, TypeError):
                 SETTINGS[opt.id] = opt.default
 
@@ -112,7 +124,7 @@ def load(opt_blocks: Iterator[Property]):
         LOGGER.warning('Extra config options: {}', set_vals)
 
 
-def set_opt(opt_name: str, value: str):
+def set_opt(opt_name: str, value: str) -> None:
     """Set an option to a specific value."""
     folded_name = opt_name.casefold()
     for opt in DEFAULTS:
@@ -132,33 +144,54 @@ def set_opt(opt_name: str, value: str):
         SETTINGS[opt.id] = srctools.conv_bool(value, SETTINGS[opt.id])
     else:  # int, float, str - no special handling...
         try:
-            SETTINGS[opt.id] = opt.type.value(value)
+            SETTINGS[opt.id] = opt.type.convert(value)
         except (ValueError, TypeError):
             pass
 
-OptionType = TypeVar('OptionType')
 
-
-def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
+def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
     """Get the given option. 
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
+
+    If expected_type is an Enum, this will be used to convert the output.
+    If it fails, a warning is produced and the first value in the enum is
+    returned.
     """
     try:
         val = SETTINGS[name.casefold()]
     except KeyError:
         raise TypeError('Option "{}" does not exist!'.format(name)) from None
-    
+
     if val is None:
         return None
+
+    if isinstance(expected_type, EnumMeta):
+        enum_type = expected_type
+        expected_type = str
+    else:
+        enum_type = None
         
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
         raise ValueError('Option "{}" is {} (expected {})'.format(
-            name, 
-            type(val), 
+            name,
+            type(val),
             expected_type,
         ))
+
+    if enum_type is not None:
+        try:
+            return enum_type(val)
+        except ValueError:
+            LOGGER.warning(
+                'Option "{}" is not a valid value. '
+                'Allowed values are:\n{}',
+                name,
+                '\n'.join([mem.value for mem in enum_type])
+            )
+            return next(iter(enum_type))
+
     # Vec is mutable, don't allow modifying the original.
     if expected_type is Vec:
         return val.copy()
@@ -168,9 +201,9 @@ def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
 
 def get_itemconf(
     name: Union[str, Tuple[str, str]],
-    default: Optional[OptionType],
+    default: Optional[OptionT],
     timer_delay: int=None,
-) -> Optional[OptionType]:
+) -> Optional[OptionT]:
     """Get an itemconfig value.
 
     The name should be an 'ID:Section', or a tuple of the same.
@@ -231,7 +264,7 @@ This is a list of all current options for the config.
 '''
 
 
-def dump_info(file):
+def dump_info(file: TextIO) -> None:
     """Create the wiki page for item options, given a file to write to."""
     print(DOC_HEADER, file=file)
     
@@ -274,8 +307,8 @@ DEFAULTS = [
         """Set the offset of squarebeams to 0.
         """),
     Opt('edge_scale', 0.15,
-       """The scale on squarebeams textures.
-       """),
+        """The scale on squarebeams textures.
+        """),
     Opt('rotate_edge_special', TYPE.BOOL,
         """Rotate squarebeams textures on angled/flip panels 90 degrees.
         """, fallback='rotate_edge'),
@@ -342,6 +375,40 @@ DEFAULTS = [
         """The local name that the panel func_brush should parent to.
         Adding the attachment name to the parent after a comma
         automatically sets the attachment point for the brush.
+        """),
+
+    Opt('ind_pan_check_switching', 'custom',
+        """Specify the type of switching behaviour used in the instance.
+        
+        This can allow optimising control of antlines. The $indicator_name
+        fixup value should be used for the names of overlays. If the option is
+        set to 'internal', one instance contains the toggle/panel entity. If it 
+        is set to 'external', one is generated for the instance(s). If set to 
+        'custom' (default), no optimisation is done (other than skipping the
+        proxy).
+        """),
+
+    Opt('ind_pan_timer_switching', 'custom',
+        """Specify the type of switching behaviour used in the instance.
+        
+        This can allow optimising control of antlines. The $indicator_name
+        fixup value should be used for the names of overlays. If the option is
+        set to 'internal', one instance contains the toggle/panel entity. If it 
+        is set to 'external', one is generated for the instance(s). If set to 
+        'custom' (default), no optimisation is done (other than skipping the
+        proxy).
+        """),
+
+    Opt('timer_sound', 'Portal.room1_TickTock',
+        """The soundscript used for timer tick-tock sounds. 
+        
+        Re-played every second, so it should not loop."""),
+
+    Opt('timer_sound_cc', TYPE.STR,
+        """Closed caption soundscript for tick-tock sounds.
+        
+        We mimic this soundscript when `timer_sound` is played.
+        Set to "" to disable adding additional closed captions. 
         """),
 
     Opt('signInst', TYPE.STR,
@@ -486,17 +553,14 @@ DEFAULTS = [
     Opt('game_id', "620",
         """(Automatic) The game's steam ID.
         """),
-    Opt('music_id', "<NONE>",
-        """The ID of the selected music.
-        """),
     Opt('music_instance', TYPE.STR,
         """The instance for the chosen music.
         """),
-    Opt('music_soundscript', TYPE.STR,
-        """The soundscript for the chosen music.
-        """),
     Opt('music_looplen', 0,
         """If set, re-trigger music after this number of seconds.
+        """),
+    Opt('music_sync_tbeam', False,
+        """If set, funnel music syncs with the main track.
         """),
     Opt('skybox', 'sky_black',
         """The skybox name to use for the map.

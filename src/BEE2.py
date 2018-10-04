@@ -2,12 +2,13 @@
 
 # First do a few things as early as possible.
 import utils
+import srctools.logger
 
 utils.fix_cur_directory()
 # We need to initialise logging as early as possible - that way
 # it can record any errors in the initialisation of modules.
 import tk_tools
-LOGGER = utils.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
+LOGGER = srctools.logger.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
 
 utils.setup_localisations(LOGGER)
 
@@ -22,8 +23,8 @@ import paletteLoader
 import packageLoader
 import gameMan
 import logWindow
-import sound
 import img
+import music_conf
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -62,7 +63,7 @@ DEFAULT_SETTINGS = {
 GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
-loadScreen.main_loader.set_length('UI', 15)
+loadScreen.main_loader.set_length('UI', 14)
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
 # OS X starts behind other windows, fix that.
@@ -99,10 +100,11 @@ pack_data, package_sys = packageLoader.load_packages(
 )
 
 # Load filesystems into various modules
+music_conf.load_filesystems(package_sys)
 img.load_filesystems(package_sys)
 gameMan.load_filesystems(package_sys)
 
-UI.load_packages(pack_data, package_sys)
+UI.load_packages(pack_data)
 LOGGER.info('Done!')
 
 LOGGER.info('Loading Palettes...')
@@ -113,10 +115,6 @@ LOGGER.info('Done!')
 LOGGER.info('Loading Item Translations...')
 for game in gameMan.all_games:
     game.init_trans()
-
-LOGGER.info('Loading sound FX...')
-sound.load_snd()
-loadScreen.main_loader.step('UI')
 
 LOGGER.info('Initialising UI...')
 UI.init_windows()  # create all windows

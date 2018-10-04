@@ -3,15 +3,16 @@
 """
 from collections import deque
 
-from srctools import Vec, Vec_tuple, Property, Entity, VMF
+from srctools import Vec, Vec_tuple, VMF
 from enum import Enum
 
-import utils
+import srctools.logger
 import bottomlessPit
 
-from typing import Dict, Union
+from typing import Dict, Union, Set, Iterator, Tuple, Iterable
 
-LOGGER = utils.getLogger(__name__)
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 # The attribute to set if these are in the map.
 VOICE_ATTR_GOO = 'goo'
@@ -146,7 +147,7 @@ class Grid(Dict[_grid_keys, Block]):
         self,
         pos: _grid_keys,
         direction: Vec,
-        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM}),
+        collide: Set[Block]=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
     ) -> Vec:
         """Move in a direction until hitting a block of a certain type.
 
@@ -185,17 +186,17 @@ class Grid(Dict[_grid_keys, Block]):
         self,
         pos: Vec,
         direction: Vec,
-        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
+        collide: Set[Block]=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
     ) -> Vec:
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
 
-    def __getitem__(self, pos: _grid_keys):
+    def __getitem__(self, pos: _grid_keys) -> Block:
         return super().get(self._conv_key(pos), Block.VOID)
 
     get = __getitem__
 
-    def __setitem__(self, pos: _grid_keys, value: Block):
+    def __setitem__(self, pos: _grid_keys, value: Block) -> None:
         if type(value) is not Block:
             raise ValueError('Must be set to a Block item, not "{}"!'.format(
                 type(value).__name__,
@@ -203,17 +204,17 @@ class Grid(Dict[_grid_keys, Block]):
 
         super().__setitem__(self._conv_key(pos), value)
 
-    def __contains__(self, pos: _grid_keys):
+    def __contains__(self, pos: _grid_keys) -> bool:
         return super().__contains__(self._conv_key(pos))
 
-    def keys(self):
+    def keys(self) -> Iterator[Vec]:
         yield from map(Vec, super().keys())
 
-    def items(self):
+    def items(self) -> Iterator[Tuple[Vec, Block]]:
         for pos, block in super().items():
             yield Vec(pos), block
 
-    def read_from_map(self, vmf: VMF, has_attr: dict):
+    def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool]) -> None:
         """Given the map file, set blocks."""
         search_locs = []
 
@@ -296,7 +297,7 @@ class Grid(Dict[_grid_keys, Block]):
         self.fill_air(search_locs)
         LOGGER.info('Air filled!')
 
-    def fill_air(self, search_locs):
+    def fill_air(self, search_locs: Iterable[Vec]):
         """Flood-fill the area, making all inside spaces air.
 
         This assumes the map is sealed.
@@ -304,9 +305,9 @@ class Grid(Dict[_grid_keys, Block]):
         Since ambient_light ents are placed every 5 blocks, this should
         cover all playable space.
         """
-        queue = deque(search_locs)
+        queue = deque(search_locs)  # type: deque[Union[Vec, Tuple[float, float, float]]]
 
-        def iterdel():
+        def iterdel() -> Iterator[Vec]:
             """Iterate as FIFO queue, deleting as we go."""
             try:
                 while True:
@@ -315,7 +316,7 @@ class Grid(Dict[_grid_keys, Block]):
                 return
 
         # This will iterate every item we add to the queue..
-        for pos in iterdel():  # type: Vec
+        for pos in iterdel():
             if pos in self:
                 # Already set...
                 continue

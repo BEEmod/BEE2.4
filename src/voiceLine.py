@@ -1,4 +1,4 @@
-# coding=utf-8
+"""Adds voicelines dynamically into the map."""
 import itertools
 import os
 import random
@@ -7,15 +7,15 @@ from decimal import Decimal
 from typing import List, Set
 
 import conditions.monitor
-import srctools
-import utils
+import packing
+import srctools.logger
 import vbsp
 import vbsp_options
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output, Entity
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
 
 map_attr = {}
@@ -357,16 +357,16 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
             # chosen.
             style_vars[prop.value.casefold()] = True
         elif name == 'packlist':
-            vbsp.TO_PACK.add(prop.value.casefold())
+            packing.pack_list(vmf_file, prop.value)
         elif name == 'pack':
             if prop.has_children():
-                vbsp.PACK_FILES.update(
+                packing.pack_files(vmf_file, *[
                     subprop.value
                     for subprop in
                     prop
-                )
+                ])
             else:
-                vbsp.PACK_FILES.add(prop.value)
+                packing.pack_files(vmf_file, prop.value)
         elif name == 'choreo_name':
             # Change the targetname used for subsequent entities
             targetname = prop.value

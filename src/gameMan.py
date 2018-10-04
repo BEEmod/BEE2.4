@@ -5,35 +5,42 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
-import itertools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
 from tk_tools import TK_ROOT
 
 import os
-import os.path
 import shutil
 import math
+import re
+
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
 from srctools import (
     Vec, VPK,
-    Property, NoKeyError,
+    Property,
     VMF, Output,
-    FileSystemChain,
+    FileSystem, FileSystemChain,
 )
+import srctools.logger
 import backup
 import loadScreen
 import packageLoader
 import utils
 import srctools
 
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Iterable, Iterator, Dict
+
+try:
+    from importlib.resources import read_binary as imp_res_read_binary
+except ImportError:
+    # Backport module for before Python 3.7
+    from importlib_resources import read_binary as imp_res_read_binary
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 all_games = []  # type: List[Game]
 selected_game = None  # type: Game
@@ -107,10 +114,6 @@ GAMEINFO_LINE = 'Game\t"BEE2"'
 # We inject this line to recognise where our sounds start, so we can modify
 # them.
 EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
-
-# The name given to standard connections - regular input/outputs in editoritems.
-CONN_NORM = 'CONNECTION_STANDARD'
-CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
@@ -210,13 +213,13 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
-def load_filesystems(package_sys):
+def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
     """Load package filesystems into a chain."""
     for system in package_sys:
         res_system.add_sys(system, prefix='resources/')
 
 
-def translate(string):
+def translate(string: str) -> str:
     """Translate the string using Portal 2's language files.
 
     This is needed for Valve items, since they translate automatically.
@@ -239,7 +242,13 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id: str, folder, mod_times):
+    def __init__(
+        self,
+        name: str,
+        steam_id: str,
+        folder: str,
+        mod_times: Dict[str, int],
+    ) -> None:
         self.name = name
         self.steamID = steam_id
         self.root = folder
@@ -247,7 +256,8 @@ class Game:
         self.mod_times = mod_times
 
     @classmethod
-    def parse(cls, gm_id, config: ConfigFile):
+    def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
+        """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():
             raise ValueError(
@@ -267,7 +277,7 @@ class Game:
 
         return cls(gm_id, steam_id, folder, mod_times)
 
-    def save(self):
+    def save(self) -> None:
         """Write a game into the config page."""
         # Wipe the original configs
         CONFIG[self.name] = {}
@@ -276,7 +286,7 @@ class Game:
         for pack, mod_time in self.mod_times.items():
             CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
-    def dlc_priority(self):
+    def dlc_priority(self) -> Iterator[str]:
         """Iterate through all subfolders, in order of high to low priority.
 
         We assume the priority follows:
@@ -301,10 +311,14 @@ class Game:
                     folder not in blacklist):
                 yield folder
 
-    def abs_path(self, path):
+    def abs_path(self, path: str) -> str:
+        """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
 
-    def add_editor_sounds(self, sounds):
+    def add_editor_sounds(
+        self,
+        sounds: Iterable[packageLoader.EditorSound],
+    ) -> None:
         """Add soundscript items so they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
         # First find the highest-priority file
@@ -335,7 +349,7 @@ class Game:
                 del file_data[i:]
 
         # Then add our stuff!
-        with open(file, 'w', encoding='utf8') as f:
+        with srctools.AtomicWriter(file) as f:
             f.writelines(file_data)
             f.write(EDITOR_SOUND_LINE + '\n')
             for sound in sounds:
@@ -343,7 +357,7 @@ class Game:
                     f.write(line)
                 f.write('\n')  # Add a little spacing
 
-    def edit_gameinfo(self, add_line=False):
+    def edit_gameinfo(self, add_line=False) -> None:
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
@@ -403,7 +417,52 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
-    def cache_invalid(self):
+    def edit_fgd(self, add_lines: bool=False) -> None:
+        """Add our FGD files to the game folder.
+
+        This is necessary so that VBSP offsets the entities properly,
+        if they're in instances.
+        Add_line determines if we are adding or removing it.
+        """
+        # We do this in binary to ensure non-ASCII characters pass though
+        # untouched.
+
+        fgd_path = self.abs_path('bin/portal2.fgd')
+        try:
+            with open(fgd_path, 'rb') as file:
+                data = file.readlines()
+        except FileNotFoundError:
+            LOGGER.warning('No FGD file? ("{}")', fgd_path)
+            return
+
+        for i, line in enumerate(data):
+            match = re.match(
+                br'// BEE\W*2 EDIT FLAG\W*=\W*([01])',
+                line,
+                re.IGNORECASE,
+            )
+            if match:
+                if match.group(0) == '0':
+                    return  # User specifically disabled us.
+                # Delete all data after this line.
+                del data[i:]
+                break
+
+        with srctools.AtomicWriter(fgd_path, is_bytes=True) as file:
+            for line in data:
+                file.write(line)
+            if add_lines:
+                file.write(
+                    b'// BEE 2 EDIT FLAG = 1 \n'
+                    b'// Added automatically by BEE2. Set above to "0" to '
+                    b'allow editing below text without being overwritten.\n'
+                    b'\n\n'
+                )
+                with open('../BEE2.fgd', 'rb') as bee2_fgd:
+                    shutil.copyfileobj(bee2_fgd, file)
+                file.write(imp_res_read_binary(srctools, 'srctools.fgd'))
+
+    def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
         if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
             # Skipped always
@@ -421,7 +480,7 @@ class Game:
         ):
             return True
 
-    def refresh_cache(self, already_copied: Set[str]):
+    def refresh_cache(self, already_copied: Set[str]) -> None:
         """Copy over the resource files into this game.
 
         already_copied is passed from copy_mod_music(), to
@@ -481,7 +540,7 @@ class Game:
         self.save()
         CONFIG.save_check()
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Remove all resources from the game."""
         shutil.rmtree(self.abs_path(INST_PATH), ignore_errors=True)
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
@@ -499,7 +558,7 @@ class Game:
         style: packageLoader.Style,
         selected_objects: dict,
         should_refresh=False,
-        ) -> Tuple[bool, bool]:
+    ) -> Tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -549,7 +608,9 @@ class Game:
         # VBSP_config
         # Instance list
         # Editor models.
-        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 4)
+        # FGD file
+        # Gameinfo
+        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 6)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -652,10 +713,15 @@ class Game:
             for item_prop in editoritems.find_all('Item'):
                 improve_item(item_prop)
 
-            LOGGER.info('Editing Gameinfo!')
+            LOGGER.info('Editing Gameinfo...')
             self.edit_gameinfo(True)
+            export_screen.step('EXP')
 
-            LOGGER.info('Writing instance list!')
+            LOGGER.info('Adding ents to FGD.')
+            self.edit_fgd(True)
+            export_screen.step('EXP')
+
+            LOGGER.info('Writing instance list...')
             with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
                 for line in self.build_instance_data(editoritems):
                     inst_file.write(line)
@@ -663,7 +729,7 @@ class Game:
 
             # AtomicWriter writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
-            LOGGER.info('Writing Editoritems!')
+            LOGGER.info('Writing Editoritems...')
             with srctools.AtomicWriter(self.abs_path(
                     'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
                 for line in editoritems.export():
@@ -787,7 +853,12 @@ class Game:
                         os.path.join(mdl_folder, file_no_ext + new_ext),
                     )
 
-        LOGGER.info('{}/{} editor models used.', len(used_models), mdl_count)
+        LOGGER.info(
+            '{}/{} ({:.0%})editor models used.',
+            len(used_models),
+            mdl_count,
+            len(used_models) / mdl_count,
+        )
 
     @staticmethod
     def build_instance_data(editoritems: Property):
@@ -809,11 +880,32 @@ class Game:
             commands,
         ])
 
-        for item in editoritems.find_all("Item"):
-            instance_block = Property(item['Type'], [])
-            instance_locs.append(instance_block)
+        # Produce the VMF output command we want - all PeTI outputs are simply
+        # just the input part, no delays, counts, parameter or target instance.
+        # so make those blank.
+        output_format = ',{},,0.0,-1'.replace(',', Output.SEP).format
 
-            comm_block = Property(item['Type'], [])
+        def conv_peti_input(block: Property, key: str, name: str):
+            """Do comm_block[key] = block[name], but convert the formats.
+
+            comm_block expects a full VMF output value, but PeTI just has the IO
+            component (instance:x;blah).
+            """
+            if key in block:
+                # Do not add from editoritems if the new style is set.
+                return
+            try:
+                full_value = output_format(block[name])
+            except IndexError:  # No key
+                pass
+            else:
+                comm_block.append(Property(key, full_value))
+
+        for item in editoritems.find_all("Item"):
+            item_id = item['Type']
+
+            instance_block = Property(item_id, [])
+            instance_locs.append(instance_block)
 
             for inst_block in item.find_all("Exporting", "instances"):
                 for inst in inst_block.value[:]:  # type: Property
@@ -833,46 +925,33 @@ class Game:
                             name = name[5:]
 
                         cust_inst.set_key(
-                            (item['type'], name),
+                            (item_id, name),
                             # Allow using either the normal block format,
                             # or just providing the file - we don't use the
                             # other values.
                             inst['name'] if inst.has_children() else inst.value,
                         )
 
-            # Look in the Inputs and Outputs blocks to find the io definitions.
-            # Copy them to property names like 'Input_Activate'.
-            for io_type in ('Inputs', 'Outputs'):
-                for block in item.find_all('Exporting', io_type, CONN_NORM):
-                    for io_prop in block:
-                        comm_block[
-                            io_type[:-1] + '_' + io_prop.real_name
-                        ] = io_prop.value
+            comm_block = Property(item['Type'], [])
 
-            # The funnel item type is special, having the additional input type.
-            # Handle that specially.
-            if item['type'].casefold() == 'item_tbeam':
-                for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
-                    for io_prop in block:
-                        comm_block['TBeam_' + io_prop.real_name] = io_prop.value
-
-            # Fizzlers don't work correctly with outputs. This is a signal to
-            # conditions.fizzler, but it must be removed in editoritems.
-            if item['ItemClass', ''].casefold() == 'itembarrierhazard':
-                for block in item.find_all('Exporting', 'Outputs'):
-                    if CONN_NORM in block:
-                        del block[CONN_NORM]
+            (
+                has_input,
+                has_output,
+                has_secondary,
+            ) = packageLoader.Item.convert_item_io(comm_block, item, conv_peti_input)
 
             # Record the itemClass for each item type.
-            item_classes[item['type']] = item['ItemClass', 'ItemBase']
+            # 'ItemBase' is the default class.
+            item_classes[item_id] = item['ItemClass', 'ItemBase']
 
             # Only add the block if the item actually has IO.
-            if comm_block.value:
+            if has_input or has_secondary or has_output:
                 commands.append(comm_block)
 
         return root_block.export()
 
     def generate_fizzler_sides(self, conf: Property):
+        """Create the VMTs used for fizzler sides."""
         fizz_colors = {}
         mat_path = self.abs_path('bee2/materials/BEE2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
@@ -989,7 +1068,7 @@ class Game:
             appman = Property.parse(appman_file, 'appmanifest_620.acf')
         try:
             lang = appman.find_key('AppState').find_key('UserConfig')['language']
-        except NoKeyError:
+        except LookupError:
             return
 
         self.load_trans(lang)
@@ -1344,6 +1423,7 @@ def remove_game(e=None):
         )
     if confirm:
         selected_game.edit_gameinfo(add_line=False)
+        selected_game.edit_fgd(add_lines=False)
 
         all_games.remove(selected_game)
         CONFIG.remove_section(selected_game.name)

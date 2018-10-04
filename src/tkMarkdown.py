@@ -5,13 +5,12 @@ from markdown.util import etree
 from markdown.extensions import smart_strong, sane_lists
 from markdown.preprocessors import Preprocessor
 import markdown
-
-import utils
+import srctools.logger
 
 from typing import Iterable, Iterator, Union, List, Tuple
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # These tags if present simply add a TK tag.
 SIMPLE_TAGS = {

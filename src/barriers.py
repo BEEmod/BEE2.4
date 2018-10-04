@@ -1,19 +1,20 @@
 """Implements Glass and Grating."""
-from enum import Enum
-from typing import Dict, Tuple, List, Set, Callable, Iterable
-
 from collections import defaultdict
+from enum import Enum
+from typing import Dict, Tuple, List, Set, Callable
 
-from grid_optim import optimise as grid_optimise
+import comp_consts as consts
+import srctools.logger
 import template_brush
 import vbsp_options
-from srctools import VMF, Vec, Solid, Side, Property, Entity
-import utils
-import comp_consts as consts
-from instanceLocs import resolve_one
+import packing
 from conditions import make_result
+from grid_optim import optimise as grid_optimise
+from instanceLocs import resolve_one
+from srctools import VMF, Vec, Solid, Property, Entity
 
-LOGGER = utils.getLogger(__name__)
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 COND_MOD_NAME = None
@@ -42,7 +43,7 @@ def get_pos_norm(origin: Vec):
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
-def parse_map(vmf: VMF, has_attr: Dict[str, bool], pack_list: Set[str]):
+def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
     """Remove instances from the map, and store off the positions."""
     glass_inst = resolve_one('[glass_128]')
 
@@ -77,7 +78,7 @@ def parse_map(vmf: VMF, has_attr: Dict[str, bool], pack_list: Set[str]):
             inst.remove()
 
     if vbsp_options.get(str, 'glass_pack') and has_attr['glass']:
-        pack_list.add(vbsp_options.get(str, 'glass_pack').casefold())
+        packing.pack_list(vmf, vbsp_options.get(str, 'glass_pack'))
 
 
 def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
@@ -287,7 +288,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
             off_min = min(off1, off2)
             off_max = max(off1, off2)
             new_brushes = [
-                brush.copy(map=vmf)
+                brush.copy(vmf_file=vmf)
                 for brush in hole_temp
             ]
 
@@ -567,7 +568,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 for plane in beam_end_face.planes:
                     plane.x = beam_end_off
 
-                new_beam = beam_template.copy(map=vmf)
+                new_beam = beam_template.copy(vmf_file=vmf)
                 new_beam.localise(min_pos, rot)
                 detail.solids.append(new_beam)
 
@@ -593,11 +594,6 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec):
             normal = (0, 0, -1)
         import vbsp
         for pos in min_pos.iter_line(max_pos, 128):
-            vbsp.VMF.create_ent(
-                'info_particle_system',
-                origin=Vec(pos.x, pos.y, grid_height),
-                angles=Vec(normal).to_angle(),
-            )
             try:
                 hole_type = HOLES[(pos.x, pos.y, grid_height), normal]
             except KeyError:

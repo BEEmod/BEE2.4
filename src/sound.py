@@ -5,12 +5,11 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 import shutil
-import os.path
+import os
 
-from srctools import VPK
 from tk_tools import TK_ROOT
 from srctools.filesys import RawFileSystem, FileSystemChain
-import utils
+import srctools.logger
 
 __all__ = [
     'SOUNDS', 'SamplePlayer',
@@ -20,12 +19,13 @@ __all__ = [
     'fx_blockable', 'block_fx',
 ]
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 play_sound = True
 
 SAMPLE_WRITE_PATH = '../config/music_sample_temp'
 
+# This starts holding the filenames, but then caches the actual sound object.
 SOUNDS = {
     'select': 'rollover',
     'add': 'increment',
@@ -86,19 +86,23 @@ else:
     initiallised = True
     _play_repeat_sfx = True
 
-    def load_snd():
-        """Load in sound FX."""
-        for key, filename in SOUNDS.items():
-            LOGGER.debug('Loading {}', filename)
-            SOUNDS[key] = pyglet.media.load(
-                '../sounds/' + filename + '.ogg',
-                streaming=False,
-            )
-
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
-        if play_sound and name in SOUNDS:
-            SOUNDS[name].play()
+        if not play_sound:
+            return
+        # Defer loading these until we actually need them, speeds up
+        # startup a little.
+        try:
+            sound = SOUNDS[name]
+        except KeyError:
+            raise ValueError(f'Not a valid sound? "{name}"')
+        if type(sound) is str:
+            LOGGER.info('Loading sound "{}" -> sounds/{}.ogg', name, sound)
+            sound = SOUNDS[name] = pyglet.media.load(
+                f'../sounds/{sound}.ogg',
+                streaming=False,
+            )
+        sound.play()
 
 
     def _reset_fx_blockable():

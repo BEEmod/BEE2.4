@@ -1,16 +1,15 @@
-import os.path
+import os
 import shutil
 import zipfile
 import random
 
-import utils
-import srctools
+import srctools.logger
 from srctools import Property
 
 from typing import List, Tuple
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 PAL_DIR = "palettes\\"
 

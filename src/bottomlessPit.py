@@ -2,14 +2,14 @@
 import random
 
 from srctools import Vec, Property, VMF, Solid, Side, Output
-import srctools
+import srctools.logger
 import utils
 import vbsp
 import brushLoc
 import vbsp_options
 
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # The base of a pit must be below this z-pos to be considered a pit.
 # It must basically be one of the bottom two grid positions.

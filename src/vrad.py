@@ -1,20 +1,30 @@
+"""Replacement for Valve's VRAD.
+
+This allows us to change the arguments passed in,
+edit the BSP after instances are collapsed, and pack files.
+"""
+# Run as early as possible to catch errors in imports.
+from srctools.logger import init_logging
+LOGGER = init_logging('bee2/vrad.log')
+
 import os
-import os.path
 import shutil
 import subprocess
 import sys
-import logging
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from zipfile import ZipFile
+from typing import Iterator, List, Tuple
 
 import srctools
 import utils
 from srctools import Property
 from srctools.bsp import BSP, BSP_LUMPS
+from srctools.filesys import RawFileSystem, VPKFileSystem, ZipFileSystem
+from srctools.packlist import PackList, FileType as PackType, load_fgd
+from srctools.game import find_gameinfo
+from srctools.bsp_transform import run_transformations
 
-
-LOGGER = utils.init_logging('bee2/VRAD.log')
 
 CONF = Property('Config', [])
 
@@ -24,12 +34,6 @@ SCREENSHOT_DIR = os.path.join(
     'puzzles',
     # Then the <random numbers> folder
 )
-# Locations of resources we need to pack
-RES_ROOT = [
-    os.path.join('..', loc)
-    for loc in
-    ('bee2', 'bee2_dev', 'portal2_dlc2')
-]
 
 GAME_FOLDER = {
     # The game's root folder, where screenshots are saved
@@ -70,6 +74,9 @@ INJECT_FILES = {
 
     # Script for setting model types on cubes.
     'cube_setmodel.nut': 'scripts/vscripts/BEE2/cube_setmodel.nut',
+
+    # Plays the tick-tock timer sound.
+    'timer_sound.nut': 'scripts/vscripts/BEE2/timer_sound.nut',
 }
 
 # Additional parts to add if we have a mdl file.
@@ -302,10 +309,6 @@ MUSIC_FUNNEL_UPDATE_STACK = """\
 """
 
 
-def quote(txt):
-    return '"' + txt + '"'
-
-
 def load_config():
     global CONF
     LOGGER.info('Loading Settings...')
@@ -319,182 +322,38 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def get_zip_writer(zipfile: ZipFile):
-    """Allow dumping the packed files to a folder.
-
-    Returns a zipfile.write() method.
+def dump_files(zipfile: ZipFile):
+    """Dump packed files to a location.
     """
     dump_folder = CONF['packfile_dump', '']
     if not dump_folder:
-        return zipfile.write
+        return
 
     dump_folder = os.path.abspath(dump_folder)
 
     # Delete files in the folder, but don't delete the folder itself.
     try:
-        dump_files = os.listdir(dump_folder)
+        files = os.listdir(dump_folder)
     except FileNotFoundError:
-        pass
-    else:
-        for name in dump_files:
-            name = os.path.join(dump_folder, name)
-            if os.path.isdir(name):
-                shutil.rmtree(name)
-            else:
-                os.remove(name)
-
-    def write_to_zip(filename, arcname):
-        dump_loc = os.path.join(dump_folder, arcname)
-        os.makedirs(os.path.dirname(dump_loc), exist_ok=True)
-        shutil.copy(filename, dump_loc)
-        zipfile.write(filename, arcname)
-    return write_to_zip
-
-
-def pack_file(zip_write, filename: str, suppress_error=False):
-    """Check multiple locations for a resource file.
-    """
-    if '\t' in filename:
-        # We want to rename the file!
-        filename, arcname = filename.split('\t')
-    else:
-        arcname = filename
-
-    if filename[-1] == '*':
-        # Pack a whole folder (blah/blah/*)
-        directory = filename[:-1]
-        file_count = 0
-        for poss_path in RES_ROOT:
-            dir_path = os.path.normpath(
-                os.path.join(poss_path, directory)
-            )
-            if not os.path.isdir(dir_path):
-                continue
-            for subfile in os.listdir(dir_path):
-                full_path = os.path.join(dir_path, subfile)
-                rel_path = os.path.join(directory, subfile)
-                zip_write(
-                    filename=full_path,
-                    arcname=rel_path,
-                )
-                file_count += 1
-        LOGGER.info('Packed {} files from folder "{}"', file_count, directory)
         return
 
-    for poss_path in RES_ROOT:
-        full_path = os.path.normpath(
-            os.path.join(poss_path, filename)
-        )
-        if os.path.isfile(full_path):
-            zip_write(
-                filename=full_path,
-                arcname=arcname,
-            )
-            break
-    else:
-        if not suppress_error:
-            LOGGER.warning(
-                '"bee2/' + filename + '" not found! (May be OK if not custom)'
-            )
+    for name in files:
+        name = os.path.join(dump_folder, name)
+        if os.path.isdir(name):
+            try:
+                shutil.rmtree(name)
+            except OSError:
+                # It's possible to fail here, if the window is open elsewhere.
+                # If so, just skip removal and fill the folder.
+                pass
+        else:
+            os.remove(name)
+
+    for zipinfo in zipfile.infolist():
+        zipfile.extract(zipinfo, dump_folder)
 
 
-def gen_sound_manifest(additional, excludes):
-    """Generate a new game_sounds_manifest.txt file.
-
-    This includes all the current scripts defined, plus any custom ones.
-    Excludes is a list of scripts to remove from the listing - this allows
-    overriding the sounds without VPK overrides.
-    """
-    if not additional:
-        return  # Don't pack, there aren't any new sounds..
-
-    orig_manifest = os.path.join(
-        '..',
-        SOUND_MAN_FOLDER.get(CONF['game_id', ''], 'portal2'),
-        'scripts',
-        'game_sounds_manifest.txt',
-    )
-
-    try:
-        with open(orig_manifest) as f:
-            props = Property.parse(f, orig_manifest).find_key(
-                'game_sounds_manifest', [],
-            )
-    except FileNotFoundError:  # Assume no sounds
-        props = Property('game_sounds_manifest', [])
-
-    scripts = [prop.value for prop in props.find_all('precache_file')]
-
-    for script in additional:
-        scripts.append(script)
-
-    for script in excludes:
-        try:
-            scripts.remove(script)
-        except ValueError:
-            LOGGER.warning(
-                '"{}" should be excluded, but it\'s'
-                ' not in the manifest already!',
-                script,
-            )
-
-    # Build and unbuild it to strip other things out - Valve includes a bogus
-    # 'new_sound_scripts_must_go_below_here' entry..
-    new_props = Property('game_sounds_manifest', [
-        Property('precache_file', file)
-        for file in scripts
-    ])
-
-    inject_loc = os.path.join('bee2', 'inject', 'soundscript_manifest.txt')
-    with open(inject_loc, 'w') as f:
-        for line in new_props.export():
-            f.write(line)
-    LOGGER.info('Written new soundscripts_manifest..')
-
-
-def gen_part_manifest(additional):
-    """Generate a new particle system manifest file.
-
-    This includes all the current ones defined, plus any custom ones.
-    """
-    if not additional:
-        return  # Don't pack, there aren't any new particles..
-
-    orig_manifest = os.path.join(
-        '..',
-        GAME_FOLDER.get(CONF['game_id', ''], 'portal2'),
-        'particles',
-        'particles_manifest.txt',
-    )
-
-    try:
-        with open(orig_manifest) as f:
-            props = Property.parse(f, orig_manifest).find_key(
-                'particles_manifest', [],
-            )
-    except FileNotFoundError:  # Assume no particles
-        props = Property('particles_manifest', [])
-
-    parts = [prop.value for prop in props.find_all('file')]
-
-    for particle in additional:
-        parts.append(particle)
-
-    # Build and unbuild it to strip comments and similar lines.
-    new_props = Property('particles_manifest', [
-        Property('file', file)
-        for file in parts
-    ])
-
-    inject_loc = os.path.join('bee2', 'inject', 'particles_manifest.txt')
-    with open(inject_loc, 'w') as f:
-        for line in new_props.export():
-            f.write(line)
-
-    LOGGER.info('Written new particles_manifest..')
-
-
-def generate_music_script(data: Property, pack_list):
+def generate_music_script(data: Property, pack_list: PackList) -> bytes:
     """Generate a soundscript file for music."""
     # We also pack the filenames used for the tracks - that way funnel etc
     # only get packed when needed. Stock sounds are in VPKS or in aperturetag/,
@@ -505,6 +364,15 @@ def generate_music_script(data: Property, pack_list):
     funnel = data.find_key('tbeam', '')
     bounce = data.find_key('bouncegel', '')
     speed = data.find_key('speedgel', '')
+
+    sync_funnel = data.bool('sync_funnel')
+
+    if 'base' not in data:
+        base = Property('base', 'BEE2/silent_lp.wav')
+        # Don't sync to a 2-second sound.
+        sync_funnel = False
+    else:
+        base = data.find_key('base')
 
     # The sounds must be present, and the items should be in the map.
     has_funnel = funnel.value and (
@@ -517,57 +385,65 @@ def generate_music_script(data: Property, pack_list):
     )
     # Speed-gel sounds also play when flinging, so keep it always.
 
-    with open(os.path.join('bee2', 'inject', 'music_script.txt'), 'w') as file:
-        # Write the base music track
-        file.write(MUSIC_START.format(name='', vol='1'))
-        write_sound(file, data.find_key('base'), pack_list, snd_prefix='#*')
-        file.write(MUSIC_BASE)
-        # The 'soundoperators' section is still open now.
+    file = StringIO()
 
-        # Add the operators to play the auxilluary sounds..
-        if has_funnel:
-            file.write(MUSIC_FUNNEL_MAIN)
-        if has_bounce:
-            file.write(MUSIC_GEL_BOUNCE_MAIN)
-        if speed.value:
-            file.write(MUSIC_GEL_SPEED_MAIN)
+    # Write the base music track
+    file.write(MUSIC_START.format(name='', vol='1'))
+    write_sound(file, base, pack_list, snd_prefix='#*')
+    file.write(MUSIC_BASE)
+    # The 'soundoperators' section is still open now.
 
-        # End the main sound block
-        file.write(MUSIC_END)
+    # Add the operators to play the auxilluary sounds..
+    if has_funnel:
+        file.write(MUSIC_FUNNEL_MAIN)
+    if has_bounce:
+        file.write(MUSIC_GEL_BOUNCE_MAIN)
+    if speed.value:
+        file.write(MUSIC_GEL_SPEED_MAIN)
 
-        if has_funnel:
-            # Write the 'music.BEE2_funnel' sound entry
-            file.write('\n')
-            file.write(MUSIC_START.format(name='_funnel', vol='1'))
-            write_sound(file, funnel, pack_list, snd_prefix='*')
-            # Some tracks want the funnel music to sync with the normal
-            # track, others randomly choose a start.
-            file.write(
-                MUSIC_FUNNEL_SYNC_STACK
-                if data.bool('sync_funnel') else
-                MUSIC_FUNNEL_RAND_STACK
-            )
-            file.write(MUSIC_FUNNEL_UPDATE_STACK)
+    # End the main sound block
+    file.write(MUSIC_END)
 
-        if has_bounce:
-            file.write('\n')
-            file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
-            write_sound(file, bounce, pack_list, snd_prefix='*')
-            # Fade in fast (we never get false positives, but fade out slow
-            # since this disables when falling back..
-            file.write(MUSIC_GEL_STACK.format(fadein=0.25, fadeout=1.5))
+    if has_funnel:
+        # Write the 'music.BEE2_funnel' sound entry
+        file.write('\n')
+        file.write(MUSIC_START.format(name='_funnel', vol='1'))
+        write_sound(file, funnel, pack_list, snd_prefix='*')
+        # Some tracks want the funnel music to sync with the normal
+        # track, others randomly choose a start.
+        file.write(
+            MUSIC_FUNNEL_SYNC_STACK
+            if sync_funnel else
+            MUSIC_FUNNEL_RAND_STACK
+        )
+        file.write(MUSIC_FUNNEL_UPDATE_STACK)
 
-        if speed.value:
-            file.write('\n')
-            file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
-            write_sound(file, speed, pack_list, snd_prefix='*')
-            # We need to shut off the sound fast, so portals don't confuse it.
-            # Fade in slow so it doesn't make much sound (and also as we get
-            # up to speed). We stop almost immediately on gel too.
-            file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
+    if has_bounce:
+        file.write('\n')
+        file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
+        write_sound(file, bounce, pack_list, snd_prefix='*')
+        # Fade in fast (we never get false positives, but fade out slow
+        # since this disables when falling back..
+        file.write(MUSIC_GEL_STACK.format(fadein=0.25, fadeout=1.5))
+
+    if speed.value:
+        file.write('\n')
+        file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
+        write_sound(file, speed, pack_list, snd_prefix='*')
+        # We need to shut off the sound fast, so portals don't confuse it.
+        # Fade in slow so it doesn't make much sound (and also as we get
+        # up to speed). We stop almost immediately on gel too.
+        file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
+
+    return file.getvalue().encode()
 
 
-def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
+def write_sound(
+    file: StringIO,
+    snds: Property,
+    pack_list: PackList,
+    snd_prefix: str='*',
+) -> None:
     """Write either a single sound, or multiple rndsound.
 
     snd_prefix is the prefix for each filename - *, #, @, etc.
@@ -581,7 +457,7 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
                     sndchar=snd_prefix,
                 )
             )
-            pack_list.add('sound/' + snd.value.casefold())
+            pack_list.pack_file('sound/' + snd.value.casefold())
         file.write('\t}\n')
     else:
         file.write(
@@ -590,34 +466,10 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
                 sndchar=snd_prefix,
             )
         )
-        pack_list.add('sound/' + snds.value.casefold())
+        pack_list.pack_file('sound/' + snds.value.casefold())
 
 
-def gen_auto_script(preload, is_peti):
-    """Run various commands on spawn.
-
-    This allows precaching specific sounds on demand.
-    """
-    dest = os.path.join('bee2', 'inject', 'auto_run.nut')
-    if not preload and not is_peti:
-        return  # Don't add for hammer maps
-
-    with open(dest, 'w') as file:
-        if not preload:
-            # Leave it empty, don't write an empty function body.
-            file.write('//---\n')
-            return
-
-        file.write('function Precache() {\n')
-        for entry in preload:
-            if entry.startswith('precache_sound:'):
-                file.write('\tself.PrecacheSoundScript("{}");\n'.format(
-                    entry[15:],
-                ))
-        file.write('}\n')
-
-
-def inject_files():
+def inject_files() -> Iterator[Tuple[str, str]]:
     """Generate the names of files to inject, if they exist.."""
     for filename, arcname in INJECT_FILES.items():
         filename = os.path.join('bee2', 'inject', filename)
@@ -631,132 +483,7 @@ def inject_files():
             yield filename, prop.value
 
 
-def pack_content(bsp_file: BSP, path: str, is_peti: bool):
-    """Pack any custom content into the map.
-
-    Filelist format: "[control char]filename[\t packname]"
-    Filename is the name of the actual file. If given packname is the
-    name to save it into the packfile as. If the first character of the
-    filename is '#', the file will be added to the soundscript manifest too.
-    """
-    files = set()  # Files to pack.
-    soundscripts = set()  # Soundscripts need to be added to the manifest too..
-    rem_soundscripts = set()  # Soundscripts to exclude, so we can override the sounds.
-    particles = set()
-    additional_files = set()  # .vvd files etc which also are needed.
-    preload_files = set()  # Files we want to force preloading
-
-    try:
-        pack_list = open(path[:-4] + '.filelist.txt')
-    except (IOError, FileNotFoundError):
-        pass  # Assume no files if missing..
-        # There might still be things to inject.
-    else:
-        with pack_list:
-            for line in pack_list:
-                line = line.strip().lower()
-                if not line or line.startswith('//'):
-                    continue  # Skip blanks or comments
-
-                if line[:8] == 'precache':
-                    preload_files.add(line)
-                    continue
-
-                if line[:2] == '-#':
-                    rem_soundscripts.add(line[2:])
-                    continue
-
-                if line[:1] == '#':
-                    line = line[1:]
-                    soundscripts.add(line)
-
-                # We need to add particle systems to a manifest.
-                if line.startswith('particles/'):
-                    particles.add(line)
-
-                if line[-4:] == '.mdl':
-                    additional_files.update({
-                        line[:-4] + ext
-                        for ext in
-                        MDL_ADDITIONAL_EXT
-                    })
-
-                files.add(line)
-
-    # Remove guessed files not in the original list.
-    additional_files -= files
-
-    # Only generate a soundscript for PeTI maps..
-    if is_peti:
-        music_data = CONF.find_key('MusicScript', [])
-        if music_data.value:
-            generate_music_script(music_data, files)
-            # Add the new script to the manifest file..
-            soundscripts.add('scripts/BEE2_generated_music.txt')
-
-    # We still generate these in hammer-mode - it's still useful there.
-    # If no files are packed, no manifest will be added either.
-    gen_sound_manifest(soundscripts, rem_soundscripts)
-    gen_part_manifest(particles)
-    gen_auto_script(preload_files, is_peti)
-
-    inject_names = list(inject_files())
-
-    # Abort packing if no packfiles exist, and no injected files exist either.
-    if not files and not inject_names:
-        LOGGER.info('No files to pack!')
-        return
-
-    LOGGER.info('Files to pack:')
-    for file in sorted(files):
-        # \t seperates the original and in-pack name if used.
-        LOGGER.info(' # "' + file.replace('\t', '" as "') + '"')
-
-    if additional_files and LOGGER.isEnabledFor(logging.DEBUG):
-        LOGGER.info('Potential additional files:')
-        for file in sorted(additional_files):
-            LOGGER.debug(' # "' + file + '"')
-
-    LOGGER.info('Injected files:')
-    for _, file in inject_names:
-        LOGGER.info(' # "' + file + '"')
-
-    LOGGER.info("Packing Files!")
-
-    # Manipulate the zip entirely in memory
-    zip_data = BytesIO()
-    zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
-    zipfile = ZipFile(zip_data, mode='a')
-    LOGGER.debug(' - Existing zip read')
-
-    zip_write = get_zip_writer(zipfile)
-
-    for file in files:
-        pack_file(zip_write, file)
-
-    for file in additional_files:
-        pack_file(zip_write, file, suppress_error=True)
-
-    for filename, arcname in inject_names:
-        LOGGER.info('Injecting "{}" into packfile.', arcname)
-        zip_write(filename, arcname)
-
-    LOGGER.debug(' - Added files')
-
-    zipfile.close()  # Finalise the zip modification
-
-    # Copy the zipfile into the BSP file, and adjust the headers
-    bsp_file.replace_lump(
-        path,
-        BSP_LUMPS.PAKFILE,
-        zip_data.getvalue(),  # Get the binary data we need
-    )
-    LOGGER.debug(' - BSP written!')
-
-    LOGGER.info("Packing complete!")
-
-
-def find_screenshots():
+def find_screenshots() -> Iterator[str]:
     """Find candidate screenshots to overwrite."""
     # Inside SCREENSHOT_DIR, there should be 1 folder with a
     # random name which contains the user's puzzles. Just
@@ -771,7 +498,7 @@ def find_screenshots():
                 yield screenshot
 
 
-def mod_screenshots():
+def mod_screenshots() -> None:
     """Modify the map's screenshot."""
     mod_type = CONF['screenshot_type', 'PETI'].lower()
 
@@ -813,7 +540,7 @@ def mod_screenshots():
                 playtested = True
                 continue
             elif filename.startswith('bee2_screenshot'):
-                continue # Ignore other screenshots
+                continue  # Ignore other screenshots
 
             # We have a screenshot. Check to see if it's
             # not too old. (Old is > 2 hours)
@@ -874,8 +601,8 @@ def mod_screenshots():
             utils.unset_readonly(screen)
 
 
-def run_vrad(args):
-    "Execute the original VRAD."
+def run_vrad(args: List[str]) -> None:
+    """Execute the original VRAD."""
 
     suffix = ''
     if utils.MAC:
@@ -893,7 +620,7 @@ def run_vrad(args):
         '" ' +
         " ".join(
             # put quotes around args which contain spaces
-            (quote(x) if " " in x else x)
+            ('"' + x + '"' if " " in x else x)
             for x in args
         )
     )
@@ -912,7 +639,7 @@ def run_vrad(args):
         sys.exit(code)
 
 
-def main(argv):
+def main(argv: List[str]) -> None:
     LOGGER.info('BEE2 VRAD hook started!')
         
     args = " ".join(argv)
@@ -934,7 +661,7 @@ def main(argv):
 
     # The path is the last argument to vrad
     # P2 adds wrong slashes sometimes, so fix that.
-    fast_args[-1] = path = os.path.normpath(argv[-1])
+    fast_args[-1] = path = os.path.normpath(argv[-1])  # type: str
 
     LOGGER.info("Map path is " + path)
 
@@ -951,7 +678,7 @@ def main(argv):
             # remove final parameters from the modified arguments
             fast_args.remove(a)
         elif a in ('-force_peti', '-force_hammer', '-no_pack'):
-            # we need to strip these out, otherwise VBSP will get confused
+            # we need to strip these out, otherwise VRAD will get confused
             fast_args.remove(a)
             full_args.remove(a)
 
@@ -993,15 +720,131 @@ def main(argv):
 
     LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
 
+    # Grab the currently mounted filesystems in P2.
+    game = find_gameinfo(argv)
+    root_folder = game.path.parent
+    fsys = game.get_filesystem()
+
+    fsys_tag = fsys_mel = None
+    if is_peti and 'mel_vpk' in CONF:
+        fsys_mel = VPKFileSystem(CONF['mel_vpk'])
+        fsys.add_sys(fsys_mel)
+    if is_peti and 'tag_dir' in CONF:
+        fsys_tag = RawFileSystem(CONF['tag_dir'])
+        fsys.add_sys(fsys_tag)
+
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
     bsp_file.read_header()
+
+    bsp_ents = bsp_file.read_ent_data()
+
+    zip_data = BytesIO()
+    zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
+    zipfile = ZipFile(zip_data, mode='a')
+
+    # Mount the existing packfile, so the cubemap files are recognised.
+    fsys.systems.append((ZipFileSystem('', zipfile), ''))
+
+    fsys.open_ref()
+
     LOGGER.info('Done!')
 
-    if '-no_pack' not in args:
-        pack_content(bsp_file, path, is_peti)
+    LOGGER.info('Reading our FGD files...')
+    fgd = load_fgd()
+
+    packlist = PackList(fsys)
+    packlist.load_soundscript_manifest(
+        str(root_folder / 'bin/bee2/sndscript_cache.vdf')
+    )
+
+    # We nee to add all soundscripts in scripts/bee2_snd/
+    # This way we can pack those, if required.
+    for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
+        if soundscript.path.endswith('.txt'):
+            packlist.load_soundscript(soundscript, always_include=False)
+
+    if is_peti:
+        LOGGER.info('Adding special packed files:')
+        music_data = CONF.find_key('MusicScript', [])
+        if music_data:
+            packlist.pack_file(
+                'scripts/BEE2_generated_music.txt',
+                PackType.SOUNDSCRIPT,
+                data=generate_music_script(music_data, packlist)
+            )
+
+        for filename, arcname in inject_files():
+            LOGGER.info('Injecting "{}" into packfile.', arcname)
+            with open(filename, 'rb') as f:
+                packlist.pack_file(arcname, data=f.read())
+
+    LOGGER.info('Run transformations...')
+    run_transformations(bsp_ents, fsys, packlist)
+
+    LOGGER.info('Scanning map for files to pack:')
+    packlist.pack_from_bsp(bsp_file)
+    packlist.pack_fgd(bsp_ents, fgd)
+    packlist.eval_dependencies()
+    LOGGER.info('Done!')
+
+    if is_peti:
+        packlist.write_manifest()
     else:
-        LOGGER.warning("Packing files is disabled!")
+        # Write with the map name, so it loads directly.
+        packlist.write_manifest(os.path.basename(path)[:-4])
+
+    # We need to disallow Valve folders.
+    pack_whitelist = set()
+    pack_blacklist = set()
+    if is_peti:
+        pack_blacklist |= {
+            RawFileSystem(root_folder / 'portal2_dlc2'),
+            RawFileSystem(root_folder / 'portal2_dlc1'),
+            RawFileSystem(root_folder / 'portal2'),
+            RawFileSystem(root_folder / 'platform'),
+            RawFileSystem(root_folder / 'update'),
+        }
+        pack_whitelist.add(fsys_mel)
+        pack_whitelist.add(fsys_tag)
+        # If those weren't present, we added a None.
+        pack_whitelist.discard(None)
+
+    if '-no_pack' not in args:
+        # Cubemap files packed into the map already.
+        existing = set(zipfile.infolist())
+
+        LOGGER.info('Writing to BSP...')
+        packlist.pack_into_zip(
+            zipfile,
+            ignore_vpk=True,
+            whitelist=pack_whitelist,
+            blacklist=pack_blacklist,
+        )
+
+        LOGGER.info('Packed files:\n{}', '\n'.join([
+            zipinfo.filename
+            for zipinfo in zipfile.infolist()
+            if zipinfo.filename not in existing
+        ]))
+
+    dump_files(zipfile)
+
+    zipfile.close()  # Finalise the zip modification
+
+    # Copy the zipfile into the BSP file, and adjust the headers
+    bsp_file.replace_lump(
+        path,
+        BSP_LUMPS.PAKFILE,
+        zip_data.getvalue(),  # Get the binary data we need
+    )
+    # Copy new entity data.
+    bsp_file.replace_lump(
+        path,
+        BSP_LUMPS.ENTITIES,
+        BSP.write_ent_data(bsp_ents),
+    )
+    LOGGER.info(' - BSP written!')
 
     if is_peti:
         mod_screenshots()

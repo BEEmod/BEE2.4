@@ -3,23 +3,24 @@ import math
 import os
 import itertools
 
-import srctools
+import srctools.logger
 import instanceLocs
 import utils
 import vbsp_options
 import vbsp
 from conditions import (
     meta_cond, make_result,
-    remove_ant_toggle,
     PETI_INST_ANGLE, RES_EXHAUSTED,
-    local_name
+    local_name,
+    make_result_setup,
 )
+from connections import ITEMS, Item, ItemType
 from fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 from srctools import Vec, Property, VMF, Entity, Output
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Fizzler type ID for Gel Gun Activator.
 TAG_FIZZ_ID = 'TAG_GEL_GUN'
@@ -27,10 +28,11 @@ TAG_FIZZ_ID = 'TAG_GEL_GUN'
 
 @make_result('ATLAS_SpawnPoint')
 def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
-    """Create the spawn point for ATLAS, in Aperture Tag.
+    """Create the spawn point for ATLAS in the entry corridor.
 
-    This creates an instance with the desired orientation.
-    The two parameters 'origin' and 'angles' must be set.
+    It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
+    The two parameters `origin` and `facing` must be set to determine the required position.
+    If `global` is set, the spawn point will be absolute instead of relative to the current instance.
     """
     if vbsp.GAME_MODE != 'COOP':
         return RES_EXHAUSTED
@@ -88,12 +90,11 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
 @meta_cond(priority=200, only_once=True)
 def ap_tag_modifications(vmf: VMF):
     """Perform modifications for Aperture Tag.
-
-    * All fizzlers will be combined with a trigger_paint_cleanser
+    
     * Paint is always present in every map!
-    * Suppress ATLAS's Portalgun in coop
-    * Override the transition ent instance to have the Gel Gun
-    * Create subdirectories with the user's steam ID
+    * Suppress ATLAS's Portalgun in coop.
+    * In singleplayer, override the transition ent instance to have the Gel Gun.
+    * Create subdirectories with the user's steam ID to fix a workshop compile bug.
     """
     if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
@@ -164,13 +165,46 @@ def calc_fizzler_orient(fizzler: Fizzler):
         )
 
 
+@make_result_setup('TagFizzler')
+def res_make_tag_fizzler_setup(res: Property):
+    """We need this to pre-parse the fizzler type."""
+    if 'ioconf' in res:
+        fizz_type = ItemType.parse('<TAG_FIZZER>', res.find_key('ioconf'))
+    else:
+        fizz_type = None
+
+    # The distance from origin the double signs are seperated by.
+    sign_offset = res.int('signoffset', 16)
+
+    return (
+        sign_offset,
+        fizz_type,
+        res['frame_double'],
+        res['frame_single'],
+        res['blue_sign', ''],
+        res['blue_off_sign', ''],
+        res['oran_sign', ''],
+        res['oran_off_sign', ''],
+    )
+
+
 @make_result('TagFizzler')
 def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
-    MUST be priority -100 so it runs before fizzlers!
+    This must be before -250 so it runs before fizzlers and connections.
     """
+    (
+        sign_offset,
+        fizz_io_type,
+        inst_frame_double,
+        inst_frame_single,
+        blue_sign_on,
+        blue_sign_off,
+        oran_sign_on,
+        oran_sign_off,
+    ) = res.value  # type: int, ItemType, str, str, str, str, str, str
     import vbsp
     if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
@@ -178,26 +212,28 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         return
 
     fizzler = None
+    fizzler_item = None
 
-    # Look for the fizzler instance we want to replace
-    for targetname in inst.output_targets():
-        try:
-            fizzler = FIZZLERS[targetname]
-        except KeyError:
-            # Not a fizzler.
+    # Look for the fizzler instance we want to replace.
+    sign_item = ITEMS[inst['targetname']]
+    for conn in list(sign_item.outputs):
+        if conn.to_item.name in FIZZLERS:
+            if fizzler is None:
+                fizzler = FIZZLERS[conn.to_item.name]
+                fizzler_item = conn.to_item
+            else:
+                raise ValueError('Multiple fizzlers attached to a sign!')
 
-            # It's an indicator toggle, remove it and the antline to clean up.
-            for ent in vmf.by_target[targetname]:
-                remove_ant_toggle(ent)
+        conn.remove()  # Regardless, remove the useless output.
 
-    inst.outputs.clear()  # Remove the outputs now, they're not valid anyway.
+    sign_item.delete_antlines()
 
     if fizzler is None:
         # No fizzler - remove this sign
         inst.remove()
         return
 
-    if fizzler.fizz_type.id == 'TAG_FIZZ_ID':
+    if fizzler.fizz_type.id == TAG_FIZZ_ID:
         LOGGER.warning('Two tag signs attached to one fizzler...')
         inst.remove()
         return
@@ -205,8 +241,12 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # Swap to the special Tag Fizzler type.
     fizzler.fizz_type = FIZZ_TYPES[TAG_FIZZ_ID]
 
-    # The distance from origin the double signs are seperated by.
-    sign_offset = res.int('signoffset', 16)
+    # And also swap the connection's type.
+    fizzler_item.item_type = fizz_io_type
+    fizzler_item.enable_cmd = fizz_io_type.enable_cmd
+    fizzler_item.disable_cmd = fizz_io_type.disable_cmd
+    fizzler_item.sec_enable_cmd = fizz_io_type.sec_enable_cmd
+    fizzler_item.sec_disable_cmd = fizz_io_type.sec_disable_cmd
 
     sign_loc = (
         # The actual location of the sign - on the wall
@@ -239,7 +279,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     loc = Vec.from_str(inst['origin'])
 
     if disable_other or (blue_enabled and oran_enabled):
-        inst['file'] = res['frame_double']
+        inst['file'] = inst_frame_double
         # On a wall, and pointing vertically
         if inst_normal.z == 0 and Vec(y=1).rotate(*inst_angle).z:
             # They're vertical, make sure blue's on top!
@@ -255,7 +295,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
             blue_loc = loc + offset
             oran_loc = loc - offset
     else:
-        inst['file'] = res['frame_single']
+        inst['file'] = inst_frame_single
         # They're always centered
         blue_loc = loc
         oran_loc = loc
@@ -316,13 +356,13 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
 
     # If disable_other, we show off signs. Otherwise we don't use that sign.
-    blue_sign = 'blue_sign' if blue_enabled else 'blue_off_sign' if disable_other else None
-    oran_sign = 'oran_sign' if oran_enabled else 'oran_off_sign' if disable_other else None
+    blue_sign = blue_sign_on if blue_enabled else blue_sign_off if disable_other else None
+    oran_sign = oran_sign_on if oran_enabled else oran_sign_off if disable_other else None
 
     if blue_sign:
         vmf.create_ent(
             classname='func_instance',
-            file=res[blue_sign, ''],
+            file=blue_sign,
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=blue_loc.join(' '),
@@ -331,7 +371,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     if oran_sign:
         vmf.create_ent(
             classname='func_instance',
-            file=res[oran_sign, ''],
+            file=oran_sign,
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=oran_loc.join(' '),
@@ -343,14 +383,13 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # zero
     fizzler.base_inst.fixup['$connectioncount'] = str(max(
         0,
-        srctools.conv_int(fizzler.base_inst.fixup['$connectioncount', ''], 0) - 1
+        srctools.conv_int(fizzler.base_inst.fixup['$connectioncount', '']) - 1
     ))
 
     # Find the direction the fizzler normal is.
     # Signs will associate with the given side!
 
     bbox_min, bbox_max = fizzler.emitters[0]
-    fizz_field_axis = (bbox_max-bbox_min).norm()
     fizz_norm_axis = fizzler.normal().axis()
 
     sign_center = (bbox_min[fizz_norm_axis] + bbox_max[fizz_norm_axis]) / 2
@@ -399,6 +438,10 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
 
     pos_trig['targetname'] = local_name(fizzler.base_inst, 'trig_pos')
     neg_trig['targetname'] = local_name(fizzler.base_inst, 'trig_neg')
+
+    pos_trig['startdisabled'] = neg_trig['startdisabled'] = (
+        not fizzler.base_inst.fixup.bool('start_enabled')
+    )
 
     pos_trig.outputs = [
         Output(output, neg_trig, 'Enable'),

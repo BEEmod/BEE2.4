@@ -24,11 +24,9 @@ EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
     'distutils',  # Found in shutil, used if zipfile is not availible
     'doctest',  # Used in __main__ of decimal and heapq
-    'lzma',  # We use this for packages, but not in VBSP & VRAD
     'optparse',  # Used in calendar.__main__
     'pprint',  # From pickle, not needed
     'textwrap',  # Used in zipfile.__main__
-    'pkgutil',  # Used by conditions only when unfrozen
 
     # We don't localise the compiler, but utils imports the modules.
     'locale', 'gettext',
@@ -36,17 +34,25 @@ EXCLUDES = [
     # This isn't ever used in the compiler.
     'tkinter',
 
+    # We aren't using the Python 2 code, for obvious reasons.
+    'importlib_resources._py2',
+
+    'win32api',
+    'win32com',
+    'win32wnet'
+
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',
-    'email',
     'smtplib',
     'http',
 ]
+
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
 import logging.handlers
 import logging.config
+
 if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'socket'):
     EXCLUDES.append('socket')
     # Subprocess uses this in UNIX-style OSes, but not Windows.
@@ -62,26 +68,33 @@ if utils.MAC or utils.LINUX:
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
 
-
-# Additional modules to include:
+# Include the condition sub-modules that are dynamically imported.
 INCLUDES = [
-
-]
-
-# Get the list of condition sub-modules that we need to also include.
-condition_modules = [
-    name
-    for loader, name, is_package in
+    'conditions.' + module
+    for loader, module, is_package in
     pkgutil.iter_modules(['conditions'])
 ]
 
-INCLUDES += [
-    'conditions.' + module
-    for module in
-    condition_modules
-]
-
 bee_version = input('BEE2 Version (or blank for dev): ')
+
+import srctools
+
+zip_includes = [
+    # Add the FGD data for us.
+    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools/fgd.lzma'),
+]
+# We need to include this version data.
+try:
+    import importlib_resources
+    zip_includes.append(
+        (
+            os.path.join(importlib_resources.__path__[0], 'version.txt'),
+            'importlib_resources/version.txt',
+         )
+    )
+except ImportError:
+    pass
+
 
 setup(
     name='VBSP_VRAD',
@@ -92,16 +105,14 @@ setup(
             'excludes': EXCLUDES,
             'includes': INCLUDES,
             # These values are added to the generated BUILD_CONSTANTS module.
-            'constants': 'BEE_VERSION={ver!r},cond_modules={cond!r}'.format(
+            'constants': 'BEE_VERSION={ver!r}'.format(
                 ver=bee_version,
-                # Pass on the list of frozen constants so we can import them
-                # later.
-                cond=';'.join(condition_modules),
             ),
 
             # Include all modules in the zip..
             'zip_include_packages': '*',
             'zip_exclude_packages': '',
+            'zip_includes': zip_includes,
         },
     },
     description='BEE2 VBSP and VRAD compilation hooks, '

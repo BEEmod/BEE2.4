@@ -219,6 +219,8 @@ class LoadScreen(BaseLoadScreen):
 
     def op_skip_stage(self, stage):
         """Skip over this stage of the loading process."""
+        self.values[stage] = 0
+        self.maxes[stage] = 0
         self.labels[stage]['text'] = TRANSLATION['skip']
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 

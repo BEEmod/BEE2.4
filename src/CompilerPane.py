@@ -1,15 +1,17 @@
-import utils
+import tkMarkdown
+from srctools.logger import init_logging, get_logger
 import tk_tools
+import utils
 if __name__ == '__main__':
     utils.fix_cur_directory()
-    LOGGER = utils.init_logging(
+    LOGGER = init_logging(
         '../logs/compiler_pane.log',
         __name__,
         on_error=tk_tools.on_error
     )
     utils.setup_localisations(LOGGER)
 else:
-    LOGGER = utils.getLogger(__name__)
+    LOGGER = get_logger(__name__)
 
 
 from tkinter import *
@@ -17,26 +19,26 @@ from tk_tools import TK_ROOT, FileField
 from tkinter import ttk
 from tkinter import filedialog
 
-from functools import partial
 from PIL import Image, ImageTk
+from typing import Dict, Tuple
 
-import os.path
-
-import img as png
+import os
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from tooltip import add_tooltip
+from packageLoader import CORRIDOR_COUNTS, CorrDesc
+from tooltip import add_tooltip, set_tooltip
+import selectorWin
 import SubPane
+import img
 
 # The size of PeTI screenshots
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR_COUNTS = [
-    ('sp_entry', 7),
-    ('sp_exit', 4),
-    ('coop', 4),
-]
+CORRIDOR = {}  # type: Dict[str, selectorWin.selWin]
+CORRIDOR_DATA = {}  # type: Dict[Tuple[str, int], CorrDesc]
+
+CORRIDOR_DESC = tkMarkdown.convert('')
 
 COMPILE_DEFAULTS = {
     'Screenshot': {
@@ -66,11 +68,7 @@ COMPILE_DEFAULTS = {
         'max_overlay': '512',
         'max_entity': '2048',
     },
-    'CorridorNames': {
-        '{}_{}'.format(group, i): '{}: Corridor'.format(i)
-        for group, length in CORRIDOR_COUNTS
-        for i in range(1,length + 1)
-    }
+    'CorridorNames': {},
 }
 
 PLAYER_MODELS = {
@@ -164,61 +162,105 @@ cleanup_screenshot = IntVar(
     value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True)
 )
 
-CORRIDOR = {}
-
-
-def save_corridors():
-    """Save corridor names to the config file."""
+def load_corridors() -> None:
+    """Parse corridors out of the config file."""
     corridor_conf = COMPILE_CFG['CorridorNames']
-    for group, corr in CORRIDOR.items():
-        for i, name in enumerate(corr[1:], start=1):
-            corridor_conf['{}_{}'.format(group, i)] = name
+    config = {}
+    for group, length in CORRIDOR_COUNTS.items():
+        for i in range(1, length + 1):
+            config[group, i] = CorrDesc(
+                name=corridor_conf.get('{}_{}_name'.format(group, i), ''),
+                icon=corridor_conf.get('{}_{}_icon'.format(group, i), ''),
+                desc=corridor_conf.get('{}_{}_desc'.format(group, i), ''),
+            )
+    set_corridors(config)
 
 
-def load_corridors():
+def set_corridors(config: Dict[Tuple[str, int], CorrDesc]):
+    """Set the corridor data based on the passed in config."""
+    CORRIDOR_DATA.clear()
+    CORRIDOR_DATA.update(config)
+
+    default_icon = img.icon('clean/portal_door')
+
     corridor_conf = COMPILE_CFG['CorridorNames']
-    for group, length in CORRIDOR_COUNTS:
-        CORRIDOR[group] = ['Random'] + [
-            corridor_conf['{}_{}'.format(group, i)]
-            for i in
-            range(1, length + 1)
-        ]
+
+    for group, length in CORRIDOR_COUNTS.items():
+        selector = CORRIDOR[group]
+        for item in selector.item_list:
+            if item.name == '<NONE>':
+                continue  # No customisation for this.
+            ind = int(item.name)
+
+            data = config[group, ind]
+
+            corridor_conf['{}_{}_name'.format(group, ind)] = data.name
+            corridor_conf['{}_{}_desc'.format(group, ind)] = data.desc
+            corridor_conf['{}_{}_icon'.format(group, ind)] = data.icon
+
+            # Note: default corridor description
+            desc = data.name or _('Corridor')
+            item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
+
+            if data.icon:
+                item.large_icon = img.png(
+                    'corr/' + data.icon,
+                    resize_to=selectorWin.ICON_SIZE_LRG,
+                    error=default_icon,
+                )
+                item.icon = img.png(
+                    'corr/' + data.icon,
+                    resize_to=selectorWin.ICON_SIZE,
+                    error=default_icon,
+                )
+            else:
+                item.icon = item.large_icon = default_icon
+
+            if data.desc:
+                item.desc = tkMarkdown.convert(data.desc)
+            else:
+                item.desc = CORRIDOR_DESC
+
+        selector.set_disp()
+
+    COMPILE_CFG.save_check()
 
 
-def set_corr_values(group_name, props):
-    """Set the corrdors according to the passed prop_block."""
-    count = 7 if group_name == 'sp_entry' else 4
-    group = CORRIDOR[group_name] = [_('Random')] + [
-        # Note: default corridor description
-        str(i) + ': ' + _('Corridor')
-        for i in
-        range(1, count + 1)
-    ]
-    for prop in props[group_name]:
-        try:
-            ind = int(prop.name)
-        except ValueError:
-            continue
+def make_corr_wid(corr_name: str):
+    """Create the corridor widget and items."""
+    length = CORRIDOR_COUNTS[corr_name]
 
-        if 0 < ind <= count:
-            group[ind] = '{!r}: {}'.format(ind, prop.value)
-
-
-def make_corr_combo(frm, corr_name, width):
-    widget = ttk.Combobox(
-        frm,
-        values=CORRIDOR[corr_name],
-        width=width,
-        exportselection=0,
+    CORRIDOR[corr_name] = sel = selectorWin.selWin(
+        TK_ROOT,
+        [
+            selectorWin.Item(
+                str(i),
+                'INVALID: ' + str(i),
+            )
+            for i in range(1, length + 1)
+        ],
+        has_none=True,
+        none_desc=_(
+            'Randomly choose a corridor. '
+            'This is saved in the puzzle data '
+            'and will not change.'
+        ),
+        none_icon='BEE2/random.png',
+        none_name=_('Random'),
+        callback=sel_corr_callback,
+        callback_params=[corr_name],
     )
-    widget['postcommand'] = partial(set_corr_dropdown, corr_name, widget)
-    widget.state(['readonly'])
-    widget.bind(
-        '<<ComboboxSelected>>',
-        partial(set_corr, corr_name)
-    )
-    widget.current(COMPILE_CFG.get_int('Corridor', corr_name))
-    return widget
+
+    chosen_corr = COMPILE_CFG.get_int('Corridor', corr_name)
+    if chosen_corr == 0:
+        sel.sel_item_id('<NONE>')
+    else:
+        sel.sel_item_id(str(chosen_corr))
+
+
+def sel_corr_callback(sel_item: str, corr_name: str):
+    COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
+    COMPILE_CFG.save_check()
 
 
 def flash_count():
@@ -270,12 +312,12 @@ def refresh_counts(reload=True):
             bar_var.should_flash = False
             bar_var.set(100 * value / max_value)
 
-        UI['count_' + name].tooltip_text = '{}/{} ({:.2%}):\n{}'.format(
+        set_tooltip(UI['count_' + name], '{}/{} ({:.2%}):\n{}'.format(
             value,
             max_value,
             value / max_value,
             tip_blurb,
-        )
+        ))
 
     if run_flash:
         flash_count()
@@ -283,7 +325,7 @@ def refresh_counts(reload=True):
 
 def set_pack_dump_dir(path):
     COMPILE_CFG['General']['packfile_dump_dir'] = path
-    COMPILE_CFG.save()
+    COMPILE_CFG.save_check()
 
 
 def set_pack_dump_enabled():
@@ -632,7 +674,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
-        png.png('icons/tool_sub', resize_to=16),
+        img.png('icons/tool_sub', resize_to=16),
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
@@ -741,29 +783,16 @@ def make_map_widgets(frame: ttk.Frame):
     corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
+    make_corr_wid('sp_entry')
+    make_corr_wid('sp_exit')
+    make_corr_wid('coop')
+
     load_corridors()
 
-    UI['corr_sp_entry'] = make_corr_combo(
-        corr_frame,
-        'sp_entry',
-        width=9,
-    )
+    CORRIDOR['sp_entry'].widget(corr_frame).grid(row=1, column=0, sticky=EW)
+    CORRIDOR['sp_exit'].widget(corr_frame).grid(row=1, column=1, sticky=EW)
+    CORRIDOR['coop'].widget(corr_frame).grid(row=2, column=1, sticky=EW)
 
-    UI['corr_sp_exit'] = make_corr_combo(
-        corr_frame,
-        'sp_exit',
-        width=9,
-    )
-
-    UI['corr_coop'] = make_corr_combo(
-        corr_frame,
-        'coop',
-        width=9,
-    )
-
-    UI['corr_sp_entry'].grid(row=1, column=0, sticky=EW)
-    UI['corr_sp_exit'].grid(row=1, column=1, sticky=EW)
-    UI['corr_coop'].grid(row=2, column=1, sticky=EW)
     ttk.Label(
         corr_frame,
         text=_('SP Entry:'),
@@ -812,7 +841,7 @@ def make_pane(tool_frame):
         resize_x=True,
         resize_y=False,
         tool_frame=tool_frame,
-        tool_img=png.png('icons/win_compiler'),
+        tool_img=img.png('icons/win_compiler'),
         tool_col=4,
     )
     window.columnconfigure(0, weight=1)

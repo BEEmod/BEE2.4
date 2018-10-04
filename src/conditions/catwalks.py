@@ -6,14 +6,15 @@ from conditions import (
 )
 import instanceLocs
 from srctools import Vec, Property, VMF, Entity
-import conditions
+import srctools.logger
+from connections import ITEMS
 import utils
 
 from typing import Dict, Tuple
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.catwalks')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.catwalks')
 
 CATWALK_TYPES = {
     utils.CONN_TYPES.straight: 'straight_128',
@@ -121,24 +122,24 @@ def res_make_catwalk(vmf: VMF, res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
-    Instances:
-        MarkerInst: The instance set in editoritems.
-        Straight_128/256/512: Straight sections. Extends East
-        Corner: A corner piece. Connects on N and W sides.
-        TJunction; A T-piece. Connects on all but the East side.
-        CrossJunction: A X-piece. Connects on all sides.
-        End: An end piece. Connects on the East side.
-        Stair: A stair. Starts East and goes Up and West.
-        End_wall: Connects a West wall to a East catwalk.
-        Support_Wall: A support extending from the East wall.
-        Support_Ceil: A support extending from the ceiling.
-        Support_Floor: A support extending from the floor.
-        Support_Goo: A floor support, designed for goo pits.
-        Single_Wall: A section connecting to an East wall.
+    
+    * Instances:
+        * `markerInst: The instance set in editoritems.
+        * `straight_128`/`256`/`512`: Straight sections. Extends East.
+        * `corner: An L-corner piece. Connects on North and West sides.
+        * `TJunction`: A T-piece. Connects on all but the East side.
+        * `crossJunction`: A X-piece. Connects on all sides.
+        * `end`: An end piece. Connects on the East side.
+        * `stair`: A stair. Starts East and goes Up and West.
+        * `end_wall`: Connects a West wall to a East catwalk.
+        * `support_wall`: A support extending from the East wall.
+        * `support_ceil`: A support extending from the ceiling.
+        * `support_floor`: A support extending from the floor.
+        * `support_goo`: A floor support, designed for goo pits.
+        * `single_wall`: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
     marker = instanceLocs.resolve(res['markerInst'])
-    output_target = res['output_name', 'MARKER']
 
     instances = {
         name: instanceLocs.resolve_one(res[name, ''], error=True)
@@ -187,17 +188,17 @@ def res_make_catwalk(vmf: VMF, res: Property):
     LOGGER.info('Markers: {}', markers)
 
     # First loop through all the markers, adding connecting sections
-    for inst in markers.values():
-        for conn in inst.outputs:
-            if conn.output != output_target or conn.input != output_target:
-                # Indicator toggles or similar, delete these entities.
-                # Find the associated overlays too.
-                for del_inst in vmf.by_target[conn.target]:
-                    conditions.remove_ant_toggle(del_inst)
-                continue
+    for marker_name, inst in markers.items():
+        mark_item = ITEMS[marker_name]
+        mark_item.delete_antlines()
+        for conn in list(mark_item.outputs):
+            try:
+                inst2 = markers[conn.to_item.name]
+            except KeyError:
+                LOGGER.warning('Catwalk connected to non-catwalk!')
 
-            inst2 = markers[conn.target]
-            LOGGER.debug('{} <-> {}', inst['targetname'], inst2['targetname'])
+            conn.remove()
+
             origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
             if origin1.x != origin2.x and origin1.y != origin2.y:
@@ -233,8 +234,6 @@ def res_make_catwalk(vmf: VMF, res: Property):
                 conn_lst1.N = conn_lst2.S = True
             elif origin2.y < origin1.y:
                 conn_lst1.S = conn_lst2.N = True
-
-        inst.outputs.clear()  # Remove the outputs now, they're useless
 
     for inst, dir_mask in links.items():
         # Set the marker instances based on the attached walkways.

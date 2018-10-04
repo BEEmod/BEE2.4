@@ -1,19 +1,20 @@
 """Handles generating Piston Platforms with specific logic."""
-from typing import Tuple, Dict, List
+from typing import Dict, List
 
 import conditions
-import utils
-from conditions import make_result, make_result_setup, local_name
-from srctools import Entity, VMF, Property, Output, Vec, Solid
-from instanceLocs import resolve_one as resolve_single
+import packing
+import srctools.logger
 import template_brush
-from connections import ITEMS
 from comp_consts import FixupVars
-import vbsp
+from conditions import make_result, make_result_setup, local_name
+from connections import ITEMS
+from instanceLocs import resolve_one as resolve_single
+from srctools import Entity, VMF, Property, Output, Vec
+
 
 COND_MOD_NAME = 'Piston Platform'
 
-LOGGER = utils.getLogger(__name__, 'cond.piston_plat')
+LOGGER = srctools.logger.get_logger(__name__, 'cond.piston_plat')
 
 INST_NAMES = [
     # Static bottom pistons
@@ -36,17 +37,6 @@ INST_NAMES = [
     'fullstatic_3',
     'fullstatic_4',
 ]
-
-SOUND_LOC = 'scripts/vscripts/BEE2/piston/'
-
-# For the start/stop sound, we need to provide them via VScript.
-# (casefolded start, stop) -> (filename,code)
-SOUNDS = {}  # type: Dict[Tuple[str, str], Tuple[str, str]]
-
-SCRIPT_TEMP = '''\
-STTART_SND <- "{start}";
-STOP_SND <- "{stop}";
-'''
 
 
 @make_result_setup('PistonPlatform')
@@ -103,7 +93,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         snd_start,
         snd_loop,
         snd_stop,
-    ) = res.value  # type: Tuple[template_brush.Template, List[str], Dict[str, str], str, str, str, str, str, str]
+    ) = res.value  # type: template_brush.Template, List[str], Dict[str, str], str, str, str, str, str, str
 
     min_pos = inst.fixup.int(FixupVars.PIST_BTM)
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
@@ -130,30 +120,23 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
             static_inst['file'] = inst_filenames['fullstatic_' + str(position)]
             return
 
-    scripts = ['BEE2/piston/common.nut']
-    vbsp.PACK_FILES.add('scripts/vscripts/BEE2/piston/common.nut')
+    init_script = 'SPAWN_UP <- {}'.format('true' if start_up else 'false')
 
-    if snd_start or snd_stop:
-        snd_key = snd_start.casefold(), snd_stop.casefold()
-        try:
-            snd_filename, snd_code = SOUNDS[snd_key]
-        except KeyError:
-            # We need to generate this.
-            snd_code = SCRIPT_TEMP.format(start=snd_start, stop=snd_stop)
-            snd_filename = 'snd_{:02}.nut'.format(len(SOUNDS) + 1)
-            SOUNDS[snd_key] = snd_filename, snd_code
-
-        scripts.append('BEE2/piston/' + snd_filename)
-
-    if start_up:
-        # Notify the script that we start up.
-        scripts.append('BEE2/piston/spawn_up.nut')
-        vbsp.PACK_FILES.add('scripts/vscripts/BEE2/piston/spawn_up.nut')
+    if snd_start and snd_stop:
+        packing.pack_files(vmf, snd_start, snd_stop, file_type='sound')
+        init_script += '; START_SND <- `{}`; STOP_SND <- `{}`'.format(snd_start, snd_stop)
+    elif snd_start:
+        packing.pack_files(vmf, snd_start, file_type='sound')
+        init_script += '; START_SND <- `{}`'.format(snd_start)
+    elif snd_stop:
+        packing.pack_files(vmf, snd_stop, file_type='sound')
+        init_script += '; STOP_SND <- `{}`'.format(snd_stop)
 
     script_ent = vmf.create_ent(
         classname='info_target',
         targetname=local_name(inst, 'script'),
-        vscripts=' '.join(scripts),
+        vscripts='BEE2/piston/common.nut',
+        vscript_init_code=init_script,
         origin=inst['origin'],
     )
 
@@ -270,16 +253,3 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
             # Parent is irrelevant for actual entity locations, but it
             # survives for the script to read.
             script_ent['SourceEntityName'] = script_ent['parentname'] = local_name(inst, source_ent)
-
-
-def write_vscripts(vrad_conf: Property):
-    """Write script functions for sounds out for VRAD to use."""
-    if not SOUNDS:
-        return
-
-    conf_block = vrad_conf.ensure_exists('InjectFiles')
-
-    for filename, code in SOUNDS.values():
-        with open('BEE2/inject/' + filename, 'w') as f:
-            f.write(code)
-        conf_block[filename] = SOUND_LOC + filename

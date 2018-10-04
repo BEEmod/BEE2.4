@@ -319,9 +319,10 @@ class FileField(ttk.Frame):
     @value.setter
     def value(self, path):
         """Set the current path. This calls the callback function."""
+        import tooltip
         self.callback(path)
         self._location = path
-        self.textbox.tooltip_text = path
+        tooltip.set_tooltip(self, path)
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path):

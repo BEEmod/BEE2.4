@@ -2,13 +2,12 @@
 """
 from collections import namedtuple
 
-import srctools
+import connections
+import srctools.logger
 import template_brush
-import utils
 import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    remove_ant_toggle,
     GOO_LOCS, SOLIDS
 )
 import instanceLocs
@@ -19,7 +18,7 @@ from srctools import (
 
 COND_MOD_NAME = None
 
-LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.vactubes')
 
 PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
@@ -157,10 +156,9 @@ def res_vactube_setup(res: Property):
 
 @make_result('CustVactube')
 def res_make_vactubes(res: Property):
-    """Speciallised result to generate vactubes from markers.
+    """Specialised result to generate vactubes from markers.
 
     Only runs once, and then quits the condition list.
-    Instances:
     """
     if res.value not in VAC_CONFIGS:
         # We've already executed this config group
@@ -182,15 +180,6 @@ def res_make_vactubes(res: Property):
         except KeyError:
             continue  # Not a marker
 
-        next_instances = {
-            out.target
-            for out in
-            inst.outputs
-        }
-
-        # Destroy these outputs, they're useless now!
-        inst.outputs.clear()
-
         # Remove the original instance from the level - we spawn entirely new
         # ones.
         inst.remove()
@@ -198,32 +187,33 @@ def res_make_vactubes(res: Property):
         markers[inst['targetname']] = {
             'ent': inst,
             'conf': config,
-            'next': next_instances,
-            'prev': None,
+            'next': None,
+            'no_prev': True,
             'size': inst_size,
         }
 
-    if not markers:
-        # No actual vactubes..
-        return RES_EXHAUSTED
-
-    LOGGER.info('Markers: {}', markers.keys())
-
     for mark_name, marker in markers.items():
-        LOGGER.info('Outputs: {}', marker['next'])
+        marker_item = connections.ITEMS[mark_name]
+
+        marker_item.delete_antlines()
+
         next_marker = None
-        for inst in marker['next']:
+        for conn in list(marker_item.outputs):
             try:
-                next_marker = markers[inst]
+                next_marker = markers[conn.to_item.name]
             except KeyError:
-                # Not a marker-instance, remove this (indicator_toggles, etc)
-                # We want to remove any them as well as the assoicated
-                # antlines!
-                for toggle in vbsp.VMF.by_target[inst]:
-                    remove_ant_toggle(toggle)
-            else:
-                marker['next'] = inst
-                next_marker['prev'] = mark_name
+                LOGGER.warning(
+                    'Vactube connected to non-vactube ("{}")!',
+                    conn.to_item.name,
+                )
+                continue
+
+            conn.remove()
+                
+            if marker['next'] is not None:
+                raise ValueError('Vactube connected to two targets!')
+            marker['next'] = conn.to_item.name
+            next_marker['no_prev'] = False
 
         if next_marker is None:
             # No next-instances were found..
@@ -231,10 +221,12 @@ def res_make_vactubes(res: Property):
             marker['next'] = None
 
     for marker in markers.values():
-        if marker['prev'] is not None:
+        if marker['no_prev']:
             continue
 
         make_vac_track(marker, markers)
+
+    return RES_EXHAUSTED
 
 
 def make_vac_track(start, all_markers):

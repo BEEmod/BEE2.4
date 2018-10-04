@@ -3,7 +3,7 @@ from conditions import make_result_setup, make_result, RES_EXHAUSTED, local_name
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, VMF, Solid, Side, Entity, Output
 
-import utils
+import srctools.logger
 import comp_consts as const
 import template_brush
 
@@ -11,7 +11,7 @@ from typing import Iterator, Any, Tuple, Dict, List
 
 COND_MOD_NAME = 'Breakable Glass'
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 BREAKABLE_GLASS_CONF = {}
 
@@ -225,12 +225,13 @@ def res_breakable_glass_setup(res: Property):
 def res_breakable_glass(inst: Entity, res: Property):
     """Adds breakable glass to the map.
 
-    Paramters:
-        * thickness: Thickness of the collision brushes.
-        * offset: Distance into the block to place the surface.
-        * border_size: Distance on borders to inset by (so the shatter effects
-          appear.)
-        * material: Name of the func_breakable_surf material.
+    Parameters:
+    
+    * `thickness`: Thickness of the collision brushes.
+    * `offset`: Distance into the block to place the surface.
+    * `border_size`: Distance on borders to inset by (so the shatter effects
+          appear on the border.)
+    * `material`: Name of the func_breakable_surf material.
     """
     vmf = inst.map
 

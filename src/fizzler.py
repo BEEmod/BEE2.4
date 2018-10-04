@@ -7,15 +7,18 @@ import itertools
 from enum import Enum
 
 import conditions
+import connections
+import packing
 import utils
 import vbsp_options
+import srctools.logger
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
 import comp_consts as const
 import instance_traits
 import instanceLocs
 import template_brush
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 FIZZ_TYPES = {}  # type: Dict[str, FizzlerType]
 
@@ -83,7 +86,8 @@ class FizzInst(Enum):
 MatModify = namedtuple('MatModify', 'name mat_var')
 FizzBeam = namedtuple('FizzBeam', 'offset keys speed_min speed_max')
 
-def read_configs(conf: Property):
+
+def read_configs(conf: Property) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
         fizz = FizzlerType.parse(fizz_conf)
@@ -103,10 +107,19 @@ def read_configs(conf: Property):
         for brush in fizz.brushes:
             if brush.keys['classname'].casefold() == 'trigger_portal_cleanser':
                 brush_name = brush.name
-                break
+                # Retrieve what key is used for start-disabled.
+                brush_start_disabled = None
+                for key_map in [brush.keys, brush.local_keys]:
+                    if brush_start_disabled is None:
+                        for key, value in key_map.items():
+                            if key.casefold() == 'startdisabled':
+                                brush_start_disabled = value
+                                break
+                break  # Jump past else.
         else:
             # No fizzlers in this item.
             continue
+
         # Add a paint fizzler brush to these fizzlers.
         fizz.brushes.append(FizzlerBrush(
             brush_name,
@@ -115,7 +128,7 @@ def read_configs(conf: Property):
             },
             keys={
                 'classname': 'trigger_paint_cleanser',
-                'startdisabled': '0',
+                'startdisabled': brush_start_disabled or '0',
                 'spawnflags': '9',
             },
             local_keys={},
@@ -124,7 +137,7 @@ def read_configs(conf: Property):
         ))
 
 
-def _calc_fizz_angles():
+def _calc_fizz_angles() -> None:
     """Generate FIZZ_ANGLES."""
     it = itertools.product('xyz', (-1, 1), 'xyz', (-1, 1))
     for norm_axis, norm_mag, roll_axis, roll_mag in it:
@@ -154,8 +167,6 @@ class FizzlerType:
         pack_lists_static: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
-        out_activate: Optional[Tuple[Optional[str], str]],
-        out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
         beams: List['FizzBeam'],
         inst: Dict[Tuple[FizzInst, bool], List[str]],
@@ -189,10 +200,6 @@ class FizzlerType:
         self.model_name = model_local_name
         # Instances to use - FizzInst, is_static -> list of instances.
         self.inst = inst
-
-        # If set, outputs to use via the fizzler output relay.
-        self.out_deactivate = out_deactivate
-        self.out_activate = out_activate
 
         # If set, add a brush ent using templates.
         self.temp_single = temp_single
@@ -254,14 +261,6 @@ class FizzlerType:
             else:
                 voice_attrs.append(prop.value.casefold())
 
-        out_activate = conf['OutActivate', None]
-        if out_activate is not None:
-            out_activate = Output.parse_name(out_activate)
-
-        out_deactivate = conf['OutDeactivate', None]
-        if out_deactivate is not None:
-            out_deactivate = Output.parse_name(out_deactivate)
-
         pack_lists = {
             prop.value
             for prop in
@@ -320,8 +319,6 @@ class FizzlerType:
             pack_lists_static,
             model_local_name,
             model_name_type,
-            out_activate,
-            out_deactivate,
             brushes,
             beams,
             inst,
@@ -340,7 +337,7 @@ class Fizzler:
         up_axis: Vec,
         base_inst: Entity,
         emitters: List[Tuple[Vec, Vec]]
-    ):
+    ) -> None:
         self.fizz_type = fizz_type
         self.base_inst = base_inst
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
@@ -358,7 +355,7 @@ class Fizzler:
         """The axis moving in and out of the surface."""
         return abs(self.up_axis.cross(self.forward()))
 
-    def gen_flinch_trigs(self, vmf: VMF, name: str):
+    def gen_flinch_trigs(self, vmf: VMF, name: str) -> None:
         """For deadly fizzlers optionally make them safer.
 
         This adds logic to force players
@@ -440,7 +437,7 @@ class FizzlerBrush:
         set_axis_var: bool=False,
         mat_mod_name: str=None,
         mat_mod_var: str=None,
-    ):
+    ) -> None:
         self.keys = keys
         self.local_keys = local_keys
         self.name = name  # Local name of the fizzler brush.
@@ -476,7 +473,7 @@ class FizzlerBrush:
             self.textures[group] = textures.get(group, None)
 
     @classmethod
-    def parse(cls, conf: Property):
+    def parse(cls, conf: Property) -> 'FizzlerBrush':
         """Parse from a config file."""
         if 'side_color' in conf:
             side_color = conf.vec('side_color')
@@ -527,14 +524,21 @@ class FizzlerBrush:
             set_axis_var=conf.bool('set_axis_var'),
         )
 
-    def _side_color(self, side: Side, normal: Vec, min_pos: Vec, used_tex_func):
-        """Output the side texture for fields."""
+    def _side_color(
+        self,
+        side: Side,
+        normal: Vec,
+        min_pos: Vec,
+        used_tex_func: Callable[[str], None],
+    ) -> None:
+        """Output the side texture for fields.
+
+        used_tex_func is called with each material we use.
+        """
         if not self.side_color:
             # Just apply nodraw.
             side.mat = const.Tools.NODRAW
             return
-
-        import vbsp
 
         # Produce a hex colour string, and use that as the material name.
         side.mat = 'BEE2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
@@ -543,11 +547,6 @@ class FizzlerBrush:
             round(self.side_color.z * 255),
         )
         used_tex_func(side.mat)
-
-        # Pack the file.
-        vbsp.PACK_FILES.add('materials/{}.vmt'.format(side.mat))
-        # Pack the auxiliary texture needed.
-        vbsp.PACK_FILES.add('materials/BEE2/fizz/fizz_side.vtf')
 
         # FLip orientation if needed.
         if not side.uaxis.vec().dot(normal):
@@ -768,7 +767,7 @@ class FizzlerBrush:
         neg: Vec,
         pos: Vec,
         is_laserfield=False,
-    ):
+    ) -> None:
         """Calculate the texture offsets required for fitting a texture."""
         if side.vaxis.vec() != -fizz.up_axis:
             # Rotate it
@@ -796,11 +795,12 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
-def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
+def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
     """Analyse fizzler instances to assign fizzler types.
 
     Instance traits are required.
     The model instances and brushes will be removed from the map.
+    Needs connections to be parsed.
     """
 
     # Item ID and model skin -> fizzler type
@@ -917,42 +917,50 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             brush.remove()
 
     # Check for fizzler output relays.
-    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
+    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>', silent=True)
     if not relay_file:
         # No relay item - deactivated most likely.
         return
 
     for inst in vmf.by_class['func_instance']:
-        filename = inst['file'].casefold()
-
-        if filename not in relay_file:
+        if inst['file'].casefold() not in relay_file:
             continue
 
         inst.remove()
+
+        relay_item = connections.ITEMS[inst['targetname']]
 
         try:
             fizz_name = fizz_pos[
                 Vec.from_str(inst['origin']).as_tuple(),
                 Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
             ]
+            fizz_item = connections.ITEMS[fizz_name]
         except KeyError:
-            # Not placed on a fizzler...
+            # Not placed on a fizzler, or a fizzler with no IO
+            # - ignore, and destroy.
+            for out in list(relay_item.outputs):
+                out.remove()
+            for out in list(relay_item.inputs):
+                out.remove()
+            del connections.ITEMS[relay_item.name]
             continue
-        fizz = FIZZLERS[fizz_name]
 
         # Copy over fixup values
-        fizz.base_inst.fixup.update(inst.fixup)
+        fizz_item.inst.fixup.update(inst.fixup)
 
-        for out in inst.outputs:
-            new_out = out.copy()
-            if out.output == 'ON' and fizz.fizz_type.out_activate is not None:
-                new_out.inst_out, new_out.output = fizz.fizz_type.out_activate
-            elif out.output == 'OFF' and fizz.fizz_type.out_deactivate is not None:
-                new_out.inst_out, new_out.output = fizz.fizz_type.out_deactivate
-            else:
-                # Not the marker's output somehow?
-                continue
-            fizz.base_inst.add_out(new_out)
+        # Copy over the timer delay set in the relay.
+        fizz_item.timer = relay_item.timer
+        # Transfer over antlines.
+        fizz_item.antlines |= relay_item.antlines
+        fizz_item.shape_signs += relay_item.shape_signs
+        fizz_item.ind_panels |= relay_item.ind_panels
+
+        # Remove the relay item so it doesn't get added to the map.
+        del connections.ITEMS[relay_item.name]
+
+        for conn in list(relay_item.outputs):
+            conn.from_item = fizz_item
 
 
 @conditions.meta_cond(priority=500, only_once=True)
@@ -962,7 +970,7 @@ def generate_fizzlers(vmf: VMF):
     After this is done, fizzler-related conditions will not function correctly.
     However the model instances are now available for modification.
     """
-    from vbsp import MAP_RAND_SEED, TO_PACK, PACK_FILES
+    from vbsp import MAP_RAND_SEED
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -979,9 +987,13 @@ def generate_fizzlers(vmf: VMF):
             and fizz.base_inst.fixup.bool('$start_enabled', 1)
         )
 
-        if is_static:
-            TO_PACK |= fizz.fizz_type.pack_lists_static
-        TO_PACK |= fizz.fizz_type.pack_lists
+        pack_list = (
+            fizz.fizz_type.pack_lists_static
+            if is_static else
+            fizz.fizz_type.pack_lists
+        )
+        for pack in pack_list:
+            packing.pack_list(vmf, pack)
 
         if fizz_type.inst[FizzInst.BASE, is_static]:
             random.seed('{}_fizz_base_{}'.format(MAP_RAND_SEED, fizz_name))
@@ -1188,11 +1200,18 @@ def generate_fizzlers(vmf: VMF):
 
                 # Non-singular or not generated yet - make the entity.
                 if brush_ent is None:
-                    brush_ent = Entity(vmf, keys=brush_type.keys)
-                    vmf.add_ent(brush_ent)
+                    brush_ent = vmf.create_ent(classname='func_brush')
+
+                    for key_name, key_value in brush_type.keys.items():
+                        brush_ent[key_name] = conditions.resolve_value(fizz.base_inst, key_value)
 
                     for key_name, key_value in brush_type.local_keys.items():
-                        brush_ent[key_name] = conditions.local_name(fizz.base_inst, key_value)
+                        brush_ent[key_name] = conditions.local_name(
+                            fizz.base_inst, conditions.resolve_value(
+                                fizz.base_inst, key_value,
+                            )
+                        )
+
                     brush_ent['targetname'] = conditions.local_name(
                         fizz.base_inst, brush_type.name,
                     )
@@ -1208,11 +1227,11 @@ def generate_fizzlers(vmf: VMF):
                         trigger_hurt_name = brush_ent['targetname']
 
                     if brush_type.set_axis_var:
-                        axis_script = 'BEE2/fizzler_axis_{}.nut'.format(fizz.normal().axis())
-                        scripts = brush_ent['vscripts'].split()
-                        scripts.insert(0, axis_script)
-                        brush_ent['vscripts'] = ' '.join(scripts)
-                        PACK_FILES.add('scripts/vscripts/' + axis_script)
+                        brush_ent['vscript_init_code'] = (
+                            'axis <- `{}`;'.format(
+                                fizz.normal().axis(),
+                            )
+                        )
 
                     for out in brush_type.outputs:
                         new_out = out.copy()

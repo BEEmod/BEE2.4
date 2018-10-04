@@ -3,11 +3,11 @@ import ast
 
 from conditions import make_result_setup, make_result
 from srctools import Property, Vec, Entity, conv_bool
-import utils
+import srctools.logger
 
 COND_MOD_NAME = 'Python'
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Functions we allow the result to call.
 FUNC_GLOBALS = {

@@ -1,16 +1,24 @@
-# coding=utf-8
+"""Various functions shared among the compiler and application."""
 import collections.abc
 import functools
 import logging
-import os.path
+import os
 import stat
 import shutil
 import sys
 from enum import Enum
 
 from typing import (
-    Tuple, List, Union, Iterator,
+    Tuple, List, Set, Sequence,
+    Iterator, Iterable, SupportsInt,
+    TypeVar, Any,
+    Union, Callable, Generator,
 )
+
+try:
+    from typing import NoReturn
+except ImportError:  # py < 3.6.5
+    NoReturn = None  # type: ignore
 
 
 try:
@@ -29,14 +37,6 @@ else:
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
 LINUX = sys.platform.startswith('linux')
-
-# Formatters for the logger handlers.
-short_log_format = None
-long_log_format = None
-
-# Various logger handlers
-stdout_loghandler = None
-stderr_loghandler = None
 
 # App IDs for various games. Used to determine which game we're modding
 # and activate special support for them
@@ -64,7 +64,7 @@ STEAM_IDS = {
 }
 
 
-def fix_cur_directory():
+def fix_cur_directory() -> None:
     """Change directory to the location of the executable.
 
     Otherwise we can't find our files!
@@ -353,6 +353,8 @@ CONN_LOOKUP = {
 
 del N, S, E, W
 
+RetT = TypeVar('RetT')
+
 
 class FuncLookup(collections.abc.Mapping):
     """A dict for holding callback functions.
@@ -363,13 +365,19 @@ class FuncLookup(collections.abc.Mapping):
     Additionally overwriting names is not allowed.
     Iteration yields all functions.
     """
-    def __init__(self, name, *, casefold=True, attrs=()):
+    def __init__(
+        self,
+        name: str,
+        *,
+        casefold: bool=True,
+        attrs: Iterable[str]=(),
+    ) -> None:
         self.casefold = casefold
         self.__name__ = name
         self._registry = {}
         self.allowed_attrs = set(attrs)
 
-    def __call__(self, *names: str, **kwargs):
+    def __call__(self, *names: str, **kwargs) -> Callable[[Callable[..., RetT]], Callable[..., RetT]]:
         """Add a function to the dict."""
         if not names:
             raise TypeError('No names passed!')
@@ -378,7 +386,7 @@ class FuncLookup(collections.abc.Mapping):
         if bad_keywords:
             raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
 
-        def callback(func):
+        def callback(func: 'Callable[..., RetT]') -> 'Callable[..., RetT]':
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
@@ -389,20 +397,20 @@ class FuncLookup(collections.abc.Mapping):
 
         return callback
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, FuncLookup):
             return self._registry == other._registry
         if not isinstance(other, collections.abc.Mapping):
             return NotImplemented
         return self._registry == dict(other.items())
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Callable[..., Any]]:
         yield from self.values()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(set(self._registry.values()))
 
-    def __getitem__(self, names: Union[str, Tuple[str]]):
+    def __getitem__(self, names: Union[str, Tuple[str]]) -> Callable[..., Any]:
         if isinstance(names, str):
             names = names,
 
@@ -418,7 +426,11 @@ class FuncLookup(collections.abc.Mapping):
                 ', '.join(names),
             ))
 
-    def __setitem__(self, names: Union[str, Tuple[str]], func):
+    def __setitem__(
+        self,
+        names: Union[str, Tuple[str]],
+        func: Callable[..., Any],
+    ) -> None:
         if isinstance(names, str):
             names = names,
 
@@ -429,28 +441,28 @@ class FuncLookup(collections.abc.Mapping):
                 raise ValueError('Overwrote {!r}!'.format(name))
             self._registry[name] = func
 
-    def __delitem__(self, name: str):
+    def __delitem__(self, name: str) -> None:
         if self.casefold:
             name = name.casefold()
         del self._registry[name]
 
-    def __contains__(self, name):
+    def __contains__(self, name: str) -> bool:
         if self.casefold:
             name = name.casefold()
         return name in self._registry
 
-    def functions(self):
+    def functions(self) -> Set[Callable[..., Any]]:
         """Return the set of functions in this mapping."""
         return set(self._registry.values())
 
     values = functions
 
-    def clear(self):
+    def clear(self) -> None:
         """Delete all functions."""
         self._registry.clear()
 
 
-def get_indent(line: str):
+def get_indent(line: str) -> str:
     """Return the whitespace which this line starts with.
 
     """
@@ -463,12 +475,12 @@ def get_indent(line: str):
 
 
 def iter_grid(
-        max_x: int,
-        max_y: int,
-        min_x: int=0,
-        min_y: int=0,
-        stride: int=1,
-        ) -> Iterator[Tuple[int, int]]:
+    max_x: int,
+    max_y: int,
+    min_x: int=0,
+    min_y: int=0,
+    stride: int=1,
+) -> Iterator[Tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
         for y in range(min_y, max_y, stride):
@@ -478,8 +490,18 @@ def iter_grid(
 DISABLE_ADJUST = False
 
 
-def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
-    """Adjust a window position to ensure it fits inside the screen."""
+def adjust_inside_screen(
+    x: int,
+    y: int,
+    win,
+    horiz_bound: int=14,
+    vert_bound: int=45,
+) -> Tuple[int, int]:
+    """Adjust a window position to ensure it fits inside the screen.
+
+    The new value is returned.
+    If utils.DISABLE_ADJUST is set to True, this is disabled.
+    """
     if DISABLE_ADJUST:  # Allow disabling this adjustment
         return x, y     # for multi-window setups
     max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
@@ -510,15 +532,18 @@ def center_win(window, parent=None):
     window.geometry('+' + str(x) + '+' + str(y))
 
 
-def append_bothsides(deq):
+def _append_bothsides(deq: collections.deque) -> Generator[None, Any, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
         deq.appendleft((yield))
 
 
-def fit(dist, obj):
-    """Figure out the smallest number of parts to stretch a distance."""
+def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
+    """Figure out the smallest number of parts to stretch a distance.
+
+    The list should be a series of sizes, from largest to smallest.
+    """
     # If dist is a float the outputs will become floats as well
     # so ensure it's an int.
     dist = int(dist)
@@ -529,7 +554,7 @@ def fit(dist, obj):
     items = collections.deque()
 
     # We use this so the small sections appear on both sides of the area.
-    adder = append_bothsides(items)
+    adder = _append_bothsides(items)
     next(adder)
     while dist >= smallest:
         for item in obj:
@@ -537,6 +562,8 @@ def fit(dist, obj):
                 adder.send(item)
                 dist -= item
                 break
+        else:
+            raise ValueError(f'No section for dist of {dist}!')
     if dist > 0:
         adder.send(dist)
 
@@ -544,7 +571,7 @@ def fit(dist, obj):
     return list(items)  # Dump the deque
 
 
-def restart_app():
+def restart_app() -> NoReturn:
     """Restart this python application.
 
     This will not return!
@@ -554,22 +581,21 @@ def restart_app():
     # We need to add the program to the arguments list, since python
     # strips that off.
     args = [sys.executable] + sys.argv
-    getLogger(__name__).info(
-        'Restarting using "{}", with args {!r}',
+    logging.root.info('Restarting using "{}", with args {!r}'.format(
         sys.executable,
         args,
-    )
+    ))
     logging.shutdown()
     os.execv(sys.executable, args)
 
 
-def quit_app(status=0):
+def quit_app(status=0) -> NoReturn:
     """Quit the application."""
     logging.shutdown()
     sys.exit(status)
 
 
-def set_readonly(file):
+def set_readonly(file: Union[bytes, str]) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
@@ -583,7 +609,7 @@ def set_readonly(file):
     )
 
 
-def unset_readonly(file):
+def unset_readonly(file: os.PathLike) -> None:
     """Set the writeable flag on a file."""
     # Get the old flags
     flags = os.stat(file).st_mode
@@ -597,7 +623,11 @@ def unset_readonly(file):
     )
 
 
-def merge_tree(src, dst, copy_function=shutil.copy2):
+def merge_tree(
+    src: str,
+    dst: str,
+    copy_function=shutil.copy2,
+) -> None:
     """Recursively copy a directory tree to a destination, which may exist.
 
     This is a modified version of shutil.copytree(), with the difference that
@@ -645,7 +675,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
         raise shutil.Error(errors)
 
 
-def setup_localisations(logger: logging.Logger):
+def setup_localisations(logger: logging.Logger) -> None:
     """Setup gettext localisations."""
     from srctools.property_parser import PROP_FLAGS_DEFAULT
     import gettext
@@ -714,231 +744,3 @@ def setup_localisations(logger: logging.Logger):
         ]
         for font_name in font_names:
             font.nametofont(font_name).configure(family='sans-serif')
-
-
-class LogMessage:
-    """Allow using str.format() in logging messages.
-
-    The __str__() method performs the joining.
-    """
-    def __init__(self, fmt, args, kwargs):
-        self.fmt = fmt
-        self.args = args
-        self.kwargs = kwargs
-        self.has_args = kwargs or args
-
-    def format_msg(self):
-        # Only format if we have arguments!
-        # That way { or } can be used in regular messages.
-        if self.has_args:
-            f = self.fmt = str(self.fmt).format(*self.args, **self.kwargs)
-
-            # Don't repeat the formatting
-            del self.args, self.kwargs
-            self.has_args = False
-            return f
-        else:
-            return str(self.fmt)
-
-    def __str__(self):
-        """Format the string, and add an ASCII indent."""
-        msg = self.format_msg()
-
-        if '\n' not in msg:
-            return msg
-
-        # For multi-line messages, add an indent so they're associated
-        # with the logging tag.
-        lines = msg.split('\n')
-        if lines[-1].isspace():
-            # Strip last line if it's blank
-            del lines[-1]
-        # '|' beside all the lines, '|_ beside the last. Add an empty
-        # line at the end.
-        return '\n | '.join(lines[:-1]) + '\n |_' + lines[-1] + '\n'
-
-
-class LoggerAdapter(logging.LoggerAdapter):
-    """Fix loggers to use str.format().
-
-    """
-    def __init__(self, logger: logging.Logger, alias=None) -> None:
-        # Alias is a replacement module name for log messages.
-        self.alias = alias
-        super(LoggerAdapter, self).__init__(logger, extra={})
-
-    def log(self, level, msg, *args, exc_info=None, stack_info=False, **kwargs):
-        """This version of .log() is for str.format() compatibility.
-
-        The message is wrapped in a LogMessage object, which is given the
-        args and kwargs
-        """
-        if self.isEnabledFor(level):
-            self.logger._log(
-                level,
-                LogMessage(msg, args, kwargs),
-                (), # No positional arguments, we do the formatting through
-                # LogMessage..
-                # Pull these two arguments out of kwargs, so they can be set..
-                exc_info=exc_info,
-                stack_info=stack_info,
-                extra={'alias': self.alias},
-            )
-
-
-def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.Logger:
-    """Setup the logger and logging handlers.
-
-    If filename is set, all logs will be written to this file as well.
-    This also sets sys.except_hook, so uncaught exceptions are captured.
-    on_error should be a function to call when this is done
-    (taking type, value, traceback).
-    """
-    global short_log_format, long_log_format
-    global stderr_loghandler, stdout_loghandler
-    import logging
-    from logging import handlers
-    import sys, io, os
-
-    class NewLogRecord(logging.getLogRecordFactory()):
-        """Allow passing an alias for log modules."""
-        # This breaks %-formatting, so only set when init_logging() is called.
-
-        alias = None  # type: str
-
-        def getMessage(self):
-            """We have to hook here to change the value of .module.
-
-            It's called just before the formatting call is made.
-            """
-            if self.alias is not None:
-                self.module = self.alias
-            return str(self.msg)
-    logging.setLogRecordFactory(NewLogRecord)
-
-    logger = logging.getLogger('BEE2')
-    logger.setLevel(logging.DEBUG)
-
-    # Put more info in the log file, since it's not onscreen.
-    long_log_format = logging.Formatter(
-        '[{levelname}] {module}.{funcName}(): {message}',
-        style='{',
-    )
-    # Console messages, etc.
-    short_log_format = logging.Formatter(
-        # One letter for level name
-        '[{levelname[0]}] {module}: {message}',
-        style='{',
-    )
-
-    if filename is not None:
-        # Make the directories the logs are in, if needed.
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-
-        # The log contains DEBUG and above logs.
-        # We rotate through logs of 500kb each, so it doesn't increase too much.
-        log_handler = handlers.RotatingFileHandler(
-            filename,
-            backupCount=5,
-        )
-        log_handler.doRollover()
-        log_handler.setLevel(logging.DEBUG)
-        log_handler.setFormatter(long_log_format)
-        logger.addHandler(log_handler)
-
-        err_log_handler = handlers.RotatingFileHandler(
-            filename[:-3] + 'error.' + filename[-3:],
-            backupCount=5,
-        )
-        err_log_handler.doRollover()
-        err_log_handler.setLevel(logging.WARNING)
-        err_log_handler.setFormatter(long_log_format)
-
-        logger.addHandler(err_log_handler)
-
-    # This is needed for multiprocessing, since it tries to flush stdout.
-    # That'll fail if it is None.
-    class NullStream(io.IOBase):
-        """A stream object that discards all data."""
-        def __init__(self):
-            super(NullStream, self).__init__()
-
-        @staticmethod
-        def write(self, *args, **kwargs):
-            pass
-
-        @staticmethod
-        def read(*args, **kwargs):
-            return ''
-
-    if sys.stdout:
-        stdout_loghandler = logging.StreamHandler(sys.stdout)
-        # When run from source, dump debug output.
-        stdout_loghandler.setLevel(logging.DEBUG if DEV_MODE else logging.INFO)
-        stdout_loghandler.setFormatter(long_log_format)
-        logger.addHandler(stdout_loghandler)
-
-        if sys.stderr:
-            def ignore_warnings(record: logging.LogRecord):
-                """Filter out messages higher than WARNING.
-
-                Those are handled by stdError, and we don't want duplicates.
-                """
-                return record.levelno < logging.WARNING
-            stdout_loghandler.addFilter(ignore_warnings)
-    else:
-        sys.stdout = NullStream()
-
-    if sys.stderr:
-        stderr_loghandler = logging.StreamHandler(sys.stderr)
-        stderr_loghandler.setLevel(logging.WARNING)
-        stderr_loghandler.setFormatter(long_log_format)
-        logger.addHandler(stderr_loghandler)
-    else:
-        sys.stderr = NullStream()
-
-    # Use the exception hook to report uncaught exceptions, and finalise the
-    # logging system.
-    old_except_handler = sys.excepthook
-
-    def except_handler(exc_type, exc_value, exc_tb):
-        """Log uncaught exceptions."""
-        if not issubclass(exc_type, Exception):
-            # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
-            # so we should quit without messages.
-            logging.shutdown()
-            return
-
-        logger._log(
-            level=logging.ERROR,
-            msg='Uncaught Exception:',
-            args=(),
-            exc_info=(exc_type, exc_value, exc_tb),
-        )
-        logging.shutdown()
-        if on_error is not None:
-            on_error(exc_type, exc_value, exc_tb)
-        # Call the original handler - that prints to the normal console.
-        old_except_handler(exc_type, exc_value, exc_tb)
-
-    sys.excepthook = except_handler
-
-    if main_logger:
-        return getLogger(main_logger)
-    else:
-        return LoggerAdapter(logger)
-
-
-def getLogger(name: str='', alias: str=None) -> logging.Logger:
-    """Get the named logger object.
-
-    This puts the logger into the BEE2 namespace, and wraps it to
-    use str.format() instead of % formatting.
-    If set, alias is the name to show for the module.
-    """
-    if name:
-        return LoggerAdapter(logging.getLogger('BEE2.' + name), alias)
-    else:  # Allow retrieving the main logger.
-        return LoggerAdapter(logging.getLogger('BEE2'), alias)
-
-

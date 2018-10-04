@@ -9,8 +9,9 @@ from typing import Union
 import img
 import tkMarkdown
 import utils
+import srctools.logger
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class tkRichText(tkinter.Text):

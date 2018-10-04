@@ -3,9 +3,8 @@ import random
 from collections import defaultdict
 
 import conditions
-import srctools
+import srctools.logger
 import template_brush
-import utils
 from conditions import (
     make_result, make_result_setup,
     SOLIDS
@@ -15,7 +14,7 @@ from srctools import Property, Vec, VMF, Entity
 
 COND_MOD_NAME = 'Entities'
 
-LOGGER = utils.getLogger(__name__, alias='cond.entities')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
 @make_result_setup('TemplateOverlay')
@@ -254,8 +253,6 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
     if min(pos1.z, pos2.z) > water_pos.z + 8:
         return
 
-    import vbsp
-
     # Pass along the water_pos encoded into the targetname.
     # Restrict the number of characters to allow direct slicing
     # in the script.
@@ -274,8 +271,6 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
         thinkfunction='Think',
         spawnflags='1',  # Trace downward to water surface.
     )
-
-    vbsp.PACK_FILES.add('scripts/vscripts/BEE2/water_splash.nut')
 
 
 @make_result('FunnelLight')

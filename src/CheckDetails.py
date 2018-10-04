@@ -11,7 +11,7 @@ import tkinter as tk
 
 import functools
 
-from tooltip import add_tooltip
+from tooltip import add_tooltip, set_tooltip
 import utils
 import tk_tools
 
@@ -115,10 +115,10 @@ class Item:
             )
             add_tooltip(wid)
             if self.hover_text:
-                wid.tooltip_text = self.hover_text
+                set_tooltip(wid, self.hover_text)
                 wid.hover_override = True
             else:
-                wid.tooltip_text = ''
+                set_tooltip(wid)
                 wid.hover_override = False
 
             if not self.locked:
@@ -158,10 +158,7 @@ class Item:
             text = str(text)
             short_text = widget['text'] = truncate(text, width-5)
             if not widget.hover_override:
-                if short_text != text:
-                    widget.tooltip_text = text
-                else:
-                    widget.tooltip_text = ''
+                set_tooltip(widget, text if short_text != text else '')
             x += width
 
     def destroy(self):

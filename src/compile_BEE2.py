@@ -142,6 +142,25 @@ INCLUDE_LIBS = [
 
 bee_version = input('BEE2 Version: ')
 
+import srctools
+
+zip_includes = [
+    # Add the FGD data for us.
+    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools/fgd.lzma'),
+    (os.path.join(srctools.__path__[0], 'srctools.fgd'), 'srctools/srctools.fgd'),
+]
+# We need to include this version data.
+try:
+    import importlib_resources
+    zip_includes.append(
+        (
+            os.path.join(importlib_resources.__path__[0], 'version.txt'),
+            'importlib_resources/version.txt',
+         )
+    )
+except ImportError:
+    pass
+
 
 setup(
     name='BEE2',
@@ -159,6 +178,7 @@ setup(
             # Include all modules in the zip..
             'zip_include_packages': '*',
             'zip_exclude_packages': '',
+            'zip_includes': zip_includes,
         },
     },
     executables=[
@@ -206,6 +226,7 @@ def copy_resource(tree):
             copy_resource(tree + '/' + file)
 
 copy_resource('BEE2.ico')
+copy_resource('BEE2.fgd')
 copy_resource('images/BEE2')
 copy_resource('images/icons')
 copy_resource('images/splash_screen')
