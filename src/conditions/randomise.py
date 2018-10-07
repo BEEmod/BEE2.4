@@ -1,9 +1,11 @@
 """Conditions for randomising instances."""
 import random
+from typing import List
 
 from srctools import Property, Vec, Entity
 import conditions
 import srctools
+import instance_traits
 
 from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
@@ -12,34 +14,48 @@ from conditions import (
 COND_MOD_NAME = 'Randomisation'
 
 
+def set_random_seed(inst: Entity, seed: str) -> None:
+    """Compute and set a random seed for a specific entity."""
+    name = inst['targetname']
+    # The global instances like elevators always get the same name, or
+    # none at all so we cannot use those for the seed. Instead use the global
+    # seed.
+    if name == '' or 'preplaced' in instance_traits.get(inst):
+        import vbsp
+        random.seed('{}{}{}{}'.format(
+            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
+        ))
+    else:
+        # We still need to use angles and origin, since things like
+        # fizzlers might not get unique names.
+        random.seed('{}{}{}{}'.format(
+            inst['targetname'], seed, inst['origin'], inst['angles']
+        ))
+
+
 @make_flag('random')
-def flag_random(inst: Entity, res: Property):
+def flag_random(inst: Entity, res: Property) -> bool:
     """Randomly is either true or false."""
     if res.has_children():
         chance = res['chance', '100']
-        seed = res['seed', '']
+        seed = 'a' + res['seed', '']
     else:
         chance = res.value
-        seed = ''
+        seed = 'a'
 
     # Allow ending with '%' sign
     chance = srctools.conv_int(chance.rstrip('%'), 100)
 
-    random.seed('random_chance_{}:{}_{}_{}'.format(
-        seed,
-        inst['targetname', ''],
-        inst['origin'],
-        inst['angles'],
-    ))
+    set_random_seed(inst, seed)
     return random.randrange(100) < chance
 
 
 @make_result_setup('random')
-def res_random_setup(res: Property):
+def res_random_setup(res: Property) -> object:
     weight = ''
     results = []
     chance = 100
-    seed = ''
+    seed = 'b'
     for prop in res:
         if prop.name == 'chance':
             # Allow ending with '%' sign
@@ -50,7 +66,7 @@ def res_random_setup(res: Property):
         elif prop.name == 'weights':
             weight = prop.value
         elif prop.name == 'seed':
-            seed = prop.value
+            seed = 'b' + prop.value
         else:
             results.append(prop)
 
@@ -62,7 +78,7 @@ def res_random_setup(res: Property):
     # We also need to execute result setups on all child properties!
     for prop in results[:]:
         if prop.name == 'group':
-            for sub_prop in prop.value[:]:
+            for sub_prop in list(prop):
                 Condition.setup_result(prop.value, sub_prop)
         else:
             Condition.setup_result(results, prop)
@@ -71,7 +87,7 @@ def res_random_setup(res: Property):
 
 
 @make_result('random')
-def res_random(inst: Entity, res: Property):
+def res_random(inst: Entity, res: Property) -> None:
     """Randomly choose one of the sub-results to execute.
 
     The "chance" value defines the percentage chance for any result to be
@@ -82,20 +98,18 @@ def res_random(inst: Entity, res: Property):
     # Note: 'global' results like "Has" won't delete themselves!
     # Instead they're replaced by 'dummy' results that don't execute.
     # Otherwise the chances would be messed up.
-    seed, chance, weight, results = res.value
-    random.seed('random_case_{}:{}_{}_{}'.format(
-        seed,
-        inst['targetname', ''],
-        inst['origin'],
-        inst['angles'],
-    ))
+    seed, chance, weight, results = res.value  # type: str, float, List[int], List[Property]
+
+    set_random_seed(inst, seed)
     if random.randrange(100) > chance:
         return
 
     ind = random.choice(weight)
-    choice = results[ind]  # type: Property
-    if choice.name == 'group':
-        for sub_res in choice.value:
+    choice = results[ind]
+    if choice.name == 'nop':
+        pass
+    elif choice.name == 'group':
+        for sub_res in choice:
             should_del = Condition.test_result(
                 inst,
                 sub_res,
@@ -115,7 +129,7 @@ def res_random(inst: Entity, res: Property):
 
 
 @make_result_setup('variant')
-def res_add_variant_setup(res: Property):
+def res_add_variant_setup(res: Property) -> object:
     if res.has_children():
         count = srctools.conv_int(res['Number', ''], None)
         if count:
@@ -134,7 +148,7 @@ def res_add_variant_setup(res: Property):
 
 
 @make_result('variant')
-def res_add_variant(inst: Entity, res: Property):
+def res_add_variant(inst: Entity, res: Property) -> None:
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form `_var4`.
@@ -150,20 +164,12 @@ def res_add_variant(inst: Entity, res: Property):
     Alternatively, you can use `"variant" "number"` to choose from equally-weighted
     options.
     """
-    import vbsp
-    if inst['targetname', ''] == '':
-        # some instances don't get names, so use the global
-        # seed instead for stuff like elevators.
-        random.seed(vbsp.MAP_RAND_SEED + inst['origin'] + inst['angles'])
-    else:
-        # We still need to use angles and origin, since things like
-        # fizzlers might not get unique names.
-        random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
+    set_random_seed(inst, 'variant')
     conditions.add_suffix(inst, "_var" + str(random.choice(res.value) + 1))
 
 
 @make_result('RandomNum')
-def res_rand_num(inst: Entity, res: Property):
+def res_rand_num(inst: Entity, res: Property) -> None:
     """Generate a random number and save in a fixup value.
 
     If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
@@ -175,9 +181,9 @@ def res_rand_num(inst: Entity, res: Property):
     max_val = srctools.conv_float(res['max', 1.0])
     min_val = srctools.conv_float(res['min', 0.0])
     var = res['resultvar', '$random']
-    seed = res['seed', 'random']
+    seed = 'd' + res['seed', 'random']
 
-    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+    set_random_seed(inst, seed)
 
     if is_float:
         func = random.uniform
@@ -188,7 +194,7 @@ def res_rand_num(inst: Entity, res: Property):
 
 
 @make_result('RandomVec')
-def res_rand_vec(inst: Entity, res: Property):
+def res_rand_vec(inst: Entity, res: Property) -> None:
     """A modification to RandomNum which generates a random vector instead.
 
     'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
@@ -197,9 +203,8 @@ def res_rand_vec(inst: Entity, res: Property):
     """
     is_float = srctools.conv_bool(res['decimal'])
     var = res['resultvar', '$random']
-    seed = res['seed', 'random']
 
-    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+    set_random_seed(inst, 'e' + res['seed', 'random'])
 
     if is_float:
         func = random.uniform
@@ -220,40 +225,36 @@ def res_rand_vec(inst: Entity, res: Property):
 
 
 @make_result_setup('randomShift')
-def res_rand_inst_shift_setup(res: Property):
-    min_x = srctools.conv_int(res['min_x', '0'])
-    max_x = srctools.conv_int(res['max_x', '0'])
-    min_y = srctools.conv_int(res['min_y', '0'])
-    max_y = srctools.conv_int(res['max_y', '0'])
-    min_z = srctools.conv_int(res['min_z', '0'])
-    max_z = srctools.conv_int(res['max_z', '0'])
+def res_rand_inst_shift_setup(res: Property) -> tuple:
+    min_x = res.float('min_x')
+    max_x = res.float('max_x')
+    min_y = res.float('min_y')
+    max_y = res.float('max_y')
+    min_z = res.float('min_z')
+    max_z = res.float('max_z')
 
     return (
         min_x, max_x,
         min_y, max_y,
         min_z, max_z,
+        'f' + res['seed', 'randomshift']
     )
 
 
 @make_result('randomShift')
-def res_rand_inst_shift(inst: Entity, res: Property):
+def res_rand_inst_shift(inst: Entity, res: Property) -> None:
     """Randomly shift a instance by the given amounts.
 
     The positions are local to the instance.
     """
-    import vbsp
     (
         min_x, max_x,
         min_y, max_y,
         min_z, max_z,
-    ) = res.value
+        seed,
+    ) = res.value  # type: float, float, float, float, float, float, str
 
-    random.seed(
-        vbsp.MAP_RAND_SEED +
-        '_random_shift_' +
-        inst['origin'] +
-        inst['angles']
-    )
+    set_random_seed(inst, seed)
 
     offset = Vec(
         random.uniform(min_x, max_x),
