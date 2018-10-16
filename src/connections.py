@@ -14,6 +14,7 @@ import instance_traits
 import srctools.logger
 import vbsp_options
 import antlines
+import packing
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple
 
@@ -1031,8 +1032,12 @@ def gen_item_outputs(vmf: VMF):
 
     if has_timer_relay:
         # Write this VScript out.
+        timer_sound = vbsp_options.get(str, 'timer_sound')
         with open('BEE2/inject/timer_sound.nut', 'w') as f:
-            f.write(TIMER_SOUND_SCRIPT.format(snd=vbsp_options.get(str, 'timer_sound')))
+            f.write(TIMER_SOUND_SCRIPT.format(snd=timer_sound))
+
+        # Make sure this is packed, since parsing the VScript isn't trivial.
+        packing.pack_files(vmf, timer_sound, file_type='sound')
 
     LOGGER.info('Item IO generated.')
 
