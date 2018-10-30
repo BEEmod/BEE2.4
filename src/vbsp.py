@@ -555,12 +555,13 @@ def static_pan(inst: Entity):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
-
-ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
-FLIP_PAN_BRUSH = {}  # locations -> white, black faces
+# Dict mapping locations -> func_brush face, name
+ANGLED_PAN_BRUSH = {}   # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, str]]
+# locations -> white, black faces
+FLIP_PAN_BRUSH = {}  # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, VLib.Side]]
 # Record info_targets at the angled panel positions, so we can correct
 # their locations for static panels
-PANEL_FAITH_TARGETS = defaultdict(list)
+PANEL_FAITH_TARGETS = defaultdict(list) # type: Dict[Tuple[float, float, float], List[VLib.Entity]]
 
 
 @conditions.meta_cond(-1000)
@@ -608,6 +609,25 @@ def find_panel_locs():
             )
 
 
+@conditions.meta_cond(100)
+def set_flip_panel_keyvalues() -> None:
+    """Set keyvalues on flip panels."""
+    flip_panel_start = vbsp_options.get(str, 'flip_sound_start') or ''
+    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop') or ''
+
+    for flip_pan in VMF.by_class['func_door_rotating']:
+        # Don't edit non flip panels!
+        pan_name = flip_pan['targetname']
+        if not pan_name.endswith('-flipping_panel'):
+            continue
+        try:
+            item = connections.ITEMS[flip_pan['targetname'][:-15]]
+        except KeyError:
+            continue
+
+        flip_pan['spawnpos'] = int(not item.inst.fixup.bool('$start_deployed'))
+        flip_pan['noise1'] = flip_panel_start
+        flip_pan['noise2'] = flip_panel_stop
 @conditions.make_result_setup('FaithBullseye')
 def res_faith_bullseye_check(res: Property):
     """Do a check to ensure there are actually textures availble."""
@@ -2634,16 +2654,6 @@ def change_func_brush():
         packing.pack_list(VMF, vbsp_options.get(str, 'grating_pack'))
 
 
-def alter_flip_panel() -> None:
-    flip_panel_start = vbsp_options.get(str, 'flip_sound_start')
-    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop')
-    if flip_panel_start is not None or flip_panel_stop is not None:
-        for flip_pan in VMF.by_class['func_door_rotating']:
-            # Change flip panel sounds by editing the func_door_rotating
-            flip_pan['noise1'] = flip_panel_start or ''
-            flip_pan['noise2'] = flip_panel_stop or ''
-
-
 def set_special_mat(face, side_type):
     """Set a face to a special texture.
 
@@ -3166,7 +3176,6 @@ def main() -> None:
             vmf_file=VMF,
         )
 
-        alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
