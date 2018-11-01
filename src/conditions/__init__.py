@@ -786,13 +786,20 @@ def add_suffix(inst: Entity, suff: str) -> None:
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
-def local_name(inst: Entity, name: str) -> str:
+def local_name(inst: Entity, name: Union[str, Entity]) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
+
+    If the name is an entity, that entity's name is passed through unchanged.
     """
+    # Don't translate direct entity names - it's already the entity's full
+    # name.
+    if isinstance(name, Entity):
+        return name['targetname']
+
     # If blank, keep it blank, and don't fix special or global names
-    if not name or name.startswith('!') or name.startswith('@'):
+    if not name or name.startswith(('!', '@')):
         return name
 
     fixup = inst['fixup_style', '0']
