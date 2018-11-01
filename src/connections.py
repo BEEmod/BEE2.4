@@ -205,7 +205,9 @@ class ItemType:
         default_dual: ConnType=ConnType.DEFAULT,
         input_type: InputType=InputType.DEFAULT,
 
-        invert_var: str='0',
+        spawn_fire: bool=False,
+
+        invert_var: str = '0',
         enable_cmd: List[Output]=(),
         disable_cmd: List[Output]=(),
 
@@ -223,7 +225,7 @@ class ItemType:
         output_unlock: Optional[Tuple[Optional[str], str]]=None,
         inf_lock_only: bool=False,
 
-        timer_sound_pos: Optional[Vec] = None,
+        timer_sound_pos: Optional[Vec]=None,
         timer_done_cmd: List[Output]=(),
         force_timer_sound: bool=False,
 
@@ -237,6 +239,10 @@ class ItemType:
 
         # True/False for always, $var, !$var for lookup.
         self.invert_var = invert_var
+
+        # If True, fire the enable/disable commands after spawning to initialise
+        # the entity.
+        self.spawn_fire = spawn_fire
 
         # IO commands for enabling/disabling the item.
         # These are copied to the item, so it can have modified ones.
@@ -349,6 +355,7 @@ class ItemType:
             )) from None
 
         invert_var = conf['invertVar', '0']
+        spawn_fire = conf.bool('spawnfire')
 
         if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
@@ -411,7 +418,7 @@ class ItemType:
             ]
 
         return ItemType(
-            item_id, default_dual, input_type,
+            item_id, default_dual, input_type, spawn_fire,
             invert_var, enable_cmd, disable_cmd,
             sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
@@ -494,6 +501,11 @@ class Item:
         return instance_traits.get(self.inst)
 
     @property
+    def is_logic(self) -> bool:
+        """Check if the input type is a logic type."""
+        return self.item_type.input_type.is_logic
+
+    @property
     def name(self) -> str:
         """Return the targetname of the item."""
         return self.inst['targetname']
@@ -504,17 +516,25 @@ class Item:
         self.inst['targetname'] = name
 
     def output_act(self) -> Optional[Tuple[Optional[str], str]]:
-        """Return the output to use when activating this."""
+        """Return the output used when this is activated."""
+        if self.item_type.spawn_fire and self.is_logic:
+            return None, 'OnUser2'
+
         if self.item_type.input_type is InputType.DAISYCHAIN:
             if self.inputs:
                 return None, COUNTER_AND_ON
+
         return self.item_type.output_act
 
     def output_deact(self) -> Optional[Tuple[Optional[str], str]]:
-        """Return the output to use when deactivating this."""
+        """Return the output to use when this is deactivated."""
+        if self.item_type.spawn_fire and self.is_logic:
+            return None, 'OnUser1'
+
         if self.item_type.input_type is InputType.DAISYCHAIN:
             if self.inputs:
                 return None, COUNTER_AND_OFF
+
         return self.item_type.output_deact
 
     def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
@@ -926,6 +946,13 @@ def gen_item_outputs(vmf: VMF):
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
+    logic_auto = vmf.create_ent(
+        'logic_auto',
+        origin=vbsp_options.get(Vec, 'global_ents_loc')
+    )
+
+    auto_logic = []
+
     # Apply input A/B types to connections.
     # After here, all connections are primary or secondary only.
     for item in ITEMS.values():
@@ -970,7 +997,34 @@ def gen_item_outputs(vmf: VMF):
             else:
                 add_item_indicators(item, pan_switching_timer, pan_timer_type)
 
+        # Special case - inverted spawnfire items with no inputs need to fire
+        # off the activation outputs. There's no way to then deactivate those.
         if not item.inputs:
+            if item.item_type.spawn_fire:
+                if item.is_logic:
+                    # Logic gates need to trigger their outputs.
+                    # Make a logic_auto temporarily for this to collect the
+                    # outputs we need.
+
+                    item.inst.clear_keys()
+                    item.inst['classname'] = 'logic_auto'
+
+                    auto_logic.append(item.inst)
+                else:
+                    for cmd in item.enable_cmd:
+                        logic_auto.add_out(
+                            Output(
+                                'OnMapSpawn',
+                                conditions.local_name(
+                                    item.inst,
+                                    conditions.resolve_value(item.inst, cmd.target),
+                                ) or item.inst,
+                                conditions.resolve_value(item.inst, cmd.input),
+                                conditions.resolve_value(item.inst, cmd.params),
+                                delay=cmd.delay,
+                                only_once=True,
+                            )
+                        )
             continue
 
         if item.item_type.input_type is InputType.DUAL:
@@ -1038,6 +1092,16 @@ def gen_item_outputs(vmf: VMF):
 
         # Make sure this is packed, since parsing the VScript isn't trivial.
         packing.pack_files(vmf, timer_sound, file_type='sound')
+
+    for ent in auto_logic:
+        # Condense all these together now.
+        # User2 is the one that enables the target.
+        ent.remove()
+        for out in ent.outputs:
+            if out.output == 'OnUser2':
+                out.output = 'OnMapSpawn'
+                logic_auto.add_out(out)
+                out.only_once = True
 
     LOGGER.info('Item IO generated.')
 
@@ -1270,34 +1334,117 @@ def add_item_inputs(
 
     if is_inverted:
         enable_cmd, disable_cmd = disable_cmd, enable_cmd
+        # Inverted outputs get a short amount of lag, so loops will propagate
+        # over several frames so we don't lock up.
+        for out in enable_cmd:
+            out.delay += 0.1
+        for out in disable_cmd:
+            out.delay += 0.1
 
     needs_counter = len(inputs) > 1
 
-    if logic_type.is_logic:
-        origin = item.inst['origin']
-        name = item.name
+    # If this option is enabled, generate additional logic to fire the disable
+    # output after spawn (but only if it's not triggered normally.)
 
-        counter = item.inst
-        counter.clear_keys()
+    # We just use a relay to do this.
+    # User2 is the real enable input, User1 is the real disable input.
 
-        counter['origin'] = origin
-        counter['targetname'] = name
-        counter['classname'] = 'math_counter'
+    # The relay allows cancelling the 'disable' output that fires shortly after
+    # spawning.
+    if item.item_type.spawn_fire:
+        if logic_type.is_logic:
+            # We have to handle gates specially, and make us the instance
+            # so future evaluation applies to this.
+            origin = item.inst['origin']
+            name = item.name
 
-        if not needs_counter:
-            LOGGER.warning('Item "{}" was not optimised out!', name)
-            # Force counter so it still works.
-            needs_counter = True
-    elif needs_counter:
-        counter = item.inst.map.create_ent(
-            classname='math_counter',
-            targetname=item.name + COUNTER_NAME[count_var],
-            origin=item.inst['origin'],
+            spawn_relay = item.inst
+            spawn_relay.clear_keys()
+
+            spawn_relay['origin'] = origin
+            spawn_relay['targetname'] = name
+            spawn_relay['classname'] = 'logic_relay'
+            # This needs to be blank so it'll be substituted by the instance
+            # name in enable/disable_cmd.
+            relay_cmd_name = ''
+        else:
+            relay_cmd_name = '@' + item.name + '_inv_rl'
+            spawn_relay = item.inst.map.create_ent(
+                classname='logic_relay',
+                targetname=relay_cmd_name,
+                origin=item.inst['origin'],
+            )
+
+        if is_inverted:
+            enable_user = 'User1'
+            disable_user = 'User2'
+        else:
+            enable_user = 'User2'
+            disable_user = 'User1'
+            
+        spawn_relay['spawnflags'] = '0'
+        spawn_relay['startdisabled'] = '0'
+
+        spawn_relay.add_out(
+            Output('OnTrigger', '!self', 'Fire' + disable_user, only_once=True),
+            Output('OnSpawn', '!self', 'Trigger', delay=0.1),
         )
-    else:
-        counter = None
+        for output_name, input_cmds in [
+            ('On' + enable_user, enable_cmd),
+            ('On' + disable_user, disable_cmd)
+        ]:
+            if not input_cmds:
+                continue
+            for cmd in input_cmds:
+                spawn_relay.add_out(
+                    Output(
+                        output_name,
+                        conditions.local_name(
+                            item.inst,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or item.inst,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        delay=cmd.delay,
+                        times=cmd.times,
+                    )
+                )
+
+        # Now overwrite input commands to redirect to the relay.
+        enable_cmd = [
+            Output('', relay_cmd_name, 'Fire' + enable_user),
+            Output('', relay_cmd_name, 'Disable', only_once=True),
+        ]
+        disable_cmd = [
+            Output('', relay_cmd_name, 'Fire' + disable_user),
+            Output('', relay_cmd_name, 'Disable', only_once=True),
+        ]
+        # For counters, swap out the input type.
+        if logic_type is InputType.AND_LOGIC:
+            logic_type = InputType.AND
+        elif logic_type is InputType.OR_LOGIC:
+            logic_type = InputType.OR
 
     if needs_counter:
+        if logic_type.is_logic:
+            # Logic items are the counter. We convert the instance to that
+            # so we keep outputs added by items evaluated earlier.
+            origin = item.inst['origin']
+            name = item.name
+
+            counter = item.inst
+            counter.clear_keys()
+
+            counter['origin'] = origin
+            counter['targetname'] = name
+            counter['classname'] = 'math_counter'
+        else:
+            counter = item.inst.map.create_ent(
+                classname='math_counter',
+                targetname=item.name + COUNTER_NAME[count_var],
+                origin=item.inst['origin'],
+            )
+
         counter['min'] = counter['startvalue'] = counter['StartDisabled'] = 0
         counter['max'] = len(inputs)
 
