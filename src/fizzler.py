@@ -355,7 +355,7 @@ class Fizzler:
         """The axis moving in and out of the surface."""
         return abs(self.up_axis.cross(self.forward()))
 
-    def gen_flinch_trigs(self, vmf: VMF, name: str) -> None:
+    def gen_flinch_trigs(self, vmf: VMF, name: str, start_disabled: str) -> None:
         """For deadly fizzlers optionally make them safer.
 
         This adds logic to force players
@@ -395,6 +395,7 @@ class Fizzler:
             physicsSpeed=0,
             playerSpeed=96,
             launchDirection=(-normal).to_angle(),
+            startDisabled=start_disabled,
         )
         neg_brush.add_out(Output('OnCatapulted', '_fizz_flinch_hurt', 'Hurt'))
 
@@ -1110,8 +1111,9 @@ def generate_fizzlers(vmf: VMF):
             if brush_type.mat_mod_var is not None:
                 mat_mod_tex[brush_type] = set()
 
+        # Record the data for trigger hurts so flinch triggers can match them.
         trigger_hurt_name = ''
-
+        trigger_hurt_start_disabled = '0'
 
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
@@ -1225,6 +1227,7 @@ def generate_fizzlers(vmf: VMF):
 
                     if brush_ent['classname'] == 'trigger_hurt':
                         trigger_hurt_name = brush_ent['targetname']
+                        trigger_hurt_start_disabled = brush_ent['startdisabled']
 
                     if brush_type.set_axis_var:
                         brush_ent['vscript_init_code'] = (
@@ -1268,7 +1271,11 @@ def generate_fizzlers(vmf: VMF):
                 )
 
         if trigger_hurt_name:
-            fizz.gen_flinch_trigs(vmf, trigger_hurt_name)
+            fizz.gen_flinch_trigs(
+                vmf,
+                trigger_hurt_name,
+                trigger_hurt_start_disabled,
+            )
 
         # If we have the config, but no templates used anywhere...
         if template_brush_ent is not None and not template_brush_ent.solids:

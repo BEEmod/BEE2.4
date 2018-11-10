@@ -46,6 +46,9 @@ EXCLUDES = [
     'win32evtlogutil',
     'smtplib',
     'http',
+
+    # Pillow is imported by Srctools' VTF support, but we don't need to do that.
+    'PIL',
 ]
 
 # These also aren't required by logging really, but by default

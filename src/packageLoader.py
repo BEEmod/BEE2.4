@@ -966,7 +966,6 @@ class ItemVariant:
     def can_group(self) -> bool:
         """Does this variant have the data needed to group?"""
         return (
-            'all' in self.icons and
             self.all_icon is not None and
             self.all_name is not None
         )
@@ -1693,6 +1692,8 @@ class Item(PakObject):
                     continue
 
                 if index in palette_items:
+                    icon = pal_section['Image']
+
                     if len(palette_items) == 1:
                         # Switch to the 'Grouped' icon and name
                         if item_data.all_name is not None:
@@ -1700,13 +1701,12 @@ class Item(PakObject):
 
                         if item_data.all_icon is not None:
                             icon = item_data.all_icon
-                        else:
-                            icon = pal_section['Image']
-                        # Bug in Portal 2 - palette icons must end with '.png',
-                        # so force that to be the case for all icons.
-                        if icon.casefold().endswith('.vtf'):
-                            icon = icon[:-3] + 'png'
-                        pal_section['Image'] = icon
+
+                    # Bug in Portal 2 - palette icons must end with '.png',
+                    # so force that to be the case for all icons.
+                    if icon.casefold().endswith('.vtf'):
+                        icon = icon[:-3] + 'png'
+                    pal_section['Image'] = icon
 
                     pal_section['Position'] = "{x} {y} 0".format(
                         x=palette_items[index] % 4,

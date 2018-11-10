@@ -735,7 +735,6 @@ def main(argv: List[str]) -> None:
 
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
-    bsp_file.read_header()
 
     bsp_ents = bsp_file.read_ent_data()
 
@@ -832,18 +831,12 @@ def main(argv: List[str]) -> None:
 
     zipfile.close()  # Finalise the zip modification
 
-    # Copy the zipfile into the BSP file, and adjust the headers
-    bsp_file.replace_lump(
-        path,
-        BSP_LUMPS.PAKFILE,
-        zip_data.getvalue(),  # Get the binary data we need
-    )
+    # Copy the zipfile into the BSP file, and adjust the headers.
+    bsp_file.lumps[BSP_LUMPS.PAKFILE].data = zip_data.getvalue()
     # Copy new entity data.
-    bsp_file.replace_lump(
-        path,
-        BSP_LUMPS.ENTITIES,
-        BSP.write_ent_data(bsp_ents),
-    )
+    bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
+
+    bsp_file.save()
     LOGGER.info(' - BSP written!')
 
     if is_peti:

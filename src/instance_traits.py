@@ -33,6 +33,9 @@ ID_ATTRS = {
     'ITEM_PANEL_CLEAR': [
         {'panel_glass'},
     ],
+    'ITEM_OBSERVATION_ROOM': [
+        {'preplaced'},
+    ]
 }
 
 CLASS_ATTRS = {
@@ -81,41 +84,41 @@ CLASS_ATTRS = {
         {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner'},
     ],
     ItemClass.DOOR_ENTRY_SP: [
-        {'corridor_1', 'entry_corridor', 'sp_corridor'},
-        {'corridor_2', 'entry_corridor', 'sp_corridor'},
-        {'corridor_3', 'entry_corridor', 'sp_corridor'},
-        {'corridor_4', 'entry_corridor', 'sp_corridor'},
-        {'corridor_5', 'entry_corridor', 'sp_corridor'},
-        {'corridor_6', 'entry_corridor', 'sp_corridor'},
-        {'corridor_7', 'entry_corridor', 'sp_corridor'},
-        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white'},
-        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black'},
-        {'entry_elevator', 'elevator', 'sp_corridor'},
-        {'exit_elevator', 'elevator', 'sp_corridor'},
-        {'arrival_departure_transition'},
+        {'corridor_1', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_2', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_3', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_4', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_5', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_6', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_7', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white', 'preplaced'},
+        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black', 'preplaced'},
+        {'entry_elevator', 'elevator', 'sp_corridor', 'preplaced'},
+        {'exit_elevator', 'elevator', 'sp_corridor', 'preplaced'},
+        {'arrival_departure_transition', 'preplaced'},
     ],
     ItemClass.DOOR_EXIT_SP: [
-        {'corridor_1', 'exit_corridor', 'sp_corridor'},
-        {'corridor_2', 'exit_corridor', 'sp_corridor'},
-        {'corridor_3', 'exit_corridor', 'sp_corridor'},
-        {'corridor_4', 'exit_corridor', 'sp_corridor'},
-        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white'},
-        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black'},
+        {'corridor_1', 'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_2', 'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_3', 'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_4', 'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black', 'preplaced'},
     ],
     ItemClass.DOOR_ENTRY_COOP: [
-        {'entry_corridor', 'coop_corridor'},
+        {'entry_corridor', 'coop_corridor', 'preplaced'},
         set(),  # White/black 'door frames', not used on the entry.
         set(),
-        {'exit_elevator', 'elevator', 'coop_corridor'},
-        {'arrival_departure_transition'},
+        {'exit_elevator', 'elevator', 'coop_corridor', 'preplaced'},
+        {'arrival_departure_transition', 'preplaced'},
     ],
     ItemClass.DOOR_EXIT_COOP: [
-        {'corridor_1', 'exit_corridor', 'coop_corridor'},
-        {'corridor_2', 'exit_corridor', 'coop_corridor'},
-        {'corridor_3', 'exit_corridor', 'coop_corridor'},
-        {'corridor_4', 'exit_corridor', 'coop_corridor'},
-        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white'},
-        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black'},
+        {'corridor_1', 'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'corridor_2', 'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'corridor_3', 'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'corridor_4', 'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black', 'preplaced'},
     ],
 
     ItemClass.PAINT_DROPPER: [

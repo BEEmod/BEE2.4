@@ -235,7 +235,7 @@ def alter_mat(
         return False
 
 
-def get_tile_type(mat, orient):
+def get_tile_type(mat: str, orient: ORIENT) -> str:
     """Get the texture command for a texture."""
     surf_type = 'white' if mat in consts.WhitePan else 'black'
     # We need to handle specially the 4x4 and 2x4 variants.
@@ -555,16 +555,17 @@ def static_pan(inst: Entity):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
-
-ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
-FLIP_PAN_BRUSH = {}  # locations -> white, black faces
+# Dict mapping locations -> func_brush face, name
+ANGLED_PAN_BRUSH = {}   # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, str]]
+# locations -> white, black faces
+FLIP_PAN_BRUSH = {}  # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, VLib.Side]]
 # Record info_targets at the angled panel positions, so we can correct
 # their locations for static panels
-PANEL_FAITH_TARGETS = defaultdict(list)
+PANEL_FAITH_TARGETS = defaultdict(list) # type: Dict[Tuple[float, float, float], List[VLib.Entity]]
 
 
 @conditions.meta_cond(-1000)
-def find_panel_locs():
+def find_panel_locs() -> None:
     """Find the locations of panels, used for FaithBullseye."""
 
     non_panel_mats = {
@@ -608,8 +609,29 @@ def find_panel_locs():
             )
 
 
+@conditions.meta_cond(100)
+def set_flip_panel_keyvalues() -> None:
+    """Set keyvalues on flip panels."""
+    flip_panel_start = vbsp_options.get(str, 'flip_sound_start') or ''
+    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop') or ''
+
+    for flip_pan in VMF.by_class['func_door_rotating']:
+        # Don't edit non flip panels!
+        pan_name = flip_pan['targetname']
+        if not pan_name.endswith('-flipping_panel'):
+            continue
+        try:
+            item = connections.ITEMS[flip_pan['targetname'][:-15]]
+        except KeyError:
+            continue
+
+        flip_pan['spawnpos'] = int(not item.inst.fixup.bool('$start_deployed'))
+        flip_pan['noise1'] = flip_panel_start
+        flip_pan['noise2'] = flip_panel_stop
+
+
 @conditions.make_result_setup('FaithBullseye')
-def res_faith_bullseye_check(res: Property):
+def res_faith_bullseye_check(res: Property) -> None:
     """Do a check to ensure there are actually textures availble."""
     for col in ('white', 'black'):
         for orient in ('wall', 'floor', 'ceiling'):
@@ -692,12 +714,12 @@ def make_bullseye_face(
     ) -> bool:
     """Switch the given face to use a bullseye texture.
 
-    Returns whether it was sucessful or not.
+    Returns whether it was successful or not.
     """
     if orient is None:
         orient = get_face_orient(face)
 
-    if orient is ORIENT.ceil: # We use the full 'ceiling' here, instead of 'ceil'.
+    if orient is ORIENT.ceil:  # We use the full 'ceiling' here, instead of 'ceil'.
         orient = 'ceiling'
 
     mat = get_tex('special.bullseye_{!s}_{!s}'.format(color, orient))
@@ -897,7 +919,7 @@ def set_player_model():
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun():
+def set_player_portalgun() -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -1106,7 +1128,7 @@ def set_player_portalgun():
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic():
+def add_screenshot_logic() -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
@@ -1591,7 +1613,7 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
         inst['file'] = replace
 
 
-def calc_rand_seed():
+def calc_rand_seed() -> str:
     """Use the ambient light entities to create a map seed.
 
      This ensures textures remain the same when the map is recompiled.
@@ -1608,8 +1630,6 @@ def calc_rand_seed():
         return 'SEED'
     else:
         return '|'.join(lst)
-
-
 
 
 def add_goo_mist(sides):
@@ -1695,7 +1715,7 @@ def fit_goo_mist(
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 
-def fixup_goo_sides():
+def fixup_goo_sides() -> None:
     """Replace the textures on the sides of goo and bottomless pits.
 
     For goo these can use special textures, or black 4x4 walls.
@@ -1750,7 +1770,7 @@ def fixup_goo_sides():
     LOGGER.info("Done!")
 
 
-def collapse_goo_trig():
+def collapse_goo_trig() -> None:
     """Collapse the goo triggers to only use 2 entities for all pits."""
     LOGGER.info('Collapsing goo triggers...')
 
@@ -1792,7 +1812,7 @@ def collapse_goo_trig():
 
 
 @conditions.meta_cond(priority=-50)
-def set_barrier_frame_type():
+def set_barrier_frame_type() -> None:
     """Set a $type instvar on glass frame.
 
     This allows using different instances on glass and grating.
@@ -1845,12 +1865,17 @@ def set_barrier_frame_type():
             pass
 
 
-def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
-    '''Fix a squarebeams brush for use in other styles.
+def fix_squarebeams(
+    face: VLib.Side,
+    rotate: bool,
+    reset_offset: bool,
+    scale: float,
+) -> None:
+    """Fix a squarebeams brush for use in other styles.
 
     If rotate is True, rotate the texture 90 degrees.
     offset is the offset for the texture.
-    '''
+    """
     if rotate:
         # To rotate, swap the two values
         face.uaxis, face.vaxis = face.vaxis, face.uaxis
@@ -1866,7 +1891,7 @@ def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     targ.scale = scale
 
 
-def change_brush():
+def change_brush() -> None:
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
 
@@ -1913,7 +1938,6 @@ def change_brush():
     LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
-        is_glass = False
         for face in solid:
             highest_brush = max(
                 highest_brush,
@@ -1953,15 +1977,12 @@ def change_brush():
         random_walls()
 
 
-def can_clump():
+def can_clump() -> bool:
     """Check the clump algorithm is enabled."""
     return vbsp_options.get(bool, "clump_wall_tex")
 
 
-
-
-
-def face_seed(face):
+def face_seed(face: VLib.Side) -> str:
     """Create a seed unique to this brush face.
 
     This is the same regardless of side direction.
@@ -1975,7 +1996,7 @@ def face_seed(face):
     return origin.join(' ')
 
 
-def random_walls():
+def random_walls() -> None:
     """The original wall style, with completely randomised walls."""
     rotate_edge = vbsp_options.get(bool, 'rotate_edge')
     texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
@@ -2212,7 +2233,7 @@ def clump_walls():
                 alter_mat(face, texture_lock=texture_lock)
 
 
-def get_face_orient(face):
+def get_face_orient(face: VLib.Side) -> ORIENT:
     """Determine the orientation of an on-grid face."""
     norm = face.normal()
     # Even if not axis-aligned, make mostly-flat surfaces
@@ -2225,7 +2246,7 @@ def get_face_orient(face):
     return ORIENT.wall
 
 
-def change_overlays():
+def change_overlays() -> None:
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
 
@@ -2238,9 +2259,6 @@ def change_overlays():
     # A packlist associated with the sign_inst.
     sign_inst_pack = vbsp_options.get(str, 'signPack')
 
-    # Grab all the textures we're using...
-
-    tex_dict = settings['textures']
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2634,16 +2652,6 @@ def change_func_brush():
         packing.pack_list(VMF, vbsp_options.get(str, 'grating_pack'))
 
 
-def alter_flip_panel() -> None:
-    flip_panel_start = vbsp_options.get(str, 'flip_sound_start')
-    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop')
-    if flip_panel_start is not None or flip_panel_stop is not None:
-        for flip_pan in VMF.by_class['func_door_rotating']:
-            # Change flip panel sounds by editing the func_door_rotating
-            flip_pan['noise1'] = flip_panel_start or ''
-            flip_pan['noise2'] = flip_panel_stop or ''
-
-
 def set_special_mat(face, side_type):
     """Set a face to a special texture.
 
@@ -2663,7 +2671,11 @@ def set_special_mat(face, side_type):
         face.mat = get_tex(side_type + '.' + str(orient))
 
 
-def make_static_pan(ent, pan_type, is_bullseye=False):
+def make_static_pan(
+    ent: VLib.Entity,
+    pan_type: str,
+    is_bullseye: bool=False
+) -> bool:
     """Convert a regular panel into a static version.
 
     This is done to save entities and improve lighting."""
@@ -2764,7 +2776,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
     return True
 
 
-def change_ents():
+def change_ents() -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
     if vbsp_options.get(bool, "remove_info_lighting"):
@@ -2780,7 +2792,7 @@ def change_ents():
                 VMF.remove_ent(auto)
 
 
-def fix_worldspawn():
+def fix_worldspawn() -> None:
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
@@ -2794,7 +2806,7 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = vbsp_options.get(str, 'skybox')
 
 
-def make_vrad_config(is_peti: bool):
+def make_vrad_config(is_peti: bool) -> None:
     """Generate a config file for VRAD from our configs.
 
     This way VRAD doesn't need to parse through vbsp_config, or anything else.
@@ -2875,7 +2887,7 @@ def instance_symlink():
     os.symlink(inst, link_loc, target_is_directory=True)
 
 
-def save(path):
+def save(path: str) -> None:
     """Save the modified map back to the correct location.
     """
     LOGGER.info("Saving New Map...")
@@ -2944,7 +2956,7 @@ def run_vbsp(vbsp_args, path, new_path=None) -> None:
                 )
 
 
-def process_vbsp_log(output: str):
+def process_vbsp_log(output: str) -> None:
     """Read through VBSP's log, extracting entity counts.
 
     This is then passed back to the main BEE2 application for display.
@@ -2997,7 +3009,7 @@ def process_vbsp_log(output: str):
     BEE2_config.save()
 
 
-def process_vbsp_fail(output: str):
+def process_vbsp_fail(output: str) -> None:
     """Read through VBSP's logs when failing, to update counts."""
     # VBSP doesn't output the actual entity counts, so set the errorred
     # one to max and the others to zero.
@@ -3166,7 +3178,6 @@ def main() -> None:
             vmf_file=VMF,
         )
 
-        alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
