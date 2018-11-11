@@ -3190,6 +3190,12 @@ def main() -> None:
         barriers.make_barriers(VMF, get_tex)
         fix_worldspawn()
 
+        
+        # Ensure all VMF outputs use the correct seperator.
+        for ent in VMF.entities:
+            for out in ent.outputs:
+                out.comma_sep = False
+
         save(new_path)
         run_vbsp(
             vbsp_args=new_args,
