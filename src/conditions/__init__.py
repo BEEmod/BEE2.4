@@ -978,7 +978,7 @@ def resolve_value(inst: Entity, value: T) -> Union[str, T]:
     if not isinstance(value, str):
         return value
 
-    if value.startswith('!'):
+    if value.startswith('!$'):
         inverted = True
         value = value[1:]
     else:
