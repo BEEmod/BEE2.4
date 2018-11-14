@@ -1334,12 +1334,33 @@ def add_item_inputs(
 
     if is_inverted:
         enable_cmd, disable_cmd = disable_cmd, enable_cmd
+
         # Inverted outputs get a short amount of lag, so loops will propagate
         # over several frames so we don't lock up.
-        for out in enable_cmd:
-            out.delay += 0.1
-        for out in disable_cmd:
-            out.delay += 0.1
+        enable_cmd = [
+            Output(
+                '',
+                out.target,
+                out.input,
+                out.params,
+                out.delay + 0.1,
+                times=out.times,
+                inst_in=out.inst_in,
+            )
+            for out in enable_cmd
+        ]
+        disable_cmd = [
+            Output(
+                '',
+                out.target,
+                out.input,
+                out.params,
+                out.delay + 0.1,
+                times=out.times,
+                inst_in=out.inst_in,
+            )
+            for out in disable_cmd
+        ]
 
     needs_counter = len(inputs) > 1
 
