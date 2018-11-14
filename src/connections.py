@@ -128,6 +128,20 @@ class OutNames(str, Enum):
     OUT_DEACT = 'ON_DEACTIVATED'
 
 
+class FeatureMode(Enum):
+    """When to apply a feature."""
+    DYNAMIC = 'dynamic'  # Only if dynamic (inputs)
+    ALWAYS = 'always'
+    NEVER = 'never'
+
+    def valid(self, item: 'Item') -> bool:
+        """Check if this is valid for the item."""
+        if self.value == 'dynamic':
+            return len(item.inputs) > 0
+        else:
+            return self.value == 'always'
+
+
 CONN_NAMES = {
     ConnType.DEFAULT: 'DEF',
     ConnType.PRIMARY: 'A',
@@ -205,7 +219,7 @@ class ItemType:
         default_dual: ConnType=ConnType.DEFAULT,
         input_type: InputType=InputType.DEFAULT,
 
-        spawn_fire: bool=False,
+        spawn_fire: FeatureMode=FeatureMode.NEVER,
 
         invert_var: str = '0',
         enable_cmd: List[Output]=(),
@@ -240,7 +254,7 @@ class ItemType:
         # True/False for always, $var, !$var for lookup.
         self.invert_var = invert_var
 
-        # If True, fire the enable/disable commands after spawning to initialise
+        # Fire the enable/disable commands after spawning to initialise
         # the entity.
         self.spawn_fire = spawn_fire
 
@@ -355,7 +369,16 @@ class ItemType:
             )) from None
 
         invert_var = conf['invertVar', '0']
-        spawn_fire = conf.bool('spawnfire')
+
+        try:
+            spawn_fire = FeatureMode(conf['spawnfire', 'never'])
+        except ValueError:
+            # Older config option - it was a bool for always/never.
+            spawn_fire_bool = conf.bool('spawnfire', None)
+            if spawn_fire_bool is None:
+                raise  # Nope, not a bool.
+
+            spawn_fire = FeatureMode.DYNAMIC if spawn_fire_bool else FeatureMode.NEVER
 
         if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
@@ -517,7 +540,7 @@ class Item:
 
     def output_act(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output used when this is activated."""
-        if self.item_type.spawn_fire and self.is_logic:
+        if self.item_type.spawn_fire.valid(self) and self.is_logic:
             return None, 'OnUser2'
 
         if self.item_type.input_type is InputType.DAISYCHAIN:
@@ -528,7 +551,7 @@ class Item:
 
     def output_deact(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output to use when this is deactivated."""
-        if self.item_type.spawn_fire and self.is_logic:
+        if self.item_type.spawn_fire.valid(self) and self.is_logic:
             return None, 'OnUser1'
 
         if self.item_type.input_type is InputType.DAISYCHAIN:
@@ -1000,7 +1023,7 @@ def gen_item_outputs(vmf: VMF):
         # Special case - inverted spawnfire items with no inputs need to fire
         # off the activation outputs. There's no way to then deactivate those.
         if not item.inputs:
-            if item.item_type.spawn_fire:
+            if item.item_type.spawn_fire is FeatureMode.ALWAYS:
                 if item.is_logic:
                     # Logic gates need to trigger their outputs.
                     # Make a logic_auto temporarily for this to collect the
@@ -1372,7 +1395,7 @@ def add_item_inputs(
 
     # The relay allows cancelling the 'disable' output that fires shortly after
     # spawning.
-    if item.item_type.spawn_fire:
+    if item.item_type.spawn_fire is not FeatureMode.NEVER:
         if logic_type.is_logic:
             # We have to handle gates specially, and make us the instance
             # so future evaluation applies to this.
