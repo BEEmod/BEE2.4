@@ -22,9 +22,9 @@ AntLaserType = connections.ItemType(
     output_deact=(None, 'OnUser1'),
 )
 
-NAME_SPR = '{}-sprite_{}'.format  # type: Callable[[str, int], str]
-NAME_BEAM_LOW = '{}-beam_low_{}'.format  # type: Callable[[str, int], str]
-NAME_BEAM_CONN = '{}-beam_conn_{}'.format  # type: Callable[[str, int], str]
+NAME_SPR = '{}-fx_sp_{}'.format  # type: Callable[[str, int], str]
+NAME_BEAM_LOW = '{}-fx_b_low_{}'.format  # type: Callable[[str, int], str]
+NAME_BEAM_CONN = '{}-fx_b_conn_{}'.format  # type: Callable[[str, int], str]
 
 
 class Group:
