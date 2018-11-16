@@ -56,22 +56,30 @@ def res_antlaser(vmf: VMF, res: Property):
     conf_inst = instanceLocs.resolve(res['instance'])
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
-    # Grab a copy of the beam spawnflags so we can set our own options.
-    conf_beam_flags = res.find_key('BeamKeys', []).int('spawnflags')
-    # Mask out certain flags.
-    conf_beam_flags &= (
-        0
-        | 1  # Start On
-        | 2  # Toggle
-        | 4  # Random Strike
-        | 8  # Ring
-        | 16  # StartSparks
-        | 32  # EndSparks
-        | 64  # Decal End
-        #| 128  # Shade Start
-        #| 256  # Shade End
-        #| 512  # Taper Out
-    )
+
+    has_beam = 'BeamKeys' in res
+    has_glow = 'GlowKeys' in res
+
+    if has_beam:
+        # Grab a copy of the beam spawnflags so we can set our own options.
+        conf_beam_flags = res.find_key('BeamKeys', []).int('spawnflags')
+        # Mask out certain flags.
+        conf_beam_flags &= (
+            0
+            | 1  # Start On
+            | 2  # Toggle
+            | 4  # Random Strike
+            | 8  # Ring
+            | 16  # StartSparks
+            | 32  # EndSparks
+            | 64  # Decal End
+            #| 128  # Shade Start
+            #| 256  # Shade End
+            #| 512  # Taper Out
+        )
+    else:
+        conf_beam_flags = 0
+
     conf_outputs = [
         Output.parse(prop)
         for prop in res
@@ -183,38 +191,41 @@ def res_antlaser(vmf: VMF, res: Property):
             indexes[node] = i
             node.name = base_name
 
-            # First add the sprite at the right height.
-            sprite_pos = conf_glow_height.copy()
-            sprite_pos.localise(
-                Vec.from_str(node.inst['origin']),
-                Vec.from_str(node.inst['angles']),
-            )
-            sprite = vmf.create_ent('env_sprite')
-            conditions.set_ent_keys(sprite, node.inst, res, 'GlowKeys')
-            sprite['origin'] = sprite_pos
-            sprite['targetname'] = NAME_SPR(base_name, i)
+            if has_glow:
+                # First add the sprite at the right height.
+                sprite_pos = conf_glow_height.copy()
+                sprite_pos.localise(
+                    Vec.from_str(node.inst['origin']),
+                    Vec.from_str(node.inst['angles']),
+                )
+                sprite = vmf.create_ent('env_sprite')
+                conditions.set_ent_keys(sprite, node.inst, res, 'GlowKeys')
+                sprite['origin'] = sprite_pos
+                sprite['targetname'] = NAME_SPR(base_name, i)
 
-            # Now the beam going from below up to the sprite.
-            beam_pos = conf_las_start.copy()
-            beam_pos.localise(
-                Vec.from_str(node.inst['origin']),
-                Vec.from_str(node.inst['angles']),
-            )
-            beam = vmf.create_ent('env_beam')
-            conditions.set_ent_keys(beam, node.inst, res, 'BeamKeys')
-            beam['origin'] = beam_pos
-            beam['targetname'] = NAME_BEAM_LOW(base_name, i)
-            beam['LightningStart'] = beam['targetname']
-            beam['LightningEnd'] = NAME_SPR(base_name, i)
-            beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
+            if has_beam:
+                # Now the beam going from below up to the sprite.
+                beam_pos = conf_las_start.copy()
+                beam_pos.localise(
+                    Vec.from_str(node.inst['origin']),
+                    Vec.from_str(node.inst['angles']),
+                )
+                beam = vmf.create_ent('env_beam')
+                conditions.set_ent_keys(beam, node.inst, res, 'BeamKeys')
+                beam['origin'] = beam['targetpoint'] = beam_pos
+                beam['targetname'] = NAME_BEAM_LOW(base_name, i)
+                beam['LightningStart'] = beam['targetname']
+                beam['LightningEnd'] = NAME_SPR(base_name, i)
+                beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
 
-        for i, (node1, node2) in enumerate(group.links):
-            beam = vmf.create_ent('env_beam')
-            conditions.set_ent_keys(beam, node1.inst, res, 'BeamKeys')
-            beam['origin'] = node1.inst['origin']
-            beam['targetname'] = NAME_BEAM_CONN(base_name, i)
-            beam['LightningStart'] = NAME_SPR(base_name, indexes[node1])
-            beam['LightningEnd'] = NAME_SPR(base_name, indexes[node2])
-            beam['spawnflags'] = conf_beam_flags
+        if has_beam:
+            for i, (node1, node2) in enumerate(group.links):
+                beam = vmf.create_ent('env_beam')
+                conditions.set_ent_keys(beam, node1.inst, res, 'BeamKeys')
+                beam['origin'] = beam['targetpoint'] = node1.inst['origin']
+                beam['targetname'] = NAME_BEAM_CONN(base_name, i)
+                beam['LightningStart'] = NAME_SPR(base_name, indexes[node1])
+                beam['LightningEnd'] = NAME_SPR(base_name, indexes[node2])
+                beam['spawnflags'] = conf_beam_flags
 
     return conditions.RES_EXHAUSTED
