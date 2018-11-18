@@ -4,12 +4,13 @@ import tkinter
 import img
 import utils
 import sound
+from enum import Enum
 from tkinter import ttk
 from srctools.logger import get_logger
 from typing import (
     Union, Generic, TypeVar,
-    List, Tuple,
-    Optional,
+    Optional, Callable,
+    List, Tuple, Dict
 )
 
 __all__ = ['Manager', 'Slot', 'ItemProto']
@@ -29,7 +30,18 @@ class ItemProto(Protocol):
     # If only one item is present for a group, it uses this.
     dnd_group_icon: Optional[tkinter.PhotoImage]
 
-ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
+ItemT = TypeVar('ItemT')  # The object the items move around.
+
+
+class Event(Enum):
+    """Callbacks that can be registered to be called by the manager."""
+    # Fires when items are right-clicked on. If one is registered, the gear
+    # icon appears.
+    CONFIG = 'config'
+
+    # Mouse over or out of the items (including drag item).
+    HOVER_ENTER = 'hover_enter'
+    HOVER_EXIT = 'hover_exit'
 
 
 def in_bbox(
@@ -52,11 +64,13 @@ class Manager(Generic[ItemT]):
         self,
         *,
         size: Tuple[int, int]=(64, 64),
+        config_icon: bool=False
     ):
         """Create a group of drag-drop slots.
 
         size is the size of each moved image.
-
+        If config_icon is set, gear icons will be added to each slot to
+        configure items.
         """
         self.width, self.height = size
 
@@ -64,10 +78,17 @@ class Manager(Generic[ItemT]):
 
         self._img_blank = img.color_square(img.PETI_ITEM_BG, size)
 
+        self.config_icon = config_icon
+
         # If dragging, the item we are dragging.
         self._cur_drag = None  # type: Optional[ItemT]
         # While dragging, the place we started at.
         self._cur_prev_slot = None  # type: Optional[Slot[ItemT]]
+
+        self._callbacks = {
+            event: []
+            for event in Event
+        }  # type: Dict[Event, List[Callable[[Slot], None]]]
 
         self._drag_win = drag_win = tkinter.Toplevel(TK_ROOT)
         drag_win.withdraw()
@@ -81,13 +102,22 @@ class Manager(Generic[ItemT]):
         drag_lbl.grid(row=0, column=0)
         drag_win.bind(utils.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
-    def slot(self, parent: tkinter.Misc, *, source: bool) -> 'Slot[ItemT]':
+    def slot(self: 'Manager[ItemT]', parent: tkinter.Misc, *, source: bool) -> 'Slot[ItemT]':
         """Add a slot to this group."""
         slot = Slot(self, parent, source)
         if not source:
             self._targets.append(slot)
 
         return slot
+
+    def reg_callback(self, event: Event, func: Callable[['Slot'], None]) -> None:
+        """Register a callback."""
+        self._callbacks[event].append(func)
+
+    def _fire_callback(self, event: Event, slot: 'Slot') -> None:
+        """Fire all the registered callbacks."""
+        for cback in self._callbacks[event]:
+            cback(slot)
 
     def _pos_slot(self, x: float, y: float) -> 'Optional[Slot[ItemT]]':
         """Find the slot under this X,Y (if any)."""
@@ -239,13 +269,37 @@ class Slot(Generic[ItemT]):
         self.is_source = is_source
         self._contents = None  # type: Optional[ItemT]
         self._pos_type = None
-        self._lbl = ttk.Label(
+        self._lbl = tkinter.Label(
             parent,
             image=man._img_blank,
-            relief='raised',
         )
         utils.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(utils.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
+        self._lbl.bind('<Enter>', self._evt_hover_enter)
+        self._lbl.bind('<Leave>', self._evt_hover_exit)
+
+        config_event = self._evt_configure
+        utils.bind_rightclick(self._lbl, config_event)
+
+        if man.config_icon:
+            self._info_btn = tkinter.Label(
+                self._lbl,
+                image=img.png('icons/gear'),
+                relief='ridge',
+                width=12,
+                height=12,
+            )
+
+            @utils.bind_leftclick(self._info_btn)
+            def info_button_click(e):
+                config_event(e)
+                # Cancel the event sequence, so it doesn't travel up to the main
+                # window and hide the window again.
+                return 'break'
+            # Rightclick does the same as the main icon.
+            utils.bind_rightclick(self._info_btn, config_event)
+        else:
+            self._info_btn = None
 
     @property
     def contents(self) -> Optional[ItemT]:
@@ -328,6 +382,30 @@ class Slot(Generic[ItemT]):
             self.contents = None
             sound.fx('delete')
 
+    def _evt_hover_enter(self, event: tkinter.Event) -> None:
+        """Fired when the cursor starts hovering over the item."""
+        # Show configure icon for items.
+        if self._info_btn and self._contents is not None:
+            self._lbl['relief'] = 'ridge'
+            padding = 2 if utils.WIN else 0
+            self._info_btn.place(
+                x=self._lbl.winfo_width() - padding,
+                y=self._lbl.winfo_height() - padding,
+                anchor='se',
+            )
+        self.man._fire_callback(Event.HOVER_ENTER, self)
+
+    def _evt_hover_exit(self, event: tkinter.Event) -> None:
+        """Fired when the cursor stops hovering over the item."""
+        if self._info_btn:
+            self._lbl['relief'] = 'flat'
+            self._info_btn.place_forget()
+        self.man._fire_callback(Event.HOVER_EXIT, self)
+
+    def _evt_configure(self, event: tkinter.Event) -> None:
+        """Configuration event, fired by clicking icon or right-clicking item."""
+        self.man._fire_callback(Event.CONFIG, self)
+
 
 def _test() -> None:
     """Test the GUI."""
@@ -344,8 +422,6 @@ def _test() -> None:
     find_packages(GEN_OPTS['Directories']['package'])
     img.load_filesystems(PACKAGE_SYS.values())
     print('Done.')
-
-    manager = Manager()
 
     left_frm = ttk.Frame(TK_ROOT)
     right_frm = ttk.Frame(TK_ROOT)
@@ -368,6 +444,16 @@ def _test() -> None:
 
         def __repr__(self):
             return '<Item {}>'.format(self.name)
+
+    manager = Manager[TestItem](config_icon=True)
+
+    def func(ev):
+        def call(slot):
+            print('Cback: ', ev, slot)
+        return call
+
+    for event in Event:
+        manager.reg_callback(event, func(event))
 
     items = [
         TestItem('Dropper', 'dropper'),
