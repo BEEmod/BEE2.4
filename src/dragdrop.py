@@ -141,10 +141,28 @@ class Manager(Generic[ItemT]):
             return  # Can't pick up blank...
 
         self._cur_drag = slot.contents
+
+        show_group = False
+
         if not slot.is_source:
             slot.contents = None
 
-        self._display_item(self._drag_lbl, self._cur_drag)
+            # If none of this group are present in the targets and we're
+            # pulling from the items, we hold a group icon.
+            try:
+                group = self._cur_drag.dnd_group
+            except AttributeError:
+                pass
+            else:
+                if group is not None:
+                    for other_slot in self._targets:
+                        if getattr(other_slot.contents, 'dnd_group', None) == group:
+                            break
+                    else:
+                        # None present.
+                        show_group = True
+
+        self._display_item(self._drag_lbl, self._cur_drag, show_group)
         self._cur_prev_slot = slot
 
         sound.fx('config')
