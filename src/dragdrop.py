@@ -98,12 +98,34 @@ class Manager(Generic[ItemT]):
         self,
         lbl: Union[tkinter.Label, ttk.Label],
         item: Optional[ItemT],
+        group: bool=False,
     ) -> None:
         """Display the specified item on the given label."""
         if item is None:
             lbl['image'] = self._img_blank
+        elif group:
+            try:
+                lbl['image'] = item.dnd_group_icon
+            except AttributeError:
+                lbl['image'] = item.dnd_icon
         else:
             lbl['image'] = item.dnd_icon
+
+    def _group_update(self, group: Optional[str]):
+        """Update all target items with this group."""
+        if group is None:
+            # None to do..
+            return
+        group_slots = [
+            slot for slot in self._targets
+            if getattr(slot.contents, 'dnd_group', None) == group
+        ]
+
+        LOGGER.info('Group update: {}', group_slots)
+
+        has_group = len(group_slots) == 1
+        for slot in group_slots:
+            self._display_item(slot._lbl, slot.contents, has_group)
 
     def _start(self, slot: 'Slot[ItemT]', event: tkinter.Event) -> None:
         """Start the drag."""
@@ -120,32 +142,6 @@ class Manager(Generic[ItemT]):
         LOGGER.info('Started: {}', self._cur_drag)
 
         sound.fx('config')
-        # drag_win.passed_over_pal = False
-
-        # if drag_win.drag_item.is_pre:  # is the cursor over the preview pane?
-        #     drag_win.drag_item.kill()
-        #     UI['pre_moving'].place(
-        #         x=drag_win.drag_item.pre_x * 65 + 4,
-        #         y=drag_win.drag_item.pre_y * 65 + 32,
-        #     )
-        #     drag_win.from_pal = True
-        #
-        #     for item in pal_picked:
-        #         if item.id == drag_win.drag_item.id:
-        #             item.load_data()
-        #
-        #     # When dragging off, switch to the single-only icon
-        #     UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
-        #         drag_win.drag_item.subKey,
-        #         allow_single=False,
-        #     )
-        # else:
-        #     drag_win.from_pal = False
-        #     UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
-        #         drag_win.drag_item.subKey,
-        #         allow_single=True,
-        #         single_num=0,
-        #     )
 
         self._drag_win.deiconify()
         self._drag_win.lift(TK_ROOT)
@@ -229,14 +225,38 @@ class Slot(Generic[ItemT]):
 
     @property
     def contents(self) -> Optional[ItemT]:
-        """Get the item in this slot, or None if empty"""
+        """Get the item in this slot, or None if empty."""
         return self._contents
 
     @contents.setter
     def contents(self, value: Optional[ItemT]) -> None:
+        """Set the item in this slot."""
         old_cont = self._contents
-        self.man._display_item(self._lbl, value)
+
+        if value is not None:
+            # Make sure this isn't already present.
+            for slot in self.man._targets:
+                if slot.contents is value:
+                    slot.contents = None
+        # Then set us.
         self._contents = value
+
+        if not self.is_source:
+            # Update items in the previous group, so they gain the group icon
+            # if only one now exists.
+            self.man._group_update(getattr(old_cont, 'dnd_group', None))
+            new_group = getattr(value, 'dnd_group', None)
+        else:
+            # Source pickers never group items.
+            new_group = None
+
+        if new_group is not None:
+            # Update myself and the entire group to get the group
+            # icon if required.
+            self.man._group_update(new_group)
+        else:
+            # Just update myself.
+            self.man._display_item(self._lbl, value)
 
     def grid(self, *args, **kwargs) -> None:
         """Grid-position this slot."""
@@ -268,9 +288,14 @@ class Slot(Generic[ItemT]):
         """Quickly add/remove items by shift-clicking."""
         if self.is_source:
             # Add this item to the first free position.
+            item = self.contents
             for slot in self.man._targets:
                 if slot.contents is None:
-                    slot.contents = self.contents
+                    slot.contents = item
+                    sound.fx('config')
+                    return
+                elif slot.contents is item:
+                    # It's already on the board, don't change anything.
                     sound.fx('config')
                     return
             sound.fx('delete')
