@@ -50,7 +50,7 @@ class Manager(Generic[ItemT]):
         """
         self.width, self.height = size
 
-        self._slots = []  # type: List[Slot[ItemT]]
+        self._targets = []  # type: List[Slot[ItemT]]
 
         self._img_blank = img.color_square(img.PETI_ITEM_BG, size)
 
@@ -74,13 +74,14 @@ class Manager(Generic[ItemT]):
     def slot(self, parent: tkinter.Misc, *, source: bool) -> 'Slot[ItemT]':
         """Add a slot to this group."""
         slot = Slot(self, parent, source)
-        self._slots.append(slot)
+        if not source:
+            self._targets.append(slot)
 
         return slot
 
     def _pos_slot(self, x: float, y: float) -> 'Optional[Slot[ItemT]]':
         """Find the slot under this X,Y (if any)."""
-        for slot in self._slots:
+        for slot in self._targets:
             if slot._pos_type is not None:
                 lbl = slot._lbl
                 if in_bbox(
@@ -110,6 +111,8 @@ class Manager(Generic[ItemT]):
             return  # Can't pick up blank...
 
         self._cur_drag = slot.contents
+        if not slot.is_source:
+            slot.contents = None
 
         self._display_item(self._drag_lbl, self._cur_drag)
         self._cur_prev_slot = slot
@@ -169,29 +172,14 @@ class Manager(Generic[ItemT]):
             event.y_root - self.height // 2,
         ))
 
-        # if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        #     drag_win.configure(cursor=utils.CURSORS['move_item'])
-        #     UI['pre_sel_line'].place(x=pos_x * 65 + 3, y=pos_y * 65 + 33)
-        #     if not drag_win.passed_over_pal:
-        #         # If we've passed over the palette, replace identical items
-        #         # with movement icons to indicate they will move to the new
-        #         # location
-        #         for item in pal_picked:
-        #             if item == drag_win.drag_item:
-        #                 # We haven't removed the original, so we don't need the
-        #                 # special label for this.
-        #                 # The group item refresh will return this if nothing
-        #                 # changes.
-        #                 item['image'] = img.png('BEE2/item_moving')
-        #                 break
-        #
-        #     drag_win.passed_over_pal = True
-        # else:
-        #     if drag_win.from_pal and drag_win.passed_over_pal:
-        #         drag_win.configure(cursor=utils.CURSORS['destroy_item'])
-        #     else:
-        #         drag_win.configure(cursor=utils.CURSORS['invalid_drag'])
-        #     UI['pre_sel_line'].place_forget()
+        dest = self._pos_slot(event.x_root, event.y_root)
+
+        if dest:
+            self._drag_win.configure(cursor=utils.CURSORS['move_item'])
+        elif self._cur_prev_slot.is_source:
+            self._drag_win.configure(cursor=utils.CURSORS['invalid_drag'])
+        else:
+            self._drag_win.configure(cursor=utils.CURSORS['destroy_item'])
 
     def _evt_stop(self, event: tkinter.Event):
         """User released the item."""
@@ -206,8 +194,12 @@ class Manager(Generic[ItemT]):
         dest = self._pos_slot(event.x_root, event.y_root)
         LOGGER.info('Stopped: {} -> {}', self._cur_drag, dest)
 
-        if dest and not dest.is_source:
+        if dest:
+            # We have a target.
             dest.contents = self._cur_drag
+        # No target, and we dragged off an existing target - delete.
+        elif not self._cur_prev_slot.is_source:
+            sound.fx('delete')
 
         self._cur_drag = None
         self._cur_prev_slot = None
@@ -233,6 +225,7 @@ class Slot(Generic[ItemT]):
             relief='raised',
         )
         utils.bind_leftclick(self._lbl, self._evt_start)
+        self._lbl.bind(utils.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
 
     @property
     def contents(self) -> Optional[ItemT]:
@@ -270,6 +263,21 @@ class Slot(Generic[ItemT]):
     def _evt_start(self, event: tkinter.Event) -> None:
         """Start dragging."""
         self.man._start(self, event)
+
+    def _evt_fastdrag(self, event: tkinter.Event):
+        """Quickly add/remove items by shift-clicking."""
+        if self.is_source:
+            # Add this item to the first free position.
+            for slot in self.man._targets:
+                if slot.contents is None:
+                    slot.contents = self.contents
+                    sound.fx('config')
+                    return
+            sound.fx('delete')
+        else:
+            # Fast-delete this.
+            self.contents = None
+            sound.fx('delete')
 
 
 def _test() -> None:
@@ -327,15 +335,15 @@ def _test() -> None:
         TestItem('Edgeless Cube', 'edgeless_safety_cube', 'ITEM_CUBE', 'cubes'),
         TestItem('Franken Cube', 'frankenturret', 'ITEM_CUBE', 'cubes'),
 
-        TestItem('Repulsion', 'paintsplat_bounce', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Propulsion', 'paintsplat_speed', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Reflection', 'paintsplat_reflection', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Conversion', 'paintsplat_portal', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Cleansing', 'paintsplat_water', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Repulsion Gel', 'paintsplat_bounce', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Propulsion Gel', 'paintsplat_speed', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Reflection Gel', 'paintsplat_reflection', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Conversion Gel', 'paintsplat_portal', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Cleansing Gel', 'paintsplat_water', 'ITEM_PAINT_SPLAT', 'paints'),
     ]
 
-    for x in range(4):
-        for y in range(8):
+    for y in range(8):
+        for x in range(4):
             slot = manager.slot(left_frm, source=False)
             slot.grid(column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
