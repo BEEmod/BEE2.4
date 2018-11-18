@@ -8,18 +8,28 @@ from tkinter import ttk
 from srctools.logger import get_logger
 from typing import (
     Union, Generic, TypeVar,
-    List, Dict, Tuple,
+    List, Tuple,
     Optional,
 )
 
+__all__ = ['Manager', 'Slot', 'ItemProto']
+
+try:
+    from typing import Protocol
+except ImportError:
+    from typing_extensions import Protocol
+
 LOGGER = get_logger(__name__)
 
-ItemT = TypeVar('ItemT')  # The object the items move around.
-# TODO: Protocol for this.
-# Attributes:
-#  dnd_icon: Image for the item.
-#  dnd_group: If set, the group an item belongs to.
-#  dnd_group_icon: If only one item is present for a group, it uses this.
+
+class ItemProto(Protocol):
+    """Protocol draggable items satisfy."""
+    dnd_icon: tkinter.PhotoImage  # Image for the item.
+    dnd_group: Optional[str]  # If set, the group an item belongs to.
+    # If only one item is present for a group, it uses this.
+    dnd_group_icon: Optional[tkinter.PhotoImage]
+
+ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 
 
 def in_bbox(
@@ -35,13 +45,13 @@ def in_bbox(
     return True
 
 
+# noinspection PyProtectedMember
 class Manager(Generic[ItemT]):
     """Manages a set of drag-drop points."""
     def __init__(
         self,
         *,
         size: Tuple[int, int]=(64, 64),
-        move_icon: str,
     ):
         """Create a group of drag-drop slots.
 
@@ -121,8 +131,6 @@ class Manager(Generic[ItemT]):
             if getattr(slot.contents, 'dnd_group', None) == group
         ]
 
-        LOGGER.info('Group update: {}', group_slots)
-
         has_group = len(group_slots) == 1
         for slot in group_slots:
             self._display_item(slot._lbl, slot.contents, has_group)
@@ -138,8 +146,6 @@ class Manager(Generic[ItemT]):
 
         self._display_item(self._drag_lbl, self._cur_drag)
         self._cur_prev_slot = slot
-
-        LOGGER.info('Started: {}', self._cur_drag)
 
         sound.fx('config')
 
@@ -188,7 +194,6 @@ class Manager(Generic[ItemT]):
         self._drag_win.unbind(utils.EVENTS['LEFT_MOVE'])
 
         dest = self._pos_slot(event.x_root, event.y_root)
-        LOGGER.info('Stopped: {} -> {}', self._cur_drag, dest)
 
         if dest:
             # We have a target.
@@ -201,6 +206,7 @@ class Manager(Generic[ItemT]):
         self._cur_prev_slot = None
 
 
+# noinspection PyProtectedMember
 class Slot(Generic[ItemT]):
     """Represents a single slot."""
     def __init__(
@@ -321,9 +327,7 @@ def _test() -> None:
     img.load_filesystems(PACKAGE_SYS.values())
     print('Done.')
 
-    manager = Manager(
-        move_icon='BEE2/item_moving.png',
-    )
+    manager = Manager()
 
     left_frm = ttk.Frame(TK_ROOT)
     right_frm = ttk.Frame(TK_ROOT)
