@@ -10,6 +10,7 @@ import os
 from srctools import Vec
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
+from tk_tools import TK_ROOT  # Make sure this is initialised!
 
 from typing import Iterable, Union, Dict, Tuple
 
@@ -218,6 +219,7 @@ def invis_square(size):
         cached_squares['alpha', size] = tk_img
 
         return tk_img
+
 
 BLACK_64 = color_square(Vec(0, 0, 0), size=64)
 BLACK_96 = color_square(Vec(0, 0, 0), size=96)
