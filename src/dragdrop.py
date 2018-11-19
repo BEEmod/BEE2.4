@@ -106,10 +106,24 @@ class Manager(Generic[ItemT]):
         drag_lbl.grid(row=0, column=0)
         drag_win.bind(utils.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
-    def slot(self: 'Manager[ItemT]', parent: tkinter.Misc, *, source: bool) -> 'Slot[ItemT]':
-        """Add a slot to this group."""
-        slot = Slot(self, parent, source)
-        if not source:
+    def slot(
+        self: 'Manager[ItemT]',
+        parent: tkinter.Misc,
+        *,
+        source: bool,
+        label: str='',
+    ) -> 'Slot[ItemT]':
+        """Add a slot to this group.
+
+        Parameters:
+            - parent: Parent widget for the slot.
+            - source: If True this cannot be edited, and produces
+              copies of the contained item. If False, users can remove
+              items.
+            - label: Set to a short string to be displayed in the lower-left.
+              Intended for numbers.
+        """
+        slot = Slot(self, parent, source, label)
         if source:
             self._sources.append(slot)
         else:
@@ -137,6 +151,7 @@ class Manager(Generic[ItemT]):
         for slot in self._sources:
             # These are never grouped.
             self._display_item(slot._lbl, slot.contents)
+
     def reg_callback(self, event: Event, func: Callable[['Slot'], None]) -> None:
         """Register a callback."""
         self._callbacks[event].append(func)
@@ -288,7 +303,8 @@ class Slot(Generic[ItemT]):
         self,
         man: Manager,
         parent: tkinter.Misc,
-        is_source: bool
+        is_source: bool,
+        label: str,
     ) -> None:
         """Internal only, use Manager.slot()."""
 
@@ -308,13 +324,22 @@ class Slot(Generic[ItemT]):
         config_event = self._evt_configure
         utils.bind_rightclick(self._lbl, config_event)
 
+        if label:
+            self._text_lbl = tkinter.Label(
+                self._lbl,
+                text=label,
+                font=('Helvetica', -12),
+                relief='ridge',
+                bg=img.PETI_ITEM_BG_HEX,
+            )
+        else:
+            self._text_lbl = None
+
         if man.config_icon:
             self._info_btn = tkinter.Label(
                 self._lbl,
                 image=img.png('icons/gear'),
                 relief='ridge',
-                width=12,
-                height=12,
             )
 
             @utils.bind_leftclick(self._info_btn)
@@ -411,10 +436,13 @@ class Slot(Generic[ItemT]):
 
     def _evt_hover_enter(self, event: tkinter.Event) -> None:
         """Fired when the cursor starts hovering over the item."""
+        padding = 2 if utils.WIN else 0
+        # Add border, but only if either icon exists or we contain an item.
+        if self._text_lbl or self._contents is not None:
+            self._lbl['relief'] = 'ridge'
+
         # Show configure icon for items.
         if self._info_btn and self._contents is not None:
-            self._lbl['relief'] = 'ridge'
-            padding = 2 if utils.WIN else 0
             self._info_btn.place(
                 x=self._lbl.winfo_width() - padding,
                 y=self._lbl.winfo_height() - padding,
@@ -422,11 +450,21 @@ class Slot(Generic[ItemT]):
             )
         self.man._fire_callback(Event.HOVER_ENTER, self)
 
+        if self._text_lbl:
+            self._text_lbl.place(
+                x=-padding,
+                y=self._lbl.winfo_height() - padding,
+                anchor='sw',
+            )
+
     def _evt_hover_exit(self, event: tkinter.Event) -> None:
         """Fired when the cursor stops hovering over the item."""
+        self._lbl['relief'] = 'flat'
+
         if self._info_btn:
-            self._lbl['relief'] = 'flat'
             self._info_btn.place_forget()
+        if self._text_lbl:
+            self._text_lbl.place_forget()
         self.man._fire_callback(Event.HOVER_EXIT, self)
 
     def _evt_configure(self, event: tkinter.Event) -> None:
@@ -504,12 +542,12 @@ def _test() -> None:
 
     for y in range(8):
         for x in range(4):
-            slot = manager.slot(left_frm, source=False)
+            slot = manager.slot(left_frm, source=False, label=(format(x + 4*y, '02') if y < 2 else ''))
             slot.grid(column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
 
     for i, item in enumerate(items):
-            slot = manager.slot(right_frm, source=True)
+            slot = manager.slot(right_frm, source=True, label=format(i+1, '02'))
             slot.grid(column=i % 5, row=i // 5, padx=1, pady=1)
             slot_src.append(slot)
             slot.contents = item
