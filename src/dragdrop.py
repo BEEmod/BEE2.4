@@ -7,7 +7,7 @@ import img
 import utils
 import sound
 from enum import Enum
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from srctools.logger import get_logger
 from typing import (
     Union, Generic, TypeVar,
@@ -469,7 +469,8 @@ class Slot(Generic[ItemT]):
 
     def _evt_configure(self, event: tkinter.Event) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
-        self.man._fire_callback(Event.CONFIG, self)
+        if self.contents:
+            self.man._fire_callback(Event.CONFIG, self)
 
 
 def _test() -> None:
@@ -562,6 +563,20 @@ def _test() -> None:
         text='Debug',
         command=lambda: print('Source:', [slot.contents for slot in slot_src])
     ).grid(row=2, column=1)
+
+    name_lbl = ttk.Label(TK_ROOT, text='')
+    name_lbl.grid(row=3, column=0)
+
+    def enter(slot):
+        if slot.contents is not None:
+            name_lbl['text'] = 'Name: ' + slot.contents.name
+
+    def exit(slot):
+        name_lbl['text'] = ''
+
+    manager.reg_callback(Event.HOVER_ENTER, enter)
+    manager.reg_callback(Event.HOVER_EXIT, exit)
+    manager.reg_callback(Event.CONFIG, lambda slot: messagebox.showinfo('Hello World', str(slot.contents)))
 
     TK_ROOT.deiconify()
     TK_ROOT.mainloop()
