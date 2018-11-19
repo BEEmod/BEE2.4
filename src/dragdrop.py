@@ -1,4 +1,6 @@
 """Implements drag/drop logic."""
+from collections import defaultdict
+
 from tk_tools import TK_ROOT
 import tkinter
 import img
@@ -70,11 +72,13 @@ class Manager(Generic[ItemT]):
 
         size is the size of each moved image.
         If config_icon is set, gear icons will be added to each slot to
-        configure items.
+        configure items. This indicates the right-click option is available,
+        and makes it easier to press that.
         """
         self.width, self.height = size
 
         self._targets = []  # type: List[Slot[ItemT]]
+        self._sources = []  # type: List[Slot[ItemT]]
 
         self._img_blank = img.color_square(img.PETI_ITEM_BG, size)
 
@@ -106,10 +110,33 @@ class Manager(Generic[ItemT]):
         """Add a slot to this group."""
         slot = Slot(self, parent, source)
         if not source:
+        if source:
+            self._sources.append(slot)
+        else:
             self._targets.append(slot)
 
         return slot
 
+    def refresh_icons(self) -> None:
+        """Update all items to set new icons."""
+        # Count the number of items in each group to find
+        # which should have group icons.
+        groups = defaultdict(int)
+        for slot in self._targets:
+            groups[getattr(slot.contents, 'dnd_group', None)] += 1
+
+        groups[None] = 2  # This must always be ungrouped.
+
+        for slot in self._targets:
+            self._display_item(
+                slot._lbl,
+                slot.contents,
+                groups[getattr(slot.contents, 'dnd_group', None)] == 1
+            )
+
+        for slot in self._sources:
+            # These are never grouped.
+            self._display_item(slot._lbl, slot.contents)
     def reg_callback(self, event: Event, func: Callable[['Slot'], None]) -> None:
         """Register a callback."""
         self._callbacks[event].append(func)
