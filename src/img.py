@@ -20,9 +20,6 @@ cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
 cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
 
-# Colour of the palette item background
-PETI_ITEM_BG = Vec(229, 232, 233)
-
 filesystem = FileSystemChain(
     # Highest priority is the in-built UI images.
     RawFileSystem(os.path.join(os.getcwd(), '../', 'images')),
@@ -40,6 +37,12 @@ def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
     if isinstance(size, tuple):
         return size
     return size, size
+
+
+def color_hex(color: Vec) -> str:
+    """Convert a RGB colour to #xxxxxx."""
+    r, g, b = color
+    return '#{:2X}{:2X}{:2X}'.format(int(r), int(g), int(b))
 
 
 def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
@@ -219,6 +222,10 @@ def invis_square(size):
         cached_squares['alpha', size] = tk_img
 
         return tk_img
+
+# Colour of the palette item background
+PETI_ITEM_BG = Vec(229, 232, 233)
+PETI_ITEM_BG_HEX = color_hex(PETI_ITEM_BG)
 
 
 BLACK_64 = color_square(Vec(0, 0, 0), size=64)
