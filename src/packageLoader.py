@@ -181,9 +181,6 @@ class _PakObjectMeta(type):
         type.__init__(cls, name, bases, namespace)
 
 
-T = TypeVar('T')
-
-
 class PakObject(metaclass=_PakObjectMeta):
     """PackObject(allow_mult=False, has_img=True): The base class for package objects.
 
@@ -1264,7 +1261,7 @@ class Style(PakObject):
         suggested=None,
         has_video=True,
         vpk_name='',
-        corridors: Property=None,
+        corridors: Dict[Tuple[str, int], CorrDesc]=None,
     ):
         self.id = style_id
         self.selitem_data = selitem_data
@@ -1276,7 +1273,15 @@ class Style(PakObject):
         self.suggested = suggested or {}
         self.has_video = has_video
         self.vpk_name = vpk_name
-        self.corridors = corridors or Property('Corridor', [])
+        self.corridors = {}
+
+        for group, length in CORRIDOR_COUNTS.items():
+            for i in range(1, length + 1):
+                try:
+                    self.corridors[group, i] = corridors[group, i]
+                except KeyError:
+                    self.corridors[group, i] = CorrDesc('', '', '')
+
         if config is None:
             self.config = Property(None, [])
         else:
@@ -1378,8 +1383,7 @@ class Style(PakObject):
             vpk_name=vpk_name,
         )
 
-
-    def add_over(self, override: 'Style'):
+    def add_over(self, override: 'Style') -> None:
         """Add the additional commands to ourselves."""
         self.editor.append(override.editor)
         self.config.append(override.config)
@@ -2525,14 +2529,14 @@ class Music(PakObject):
 
 class StyleVar(PakObject, allow_mult=True, has_img=False):
     def __init__(
-            self,
-            var_id,
-            name,
-            styles,
-            unstyled=False,
-            default=False,
-            desc='',
-            ):
+        self,
+        var_id: str,
+        name: str,
+        styles: List[str],
+        unstyled: bool=False,
+        default: bool=False,
+        desc: str='',
+    ):
         self.id = var_id
         self.name = name
         self.default = default
@@ -2544,7 +2548,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             self.styles = styles
 
     @classmethod
-    def parse(cls, data: 'ParseData'):
+    def parse(cls, data: 'ParseData') -> 'StyleVar':
         """Parse StyleVars from configs."""
         name = data.info['name', '']
 
@@ -2569,7 +2573,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             desc=desc,
         )
 
-    def add_over(self, override):
+    def add_over(self, override: 'StyleVar') -> None:
         """Override a stylevar to add more compatible styles."""
         # Setting it to be unstyled overrides any other values!
         if self.styles is None:
@@ -2592,16 +2596,16 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             else:
                 self.desc = override.desc
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Stylevar "{}", name="{}", default={}, styles={}>:\n{}'.format(
             self.id,
             self.name,
             self.default,
-            ','.join(self.styles),
+            self.styles,
             self.desc,
         )
 
-    def applies_to_style(self, style):
+    def applies_to_style(self, style: Style) -> bool:
         """Check to see if this will apply for the given style.
 
         """
@@ -2617,18 +2621,18 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             style.bases
         )
 
-    def applies_to_all(self):
+    def applies_to_all(self) -> bool:
         """Check if this applies to all styles."""
         if self.styles is None:
             return True
 
-        for style in Style.all():  # type: Style
+        for style in Style.all():
             if not self.applies_to_style(style):
                 return False
         return True
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export style var selections into the config.
 
         The .selected attribute is a dict mapping ids to the boolean value.
@@ -2648,7 +2652,7 @@ class StyleVPK(PakObject, has_img=False):
     These are copied into _dlc3, allowing changing the in-editor wall
     textures.
     """
-    def __init__(self, vpk_id, filesys: FileSystem, directory: str):
+    def __init__(self, vpk_id, filesys: FileSystem, directory: str) -> None:
         """Initialise a StyleVPK object."""
         self.id = vpk_id
         self.fsys = filesys
@@ -2782,12 +2786,12 @@ class Elevator(PakObject):
     This is mainly defined just for Valve's items - you can't pack BIKs.
     """
     def __init__(
-            self,
-            elev_id,
-            selitem_data: 'SelitemData',
-            video,
-            vert_video=None,
-            ):
+        self,
+        elev_id,
+        selitem_data: 'SelitemData',
+        video,
+        vert_video=None,
+    ) -> None:
         self.id = elev_id
 
         self.selitem_data = selitem_data
@@ -2802,7 +2806,7 @@ class Elevator(PakObject):
             self.vert_video = vert_video
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData) -> 'Elevator':
         """Read elevator videos from the package."""
         info = data.info
         selitem_data = get_selitem_data(info)
@@ -2821,11 +2825,11 @@ class Elevator(PakObject):
             vert_video,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Elevator ' + self.id + '>'
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export the chosen video into the configs."""
         style = exp_data.selected_style  # type: Style
         vbsp_config = exp_data.vbsp_conf  # type: Property
@@ -2877,12 +2881,12 @@ class Elevator(PakObject):
 
 class PackList(PakObject, allow_mult=True, has_img=False):
     """Specifies a group of resources which can be packed together."""
-    def __init__(self, pak_id, files) -> None:
+    def __init__(self, pak_id: str, files: List[str]) -> None:
         self.id = pak_id
         self.files = files
 
     @classmethod
-    def parse(cls, data: ParseData):
+    def parse(cls, data: ParseData) -> 'PackList':
         """Read pack lists from packages."""
         filesystem = data.fsys  # type: FileSystem
         conf = data.info.find_key('Config', '')
@@ -2955,7 +2959,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                 self.files.append(item)
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export all the packlists."""
 
         pack_block = Property('PackList', [])
@@ -2992,13 +2996,13 @@ class EditorSound(PakObject, has_img=False):
     The ID is the name of the sound, prefixed with 'BEE2_Editor.'.
     The values in 'keys' will form the soundscript body.
     """
-    def __init__(self, snd_name, data):
+    def __init__(self, snd_name: str, data: Property) -> None:
         self.id = 'BEE2_Editor.' + snd_name
         self.data = data
         data.name = self.id
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData) -> 'EditorSound':
         """Parse editor sounds from the package."""
         return cls(
             snd_name=data.id,
