@@ -1,6 +1,7 @@
 """Implement Konclan's AntLaser item.
 """
-from typing import Dict, List, Tuple, Set, Optional, Callable
+from enum import Enum
+from typing import Dict, List, Tuple, Set, Optional, Callable, Union
 
 import conditions
 import instanceLocs
@@ -8,7 +9,7 @@ import srctools.logger
 from conditions import make_result
 import connections
 from connections import Item
-from srctools import VMF, Property, Output, Vec
+from srctools import VMF, Property, Output, Vec, Vec_tuple, Entity
 
 
 COND_MOD_NAME = None
@@ -25,6 +26,28 @@ AntLaserType = connections.ItemType(
 NAME_SPR = '{}-fx_sp_{}'.format  # type: Callable[[str, int], str]
 NAME_BEAM_LOW = '{}-fx_b_low_{}'.format  # type: Callable[[str, int], str]
 NAME_BEAM_CONN = '{}-fx_b_conn_{}'.format  # type: Callable[[str, int], str]
+NAME_CABLE = '{}-cab_{}'.format  # type: Callable[[str, int], str]
+
+class RopeState(Enum):
+    """Used to link up ropes."""
+    NONE = 'none'  # No rope here.
+    UNLINKED = 'unlinked'  # Rope ent, with no target.
+    LINKED = 'linked'  # Rope ent, with target already.
+
+    @staticmethod
+    def from_node(
+        points: Dict[Item, Union[Entity, str]],
+        node: Item,
+    ) -> Tuple['RopeState', Union[Entity, str]]:
+        """Compute the state and ent/name from the points data."""
+        try:
+            ent = points[node]
+        except KeyError:
+            return RopeState.NONE, ''
+        if isinstance(ent, str):
+            return RopeState.LINKED, ent
+        else:
+            return RopeState.UNLINKED, ent
 
 
 class Group:
@@ -47,6 +70,12 @@ class Group:
         connections.ITEMS[self.item.name] = self.item
 
 
+def on_floor(node: Item) -> bool:
+    """Check if this node is on the floor."""
+    norm = Vec(z=1).rotate_by_str(node.inst['angles'])
+    return norm.z > 0
+
+
 @make_result('AntLaser')
 def res_antlaser(vmf: VMF, res: Property):
     """The condition to generate AntLasers.
@@ -56,13 +85,16 @@ def res_antlaser(vmf: VMF, res: Property):
     conf_inst = instanceLocs.resolve(res['instance'])
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
+    conf_rope_off = res.vec('RopePos')
+    conf_toggle_targ = res['toggleTarg', '']
 
-    has_beam = 'BeamKeys' in res
-    has_glow = 'GlowKeys' in res
+    beam_conf = res.find_key('BeamKeys', [])
+    glow_conf = res.find_key('GlowKeys', [])
+    cable_conf = res.find_key('CableKeys', [])
 
-    if has_beam:
+    if beam_conf:
         # Grab a copy of the beam spawnflags so we can set our own options.
-        conf_beam_flags = res.find_key('BeamKeys', []).int('spawnflags')
+        conf_beam_flags = beam_conf.int('spawnflags')
         # Mask out certain flags.
         conf_beam_flags &= (
             0
@@ -99,6 +131,10 @@ def res_antlaser(vmf: VMF, res: Property):
             nodes[name] = connections.ITEMS.pop(name)
         except KeyError:
             raise ValueError('No item for "{}"?'.format(name)) from None
+
+    if not nodes:
+        # None at all.
+        return conditions.RES_EXHAUSTED
 
     # Now find every connected group, recording inputs, outputs and links.
     todo = set(nodes.values())
@@ -140,9 +176,7 @@ def res_antlaser(vmf: VMF, res: Property):
             # If we have a real output, we need to transfer it.
             # Otherwise we can just destroy it.
             if has_output:
-                group.item.antlines.update(node.antlines)
-                group.item.ind_panels.update(node.ind_panels)
-                group.item.shape_signs.extend(node.shape_signs)
+                node.transfer_antlines(group.item)
             else:
                 node.delete_antlines()
 
@@ -181,29 +215,54 @@ def res_antlaser(vmf: VMF, res: Property):
             else:
                 out_disable.append(output.copy())
 
+        if conf_toggle_targ:
+            # Make the group info_target into a texturetoggle.
+            toggle = group.item.inst
+            toggle['classname'] = 'env_texturetoggle'
+            toggle['target'] = conditions.local_name(group.nodes[0].inst, conf_toggle_targ)
+
         group.item.enable_cmd = tuple(out_enable)
         group.item.disable_cmd = tuple(out_disable)
 
         # Node -> index for targetnames.
         indexes = {}  # type: Dict[Item, int]
 
+        # For cables, it's a bit trickier than the beams.
+        # The cable ent itself is the one which decides what it links to,
+        # so we need to potentially make endpoint cables at locations with
+        # only "incoming" lines.
+        # So this dict is either a targetname to indicate cables with an
+        # outgoing connection, or the entity for endpoints without an outgoing
+        # connection.
+        cable_points = {}  # type: Dict[Item, Union[Entity, str]]
+
         for i, node in enumerate(group.nodes, start=1):
             indexes[node] = i
             node.name = base_name
 
-            if has_glow:
+            sprite_pos = conf_glow_height.copy()
+            sprite_pos.localise(
+                Vec.from_str(node.inst['origin']),
+                Vec.from_str(node.inst['angles']),
+            )
+
+            if glow_conf:
                 # First add the sprite at the right height.
-                sprite_pos = conf_glow_height.copy()
-                sprite_pos.localise(
-                    Vec.from_str(node.inst['origin']),
-                    Vec.from_str(node.inst['angles']),
-                )
                 sprite = vmf.create_ent('env_sprite')
-                conditions.set_ent_keys(sprite, node.inst, res, 'GlowKeys')
+                for prop in glow_conf:
+                    sprite[prop.name] = conditions.resolve_value(node.inst, prop.value)
+
                 sprite['origin'] = sprite_pos
                 sprite['targetname'] = NAME_SPR(base_name, i)
+            elif beam_conf:
+                # If beams but not sprites, we need a target.
+                vmf.create_ent(
+                    'info_target',
+                    origin=sprite_pos,
+                    targetname=NAME_SPR(base_name, i),
+                )
 
-            if has_beam:
+            if beam_conf:
                 # Now the beam going from below up to the sprite.
                 beam_pos = conf_las_start.copy()
                 beam_pos.localise(
@@ -211,21 +270,107 @@ def res_antlaser(vmf: VMF, res: Property):
                     Vec.from_str(node.inst['angles']),
                 )
                 beam = vmf.create_ent('env_beam')
-                conditions.set_ent_keys(beam, node.inst, res, 'BeamKeys')
+                for prop in beam_conf:
+                    beam[prop.name] = conditions.resolve_value(node.inst, prop.value)
+
                 beam['origin'] = beam['targetpoint'] = beam_pos
                 beam['targetname'] = NAME_BEAM_LOW(base_name, i)
                 beam['LightningStart'] = beam['targetname']
                 beam['LightningEnd'] = NAME_SPR(base_name, i)
                 beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
 
-        if has_beam:
-            for i, (node1, node2) in enumerate(group.links):
+        if beam_conf:
+            for i, (node_a, node_b) in enumerate(group.links):
                 beam = vmf.create_ent('env_beam')
-                conditions.set_ent_keys(beam, node1.inst, res, 'BeamKeys')
-                beam['origin'] = beam['targetpoint'] = node1.inst['origin']
+                conditions.set_ent_keys(beam, node_a.inst, res, 'BeamKeys')
+                beam['origin'] = beam['targetpoint'] = node_a.inst['origin']
                 beam['targetname'] = NAME_BEAM_CONN(base_name, i)
-                beam['LightningStart'] = NAME_SPR(base_name, indexes[node1])
-                beam['LightningEnd'] = NAME_SPR(base_name, indexes[node2])
+                beam['LightningStart'] = NAME_SPR(base_name, indexes[node_a])
+                beam['LightningEnd'] = NAME_SPR(base_name, indexes[node_b])
                 beam['spawnflags'] = conf_beam_flags
+
+        # We have a couple different situations to deal with here.
+        # Either end could Not exist, be Unlinked, or be Linked = 8 combos.
+        # Always flip so we do A to B.
+        # AB |
+        # NN | Make 2 new ones, one is an endpoint.
+        # NU | Flip, do UN.
+        # NL | Make A, link A to B. Both are linked.
+        # UN | Make B, link A to B. B is unlinked.
+        # UU | Link A to B, A is now linked, B is unlinked.
+        # UL | Link A to B. Both are linked.
+        # LN | Flip, do NL.
+        # LU | Flip, do UL
+        # LL | Make A, link A to B. Both are linked.
+        if cable_conf:
+            rope_ind = 0  # Uniqueness value.
+            for node_a, node_b in group.links:
+                state_a, ent_a = RopeState.from_node(cable_points, node_a)
+                state_b, ent_b = RopeState.from_node(cable_points, node_b)
+
+                if (state_a is RopeState.LINKED
+                   or (state_a is RopeState.NONE and
+                       state_b is RopeState.UNLINKED)
+                ):
+                    # Flip these, handle the opposite order.
+                    state_a, state_b = state_b, state_a
+                    ent_a, ent_b = ent_b, ent_a
+                    node_a, node_b = node_b, node_a
+
+                pos_a = conf_rope_off.copy()
+                pos_a.localise(
+                    Vec.from_str(node_a.inst['origin']),
+                    Vec.from_str(node_a.inst['angles']),
+                )
+
+                pos_b = conf_rope_off.copy()
+                pos_b.localise(
+                    Vec.from_str(node_b.inst['origin']),
+                    Vec.from_str(node_b.inst['angles']),
+                )
+
+                # Need to make the A rope if we don't have one that's unlinked.
+                if state_a is not RopeState.UNLINKED:
+                    rope_a = vmf.create_ent('move_rope')
+                    for prop in beam_conf:
+                        rope_a[prop.name] = conditions.resolve_value(node_a.inst, prop.value)
+                    rope_a['origin'] = pos_a
+                    rope_ind += 1
+                    rope_a['targetname'] = NAME_CABLE(base_name, rope_ind)
+                else:
+                    # It is unlinked, so it's the rope to use.
+                    rope_a = ent_a
+
+                # Only need to make the B rope if it doesn't have one.
+                if state_b is RopeState.NONE:
+                    rope_b = vmf.create_ent('move_rope')
+                    for prop in beam_conf:
+                        rope_b[prop.name] = conditions.resolve_value(node_b.inst, prop.value)
+                    rope_b['origin'] = pos_b
+                    rope_ind += 1
+                    name_b = rope_b['targetname'] = NAME_CABLE(base_name, rope_ind)
+
+                    cable_points[node_b] = rope_b  # Someone can use this.
+                elif state_b is RopeState.UNLINKED:
+                    # Both must be unlinked, we aren't using this link though.
+                    name_b = ent_b['targetname']
+                else:  # Linked, we just have the name.
+                    name_b = ent_b
+
+                # By here, rope_a should be an unlinked rope,
+                # and name_b should be a name to link to.
+                rope_a['nextkey'] = name_b
+
+                # Figure out how much slack to give.
+                # If on floor, we need to be taut to have clearance.
+
+                if on_floor(node_a) or on_floor(node_b):
+                    rope_a['slack'] = 60
+                else:
+                    rope_a['slack'] = 300
+
+                # We're always linking A to B, so A is always linked!
+                if state_a is not RopeState.LINKED:
+                    cable_points[node_a] = rope_a['targetname']
 
     return conditions.RES_EXHAUSTED
