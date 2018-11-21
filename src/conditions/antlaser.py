@@ -1,7 +1,7 @@
 """Implement Konclan's AntLaser item.
 """
 from enum import Enum
-from typing import Dict, List, Tuple, Set, Optional, Callable, Union
+from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
 
 import conditions
 import instanceLocs
@@ -54,7 +54,9 @@ class Group:
     """Represents a group of markers."""
     def __init__(self, start: Item):
         self.nodes = [start]  # type: List[Item]
-        self.links = set()  # type: Set[Tuple[Item, Item]]
+        # We use a frozenset here to ensure we don't double-up the links -
+        # users might accidentally do that.
+        self.links = set()  # type: Set[FrozenSet[Item]]
         # Create the item for the entire group of markers.
         logic_ent = start.inst.map.create_ent(
             'info_target',
@@ -171,7 +173,7 @@ def res_antlaser(vmf: VMF, res: Property):
 
                 # For nodes, connect link.
                 conn.remove()
-                group.links.add((node, neighbour))
+                group.links.add(frozenset({node, neighbour}))
 
             # If we have a real output, we need to transfer it.
             # Otherwise we can just destroy it.
@@ -196,7 +198,7 @@ def res_antlaser(vmf: VMF, res: Property):
 
                 # For nodes, connect link.
                 conn.remove()
-                group.links.add((neighbour, node))
+                group.links.add(frozenset({neighbour, node}))
 
     # Now every node is in a group. Generate the actual entities.
     for group in groups:
@@ -367,7 +369,7 @@ def res_antlaser(vmf: VMF, res: Property):
                 if on_floor(node_a) or on_floor(node_b):
                     rope_a['slack'] = 60
                 else:
-                    rope_a['slack'] = 300
+                    rope_a['slack'] = 125
 
                 # We're always linking A to B, so A is always linked!
                 if state_a is not RopeState.LINKED:
