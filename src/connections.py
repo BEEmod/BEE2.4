@@ -588,6 +588,15 @@ class Item:
         self.ind_panels.clear()
         self.shape_signs.clear()
 
+    def transfer_antlines(self, item: 'Item'):
+        """Transfer the antlines and checkmarks from this item to another."""
+        item.antlines.update(self.antlines)
+        item.ind_panels.update(self.ind_panels)
+        item.shape_signs.extend(self.shape_signs)
+
+        self.antlines.clear()
+        self.ind_panels.clear()
+        self.shape_signs.clear()
 
 class Connection:
     """Represents a connection between two items."""
