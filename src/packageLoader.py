@@ -1096,22 +1096,17 @@ class ItemVariant:
                     'editoritems for {}'.format(item.name, source)
                 )
 
-            # Overriding model data
-            try:
-                try:
-                    model_prop = item.find_key('Models')
-                except NoKeyError:
-                    model_prop = item.find_key('Model')
-            except NoKeyError:
-                pass
-            else:
+            # Overriding model data.
+            models = []
+            for prop in item:
+                if prop.name in ('models', 'model'):
+                    if prop.has_children():
+                        models.extend([subprop.value for subprop in prop])
+                    else:
+                        models.append(prop.value)
+            if models:
                 while 'model' in subtype:
                     del subtype['model']
-                if model_prop.has_children():
-                    models = [prop.value for prop in model_prop]
-                else:
-                    # Special case - one model, for the entire subtype.
-                    models = [model_prop.value]
                 for model in models:
                     subtype.append(Property('Model', [
                         Property('ModelName', model),
