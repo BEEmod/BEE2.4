@@ -863,6 +863,16 @@ def calc_connections(
             )
             conn.add()
 
+        # Now, re-apply these timer fixup variables so they reflect the item's
+        # data.
+        if const.FixupVars.TIM_DELAY in item.inst.fixup:
+            item.inst.fixup[const.FixupVars.TIM_DELAY] = (
+                '99999999999' if item.timer is None
+                else item.timer
+            )
+        if const.FixupVars.TIM_ENABLED in item.inst.fixup:
+            item.inst.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
+
     # Make signage frames
     shape_frame_tex = [mat for mat in shape_frame_tex if mat]
     if shape_frame_tex and enable_shape_frame:
