@@ -812,7 +812,10 @@ def refresh_pal_ui():
     # Add a set of options to pick the palette into the menu system
     for val, pal in enumerate(paletteLoader.pal_list):
         menus['pal'].add_radiobutton(
-            label=pal.name,
+            label=(
+                pal.name if pal.settings is None
+                else '⚙' + pal.name
+            ),
             variable=selectedPalette_radio,
             value=val,
             command=set_pal_radio,
