@@ -7,6 +7,7 @@ import operator
 
 from SubPane import SubPane
 from srctools import Property
+from srctools.logger import get_logger
 import packageLoader
 import tooltip
 import utils
@@ -15,6 +16,9 @@ import BEE2_config
 import img
 
 from typing import Union, List, Dict
+
+
+LOGGER = get_logger(__name__)
 
 
 stylevar = namedtuple('stylevar', 'id name default desc')
@@ -130,7 +134,10 @@ def save_load_stylevars(props: Property=None):
     else:
         # Loading
         for prop in props:
-            tk_vars[prop.real_name].set(prop.value)
+            try:
+                tk_vars[prop.real_name].set(prop.value)
+            except KeyError:
+                LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
         update_filter()
 
 
