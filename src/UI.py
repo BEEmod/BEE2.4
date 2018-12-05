@@ -15,7 +15,6 @@ from BEE2_config import ConfigFile, GEN_OPTS
 from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 import srctools.logger
-from srctools.filesys import FileSystem, FileSystemChain
 import sound as snd
 import BEE2_config
 import paletteLoader
@@ -37,8 +36,7 @@ import helpMenu
 import backup as backup_win
 import tooltip
 
-from typing import Iterable, List, Dict
-
+from typing import List, Dict
 
 
 LOGGER = srctools.logger.get_logger(__name__)
