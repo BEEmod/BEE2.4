@@ -6,7 +6,7 @@ import itertools
 import operator
 import random
 
-from srctools import Property, NoKeyError
+from srctools import Property
 import music_conf
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
@@ -473,9 +473,12 @@ def save_load_selector_win(props: Property=None):
         ('Style', style_win),
         ('Skybox', skybox_win),
         ('Voice', voice_win),
-        ('Music', music_win),
         ('Elevator', elev_win),
     ]
+    for channel, win in music_conf.WINDOWS.items():
+        sel_win.append(('Music_' + channel.name.title(), win))
+
+    # Saving
     if props is None:
         props = Property('', [])
         for win_name, win in sel_win:
@@ -486,7 +489,7 @@ def save_load_selector_win(props: Property=None):
     for win_name, win in sel_win:
         try:
             win.sel_item_id(props[win_name])
-        except NoKeyError:
+        except IndexError:
             pass
 
 
@@ -664,9 +667,10 @@ def load_packages(data):
     style_win.sel_item_id('BEE2_CLEAN')
 
     voice_win.sel_suggested()
-    music_win.sel_suggested()
     skybox_win.sel_suggested()
     elev_win.sel_suggested()
+    for win in music_conf.WINDOWS.values():
+        win.sel_suggested()
 
 
 def current_style() -> packageLoader.Style:
