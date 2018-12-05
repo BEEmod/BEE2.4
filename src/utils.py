@@ -1,5 +1,5 @@
 """Various functions shared among the compiler and application."""
-import collections.abc
+import collections
 import functools
 import logging
 import os
@@ -11,9 +11,10 @@ from enum import Enum
 
 from typing import (
     Tuple, List, Set, Sequence,
-    Iterator, Iterable, SupportsInt,
+    Iterator, Iterable, SupportsInt, Mapping,
     TypeVar, Any,
     Union, Callable, Generator,
+    KeysView, ValuesView, ItemsView,
 )
 
 try:
@@ -394,7 +395,7 @@ del N, S, E, W
 RetT = TypeVar('RetT')
 
 
-class FuncLookup(collections.abc.Mapping):
+class FuncLookup(Mapping[str, Callable[..., Any]]):
     """A dict for holding callback functions.
 
     Functions are added by using this as a decorator. Positional arguments
@@ -438,7 +439,7 @@ class FuncLookup(collections.abc.Mapping):
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, FuncLookup):
             return self._registry == other._registry
-        if not isinstance(other, collections.abc.Mapping):
+        if not isinstance(other, collections.Mapping):
             return NotImplemented
         return self._registry == dict(other.items())
 
@@ -446,19 +447,19 @@ class FuncLookup(collections.abc.Mapping):
         """Yield all the functions."""
         return iter(self.values())
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         """Yield all the valid IDs."""
         return self._registry.keys()
 
-    def values(self):
+    def values(self) -> ValuesView[Callable[..., Any]]:
         """Yield all the functions."""
         return self._registry.values()
 
-    def items(self):
+    def items(self) -> ItemsView[str, Callable[..., Any]]:
         """Return pairs of (ID, func)."""
         return self._registry.items()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(set(self._registry.values()))
 
     def __getitem__(self, names: Union[str, Tuple[str]]) -> Callable[..., Any]:
@@ -505,8 +506,6 @@ class FuncLookup(collections.abc.Mapping):
     def functions(self) -> Set[Callable[..., Any]]:
         """Return the set of functions in this mapping."""
         return set(self._registry.values())
-
-    values = functions
 
     def clear(self) -> None:
         """Delete all functions."""

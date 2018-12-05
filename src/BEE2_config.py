@@ -1,4 +1,9 @@
-"""Modified version of ConfigParser that can be easily resaved.
+"""Settings related logic for the application.
+
+Functions can be registered with a name, which will be called to save/load
+settings.
+
+This also contains a version of ConfigParser that can be easily resaved.
 
 It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
@@ -6,7 +11,6 @@ Most functions are also altered to allow defaults instead of erroring.
 from configparser import ConfigParser, NoOptionError
 from srctools import AtomicWriter, Property
 
-import os
 import utils
 import srctools.logger
 
@@ -16,7 +20,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # Functions for saving or loading application settings.
 # Call with a block to load, or with no args to return the current
 # values.
-option_handler = utils.FuncLookup('OptionHandlers')
+option_handler = utils.FuncLookup('OptionHandlers')  # type: utils.FuncLookup
 
 
 def get_curr_settings() -> Property:
@@ -24,7 +28,7 @@ def get_curr_settings() -> Property:
     props = Property('', [])
 
     for opt_id, opt_func in option_handler.items():
-        opt_prop = opt_func()
+        opt_prop = opt_func()  # type: Property
         opt_prop.name = opt_id.title()
         props.append(opt_prop)
 
@@ -42,7 +46,7 @@ def apply_settings(props: Property):
             func(opt_prop)
 
 
-def read_settings():
+def read_settings() -> None:
     """Read and apply the settings from disk."""
     try:
         file = open(utils.conf_location('config/config.vdf'), encoding='utf8')
@@ -53,7 +57,7 @@ def read_settings():
     apply_settings(props)
 
 
-def write_settings():
+def write_settings() -> None:
     """Write the settings to disk."""
     props = get_curr_settings()
     props.name = None
