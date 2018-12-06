@@ -23,7 +23,7 @@ except ImportError:  # py < 3.6.5
 
 try:
     # This module is generated when cx_freeze compiles the app.
-    from BUILD_CONSTANTS import BEE_VERSION
+    from BUILD_CONSTANTS import BEE_VERSION  # type: ignore
 except ImportError:
     # We're running from source!
     BEE_VERSION = "(dev)"

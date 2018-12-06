@@ -37,14 +37,14 @@ ALL_INST = set()  # type: Set[str]
 VMF = None  # type: srctools.VMF
 
 conditions = []
-FLAG_LOOKUP = {}
-RESULT_LOOKUP = {}
-RESULT_SETUP = {}
+FLAG_LOOKUP = {}  # type: Dict[str, Callable[[srctools.VMF, Entity, Property], bool]]
+RESULT_LOOKUP = {}  # type: Dict[str, Callable[[srctools.VMF, Entity, Property], object]]
+RESULT_SETUP = {}  # type: Dict[str, Callable[[srctools.VMF, Property], object]]
 
 # Used to dump a list of the flags, results, meta-conditions
-ALL_FLAGS = []
-ALL_RESULTS = []
-ALL_META = []
+ALL_FLAGS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
+ALL_RESULTS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
+ALL_META = []  # type: List[Tuple[str, Decimal, Callable[[srctools.VMF], None]]]
 
 GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
 GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
@@ -192,9 +192,9 @@ class Condition:
     @classmethod
     def parse(cls, prop_block: Property) -> 'Condition':
         """Create a condition from a Property block."""
-        flags = []
-        results = []
-        else_results = []
+        flags = []  # type: List[Property]
+        results = []  # type: List[Property]
+        else_results = []  # type: List[Property]
         priority = Decimal()
         source = None
         for prop in prop_block:
@@ -243,7 +243,7 @@ class Condition:
             self.setup_result(self.else_results, res, self.source)
 
     @staticmethod
-    def setup_result(res_list: List[Property], result: Property, source: str='') -> None:
+    def setup_result(res_list: List[Property], result: Property, source: Optional[str]='') -> None:
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
@@ -319,7 +319,7 @@ def annotation_caller(
         inspect.Parameter.POSITIONAL_ONLY,
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
     ]
-    type_to_parm = dict.fromkeys(parms, None)
+    type_to_parm = dict.fromkeys(parms, None)  # type: Dict[object, Optional[str]]
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
         ann = parm.annotation
@@ -344,9 +344,9 @@ def annotation_caller(
         enumerate(sig.parameters.values())
     }
     letters = 'abcdefghijklmnopqrstuvwxyz'
-    for var_name, parm in zip(letters, parms):
+    for var_name, parm_typ in zip(letters, parms):
         inputs.append(var_name)
-        out_name = type_to_parm[parm]
+        out_name = type_to_parm[parm_typ]
         if out_name is not None:
             outputs[parm_order[out_name]] = var_name
 
@@ -374,20 +374,22 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
     """
+    dec_priority = Decimal(priority)
     # This adds a condition result like "func" (with quotes), which cannot
     # be entered into property files.
     # The qualname will be unique across modules.
     name = '"' + func.__qualname__ + '"'
-    LOGGER.debug("Adding metacondition ({}) with priority {!s}!",
+    LOGGER.debug(
+        "Adding metacondition ({}) with priority {!s}!",
         name,
-        priority,
+        dec_priority,
     )
 
     RESULT_LOOKUP[name] = annotation_caller(func, srctools.VMF, Entity, Property)
 
     cond = Condition(
         results=[Property(name, '')],
-        priority=Decimal(priority),
+        priority=Decimal(dec_priority),
         source='MetaCondition {}'.format(name)
     )
 
@@ -396,7 +398,7 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
             Property('endCondition', '')
         )
     conditions.append(cond)
-    ALL_META.append((name, priority, func))
+    ALL_META.append((name, dec_priority, func))
 
 
 def meta_cond(priority=0, only_once=True):
@@ -683,7 +685,7 @@ def dump_conditions(file: TextIO) -> None:
         print('# ' + name, file=file)
         print('<!------->', file=file)
 
-        lookup_grouped = defaultdict(list)
+        lookup_grouped = defaultdict(list)  # type: Dict[str, List[Tuple[str, Tuple[str, ...], Callable]]]
 
         for flag_key, aliases, func in lookup:
             group = getattr(func, 'group', 'ERROR')
@@ -808,14 +810,14 @@ def local_name(inst: Entity, name: Union[str, Entity]) -> str:
     if fixup == '2' or not targ_name:
         # We can't do fixup..
         return name
-
-    if fixup == '0':
+    elif fixup == '0':
         # Prefix
         return targ_name + '-' + name
-
-    if fixup == '1':
+    elif fixup == '1':
         # Postfix
         return name + '-' + targ_name
+    else:
+        raise ValueError('Unknown fixup style {}!'.format(fixup))
 
 
 def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=None):
@@ -917,7 +919,7 @@ def steal_from_brush(
         for face_id in
         additional
     }
-    new_ids = []
+    new_ids = []  # type: List[str]
 
     for brush in temp_brushes:
         for face in brush.sides:
@@ -969,7 +971,7 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_value(inst: Entity, value: T) -> Union[str, T]:
+def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
     """If a value starts with '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
@@ -1244,7 +1246,7 @@ def res_timed_relay(inst: Entity, res: Property):
             relay.add_out(new_out)
 
     for out in final_outs:
-        new_out = out.copy()  # type: Output
+        new_out = out.copy()
         new_out.target = local_name(inst, new_out.target)
         new_out.delay += delay
         new_out.comma_sep = False
@@ -1462,7 +1464,7 @@ def res_goo_debris(res: Property):
             res['weights', ''],
         )
     else:
-        rand_list = None
+        rand_list = None  # type: Optional[List[int]]
     chance = res.int('chance', 30) / 100
     file = res['file']
     offset = res.int('offset', 0)

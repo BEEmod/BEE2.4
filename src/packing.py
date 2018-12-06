@@ -13,7 +13,7 @@ COND_MOD_NAME = 'Packing'
 # Filenames we've packed, so we can avoid adding duplicate ents.
 _PACKED_FILES = set()  # type: Set[str]
 
-PACKLISTS = {}  # type: Dict[str, Set[str]]]
+PACKLISTS = {}  # type: Dict[str, Set[str]]
 
 
 def parse_packlists(props: Property) -> None:
