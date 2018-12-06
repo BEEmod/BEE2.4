@@ -75,6 +75,10 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
+# "Wheel of Dharma" / white sun, close enough and should be
+# in most fonts.
+CHR_GEAR = '☼ '
+
 
 class Item:
     """Represents an item that can appear on the list."""
@@ -750,16 +754,9 @@ def refresh_pal_ui():
     listbox = UI['palette']  # type: Listbox
     listbox.delete(0, END)
 
-    gear_icons = listbox.gear_icons  # type: Dict[int, Label]
-
-    for gear in gear_icons.values():
-        gear.destroy()
-
-    gear_icons.clear()
-
     for i, pal in enumerate(paletteLoader.pal_list):
         if pal.settings is not None:
-            listbox.insert(i, '     ' + pal.name)
+            listbox.insert(i, CHR_GEAR + pal.name)
         else:
             listbox.insert(i, pal.name)
 
@@ -778,30 +775,6 @@ def refresh_pal_ui():
                 selectbackground=tk_tools.LISTBOX_BG_SEL_COLOR,
             )
 
-    listbox.update()
-
-    for i, pal in enumerate(paletteLoader.pal_list):
-        if pal.settings is not None:
-            gear = Label(
-                listbox,
-                bg='white',
-                image=img.png('icons/gear'),
-                width=10,
-                height=10,
-                borderwidth=0,
-                padx=0,
-                pady=0,
-            )
-            x, y, width, height = listbox.bbox(i)
-            gear_icons[i] = gear
-            gear.place(
-                x=x,
-                y=y + (height-10)//2,
-                width=10,
-                height=10,
-                anchor='nw',
-            )
-
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
         # Iterate backward to ensure indexes stay the same.
@@ -812,7 +785,7 @@ def refresh_pal_ui():
         menus['pal'].add_radiobutton(
             label=(
                 pal.name if pal.settings is None
-                else '⚙' + pal.name
+                else CHR_GEAR + pal.name
             ),
             variable=selectedPalette_radio,
             value=val,
@@ -1130,14 +1103,6 @@ def set_palette(e=None):
         LOGGER.warning('Invalid palette index!')
         selectedPalette = 0
 
-    # Update gear icons (if any) to match the background of their label.
-    # Do this before palettes update, so you can't see the change.
-    for ind, gear in UI['palette'].gear_icons.items():
-        if ind == selectedPalette:
-            gear['bg'] = tk_tools.LISTBOX_BG_SEL_COLOR
-        else:
-            gear['bg'] = tk_tools.LISTBOX_BG_COLOR
-
     chosen_pal = paletteLoader.pal_list[selectedPalette]
 
     GEN_OPTS['Last_Selected']['palette'] = str(selectedPalette)
@@ -1291,31 +1256,32 @@ def init_palette(f):
         command=pal_clear,
         ).grid(row=0, sticky="EW")
 
-    UI['palette'] = Listbox(f, width=10)
-    UI['palette'].grid(row=1, sticky="NSEW")
-
-    # Dict to store gear overlays for palettes with settings.
-    UI['palette'].gear_icons = {}
+    UI['palette'] = listbox = Listbox(f, width=10)
+    listbox.grid(row=1, sticky="NSEW")
 
     def set_pal_listbox(e=None):
         global selectedPalette
-        cur_selection = UI['palette'].curselection()
+        cur_selection = listbox.curselection()
         if cur_selection:  # Might be blank if none selected
             selectedPalette = int(cur_selection[0])
             selectedPalette_radio.set(selectedPalette)
+
+            # Actually set palette..
             set_palette()
         else:
-            UI['palette'].selection_set(selectedPalette, selectedPalette)
-    UI['palette'].bind("<<ListboxSelect>>", set_pal_listbox)
-    UI['palette'].bind("<Enter>", set_pal_listbox_selection)
+            listbox.selection_set(selectedPalette, selectedPalette)
+
+    listbox.bind("<<ListboxSelect>>", set_pal_listbox)
+    listbox.bind("<Enter>", set_pal_listbox_selection)
+
     # Set the selected state when hovered, so users can see which is
     # selected.
-    UI['palette'].selection_set(0)
+    listbox.selection_set(0)
 
     pal_scroll = tk_tools.HidingScroll(
         f,
         orient=VERTICAL,
-        command=UI['palette'].yview,
+        command=listbox.yview,
     )
     pal_scroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand'] = pal_scroll.set
