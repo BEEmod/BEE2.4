@@ -853,12 +853,15 @@ class Game:
                         os.path.join(mdl_folder, file_no_ext + new_ext),
                     )
 
-        LOGGER.info(
-            '{}/{} ({:.0%})editor models used.',
-            len(used_models),
-            mdl_count,
-            len(used_models) / mdl_count,
-        )
+        if mdl_count != 0:
+            LOGGER.info(
+                '{}/{} ({:.0%})editor models used.',
+                len(used_models),
+                mdl_count,
+                len(used_models) / mdl_count,
+            )
+        else:
+            LOGGER.warning('No custom editor models!')
 
     @staticmethod
     def build_instance_data(editoritems: Property):
