@@ -5,7 +5,6 @@ import random
 import utils
 
 import srctools.logger
-from srctools import Property
 import BEE2_config
 from srctools import Property, NoKeyError
 
