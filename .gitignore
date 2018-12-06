@@ -41,6 +41,10 @@ Icon
 .Spotlight-V100
 .Trashes
 
+# MyPy
+.mypy_cache
+
+
 # Portal 2 stuff
 *.vmx
 *.log
