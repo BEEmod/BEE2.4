@@ -39,6 +39,7 @@ INF = '∞'
 # For itemvariant, we need to refresh on style changes.
 ITEM_VARIANT_LOAD = []
 
+
 class Widget:
     """Represents a widget that can appear on a ConfigGroup."""
     def __init__(
@@ -239,7 +240,7 @@ def make_pane(parent: ttk.Frame):
 
     parent.columnconfigure(0, weight=1)
 
-    # need to use a canvas to allow scrolling
+    # Need to use a canvas to allow scrolling
     canvas = tk.Canvas(parent, highlightthickness=0)
     canvas.grid(row=0, column=0, sticky='NSEW')
     parent.rowconfigure(0, weight=1)
@@ -269,10 +270,14 @@ def make_pane(parent: ttk.Frame):
         # Now make the widgets.
         if config.widgets:
             for row, wid in enumerate(config.widgets):
-                label = ttk.Label(frame, text=wid.name + ': ')
-                label.grid(row=row, column=0)
-                widget = wid.create_func(frame, wid.values, wid.config)
-                widget.grid(row=row, column=1, sticky='ew')
+                wid_frame = ttk.Frame(frame)
+                wid_frame.grid(row=row, column=0, sticky='ew')
+                wid_frame.columnconfigure(1, weight=1)
+
+                label = ttk.Label(wid_frame, text=wid.name + ': ')
+                label.grid(row=0, column=0)
+                widget = wid.create_func(wid_frame, wid.values, wid.config)
+                widget.grid(row=0, column=1, sticky='e')
 
                 if wid.tooltip:
                     add_tooltip(widget, wid.tooltip)
