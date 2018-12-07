@@ -63,7 +63,10 @@ def write_settings() -> None:
     """Write the settings to disk."""
     props = get_curr_settings()
     props.name = None
-    with open(utils.conf_location('config/config.vdf'), 'w', encoding='utf8') as file:
+    with AtomicWriter(
+        str(utils.conf_location('config/config.vdf')),
+        is_bytes=False,
+    ) as file:
         for line in props.export():
             file.write(line)
 
