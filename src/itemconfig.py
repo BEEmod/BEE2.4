@@ -157,14 +157,14 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             name = wid['Label']
             tooltip = wid['Tooltip', '']
             default = wid.find_key('Default', '')
+            values = None  # type: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:
                 if is_timer:
                     LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
                     is_timer = use_inf = False
-                # Dummy, not used.
-                values = None
+                # Values remains a dummy None value, we don't use it.
             elif is_timer:
                 if default.has_children():
                     defaults = {
@@ -575,8 +575,6 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label
 
     # Register a function to be called whenever this variable is changed.
     var.trace_add('write', update_image)
-
-    LOGGER.info('Trace info: {}', var.trace_info())
 
     utils.bind_leftclick(swatch, open_win)
 
