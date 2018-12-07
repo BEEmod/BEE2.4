@@ -878,6 +878,7 @@ def export_editoritems(e=None):
     # Save the configs since we're writing to disk lots anyway.
     GEN_OPTS.save_check()
     item_opts.save_check()
+    BEE2_config.write_settings()
 
     message = _('Selected Items and Style successfully exported!')
     if not vpk_success:
