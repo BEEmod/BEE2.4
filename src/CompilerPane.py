@@ -1,7 +1,7 @@
-import tkMarkdown
-from srctools.logger import init_logging, get_logger
 import tk_tools
 import utils
+from srctools.logger import init_logging, get_logger
+
 if __name__ == '__main__':
     utils.fix_cur_directory()
     LOGGER = init_logging(
@@ -20,16 +20,17 @@ from tkinter import ttk
 from tkinter import filedialog
 
 from PIL import Image, ImageTk
-from typing import Dict, Tuple
-
-import os
-
-from BEE2_config import ConfigFile, GEN_OPTS
+from BEE2_config import ConfigFile, GEN_OPTS, option_handler
 from packageLoader import CORRIDOR_COUNTS, CorrDesc
 from tooltip import add_tooltip, set_tooltip
+from srctools import Property
 import selectorWin
+import tkMarkdown
 import SubPane
 import img
+import os
+
+from typing import Dict, Tuple, Optional
 
 # The size of PeTI screenshots
 PETI_WIDTH = 555
@@ -83,7 +84,7 @@ PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
 COMPILE_CFG = ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window = None
-UI = {}
+UI = {}  # type: Dict[str, Widget]
 
 chosen_thumb = StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
@@ -161,6 +162,66 @@ vrad_light_type = IntVar(
 cleanup_screenshot = IntVar(
     value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True)
 )
+
+
+@option_handler('CompilerPane')
+def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]:
+    """Save/load compiler options from the palette.
+
+    Note: We specifically do not save/load the following:
+        - packfile dumping
+        - compile counts
+    This is because these are more system-dependent than map dependent.
+    """
+    if props is None:  # Saving
+        corr_prop = Property('corridor', [])
+        props = Property('', [
+            Property('sshot_type', chosen_thumb.get()),
+            Property('sshot_cleanup', str(cleanup_screenshot.get())),
+            Property('spawn_elev', str(start_in_elev.get())),
+            Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
+            Property('use_voice_priority', str(VOICE_PRIORITY_VAR.get())),
+            corr_prop,
+        ])
+        for group, win in CORRIDOR.items():
+            corr_prop[group] = win.chosen_id or '<NONE>'
+
+        return props
+
+    # else: Loading
+
+    chosen_thumb.set(props['sshot_type', chosen_thumb.get()])
+    cleanup_screenshot.set(props.bool('sshot_cleanup', cleanup_screenshot.get()))
+
+    # Refresh these.
+    set_screen_type()
+    set_screenshot()
+
+    start_in_elev.set(props.bool('spawn_elev', start_in_elev.get()))
+
+    try:
+        player_mdl = props['player_model']
+    except LookupError:
+        pass
+    else:
+        player_model_var.set(PLAYER_MODELS[player_mdl])
+        COMPILE_CFG['General']['player_model'] = player_mdl
+
+    VOICE_PRIORITY_VAR.set(props.bool('use_voice_priority', VOICE_PRIORITY_VAR.get()))
+
+    corr_prop = props.find_key('corridor', [])
+    for group, win in CORRIDOR.items():
+        try:
+            sel_id = corr_prop[group]
+        except LookupError:
+            "No config option, ok."
+        else:
+            win.sel_item_id(sel_id)
+            COMPILE_CFG['Corridor'][group] = '0' if sel_id == '<NONE>' else sel_id
+
+    COMPILE_CFG.save_check()
+    return None
+
 
 def load_corridors() -> None:
     """Parse corridors out of the config file."""
@@ -323,12 +384,12 @@ def refresh_counts(reload=True):
         flash_count()
 
 
-def set_pack_dump_dir(path):
+def set_pack_dump_dir(path: str) -> None:
     COMPILE_CFG['General']['packfile_dump_dir'] = path
     COMPILE_CFG.save_check()
 
 
-def set_pack_dump_enabled():
+def set_pack_dump_enabled() -> None:
     is_enabled = packfile_dump_enable.get()
     COMPILE_CFG['General']['packfile_dump_enable'] = str(is_enabled)
     COMPILE_CFG.save_check()
@@ -409,34 +470,25 @@ def set_model(e=None):
     COMPILE_CFG.save()
 
 
-def set_corr(corr_name, e):
-    """Save the chosen corridor when it's changed.
-
-    This is shared by all three dropdowns.
-    """
-    COMPILE_CFG['Corridor'][corr_name] = str(e.widget.current())
-    COMPILE_CFG.save()
-
-
-def set_corr_dropdown(corr_name, widget):
-    """Set the values in the dropdown when it's opened."""
-    widget['values'] = CORRIDOR[corr_name]
-
-
-def make_setter(section, config, variable):
+def make_setter(section: str, config: str, variable: Variable) -> None:
     """Create a callback which sets the given config from a variable."""
-
-    def callback():
+    def callback(var_name: str, var_ind: str, cback_name: str) -> None:
+        """Automatically called when the variable is written to."""
         COMPILE_CFG[section][config] = str(variable.get())
         COMPILE_CFG.save_check()
 
-    return callback
+    variable.trace_add('write', callback)
 
 
-def make_widgets():
+def make_widgets() -> None:
     """Create the compiler options pane.
 
     """
+    make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR)
+    make_setter('General', 'spawn_elev', start_in_elev)
+    make_setter('Screenshot', 'del_old', cleanup_screenshot)
+    make_setter('General', 'vrad_force_full', vrad_light_type)
+
     ttk.Label(window, justify='center', text=_(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
@@ -515,7 +567,6 @@ def make_comp_widgets(frame: ttk.Frame):
         thumb_frame,
         text=_('Cleanup old screenshots'),
         variable=cleanup_screenshot,
-        command=make_setter('Screenshot', 'del_old', cleanup_screenshot),
     )
 
     UI['thumb_auto'].grid(row=0, column=0, sticky='W')
@@ -572,7 +623,6 @@ def make_comp_widgets(frame: ttk.Frame):
         text=_('Fast'),
         value=0,
         variable=vrad_light_type,
-        command=make_setter('General', 'vrad_force_full', vrad_light_type),
     )
     UI['light_fast'].grid(row=0, column=0)
     UI['light_full'] = ttk.Radiobutton(
@@ -580,7 +630,6 @@ def make_comp_widgets(frame: ttk.Frame):
         text=_('Full'),
         value=1,
         variable=vrad_light_type,
-        command=make_setter('General', 'vrad_force_full', vrad_light_type),
     )
     UI['light_full'].grid(row=0, column=1)
 
@@ -709,6 +758,7 @@ def make_map_widgets(frame: ttk.Frame):
 
     These are things which mainly affect the geometry or gameplay of the map.
     """
+
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(
@@ -722,7 +772,6 @@ def make_map_widgets(frame: ttk.Frame):
         voice_frame,
         text=_("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
-        command=make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR),
     )
     voice_priority.grid(row=0, column=0)
     add_tooltip(
@@ -742,12 +791,12 @@ def make_map_widgets(frame: ttk.Frame):
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
+
     UI['elev_preview'] = ttk.Radiobutton(
         elev_frame,
         text=_('Entry Door'),
         value=0,
         variable=start_in_elev,
-        command=make_setter('General', 'spawn_elev', start_in_elev),
     )
 
     UI['elev_elevator'] = ttk.Radiobutton(
@@ -755,7 +804,6 @@ def make_map_widgets(frame: ttk.Frame):
         text=_('Elevator'),
         value=1,
         variable=start_in_elev,
-        command=make_setter('General', 'spawn_elev', start_in_elev),
     )
 
     UI['elev_preview'].grid(row=0, column=0, sticky=W)

@@ -2,16 +2,18 @@ import os
 import shutil
 import zipfile
 import random
+import utils
 
 import srctools.logger
-from srctools import Property
+import BEE2_config
+from srctools import Property, NoKeyError
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-PAL_DIR = "palettes\\"
+PAL_DIR = utils.conf_location('palettes/')
 
 PAL_EXT = '.bee2_palette'
 
@@ -35,6 +37,7 @@ DEFAULT_PALETTES = {
     'APTAG': _('Aperture Tag'),
 }
 
+
 class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
     def __init__(
@@ -44,6 +47,7 @@ class Palette:
         trans_name='',
         prevent_overwrite=False,
         filename: str=None,
+        settings: Optional[Property]=None,
     ):
         # Name of the palette
         self.name = name
@@ -63,6 +67,9 @@ class Palette:
         # (premade palettes or <LAST EXPORT>)
         self.prevent_overwrite = prevent_overwrite
 
+        # If not None, settings associated with the palette.
+        self.settings = settings
+
     def __str__(self):
         return self.name
 
@@ -78,12 +85,18 @@ class Palette:
 
         trans_name = props['TransName', '']
 
+        try:
+            settings = props.find_key('Settings')
+        except NoKeyError:
+            settings = None
+
         return Palette(
             name,
             items,
             trans_name=trans_name,
             prevent_overwrite=props.bool('readonly'),
             filename=os.path.basename(path),
+            settings=settings,
         )
 
     def save(self, ignore_readonly=False):
@@ -114,6 +127,10 @@ class Palette:
         if not self.prevent_overwrite:
             del props['ReadOnly']
 
+        if self.settings is not None:
+            self.settings.name = 'Settings'
+            props.append(self.settings.copy())
+
         # We need to write a new file, determine a valid path.
         # Use a hash to ensure it's a valid path (without '-' if negative)
         # If a conflict occurs, add ' ' and hash again to get a different
@@ -141,15 +158,17 @@ class Palette:
             os.remove(os.path.join(PAL_DIR, self.filename))
 
 
-def load_palettes(pal_dir):
+def load_palettes():
     """Scan and read in all palettes in the specified directory."""
-    global PAL_DIR
-    PAL_DIR = os.path.abspath(os.path.join('..', pal_dir))
-    full_dir = os.path.join(os.getcwd(), PAL_DIR)
 
-    for name in os.listdir(full_dir):  # this is both files and dirs
+    # Load our builtin palettes:
+    for name in os.listdir('../palettes/'):
+        LOGGER.info('Loading builtin "{}"', name)
+        pal_list.append(Palette.parse(os.path.join('../palettes/', name)))
+
+    for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
-        path = os.path.join(full_dir, name)
+        path = os.path.join(PAL_DIR, name)
         pos_file, prop_file = None, None
         try:
             if name.endswith(PAL_EXT):
@@ -222,7 +241,7 @@ def parse_legacy(posfile, propfile, path):
     return Palette(name, pos)
 
 
-def save_pal(items, name):
+def save_pal(items, name: str, include_settings: bool):
     """Save a palette under the specified name."""
     for pal in pal_list:
         if pal.name == name and not pal.prevent_overwrite:
@@ -231,6 +250,11 @@ def save_pal(items, name):
     else:
         pal = Palette(name, list(items))
         pal_list.append(pal)
+
+    if include_settings:
+        pal.settings = BEE2_config.get_curr_settings()
+    else:
+        pal.settings = None
 
     pal.save()
     return pal
@@ -245,6 +269,6 @@ def check_exists(name):
 
 
 if __name__ == '__main__':
-    results = load_palettes('palettes\\')
+    results = load_palettes()
     for palette in results:
         print(palette)

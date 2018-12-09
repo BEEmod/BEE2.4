@@ -3,19 +3,23 @@ from tk_tools import TK_ROOT
 from tkinter import ttk
 
 from collections import namedtuple
-import functools
 import operator
 
-import img as png
-
-from BEE2_config import GEN_OPTS
 from SubPane import SubPane
+from srctools import Property
+from srctools.logger import get_logger
 import packageLoader
 import tooltip
 import utils
 import itemconfig
+import BEE2_config
+import img
 
-from typing import Union
+from typing import Union, List, Dict
+
+
+LOGGER = get_logger(__name__)
+
 
 stylevar = namedtuple('stylevar', 'id name default desc')
 
@@ -88,9 +92,9 @@ styleOptions = [
 checkbox_all = {}
 checkbox_chosen = {}
 checkbox_other = {}
-tk_vars = {}
+tk_vars = {}  # type: Dict[str, IntVar]
 
-VAR_LIST = []
+VAR_LIST = []  # type: List[packageLoader.StyleVar]
 STYLES = {}
 
 window = None
@@ -99,7 +103,7 @@ UI = {}
 
 
 def update_filter():
-    pass
+    """Callback function replaced by tagsPane, to update items if needed."""
 
 
 def add_vars(style_vars, styles):
@@ -112,18 +116,28 @@ def add_vars(style_vars, styles):
         sorted(style_vars, key=operator.attrgetter('id'))
     )
 
-    for var in VAR_LIST:  # type: packageLoader.StyleVar
-        var.enabled = GEN_OPTS.get_bool('StyleVar', var.id, var.default)
+    for var in VAR_LIST:
+        var.enabled = BEE2_config.GEN_OPTS.get_bool('StyleVar', var.id, var.default)
 
     for style in styles:
         STYLES[style.id] = style
 
 
-def set_stylevar(var):
-    """Save the value for a particular stylevar."""
-    val = str(tk_vars[var].get())
-    GEN_OPTS['StyleVar'][var] = val
-    if var == 'UnlockDefault':
+@BEE2_config.option_handler('StyleVar')
+def save_load_stylevars(props: Property=None):
+    """Save and load variables from configs."""
+    if props is None:
+        props = Property('', [])
+        for var_id, var in sorted(tk_vars.items()):
+            props[var_id] = str(int(var.get()))
+        return props
+    else:
+        # Loading
+        for prop in props:
+            try:
+                tk_vars[prop.real_name].set(prop.value)
+            except KeyError:
+                LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
         update_filter()
 
 
@@ -216,12 +230,12 @@ def make_pane(tool_frame):
     global window
     window = SubPane(
         TK_ROOT,
-        options=GEN_OPTS,
+        options=BEE2_config.GEN_OPTS,
         title=_('Style/Item Properties'),
         name='style',
         resize_y=True,
         tool_frame=tool_frame,
-        tool_img=png.png('icons/win_stylevar'),
+        tool_img=img.png('icons/win_stylevar'),
         tool_col=3,
     )
 
@@ -284,16 +298,20 @@ def make_pane(tool_frame):
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
-        tk_vars[var.id] = IntVar(
-            value=GEN_OPTS.get_bool('StyleVar', var.id, var.default)
-        )
+        tk_vars[var.id] = int_var = IntVar(value=var.default)
         checkbox_all[var.id] = ttk.Checkbutton(
             frame_all,
-            variable=tk_vars[var.id],
+            variable=int_var,
             text=var.name,
-            command=functools.partial(set_stylevar, var.id)
         )
         checkbox_all[var.id].grid(row=all_pos, column=0, sticky="W", padx=3)
+
+        # Special case - this needs to refresh the filter when swapping,
+        # so the items disappear or reappear.
+        if var.id == 'UnlockDefault':
+            def cmd():
+                update_filter()
+            checkbox_all[var.id]['command'] = cmd
 
         tooltip.add_tooltip(
             checkbox_all[var.id],
@@ -305,7 +323,6 @@ def make_pane(tool_frame):
         args = {
             'variable': tk_vars[var.id],
             'text': var.name,
-            'command': functools.partial(set_stylevar, var.id)
             }
         desc = make_desc(var)
         if var.applies_to_all():
