@@ -1056,6 +1056,9 @@ class selWin:
 
     def sel_item_id(self, it_id):
         """Select the item with the given ID."""
+        if self.selected.name == it_id:
+            return True
+
         if it_id == '<NONE>':
             self.sel_item(self.noneItem)
             self.set_disp()

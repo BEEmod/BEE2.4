@@ -15,7 +15,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 SETTINGS = {}
 
 # Overwritten by VBSP to get the actual values.
-ITEM_CONFIG = ConfigFile('', root='', auto_load=False)
+ITEM_CONFIG = ConfigFile(None)
 
 
 class TYPE(Enum):

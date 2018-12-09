@@ -1,6 +1,6 @@
 """Help menu and associated dialogs."""
-from collections import namedtuple
 from enum import Enum
+from typing import NamedTuple
 
 from tkinter import ttk
 import tkinter as tk
@@ -46,12 +46,19 @@ DISCORD_SERVER = 'https://discord.me/beemod'
 STEAM_GROUP = 'steam://url/GroupSteamIDPage/103582791458212641'
 MUSIC_CHANGER = 'https://beemmc.boards.net/'
 
+
 def steam_url(name):
     """Return the URL to open the given game in Steam."""
     return 'steam://store/' + utils.STEAM_IDS[name]
 
 
-Res = WebResource = namedtuple('WebResource', ['name', 'url', 'icon'])
+WebResource = NamedTuple('WebResource', [
+    ('name', str),
+    ('url', str),
+    ('icon', ResIcon),
+])
+Res = WebResource
+
 WEB_RESOURCES = [
     Res(_('Wiki...'), BEE2_ITEMS_REPO + 'wiki/', ResIcon.BEE2),
     Res(

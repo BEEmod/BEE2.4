@@ -67,7 +67,7 @@ def generate_resp_script(file, allow_dings):
     """Write the responses section into a file."""
     use_dings = allow_dings
 
-    config = ConfigFile('resp_voice.cfg', root='bee2')
+    config = ConfigFile('bee2/resp_voice.cfg', in_conf_folder=False)
     file.write("BEE2_RESPONSES <- {\n")
     for section in QUOTE_DATA.find_key('CoopResponses', []):
         if not section.has_children() and section.name == 'use_dings':
@@ -436,8 +436,8 @@ def add_voice(
     map_attr = has_items
     style_vars = style_vars_
 
-    norm_config = ConfigFile('voice.cfg', root='bee2')
-    mid_config = ConfigFile('mid_voice.cfg', root='bee2')
+    norm_config = ConfigFile('bee2/voice.cfg', in_conf_folder=False)
+    mid_config = ConfigFile('bee2/mid_voice.cfg', in_conf_folder=False)
 
     quote_base = QUOTE_DATA['base', False]
     quote_loc = Vec.from_str(QUOTE_DATA['quote_loc', '-10000 0 0'], x=-10000)

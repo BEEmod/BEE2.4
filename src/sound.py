@@ -6,6 +6,7 @@ If PyGame fails to load, all fx() calls will fail silently.
 """
 import shutil
 import os
+import utils
 
 from tk_tools import TK_ROOT
 from srctools.filesys import RawFileSystem, FileSystemChain
@@ -23,7 +24,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 play_sound = True
 
-SAMPLE_WRITE_PATH = '../config/music_sample_temp'
+SAMPLE_WRITE_PATH = utils.conf_location('config/music_sample/temp')
 
 # This starts holding the filenames, but then caches the actual sound object.
 SOUNDS = {
@@ -77,6 +78,9 @@ except ImportError:
     def block_fx():
         """Block fx_blockable() for a short time."""
 
+    def clean_folder():
+        pass
+
     initiallised = False
     pyglet = avbin = None  # type: ignore
     SamplePlayer = None  # type: ignore
@@ -128,6 +132,15 @@ else:
         _play_repeat_sfx = False
         TK_ROOT.after(50, _reset_fx_blockable)
 
+    def clean_folder():
+        """Delete files used by the sample player."""
+        for file in SAMPLE_WRITE_PATH.parent.iterdir():
+            LOGGER.info('Cleaning up "{}"...', file)
+            try:
+                file.unlink()
+            except (PermissionError, FileNotFoundError):
+                pass
+
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""
         def __init__(self, start_callback, stop_callback, system: FileSystemChain):
@@ -178,10 +191,7 @@ else:
             else:
                 # In a filesystem, we need to extract it.
                 # SAMPLE_WRITE_PATH + the appropriate extension.
-                disk_filename = (
-                    SAMPLE_WRITE_PATH +
-                    os.path.splitext(self.cur_file)[1]
-                )
+                disk_filename = SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1])
                 with self.system.get_system(file), file.open_bin() as fsrc:
                     with open(disk_filename, 'wb') as fdest:
                         shutil.copyfileobj(fsrc, fdest)

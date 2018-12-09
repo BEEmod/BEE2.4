@@ -398,14 +398,8 @@ def load_settings():
     # set in the 'Compiler Pane'.
     bee2_loc = vbsp_options.get(str, 'BEE2_loc')
     if bee2_loc:
-        BEE2_config = ConfigFile(
-            'config/compile.cfg',
-            root=bee2_loc,
-        )
-        vbsp_options.ITEM_CONFIG = ConfigFile(
-            'config/item_cust_configs.cfg',
-            root=bee2_loc,
-        )
+        BEE2_config = ConfigFile('compile.cfg')
+        vbsp_options.ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
     else:
         BEE2_config = ConfigFile(None)
 
@@ -3189,6 +3183,12 @@ def main() -> None:
         change_func_brush()
         barriers.make_barriers(VMF, get_tex)
         fix_worldspawn()
+
+        
+        # Ensure all VMF outputs use the correct seperator.
+        for ent in VMF.entities:
+            for out in ent.outputs:
+                out.comma_sep = False
 
         save(new_path)
         run_vbsp(

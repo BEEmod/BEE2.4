@@ -241,7 +241,6 @@ def show(quote_pack):
 
     quote_data = quote_pack.config
 
-    os.makedirs('config/voice', exist_ok=True)
     config = ConfigFile('voice/' + quote_pack.id + '.cfg')
     config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
     config_resp = ConfigFile('voice/RESP_' + quote_pack.id + '.cfg')

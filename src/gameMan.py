@@ -853,12 +853,15 @@ class Game:
                         os.path.join(mdl_folder, file_no_ext + new_ext),
                     )
 
-        LOGGER.info(
-            '{}/{} ({:.0%})editor models used.',
-            len(used_models),
-            mdl_count,
-            len(used_models) / mdl_count,
-        )
+        if mdl_count != 0:
+            LOGGER.info(
+                '{}/{} ({:.0%})editor models used.',
+                len(used_models),
+                mdl_count,
+                len(used_models) / mdl_count,
+            )
+        else:
+            LOGGER.warning('No custom editor models!')
 
     @staticmethod
     def build_instance_data(editoritems: Property):
@@ -1257,15 +1260,17 @@ def make_tag_coop_inst(tag_loc: str):
         os.path.join(tag_loc, TAG_GUN_COOP_INST)
     )
 
+    ent_count = len(vmf.entities)
+
     def logic_pos():
         """Put the entities in a nice circle..."""
         while True:
-            for ang in range(0, 44):
-                ang *= 360/44
+            for ang in range(0, ent_count):
+                ang *= 360/ent_count
                 yield Vec(16*math.sin(ang), 16*math.cos(ang), 32)
     pos = logic_pos()
     # Move all entities that don't care about position to the base of the player
-    for ent in TAG_COOP_INST_VMF.iter_ents():
+    for ent in vmf.entities:
         if ent['classname'] == 'info_coop_spawn':
             # Remove the original spawn point from the instance.
             # That way it can overlay over other dropper instances.

@@ -6,7 +6,8 @@ from conditions import (
     make_result, RES_EXHAUSTED,
 )
 import instanceLocs
-from srctools import Vec, Property, Entity
+from srctools import Vec, Property, Entity, VMF
+
 
 COND_MOD_NAME = 'Track Platforms'
 
@@ -15,17 +16,20 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.trackPlat')
 
 
 @make_result('trackPlatform')
-def res_track_plat(res: Property):
+def res_track_plat(vmf: VMF, res: Property):
     """Logic specific to Track Platforms.
 
     This allows switching the instances used depending on if the track
     is horizontal or vertical and sets the track
-    targetnames to a useful value.
+    targetnames to a useful value. This should be run unconditionally, not
+    once per item.
     Values:
     
-    * `orig_item`: The "<ITEM_ID>" for the track platform, with angle brackets. This is used to determine all the instance filenames.
+    * `orig_item`: The "<ITEM_ID>" for the track platform, with angle brackets.
+      This is used to determine all the instance filenames.
     * `single_plat`: An instance used for the entire platform, if it's one rail long (and therefore can't move). 
-    * `track_name`: If set, rename track instances following the pattern `plat_name-track_nameXX`. Otherwise all tracks will receive the name of the platform.
+    * `track_name`: If set, rename track instances following the pattern `plat_name-track_nameXX`.
+      Otherwise all tracks will receive the name of the platform.
     * `vert_suffix`: If set, add `_vert` suffixes to vertical track instance names.
     * `horiz_suffix`: Add suffixes to horizontal tracks
             (_horiz, _horiz_mirrored)
@@ -66,7 +70,7 @@ def res_track_plat(res: Property):
 
     # Now we loop through all platforms in the map, and then locate their
     # track_set
-    for plat_inst in vbsp.VMF.by_class['func_instance']:
+    for plat_inst in vmf.by_class['func_instance']:
         if plat_inst['file'].casefold() not in platforms:
             continue  # Not a platform!
 
@@ -184,7 +188,7 @@ def res_track_plat(res: Property):
             # Skip the '_mirrored' section if needed
             plat_inst.fixup[plat_var] = track_facing[:5].lower()
 
-    return RES_EXHAUSTED # Don't re-run
+    return RES_EXHAUSTED  # Don't re-run
 
 
 def track_scan(
