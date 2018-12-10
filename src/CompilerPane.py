@@ -23,12 +23,12 @@ from PIL import Image, ImageTk
 from BEE2_config import ConfigFile, GEN_OPTS, option_handler
 from packageLoader import CORRIDOR_COUNTS, CorrDesc
 from tooltip import add_tooltip, set_tooltip
-from srctools import Property
+from srctools import Property, AtomicWriter
 import selectorWin
 import tkMarkdown
 import SubPane
 import img
-import os
+import base64
 
 from typing import Dict, Tuple, Optional
 
@@ -92,12 +92,7 @@ chosen_thumb = StringVar(
 tk_screenshot = None  # The preview image shown
 
 # Location we copy custom screenshots to
-SCREENSHOT_LOC = os.path.abspath(os.path.join(
-    os.getcwd(),
-    '..',
-    'config',
-    'screenshot.jpg'
-))
+SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
 VOICE_PRIORITY_VAR = IntVar(
     value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True)
@@ -186,12 +181,38 @@ def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]
         for group, win in CORRIDOR.items():
             corr_prop[group] = win.chosen_id or '<NONE>'
 
+        # Embed the screenshot in so we can load it later.
+        if chosen_thumb.get() == 'CUST':
+            # encodebytes() splits it into multiple lines, which we write
+            # in individual blocks to prevent having a massively long line
+            # in the file.
+            with open(SCREENSHOT_LOC, 'rb') as f:
+                screenshot_data = base64.encodebytes(f.read())
+            props.append(Property(
+                'sshot_data',
+                [
+                    Property('b64', data)
+                    for data in
+                    screenshot_data.decode('ascii').splitlines()
+                ]
+            ))
+
         return props
 
     # else: Loading
 
     chosen_thumb.set(props['sshot_type', chosen_thumb.get()])
     cleanup_screenshot.set(props.bool('sshot_cleanup', cleanup_screenshot.get()))
+
+    if 'sshot_data' in props:
+        screenshot_parts = b'\n'.join([
+            prop.value.encode('ascii')
+            for prop in
+            props.find_children('sshot_data')
+        ])
+        screenshot_data = base64.decodebytes(screenshot_parts)
+        with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
+            f.write(screenshot_data)
 
     # Refresh these.
     set_screen_type()
