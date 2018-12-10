@@ -1,10 +1,12 @@
 """Results relating to item connections."""
-from typing import List
+from typing import List, Dict, Iterable, Set
 
 import connections
 import srctools.logger
 import conditions
+import comp_consts as consts
 from srctools import Property, Entity, Output, VMF, Vec
+from srctools.vmf import make_overlay, Side
 
 
 COND_MOD_NAME = 'I/O'
@@ -132,6 +134,81 @@ class Corner:
     def __init__(self, item: connections.Item, pos: Vec):
         self.item = item
         self.pos = pos
+        self.normal = Vec(z=1).rotate_by_str(item.inst['angles'])
+
+
+def get_surf_faces(normal: Vec, start: Vec, end: Vec) -> Set[Side]:
+    """Get the brush face between two positions."""
+    faces = set()
+    axis_norm = normal.axis()
+    axis_u, axis_v = Vec.INV_AXIS[axis_norm]
+
+    # Snap to center of the block.
+    start[axis_u] = start[axis_u] // 128 * 128 + 64
+    start[axis_v] = start[axis_v] // 128 * 128 + 64
+    end[axis_u]   = end[axis_u]   // 128 * 128 + 64
+    end[axis_v]   = end[axis_v]   // 128 * 128 + 64
+
+    for pos in start.iter_line(end, 128):
+        try:
+            group = conditions.SOLIDS[pos.as_tuple()]
+        except KeyError:
+            continue
+        faces.add(group.face)
+
+    return faces
+
+
+def create_antline_corner(
+    vmf: VMF,
+    normal: Vec,
+    pos: Vec,
+) -> Entity:
+    """Construct an antline corner at this position."""
+    axis_norm = normal.axis()
+    axis_u, axis_v = Vec.INV_AXIS[axis_norm]
+
+    return make_overlay(
+        vmf,
+        normal,
+        pos,
+        Vec.with_axes(axis_u, 16),
+        Vec.with_axes(axis_v, 16),
+        consts.Antlines.CORNER,
+        # 'signage/indicator_lights/indicator_neon_straight',
+        get_surf_faces(normal, pos, pos),
+    )
+
+
+def create_antline_straight(
+    vmf: VMF,
+    normal: Vec,
+    start: Vec,
+    end: Vec,
+) -> Entity:
+    """Construct a straight antline between two points.
+
+    The two points will be the centers of the antlines.
+    """
+    offset = start - end
+    forward = offset.norm()
+    side = Vec.cross(normal, forward).norm()
+
+    vmf.create_ent('info_null', origin=start)
+    vmf.create_ent('info_null', origin=end)
+
+    length = offset.mag() + 16
+
+    return make_overlay(
+        vmf,
+        normal,
+        (start + end) / 2,
+        length * forward,
+        16 * side,
+        consts.Antlines.STRAIGHT,
+        get_surf_faces(normal, start, end),
+        u_repeat=length // 4,
+    )
 
 
 @conditions.meta_cond(-900)
@@ -143,15 +220,31 @@ def antline_layouter(vmf: VMF) -> None:
         # Item not installed.
         return
 
-    corners = []  # type: List[Corner]
+    corners = {}  # type: Dict[str, Corner]
 
     for item in connections.ITEMS.values():
-        if item.item_type is corner_type:
-            timer_delay = item.inst.fixup.int('$timer_delay')
-            pos = CORNER_POS[max(0, timer_delay - 3) % 8].copy()
-            pos.localise(
-                Vec.from_str(item.inst['origin']),
-                Vec.from_str(item.inst['angles']),
-            )
-            corners.append(Corner(item, pos))
+        if item.item_type is not corner_type:
+            continue
+
+        timer_delay = item.inst.fixup.int('$timer_delay')
+        # We treat inf, 1, 2 and 3 as the same, to get around the 1/2 not
+        # being selectable issue.
+        pos = CORNER_POS[max(0, timer_delay - 3) % 8].copy()
+        pos.localise(
+            Vec.from_str(item.inst['origin']),
+            Vec.from_str(item.inst['angles']),
+        )
+        corners[item.name] = corn = Corner(item, pos)
+
+        # Antline corners go at the start of antlines, but not at the end.
+        create_antline_corner(vmf, corn.normal, pos)
+
+        u, v = Vec.INV_AXIS[corn.normal.axis()]
+        for offset in [
+            Vec.with_axes(u, -16),
+            Vec.with_axes(u, 16),
+            Vec.with_axes(v, -16),
+            Vec.with_axes(v, 16),
+        ]:
+            create_antline_straight(vmf, corn.normal, pos + offset, pos + 8*offset)
 
