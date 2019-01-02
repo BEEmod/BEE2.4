@@ -1,3 +1,27 @@
+"""Implements the Conditions system.
+
+This system allows users to define transformations applied to
+every instance.
+
+In pseudocode:
+    for cond in all_conditions:
+        for inst in vmf:
+            if all(flag() in cond):
+                apply_results()
+
+Both results and flags recieve configuration keyvalues, the vmf and the
+current instance. Flags return a boolean to indicate if they are successful.
+Results return None normally, but can return the special value RES_EXHAUSTED to
+indicate calling the specific result again will have no effect. In this case the
+result will be deleted.
+
+Argument type annotations are used to allow flexibility in defining results and
+flags. Each argument must be typed as one of the following to recieve a specific
+value:
+    * VMF to recieve the overall map.
+    * Entity to recieve the current instance.
+    * Property to recieve keyvalues configuration.
+"""
 import inspect
 import io
 import itertools
