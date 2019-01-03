@@ -308,35 +308,54 @@ AnnCallT = TypeVar('AnnCallT')
 def annotation_caller(
     func: Callable[..., AnnCallT],
     *parms: type,
-) -> Callable[..., AnnCallT]:
+) -> Tuple[Callable[..., AnnCallT], List[type]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
-    called with. func's arguments should be positional, and be annotated
-    with the same types. A wrapper will be returned which can be called
-    with the parms arguments, but delegates to func. (This could be the
-    function itself).
+    called with.
+
+    func's arguments should be positional, and be annotated
+    with the same types.
+
+    A wrapper will be returned which can be called
+    with arguments in order of parms, but delegates to func.
+    The actual argument order is also returned.
     """
+    # We can't take keyword arguments, or the varargs.
     allowed_kinds = [
         inspect.Parameter.POSITIONAL_ONLY,
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
     ]
-    type_to_parm = dict.fromkeys(parms, None)  # type: Dict[object, Optional[str]]
+
+    # For forward references and 3.7+ stringified arguments.
+    forward: dict[str, type] = {
+        parm.__name__: parm
+        for parm in parms
+    }
+
+    ann_order: list[type] = []
+
+    # type -> parameter name.
+    type_to_parm: dict[type, Optional[str]] = dict.fromkeys(parms, None)
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
         ann = parm.annotation
         if isinstance(ann, str):
-            ann = eval(ann)
+            try:
+                ann = forward[ann]
+            except KeyError:
+                raise ValueError(f'Unknown potential type {ann}!')
         if parm.kind not in allowed_kinds:
-            raise ValueError('Parameter kind "{}" is not allowed!'.format(parm.kind))
+            raise ValueError(f'Parameter kind "{parm.kind}" is not allowed!')
         if ann is inspect.Parameter.empty:
-            raise ValueError('Parameters must have value!')
+            raise ValueError('Parameters must have an annotation!')
         try:
             if type_to_parm[ann] is not None:
-                raise ValueError('Parameter {} used twice!'.format(ann))
+                raise ValueError(f'Parameter {ann} used twice!')
         except KeyError:
-            raise ValueError('Unknown potential type {!r}'.format(ann))
+            raise ValueError(f'Unknown potential type {ann!r}!')
         type_to_parm[ann] = parm.name
+        ann_order.append(ann)
     inputs = []
     outputs = ['_'] * len(sig.parameters)
     # Parameter -> letter in func signature
@@ -356,7 +375,7 @@ def annotation_caller(
 
     if inputs == outputs:
         # Matches already, don't need to do anything.
-        return func
+        return func, ann_order
 
     # Double function to make a closure, to allow reference to the function
     # more directly.
@@ -380,7 +399,7 @@ def annotation_caller(
         )
     except AttributeError:
         pass
-    return reorder_func
+    return reorder_func, ann_order
 
 
 def add_meta(func, priority: Union[Decimal, int], only_once=True):
@@ -400,7 +419,12 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
         dec_priority,
     )
 
-    RESULT_LOOKUP[name] = annotation_caller(func, srctools.VMF, Entity, Property)
+    RESULT_LOOKUP[name], arg_order = annotation_caller(
+        func,
+        srctools.VMF,
+        Entity,
+        Property,
+    )
 
     cond = Condition(
         results=[Property(name, '')],
@@ -416,7 +440,7 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
     ALL_META.append((name, dec_priority, func))
 
 
-def meta_cond(priority=0, only_once=True):
+def meta_cond(priority: int=0, only_once: bool=True):
     """Decorator version of add_meta."""
     def x(func):
         add_meta(func, priority, only_once)
@@ -433,7 +457,7 @@ def make_flag(orig_name: str, *aliases: str):
             func.group = func.__globals__['__name__']
             LOGGER.info('No name for module "{}"!', func.group)
 
-        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
+        wrapper, ann_order = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
@@ -460,7 +484,7 @@ def make_result(orig_name: str, *aliases: str):
             func.group = func.__globals__['__name__']
             LOGGER.info('No name for module "{}"!', func.group)
 
-        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
+        wrapper, ann_order = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
@@ -474,7 +498,7 @@ def make_result(orig_name: str, *aliases: str):
 def make_result_setup(*names: str):
     """Decorator to do setup for this result."""
     def x(func: Callable[..., Any]):
-        wrapper = annotation_caller(func, srctools.VMF, Property)
+        wrapper, ann_order = annotation_caller(func, srctools.VMF, Property)
         for name in names:
             RESULT_SETUP[name.casefold()] = wrapper
         return func
