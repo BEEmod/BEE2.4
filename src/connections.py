@@ -1036,36 +1036,33 @@ def gen_item_outputs(vmf: VMF):
 
         # Special case - inverted spawnfire items with no inputs need to fire
         # off the activation outputs. There's no way to then deactivate those.
-        if not item.inputs:
-            if item.item_type.spawn_fire is FeatureMode.ALWAYS:
-                if item.is_logic:
-                    # Logic gates need to trigger their outputs.
-                    # Make a logic_auto temporarily for this to collect the
-                    # outputs we need.
+        if not item.inputs and item.item_type.spawn_fire is FeatureMode.ALWAYS:
+            if item.is_logic:
+                # Logic gates need to trigger their outputs.
+                # Make a logic_auto temporarily for this to collect the
+                # outputs we need.
 
-                    item.inst.clear_keys()
-                    item.inst['classname'] = 'logic_auto'
+                item.inst.clear_keys()
+                item.inst['classname'] = 'logic_auto'
 
-                    auto_logic.append(item.inst)
-                else:
-                    for cmd in item.enable_cmd:
-                        logic_auto.add_out(
-                            Output(
-                                'OnMapSpawn',
-                                conditions.local_name(
-                                    item.inst,
-                                    conditions.resolve_value(item.inst, cmd.target),
-                                ) or item.inst,
-                                conditions.resolve_value(item.inst, cmd.input),
-                                conditions.resolve_value(item.inst, cmd.params),
-                                delay=cmd.delay,
-                                only_once=True,
-                            )
+                auto_logic.append(item.inst)
+            else:
+                for cmd in item.enable_cmd:
+                    logic_auto.add_out(
+                        Output(
+                            'OnMapSpawn',
+                            conditions.local_name(
+                                item.inst,
+                                conditions.resolve_value(item.inst, cmd.target),
+                            ) or item.inst,
+                            conditions.resolve_value(item.inst, cmd.input),
+                            conditions.resolve_value(item.inst, cmd.params),
+                            delay=cmd.delay,
+                            only_once=True,
                         )
-            continue
+                    )
 
         if item.item_type.input_type is InputType.DUAL:
-
             prim_inputs = [
                 conn
                 for conn in item.inputs
@@ -1278,6 +1275,9 @@ def add_item_inputs(
 ):
     """Handle either the primary or secondary inputs to an item."""
     item.inst.fixup[count_var] = len(inputs)
+
+    if len(inputs) == 0:
+        return  # The rest of this function requires at least one input.
 
     if logic_type is InputType.DEFAULT:
         # 'Original' PeTI proxies.
