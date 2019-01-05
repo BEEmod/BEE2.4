@@ -752,6 +752,11 @@ def calc_connections(
                 # Pass in the defaults for antline styles.
                 ITEMS[inst_name] = Item(inst, item_type, antline_floor, antline_wall)
 
+                # Strip off the original connection count variables, these are
+                # invalid.
+                if item_type.input_type is InputType.DUAL:
+                    del inst.fixup[const.FixupVars.CONN_COUNT]
+
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
         mat = over['material']
