@@ -683,21 +683,29 @@ def dump_conditions(file: TextIO) -> None:
     # Delete existing data, after the marker.
     file.seek(0, io.SEEK_SET)
 
+    prelude = []
+
     for line in file:
         if DOC_MARKER in line:
-            file.truncate()
             break
-    else:
+        prelude.append(line)
+
+    file.seek(0, io.SEEK_SET)
+    file.truncate(0)
+
+    if not prelude:
         # No marker, blank the whole thing.
         LOGGER.warning('No intro text before marker!')
-        file.truncate(0)
-        file.write(DOC_MARKER + '\n\n')
 
-    print(DOC_META_COND, file=file)
+    for line in prelude:
+        file.write(line)
+    file.write(DOC_MARKER + '\n\n')
+
+    file.write(DOC_META_COND)
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
-        print('#### `{}` ({}):\n'.format(flag_key, priority), file=file)
+        file.write('#### `{}` ({}):\n\n'.format(flag_key, priority))
         dump_func_docs(file, func)
         file.write('\n')
 
