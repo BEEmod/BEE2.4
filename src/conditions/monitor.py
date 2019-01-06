@@ -190,7 +190,7 @@ def res_camera(inst: Entity, res: Property):
 
 
 @meta_cond(priority=-5, only_once=False)
-def mon_remove_bullseyes(inst: Entity):
+def mon_remove_bullseyes(inst: Entity) -> object:
     """Remove bullsyes used for cameras."""
     if not BULLSYE_LOCS:
         return RES_EXHAUSTED
@@ -208,12 +208,8 @@ def mon_remove_bullseyes(inst: Entity):
         BULLSYE_LOCS[origin] -= 1
         inst.remove()
 
-
-#  Note that we happen after voiceline adding!
-
-
 @meta_cond(priority=-275, only_once=True)
-def mon_camera_link():
+def mon_camera_link() -> None:
     """Link cameras to monitors."""
     import vbsp
     LOGGER.info('Bullseye {}', BULLSYE_LOCS)
@@ -298,7 +294,18 @@ def mon_camera_link():
     cam['vscripts'] = 'BEE2/mon_camera_args.nut BEE2/mon_camera.nut'
     cam['thinkfunction'] = 'Think'
 
-    # Write out a script containing the arguments to the camera.
+
+# Note that we must happen after voiceline adding!
+
+@meta_cond(priority=150, only_once=True)
+def mon_camera_script() -> None:
+    """Write out a script containing the arguments to the camera."""
+    active_counts = [
+        srctools.conv_int(cam.inst.fixup['$start_enabled', '0'])
+        for cam in
+        ALL_CAMERAS
+    ]
+
     with open(MON_ARGS_SCRIPT, 'w') as scr:
         scr.write('CAM_NUM <- {};\n'.format(len(ALL_CAMERAS)))
         scr.write('CAM_ACTIVE_NUM <- {};\n'.format(sum(active_counts)))
