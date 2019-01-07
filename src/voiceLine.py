@@ -421,6 +421,11 @@ def sort_func(quote: PossibleQuote):
         return Decimal(0)
 
 
+def get_studio_loc() -> Vec:
+    """Return the location of the voice studio."""
+    return Vec.from_str(QUOTE_DATA['quote_loc', '-10000 0 0'], x=-10000)
+
+
 def add_voice(
         has_items: dict,
         style_vars_: dict,
@@ -440,7 +445,7 @@ def add_voice(
     mid_config = ConfigFile('bee2/mid_voice.cfg', in_conf_folder=False)
 
     quote_base = QUOTE_DATA['base', False]
-    quote_loc = Vec.from_str(QUOTE_DATA['quote_loc', '-10000 0 0'], x=-10000)
+    quote_loc = get_studio_loc()
     if quote_base:
         LOGGER.info('Adding Base instance!')
         vmf_file.create_ent(
@@ -453,7 +458,7 @@ def add_voice(
         )
 
     # Either box in with nodraw, or place the voiceline studio.
-    has_studio = conditions.monitor.make_voice_studio(vmf_file, quote_loc)
+    has_studio = conditions.monitor.make_voice_studio(vmf_file)
 
     bullsye_actor = vbsp_options.get(str, 'voice_studio_actor')
     if bullsye_actor and has_studio:

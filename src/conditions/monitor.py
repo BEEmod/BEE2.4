@@ -11,8 +11,10 @@ import instanceLocs
 from srctools import Property, Vec, Entity, VMF, Output
 import srctools.logger
 import vbsp_options
+import voiceLine
 
-from typing import List
+from typing import Optional, List, Dict, Tuple
+
 
 COND_MOD_NAME = 'Monitors'
 
@@ -24,7 +26,7 @@ ALL_CAMERAS = []  # type: List[Camera]
 # Keep a counter of the number of monitor bullseyes at a pos.
 # This allows us to ensure we don't remove catapults also aiming here,
 # and that we remove when more than one camera is pointed here.
-BULLSYE_LOCS = defaultdict(int)
+BULLSYE_LOCS = defaultdict(int)  # type: Dict[Tuple[float, float, float], int]
 
 MON_ARGS_SCRIPT = os.path.join('BEE2', 'inject', 'monitor_args.nut')
 
@@ -38,8 +40,10 @@ NEEDS_TURRET = False
 # If non-emtpy we have monitors to shoot by turrets.
 MONITOR_RELATIONSHIP_ENTS = []  # type: List[Entity]
 
-# The location of the voiceline room, used to position the camera.
-VOICELINE_LOC = Vec()
+
+def get_studio_pose() -> Vec:
+    """Return the position of the studio camera."""
+    return voiceLine.get_studio_loc() + vbsp_options.get(Vec, 'voice_studio_cam_loc')
 
 
 @make_result_setup('Monitor')
@@ -53,7 +57,7 @@ def res_monitor_setup(res: Property):
 
 
 @make_result('Monitor')
-def res_monitor(inst: Entity, res: Property):
+def res_monitor(inst: Entity, res: Property) -> None:
     """Result for the monitor component.
 
     """
@@ -135,7 +139,7 @@ def res_camera(inst: Entity, res: Property):
     inst_name = inst['targetname']
 
     try:
-        target, = inst.map.by_target[inst_name + '-target']  # type: Entity
+        [target] = inst.map.by_target[inst_name + '-target']  # type: Entity
     except ValueError:
         # No targets with that name
         inst.remove()
@@ -190,7 +194,7 @@ def res_camera(inst: Entity, res: Property):
 
 
 @meta_cond(priority=-5, only_once=False)
-def mon_remove_bullseyes(inst: Entity) -> object:
+def mon_remove_bullseyes(inst: Entity) -> Optional[object]:
     """Remove bullsyes used for cameras."""
     if not BULLSYE_LOCS:
         return RES_EXHAUSTED
@@ -207,6 +211,7 @@ def mon_remove_bullseyes(inst: Entity) -> object:
     if BULLSYE_LOCS[origin]:
         BULLSYE_LOCS[origin] -= 1
         inst.remove()
+
 
 @meta_cond(priority=-275, only_once=True)
 def mon_camera_link() -> None:
@@ -255,7 +260,7 @@ def mon_camera_link() -> None:
     else:
         if vbsp_options.get(str, 'voice_studio_inst'):
             # Start at the studio, if it exists.
-            start_pos = VOICELINE_LOC
+            start_pos = get_studio_pose()
             start_angles = '{:g} {:g} 0'.format(
                 vbsp_options.get(float, 'voice_studio_cam_pitch'),
                 vbsp_options.get(float, 'voice_studio_cam_yaw'),
@@ -327,7 +332,7 @@ def mon_camera_script() -> None:
             # We have a voice studio, send values to the script.
             scr.write(
                 'CAM_STUDIO_LOC <- Vector({0.x:.3f}, '
-                '{0.y:.3f}, {0.z:.3f});\n'.format(VOICELINE_LOC),
+                '{0.y:.3f}, {0.z:.3f});\n'.format(get_studio_pose()),
             )
             scr.write(
                 'CAM_STUDIO_CHANCE <- {chance};\n'
@@ -347,14 +352,14 @@ def mon_camera_script() -> None:
             )
 
 
-def make_voice_studio(vmf: VMF, loc: Vec):
+def make_voice_studio(vmf: VMF) -> bool:
     """Create the voice-line studio.
 
     This is either an instance (if monitors are present), or a nodraw room.
     """
-    global VOICELINE_LOC
 
     studio_file = vbsp_options.get(str, 'voice_studio_inst')
+    loc = voiceLine.get_studio_loc()
 
     if ALL_MONITORS and studio_file:
         vmf.create_ent(
@@ -363,7 +368,6 @@ def make_voice_studio(vmf: VMF, loc: Vec):
             origin=loc,
             angles='0 0 0',
         )
-        VOICELINE_LOC = loc + vbsp_options.get(Vec, 'voice_studio_cam_loc')
         return True
     else:
         # If there aren't monitors, the studio instance isn't used.
