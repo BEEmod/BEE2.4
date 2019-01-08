@@ -172,8 +172,10 @@ def res_track_plat(vmf: VMF, res: Property):
 
         track_var = res['track_var', '']
         if track_var:
-            for track in track_set:
-                track.fixup[track_var] = track_facing
+            plat_inst.fixup[track_var] = track_facing
+
+        for track in track_set:
+            track.fixup.update(plat_inst.fixup)
 
     return RES_EXHAUSTED  # Don't re-run
 
