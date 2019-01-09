@@ -650,7 +650,11 @@ def setup_style_tree(
                 for sty_id, conf in to_change:
                     if conf.style:
                         try:
-                            start_data = styles[conf.style]
+                            if ':' in conf.style:
+                                ver_id, base_style_id = conf.style.split(':', 1)
+                                start_data = item.versions[ver_id]['styles'][base_style_id]
+                            else:
+                                start_data = styles[conf.style]
                         except KeyError:
                             raise ValueError(
                                 'Item {}\'s {} style referenced '
