@@ -575,7 +575,7 @@ def mod_screenshots() -> None:
             # Clean up this folder - otherwise users will get thousands of
             # pics in there!
             for screen in screens:
-                if screen != scr_loc:
+                if screen != scr_loc and os.path.isfile(screen):
                     os.remove(screen)
             LOGGER.info('Done!')
     else:
