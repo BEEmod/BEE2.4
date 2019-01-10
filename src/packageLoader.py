@@ -1050,11 +1050,11 @@ class ItemVariant:
             all_icon=self.all_icon,
             source='{} from {}'.format(source, self.source),
         )
-        variant._modify_editoritems(props, variant.editor, source)
+        variant._modify_editoritems(props, Property('', [variant.editor]), source)
         if 'Item' in variant.editor_extra and 'extra' in props:
             variant._modify_editoritems(
                 props.find_key('extra'),
-                variant.editor_extra.find_key('Item'),
+                variant.editor_extra,
                 source,
             )
 
@@ -1069,7 +1069,7 @@ class ItemVariant:
         """Modify either the base or extra editoritems block."""
         is_extra = editor is self.editor_extra
 
-        subtypes = list(editor.find_all('Editor', 'SubType'))
+        subtypes = list(editor.find_all('Item', 'Editor', 'SubType'))
 
         # Implement overriding palette items
         for item in props.find_children('Palette'):
@@ -1135,8 +1135,10 @@ class ItemVariant:
                 if pal_icon:
                     palette['Image'] = pal_icon
 
-        # Allow overriding the instance blocks.
-        instances = editor.ensure_exists('Exporting').ensure_exists('Instances')
+        # Allow overriding the instance blocks, only for the first in extras.
+        exporting = editor.find_key('Item').ensure_exists('Exporting')
+
+        instances = exporting.ensure_exists('Instances')
         inst_children = {
             self._inst_block_key(prop): prop
             for prop in
@@ -1162,7 +1164,7 @@ class ItemVariant:
 
         # Override IO commands.
         if 'IOConf' in props:
-            for io_block in editor.find_children('Exporting'):
+            for io_block in exporting:
                 if io_block.name not in ('outputs', 'inputs'):
                     continue
                 while 'bee2' in io_block:
@@ -1170,7 +1172,7 @@ class ItemVariant:
 
             io_conf = props.find_key('IOConf')
             io_conf.name = 'BEE2'
-            editor.ensure_exists('Exporting').ensure_exists('Inputs').append(io_conf)
+            exporting.ensure_exists('Inputs').append(io_conf)
 
     @staticmethod
     def _inst_block_key(prop: Property):
