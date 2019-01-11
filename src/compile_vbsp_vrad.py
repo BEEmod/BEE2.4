@@ -49,6 +49,8 @@ EXCLUDES = [
 
     # Pillow is imported by Srctools' VTF support, but we don't need to do that.
     'PIL',
+
+    'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
 ]
 
 # These also aren't required by logging really, but by default
