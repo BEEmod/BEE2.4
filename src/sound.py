@@ -50,12 +50,12 @@ SOUNDS = {
 
 try:
     import pyglet.media
-    from pyglet.media import avbin  # We need this extension, so error early.
+    from pyglet.media.sources import avbin  # We need this extension, so error early.
 
     pyglet_version = pyglet.version
     avbin_version = avbin.get_version()
 except ImportError:
-    LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!')
+    LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!', exc_info=True)
 
     pyglet_version = avbin_version = '(Not installed)'
 
