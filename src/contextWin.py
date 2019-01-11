@@ -274,7 +274,7 @@ def load_item_data():
 
     editor_data = item_data.editor.copy()
 
-    comm_block = Property(editor_data['Type'], [])
+    comm_block = Property(selected_item.id, [])
     (
         has_inputs,
         has_outputs,
