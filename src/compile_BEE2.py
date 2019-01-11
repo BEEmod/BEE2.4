@@ -98,6 +98,8 @@ EXCLUDES = [
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
+    'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
+
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',
