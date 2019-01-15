@@ -13,6 +13,7 @@ import comp_consts as consts
 import utils
 import template_brush
 import texturing
+import antlines
 from texturing import TileSize
 
 LOGGER = utils.getLogger(__name__)
@@ -701,7 +702,7 @@ def gen_tile_temp():
             )
 
 
-def analyse_map(vmf_file: VMF):
+def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]]):
     """Create TileDefs from all the brush sides.
 
     Once done, all wall brushes have been removed from the map.
@@ -710,7 +711,7 @@ def analyse_map(vmf_file: VMF):
     # Face ID -> tileDef, used to match overlays to their face targets.
     # Invalid after we exit, since all the IDs have been freed and may be
     # reused later.
-    face_to_tile = {}
+    face_to_tile = {}  # type: Dict[str, TileDef]
 
     for brush in vmf_file.brushes[:]:
         bbox_min, bbox_max = brush.get_bbox()
@@ -737,6 +738,12 @@ def analyse_map(vmf_file: VMF):
         else:
             # EmbedFace block..
             tiledefs_from_embedface(face_to_tile, brush, grid_pos, norm)
+
+    # Tell the antlines which tiledefs they attach to.
+    for side, segments in side_to_ant_seg.items():
+        tile = face_to_tile[side]
+        for seg in segments:
+            seg.tiles.append(tile)
 
     # Parse face IDs saved in overlays - if they're matching a tiledef,
     # remove them.

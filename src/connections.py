@@ -7,6 +7,7 @@ from enum import Enum
 from collections import defaultdict
 
 from srctools import VMF, Entity, Output, Property, conv_bool, Vec
+from antlines import Antline
 import comp_consts as const
 import instanceLocs
 import conditions
@@ -473,7 +474,7 @@ class Item:
         ant_floor_style: antlines.AntType,
         ant_wall_style: antlines.AntType,
         panels: Iterable[Entity]=(),
-        antlines: Iterable[Entity]=(),
+        antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
         ant_toggle_var: str='',
@@ -481,11 +482,10 @@ class Item:
         self.inst = inst
         self.item_type = item_type
 
-        # Associated indicator panels
+        # Associated indicator panels and antlines
         self.ind_panels = set(panels)  # type: Set[Entity]
-
-        # Overlays
-        self.antlines = set(antlines)  # type: Set[Entity]
+        self.ind_toggle = toggle
+        self.antlines = set(antlines)
         self.shape_signs = list(shape_signs)
 
         # And the style to use for the antlines.
@@ -697,6 +697,7 @@ def read_configs(conf: Property):
 
 def calc_connections(
     vmf: VMF,
+    antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
     antline_wall: antlines.AntType,
@@ -710,8 +711,6 @@ def calc_connections(
     """
     # First we want to match targetnames to item types.
     toggles = {}  # type: Dict[str, Entity]
-    overlays = defaultdict(set)  # type: Dict[str, Set[Entity]]
-
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
     sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
@@ -762,9 +761,6 @@ def calc_connections(
         mat = over['material']
         if mat in SIGN_ORDER_LOOKUP:
             sign_shape_overlays[name, mat.casefold()].append(over)
-        else:
-            # Antlines
-            overlays[name].add(over)
 
     # Name -> signs pairs
     sign_shapes = defaultdict(list)  # type: Dict[str, List[ShapeSignage]]
@@ -813,7 +809,12 @@ def calc_connections(
 
             if out_name in toggles:
                 inst_toggle = toggles[out_name]
-                item.antlines |= overlays[inst_toggle.fixup['indicator_name']]
+                try:
+                    item.antlines.extend(
+                        antlines[inst_toggle.fixup['indicator_name']]
+                    )
+                except KeyError:
+                    pass
             elif out_name in panels:
                 pan = panels[out_name]
                 item.ind_panels.add(pan)
@@ -1600,9 +1601,10 @@ def add_item_indicators(
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
 
-    for ind in item.antlines:
-        ind['targetname'] = ant_name
-        antlines.style_antline(ind, item.ant_wall_style, item.ant_floor_style)
+    # TODO: Styling correctly.
+    # for ind in item.antlines:
+    #     ind['targetname'] = ant_name
+    #     antlines.style_antline(ind, item.ant_wall_style, item.ant_floor_style)
 
     # If the antline material doesn't toggle, the name is removed by
     # style_antline(). So check if the overlay actually exists still, to

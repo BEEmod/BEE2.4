@@ -34,6 +34,7 @@ import connections
 import instance_traits
 import template_brush
 import fizzler
+import antlines
 import comp_consts as consts
 import cubes
 import barriers
@@ -565,7 +566,6 @@ def find_panel_locs() -> None:
             )
 
 
-<<<<<<< HEAD
 @conditions.meta_cond(100)
 def set_flip_panel_keyvalues() -> None:
     """Set keyvalues on flip panels."""
@@ -599,8 +599,6 @@ def res_faith_bullseye_check(res: Property) -> None:
     return None  # No textures!
 
 
-=======
->>>>>>> temp_tiling_preantline
 @conditions.make_result('FaithBullseye')
 def res_faith_bullseye(inst: Entity, res: Property):
     """Replace the bullseye instances with textures instead."""
@@ -2959,9 +2957,12 @@ def main() -> None:
         load_map(path)
         instance_traits.set_traits(VMF)
 
+        ant, side_to_antline = antlines.parse_antlines(VMF)
+
         # Requires instance traits!
         connections.calc_connections(
             VMF,
+            ant,
             texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
             ant_floor,
@@ -2969,7 +2970,6 @@ def main() -> None:
         )
 
         MAP_RAND_SEED = calc_rand_seed()
-
 
         all_inst = get_map_info()
 
@@ -2985,7 +2985,9 @@ def main() -> None:
         )
 
         tiling.gen_tile_temp()
-        tiling.analyse_map(VMF)
+        tiling.analyse_map(VMF, side_to_antline)
+
+        del side_to_antline
 
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
