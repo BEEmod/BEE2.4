@@ -106,6 +106,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     fizz_base['origin'] = shape_inst['origin']
     origin = Vec.from_str(shape_inst['origin'])
 
+    fizz.has_cust_position = True
+
     for seg_prop in res.find_all('Segment'):
         vec1, vec2 = seg_prop.value.split(';')
         seg_min_max = Vec.bbox(
