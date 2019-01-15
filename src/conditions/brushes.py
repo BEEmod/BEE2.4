@@ -8,6 +8,7 @@ import srctools.logger
 import template_brush
 import vbsp
 import vbsp_options
+import tiling
 import comp_consts as const
 import instance_traits
 from conditions import (
@@ -74,7 +75,7 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
        the options `Output`, `Target`, `Input`, `Param` and `Delay`. If
        `Inst_targ` is defined, it will be used with the input to construct
        an instance proxy input. If `OnceOnly` is set, the output will be
-       deleted when fired.  
+       deleted when fired.
 
     Permitted entities:
        * `func_rotating`
@@ -95,7 +96,7 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
 
     name = conditions.local_name(ent, res['name', ''])
 
-    axis = Vec(**{des_axis: 1}).rotate_by_str(ent['angles', '0 0 0'])
+    axis = Vec.with_axes(des_axis, 1).rotate_by_str(ent['angles', '0 0 0'])
 
     pos = Vec.from_str(
         res['Pos', '0 0 0']
@@ -194,6 +195,8 @@ def res_set_texture(inst: Entity, res: Property):
     will be rotated by the instance angles, and then the face with the same
     orientation will be applied to the face (with the rotation and texture).
     """
+    # TODO: reimplement & replace
+    return
     import vbsp
     pos = Vec.from_str(res['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
@@ -265,7 +268,7 @@ def res_set_texture(inst: Entity, res: Property):
             vbsp.set_special_mat(face_to_mod, 'white')
             return
         elif tex == 'special-black':
-            vbsp.set_special_mat(brush.face, 'black')
+            vbsp.set_special_mat(face_to_mod, 'black')
 
         # Do <4x4>, <white-2x4>, etc
         color = str(brush.color)
@@ -285,6 +288,9 @@ def res_set_texture(inst: Entity, res: Property):
                 )
     else:
         face_to_mod.mat = tex
+
+    # Don't allow this to get overwritten later.
+    vbsp.IGNORED_FACES.add(brush.face)
 
 
 @make_result('AddBrush')
@@ -497,8 +503,8 @@ def res_import_template_setup(res: Property):
 def res_import_template(inst: Entity, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
-    It will be placed overlapping the given instance.  
-    Options:  
+    It will be placed overlapping the given instance.
+    Options:
     - ID: The ID of the template to be inserted. Add visgroups to additionally
             add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
@@ -662,7 +668,6 @@ def res_import_template(inst: Entity, res: Property):
         # Not set or solid group doesn't exist, skip..
         pass
     else:
-        LOGGER.info('IDS: {}', additional_replace_ids | template.overlay_faces)
         conditions.steal_from_brush(
             temp_data,
             brush_group,
@@ -778,3 +783,66 @@ def res_checkpoint_trigger(inst: Entity, res: Property):
         out = Output.parse(prop)
         out.target = conditions.local_name(inst, out.target)
         trig.add_out(out)
+
+
+@make_result('SetTile')
+def res_set_tile(inst: Entity, res: Property):
+    """Set 4x4 parts of a tile to the given values."""
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+
+    offset = (res.vec('offset', -48, 48) - (0, 0, 64)).rotate(*angles)
+    offset += origin
+
+    norm = Vec(0, 0, 1).rotate(*angles)
+    norm_axis = norm.axis()
+    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+
+    force_tile = res.bool('force')
+
+    tiles = [
+        row.value.strip()
+        for row in res.find_all('tile')
+    ]
+
+    for y, row in enumerate(tiles):
+        for x, val in enumerate(row):
+            if val == '_':
+                continue
+
+            pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
+
+            grid_pos = tiling.round_grid(pos - norm)
+
+            uv_pos = (pos - grid_pos + 64 - 16)
+            u = uv_pos[u_axis] // 32 % 4
+            v = uv_pos[v_axis] // 32 % 4
+
+            if u != round(u) or v != round(v):
+                continue
+
+            try:
+                tile = tiling.TILES[grid_pos.as_tuple(), norm.as_tuple()]
+            except KeyError:
+                LOGGER.warning('Expected tile, but none found: {}, {}', pos, norm)
+                continue
+
+            subtiles = tile.get_subtiles()
+
+            old_tile = subtiles[u, v]
+            new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
+
+            if force_tile:
+                subtiles[u, v] = new_tile
+                continue
+
+            # Don't replace void spaces with other things
+            if old_tile is tiling.TileType.VOID:
+                continue
+
+            # If nodrawed, don't revert for tiles.
+            if old_tile is tiling.TileType.NODRAW:
+                if new_tile.is_tile:
+                    continue
+
+            subtiles[u, v] = new_tile

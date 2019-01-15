@@ -108,11 +108,40 @@
 	= bee2_template_colorpicker:
 	"Applies the color of a surface at a position to template faces. The arrow should point out of the surface."
 	[
+	targetname(target_source): "Name" : "": "Set the name for reference from other entities."
 	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
 	grid_snap(boolean): "Snap To Grid" : 0 : "For items like fizzlers, snap to the closest grid position in side directions."
 	remove_brush(boolean): "Remove Brush" : 0 : "After grabbing the surface, remove the brush. Should only be done when you know the brush isn't shared with other faces."
+	]
+
+@PointClass
+	base(Angles)
+	studioprop("models/BEE2/editor/tile_setter.mdl")
+	= bee2_template_tilesetter:
+	"Applies a tile type to a surface."
+	[
+	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
+	color_picker(target_destination): "Color Picker": "" : "If set, use this colorpicker to reuse existing textures."
+	
+	color(choices): "Color" : "white" : "The color to use for tiles (if applicable). If set to Match Var or Invert Var, the template must provide a color." = 
+		[
+		"white": "White"
+		"black": "Black"
+		"match": "Match var"
+		"invert": "Invert var"
+		]
+	
+	skin(choices): "Tile Type" : "4": "The tile type to apply." = 
+		[
+		0: "Tile"
+		1: "4x4 Tile"
+		2: "Nodraw"
+		3: "Void (remove tile)"
+		4: "Cutout Tile (Broken)"
+		5: "Cutout Tile (Partial)"
+		]
 	]
 
 // --------
