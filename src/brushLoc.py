@@ -261,7 +261,7 @@ class Grid(Dict[_grid_keys, Block]):
                     # If goo has totally submerged tunnels, they are not filled.
                     # Add each horizontal neighbour to the search list.
                     # If not found they'll be ignored.
-                    if ind != top_ind: # Don't bother on the top level..
+                    if ind != top_ind:  # Don't bother on the top level..
                         search_locs.extend([
                             (g_x - 1, g_y, g_z),
                             (g_x + 1, g_y, g_z),
@@ -269,9 +269,8 @@ class Grid(Dict[_grid_keys, Block]):
                             (g_x, g_y - 1, g_z),
                         ])
 
-                # Bottomless pits don't use goo, so remove the water..
-                if is_pit:
-                    vmf.remove_brush(brush)
+                # Remove the brush, since we're not going to use it.
+                vmf.remove_brush(brush)
 
                 # Indicate that this map contains goo/pits
                 if is_pit:

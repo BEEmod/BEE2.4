@@ -34,7 +34,6 @@ import connections
 import instance_traits
 import template_brush
 import fizzler
-import antlines
 import comp_consts as consts
 import cubes
 import barriers
@@ -2676,7 +2675,6 @@ def main() -> None:
         barriers.make_barriers(VMF)
         fix_worldspawn()
 
-        
         # Ensure all VMF outputs use the correct seperator.
         for ent in VMF.entities:
             for out in ent.outputs:
