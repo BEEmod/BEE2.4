@@ -125,22 +125,23 @@
 	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
 	color_picker(target_destination): "Color Picker": "" : "If set, use this colorpicker to reuse existing textures."
 	
-	color(choices): "Color" : "white" : "The color to use for tiles (if applicable). If set to Match Var or Invert Var, the template must provide a color." = 
+	color(choices): "Color" : "tile" : "The color to use for tiles (if applicable). If set to Match Var or Invert Var, the template must provide a color." = 
 		[
-		"white": "White"
-		"black": "Black"
+		"tile": "Use tile colour"
 		"match": "Match var"
 		"invert": "Invert var"
 		]
 	
 	skin(choices): "Tile Type" : "4": "The tile type to apply." = 
 		[
-		0: "Tile"
-		1: "4x4 Tile"
-		2: "Nodraw"
-		3: "Void (remove tile)"
-		4: "Cutout Tile (Broken)"
-		5: "Cutout Tile (Partial)"
+		0: "Black"
+		1: "4x4 Black"
+		2: "White"
+		3: "4x4 White"
+		4: "Nodraw"
+		5: "Void (remove tile)"
+		6: "Cutout Tile (Broken)"
+		7: "Cutout Tile (Partial)"
 		]
 	]
 
@@ -225,6 +226,13 @@
 	"Configuration"
 		[
 		"bee2_template_conf"
+		]
+	"Color Picker"
+		[
 		"bee2_template_colorpicker"
+		]
+	"Tile Setter"
+		[
+		"bee2_template_tilesetter"
 		]
 	]
