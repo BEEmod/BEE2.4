@@ -484,7 +484,6 @@ class Item:
 
         # Associated indicator panels and antlines
         self.ind_panels = set(panels)  # type: Set[Entity]
-        self.ind_toggle = toggle
         self.antlines = set(antlines)
         self.shape_signs = list(shape_signs)
 
@@ -810,7 +809,7 @@ def calc_connections(
             if out_name in toggles:
                 inst_toggle = toggles[out_name]
                 try:
-                    item.antlines.extend(
+                    item.antlines.update(
                         antlines[inst_toggle.fixup['indicator_name']]
                     )
                 except KeyError:
