@@ -10,8 +10,8 @@ from typing import Tuple, Dict, List, Optional, Sequence, Union, Set
 
 import instanceLocs
 import vbsp_options
-from srctools import Vec, Vec_tuple
-from srctools import VMF, Entity, Side, Solid
+from srctools import Vec, Vec_tuple, VMF, Entity, Side, Solid
+import srctools.logger
 from brushLoc import POS as BLOCK_POS, Block
 from texturing import TileSize, Portalable
 import comp_consts as consts
@@ -21,7 +21,7 @@ import texturing
 import antlines
 import grid_optim
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 # Face surfaces used to generate tiles.
 # TILE_TEMP[tile_norm][u_norm, v_norm, thickness, is_bevel] = squarebeams_face

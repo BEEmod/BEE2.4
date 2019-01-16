@@ -4,11 +4,9 @@ from enum import Enum
 
 import random
 import abc
-import hashlib
 
-import srctools
-from srctools import Property, Side
-from srctools import Vec
+import srctools.logger
+from srctools import Property, Side, Vec
 
 import comp_consts as consts
 
@@ -16,7 +14,6 @@ from typing import (
     TYPE_CHECKING,
     Union, Type, Any,
     Dict, List, Tuple,
-    Collection,
     Optional
 )
 
@@ -25,8 +22,7 @@ import utils
 if TYPE_CHECKING:
     from tiling import TileDef
 
-
-LOGGER = utils.getLogger(__name__)
+LOGGER = srctools.logger.get_logger(__name__)
 
 GENERATORS = {}  # type: Dict[Union[GenCat, Tuple[GenCat, Orient, Portalable]], Generator]
 # Algorithms to use.
