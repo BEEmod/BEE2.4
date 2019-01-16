@@ -22,6 +22,7 @@ from typing import (
     Iterable, Union, Callable,
     NamedTuple, Tuple,
     Dict, List, Set,
+    Iterator,
 )
 
 LOGGER = srctools.logger.get_logger(__name__, alias='template')
@@ -113,7 +114,6 @@ TEMPLATE_RETEXTURE = {
     'metal/black_floor_metal_bullseye_001': (GenCat.PANEL, TileSize.TILE_1x1, B),
     'tile/white_wall_tile_bullseye': (GenCat.PANEL, TileSize.TILE_1x1, W),
 
-
     consts.Special.BACKPANELS: (GenCat.SPECIAL, 'behind', None),
     consts.Special.BACKPANELS_CHEAP: (GenCat.SPECIAL, 'behind', None),
     consts.Special.PED_SIDE: (GenCat.SPECIAL, 'pedestalside', None),
@@ -153,7 +153,7 @@ ExportedTemplate = NamedTuple('ExportedTemplate', [
     ('world', List[Solid]),
     ('detail', Entity),
     ('overlay', List[Entity]),
-    ('orig_ids', Dict[str, str]),
+    ('orig_ids', Dict[int, int]),
     ('template', 'Template'),
     ('origin', Vec),
     ('angles', Vec),
@@ -172,7 +172,7 @@ class Template:
     """Represents a template before it's imported into a map."""
     def __init__(
         self,
-        temp_id,
+        temp_id: str,
         world: Dict[str, List[Solid]],
         detail: Dict[str, List[Solid]],
         overlays: Dict[str, List[Entity]],
@@ -181,13 +181,13 @@ class Template:
         overlay_transfer_faces: Iterable[str]=(),
         vertical_faces: Iterable[str]=(),
         color_pickers: Iterable[ColorPicker]=(),
-        tile_setters: List[TileSetter]=(),
-    ):
+        tile_setters: Iterable[TileSetter]=(),
+    ) -> None:
         """Make an overlay.
 
         """
         self.id = temp_id
-        self._data = data = {}
+        self._data = data = {}  # type: Dict[str, Tuple[List[Solid], List[Solid], List[Entity]]]
 
         # We ensure the '' group is always present.
         all_groups = {''}
@@ -214,13 +214,13 @@ class Template:
         self.tile_setters = list(tile_setters)
 
     @property
-    def visgroups(self):
+    def visgroups(self) -> Iterator[str]:
         """Iterate over the template visgroups"""
         return iter(self._data)
 
     def visgrouped(
         self,
-        visgroups: Set[str]=(),
+        visgroups: Union[str, Iterable[str]]=(),
     ) -> Tuple[List[Solid], List[Solid], List[Entity]]:
         """Given some visgroups, return the matching data.
 
@@ -299,10 +299,10 @@ class ScalingTemplate(Mapping):
             )
         return cls(ent['template_id'], axes)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return 6
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Vec]:
         yield from [
             Vec(-1, 0, 0),
             Vec(1, 0, 0),
@@ -312,23 +312,26 @@ class ScalingTemplate(Mapping):
             Vec(0, 0, 1),
         ]
 
-    def __getitem__(self, normal: Union[Vec, Tuple[float, float, float]]):
+    def __getitem__(
+        self,
+        normal: Union[Vec, Tuple[float, float, float]],
+    ) -> Tuple[str, UVAxis, UVAxis, float]:
         mat, axis_u, axis_v, rotation = self._axes[tuple(normal)]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Vec, origin: Vec=(0, 0, 0)):
+    def rotate(self, angles: Vec, origin: Vec=(0, 0, 0)) -> 'ScalingTemplate':
         """Rotate this template, and return a new template with those angles."""
         new_axis = {}
         origin = Vec(origin)
         for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
             axis_u = axis_u.localise(origin, angles)
             axis_v = axis_v.localise(origin, angles)
-            norm = Vec(norm).rotate(*angles)
-            new_axis[norm.as_tuple()] = mat, axis_u, axis_v, rot
+            v_norm = Vec(norm).rotate(*angles)
+            new_axis[v_norm.as_tuple()] = mat, axis_u, axis_v, rot
 
         return ScalingTemplate(self.id, new_axis)
 
-    def apply(self, face: Side, *, change_mat=True):
+    def apply(self, face: Side, *, change_mat: bool=True) -> None:
         """Apply the template to a face."""
         mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal().as_tuple()]
         if change_mat:
@@ -348,23 +351,23 @@ def parse_temp_name(name) -> Tuple[str, Set[str]]:
         return name.casefold(), set()
 
 
-def load_templates():
+def load_templates() -> None:
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
     vmf = srctools.VMF.parse(props, preserve_ids=True)
 
-    def make_subdict():
+    def make_subdict() -> Dict[str, list]:
         return defaultdict(list)
 
     # detail_ents[temp_id][visgroup]
-    detail_ents = defaultdict(make_subdict)
-    world_ents = defaultdict(make_subdict)
-    overlay_ents = defaultdict(make_subdict)
+    detail_ents = defaultdict(make_subdict)  # type: Dict[str, Dict[str, List[Solid]]]
+    world_ents = defaultdict(make_subdict)  # type: Dict[str, Dict[str, List[Solid]]]
+    overlay_ents = defaultdict(make_subdict)  # type: Dict[str, Dict[str, List[Entity]]]
     conf_ents = {}
 
-    color_pickers = defaultdict(list)
-    tile_setters = defaultdict(list)
+    color_pickers = defaultdict(list)  # type: Dict[str, List[ColorPicker]]
+    tile_setters = defaultdict(list)  # type: Dict[str, List[TileSetter]]
 
     for ent in vmf.by_class['bee2_template_world']:
         world_ents[
@@ -454,10 +457,10 @@ def load_templates():
         try:
             conf = conf_ents[temp_id]
         except KeyError:
-            overlay_faces = []
-            skip_faces = []
-            vertical_faces = []
-            realign_faces = []
+            overlay_faces = []  # type: List[str]
+            skip_faces = []  # type: List[str]
+            vertical_faces = []  # type: List[str]
+            realign_faces = []  # type: List[str]
         else:
             vertical_faces = conf['vertical_faces'].split()
             realign_faces = conf['realign_faces'].split()
@@ -495,15 +498,15 @@ def get_template(temp_name) -> Template:
 
 
 def import_template(
-        temp_name: Union[str, Template],
-        origin,
-        angles=None,
-        targetname='',
-        force_type=TEMP_TYPES.default,
-        add_to_map=True,
-        additional_visgroups: Iterable[str]=(),
-        visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
-    ) -> ExportedTemplate:
+    temp_name: Union[str, Template],
+    origin,
+    angles=None,
+    targetname='',
+    force_type=TEMP_TYPES.default,
+    add_to_map=True,
+    additional_visgroups: Iterable[str]=(),
+    visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
+) -> ExportedTemplate:
     """Import the given template at a location.
 
     temp_name can be a string, or a template instance. visgroups is a list
@@ -522,7 +525,7 @@ def import_template(
     import vbsp
     if isinstance(temp_name, Template):
         template, temp_name = temp_name, temp_name.id
-        chosen_groups = set()
+        chosen_groups = set()  # type: Set[str]
     else:
         temp_name, chosen_groups = parse_temp_name(temp_name)
         template = get_template(temp_name)
@@ -536,7 +539,8 @@ def import_template(
     new_detail = []  # type: List[Solid]
     new_over = []  # type: List[Entity]
 
-    id_mapping = {}  # A map of the original -> new face IDs.
+    # A map of the original -> new face IDs.
+    id_mapping = {}  # type: Dict[int, int]
 
     for orig_list, new_list in [
             (orig_world, new_world),
