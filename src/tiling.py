@@ -813,32 +813,36 @@ def make_tile(
     top_surf: str,
     back_surf: str=consts.Tools.NODRAW.value,
     *,
-    recess_dist=0,
-    thickness=4,
-    width=16,
-    height=16,
-    bevels=(False, False, False, False),
-    panel_edge=False,
-    u_align=512,
-    v_align=512
+    recess_dist: int=0,
+    thickness: int=4,
+    width: int=16,
+    height: int=16,
+    bevels: Tuple[bool, bool, bool, bool]=(False, False, False, False),
+    panel_edge: bool=False,
+    u_align: int=512,
+    v_align: int=512,
 ) -> Tuple[Solid, Side]:
     """Generate a tile. 
     
     This uses UV coordinates, which equal xy, xz, or yz depending on normal.
+    
     Parameters:
-        * origin: Location of the center of the tile, on the block surface.
-        * normal: Unit vector pointing out of the tile.
-        * top_surf: Texture to apply to the front of the tile.
-        * back_surf: Texture to apply to the back of the tile.
-        * recess_dist: How far the front is below the block surface.
-        * thickness: How far back the back surface is (normally 4). 2, 4, 8,
-           Must be > recess_dist.
-        * width: size in the U-direction. Must be > 8.
-        * height: size in the V-direction. Must be > 8.
-        * bevels: If that side should be 45° angled - in order, umin/max, vmin/max.
-        * panel_edge: If True, use the panel-type squarebeams.
-        * u_align: Wrap offsets to this much at maximum.
-        * v_align: Wrap offsets to this much at maximum.
+        vmf: The map to add the tile to.
+        origin: Location of the center of the tile, on the block surface.
+        normal: Unit vector pointing out of the tile.
+        top_surf: Texture to apply to the front of the tile.
+        back_surf: Texture to apply to the back of the tile.
+        recess_dist: How far the front is below the block surface.
+        thickness: How far back the back surface is. This can
+            be either 2, 4 or 8.
+            Must be larger than the recess_dist.
+        width: size in the U-direction. Must be > 8.
+        height: size in the V-direction. Must be > 8.
+        bevels: If that side should be 45° angled - in order,
+            umin, umax, vmin, vmax.
+        panel_edge: If True, use the panel-type squarebeams.
+        u_align: Wrap offsets to this much at maximum.
+        v_align: Wrap offsets to this much at maximum.
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
