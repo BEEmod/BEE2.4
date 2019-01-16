@@ -224,16 +224,17 @@ def get_tile_type(mat: str, orient: ORIENT) -> str:
     # just stay the same).
     if orient == ORIENT.wall:
         if mat == consts.BlackPan.BLACK_4x4 or mat == consts.WhitePan.WHITE_4x4:
-            orient = '4x4'
+            return surf_type + '.4x4'
         elif mat == consts.BlackPan.BLACK_2x2 or mat == consts.WhitePan.WHITE_2x2:
-            orient = '2x2'
+            return surf_type + '.2x2'
         else:
-            orient = 'wall'
+            return surf_type + '.wall'
     elif orient == ORIENT.floor:
-        orient = 'floor'
+        return surf_type + '.floor'
     elif orient == ORIENT.ceiling:
-        orient = 'ceiling'
-    return surf_type + '.' + orient
+        return surf_type + '.ceiling'
+
+    raise AssertionError(mat, orient)
 
 ##################
 # MAIN functions #
