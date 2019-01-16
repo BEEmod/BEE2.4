@@ -214,6 +214,7 @@ TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
 
+
 def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> Dict[str, Any]:
     """Parse the options for a generator block."""
     options = {}
@@ -530,9 +531,9 @@ class GenClump(Generator):
     """
 
     # The clump locations are shared among all generators.
-    clump_locs = []
+    clump_locs = []  # type: List[Clump]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         # A seed only unique to this generator, in int form.
@@ -599,7 +600,7 @@ class GenClump(Generator):
                     clump_rand.getrandbits(32),
                 ))
 
-    def _get(self, loc: Vec, tex_name: str):
+    def _get(self, loc: Vec, tex_name: str) -> str:
         clump_seed = self._find_clump(loc)
 
         if clump_seed is None:
@@ -616,7 +617,7 @@ class GenClump(Generator):
         )
         return self._random.choice(self.textures[tex_name])
 
-    def _find_clump(self, loc: Vec) -> int:
+    def _find_clump(self, loc: Vec) -> Optional[int]:
         """Return the clump seed matching a location."""
         for clump in self.clump_locs:
             if (
@@ -625,4 +626,5 @@ class GenClump(Generator):
                 clump.z1 <= loc.z <= clump.z2
             ):
                 return clump.seed
+        return None
 
