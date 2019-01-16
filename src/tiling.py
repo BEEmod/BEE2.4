@@ -895,8 +895,10 @@ def make_tile(
         face.uaxis.offset %= 512
         face.vaxis.offset = 0
 
-    back_side.uaxis.offset %= 512
-    back_side.vaxis.offset %= 512
+    # A bit of a hack, this ensures the textures ignore the 32-unit offsets
+    # in subtile shapes.
+    back_side.uaxis.offset %= 64
+    back_side.vaxis.offset %= 64
 
     edge_name = 'panel_edge' if panel_edge else 'edge'
 
