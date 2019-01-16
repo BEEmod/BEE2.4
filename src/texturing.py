@@ -131,6 +131,9 @@ TEX_DEFAULTS = {
         'edge': consts.Special.SQUAREBEAMS,
         'edge_special': consts.Special.SQUAREBEAMS,
 
+        # Texture on the side of the special pedestal platform.
+        'pedestalside': consts.Special.PED_SIDE,
+
         # Reflective and cheap Goo
         'goo': consts.Goo.REFLECTIVE,
         'goo_cheap': consts.Goo.CHEAP,
