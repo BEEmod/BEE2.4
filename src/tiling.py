@@ -63,6 +63,16 @@ TILES = {}  # type: Dict[Tuple[Vec_tuple, Vec_tuple], TileDef]
 # indicate the center section should be nodrawed.
 SUBTILE_FIZZ_KEY = object()
 
+# Given the two bevel options, determine the correct texturing
+# values.
+# (min, max) -> (scale, offset)
+BEVEL_BACK_SCALE = {
+    (False, False): 128/512,  # |__|
+    (False, True): 124/512,  # |__/
+    (True, False): 124/512,  # \__|
+    (True, True): 120/512,   # \__/
+}
+
 
 class TileType(Enum):
     """Physical types of geometry for each 1/4 tile."""
@@ -852,14 +862,18 @@ def make_tile(
         block_min[axis_v] - (origin[axis_v] - height/2)
     ) % v_align
 
+    bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
+
     back_side = template['back'].copy(vmf_file=vmf)  # type: Side
     back_side.mat = back_surf
-    back_side.translate(origin - thickness * normal)
-
-    back_side.offset = 0  # Todo: calc offset and scale to fit bevels.
-    back_side.scale = 0.25
-
-    bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
+    # The offset was set to zero in the original we copy from.
+    back_side.uaxis.scale = BEVEL_BACK_SCALE[bevel_umin, bevel_umax]
+    back_side.vaxis.scale = BEVEL_BACK_SCALE[bevel_vmin, bevel_vmax]
+    # Shift the surface such that it's aligned to the minimum edge.
+    back_side.translate(origin - normal * thickness + Vec.with_axes(
+        axis_u, 4 * bevel_umin - 64,
+        axis_v, 4 * bevel_vmin - 64,
+    ))
 
     umin_side = template[-1, 0, thickness, bevel_umin].copy(vmf_file=vmf)
     umin_side.translate(origin + Vec.with_axes(axis_u, -width/2))
@@ -935,6 +949,9 @@ def gen_tile_temp():
                     if thickness == 4 and not bevel:
                         temp_part['back'] = face
                         face.translate(2 * norm)
+                        # Set it to zero here, so we don't need to reset
+                        # it in make_tile.
+                        face.offset = 0
                 elif face.mat in consts.BlackPan or face.mat in consts.WhitePan:
                     if thickness == 4 and not bevel:
                         temp_part['front'] = face
@@ -945,7 +962,6 @@ def gen_tile_temp():
                     face.translate(-16 * face_norm - (thickness/ 2) * norm)
                     u_dir, v_dir = face_norm.other_axes(axis_norm)
                     temp_part[u_dir, v_dir, thickness, bevel] = face
-
 
 
 def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]]):
