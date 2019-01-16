@@ -908,7 +908,7 @@ def make_tile(
     ]), top_side
 
 
-def gen_tile_temp():
+def gen_tile_temp() -> None:
     """Generate the sides used to create tiles.
 
     This populates TILE_TEMP with pre-rotated solids in each direction,
@@ -927,10 +927,11 @@ def gen_tile_temp():
 
     try:
         template = template_brush.get_template('__TILING_TEMPLATE__')
-        # Template -> world -> first solid
+        # Grab the single world brush for each visgroup.
         for (key, name) in categories.items():
-            categories[key] = template.visgrouped(name)[0][0]
-    except KeyError:
+            world, detail, over = template.visgrouped(name)
+            [categories[key]] = world
+    except (KeyError, ValueError):
         raise Exception('Bad Tiling Template!')
 
     for norm_tup, angles in NORM_ANGLES.items():
@@ -957,9 +958,11 @@ def gen_tile_temp():
                         temp_part['front'] = face
                         face.translate(-2 * norm)
                 else:
-                    # Squarebeams
+                    # Squarebeams.
+                    # Rounding the position of the face gives us the direction
+                    # it's pointing away from the center.
                     face_norm = round(face.get_origin().norm())  # type: Vec
-                    face.translate(-16 * face_norm - (thickness/ 2) * norm)
+                    face.translate(-16 * face_norm - (thickness / 2) * norm)
                     u_dir, v_dir = face_norm.other_axes(axis_norm)
                     temp_part[u_dir, v_dir, thickness, bevel] = face
 
