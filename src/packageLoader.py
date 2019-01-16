@@ -3212,7 +3212,7 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
             vmf_file.by_class['bee2_template_tilesetter']
         )
         for conf_ent in conf_classes:
-            new_ent = conf_ent.copy(map=TEMPLATE_FILE, keep_vis=False)
+            new_ent = conf_ent.copy(vmf_file=TEMPLATE_FILE, keep_vis=False)
             new_ent['template_id'] = temp_id
             TEMPLATE_FILE.add_ent(new_ent)
             has_conf_data = True

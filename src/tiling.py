@@ -839,7 +839,7 @@ def make_tile(
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
-    top_side = template['front'].copy(map=vmf)
+    top_side = template['front'].copy(vmf_file=vmf)
     top_side.mat = top_surf
     top_side.translate(origin - recess_dist * normal)
 
@@ -852,7 +852,7 @@ def make_tile(
         block_min[axis_v] - (origin[axis_v] - height/2)
     ) % v_align
 
-    back_side = template['back'].copy(map=vmf)  # type: Side
+    back_side = template['back'].copy(vmf_file=vmf)  # type: Side
     back_side.mat = back_surf
     back_side.translate(origin - thickness * normal)
 
@@ -861,16 +861,16 @@ def make_tile(
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
-    umin_side = template[-1, 0, thickness, bevel_umin].copy(map=vmf)
+    umin_side = template[-1, 0, thickness, bevel_umin].copy(vmf_file=vmf)
     umin_side.translate(origin + Vec.with_axes(axis_u, -width/2))
 
-    umax_side = template[1, 0, thickness, bevel_umax].copy(map=vmf)
+    umax_side = template[1, 0, thickness, bevel_umax].copy(vmf_file=vmf)
     umax_side.translate(origin + Vec.with_axes(axis_u, width/2))
 
-    vmin_side = template[0, -1, thickness, bevel_vmin].copy(map=vmf)
+    vmin_side = template[0, -1, thickness, bevel_vmin].copy(vmf_file=vmf)
     vmin_side.translate(origin + Vec.with_axes(axis_v, -height/2))
 
-    vmax_side = template[0, 1, thickness, bevel_vmax].copy(map=vmf)
+    vmax_side = template[0, 1, thickness, bevel_vmax].copy(vmf_file=vmf)
     vmax_side.translate(origin + Vec.with_axes(axis_v, height/2))
 
     for face in [umin_side, umax_side, vmin_side, vmax_side]:
