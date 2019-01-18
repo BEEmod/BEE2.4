@@ -747,6 +747,17 @@ class TileDef:
                 )
                 faces.append(face)
                 brushes.append(brush)
+
+                # With the fizzler offsets, we need to recalculate their
+                # positions.
+                # We want to crop them, not offset.
+                # These are always aligned to a 64-block boundary, so we
+                # can just slam them to zero.
+                if umin != round(umin):
+                    face.uaxis.offset = 0
+                if vmin != round(vmin):
+                    face.vaxis.offset = 0
+
             elif tile_type is TileType.NODRAW:
                 brush, face = make_tile(
                     vmf,
