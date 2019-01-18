@@ -695,26 +695,28 @@ class TileDef:
         vmf: VMF,
         pattern: Dict,
         is_wall: bool,
-        bevels: Sequence[bool],
+        bevels: Tuple[bool, bool, bool, bool],
         normal: Vec,
-        offset=64,
-        thickness=4,
+        offset: int=64,
+        thickness: int=4,
         vec_offset: Vec=None,
     ) -> Tuple[List[Side], List[Solid]]:
         """Generate a bunch of tiles, and return the front faces."""
         brushes = []
         faces = []
 
+        axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
+
         # NOTE: calc_patterns can produce 0, 1, 1.5, 2, 2.5, 3, 4!
         # Half-values are for nodrawing fizzlers which are center-aligned.
         for umin, umax, vmin, vmax, grid_size, tile_type in self.calc_patterns(pattern, is_wall):
             # We bevel only the grid-edge tiles.
-            tile_bevels = [
+            tile_bevels = (
                 umin == 0 and bevels[0],
                 umax == 4 and bevels[1],
                 vmin == 0 and bevels[2],
                 vmax == 4 and bevels[3],
-            ]
+            )
             tile_center = self.uv_offset(
                 (umin + umax) * 16 - 64,
                 (vmin + vmax) * 16 - 64,
@@ -759,6 +761,24 @@ class TileDef:
                 faces.append(face)
                 brushes.append(brush)
         return faces, brushes
+
+    def can_merge(self) -> bool:
+        """Check if this tile is a simple tile that can merge with neighbours."""
+        if (
+            self.is_bullseye or
+            self.sub_tiles is not None or
+            self.panel_ent is not None or
+            self.panel_inst is not None
+        ):
+            return False
+
+        if (
+            self.brush_type is not BrushType.NORMAL and
+            self.brush_type is not BrushType.NODRAW
+        ):
+            return False
+
+        return self.base_type.is_tile
 
 
 def edit_quarter_tile(
@@ -897,8 +917,8 @@ def make_tile(
 
     # A bit of a hack, this ensures the textures ignore the 32-unit offsets
     # in subtile shapes.
-    back_side.uaxis.offset %= 64
-    back_side.vaxis.offset %= 64
+    back_side.uaxis.offset %= 512
+    back_side.vaxis.offset %= 512
 
     edge_name = 'panel_edge' if panel_edge else 'edge'
 
@@ -1224,21 +1244,86 @@ def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec):
 
 def generate_brushes(vmf: VMF):
     """Generate all the brushes in the map, then set overlay sides."""
+    LOGGER.info('Generating tiles...')
+    # Each tile is either a full-block tile, or some kind of subtile/special surface.
+    # Each subtile is generated individually. If it's a full-block tile we
+    # try to merge tiles together with the same texture.
+
+    # The key is (normal, plane distance, tile type)
+    full_tiles = defaultdict(list)  # type: Dict[Tuple[float, float, float, float, TileType], List[TileDef]]
+
     for tile in TILES.values():
-        brushes = list(tile.export(vmf))
-        vmf.add_brushes(brushes)
+        if tile.can_merge():
+            pos = tile.pos + 64 * tile.normal
+            plane_dist = abs(pos.dot(tile.normal))
+
+            full_tiles[
+                tile.normal.x, tile.normal.y, tile.normal.z,
+                plane_dist,
+                tile.base_type,
+            ].append(tile)
+        else:
+            brushes = list(tile.export(vmf))
+            vmf.add_brushes(brushes)
+
+    for (norm_x, norm_y, norm_z, plane_dist, tile_type), tiles in full_tiles.items():
+        # Construct each plane of tiles.
+        normal = Vec(norm_x, norm_y, norm_z)
+        norm_axis = normal.axis()
+        u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+        bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
+
+        grid_pos = defaultdict(dict)  # type: Dict[str, Dict[Tuple[int, int], bool]]
+
+        tile_pos = {}  # type: Dict[Tuple[int, int], TileDef]
+
+        for tile in tiles:
+            pos = tile.pos + 64 * tile.normal
+            tex = texturing.gen(
+                texturing.GenCat.NORMAL,
+                normal,
+                tile.base_type.color
+            ).get(pos, tile.base_type.tile_size)
+            u_pos = (pos[u_axis] - bbox_min[u_axis]) // 128
+            v_pos = (pos[v_axis] - bbox_min[v_axis]) // 128
+            grid_pos[tex][u_pos, v_pos] = True
+            tile_pos[u_pos, v_pos] = tile
+
+        for tex, tex_pos in grid_pos.items():
+            for min_u, min_v, max_u, max_v in grid_optim.optimise(tex_pos):
+                center = Vec.with_axes(
+                    norm_axis, plane_dist,
+                    u_axis, bbox_min[u_axis] + (min_u + max_u) * 64,
+                    v_axis, bbox_min[v_axis] + (min_v + max_v) * 64,
+                )
+                brush, front = make_tile(
+                    vmf,
+                    center,
+                    normal,
+                    tex,
+                    texturing.SPECIAL.get(center, 'behind'),
+                    # TODO: Check edge tiles, see if any of those would bevel.
+                    bevels=(True, True, True, True),
+                    width=(1 + max_u - min_u) * 128,
+                    height=(1 + max_v - min_v) * 128,
+                )
+                vmf.add_brush(brush)
+
+                for u in range(min_u, max_u + 1):
+                    for v in range(min_v, max_v + 1):
+                        tile_pos[u, v].brush_faces.append(front)
 
     for over in vmf.by_class['info_overlay']:
         try:
-            tiles = over.tiledefs  # type: List[TileDef]
+            over_tiles = over.tiledefs  # type: List[TileDef]
         except AttributeError:
             continue
-        faces = over['sides', ''].split(' ')
-        for tile in tiles:
-            faces.extend(str(f.id) for f in tile.brush_faces)
+        faces = set(over['sides', ''].split(' '))
+        for tile in over_tiles:
+            faces.update(str(f.id) for f in tile.brush_faces)
 
         if faces:
-            over['sides'] = ' '.join(faces)
+            over['sides'] = ' '.join(sorted(faces))
         else:
             over.remove()
 
