@@ -158,7 +158,7 @@ class Antline:
         self.name = name
 
 
-def parse_antlines(vmf: VMF) -> Tuple[Dict[str, List[Antline]], Dict[str, List[Segment]]]:
+def parse_antlines(vmf: VMF) -> Tuple[Dict[str, List[Antline]], Dict[int, List[Segment]]]:
     """Convert overlays in the map into Antline objects.
 
     This returns two dicts. The first maps targetnames to lists of antlines.
@@ -181,7 +181,7 @@ def parse_antlines(vmf: VMF) -> Tuple[Dict[str, List[Antline]], Dict[str, List[S
     mat_straight = const.Antlines.STRAIGHT
     mat_corner = const.Antlines.CORNER
 
-    side_to_seg = {}  # type: Dict[str, List[Segment]]
+    side_to_seg = {}  # type: Dict[int, List[Segment]]
     antlines = {}  # type: Dict[str, List[Antline]]
 
     for over in vmf.by_class['info_overlay']:
@@ -224,7 +224,7 @@ def parse_antlines(vmf: VMF) -> Tuple[Dict[str, List[Antline]], Dict[str, List[S
         overlay_segment[over] = seg = Segment(seg_type, normal, start, end)
 
         for side_id in over['sides'].split():
-            side_to_seg.setdefault(side_id, []).append(seg)
+            side_to_seg.setdefault(side_id, []).append(int(seg))
 
         for point in points:
             # Lookup the point to see if we've already checked it.

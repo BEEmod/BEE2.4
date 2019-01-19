@@ -6,7 +6,12 @@ That allows any wall cube to be split into separate brushes, and make quarter-ti
 from collections import defaultdict, Counter
 
 from enum import Enum
-from typing import Tuple, Dict, List, Optional, Sequence, Union, Set
+from typing import (
+    Tuple, Dict, List,
+    Optional, Union,
+    Iterator, Iterable,
+    cast,
+)
 
 import instanceLocs
 import vbsp_options
@@ -15,7 +20,6 @@ import srctools.logger
 from brushLoc import POS as BLOCK_POS, Block
 from texturing import TileSize, Portalable
 import comp_consts as consts
-import utils
 import template_brush
 import texturing
 import antlines
@@ -197,7 +201,7 @@ class PanelAngle(Enum):
     ANGLE_90 = 90
 
     @classmethod
-    def from_inst(cls, inst: Entity):
+    def from_inst(cls, inst: Entity) -> 'PanelAngle':
         """Get the angle desired for a panel."""
         if not inst.fixup.bool('$start_deployed'):
             return cls.ANGLE_FLAT
@@ -205,12 +209,17 @@ class PanelAngle(Enum):
         return cls(int(inst.fixup['$animation'][5:7]))
 
 
-def round_grid(vec: Vec):
+def round_grid(vec: Vec) -> Vec:
     """Round to the center of the grid."""
     return vec // 128 * 128 + (64, 64, 64)
 
 
-def iter_uv(umin: float=0, umax: float=3, vmin: float=0, vmax: float=3):
+def iter_uv(
+    umin: float=0,
+    umax: float=3,
+    vmin: float=0,
+    vmax: float=3
+) -> Iterator[Tuple[int, int]]:
     """Iterate over points in a rectangle."""
     urange = range(int(umin), int(umax + 1))
     vrange = range(int(vmin), int(vmax + 1))
@@ -311,10 +320,10 @@ PATTERNS = {
     ],
     'fizzler_split_u': [],
     'fizzler_split_v': [],
-}
+}  # type: Dict[str, List[Pattern]]
 
 
-def _make_patterns():
+def _make_patterns() -> None:
     """Set additional patterns which derive from CLEAN."""
     # These are the same as clean, but they don't allow any pattern
     # which crosses over the centerline in either direction.
@@ -380,7 +389,7 @@ class TileDef:
         is_bullseye: bool=False,
         panel_inst: Entity=None,
         panel_ent: Entity=None,
-        extra_brushes: List[Solid]=(),
+        extra_brushes: Iterable[Solid]=(),
     ):
         self.pos = pos
         self.normal = normal
@@ -400,16 +409,22 @@ class TileDef:
             self.brush_type.name,
         )
 
-    def print_tiles(self):
+    def print_tiles(self) -> None:
         out = []
+        tiles = self.get_subtiles()
         for v in reversed(range(4)):
             for u in range(4):
-                out.append(TILETYPE_TO_CHAR[self.sub_tiles[u, v]])
+                out.append(TILETYPE_TO_CHAR[tiles[u, v]])
             out.append('\n')
         LOGGER.info('Subtiles: \n{}', ''.join(out))
 
     @classmethod
-    def ensure(cls, grid_pos, norm, tile_type=TileType.VOID):
+    def ensure(
+        cls,
+        grid_pos: Vec,
+        norm: Vec,
+        tile_type: TileType=TileType.VOID,
+    ) -> 'TileDef':
         """Return a tiledef at a position, creating it with a type if not present."""
         try:
             tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
@@ -433,7 +448,7 @@ class TileDef:
         else:
             return self.sub_tiles
 
-    def uv_offset(self, u, v, norm):
+    def uv_offset(self, u: float, v: float, norm: float) -> Vec:
         """Return a u/v offset from our position.
 
         This is used for subtile orientations:
@@ -452,12 +467,12 @@ class TileDef:
     def calc_patterns(
         self,
         tiles: Dict[Union[Tuple[int, int], object], TileType],
-        is_wall=False,
-        _pattern=None,
-    ):
+        is_wall: bool=False,
+        _pattern: str=None,
+    ) -> Iterator[Tuple[float, float, float, float, TileSize, TileType]]:
         """Figure out the brushes needed for a complex pattern.
 
-        This returns
+        This yields (umin, umax, vmin, vmax, grid_size_, tile_type) tuples.
         """
 
         # copy it, so we can overwrite positions with VOID = not a tile.
@@ -467,11 +482,11 @@ class TileDef:
         # infinite recursion.
         if not _pattern:
             _pattern = 'clean'
-            if SUBTILE_FIZZ_KEY in tiles:
+            if SUBTILE_FIZZ_KEY in tiles:  # type: ignore
                 # Output the split patterns for centered fizzlers.
                 # We need to remove it also so our iteration doesn't choke on it.
                 # 'u' or 'v'
-                split_type = tiles.pop(SUBTILE_FIZZ_KEY)  # type: str
+                split_type = cast(str, tiles.pop(SUBTILE_FIZZ_KEY))
                 patterns = self.calc_patterns(
                     tiles,
                     is_wall,
@@ -516,24 +531,24 @@ class TileDef:
                     yield umin, umax, vmin, vmax, pattern.tex, tile_type
 
         # All unfilled spots are single 4x4 tiles, or other objects.
-        for (u, v), tile_type in tiles.items():
+        for (u, v), tile_type in tiles.items():  # type: ignore  # SUBTILE_FIZZ_KEY
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
 
-    def export(self, vmf: VMF):
+    def export(self, vmf: VMF) -> Iterator[Solid]:
         """Create the solid for this."""
-        bevels = [
+        bevels = tuple([  # type: ignore
             BLOCK_POS[
                 'world': self.uv_offset(128*u, 128*v, 0)
             ].value not in (1, 2)
             for u, v in UV_NORMALS
-        ]
+        ])  # type: Tuple[bool, bool, bool, bool]
         front_pos = self.pos + 64 * self.normal
 
         is_wall = bool(self.normal.z)
 
         if self.sub_tiles is None:
-            full_type = self.base_type
+            full_type = self.base_type  # type: Optional[TileType]
         else:
             # If we have exactly 1 subtile, use a single full brush
             # since we know the pattern won't change.
@@ -572,7 +587,7 @@ class TileDef:
 
         if self.sub_tiles is None:
             # Force subtiles to be all the parts we need.
-            self.sub_tiles = dict.fromkeys(iter_uv(), full_type)
+            self.sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
 
         # Multiple tile types in the block, or a special tiledef type - panels etc.
 
@@ -587,6 +602,9 @@ class TileDef:
             self.brush_faces.extend(faces)
             yield from brushes
         elif self.brush_type is BrushType.ANGLED_PANEL:
+            assert self.panel_inst is not None
+            assert self.panel_ent is not None
+
             if self.panel_inst.fixup.int('$connectioncount') > 0:
                 # Dynamic panels are always beveled.
                 bevels = (True, True, True, True)
@@ -658,6 +676,9 @@ class TileDef:
                     brush.localise(panel_offset, rotation)
 
         elif self.brush_type is BrushType.FLIP_PANEL:
+            assert self.panel_inst is not None
+            assert self.panel_ent is not None
+
             # Two surfaces, forward and backward - each is 4 thick.
             invert_black = self.panel_inst.fixup.bool('$start_reversed')
             inv_subtiles = {
@@ -846,8 +867,8 @@ def make_tile(
     *,
     recess_dist: int=0,
     thickness: int=4,
-    width: int=16,
-    height: int=16,
+    width: float=16,
+    height: float=16,
     bevels: Tuple[bool, bool, bool, bool]=(False, False, False, False),
     panel_edge: bool=False,
     u_align: int=512,
@@ -975,7 +996,8 @@ def gen_tile_temp() -> None:
         norm = Vec(norm_tup)
         axis_norm = norm.axis()
 
-        TILE_TEMP[norm_tup] = temp_part = {}
+        temp_part: Dict[Union[str, Tuple[int, int, int, bool]], Side] = {}
+        TILE_TEMP[norm_tup] = temp_part
 
         for ((thickness, bevel), temp) in categories.items():
             brush = temp.copy()
@@ -1004,7 +1026,7 @@ def gen_tile_temp() -> None:
                     temp_part[u_dir, v_dir, thickness, bevel] = face
 
 
-def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]]):
+def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]]):
     """Create TileDefs from all the brush sides.
 
     Once done, all wall brushes have been removed from the map.
@@ -1013,7 +1035,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]
     # Face ID -> tileDef, used to match overlays to their face targets.
     # Invalid after we exit, since all the IDs have been freed and may be
     # reused later.
-    face_to_tile = {}  # type: Dict[str, TileDef]
+    face_to_tile = {}  # type: Dict[int, TileDef]
 
     for brush in vmf_file.brushes[:]:
         bbox_min, bbox_max = brush.get_bbox()
@@ -1095,7 +1117,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]
         over['sides'] = ' '.join(faces)
 
 
-def tiledefs_from_cube(face_to_tile, brush: Solid, grid_pos: Vec):
+def tiledefs_from_cube(face_to_tile: Dict[int, TileDef], brush: Solid, grid_pos: Vec):
     """Generate a tiledef matching a 128^3 block."""
     for face in brush:
         normal = -face.normal()
@@ -1127,7 +1149,12 @@ def tiledefs_from_cube(face_to_tile, brush: Solid, grid_pos: Vec):
     brush.remove()
 
 
-def tiledefs_from_large_tile(face_to_tile, brush: Solid, grid_pos: Vec, norm: Vec):
+def tiledefs_from_large_tile(
+    face_to_tile: Dict[int, TileDef],
+    brush: Solid,
+    grid_pos: Vec,
+    norm: Vec,
+) -> None:
     """Generate a tiledef matching a 128x128x4 side."""
     tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
 
@@ -1147,7 +1174,7 @@ def tiledefs_from_large_tile(face_to_tile, brush: Solid, grid_pos: Vec, norm: Ve
     face_to_tile[front_face.id] = tiledef
 
 
-def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity):
+def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     """Generate a tiledef matching an angled panel."""
     brush = brush_ent.solids.pop()
     assert not brush_ent.solids, 'Multiple brushes in angled panel?'
@@ -1169,7 +1196,7 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity):
     )
 
 
-def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity):
+def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     """Generate a tiledef matching a flip panel."""
     brush_ent.solids.clear()
     grid_pos = round_grid(Vec.from_str(panel_ent['origin']))
@@ -1188,11 +1215,11 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity):
 
 
 def tiledefs_from_embedface(
-    face_to_tile,
+    face_to_tile: Dict[int, TileDef],
     brush: Solid,
     grid_pos: Vec,
     norm: Vec,
-):
+) -> None:
     """Generate a tiledef matching EmbedFace brushes."""
 
     tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
@@ -1215,8 +1242,10 @@ def tiledefs_from_embedface(
 
     u_min, u_max = u_min // 32, u_max // 32 - 1
     v_min, v_max = v_min // 32, v_max // 32 - 1
+
+    subtiles = tile.get_subtiles()
     for uv in iter_uv(u_min, u_max, v_min, v_max):
-        tile.sub_tiles[uv] = tex_kind
+        subtiles[uv] = tex_kind
 
 
 def find_front_face(
@@ -1238,7 +1267,7 @@ def find_front_face(
         raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
 
 
-def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec):
+def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec) -> None:
     """Inset the sides of a flip panel, to not hit the borders."""
     norm_axis = normal.axis()
     for side in panel.sides():
@@ -1253,7 +1282,7 @@ def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec):
             side.vaxis.offset = 0
 
 
-def generate_brushes(vmf: VMF):
+def generate_brushes(vmf: VMF) -> None:
     """Generate all the brushes in the map, then set overlay sides."""
     LOGGER.info('Generating tiles...')
     # Each tile is either a full-block tile, or some kind of subtile/special surface.
@@ -1342,7 +1371,7 @@ def generate_brushes(vmf: VMF):
     generate_goo(vmf)
 
 
-def generate_goo(vmf: VMF):
+def generate_goo(vmf: VMF) -> None:
     """Generate goo pit brushes and triggers."""
     # We want to use as few brushes as possible.
     # So group them by their min/max Z, and then produce bounding boxes.
@@ -1352,7 +1381,7 @@ def generate_goo(vmf: VMF):
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
     # Valve just does it semi-randomly.
-    goo_heights = Counter()
+    goo_heights = Counter()  # type: Dict[Tuple[float, float, float], int]
 
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
