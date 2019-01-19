@@ -453,9 +453,9 @@ class Fizzler:
 
             # Reversed?
             if up_axis == u_axis:
-                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'v'
+                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'v'  # type: ignore
             elif up_axis == v_axis:
-                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'u'
+                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'u'  # type: ignore
             else:
                 LOGGER.error(
                     'Not U or V?: {} @ {} ("{}")',
@@ -521,7 +521,7 @@ class FizzlerBrush:
         self.mat_mod_var = mat_mod_var
         self.mat_mod_name = mat_mod_name
 
-        self.textures = {}
+        self.textures = {}  # type: Dict[TexGroup, Optional[str]]
         for group in TexGroup:
             self.textures[group] = textures.get(group, None)
 
@@ -615,7 +615,7 @@ class FizzlerBrush:
         neg: Vec,
         pos: Vec,
         used_tex_func: Callable[[str], None],
-    ) -> List[Solid]:
+    ) -> Iterator[Solid]:
         """Generate the actual brush.
 
         used_tex will be filled with the textures used.
@@ -761,7 +761,7 @@ class FizzlerBrush:
                 ]
 
             for brush, model_normal, brush_length in brushes:
-                for side in brush.sides:  # type: Side
+                for side in brush.sides:
                     side_norm = side.normal()
                     if abs(side_norm) == abs(fizz.up_axis):
                         self._side_color(side, normal, neg, used_tex_func)
@@ -810,6 +810,7 @@ class FizzlerBrush:
                                 TexGroup.LEFT
                             ]
                     used_tex_func(side.mat)
+
 
     def _texture_fit(
         self,
