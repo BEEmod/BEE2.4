@@ -145,6 +145,37 @@ class Segment:
         # The brushes this segment is attached to.
         self.tiles = []  # type: List['TileDef']
 
+    @property
+    def on_floor(self) -> bool:
+        """Return if this segment is on the floor/wall."""
+        return self.normal.z != 0
+
+    def broken_iter(
+        self,
+        chance: float,
+    ) -> Iterator[Tuple[int, int, bool]]:
+        """Iterator to compute positions for straight segments.
+
+        This produces min, max pairs which fill the space from 0-dist.
+        Neighbouring sections will be merged when they have the same
+        type.
+        """
+        dist = (self.start - self.end).mag()
+
+        if dist < 48 or chance == 0:
+            # Short antlines always are either on/off.
+            yield 0, int(dist), (random.randrange(100) < chance)
+        else:
+            run_start = 0
+            last_type = random.randrange(100) < chance
+            for i in range(1, int(dist)):
+                next_type = random.randrange(100) < chance
+                if next_type != last_type:
+                    yield run_start, i, last_type
+                    last_type = next_type
+                    run_start = i
+            yield run_start, int(dist), last_type
+
 
 class Antline:
     """A complete antline."""
@@ -156,6 +187,122 @@ class Antline:
         self.line = line
         self.name = name
 
+    def export(self, vmf: VMF, wall_conf: AntType, floor_conf: AntType) -> None:
+        """Add the antlines into the map."""
+
+        # First, do some optimisation. If corners aren't defined, try and
+        # optimise those antlines out by merging the straight segment
+        # before/after it into the corners.
+
+        if not wall_conf.tex_corner or not floor_conf.tex_corner:
+            collapse_line = list(self.line)  # type: List[Optional[Segment]]
+            for i, seg in enumerate(collapse_line):
+                if seg is None or seg.type is not SegType.STRAIGHT:
+                    continue
+                if (floor_conf if seg.on_floor else wall_conf).tex_corner:
+                    continue
+                for corner_ind in [i-1, i+1]:
+                    try:
+                        corner = self.line[corner_ind]
+                    except IndexError:
+                        # Each end of the list.
+                        continue
+
+                    if corner is not None and corner.normal == seg.normal:
+                        if (seg.start - corner.start).mag_sq == 16 ** 2:
+                            seg.start = corner.start
+                            # Remove corner by setting to None, so we aren't
+                            # resizing constantly.
+                            collapse_line[corner_ind] = None
+                        if (seg.end - corner.end).mag_sq == 16 ** 2:
+                            seg.end = corner.end
+                            collapse_line[corner_ind] = None
+
+            self.line[:] = [seg for seg in collapse_line if seg is not None]
+
+        for seg in self.line:
+            conf = floor_conf if seg.on_floor else wall_conf
+            random.seed('ant {} {}'.format(seg.start, seg.end))
+            if seg.type is SegType.CORNER:
+                if random.randrange(100) < conf.broken_chance:
+                    mat = random.choice(conf.broken_corner or conf.broken_straight)  # type: AntTex
+                else:
+                    mat = random.choice(conf.tex_corner or conf.tex_straight)
+
+                axis_u, axis_v = Vec.INV_AXIS[seg.normal.axis()]
+                self._make_overlay(
+                    vmf,
+                    seg,
+                    seg.start,
+                    Vec.with_axes(axis_u, 16),
+                    Vec.with_axes(axis_v, 16),
+                    mat,
+                )
+            else:  # Straight
+                # TODO: Break up these segments.
+                if random.randrange(100) < conf.broken_chance:
+                    mat = random.choice(conf.broken_straight)
+                else:
+                    mat = random.choice(conf.tex_straight)
+                self._make_straight(
+                    vmf,
+                    seg,
+                    seg.start,
+                    seg.end,
+                    mat,
+                )
+
+    def _make_overlay(
+        self,
+        vmf: VMF,
+        segment: Segment,
+        pos: Vec,
+        uax: Vec,
+        vax: Vec,
+        mat: AntTex,
+    ) -> None:
+        """Construct an antline overlay at this position."""
+        overlay = make_overlay(
+            vmf,
+            segment.normal,
+            pos,
+            uax,
+            vax,
+            mat.texture,
+            [],
+            u_repeat=(uax.mag() / 16) * mat.scale,
+        )
+        if not mat.static:
+            overlay['targetname'] = self.name
+
+        overlay.tiledefs = list(segment.tiles)
+
+    def _make_straight(
+        self,
+        vmf: VMF,
+        segment: Segment,
+        start: Vec,
+        end: Vec,
+        mat: AntTex,
+    ) -> None:
+        """Construct a straight antline between two points.
+
+        The two points will be the end of the antlines.
+        """
+        offset = start - end
+        forward = offset.norm()
+        side = Vec.cross(segment.normal, forward).norm()
+
+        length = offset.mag()
+
+        self._make_overlay(
+            vmf,
+            segment,
+            (start + end) / 2,
+            length * forward,
+            16 * side,
+            mat,
+        )
 
 
 def parse_antlines(vmf: VMF) -> Tuple[
@@ -345,6 +492,7 @@ def style_antline(over: Entity, conf: AntType, floor_conf: AntType):
 
     floor_conf, if set is an alternate texture set to use on floors and ceilings.
     """
+    raise AssertionError("Not used anymore!!")
     # Choose a random one
     random.seed(over['origin'])
 

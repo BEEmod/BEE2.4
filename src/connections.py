@@ -1596,14 +1596,14 @@ def add_item_indicators(
     inst_type: PanelSwitchingStyle,
     pan_item: ItemType,
 ):
-    """Generate the commands for antlines, and restyle them."""
+    """Generate the commands for antlines and the overlays themselves."""
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
 
-    # TODO: Styling correctly.
-    # for ind in item.antlines:
-    #     ind['targetname'] = ant_name
-    #     antlines.style_antline(ind, item.ant_wall_style, item.ant_floor_style)
+    for ant in item.antlines:
+        ant.name = ant_name
+
+        ant.export(item.inst.map, item.ant_wall_style, item.ant_floor_style)
 
     # If the antline material doesn't toggle, the name is removed by
     # style_antline(). So check if the overlay actually exists still, to
