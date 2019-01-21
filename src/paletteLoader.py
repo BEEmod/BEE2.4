@@ -6,7 +6,7 @@ import utils
 
 import srctools.logger
 import BEE2_config
-from srctools import Property, NoKeyError
+from srctools import Property, NoKeyError, KeyValError
 
 from typing import List, Tuple, Optional
 
@@ -172,7 +172,12 @@ def load_palettes():
         pos_file, prop_file = None, None
         try:
             if name.endswith(PAL_EXT):
-                pal_list.append(Palette.parse(path))
+                try:
+                    pal_list.append(Palette.parse(path))
+                except KeyValError as exc:
+                    # We don't need the traceback, this isn't an error in the app
+                    # itself.
+                    LOGGER.warning('Could not parse palette file, skipping:\n{}', exc)
                 continue
             elif name.endswith('.zip'):
                 # Extract from a zip
