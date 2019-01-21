@@ -202,23 +202,29 @@ class Antline:
                 if (floor_conf if seg.on_floor else wall_conf).tex_corner:
                     continue
                 for corner_ind in [i-1, i+1]:
+                    if i == -1:
+                        continue
                     try:
-                        corner = self.line[corner_ind]
+                        corner = collapse_line[corner_ind]
                     except IndexError:
                         # Each end of the list.
                         continue
 
                     if corner is not None and corner.normal == seg.normal:
-                        if (seg.start - corner.start).mag_sq == 16 ** 2:
-                            seg.start = corner.start
+                        corner_pos = corner.start
+                        if (seg.start - corner_pos).mag_sq() == 8 ** 2:
+                            # Move twice the distance towards the corner, covering
+                            # up that location.
+                            seg.start += 2 * (corner_pos - seg.start)
                             # Remove corner by setting to None, so we aren't
                             # resizing constantly.
                             collapse_line[corner_ind] = None
-                        if (seg.end - corner.end).mag_sq == 16 ** 2:
-                            seg.end = corner.end
+                        elif (seg.end - corner_pos).mag_sq() == 8 ** 2:
+                            seg.end += 2 * (corner_pos - seg.end)
                             collapse_line[corner_ind] = None
 
             self.line[:] = [seg for seg in collapse_line if seg is not None]
+            LOGGER.info('Collapsed {} antline corners', collapse_line.count(None))
 
         for seg in self.line:
             conf = floor_conf if seg.on_floor else wall_conf
