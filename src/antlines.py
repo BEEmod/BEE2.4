@@ -6,7 +6,7 @@ from srctools import Vec, Property, conv_float, Entity, VMF, logger
 from srctools.vmf import overlay_bounds, make_overlay
 import comp_consts as const
 from collections import defaultdict
-from typing import List, Dict, Tuple, TYPE_CHECKING, Iterator, Optional
+from typing import List, Dict, Tuple, TYPE_CHECKING, Iterator, Optional, Set
 
 from enum import Enum
 
@@ -173,7 +173,7 @@ def parse_antlines(vmf: VMF) -> Tuple[
     LOGGER.info('Parsing antlines...')
 
     # segment -> found neighbours of it.
-    overlay_joins = defaultdict(list)  # type: Dict[Segment, List[Segment]]
+    overlay_joins = defaultdict(set)  # type: Dict[Segment, Set[Segment]]
 
     segment_to_name = {}  # type: Dict[Segment, str]
 
@@ -216,7 +216,6 @@ def parse_antlines(vmf: VMF) -> Tuple[
             # fix that.
             start, end = overlay_bounds(over)
 
-
             if end[long_axis] - start[long_axis] == 16:
                 # Special case.
                 # 1-wide antlines don't have the correct
@@ -226,13 +225,11 @@ def parse_antlines(vmf: VMF) -> Tuple[
                 start = end = origin
                 points = []
             else:
-
                 offset = Vec.with_axes(side_axis, 8)
-                points = [start + offset, end - offset]
-
-                offset[long_axis] = 8
                 start += offset
                 end -= offset
+
+                points = [start, end]
         else:
             # It's not an antline.
             continue
@@ -250,11 +247,11 @@ def parse_antlines(vmf: VMF) -> Tuple[
                 (over_name, point.x, point.y, point.z),
                 seg,
             )
-            if neighbour is over:
+            if neighbour is seg:
                 # None found
                 continue
-            overlay_joins[neighbour].append(seg)
-            overlay_joins[seg].append(neighbour)
+            overlay_joins[neighbour].add(seg)
+            overlay_joins[seg].add(neighbour)
 
         # Remove original from the map.
         over.remove()
@@ -266,28 +263,26 @@ def parse_antlines(vmf: VMF) -> Tuple[
 
     # Now, finally compute each continuous section.
     for segment, over_name in segment_to_name.items():
-        neighbours = overlay_joins[segment]
+        try:
+            neighbours = overlay_joins[segment]
+        except KeyError:
+            continue  # Done already.
+
         if len(neighbours) != 1:
             continue
         # Found a start point!
-        [current] = neighbours
-        segments = [segment, current]
-        previous = segment
-        while True:
-            neighbours = overlay_joins[current]
+        segments = [segment]
+
+        for segment in segments:
+            neighbours = overlay_joins.pop(segment)
+            # Except KeyError: this segment's already done??
             for neighbour in neighbours:
-                if neighbour is not previous:
+                if neighbour not in segments:
                     segments.append(neighbour)
-                    previous, current = current, neighbour
-                    break
-            else:
-                # No neighbours we haven't got already.
-                # Break the while loop.
-                break
 
         antlines.setdefault(over_name, []).append(Antline(over_name, segments))
 
-    LOGGER.info('Done!')
+    LOGGER.info('Done! ({} antlines)'.format(sum(map(len, antlines.values()))))
     return antlines, side_to_seg
 
 
@@ -295,7 +290,7 @@ def fix_single_straight(
     seg: Segment,
     over_name: str,
     join_points: Dict[Tuple[str, float, float, float], Segment],
-    overlay_joins: Dict[Segment, List[Segment]],
+    overlay_joins: Dict[Segment, Set[Segment]],
 ) -> None:
     """Figure out the correct rotation for 1-long straight antlines."""
     # Check the U and V axis, to see if there's another antline on both
@@ -316,8 +311,8 @@ def fix_single_straight(
         except KeyError:
             continue
 
-        overlay_joins[seg].append(neigh)
-        overlay_joins[neigh].append(seg)
+        overlay_joins[seg].add(neigh)
+        overlay_joins[neigh].add(seg)
 
         off_min = center - abs(off)
         off_max = center + abs(off)
