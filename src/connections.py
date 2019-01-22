@@ -575,8 +575,6 @@ class Item:
 
     def delete_antlines(self):
         """Delete the antlines and checkmarks outputting from this item."""
-        for ent in self.antlines:
-            ent.remove()
         for ent in self.ind_panels:
             ent.remove()
         for sign in self.shape_signs:
@@ -945,8 +943,8 @@ def do_item_optimisation(vmf: VMF):
             # We just leave the panel entities, and tie all the antlines
             # to the same toggle.
             needs_global_toggle = True
-            for ent in item.antlines:
-                ent['targetname'] = '_static_ind'
+            for ant in item.antlines:
+                ant.name = '_static_ind'
 
             del ITEMS[item.name]
             item.inst.remove()
