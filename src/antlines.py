@@ -153,28 +153,30 @@ class Segment:
     def broken_iter(
         self,
         chance: float,
-    ) -> Iterator[Tuple[int, int, bool]]:
+    ) -> Iterator[Tuple[Vec, Vec, bool]]:
         """Iterator to compute positions for straight segments.
 
-        This produces min, max pairs which fill the space from 0-dist.
+        This produces point pairs which fill the space from 0-dist.
         Neighbouring sections will be merged when they have the same
         type.
         """
-        dist = (self.start - self.end).mag()
+        offset = self.end - self.start
+        dist = offset.mag() // 16
+        norm = 16 * offset.norm()
 
-        if dist < 48 or chance == 0:
+        if dist < 3 or chance == 0:
             # Short antlines always are either on/off.
-            yield 0, int(dist), (random.randrange(100) < chance)
+            yield self.start, self.end, (random.randrange(100) < chance)
         else:
-            run_start = 0
+            run_start = self.start
             last_type = random.randrange(100) < chance
             for i in range(1, int(dist)):
                 next_type = random.randrange(100) < chance
                 if next_type != last_type:
-                    yield run_start, i, last_type
+                    yield run_start, self.start + i * norm, last_type
                     last_type = next_type
-                    run_start = i
-            yield run_start, int(dist), last_type
+                    run_start = self.start + i * norm
+            yield run_start, self.end, last_type
 
 
 class Antline:
@@ -255,17 +257,18 @@ class Antline:
                 )
             else:  # Straight
                 # TODO: Break up these segments.
-                if random.randrange(100) < conf.broken_chance:
-                    mat = random.choice(conf.broken_straight)
-                else:
-                    mat = random.choice(conf.tex_straight)
-                self._make_straight(
-                    vmf,
-                    seg,
-                    seg.start,
-                    seg.end,
-                    mat,
-                )
+                for a, b, is_broken in seg.broken_iter(conf.broken_chance):
+                    if is_broken:
+                        mat = random.choice(conf.broken_straight)
+                    else:
+                        mat = random.choice(conf.tex_straight)
+                    self._make_straight(
+                        vmf,
+                        seg,
+                        a,
+                        b,
+                        mat,
+                    )
 
     def _make_overlay(
         self,
