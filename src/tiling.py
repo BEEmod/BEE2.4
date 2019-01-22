@@ -2,6 +2,9 @@
 
 It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
+
+Note: We also store a list of tiledefs in overlay entities in the map, if
+they were attached to the original brushes.
 """
 from collections import defaultdict, Counter
 
@@ -1100,7 +1103,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
         except KeyError:
             continue
         for seg in segments:
-            seg.tiles.append(tile)
+            seg.tiles.add(tile)
 
     # Parse face IDs saved in overlays - if they're matching a tiledef,
     # remove them.

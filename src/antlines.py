@@ -143,7 +143,7 @@ class Segment:
         self.start = start
         self.end = end
         # The brushes this segment is attached to.
-        self.tiles = []  # type: List['TileDef']
+        self.tiles = set()  # type: Set['TileDef']
 
     @property
     def on_floor(self) -> bool:
@@ -210,18 +210,27 @@ class Antline:
                         # Each end of the list.
                         continue
 
-                    if corner is not None and corner.normal == seg.normal:
+                    if (
+                        corner is not None and
+                        corner.type is SegType.CORNER and
+                        corner.normal == seg.normal
+                    ):
                         corner_pos = corner.start
                         if (seg.start - corner_pos).mag_sq() == 8 ** 2:
-                            # Move twice the distance towards the corner, covering
-                            # up that location.
+                            # The line segment is at the border between them,
+                            # the corner is at the center. So move double the
+                            # distance towards the corner, so it reaches to the
+                            # other side of the corner and replaces it.
                             seg.start += 2 * (corner_pos - seg.start)
                             # Remove corner by setting to None, so we aren't
-                            # resizing constantly.
+                            # resizing the list constantly.
                             collapse_line[corner_ind] = None
+                            # Now merge together the tiledefs.
+                            seg.tiles.update(corner.tiles)
                         elif (seg.end - corner_pos).mag_sq() == 8 ** 2:
                             seg.end += 2 * (corner_pos - seg.end)
                             collapse_line[corner_ind] = None
+                            seg.tiles.update(corner.tiles)
 
             self.line[:] = [seg for seg in collapse_line if seg is not None]
             LOGGER.info('Collapsed {} antline corners', collapse_line.count(None))
