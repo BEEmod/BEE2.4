@@ -20,7 +20,7 @@ import instanceLocs
 import vbsp_options
 from srctools import Vec, Vec_tuple, VMF, Entity, Side, Solid
 import srctools.logger
-from brushLoc import POS as BLOCK_POS, Block
+from brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from texturing import TileSize, Portalable
 import comp_consts as consts
 import template_brush
@@ -63,7 +63,7 @@ NORM_ANGLES = {
 UV_NORMALS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 # All the tiledefs in the map.
-# Maps a pos, normal -> tiledef
+# Maps a block center, normal -> the tiledef on the side of that block.
 TILES = {}  # type: Dict[Tuple[Vec_tuple, Vec_tuple], TileDef]
 
 # Special key for Tile.SubTile - This is set to 'u' or 'v' to
@@ -87,6 +87,8 @@ class TileType(Enum):
     WHITE_4x4 = 1
     BLACK = 2
     BLACK_4x4 = 3
+
+    GOO_SIDE = 4  # Black sides of goo pits.
      
     NODRAW = 10  # Covered, so it should be set to nodraw
 
@@ -127,11 +129,15 @@ class TileType(Enum):
         return self.value in (0, 1)
 
     @property
+    def is_4x4(self) -> bool:
+        return self.value in (1, 3)
+
+    @property
     def color(self) -> texturing.Portalable:
         """The portalability of the tile."""
         if self.value in (0, 1):
             return texturing.Portalable.WHITE
-        elif self.value in (2, 3):
+        elif self.value in (2, 3, 4):
             return texturing.Portalable.BLACK
         raise ValueError('No colour for ' + self.name + '!')
 
@@ -167,6 +173,7 @@ _tiletype_inverted = {
     TileType.WHITE: TileType.BLACK,
     TileType.BLACK_4x4: TileType.WHITE_4x4,
     TileType.WHITE_4x4: TileType.BLACK_4x4,
+    TileType.GOO_SIDE: TileType.WHITE_4x4,
 }
 
 # Symbols that represent TileSize values.
@@ -175,6 +182,7 @@ TILETYPE_TO_CHAR = {
     TileType.WHITE_4x4: 'w',
     TileType.BLACK: 'B',
     TileType.BLACK_4x4: 'b',
+    TileType.GOO_SIDE: 'g',
     TileType.NODRAW: 'n',
     TileType.VOID: '.',
     TileType.CUTOUT_TILE_BROKEN: 'x',
@@ -248,7 +256,7 @@ class Pattern:
         tex: TileSize,
         *tiles: Tuple[int, int, int, int],
         wall_only=False
-    ):
+    ) -> None:
         self.tex = tex
         self.wall_only = wall_only
         self.tiles = list(tiles)
@@ -261,7 +269,7 @@ class Pattern:
             assert (umax - umin) % tile_u == 0, tile_tex
             assert (vmax - vmin) % tile_v == 0, tile_tex
             
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Pattern({!r}, {}{}'.format(
             self.tex,
             ','.join(map(repr, self.tiles)),
@@ -269,7 +277,7 @@ class Pattern:
         )
 
 
-def order_bbox(bbox):
+def order_bbox(bbox: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
     """Used to sort 4x4 pattern positions.
 
     The pattern order is the order that they're tried in.
@@ -416,6 +424,7 @@ class TileDef:
         )
 
     def print_tiles(self) -> None:
+        """Debug utility, log the subtile shape."""
         out = []
         tiles = self.get_subtiles()
         for v in reversed(range(4)):
@@ -552,7 +561,6 @@ class TileDef:
         if self.sub_tiles is None:
             # Force subtiles to be all the parts we need.
             self.sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
-
 
         if self.brush_type is BrushType.NORMAL:
             faces, brushes = self.gen_multitile_pattern(
@@ -745,12 +753,23 @@ class TileDef:
                 tile_center += vec_offset
 
             if tile_type.is_tile:
-                u_size, v_size = TILE_SIZES[grid_size]
-                tex = texturing.gen(
-                    texturing.GenCat.NORMAL,
-                    normal,
-                    tile_type.color,
-                ).get(tile_center, grid_size)
+                if tile_type is TileType.GOO_SIDE:
+                    # This forces a specific size.
+                    u_size = v_size = 4
+                    tex = texturing.gen(
+                        texturing.GenCat.NORMAL,
+                        normal,
+                        Portalable.BLACK
+                    ).get(tile_center, TileSize.GOO_SIDE)
+                else:
+                    if tile_type.is_4x4:
+                        grid_size = TileSize.TILE_4x4
+                    u_size, v_size = TILE_SIZES[grid_size]
+                    tex = texturing.gen(
+                        texturing.GenCat.NORMAL,
+                        normal,
+                        tile_type.color,
+                    ).get(tile_center, grid_size)
                 brush, face = make_tile(
                     vmf,
                     tile_center,
@@ -851,9 +870,14 @@ def edit_quarter_tile(
         return
 
     # If nodrawed, don't revert for tiles.
-    if old_tile is TileType.NODRAW:
-        if tile_type.is_tile:
-            return
+    if old_tile is TileType.NODRAW and tile_type.is_tile:
+        return
+
+    # Don't regress goo sides to other types of black tile.
+    if old_tile is TileType.GOO_SIDE and (
+        tile_type is TileType.BLACK or tile_type is TileType.BLACK_4x4
+    ):
+        return
 
     subtiles[u, v] = tile_type
 
@@ -1116,6 +1140,26 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
                 faces.remove(face)
         over['sides'] = ' '.join(faces)
 
+    # Now look at all the blocklocs in the map, applying goo sides.
+    # Don't override white surfaces, they can only appear on panels.
+    goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
+    for pos, block in BLOCK_POS.items():
+        if block.is_goo:
+            for norm in NORMALS:
+                grid_pos = grid_to_world(pos) - 128 * norm
+                try:
+                    tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]  # type: TileDef
+                except KeyError:
+                    continue
+
+                if tile.sub_tiles is None:
+                    if tile.base_type in goo_replaceable:
+                        tile.base_type = TileType.GOO_SIDE
+                else:
+                    for uv, tile_type in tile.sub_tiles.items():
+                        if tile_type in goo_replaceable:
+                            tile.sub_tiles[uv] = TileType.GOO_SIDE
+
 
 def tiledefs_from_cube(face_to_tile: Dict[int, TileDef], brush: Solid, grid_pos: Vec):
     """Generate a tiledef matching a 128^3 block."""
@@ -1319,11 +1363,21 @@ def generate_brushes(vmf: VMF) -> None:
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
-            tex = texturing.gen(
-                texturing.GenCat.NORMAL,
-                normal,
-                tile.base_type.color
-            ).get(pos, tile.base_type.tile_size)
+
+            if tile_type is TileType.GOO_SIDE:
+                # This forces a specific size.
+                tex = texturing.gen(
+                    texturing.GenCat.NORMAL,
+                    normal,
+                    Portalable.BLACK
+                ).get(pos, TileSize.GOO_SIDE)
+            else:
+                tex = texturing.gen(
+                    texturing.GenCat.NORMAL,
+                    normal,
+                    tile.base_type.color
+                ).get(pos, tile.base_type.tile_size)
+
             u_pos = (pos[u_axis] - bbox_min[u_axis]) // 128
             v_pos = (pos[v_axis] - bbox_min[v_axis]) // 128
             grid_pos[tex][u_pos, v_pos] = True
@@ -1405,8 +1459,6 @@ def generate_goo(vmf: VMF) -> None:
 
     # Find key with the highest value - that gives the largest z-level.
     best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
-
-    LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
 
     for ((min_z, max_z), grid) in goo_pos.items():
         for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
