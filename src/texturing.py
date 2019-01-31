@@ -129,7 +129,7 @@ TEX_DEFAULTS = {
 
         # Squarebeams texture for normal walls, and moving panels.
         'edge': consts.Special.SQUAREBEAMS,
-        'edge_special': consts.Special.SQUAREBEAMS,
+        'panel_edge': consts.Special.SQUAREBEAMS,
 
         # Texture on the side of the special pedestal platform.
         'pedestalside': consts.Special.PED_SIDE,
