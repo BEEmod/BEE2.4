@@ -102,32 +102,32 @@ class TileType(Enum):
     CUTOUT_TILE_PARTIAL = 23
     
     @property
-    def is_recess(self):
+    def is_recess(self) -> bool:
         """Should this recess the surface?"""
         return self.value in (22, 23)
      
     @property   
-    def is_nodraw(self):
+    def is_nodraw(self) -> bool:
         """Should this swap to nodraw?"""
         return self.value == 10
         
     @property
-    def blocks_pattern(self):
+    def blocks_pattern(self) -> bool:
         """Does this affect patterns?"""
         return self.value != 22
         
     @property
-    def is_tile(self):
+    def is_tile(self) -> bool:
         """Is this a regular tile (white/black)."""
         return self.value < 10
         
     @property
-    def is_white(self):
+    def is_white(self) -> bool:
         """Is this portalable?"""
         return self.value in (0, 1)
 
     @property
-    def color(self):
+    def color(self) -> texturing.Portalable:
         """The portalability of the tile."""
         if self.value in (0, 1):
             return texturing.Portalable.WHITE
@@ -136,12 +136,12 @@ class TileType(Enum):
         raise ValueError('No colour for ' + self.name + '!')
 
     @property
-    def inverted(self):
+    def inverted(self) -> 'TileType':
         """Swap the color of a type."""
         return _tiletype_inverted.get(self, self)
 
     @property
-    def tile_size(self):
+    def tile_size(self) -> TileSize:
         """The size of the tile this should force."""
         if self.value in (1, 3):
             return TileSize.TILE_4x4
@@ -149,7 +149,10 @@ class TileType(Enum):
             return TileSize.TILE_1x1
 
     @staticmethod
-    def with_color_and_size(size: TileSize, color: texturing.Portalable):
+    def with_color_and_size(
+        size: TileSize,
+        color: texturing.Portalable
+    ) -> 'TileType':
         """Return the TileType with a size and color."""
         return _tiletype_tiles[size, color]
 
@@ -498,23 +501,19 @@ class TileDef:
                 # Loop through our output and adjust the centerline outward.
                 if split_type == 'u':
                     for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
-                        LOGGER.info('Pattern before: {}, {}: {}, {}', umin, vmin, umax, vmax)
                         if umin == 2:
                             umin = 2.5
                         if umax == 2:
                             umax = 1.5
-                        LOGGER.info('Pattern after: {}, {}: {}, {}', umin, vmin, umax, vmax)
                         yield umin, umax, vmin, vmax, grid_size, tile_type
                     # Now yield the nodraw-brush.
                     yield 1.5, 2.5, 0, 4, TileSize.TILE_4x4, TileType.NODRAW
                 elif split_type == 'v':
                     for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
-                        LOGGER.info('Pattern before: {}, {}: {}, {}', umin, vmin, umax, vmax)
                         if vmin == 2:
                             vmin = 2.5
                         if vmax == 2:
                             vmax = 1.5
-                        LOGGER.info('Pattern after: {}, {}: {}, {}', umin, vmin, umax, vmax)
                         yield umin, umax, vmin, vmax, grid_size, tile_type
                     # Now yield the nodraw-brush.
                     yield 0, 4, 1.5, 2.5, TileSize.TILE_4x4, TileType.NODRAW
@@ -666,19 +665,53 @@ class TileDef:
                 )
                 vmf.add_brush(brush)
             else:
+                # This is a static rotated panel.
                 self.panel_ent.keys = {'classname': 'func_detail'}
 
                 # Rotate the panel to match the panel shape:
                 # Figure out if we want to rotate +ve or -ve.
-                # We know 90 degrees should rotate to the normal.
+                # We know rotating the surface 90 degrees will point
+                # the end straight up, so check if it points at the normal.
                 if Vec(y=1).rotate(*hinge_axis.rotation_around()) == self.normal:
                     rotation = hinge_axis.rotation_around(static_angle.value)
                 else:
                     rotation = hinge_axis.rotation_around(-static_angle.value)
+
+                # Shift so the rotation axis is 0 0 0, then shift back
+                # to rotate correctly.
                 panel_offset = front_pos - 64 * front_normal
+
+                # Rotating like this though will make the brush clip into the
+                # surface it's attached on. We need to clip the hinge edge
+                # so it doesn't do that.
+                # We can just produce any plane that is the correct
+                # orientation and let VBSP sort out the geometry.
+
+                # So construct a box, and grab the side pointing "down".
+                clip_template = vmf.make_prism(
+                    self.pos + 64 + 128 * self.normal,
+                    self.pos - 64 + 128 * self.normal,
+                )[PRISM_NORMALS[(-self.normal).as_tuple()]]  # type: Side
+
+                front_axis = front_normal.axis()
+
                 for brush in brushes:
+                    clip_face = None
+                    for face in brush:
+                        if (
+                            face.normal() == front_normal
+                            and face.get_origin()[front_axis]
+                            == panel_offset[front_axis]
+                        ):
+                            clip_face = face
+                            break
                     brush.localise(-panel_offset)
                     brush.localise(panel_offset, rotation)
+                    if clip_face is not None:
+                        clip_face.uaxis = clip_template.uaxis.copy()
+                        clip_face.vaxis = clip_template.vaxis.copy()
+                        clip_face.planes = [p.copy() for p in clip_template.planes]
+                        clip_face.mat = consts.Tools.NODRAW
 
         elif self.brush_type is BrushType.FLIP_PANEL:
             assert self.panel_inst is not None
