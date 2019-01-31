@@ -550,48 +550,9 @@ class TileDef:
         is_wall = bool(self.normal.z)
 
         if self.sub_tiles is None:
-            full_type = self.base_type  # type: Optional[TileType]
-        else:
-            # If we have exactly 1 subtile, use a single full brush
-            # since we know the pattern won't change.
-
-            if len(set(self.sub_tiles.values())) == 1:
-                full_type = next(iter(self.sub_tiles.values()))
-            else:
-                full_type = None
-
-        # We only have one type of tile to generate.
-        if full_type is not None:
-            # If a 'normal' brush, we can simplify to just a single tile.
-            # Otherwise go the full multitile route.
-            if self.brush_type is BrushType.NORMAL:
-                if full_type.is_nodraw:
-                    tex = consts.Tools.NODRAW
-                else:
-                    tex = texturing.gen(
-                        texturing.GenCat.NORMAL,
-                        self.normal,
-                        full_type.color,
-                    ).get(front_pos, full_type.tile_size)
-                brush, face = make_tile(
-                    vmf,
-                    self.pos + self.normal * 64,
-                    self.normal,
-                    top_surf=tex,
-                    width=128,
-                    height=128,
-                    bevels=bevels,
-                    back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
-                )
-                self.brush_faces.append(face)
-                yield brush
-                return
-
-        if self.sub_tiles is None:
             # Force subtiles to be all the parts we need.
             self.sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
 
-        # Multiple tile types in the block, or a special tiledef type - panels etc.
 
         if self.brush_type is BrushType.NORMAL:
             faces, brushes = self.gen_multitile_pattern(
