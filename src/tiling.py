@@ -622,16 +622,17 @@ class TileDef:
             front_normal = Vec(x=1).rotate(*panel_angles)
 
             # For static 90 degree panels, we want to generate as if it's
-            # in that position.
+            # in that position - that way we get the right textures.
             if static_angle is PanelAngle.ANGLE_90:
                 faces, brushes = self.gen_multitile_pattern(
                     vmf,
                     self.sub_tiles,
-                    bool(front_normal.z),
-                    bevels,
-                    -front_normal,
-                    vec_offset=64 * self.normal - 64 *front_normal,
+                    is_wall=bool(front_normal.z),
+                    bevels=bevels,
+                    normal=-front_normal,
+                    vec_offset=64 * self.normal - 64 * front_normal,
                     thickness=2,
+                    is_panel=True,
                 )
             else:
                 faces, brushes = self.gen_multitile_pattern(
@@ -642,6 +643,7 @@ class TileDef:
                     self.normal,
                     offset=(64+8 if static_angle is PanelAngle.ANGLE_FLAT else 64),
                     thickness=(8 if static_angle is PanelAngle.ANGLE_FLAT else 2),
+                    is_panel=True,
                 )
             self.panel_ent.solids.extend(brushes)
             if static_angle is None or static_angle is PanelAngle.ANGLE_90:
@@ -659,7 +661,7 @@ class TileDef:
                     top_surf=consts.Tools.NODRAW,
                     width=128,
                     height=128,
-                    bevels=bevels,
+                    bevels=(True, True, True, True),
                     back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
                 )
                 vmf.add_brush(brush)
@@ -724,12 +726,11 @@ class TileDef:
         offset: int=64,
         thickness: int=4,
         vec_offset: Vec=None,
+        is_panel: bool=False,
     ) -> Tuple[List[Side], List[Solid]]:
         """Generate a bunch of tiles, and return the front faces."""
         brushes = []
         faces = []
-
-        axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
         # NOTE: calc_patterns can produce 0, 1, 1.5, 2, 2.5, 3, 4!
         # Half-values are for nodrawing fizzlers which are center-aligned.
@@ -768,6 +769,7 @@ class TileDef:
                     u_align=u_size * 128,
                     v_align=v_size * 128,
                     thickness=thickness,
+                    panel_edge=is_panel,
                 )
                 faces.append(face)
                 brushes.append(brush)
@@ -792,6 +794,7 @@ class TileDef:
                     height=(vmax - vmin) * 32,
                     bevels=bevels,
                     back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
+                    panel_edge=is_panel,
                 )
                 faces.append(face)
                 brushes.append(brush)
