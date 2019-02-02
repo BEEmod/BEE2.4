@@ -610,9 +610,10 @@ class GenClump(Generator):
             # No clump found - return the gap texture.
             return self._random.choice(self.textures[TileSize.CLUMP_GAP])
 
-        # Mix these two values together to determine the texture.
+        # Mix these three values together to determine the texture.
         # The clump seed makes each clump different, and adding the texture
-        # name makes sure each surface
+        # name makes sure different surface types don't copy each other's
+        # indexes.
         self._random.seed(
             self.gen_seed ^
             int.from_bytes(tex_name.encode(), 'big') ^
