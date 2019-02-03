@@ -23,6 +23,7 @@ from typing import (
     NamedTuple, Tuple,
     Dict, List, Set,
     Iterator,
+    Optional,
 )
 
 LOGGER = srctools.logger.get_logger(__name__, alias='template')
@@ -157,6 +158,7 @@ ExportedTemplate = NamedTuple('ExportedTemplate', [
     ('template', 'Template'),
     ('origin', Vec),
     ('angles', Vec),
+    ('picker_results', Dict[str, Optional[texturing.Portalable]]),
 ])
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
@@ -622,6 +624,7 @@ def import_template(
         template,
         origin,
         angles or Vec(0, 0, 0),
+        {},  # Filled by retexture_template.
     )
 
 
@@ -729,7 +732,7 @@ def retexture_template(
     # For each face, if it needs to be forced to a colour, or None if not.
     force_colour_face = defaultdict(lambda: None)
     # Picker names to their results.
-    picker_results = {}
+    picker_results = template_data.picker_results  # type: Dict[str, Optional[texturing.Portalable]]
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:

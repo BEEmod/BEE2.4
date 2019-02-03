@@ -481,6 +481,11 @@ def res_import_template_setup(res: Property):
     # If true, force visgroups to all be used.
     visgroup_force_var = res['forceVisVar', '']
 
+    picker_vars = [
+        (prop.real_name, prop.value)
+        for prop in res.find_children('pickerVars')
+    ]
+
     return (
         temp_id,
         dict(replace_tex),
@@ -496,6 +501,7 @@ def res_import_template_setup(res: Property):
         visgroup_func,
         visgroup_force_var,
         keys,
+        picker_vars,
     )
 
 
@@ -546,6 +552,11 @@ def res_import_template(inst: Entity, res: Property):
             is the percentage chance for each visgroup to be added.
     - visgroup_force_var: If set and True, visgroup is ignored and all groups
             are added.
+    - pickerVars:
+            If this is set, the results of colorpickers can be read
+            out of the template. The key is the name of the picker, the value
+            is the fixup name to write to. The output is either 'white',
+            'black' or ''.
     """
     (
         orig_temp_id,
@@ -562,6 +573,7 @@ def res_import_template(inst: Entity, res: Property):
         visgroup_func,
         visgroup_force_var,
         key_block,
+        picker_vars,
     ) = res.value
 
     if ':' in orig_temp_id:
@@ -686,6 +698,15 @@ def res_import_template(inst: Entity, res: Property):
         # Don't allow clumping if using custom keyvalues - then it won't be edited.
         no_clumping=key_block is not None,
     )
+
+    for picker_name, picker_var in picker_vars:
+        picker_val = temp_data.picker_results.get(
+            picker_name, None,
+        )  # type: Optional[texturing.Portalable]
+        if picker_val is not None:
+            inst.fixup[picker_var] = picker_val.value
+        else:
+            inst.fixup[picker_var] = ''
 
 
 @make_result('HollowBrush')
