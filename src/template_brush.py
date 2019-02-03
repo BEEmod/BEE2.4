@@ -719,13 +719,6 @@ def retexture_template(
     # can clip into each other without looking bad.
     rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*(origin // 128))
 
-    # Even if not axis-aligned, make mostly-flat surfaces
-    # floor/ceiling (+-40 degrees)
-    # sin(40) = ~0.707
-    floor_tolerance = 0.8
-
-    can_clump = vbsp.can_clump()
-
     # Ensure all values are lists.
     replace_tex = {
         key.casefold(): ([value] if isinstance(value, str) else value)
@@ -751,25 +744,35 @@ def retexture_template(
                 if not picker_norm[axis]:
                     picker_pos[axis] = picker_pos[axis] // 128 * 128 + 64
 
-        brush = conditions.SOLIDS.get(picker_pos.as_tuple(), None)
-
-        if brush is None or abs(brush.normal) != abs(picker_norm):
+        try:
+            tiledef, u, v = tiling.find_tile(picker_pos, picker_norm)
+        except KeyError:
             # Doesn't exist.
-
             if color_picker.name:
                 picker_results[color_picker.name] = None
             continue
 
-        if color_picker.name:
-            picker_results[color_picker.name] = brush.color
+        if tiledef.sub_tiles is None:
+            tile_type = tiledef.base_type
+        else:
+            tile_type = tiledef.sub_tiles[u, v]
+        try:
+            tile_color = tile_type.color
+        except ValueError:
+            # Not a tile with color (void, etc). Treat as missing.
+            picker_results[color_picker.name] = None
+            continue
 
-        if color_picker.remove_brush and brush.solid in vbsp.VMF.brushes:
-            brush.solid.remove()
+        if color_picker.name:
+            picker_results[color_picker.name] = tile_color
+
+        if color_picker.remove_brush:
+            tiledef.get_subtiles()[u, v] = TileType.VOID
 
         for side in color_picker.sides:
             # Only do the highest priority successful one.
             if force_colour_face[side] is None:
-                force_colour_face[side] = brush.color
+                force_colour_face[side] = tile_color
 
     for tile_setter in template.tile_setters:
         setter_pos = tile_setter.offset.copy().rotate(*template_data.angles)
@@ -900,7 +903,7 @@ def retexture_template(
             texturing.apply(gen_type, face, tex_name, tex_colour)
 
     for over in template_data.overlay[:]:
-        random.seed('TEMP_OVERLAY_' + over['basisorigin'])
+        over_pos = Vec.from_str(over['basisorigin'])
         mat = over['material'].casefold()
         if mat in replace_tex:
             mat = random.choice(replace_tex[mat])
@@ -909,13 +912,16 @@ def retexture_template(
             if mat.startswith('<') or mat.endswith('>'):
                 # TODO: Getting Valve textures
                 # Lookup in the style data.
-                pass #mat = vbsp.get_tex(mat[1:-1])
-        elif mat in vbsp.TEX_VALVE:
-            # TODO: Getting Valve textures
-            pass  #mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+                mat = texturing.OVERLAYS.get(over_pos, mat[1:-1])
         else:
-            # No need to edit.
-            continue
+            try:
+                gen_type, tex_type = vbsp.TEX_VALVE[mat]
+            except KeyError:
+                # No need to edit.
+                continue
+            else:
+                if gen_type == 'overlay':
+                    mat = texturing.OVERLAYS.get(over_pos, tex_type)
 
         if mat == '':
             # If blank, remove the overlay from the map and the list.

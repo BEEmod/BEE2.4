@@ -834,13 +834,12 @@ class TileDef:
         return self.base_type.is_tile
 
 
-def edit_quarter_tile(
-    origin: Vec,
-    normal: Vec,
-    tile_type: TileType,
-    force=False,
-):
-    """Alter a 1/4 tile section of a tile."""
+def find_tile(origin: Vec, normal: Vec) -> Tuple[TileDef, int, int]:
+    """Locate the tiledef for a specific tile.
+
+    The tiledef and the subtile UV are returned, or KeyError is raised
+    if the position has no tile.
+    """
     norm_axis = normal.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
 
@@ -851,10 +850,24 @@ def edit_quarter_tile(
     v = uv_pos[v_axis] // 32 % 4
 
     if u != round(u) or v != round(v):
-        return
+        raise KeyError('Badly offset into a tile!')
+
+    tile = TILES[grid_pos.as_tuple(), normal.as_tuple()]
+    # except KeyError: raise
+
+    return tile, u, v
+
+
+def edit_quarter_tile(
+    origin: Vec,
+    normal: Vec,
+    tile_type: TileType,
+    force=False,
+):
+    """Alter a 1/4 tile section of a tile."""
 
     try:
-        tile = TILES[grid_pos.as_tuple(), normal.as_tuple()]
+        tile, u, v = find_tile(origin, normal)
     except KeyError:
         LOGGER.warning('Expected tile, but none found: {}, {}', origin, normal)
         return
