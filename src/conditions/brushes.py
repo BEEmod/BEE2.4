@@ -795,8 +795,6 @@ def res_set_tile(inst: Entity, res: Property):
     offset += origin
 
     norm = Vec(0, 0, 1).rotate(*angles)
-    norm_axis = norm.axis()
-    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
 
     force_tile = res.bool('force')
 
@@ -810,39 +808,12 @@ def res_set_tile(inst: Entity, res: Property):
             if val == '_':
                 continue
 
+            try:
+                new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
+            except KeyError:
+                LOGGER.warning('Unknown tiletype "{}"!', val)
+                continue
+
             pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
 
-            grid_pos = tiling.round_grid(pos - norm)
-
-            uv_pos = (pos - grid_pos + 64 - 16)
-            u = uv_pos[u_axis] // 32 % 4
-            v = uv_pos[v_axis] // 32 % 4
-
-            if u != round(u) or v != round(v):
-                continue
-
-            try:
-                tile = tiling.TILES[grid_pos.as_tuple(), norm.as_tuple()]
-            except KeyError:
-                LOGGER.warning('Expected tile, but none found: {}, {}', pos, norm)
-                continue
-
-            subtiles = tile.get_subtiles()
-
-            old_tile = subtiles[u, v]
-            new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
-
-            if force_tile:
-                subtiles[u, v] = new_tile
-                continue
-
-            # Don't replace void spaces with other things
-            if old_tile is tiling.TileType.VOID:
-                continue
-
-            # If nodrawed, don't revert for tiles.
-            if old_tile is tiling.TileType.NODRAW:
-                if new_tile.is_tile:
-                    continue
-
-            subtiles[u, v] = new_tile
+            tiling.edit_quarter_tile(pos, norm, new_tile, force_tile)
