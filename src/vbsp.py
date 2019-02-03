@@ -1989,8 +1989,6 @@ def change_overlays() -> None:
                     val *= sign_size
                     over[prop] = val.join(' ')
 
-        # TODO: Remake antlines.
-
 
 def add_extra_ents(mode):
     """Add the various extra instances to the map."""
@@ -2181,74 +2179,6 @@ def add_extra_ents(mode):
         origin=global_ents_pos + (0, 0, 16),
     )
     logic_auto.outputs = GLOBAL_OUTPUTS
-
-
-def change_func_brush():
-    """Edit func_brushes."""
-    # TODO: Remove!!
-    LOGGER.info("Editing Brush Entities...")
-    return
-
-    dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
-    dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
-
-    # All the textures used for faith plate bullseyes
-    bullseye_white = set(itertools.chain.from_iterable(
-        settings['textures']['special.bullseye_white_' + orient]
-        for orient in ('floor', 'wall', 'ceiling')
-    ))
-    bullseye_black = set(itertools.chain.from_iterable(
-        settings['textures']['special.bullseye_black_' + orient]
-        for orient in ('floor', 'wall', 'ceiling')
-    ))
-
-    if get_tex('special.edge_special') == '':
-        edge_tex = 'special.edge'
-        rotate_edge = vbsp_options.get(bool, 'rotate_edge')
-        edge_off = vbsp_options.get(bool, 'reset_edge_off')
-        edge_scale = vbsp_options.get(float, 'edge_scale')
-    else:
-        edge_tex = 'special.edge_special'
-        rotate_edge = vbsp_options.get(bool, 'rotate_edge_special')
-        edge_off = vbsp_options.get(bool, 'reset_edge_off_special')
-        edge_scale = vbsp_options.get(float, 'edge_scale_special')
-
-    for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
-        if brush in IGNORED_BRUSH_ENTS:
-            continue
-
-        target = brush['targetname', '']
-        # Fizzlers need their custom outputs.
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            brush['targetname'] = target[:-6] + '-br_brush'
-
-        delete_brush = False
-        for side in brush.sides():
-
-            if side in IGNORED_FACES:
-                continue
-
-            if side.mat == consts.Special.SQUAREBEAMS:
-                side.mat = get_tex(edge_tex)
-                fix_squarebeams(
-                    side,
-                    rotate_edge,
-                    edge_off,
-                    edge_scale,
-                )
-                continue
-
-            alter_mat(side)  # for gratings, laserfields and some others
-
-            # The style blanked the material, so delete the brush
-            if side.mat == '':
-                delete_brush = True
-                break
-
-        if delete_brush:
-            VMF.remove_ent(brush)
-            continue
 
 
 def change_ents():
@@ -2672,11 +2602,10 @@ def main() -> None:
         tiling.generate_brushes(VMF)
         change_overlays()
         collapse_goo_trig()
-        change_func_brush()
         barriers.make_barriers(VMF)
         fix_worldspawn()
 
-        # Ensure all VMF outputs use the correct seperator.
+        # Ensure all VMF outputs use the correct separator.
         for ent in VMF.entities:
             for out in ent.outputs:
                 out.comma_sep = False
