@@ -580,10 +580,12 @@ class TileDef:
                 # Dynamic panels are always beveled.
                 bevels = (True, True, True, True)
                 static_angle = None
+                thickness = vbsp_options.get(int, 'dynamic_pan_thickness')
             else:
                 # Static panels can be straight.
                 bevels = (False, False, False, False)
                 static_angle = PanelAngle.from_inst(self.panel_inst)
+                thickness = vbsp_options.get(int, 'static_pan_thickness')
 
             panel_angles = Vec.from_str(self.panel_inst['angles'])
             hinge_axis = Vec(y=1).rotate(*panel_angles)
@@ -599,7 +601,7 @@ class TileDef:
                     bevels=bevels,
                     normal=-front_normal,
                     vec_offset=64 * self.normal - 64 * front_normal,
-                    thickness=2,
+                    thickness=thickness,
                     is_panel=True,
                 )
             else:
@@ -610,7 +612,7 @@ class TileDef:
                     bevels,
                     self.normal,
                     offset=(64+8 if static_angle is PanelAngle.ANGLE_FLAT else 64),
-                    thickness=(8 if static_angle is PanelAngle.ANGLE_FLAT else 2),
+                    thickness=(8 if static_angle is PanelAngle.ANGLE_FLAT else thickness),
                     is_panel=True,
                 )
             self.panel_ent.solids.extend(brushes)
@@ -1087,12 +1089,11 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
             # EmbedFace block..
             tiledefs_from_embedface(face_to_tile, brush, grid_pos, norm)
 
-    # Look for Angled panels.
+    # Look for Angled and Flip Panels, to link the tiledef to the instance.
     # First grab the instances.
     panel_inst = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
 
     panels = {}  # type: Dict[str, Entity]
-
     for inst in vmf_file.by_class['func_instance']:
         if inst['file'].casefold() in panel_inst:
             panels[inst['targetname']] = inst
@@ -1100,18 +1101,22 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
     import conditions
 
+    # Find Angled Panel brushes.
     for brush_ent in vmf_file.by_class['func_brush']:
         # Grab the instance name out of the parent - these are the
         # only ones with parents in default PeTI.
         if brush_ent['parentname']:
             # Strip '-model_arms'...
             panel_inst = panels[brush_ent['parentname'][:-11]]
+
+            # Allow styles to configure their instance name.
             brush_ent['parentname'] = conditions.local_name(
                 panel_inst,
                 dynamic_pan_parent
             )
             tiledef_from_angled_panel(brush_ent, panel_inst)
 
+    # Find all Flip Panels.
     for brush_ent in vmf_file.by_class['func_door_rotating']:
         # Strip '-flipping_panel'...
         panel_inst = panels[brush_ent['targetname'][:-15]]
