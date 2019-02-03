@@ -252,7 +252,7 @@ class Antline:
                     seg,
                     seg.start,
                     Vec.with_axes(axis_u, 16),
-                    Vec.with_axes(axis_v, 16),
+                    16 * seg.normal.cross(Vec.with_axes(axis_u, 1)),
                     mat,
                 )
             else:  # Straight
