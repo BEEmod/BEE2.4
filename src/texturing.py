@@ -286,6 +286,7 @@ def apply(
     else:
         if normal is None:
             normal = face.normal()
+            normal.z = -normal.z
         generator = gen(cat, normal, portalable)
 
     if loc is None:
