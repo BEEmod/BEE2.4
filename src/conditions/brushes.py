@@ -9,6 +9,7 @@ import template_brush
 import vbsp
 import vbsp_options
 import tiling
+import texturing
 import comp_consts as const
 import instance_traits
 from conditions import (
@@ -16,7 +17,8 @@ from conditions import (
 )
 from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
+
 
 COND_MOD_NAME = 'Brushes'
 
@@ -294,7 +296,7 @@ def res_set_texture(inst: Entity, res: Property):
 
 
 @make_result('AddBrush')
-def res_add_brush(inst: Entity, res: Property):
+def res_add_brush(inst: Entity, res: Property) -> None:
     """Spawn in a brush at the indicated points.
 
     - `point1` and `point2` are locations local to the instance, with `0 0 0`
@@ -322,14 +324,15 @@ def res_add_brush(inst: Entity, res: Property):
     point1 += origin  # Then offset to the location of the instance
     point2 += origin
 
-    tex_type = res['type', None]
-    if tex_type not in ('white', 'black'):
+    try:
+        tex_type = texturing.Portalable(res['type', 'black'])
+    except ValueError:
         LOGGER.warning(
             'AddBrush: "{}" is not a valid brush '
             'color! (white or black)',
-            tex_type,
+            res['type'],
         )
-        tex_type = 'black'
+        tex_type = texturing.Portalable.BLACK
 
     dim = point2 - point1
     dim.max(-dim)
@@ -337,21 +340,23 @@ def res_add_brush(inst: Entity, res: Property):
     # Figure out what grid size and scale is needed
     # Check the dimensions in two axes to figure out the largest
     # tile size that can fit in it.
-    x_maxsize = min(dim.y, dim.z)
-    y_maxsize = min(dim.x, dim.z)
-    if x_maxsize <= 32:
-        x_grid = '4x4'
-    elif x_maxsize <= 64:
-        x_grid = '2x2'
-    else:
-        x_grid = 'wall'
+    tile_grids = {
+        'x': tiling.TileSize.TILE_4x4,
+        'y': tiling.TileSize.TILE_4x4,
+        'z': tiling.TileSize.TILE_4x4,
+    }
 
-    if y_maxsize <= 32:
-        y_grid = '4x4'
-    elif y_maxsize <= 64:
-        y_grid = '2x2'
-    else:
-        y_grid = 'wall'
+    for axis in 'xyz':
+        u, v = Vec.INV_AXIS[axis]
+        max_size = min(dim[u], dim[v])
+        if max_size % 128 == 0:
+            tile_grids[axis] = tiling.TileSize.TILE_1x1
+        elif dim[u] % 64 == 0 and dim[v] % 128 == 0:
+            tile_grids[axis] = tiling.TileSize.TILE_2x1
+        elif max_size % 64 == 0:
+            tile_grids[axis] = tiling.TileSize.TILE_2x2
+        else:
+            tile_grids[axis] = tiling.TileSize.TILE_4x4
 
     grid_offset = origin // 128  # type: Vec
 
@@ -359,17 +364,40 @@ def res_add_brush(inst: Entity, res: Property):
     random.seed(grid_offset.join(' ') + '-partial_block')
 
     solids = vbsp.VMF.make_prism(point1, point2)
-    ':type solids: VLib.PrismFace'
 
     # Ensure the faces aren't re-textured later
     vbsp.IGNORED_FACES.update(solids.solid.sides)
 
-    solids.north.mat = vbsp.get_tex(tex_type + '.' + y_grid)
-    solids.south.mat = vbsp.get_tex(tex_type + '.' + y_grid)
-    solids.east.mat = vbsp.get_tex(tex_type + '.' + x_grid)
-    solids.west.mat = vbsp.get_tex(tex_type + '.' + x_grid)
-    solids.top.mat = vbsp.get_tex(tex_type + '.floor')
-    solids.bottom.mat = vbsp.get_tex(tex_type + '.ceiling')
+    solids.north.mat = texturing.gen(
+        texturing.GenCat.NORMAL,
+        Vec(Vec.N),
+        tex_type,
+    ).get(solids.north.get_origin(), tile_grids['y'])
+    solids.south.mat = texturing.gen(
+        texturing.GenCat.NORMAL,
+        Vec(Vec.S),
+        tex_type,
+    ).get(solids.north.get_origin(), tile_grids['y'])
+    solids.east.mat = texturing.gen(
+        texturing.GenCat.NORMAL,
+        Vec(Vec.E),
+        tex_type,
+    ).get(solids.north.get_origin(), tile_grids['x'])
+    solids.west.mat = texturing.gen(
+        texturing.GenCat.NORMAL,
+        Vec(Vec.W),
+        tex_type,
+    ).get(solids.north.get_origin(), tile_grids['x'])
+    solids.top.mat = texturing.gen(
+        texturing.GenCat.NORMAL,
+        Vec(Vec.T),
+        tex_type,
+    ).get(solids.north.get_origin(), tile_grids['z'])
+    solids.bottom.mat = texturing.gen(
+        texturing.GenCat.NORMAL,
+        Vec(Vec.B),
+        tex_type,
+    ).get(solids.north.get_origin(), tile_grids['z'])
 
     if srctools.conv_bool(res['detail', False], False):
         # Add the brush to a func_detail entity
