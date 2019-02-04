@@ -809,6 +809,7 @@ def retexture_template(
             setter_pos,
             setter_norm,
             setter_type,
+            silent=True,  # Don't log missing positions.
         )
 
     for brush in all_brushes:

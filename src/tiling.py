@@ -863,13 +863,24 @@ def edit_quarter_tile(
     normal: Vec,
     tile_type: TileType,
     force=False,
+    silent=False,
 ):
-    """Alter a 1/4 tile section of a tile."""
+    """Alter a 1/4 tile section of a tile.
+
+    If force is True, this overwrites any existing tile - by default nodraw
+    prevents being set back to a tile, etc.
+    If silent is True, no warning is given when the tile is missing.
+    """
 
     try:
         tile, u, v = find_tile(origin, normal)
     except KeyError:
-        LOGGER.warning('Expected tile, but none found: {}, {}', origin, normal)
+        if not silent:
+            LOGGER.warning(
+                'Expected tile, but none found: {}, {}',
+                origin,
+                normal,
+            )
         return
 
     subtiles = tile.get_subtiles()
