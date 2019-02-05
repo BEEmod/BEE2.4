@@ -5,32 +5,13 @@ from typing import List
 from srctools import Property, Vec, Entity
 import conditions
 import srctools
-import instance_traits
 
 from conditions import (
-    Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
+    Condition, make_flag, make_result, make_result_setup, RES_EXHAUSTED,
+    set_random_seed,
 )
 
 COND_MOD_NAME = 'Randomisation'
-
-
-def set_random_seed(inst: Entity, seed: str) -> None:
-    """Compute and set a random seed for a specific entity."""
-    name = inst['targetname']
-    # The global instances like elevators always get the same name, or
-    # none at all so we cannot use those for the seed. Instead use the global
-    # seed.
-    if name == '' or 'preplaced' in instance_traits.get(inst):
-        import vbsp
-        random.seed('{}{}{}{}'.format(
-            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
-        ))
-    else:
-        # We still need to use angles and origin, since things like
-        # fizzlers might not get unique names.
-        random.seed('{}{}{}{}'.format(
-            inst['targetname'], seed, inst['origin'], inst['angles']
-        ))
 
 
 @make_flag('random')

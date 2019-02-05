@@ -1083,6 +1083,27 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     return offset
 
 
+def set_random_seed(inst: Entity, seed: str) -> None:
+    """Compute and set a random seed for a specific entity."""
+    import instance_traits   # Import loop...
+
+    name = inst['targetname']
+    # The global instances like elevators always get the same name, or
+    # none at all so we cannot use those for the seed. Instead use the global
+    # seed.
+    if name == '' or 'preplaced' in instance_traits.get(inst):
+        import vbsp
+        random.seed('{}{}{}{}'.format(
+            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
+        ))
+    else:
+        # We still need to use angles and origin, since things like
+        # fizzlers might not get unique names.
+        random.seed('{}{}{}{}'.format(
+            inst['targetname'], seed, inst['origin'], inst['angles']
+        ))
+
+
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
     """Convert a solid into a embeddedVoxel-style block.
 
