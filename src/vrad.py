@@ -333,6 +333,8 @@ def dump_files(zipfile: ZipFile):
         return
 
     dump_folder = os.path.abspath(dump_folder)
+    
+    LOGGER.info('Dumping packed files to "{}"...', dump_folder)
 
     # Delete files in the folder, but don't delete the folder itself.
     try:
