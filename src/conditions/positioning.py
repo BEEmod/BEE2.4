@@ -2,11 +2,12 @@ import math
 
 from conditions import (
     make_flag, make_result, resolve_offset,
-    DIRECTIONS, SOLIDS,
+    DIRECTIONS,
 )
+import tiling
 import brushLoc
-from srctools import Vec, Entity, Property, VMF
-import srctools
+from srctools import Vec, Entity, Property
+
 
 COND_MOD_NAME = 'Positioning'
 
@@ -41,7 +42,7 @@ def flag_angles(inst: Entity, flag: Property):
             from_dir = Vec(DIRECTIONS[from_dir.casefold()])
         else:
             from_dir = Vec.from_str(from_dir, 0, 0, 1)
-        allow_inverse = srctools.conv_bool(flag['allow_inverse', '0'])
+        allow_inverse = flag.bool('allow_inverse')
     else:
         targ_angle = flag.value
         from_dir = Vec(0, 0, 1)
@@ -64,24 +65,23 @@ def flag_angles(inst: Entity, flag: Property):
 
 
 @make_flag('posIsSolid')
-def flag_brush_at_loc(vmf: VMF, inst: Entity, flag: Property):
-    """Checks to see if a wall is present at the given location.
+def flag_brush_at_loc(inst: Entity, flag: Property):
+    """Checks to see if a tile is present at the given location.
 
-    - `Pos` is the position of the brush, where `0 0 0` is the floor-position
+    - `Pos` is the position of the tile, where `0 0 0` is the floor-position
        of the brush.
     - `Dir` is the normal the face is pointing. `(0 0 -1)` is up.
     - `Type` defines the type the brush must be:
-      - `Any` requires either a black or white brush.
-      - `None` means that no brush must be present.
+      - `Any` requires some sort of surface.
+      - `Tile` allows a black/white tile of some kind.
+      - `None` means that no surface must be present.
       - `White` requires a portalable surface.
       - `Black` requires a non-portalable surface.
     - `SetVar` defines an instvar which will be given a value of `black`,
       `white` or `none` to allow the result to be reused.
     - If `gridPos` is true, the position will be snapped so it aligns with
       the 128 grid (Useful with fizzler/light strip items).
-    - `RemoveBrush`: If set to `1`, the brush will be removed if found.
-      Only do this to `EmbedFace` brushes, since it will remove the other
-      sides as well.
+    - `RemoveTile`: If set to `1`, the tile will be removed if found.
     """
     pos = Vec.from_str(flag['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
@@ -90,13 +90,11 @@ def flag_brush_at_loc(vmf: VMF, inst: Entity, flag: Property):
     # Relative to the instance origin
     pos += Vec.from_str(inst['origin', '0 0 0'])
 
-    norm = flag['dir', None]
-    if norm is not None:
-        norm = Vec.from_str(norm).rotate_by_str(
-            inst['angles', '0 0 0'],
-        )
+    norm = flag.vec('dir', 0, 0, 1).rotate_by_str(
+        inst['angles', '0 0 0'],
+    )
 
-    if srctools.conv_bool(flag['gridpos', '0']) and norm is not None:
+    if flag.bool('gridpos') and norm is not None:
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
             # those are already fine.
@@ -104,27 +102,38 @@ def flag_brush_at_loc(vmf: VMF, inst: Entity, flag: Property):
                 pos[axis] = pos[axis] // 128 * 128 + 64
 
     result_var = flag['setVar', '']
-    should_remove = srctools.conv_bool(flag['RemoveBrush', False], False)
+    # RemoveBrush is the pre-tiling name.
+    should_remove = flag.bool('RemoveTile', flag.bool('RemoveBrush', False))
+
     des_type = flag['type', 'any'].casefold()
 
-    brush = SOLIDS.get(pos.as_tuple(), None)
-
-    if brush is None or (norm is not None and abs(brush.normal) != abs(norm)):
-        br_type = 'none'
+    try:
+        tiledef, u, v = tiling.find_tile(pos, norm)
+    except KeyError:
+        tile_type = tiling.TileType.VOID
     else:
-        br_type = str(brush.color)
+        tile_type = tiledef.get_subtiles()[u, v]
         if should_remove:
-            vmf.remove_brush(
-                brush.solid,
-            )
+            tiledef.get_subtiles()[u, v] = tiling.TileType.VOID
 
     if result_var:
-        inst.fixup[result_var] = br_type
+        if tile_type.is_tile:
+            # Don't distinguish between 4x4, goo sides
+            inst.fixup[result_var] = tile_type.color.name
+        elif tile_type is tiling.tiletype.VOID:
+            inst.fixup[result_var] = 'none'
+        else:
+            inst.fixup[result_var] = tile_type.name.casefold()
 
-    if des_type == 'any' and br_type != 'none':
-        return True
-
-    return des_type == br_type
+    return (
+        # Exact match
+        (des_type == tile_type.name.casefold()) or
+        (des_type == 'any' and tile_type is not tiling.TileType.VOID) or
+        (des_type == 'tile' and tile_type.is_tile) or
+        (des_type == 'none' and tile_type is tiling.TileType.VOID) or
+        # white/black matches the other tile types too.
+        (tile_type.is_tile and des_type == tile_type.color.name)
+    )
 
 
 @make_flag('PosIsGoo')
