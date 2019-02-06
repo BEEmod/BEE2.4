@@ -10,6 +10,7 @@ import os
 from srctools import Vec
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
+import logging
 
 from typing import Iterable, Union, Dict, Tuple
 
@@ -26,6 +27,9 @@ filesystem = FileSystemChain(
     # Highest priority is the in-built UI images.
     RawFileSystem(os.path.join(os.getcwd(), '../', 'images')),
 )
+
+# Silence DEBUG messages from Pillow, they don't help.
+logging.getLogger('PIL').setLevel(logging.INFO)
 
 
 def load_filesystems(systems: Iterable[FileSystem]):
