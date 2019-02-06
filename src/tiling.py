@@ -479,6 +479,18 @@ class TileDef:
         pos[v_ax] += v
         return pos
 
+    def bind_overlay(self, over: Entity) -> None:
+        """Bind the overlay to this tiledef.
+
+        When the tiles are exported the overlay will be
+        adjusted to include the face IDs.
+        """
+        try:
+            overlays = over.tiledefs
+        except AttributeError:
+            overlays = over.tiledefs = []
+        overlays.append(self)
+
     def calc_patterns(
         self,
         tiles: Dict[Union[Tuple[int, int], object], TileType],

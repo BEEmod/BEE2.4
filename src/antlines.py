@@ -293,7 +293,8 @@ class Antline:
         if not mat.static:
             overlay['targetname'] = self.name
 
-        overlay.tiledefs = list(segment.tiles)
+        for tile in segment.tiles:
+            tile.bind_overlay(overlay)
 
     def _make_straight(
         self,
