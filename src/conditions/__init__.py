@@ -1336,9 +1336,14 @@ def res_switch_setup(res: Property):
     flag = None
     method = SWITCH_TYPE.FIRST
     cases = []
+    default = []
+    rand_seed = ''
     for prop in res:
         if prop.has_children():
-            cases.append(prop)
+            if prop.name == '<default>':
+                default.append(prop)
+            else:
+                cases.append(prop)
         else:
             if prop.name == 'flag':
                 flag = prop.value
@@ -1348,8 +1353,10 @@ def res_switch_setup(res: Property):
                     method = SWITCH_TYPE(prop.value.casefold())
                 except ValueError:
                     pass
+            elif prop.name == 'seed':
+                rand_seed = prop.value
 
-    for prop in cases:
+    for prop in itertools.chain(cases, default):
         for result in prop.value:
             Condition.setup_result(
                 prop.value,
@@ -1363,7 +1370,9 @@ def res_switch_setup(res: Property):
     return (
         flag,
         cases,
+        default,
         method,
+        rand_seed,
     )
 
 
@@ -1373,16 +1382,21 @@ def res_switch(inst: Entity, res: Property):
 
     'method' is the way the search is done - first, last, random, or all.
     'flag' is the name of the flag.
+    'seed' sets the randomisation seed for this block, for the random mode.
     Each property group is a case to check - the property name is the flag
     argument, and the contents are the results to execute in that case.
+    The special group "<default>" is only run if no other flag is valid.
     For 'random' mode, you can omit the flag to choose from all objects. In
     this case the flag arguments are ignored.
     """
-    flag_name, cases, method = res.value
+    flag_name, cases, default, method, rand_seed = res.value
 
     if method is SWITCH_TYPE.RANDOM:
         cases = cases[:]
+        set_random_seed(inst, rand_seed)
         random.shuffle(cases)
+
+    run_case = False
 
     for case in cases:
         if flag_name is not None:
@@ -1391,9 +1405,13 @@ def res_switch(inst: Entity, res: Property):
                 continue
         for res in case:
             Condition.test_result(inst, res)
+        run_case = True
         if method is not SWITCH_TYPE.ALL:
             # All does them all, otherwise we quit now.
             break
+    if not run_case:
+        for res in default:
+            Condition.test_result(inst, res)
 
 
 @make_result_setup('staticPiston')
