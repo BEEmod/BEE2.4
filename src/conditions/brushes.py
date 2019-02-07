@@ -786,8 +786,8 @@ CHECKPOINT_NEIGHBOURS.remove(Vec(0, 0, 0))
 
 
 @make_result('CheckpointTrigger')
-def res_checkpoint_trigger(inst: Entity, res: Property):
-    """Generate a trigger underneath coop checkpoint items
+def res_checkpoint_trigger(inst: Entity, res: Property) -> None:
+    """Generate a trigger underneath coop checkpoint items.
 
     """
 
@@ -834,9 +834,32 @@ def res_checkpoint_trigger(inst: Entity, res: Property):
         trig.add_out(out)
 
 
-@make_result('SetTile')
-def res_set_tile(inst: Entity, res: Property):
-    """Set 4x4 parts of a tile to the given values."""
+@make_result('SetTile', 'SetTiles')
+def res_set_tile(inst: Entity, res: Property) -> None:
+    """Set 4x4 parts of a tile to the given values.
+
+    `Offset` defines the position of the upper-left tile in the grid.
+    Each `Tile` section defines a row of the positions to edit like so:
+        "Tile" "bbbb"
+        "Tile" "b..b"
+        "Tile" "b..b"
+        "Tile" "bbbb"
+    If `Force` is true, the specified tiles will override any existing ones.
+    Otherwise they will be merged in - white/black tiles will not replace
+    tiles set to nodraw or void for example.
+
+    Allowed tile characters:
+    - `W`: White tile.
+    - `w`: White 4x4 only tile.
+    - `B`: Black tile.
+    - `b`: Black 4x4 only tile.
+    - `g`: Goo sides.
+    - `n`: Nodraw surface.
+    - `.`: Void (leave this space empty).
+    - `_` or ` `: Placeholder (don't modify this space).
+    - `x`: Cutout Tile (Broken)
+    - `o`: Cutout Tile (Partial)
+    """
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
 
@@ -854,7 +877,7 @@ def res_set_tile(inst: Entity, res: Property):
 
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
-            if val == '_':
+            if val in '_ ':
                 continue
 
             try:
