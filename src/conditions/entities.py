@@ -1,14 +1,14 @@
 """Conditions related to specific kinds of entities."""
 import random
 from collections import defaultdict
+from typing import List, Dict, Tuple
 
 import conditions
 import srctools.logger
 import template_brush
-from conditions import (
-    make_result, make_result_setup,
-    SOLIDS
-)
+import texturing
+import tiling
+from conditions import make_result, make_result_setup
 from template_brush import TEMP_TYPES
 from srctools import Property, Vec, VMF, Entity
 
@@ -18,13 +18,15 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
 @make_result_setup('TemplateOverlay')
-def res_import_template_setup(res: Property):
+def res_import_template_setup(
+    res: Property,
+) -> Tuple[str, Dict[str, List[str]], Vec, Vec, Vec]:
     temp_id = res['id'].casefold()
 
     face = Vec.from_str(res['face_pos', '0 0 -64'])
     norm = Vec.from_str(res['normal', '0 0 1'])
 
-    replace_tex = defaultdict(list)
+    replace_tex = defaultdict(list)  # type: Dict[str, List[str]]
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
@@ -40,7 +42,7 @@ def res_import_template_setup(res: Property):
 
 
 @make_result('TemplateOverlay')
-def res_insert_overlay(inst: Entity, res: Property):
+def res_insert_overlay(inst: Entity, res: Property) -> None:
     """Use a template to insert one or more overlays on a surface.
 
     Options:
@@ -74,14 +76,8 @@ def res_insert_overlay(inst: Entity, res: Property):
         inst['angles', '0 0 0']
     )
 
-    for axis, norm in enumerate(normal):
-        # Align to the center of the block grid. The normal direction is
-        # already correct.
-        if norm == 0:
-            face_pos[axis] = face_pos[axis] // 128 * 128 + 64
-
     try:
-        face_id = SOLIDS[face_pos.as_tuple()].face.id
+        tiledef, u, v = tiling.find_tile(face_pos, normal)
     except KeyError:
         LOGGER.warning(
             'Overlay brush position is not valid: {}',
@@ -106,12 +102,13 @@ def res_insert_overlay(inst: Entity, res: Property):
         if mat[:1] == '$':
             mat = inst.fixup[mat]
         if mat.startswith('<') or mat.endswith('>'):
-            # Lookup in the style data.
-            import vbsp
-            LOGGER.info('Tex: {}', vbsp.settings['textures'].keys())
-            mat = vbsp.get_tex(mat[1:-1])
+            # Lookup in the texture data.
+            mat = texturing.OVERLAYS.get(
+                Vec.from_str(over['basisorigin']),
+                mat[1:-1],
+            )
         over['material'] = mat
-        over['sides'] = str(face_id)
+        tiledef.bind_overlay(over)
 
     # Wipe the brushes from the map.
     if temp.detail is not None:
@@ -159,7 +156,7 @@ def res_water_splash_setup(res: Property):
 
 
 @make_result('WaterSplash')
-def res_water_splash(vmf: VMF, inst: Entity, res: Property):
+def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
     """Creates splashes when something goes in and out of water.
 
     Arguments:
@@ -274,7 +271,7 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
 
 
 @make_result('FunnelLight')
-def res_make_funnel_light(inst: Entity):
+def res_make_funnel_light(inst: Entity) -> None:
     """Place a light for Funnel items."""
     oran_on = inst.fixup.bool('$start_reversed')
     need_blue = need_oran = False
