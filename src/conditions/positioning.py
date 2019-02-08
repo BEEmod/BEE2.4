@@ -70,7 +70,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
 
     - `Pos` is the position of the tile, where `0 0 0` is the floor-position
        of the brush.
-    - `Dir` is the normal the face is pointing. `(0 0 -1)` is up.
+    - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
     - `Type` defines the type the brush must be:
       - `Any` requires some sort of surface.
       - `Tile` allows a black/white tile of some kind.
