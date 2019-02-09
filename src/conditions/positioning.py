@@ -71,6 +71,9 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
     - `Pos` is the position of the tile, where `0 0 0` is the floor-position
        of the brush.
     - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
+    - `Pos2`: If set, causes the check to average the tiles in a bounding box.
+      If no tiles are present they're treated as a lack of them.
+      Otherwise the dominant colour wins, with ties treated as black.
     - `Type` defines the type the brush must be:
       - `Any` requires some sort of surface.
       - `Tile` allows a black/white tile of some kind.
@@ -83,16 +86,15 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
       the 128 grid (Useful with fizzler/light strip items).
     - `RemoveTile`: If set to `1`, the tile will be removed if found.
     """
-    pos = Vec.from_str(flag['pos', '0 0 0'])
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+
+    pos = flag.vec('pos')
     pos.z -= 64  # Subtract so origin is the floor-position
-    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
 
-    # Relative to the instance origin
-    pos += Vec.from_str(inst['origin', '0 0 0'])
+    pos.localise(origin, angles)
 
-    norm = flag.vec('dir', 0, 0, 1).rotate_by_str(
-        inst['angles', '0 0 0'],
-    )
+    norm = flag.vec('dir', 0, 0, 1).rotate(*angles)
 
     if flag.bool('gridpos') and norm is not None:
         for axis in 'xyz':
@@ -107,20 +109,52 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
 
     des_type = flag['type', 'any'].casefold()
 
-    try:
-        tiledef, u, v = tiling.find_tile(pos, norm)
-    except KeyError:
-        tile_type = tiling.TileType.VOID
+    if 'pos2' in flag:
+        pos2 = flag.vec('pos2')
+        pos2.z -= 64  # Subtract so origin is the floor-position
+        pos2.localise(origin, angles)
+
+        bbox_min, bbox_max = Vec.bbox(pos, pos2)
+
+        white_count = black_count = 0
+
+        for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
+            try:
+                tiledef, u, v = tiling.find_tile(pos, norm)
+            except KeyError:
+                continue
+
+            tile_type = tiledef.get_subtiles()[u, v]
+            if should_remove:
+                tiledef.get_subtiles()[u, v] = tiling.TileType.VOID
+            if tile_type.is_tile:
+                if tile_type.color is tiling.Portalable.WHITE:
+                    white_count += 1
+                else:
+                    black_count += 1
+
+        if white_count == black_count == 0:
+            tile_type = tiling.TileType.VOID
+        elif white_count > black_count:
+            tile_type = tiling.TileType.WHITE
+        else:
+            tile_type = tiling.TileType.BLACK
     else:
-        tile_type = tiledef.get_subtiles()[u, v]
-        if should_remove:
-            tiledef.get_subtiles()[u, v] = tiling.TileType.VOID
+        # Single tile.
+        try:
+            tiledef, u, v = tiling.find_tile(pos, norm)
+        except KeyError:
+            tile_type = tiling.TileType.VOID
+        else:
+            tile_type = tiledef.get_subtiles()[u, v]
+            if should_remove:
+                tiledef.get_subtiles()[u, v] = tiling.TileType.VOID
 
     if result_var:
         if tile_type.is_tile:
             # Don't distinguish between 4x4, goo sides
             inst.fixup[result_var] = tile_type.color.name
-        elif tile_type is tiling.tiletype.VOID:
+        elif tile_type is tiling.TileType.VOID:
             inst.fixup[result_var] = 'none'
         else:
             inst.fixup[result_var] = tile_type.name.casefold()
