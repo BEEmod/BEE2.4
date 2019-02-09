@@ -2399,6 +2399,9 @@ class Music(PakObject):
         """Check if this track or its children has a channel."""
         if self.sound[channel]:
              return True
+        if channel is MusicChannel.BASE and self.inst:
+            # The instance provides the base track.
+            return True
         try:
             children = Music.by_id(self.children[channel])
         except KeyError:
@@ -2475,6 +2478,10 @@ class Music(PakObject):
             vbsp_config.set_key(
                 ('Options', 'music_sync_tbeam'),
                 srctools.bool_as_int(base_music.has_synced_tbeam),
+            )
+            vbsp_config.set_key(
+                ('Options', 'music_instance'),
+                base_music.inst or '',
             )
 
         # If we need to pack, add the files to be unconditionally
