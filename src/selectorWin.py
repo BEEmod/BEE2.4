@@ -630,7 +630,7 @@ class selWin:
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 text=BTN_PLAY,
-                width=1,
+                width=2,
             )
             samp_button.grid(row=0, column=1)
             add_tooltip(
