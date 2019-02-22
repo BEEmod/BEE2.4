@@ -83,3 +83,7 @@ logs/
 
 # Localisation files:
 *.mo
+
+
+# PyInstaller temporary file directory
+/build_tmp/
