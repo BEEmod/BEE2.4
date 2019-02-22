@@ -55,8 +55,73 @@ def get_localisation(key):
             shutil.copyfileobj(src, dest)
             data_files.append((dest.name, 'i18n'))
 
-# get_localisation('kV-oMlhZPJEJoYPI5EQ6HaqeAc1zQ73G')
+get_localisation('kV-oMlhZPJEJoYPI5EQ6HaqeAc1zQ73G')
 
+
+# Exclude bits of modules we don't need, to decrease package size.
+EXCLUDES = [
+    # We just use idlelib.WidgetRedirector
+    'idlelib.ClassBrowser',
+    'idlelib.ColorDelegator',
+    'idlelib.Debugger',
+    'idlelib.Delegator',
+    'idlelib.EditorWindow',
+    'idlelib.FileList',
+    'idlelib.GrepDialog',
+    'idlelib.IOBinding',
+    'idlelib.IdleHistory',
+    'idlelib.MultiCall',
+    'idlelib.MultiStatusBar',
+    'idlelib.ObjectBrowser',
+    'idlelib.OutputWindow',
+    'idlelib.PathBrowser',
+    'idlelib.Percolator',
+    'idlelib.PyParse',
+    'idlelib.PyShell',
+    'idlelib.RemoteDebugger',
+    'idlelib.RemoteObjectBrowser',
+    'idlelib.ReplaceDialog',
+    'idlelib.ScrolledList',
+    'idlelib.SearchDialog',
+    'idlelib.SearchDialogBase',
+    'idlelib.SearchEngine',
+    'idlelib.StackViewer',
+    'idlelib.TreeWidget',
+    'idlelib.UndoDelegator',
+    'idlelib.WindowList',
+    'idlelib.ZoomHeight',
+    'idlelib.aboutDialog',
+    'idlelib.configDialog',
+    'idlelib.configHandler',
+    'idlelib.configHelpSourceEdit',
+    'idlelib.configSectionNameDialog',
+    'idlelib.dynOptionMenuWidget',
+    'idlelib.idle_test.htest',
+    'idlelib.idlever',
+    'idlelib.keybindingDialog',
+    'idlelib.macosxSupport',
+    'idlelib.rpc',
+    'idlelib.tabbedpages',
+    'idlelib.textView',
+
+    # Stop us from then including Qt itself
+    'PIL.ImageQt',
+
+    'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
+
+    'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
+
+    # Imported by logging handlers which we don't use..
+    'win32evtlog',
+    'win32evtlogutil',
+    'email',
+    'smtplib',
+
+    'unittest',  # Imported in __name__==__main__..
+    'doctest',
+    'optparse',
+    'argparse',
+]
 
 block_cipher = None
 
@@ -81,7 +146,7 @@ bee_version = input('BEE2 Version: ')
 with open(os.path.join(workpath, 'BUILD_CONSTANTS.py'), 'w') as f:
     f.write('BEE_VERSION=' + repr(bee_version))
 
-for snd in os.listdir('sounds/'):
+for snd in os.listdir('../sounds/'):
     if snd == 'music_samp':
         continue
     data_files.append(('../sounds/' + snd, 'sounds'))
@@ -114,7 +179,7 @@ bee2_a = Analysis(
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=EXCLUDES,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -138,7 +203,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    icon='BEE2.ico'
+    icon='../BEE2.ico'
 )
 
 coll = COLLECT(

@@ -6,8 +6,6 @@ import utils
 
 import srctools
 
-ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
-
 
 # src -> build subfolder.
 data_files = [
@@ -85,7 +83,6 @@ INCLUDES = [
 
 bee_version = input('BEE2 Version (or blank for dev): ')
 
-
 # Write this to the temp folder, so it's picked up and included.
 with open(os.path.join(workpath, 'BUILD_CONSTANTS.py'), 'w') as f:
     f.write('BEE_VERSION=' + repr(bee_version))
@@ -140,7 +137,7 @@ vbsp_exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    icon='BEE2.ico'
+    icon='../BEE2.ico'
 )
 
 vrad_exe = EXE(
@@ -154,7 +151,7 @@ vrad_exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    icon='BEE2.ico'
+    icon='../BEE2.ico'
 )
 
 coll = COLLECT(
