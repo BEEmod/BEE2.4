@@ -1,22 +1,24 @@
-from cx_Freeze import setup, Executable
+"""Build commands for VBSP and VRAD."""
+import pkgutil
 import os
 import utils
-import pkgutil
-import shutil
 
-shutil.rmtree('../compiler', ignore_errors=True)
-shutil.rmtree('../build_BEE2/compiler', ignore_errors=True)
 
-ico_path = os.path.join(os.getcwd(), "../bee2.ico")
+import srctools
 
-if utils.WIN:
-    suffix = '.exe'
-elif utils.MAC:
-    suffix = '_osx'
-elif utils.LINUX:
-    suffix = '_linux'
-else:
-    suffix = ''
+ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+
+
+# src -> build subfolder.
+data_files = [
+    # Add the FGD data for us.
+    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools'),
+    (os.path.join(srctools.__path__[0], 'srctools.fgd'), 'srctools'),
+
+]
+
+block_cipher = None
+
 
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
@@ -73,6 +75,7 @@ if utils.MAC or utils.LINUX:
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
 
+
 # Include the condition sub-modules that are dynamically imported.
 INCLUDES = [
     'conditions.' + module
@@ -82,76 +85,84 @@ INCLUDES = [
 
 bee_version = input('BEE2 Version (or blank for dev): ')
 
-import srctools
 
-zip_includes = [
-    # Add the FGD data for us.
-    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools/fgd.lzma'),
-]
+# Write this to the temp folder, so it's picked up and included.
+with open(os.path.join(workpath, 'BUILD_CONSTANTS.py'), 'w') as f:
+    f.write('BEE_VERSION=' + repr(bee_version))
+
 # We need to include this version data.
 try:
     import importlib_resources
-    zip_includes.append(
+    data_files.append(
         (
             os.path.join(importlib_resources.__path__[0], 'version.txt'),
-            'importlib_resources/version.txt',
+            'importlib_resources',
          )
     )
 except ImportError:
     pass
 
+print('Data files: ')
+print(data_files)
 
-setup(
-    name='VBSP_VRAD',
-    version='0.1',
-    options={
-        'build_exe': {
-            'build_exe': '../compiler',
-            'excludes': EXCLUDES,
-            'includes': INCLUDES,
-            # These values are added to the generated BUILD_CONSTANTS module.
-            'constants': 'BEE_VERSION={ver!r}'.format(
-                ver=bee_version,
-            ),
+# Finally, run the PyInstaller analysis process.
+# from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
-            # Include all modules in the zip..
-            'zip_include_packages': '*',
-            'zip_exclude_packages': '',
-            'zip_includes': zip_includes,
-        },
-    },
-    description='BEE2 VBSP and VRAD compilation hooks, '
-                'for modifying PeTI maps during compilation.',
-    executables=[
-        Executable(
-            'vbsp_launch.py',
-            base='Console',
-            icon=ico_path,
-            targetName='vbsp' + suffix,
-        ),
-        Executable(
-            'vrad.py',
-            base='Console',
-            icon=ico_path,
-            targetName='vrad' + suffix,
-        ),
-
-        # Generate dummy exes, so if the above are renamed they
-        # error cleanly.
-        Executable(
-            'vbsp_vrad_orig_err.py',
-            base='Console',
-            icon=ico_path,
-            targetName='vbsp_original' + suffix,
-        ),
-        Executable(
-            'vbsp_vrad_orig_err.py',
-            base='Console',
-            icon=ico_path,
-            targetName='vrad_original' + suffix,
-        ),
-    ]
+vbsp_vrad_an = Analysis(
+    ['compiler_launch.py'],
+    pathex=[workpath, os.path.dirname(srctools.__path__[0])],
+    binaries=[],
+    datas=data_files,
+    hiddenimports=INCLUDES,
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=EXCLUDES,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False
 )
 
-# Copy the compiler to the frozen-BEE2 build location also
-shutil.copytree('../compiler', '../build_BEE2/compiler')
+pyz = PYZ(
+    vbsp_vrad_an.pure,
+    vbsp_vrad_an.zipped_data,
+    cipher=block_cipher
+)
+
+vbsp_exe = EXE(
+    pyz,
+    vbsp_vrad_an.scripts,
+    [],
+    exclude_binaries=True,
+    name='vbsp',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    icon='BEE2.ico'
+)
+
+vrad_exe = EXE(
+    pyz,
+    vbsp_vrad_an.scripts,
+    [],
+    exclude_binaries=True,
+    name='vrad',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    icon='BEE2.ico'
+)
+
+coll = COLLECT(
+    vbsp_exe, vrad_exe,
+    vbsp_vrad_an.binaries,
+    vbsp_vrad_an.zipfiles,
+    vbsp_vrad_an.datas,
+    strip=False,
+    upx=True,
+    name='compiler',
+)
