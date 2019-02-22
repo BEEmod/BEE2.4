@@ -28,13 +28,15 @@ TK_ROOT = tk.Tk()
 
 # Set icons for the application.
 
+ICO_PATH = str(utils.install_path('BEE2.ico'))
+
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
-    TK_ROOT.wm_iconbitmap(default='../BEE2.ico')
+    TK_ROOT.wm_iconbitmap(default=ICO_PATH)
 
     def set_window_icon(window: tk.Toplevel):
         """Set the window icon."""
-        window.wm_iconbitmap('../BEE2.ico')
+        window.wm_iconbitmap(ICO_PATH)
 
     import ctypes
     # Use Windows APIs to tell the taskbar to group us as our own program,
@@ -58,7 +60,7 @@ elif utils.MAC:
             256,  # largest size in the .ico
             256,
             '-imageFile',
-            '../bee2.ico',
+            ICO_PATH,
         )
         
     set_window_icon(TK_ROOT)
@@ -68,7 +70,7 @@ elif utils.MAC:
 else:  # Linux
     # Get the tk image object.
     import img
-    app_icon = img.get_app_icon()
+    app_icon = img.get_app_icon(ICO_PATH)
 
     def set_window_icon(window: tk.Toplevel):
         """Set the window icon."""

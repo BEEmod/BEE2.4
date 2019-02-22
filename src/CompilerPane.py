@@ -5,7 +5,7 @@ from srctools.logger import init_logging, get_logger
 if __name__ == '__main__':
     utils.fix_cur_directory()
     LOGGER = init_logging(
-        '../logs/compiler_pane.log',
+        str(utils.install_path('logs/compiler_pane.log')),
         __name__,
         on_error=tk_tools.on_error
     )

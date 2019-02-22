@@ -458,7 +458,7 @@ class Game:
                     b'allow editing below text without being overwritten.\n'
                     b'\n\n'
                 )
-                with open('../BEE2.fgd', 'rb') as bee2_fgd:
+                with open(utils.install_path('BEE2.fgd'), 'rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
                 file.write(imp_res_read_binary(srctools, 'srctools.fgd'))
 
@@ -580,7 +580,9 @@ class Game:
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
         try:
-            num_compiler_files = len(os.listdir('../compiler'))
+            num_compiler_files = len(os.listdir(str(
+                utils.install_path('compiler')
+            )))
         except FileNotFoundError:
             num_compiler_files = 0
 
