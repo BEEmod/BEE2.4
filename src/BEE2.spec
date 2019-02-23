@@ -114,7 +114,6 @@ EXCLUDES = [
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',
-    'email',
     'smtplib',
 
     'unittest',  # Imported in __name__==__main__..
@@ -166,7 +165,6 @@ except ImportError:
 
 print('Data files: ')
 print(data_files)
-
 
 
 # Finally, run the PyInstaller analysis process.

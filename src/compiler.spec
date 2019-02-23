@@ -1,10 +1,14 @@
 """Build commands for VBSP and VRAD."""
 import pkgutil
 import os
-import utils
-
-
+import sys
 import srctools
+
+
+# THe BEE2 modules cannot be imported inside the spec files.
+WIN = sys.platform.startswith('win')
+MAC = sys.platform.startswith('darwin')
+LINUX = sys.platform.startswith('linux')
 
 
 # src -> build subfolder.
@@ -61,13 +65,13 @@ import logging.config
 if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'socket'):
     EXCLUDES.append('socket')
     # Subprocess uses this in UNIX-style OSes, but not Windows.
-    if utils.WIN:
+    if WIN:
         EXCLUDES += ['selectors', 'select']
 if not hasattr(logging.handlers, 'pickle'):
     EXCLUDES.append('pickle')
 del logging
 
-if utils.MAC or utils.LINUX:
+if MAC or LINUX:
     EXCLUDES += ['grp', 'pwd']  # Unix authentication modules, optional
 
     # The only hash algorithm that's used is sha512 - random.seed()
