@@ -10,6 +10,13 @@ WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
 LINUX = sys.platform.startswith('linux')
 
+if MAC:
+    suffix = '_osx'
+elif LINUX:
+    suffix = '_linux'
+else:
+    suffix = ''
+
 
 # src -> build subfolder.
 data_files = [
@@ -135,7 +142,7 @@ vbsp_exe = EXE(
     vbsp_vrad_an.scripts,
     [],
     exclude_binaries=True,
-    name='vbsp',
+    name='vbsp' + suffix,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -149,7 +156,7 @@ vrad_exe = EXE(
     vbsp_vrad_an.scripts,
     [],
     exclude_binaries=True,
-    name='vrad',
+    name='vrad' + suffix,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
