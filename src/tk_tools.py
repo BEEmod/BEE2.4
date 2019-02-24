@@ -6,7 +6,7 @@ from typing import Union, Callable
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog
+from tkinter import filedialog, commondialog
 import tkinter as tk
 
 import os.path
@@ -32,7 +32,7 @@ if utils.WIN:
     # Ensure everything has our icon (including dialogs)
     TK_ROOT.wm_iconbitmap(default='../BEE2.ico')
 
-    def set_window_icon(window: tk.Toplevel):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
         """Set the window icon."""
         window.wm_iconbitmap('../BEE2.ico')
 
@@ -70,7 +70,7 @@ else:  # Linux
     import img
     app_icon = img.get_app_icon()
 
-    def set_window_icon(window: tk.Toplevel):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
         """Set the window icon."""
         # Weird argument order for default=True...
         window.wm_iconphoto(True, app_icon)
@@ -256,7 +256,7 @@ class FileField(ttk.Frame):
         is_dir: bool=False,
         loc: str='',
         callback: Callable[[str], None]=None,
-    ):
+    ) -> None:
         """Initialise the field.
 
         - Set is_dir to true to look for directories, instead of files.
@@ -276,15 +276,17 @@ class FileField(ttk.Frame):
             self.browser = filedialog.Directory(
                 self,
                 initialdir=loc,
-            )
+            )  # type: commondialog.Dialog
         else:
             self.browser = filedialog.SaveAs(
                 self,
                 initialdir=loc,
             )
 
-        if callback is not None:
-            self.callback = callback
+        if callback is None:
+            callback = self._nop_callback
+
+        self.callback = callback
 
         self.textbox = ReadOnlyEntry(
             self,
@@ -309,24 +311,24 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event=None):
+    def browse(self, event: tk.Event=None) -> None:
         """Browse for a file."""
         path = self.browser.show()
         if path:
             self.value = path
 
-    def callback(self, path):
+    @staticmethod  # No need to bind to a method.
+    def _nop_callback(path: str) -> None:
         """Callback function, called whenever the value changes."""
-        # When passed in, this is shadowed by the user's function.
         pass
 
     @property
-    def value(self):
+    def value(self) -> str:
         """Get the current path."""
         return self._location
 
     @value.setter
-    def value(self, path):
+    def value(self, path: str) -> None:
         """Set the current path. This calls the callback function."""
         import tooltip
         self.callback(path)
@@ -334,7 +336,7 @@ class FileField(ttk.Frame):
         tooltip.set_tooltip(self, path)
         self._text_var.set(self._truncate(path))
 
-    def _truncate(self, path):
+    def _truncate(self, path: str) -> str:
         """Truncate the path to the end portion."""
         self.textbox.update_idletasks()
         wid = (self.textbox.winfo_width() // _file_field_char_len) - 3
@@ -350,6 +352,6 @@ class FileField(ttk.Frame):
         else:
             return path
 
-    def _text_configure(self, e):
+    def _text_configure(self, e: tk.Event) -> None:
         """Truncate text every time the text widget resizes."""
         self._text_var.set(self._truncate(self._location))

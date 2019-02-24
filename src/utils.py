@@ -758,7 +758,7 @@ def setup_localisations(logger: logging.Logger) -> None:
         except FileNotFoundError:
             continue
         with file:
-            trans = gettext.GNUTranslations(file)
+            trans = gettext.GNUTranslations(file)  # type: gettext.NullTranslations
             break
     else:
         # No translations, fallback to English.
