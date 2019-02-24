@@ -11,6 +11,10 @@ if sys.stderr is None:
 if sys.stdin is None:
     sys.stdin = open(os.devnull, 'r')
 
+if sys.platform == "darwin":
+	# Disable here, can't get this to work.
+	sys.modules['pyglet'] = None
+
 freeze_support()
 set_start_method('spawn')
 
