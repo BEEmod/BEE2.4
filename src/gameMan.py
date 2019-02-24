@@ -758,7 +758,9 @@ class Game:
 
                     LOGGER.info('\t* {} -> {}', comp_file, dest)
 
-                    Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                    folder = Path(dest).parent
+                    if not folder.exists():
+                        folder.mkdir(parents=True, exist_ok=True)
 
                     try:
                         if os.path.isfile(dest):
