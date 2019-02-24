@@ -129,7 +129,7 @@ block_cipher = None
 INCLUDE_LIBS = [
     'C:/Windows/system32/avbin.dll',  # Win 32 bit
     'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
-    'libavbin.dylib',  # OS X - must be relative.
+    '/usr/local/lib/libavbin.dylib',  # OS X
     '/usr/lib/libavbin.so',  # Linux
 ]
 
@@ -166,13 +166,12 @@ except ImportError:
 print('Data files: ')
 print(data_files)
 
-
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
     ['BEE2_launch.pyw'],
     pathex=[workpath, os.path.dirname(srctools.__path__[0])],
-    binaries=[],
+    binaries=INCLUDE_LIBS,
     datas=data_files,
     hiddenimports=[],
     hookspath=[],
@@ -200,7 +199,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
+    windowed=True,
     icon='../BEE2.ico'
 )
 
