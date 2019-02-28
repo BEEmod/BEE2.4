@@ -513,7 +513,7 @@ class Game:
                 if dest in already_copied:
                     screen_func('RES')
                     continue
-                already_copied.add(dest)
+                already_copied.add(dest.casefold())
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
@@ -522,7 +522,7 @@ class Game:
 
         LOGGER.info('Cache copied.')
 
-        for path in [INST_PATH, 'bee2', 'bee2_dev']:
+        for path in [INST_PATH, 'bee2']:
             abs_path = self.abs_path(path)
             for dirpath, dirnames, filenames in os.walk(abs_path):
                 for file in filenames:
@@ -530,9 +530,9 @@ class Game:
                     # gun instance.
                     if file.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
                         continue
-                    path = os.path.normcase(os.path.join(dirpath, file))
+                    path = os.path.join(dirpath, file).casefold()
 
-                    if path.replace('bee2_dev', 'bee2') not in already_copied:
+                    if path not in already_copied:
                         LOGGER.info('Deleting: {}', path)
                         os.remove(path)
 
