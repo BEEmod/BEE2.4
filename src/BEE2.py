@@ -8,7 +8,10 @@ utils.fix_cur_directory()
 # We need to initialise logging as early as possible - that way
 # it can record any errors in the initialisation of modules.
 import tk_tools
-LOGGER = srctools.logger.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
+LOGGER = srctools.logger.init_logging(
+    str(utils.install_path('logs/BEE2.log')),
+    on_error=tk_tools.on_error,
+)
 
 utils.setup_localisations(LOGGER)
 

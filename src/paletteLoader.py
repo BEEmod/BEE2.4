@@ -162,9 +162,9 @@ def load_palettes():
     """Scan and read in all palettes in the specified directory."""
 
     # Load our builtin palettes:
-    for name in os.listdir('../palettes/'):
-        LOGGER.info('Loading builtin "{}"', name)
-        pal_list.append(Palette.parse(os.path.join('../palettes/', name)))
+    for builtin_pal in utils.install_path('palettes/').glob('*' + PAL_EXT):
+        LOGGER.info('Loading builtin "{}"', builtin_pal.stem)
+        pal_list.append(Palette.parse(str(builtin_pal)))
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)

@@ -11,6 +11,7 @@ from srctools import Vec
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
 import logging
+import utils
 
 from typing import Iterable, Union, Dict, Tuple
 
@@ -25,7 +26,7 @@ PETI_ITEM_BG = Vec(229, 232, 233)
 
 filesystem = FileSystemChain(
     # Highest priority is the in-built UI images.
-    RawFileSystem(os.path.join(os.getcwd(), '../', 'images')),
+    RawFileSystem(str(utils.install_path('images'))),
 )
 
 # Silence DEBUG messages from Pillow, they don't help.
@@ -101,9 +102,9 @@ def icon(name, error=None):
     return png('items/' + name, error=error, resize_to=64)
 
 
-def get_app_icon():
+def get_app_icon(path: str):
     """On non-Windows, retrieve the application icon."""
-    with open('../bee2.ico', 'rb') as f:
+    with open(path, 'rb') as f:
         return ImageTk.PhotoImage(Image.open(f))
 
 
@@ -120,7 +121,7 @@ def make_splash_screen(
     It then adds the gradients on top.
     """
     import random
-    folder = os.path.join('..', 'images', 'splash_screen')
+    folder = str(utils.install_path('images/splash_screen'))
     path = '<nothing>'
     try:
         path = random.choice(os.listdir(folder))

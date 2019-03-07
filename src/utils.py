@@ -82,6 +82,16 @@ if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
 
+def install_path(path: str) -> Path:
+    """Return the path to a file inside our installation folder."""
+    if FROZEN:
+        # This special attribute is set by PyInstaller to our folder.
+        return Path(sys._MEIPASS) / path
+    else:
+        # We're running from src/, so data is in the folder above that.
+        return (Path('../') / path).resolve()
+
+
 def conf_location(path: str) -> Path:
     """Return the full path to save settings to.
     
@@ -752,9 +762,11 @@ def setup_localisations(logger: logging.Logger) -> None:
     for lang in expanded_langs:
         PROP_FLAGS_DEFAULT['lang_' + lang] = True
 
+    lang_folder = install_path('i18n')
+
     for lang in expanded_langs:
         try:
-            file = open('../i18n/{}.mo'.format(lang), 'rb')
+            file = open(lang_folder / (lang + '.mo').format(lang), 'rb')
         except FileNotFoundError:
             continue
         with file:

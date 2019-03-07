@@ -103,18 +103,18 @@ else:
         if type(sound) is str:
             LOGGER.info('Loading sound "{}" -> sounds/{}.ogg', name, sound)
             sound = SOUNDS[name] = pyglet.media.load(
-                f'../sounds/{sound}.ogg',
+                str(utils.install_path('sounds/{}.ogg'.format(sound))),
                 streaming=False,
             )
         sound.play()
 
 
-    def _reset_fx_blockable():
+    def _reset_fx_blockable() -> None:
         """Reset the fx_norep() call after a delay."""
         global _play_repeat_sfx
         _play_repeat_sfx = True
 
-    def fx_blockable(sound):
+    def fx_blockable(sound: str) -> None:
         """Play a sound effect.
 
         This waits for a certain amount of time between retriggering sounds
