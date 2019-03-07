@@ -15,8 +15,9 @@ if sys.platform == "darwin":
 	# Disable here, can't get this to work.
 	sys.modules['pyglet'] = None
 
+if not sys.platform.startswith('win'):
+	set_start_method('spawn')
 freeze_support()
-set_start_method('spawn')
 
 if __name__ == '__main__':
     import BEE2
