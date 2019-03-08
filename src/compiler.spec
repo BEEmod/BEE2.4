@@ -95,8 +95,17 @@ INCLUDES = [
 bee_version = input('BEE2 Version (or blank for dev): ')
 
 # Write this to the temp folder, so it's picked up and included.
-with open(os.path.join(workpath, 'BUILD_CONSTANTS.py'), 'w') as f:
-    f.write('BEE_VERSION=' + repr(bee_version))
+# Don't write it out though if it's the same, so PyInstaller doesn't reparse.
+version_val = 'BEE_VERSION=' + repr(bee_version)
+version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
+
+with open(version_filename) as f:
+    if f.read().strip() == version_val:
+        version_val = None
+
+if version_val:
+    with open(version_filename, 'w') as f:
+        f.write(version_val)
 
 # We need to include this version data.
 try:
