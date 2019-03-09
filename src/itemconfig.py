@@ -322,6 +322,7 @@ def make_pane(parent: ttk.Frame):
                 if wid.tooltip:
                     add_tooltip(widget, wid.tooltip)
                     add_tooltip(label, wid.tooltip)
+                    add_tooltip(wid_frame, wid.tooltip)
 
         if config.widgets and config.multi_widgets:
             ttk.Separator(orient='horizontal').grid(
