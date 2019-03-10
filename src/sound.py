@@ -103,18 +103,18 @@ else:
         if type(sound) is str:
             LOGGER.info('Loading sound "{}" -> sounds/{}.ogg', name, sound)
             sound = SOUNDS[name] = pyglet.media.load(
-                f'../sounds/{sound}.ogg',
+                str(utils.install_path('sounds/{}.ogg'.format(sound))),
                 streaming=False,
             )
         sound.play()
 
 
-    def _reset_fx_blockable():
+    def _reset_fx_blockable() -> None:
         """Reset the fx_norep() call after a delay."""
         global _play_repeat_sfx
         _play_repeat_sfx = True
 
-    def fx_blockable(sound):
+    def fx_blockable(sound: str) -> None:
         """Play a sound effect.
 
         This waits for a certain amount of time between retriggering sounds
@@ -188,10 +188,12 @@ else:
                 # Special case, it's directly lying on the disk -
                 # We can just pass that along.
                 disk_filename = os.path.join(fsystem.path, file.path)
+                LOGGER.info('Directly playing sample "{}"...', disk_filename)
             else:
                 # In a filesystem, we need to extract it.
                 # SAMPLE_WRITE_PATH + the appropriate extension.
-                disk_filename = SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1])
+                disk_filename = str(SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1]))
+                LOGGER.info('Extracting music sample to "{}"...', disk_filename)
                 with self.system.get_system(file), file.open_bin() as fsrc:
                     with open(disk_filename, 'wb') as fdest:
                         shutil.copyfileobj(fsrc, fdest)

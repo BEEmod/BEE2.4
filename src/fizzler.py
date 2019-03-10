@@ -343,6 +343,8 @@ class Fizzler:
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
         self.emitters = emitters  # Pairs of left, right positions.
 
+        self.has_cust_position = False  # If the emitters are a custom layout.
+
         # Special case - for TAG fizzlers, if that side is enabled.
         # We generate the triggers elsewhere.
         self.tag_on_pos = self.tag_on_neg = False
@@ -542,7 +544,7 @@ class FizzlerBrush:
             return
 
         # Produce a hex colour string, and use that as the material name.
-        side.mat = 'BEE2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
+        side.mat = 'bee2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
             round(self.side_color.x * 255),
             round(self.side_color.y * 255),
             round(self.side_color.z * 255),
@@ -1106,6 +1108,13 @@ def generate_fizzlers(vmf: VMF):
                     counter += 1
                     beam_ent['targetpoint'] = max_off
 
+        # Prepare to copy over instance traits for the emitters.
+        fizz_traits = instance_traits.get(fizz.base_inst).copy()
+        # Special case, mark emitters that have a custom position for Clean
+        # models.
+        if fizz.has_cust_position:
+            fizz_traits.add('cust_shape')
+
         mat_mod_tex = {}  # type: Dict[FizzlerBrush, Set[str]]
         for brush_type in fizz_type.brushes:
             if brush_type.mat_mod_var is not None:
@@ -1144,7 +1153,9 @@ def generate_fizzlers(vmf: VMF):
                     angles=max_angles,
                 )
                 max_inst.fixup.update(fizz.base_inst.fixup)
+                instance_traits.get(max_inst).update(fizz_traits)
             min_inst.fixup.update(fizz.base_inst.fixup)
+            instance_traits.get(min_inst).update(fizz_traits)
 
             if fizz_type.inst[FizzInst.GRID, is_static]:
                 # Generate one instance for each position.
@@ -1162,6 +1173,7 @@ def generate_fizzlers(vmf: VMF):
                         origin=mid_pos,
                     )
                     mid_inst.fixup.update(fizz.base_inst.fixup)
+                    instance_traits.get(mid_inst).update(fizz_traits)
 
             if template_brush_ent is not None:
                 if length == 128 and fizz_type.temp_single:

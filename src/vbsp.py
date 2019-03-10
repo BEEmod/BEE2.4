@@ -1129,7 +1129,7 @@ def add_screenshot_logic() -> None:
     ).upper() == 'AUTO' and IS_PREVIEW:
         VMF.create_ent(
             classname='func_instance',
-            file='instances/BEE2/logic/screenshot_logic.vmf',
+            file='instances/bee2/logic/screenshot_logic.vmf',
             origin=vbsp_options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )

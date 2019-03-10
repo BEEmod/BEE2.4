@@ -5,6 +5,8 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
+from pathlib import Path
+
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -31,7 +33,8 @@ import packageLoader
 import utils
 import srctools
 
-from typing import List, Tuple, Set, Iterable, Iterator, Dict
+from typing import List, Tuple, Set, Iterable, Iterator, Dict, Union
+
 
 try:
     from importlib.resources import read_binary as imp_res_read_binary
@@ -104,7 +107,7 @@ MaterialModify
 '''
 
 # The location of all the instances in the game directory
-INST_PATH = 'sdk_content/maps/instances/BEE2'
+INST_PATH = 'sdk_content/maps/instances/bee2'
 
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
@@ -311,7 +314,7 @@ class Game:
                     folder not in blacklist):
                 yield folder
 
-    def abs_path(self, path: str) -> str:
+    def abs_path(self, path: Union[str, Path]) -> str:
         """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
 
@@ -458,7 +461,7 @@ class Game:
                     b'allow editing below text without being overwritten.\n'
                     b'\n\n'
                 )
-                with open('../BEE2.fgd', 'rb') as bee2_fgd:
+                with open(utils.install_path('BEE2.fgd'), 'rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
                 file.write(imp_res_read_binary(srctools, 'srctools.fgd'))
 
@@ -510,7 +513,7 @@ class Game:
                 if dest in already_copied:
                     screen_func('RES')
                     continue
-                already_copied.add(dest)
+                already_copied.add(dest.casefold())
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
@@ -519,7 +522,7 @@ class Game:
 
         LOGGER.info('Cache copied.')
 
-        for path in [INST_PATH, 'bee2', 'bee2_dev']:
+        for path in [INST_PATH, 'bee2']:
             abs_path = self.abs_path(path)
             for dirpath, dirnames, filenames in os.walk(abs_path):
                 for file in filenames:
@@ -527,9 +530,9 @@ class Game:
                     # gun instance.
                     if file.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
                         continue
-                    path = os.path.normcase(os.path.join(dirpath, file))
+                    path = os.path.join(dirpath, file).casefold()
 
-                    if path.replace('bee2_dev', 'bee2') not in already_copied:
+                    if path not in already_copied:
                         LOGGER.info('Deleting: {}', path)
                         os.remove(path)
 
@@ -580,7 +583,7 @@ class Game:
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
         try:
-            num_compiler_files = len(os.listdir('../compiler'))
+            num_compiler_files = sum(1 for _ in utils.install_path('compiler').rglob('*'))
         except FileNotFoundError:
             num_compiler_files = 0
 
@@ -745,18 +748,19 @@ class Game:
 
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
-                for file in os.listdir('../compiler'):
-                    # Ignore these dummy executables.
-                    if 'original' in file:
+                compiler_src = utils.install_path('compiler')
+                for comp_file in compiler_src.rglob('*'):
+                    # Ignore folders.
+                    if comp_file.is_dir():
                         continue
 
-                    src_path = os.path.join('../compiler', file)
-                    if not os.path.isfile(src_path):
-                        continue
+                    dest = self.abs_path('bin' / comp_file.relative_to(compiler_src))
 
-                    dest = self.abs_path('bin/' + file)
+                    LOGGER.info('\t* {} -> {}', comp_file, dest)
 
-                    LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+                    folder = Path(dest).parent
+                    if not folder.exists():
+                        folder.mkdir(parents=True, exist_ok=True)
 
                     try:
                         if os.path.isfile(dest):
@@ -764,8 +768,8 @@ class Game:
                             # if it's set read-only.
                             utils.unset_readonly(dest)
                         shutil.copy(
-                            src_path,
-                            self.abs_path('bin/')
+                            comp_file,
+                            dest,
                         )
                     except PermissionError:
                         # We might not have permissions, if the compiler is currently
@@ -775,7 +779,7 @@ class Game:
                             title=_('BEE2 - Export Failed!'),
                             message=_('Copying compiler file {file} failed.'
                                       'Ensure the {game} is not running.').format(
-                                        file=file,
+                                        file=comp_file,
                                         game=self.name,
                                     ),
                             master=TK_ROOT,
@@ -956,7 +960,7 @@ class Game:
     def generate_fizzler_sides(self, conf: Property):
         """Create the VMTs used for fizzler sides."""
         fizz_colors = {}
-        mat_path = self.abs_path('bee2/materials/BEE2/fizz_sides/side_color_')
+        mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_color', '']
             if fizz_color:
@@ -965,7 +969,7 @@ class Game:
                     brush_conf['side_vortex', fizz_color]
                 )
         if fizz_colors:
-            os.makedirs(self.abs_path('bee2/materials/BEE2/fizz_sides/'), exist_ok=True)
+            os.makedirs(self.abs_path('bee2/materials/bee2/fizz_sides/'), exist_ok=True)
         for fizz_color, (alpha, fizz_vortex_color) in fizz_colors.items():
             file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(
                 round(fizz_color.x * 255),
