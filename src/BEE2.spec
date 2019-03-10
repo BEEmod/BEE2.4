@@ -104,9 +104,6 @@ EXCLUDES = [
     'idlelib.tabbedpages',
     'idlelib.textView',
 
-    # Stop us from then including Qt itself
-    'PIL.ImageQt',
-
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
     'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
@@ -182,7 +179,9 @@ bee2_a = Analysis(
     pathex=[workpath, os.path.dirname(srctools.__path__[0])],
     binaries=INCLUDE_LIBS,
     datas=data_files,
-    hiddenimports=[],
+    hiddenimports=[
+        'PIL._tkinter_finder',
+    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
