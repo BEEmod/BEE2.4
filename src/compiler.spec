@@ -1,4 +1,5 @@
 """Build commands for VBSP and VRAD."""
+import contextlib
 import pkgutil
 import os
 import sys
@@ -99,7 +100,7 @@ bee_version = input('BEE2 Version (or blank for dev): ')
 version_val = 'BEE_VERSION=' + repr(bee_version)
 version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
 
-with open(version_filename) as f:
+with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
     if f.read().strip() == version_val:
         version_val = None
 

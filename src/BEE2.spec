@@ -2,6 +2,7 @@ import shutil
 import os
 import io
 import srctools
+import contextlib
 from zipfile import ZipFile
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
@@ -143,7 +144,7 @@ bee_version = input('BEE2 Version: ')
 version_val = 'BEE_VERSION=' + repr(bee_version)
 version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
 
-with open(version_filename) as f:
+with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
     if f.read().strip() == version_val:
         version_val = None
 
