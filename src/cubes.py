@@ -613,7 +613,7 @@ def write_vscripts(vrad_conf: Property):
 
         for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
             filename = 'cube_vscript_{:02}.nut'.format(i)
-            with open('BEE2/inject/' + filename, 'w') as f:
+            with open('bee2/inject/' + filename, 'w') as f:
                 f.write(buffer.getvalue())
             conf_block[filename] = 'scripts/vscripts/' + bsp_name
 

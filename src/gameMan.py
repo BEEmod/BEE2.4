@@ -107,7 +107,7 @@ MaterialModify
 '''
 
 # The location of all the instances in the game directory
-INST_PATH = 'sdk_content/maps/instances/BEE2'
+INST_PATH = 'sdk_content/maps/instances/bee2'
 
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
@@ -960,7 +960,7 @@ class Game:
     def generate_fizzler_sides(self, conf: Property):
         """Create the VMTs used for fizzler sides."""
         fizz_colors = {}
-        mat_path = self.abs_path('bee2/materials/BEE2/fizz_sides/side_color_')
+        mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_color', '']
             if fizz_color:
@@ -969,7 +969,7 @@ class Game:
                     brush_conf['side_vortex', fizz_color]
                 )
         if fizz_colors:
-            os.makedirs(self.abs_path('bee2/materials/BEE2/fizz_sides/'), exist_ok=True)
+            os.makedirs(self.abs_path('bee2/materials/bee2/fizz_sides/'), exist_ok=True)
         for fizz_color, (alpha, fizz_vortex_color) in fizz_colors.items():
             file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(
                 round(fizz_color.x * 255),

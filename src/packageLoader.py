@@ -1309,8 +1309,8 @@ class Style(PakObject):
                 if icon_folder:
                     icon = '{}/{}/{}.jpg'.format(icon_folder, group, i)
                     # If this doesn't actually exist, don't use this.
-                    if 'resources/BEE2/corr/' + icon not in data.fsys:
-                        LOGGER.debug('No "resources/BEE2/{}"!', icon)
+                    if 'resources/bee2/corr/' + icon not in data.fsys:
+                        LOGGER.debug('No "resources/bee2/{}"!', icon)
                         icon = ''
                 else:
                     icon = ''
