@@ -405,7 +405,7 @@ def load_packages(
         ) -> Tuple[dict, Iterable[FileSystem]]:
     """Scan and read in all packages."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
-    pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
+    pak_dir = os.path.abspath(pak_dir)
 
     if not os.path.isdir(pak_dir):
         no_packages_err(pak_dir, 'The given packages directory is not present!')
