@@ -3,7 +3,8 @@ import os
 import io
 import srctools
 import contextlib
-from zipfile import ZipFile
+from zipfile import ZipFile, ZipInfo
+
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 
@@ -123,7 +124,7 @@ block_cipher = None
 
 
 # AVbin is needed to read OGG files.
-INCLUDE_LIBS = [
+INCLUDE_PATHS = [
     'C:/Windows/system32/avbin.dll',  # Win 32 bit
     'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
     '/usr/local/lib/libavbin.dylib',  # OS X
@@ -132,7 +133,7 @@ INCLUDE_LIBS = [
 
 # Filter out files for other platforms
 INCLUDE_LIBS = [
-    (path, '.') for path in INCLUDE_LIBS
+    (path, '.') for path in INCLUDE_PATHS
     if os.path.exists(path)
 ]
 
@@ -145,7 +146,7 @@ version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
     if f.read().strip() == version_val:
-        version_val = None
+        version_val = ''
 
 if version_val:
     with open(version_filename, 'w') as f:
