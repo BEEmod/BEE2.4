@@ -1,8 +1,7 @@
 [![BEE2.4 Releases](https://img.shields.io/github/downloads/BEEmod/BEE2.4/total.svg?label=App)](https://github.com/BEEmod/BEE2.4/releases)
 [![BEE2-items Releases](https://img.shields.io/github/downloads/BEEmod/BEE2-items/total.svg?label=Packages)](https://github.com/BEEmod/BEE2-items/releases)
 
-Join the Discord [here](https://discord.me/beemod) and the Steam group [here](http://steamcommunity.com/groups/beemod)!
-
+### Please read the [Contributing Guidelines](https://github.com/BEEmod/BEE2-items/blob/master/.github/contributing.md) and [FAQ](https://github.com/BEEmod/BEE2-items/wiki/FAQ) before opening an issue.
 
 ![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/bee2.ico)
 # Better Extended Editor 2 version 4 #
@@ -12,6 +11,10 @@ different eras, and configure many other aspects. All vanilla items have been up
 bugfixes and improvements.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
+
+[Discord Server](https://discord.me/beemod)
+
+[Steam Group](https://steamcommunity.com/groups/beemod)
 
 ## Download and Use
 - Download the latest releases of the BEE2.4 and items from the following pages:
