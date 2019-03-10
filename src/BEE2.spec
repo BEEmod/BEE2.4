@@ -10,7 +10,6 @@ ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 
 # src -> build subfolder.
 data_files = [
-    ('../README.md', '.'),
     ('../BEE2.ico', '.'),
     ('../BEE2.fgd', '.'),
     ('../images/BEE2/*.png', 'images/BEE2/'),
@@ -170,9 +169,6 @@ try:
 except ImportError:
     pass
 
-print('Data files: ')
-print(data_files)
-
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
@@ -191,6 +187,13 @@ bee2_a = Analysis(
     cipher=block_cipher,
     noarchive=False
 )
+
+# Need to add this manually, so it can have a different name.
+bee2_a.datas.append((
+    'README.txt',
+    os.path.join(os.getcwd(), '../INSTALL_GUIDE.txt'),
+    'DATA',
+))
 
 pyz = PYZ(
     bee2_a.pure,
