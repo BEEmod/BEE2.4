@@ -578,12 +578,34 @@ def import_conditions() -> None:
     """
     import importlib
     import pkgutil
-    # Find the modules in the conditions package...
-    for loader, module, is_package in pkgutil.iter_modules(__path__):
+    # Find the modules in the conditions package.
+    # PyInstaller messes this up a bit.
+
+    if utils.FROZEN:
+        # This is the PyInstaller loader injected during bootstrap.
+        # See PyInstaller/loader/pyimod03_importers.py
+        # toc is a PyInstaller-specific attribute containing a set of
+        # all frozen modules.
+        loader = pkgutil.get_loader('conditions')
+        modules = [
+            module
+            for module in loader.toc
+            if module.startswith('conditions.')
+        ]  # type: List[str]
+    else:
+        # We can grab them properly.
+        modules = [
+            'conditions.' + module
+            for loader, module, is_package in
+            pkgutil.iter_modules(__path__)
+        ]
+
+    for module in modules:
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
-        importlib.import_module('conditions.' + module)
+        LOGGER.debug('Importing {} ...', module)
+        importlib.import_module(module)
     LOGGER.info('Imported all conditions modules!')
 
 

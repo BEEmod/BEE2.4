@@ -1119,7 +1119,7 @@ def gen_item_outputs(vmf: VMF):
     if has_timer_relay:
         # Write this VScript out.
         timer_sound = vbsp_options.get(str, 'timer_sound')
-        with open('BEE2/inject/timer_sound.nut', 'w') as f:
+        with open('bee2/inject/timer_sound.nut', 'w') as f:
             f.write(TIMER_SOUND_SCRIPT.format(snd=timer_sound))
 
         # Make sure this is packed, since parsing the VScript isn't trivial.
@@ -1201,7 +1201,7 @@ def add_timer_relay(item: Item, has_sounds:bool):
     )
 
     if has_sounds:
-        relay['vscripts'] = 'BEE2/timer_sound.nut'
+        relay['vscripts'] = 'bee2/timer_sound.nut'
 
     if item.item_type.timer_sound_pos:
         relay_loc = item.item_type.timer_sound_pos.copy()

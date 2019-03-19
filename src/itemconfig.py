@@ -104,7 +104,7 @@ class Widget:
         self.use_inf = use_inf  # For timer, is infinite valid?
 
 
-class ConfigGroup(PakObject, allow_mult=False, has_img=False):
+class ConfigGroup(PakObject, allow_mult=True, has_img=False):
     """A group of configs for an item."""
     def __init__(
         self,
@@ -322,6 +322,7 @@ def make_pane(parent: ttk.Frame):
                 if wid.tooltip:
                     add_tooltip(widget, wid.tooltip)
                     add_tooltip(label, wid.tooltip)
+                    add_tooltip(wid_frame, wid.tooltip)
 
         if config.widgets and config.multi_widgets:
             ttk.Separator(orient='horizontal').grid(

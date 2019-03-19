@@ -1,21 +1,34 @@
-from cx_Freeze import setup, Executable
-from zipfile import ZipFile, ZipInfo
-import os
 import shutil
-import utils
+import os
 import io
+import srctools
+import contextlib
+from zipfile import ZipFile, ZipInfo
 
-shutil.rmtree('build_BEE2', ignore_errors=True)
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 
+
+# src -> build subfolder.
+data_files = [
+    ('../BEE2.ico', '.'),
+    ('../BEE2.fgd', '.'),
+    ('../images/BEE2/*.png', 'images/BEE2/'),
+    ('../images/icons/*.png', 'images/icons/'),
+    ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
+    ('../palettes/*.bee2_palette', 'palettes/'),
+
+    # Add the FGD data for us.
+    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools'),
+    (os.path.join(srctools.__path__[0], 'srctools.fgd'), 'srctools'),
+
+]
 
 def get_localisation(key):
     """Get localisation files from Loco."""
     import requests
 
     # Make the directories.
-    os.makedirs('../build_BEE2/i18n/', exist_ok=True)
     os.makedirs('../i18n/', exist_ok=True)
 
     print('Reading translations... ', end='', flush=True)
@@ -41,8 +54,7 @@ def get_localisation(key):
         # Copy to the dev and output directory.
         with zip_file.open(file) as src, open('../i18n/' + filename, 'wb') as dest:
             shutil.copyfileobj(src, dest)
-        with zip_file.open(file) as src, open('../build_BEE2/i18n/' + filename, 'wb') as dest:
-            shutil.copyfileobj(src, dest)
+            data_files.append((dest.name, 'i18n'))
 
 get_localisation('kV-oMlhZPJEJoYPI5EQ6HaqeAc1zQ73G')
 
@@ -93,9 +105,6 @@ EXCLUDES = [
     'idlelib.tabbedpages',
     'idlelib.textView',
 
-    # Stop us from then including Qt itself
-    'PIL.ImageQt',
-
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
     'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
@@ -103,7 +112,6 @@ EXCLUDES = [
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',
-    'email',
     'smtplib',
 
     'unittest',  # Imported in __name__==__main__..
@@ -112,128 +120,109 @@ EXCLUDES = [
     'argparse',
 ]
 
+block_cipher = None
 
-# cx_freeze doesn't detect these required modules
-INCLUDES = [
-    'pyglet.clock',
-    'pyglet.resource',
-]
 
 # AVbin is needed to read OGG files.
-INCLUDE_LIBS = [
+INCLUDE_PATHS = [
     'C:/Windows/system32/avbin.dll',  # Win 32 bit
     'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
-    'libavbin.dylib',  # OS X - must be relative.
+    '/usr/local/lib/libavbin.dylib',  # OS X
     '/usr/lib/libavbin.so',  # Linux
 ]
 
-
-if utils.WIN:
-    base = 'Win32GUI'
-    INCLUDE_LIBS.extend(['tcl86t.dll', 'tk86t.dll'])
-    ext = '.exe'
-else:
-    ext = ''
-    base = None
-
 # Filter out files for other platforms
 INCLUDE_LIBS = [
-    path for path in INCLUDE_LIBS
+    (path, '.') for path in INCLUDE_PATHS
     if os.path.exists(path)
 ]
 
 bee_version = input('BEE2 Version: ')
 
-import srctools
+# Write this to the temp folder, so it's picked up and included.
+# Don't write it out though if it's the same, so PyInstaller doesn't reparse.
+version_val = 'BEE_VERSION=' + repr(bee_version)
+version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
 
-zip_includes = [
-    # Add the FGD data for us.
-    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools/fgd.lzma'),
-    (os.path.join(srctools.__path__[0], 'srctools.fgd'), 'srctools/srctools.fgd'),
-]
+with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
+    if f.read().strip() == version_val:
+        version_val = ''
+
+if version_val:
+    with open(version_filename, 'w') as f:
+        f.write(version_val)
+
+for snd in os.listdir('../sounds/'):
+    if snd == 'music_samp':
+        continue
+    data_files.append(('../sounds/' + snd, 'sounds'))
+
+
 # We need to include this version data.
 try:
     import importlib_resources
-    zip_includes.append(
+    data_files.append(
         (
             os.path.join(importlib_resources.__path__[0], 'version.txt'),
-            'importlib_resources/version.txt',
+            'importlib_resources',
          )
     )
 except ImportError:
     pass
 
+# Finally, run the PyInstaller analysis process.
 
-setup(
-    name='BEE2',
-    version='2.4',
-    description='Portal 2 Puzzlemaker item manager.',
-    options={
-        'build_exe': {
-            'build_exe': '../build_BEE2/bin',
-            'excludes': EXCLUDES,
-            'includes': INCLUDES,
-            # These values are added to the generated BUILD_CONSTANTS module.
-            'constants': 'BEE_VERSION=' + repr(bee_version),
-            'include_files': INCLUDE_LIBS,
-
-            # Include all modules in the zip..
-            'zip_include_packages': '*',
-            'zip_exclude_packages': '',
-            'zip_includes': zip_includes,
-        },
-    },
-    executables=[
-        Executable(
-            'BEE2_launch.pyw',
-            base=base,
-            icon=ico_path,
-            targetName='BEE2' + ext,
-        ),
-        Executable(
-            'backup.py',
-            base=base,
-            icon=ico_path,
-            targetName='backup_tool' + ext,
-        ),
-        Executable(
-            'CompilerPane.py',
-            base=base,
-            icon=ico_path,
-            targetName='compiler_options' + ext,
-        ),
-        Executable(
-            'packages_sync.py',
-            icon=ico_path,
-            targetName='packages_sync' + ext,
-        ),
+bee2_a = Analysis(
+    ['BEE2_launch.pyw'],
+    pathex=[workpath, os.path.dirname(srctools.__path__[0])],
+    binaries=INCLUDE_LIBS,
+    datas=data_files,
+    hiddenimports=[
+        'PIL._tkinter_finder',
     ],
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=EXCLUDES,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False
 )
 
-# -------------------------------------------------------
-# Now copy the required resources to the build directory.
+# Need to add this manually, so it can have a different name.
+bee2_a.datas.append((
+    'README.txt',
+    os.path.join(os.getcwd(), '../INSTALL_GUIDE.txt'),
+    'DATA',
+))
 
+pyz = PYZ(
+    bee2_a.pure,
+    bee2_a.zipped_data,
+    cipher=block_cipher
+)
 
-def copy_resource(tree):
-    print('Copying "{}"'.format(tree))
-    src = os.path.join('..', tree)
-    dest = os.path.join('..', 'build_BEE2', tree)
+exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='BEE2',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+    windowed=True,
+    icon='../BEE2.ico'
+)
 
-    if os.path.isfile(src):
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        shutil.copy(src, dest)
-    else:
-        os.makedirs(dest, exist_ok=True)
-        for file in os.listdir(src):
-            copy_resource(tree + '/' + file)
-
-copy_resource('BEE2.ico')
-copy_resource('BEE2.fgd')
-copy_resource('images/BEE2')
-copy_resource('images/icons')
-copy_resource('images/splash_screen')
-copy_resource('palettes')
-for snd in os.listdir('../sounds/'):
-    if snd == 'music_samp':
-        continue
-    copy_resource('sounds/' + snd)
+coll = COLLECT(
+    exe,
+    bee2_a.binaries,
+    bee2_a.zipfiles,
+    bee2_a.datas,
+    strip=False,
+    upx=True,
+    name='BEE2',
+)

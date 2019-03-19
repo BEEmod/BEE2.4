@@ -28,7 +28,7 @@ ALL_CAMERAS = []  # type: List[Camera]
 # and that we remove when more than one camera is pointed here.
 BULLSYE_LOCS = defaultdict(int)  # type: Dict[Tuple[float, float, float], int]
 
-MON_ARGS_SCRIPT = os.path.join('BEE2', 'inject', 'monitor_args.nut')
+MON_ARGS_SCRIPT = os.path.join('bee2', 'inject', 'monitor_args.nut')
 
 Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
 Monitor = namedtuple('Monitor', 'inst')

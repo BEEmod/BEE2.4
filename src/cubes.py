@@ -5,7 +5,7 @@ from contextlib import suppress
 from collections import namedtuple
 
 from enum import Enum
-from typing import Dict, Optional, List, Union, Tuple, Set, FrozenSet
+from typing import Dict, Optional, List, Union, Tuple, Set, FrozenSet, Iterable
 
 import brushLoc
 import packing
@@ -110,15 +110,6 @@ class CubeEntType(Enum):
     antique = 'ANTIQUE'
     franken = 'FRANKEN'  # prop_monster_box
 
-# The skin used for bounce-gel for this cube type.
-BOUNCE_SKINS = {
-    CubeEntType.norm: '6',
-    CubeEntType.comp: '8',
-    CubeEntType.reflect: '2',
-    CubeEntType.sphere: '2',
-    CubeEntType.antique: '1',
-}
-
 
 class CubeVoiceEvents(Enum):
     """Certain dropper events can trigger dialogue."""
@@ -189,6 +180,27 @@ class CubePaintType(Enum):
     BOUNCE = 0
     SPEED = 2
 
+# The skin used for a cube type and gel.
+CUBE_SKINS = {
+    (None, CubeEntType.norm): '0',
+    (None, CubeEntType.comp): '1',
+    (None, CubeEntType.reflect): '0',
+    (None, CubeEntType.sphere): '0',
+    (None, CubeEntType.antique): '0',
+
+    (CubePaintType.BOUNCE, CubeEntType.norm): '6',
+    (CubePaintType.BOUNCE, CubeEntType.comp): '8',
+    (CubePaintType.BOUNCE, CubeEntType.reflect): '2',
+    (CubePaintType.BOUNCE, CubeEntType.sphere): '2',
+    (CubePaintType.BOUNCE, CubeEntType.antique): '1',
+
+    (CubePaintType.SPEED, CubeEntType.norm): '7',
+    (CubePaintType.SPEED, CubeEntType.comp): '9',
+    (CubePaintType.SPEED, CubeEntType.reflect): '3',
+    (CubePaintType.SPEED, CubeEntType.sphere): '3',
+    (CubePaintType.SPEED, CubeEntType.antique): '2',
+}
+
 
 # Things that get attached to a cube.
 class CubeAddon:
@@ -196,10 +208,10 @@ class CubeAddon:
     def __init__(
         self,
         id: str,
-        inst='',
-        pack='',
-        vscript='',
-        script_vars: List[ScriptVar]=(),
+        inst: str='',
+        pack: str='',
+        vscript: str='',
+        script_vars: Iterable[ScriptVar]=(),
         outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
     ):
         self.id = id
@@ -435,7 +447,7 @@ class CubeType:
             cust_model = conf['model', None]
             cust_model_color = conf['modelColor', None]
 
-        outputs = {}
+        outputs = {}  # type: Dict[CubeOutputs, List[Output]]
 
         for out_type in CubeOutputs:
             outputs[out_type] = out_list = []
@@ -601,7 +613,7 @@ def write_vscripts(vrad_conf: Property):
 
         for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
             filename = 'cube_vscript_{:02}.nut'.format(i)
-            with open('BEE2/inject/' + filename, 'w') as f:
+            with open('bee2/inject/' + filename, 'w') as f:
                 f.write(buffer.getvalue())
             conf_block[filename] = 'scripts/vscripts/' + bsp_name
 
@@ -622,14 +634,14 @@ def parse_filter_types(
     This returns 3 sets of CubeTypes - all cubes, ones to include, and ones
     to exclude.
     """
-    inclusions = set()
-    exclusions = set()
+    inclusions = set()  # type: Set[CubeType]
+    exclusions = set()  # type: Set[CubeType]
 
     all_cubes = {
         cube
         for cube in CUBE_TYPES.values()
         if cube.in_map or cube.color_in_map
-    }
+    }  # type: Set[CubeType]
 
     for cube_id in cubes:
         if cube_id[:1] == '!':
@@ -687,9 +699,9 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     # Special case - no cubes at all.
     if not inclusions:
         try:
-            return CUBE_FILTERS[None]
+            return CUBE_FILTERS[frozenset()]
         except KeyError:
-            CUBE_FILTERS[None] = filter_name = vmf.create_ent(
+            CUBE_FILTERS[frozenset()] = filter_name = vmf.create_ent(
                 # Parent class which is True for everything.
                 classname='filter_base',
                 targetname='@filter_nothing',
@@ -1327,6 +1339,8 @@ def make_cube(
     else:
         origin.z += cube_type.base_offset
 
+    spawn_paint = pair.paint_type
+
     ent = vmf.create_ent(
         classname='prop_weighted_cube',
         origin=origin,
@@ -1334,6 +1348,9 @@ def make_cube(
     )
 
     if in_dropper:
+        assert drop_type is not None
+        assert pair.dropper is not None
+
         if not pair.drop_type:
             raise ValueError('Cube in dropper without dropper!')
 
@@ -1370,7 +1387,7 @@ def make_cube(
             # Two ways of applying paint - immediately on spawn, or at playtime.
             # Orange cubes can stay put when dropped, so they're fine.
             # Dropperless cubes should spawn bouncing around.
-            if not in_dropper or pair.paint_type is CubePaintType.SPEED:
+            if not in_dropper or pair.paint_type is CubePaintType.SPEED or drop_type is None:
                 ent['PaintPower'] = pair.paint_type.value
 
             # Another special case - droppers which can spawn bounce-gel
@@ -1378,21 +1395,24 @@ def make_cube(
             # Make the dropper 'non-stick' by manually applying the skin,
             # then set paint type after exiting. That way it can't bounce off
             # the dropper walls, but will look visually painted.
-            elif pair.drop_type.bounce_paint_file.casefold() == '<prepaint>':
+            elif drop_type.bounce_paint_file.casefold() == '<prepaint>':
+                assert drop_type is not None
+                assert pair.dropper is not None
+
                 # Apply the skin after spawn.
                 ent.add_out(
                     Output(
                         'OnUser4',
                         '!self',
                         'Skin',
-                        BOUNCE_SKINS[pair.cube_type.type],
+                        CUBE_SKINS[CubePaintType.BOUNCE, pair.cube_type.type],
                         only_once=True,
                     )
                 )
 
                 # Manually add the dropper outputs here, so they only add to the
                 # actual dropper (not the other cube if present).
-                drop_name, drop_cmd = pair.drop_type.out_finish_drop
+                drop_name, drop_cmd = drop_type.out_finish_drop
                 pair.dropper.add_out(
                     # Paint the cube, so it now has the functionality.
                     Output(
@@ -1404,17 +1424,20 @@ def make_cube(
                     )
                 )
             else:
+                assert drop_type is not None
+                assert pair.dropper is not None
+
                 # Add the bounce painter. This is only on the dropper.
                 vmf.create_ent(
                     classname='func_instance',
                     targetname=pair.dropper['targetname'],
                     origin=pair.dropper['origin'],
                     angles=pair.dropper['angles'],
-                    file=pair.drop_type.bounce_paint_file,
+                    file=drop_type.bounce_paint_file,
                 )
                 # Manually add the dropper outputs here, so they only add to the
                 # actual dropper.
-                drop_name, drop_cmd = pair.drop_type.out_finish_drop
+                drop_name, drop_cmd = drop_type.out_finish_drop
                 pair.dropper.add_out(
                     # Fire an input to activate the effects.
                     Output(
@@ -1432,11 +1455,13 @@ def make_cube(
                         inst_out=drop_name,
                     )
                 )
+                # Don't paint it on spawn.
+                spawn_paint = None
 
     yaw = norm.to_angle().y
 
     cust_model = cube_type.model
-    pack = cube_type.pack
+    pack = cube_type.pack  # type: Optional[Union[str, List[str]]]
 
     has_addon_inst = False
     vscripts = []
@@ -1485,6 +1510,7 @@ def make_cube(
 
         ent['NewSkins'] = '1'
         ent['SkinType'] = '0'
+        ent['Skin'] = CUBE_SKINS[spawn_paint, pair.cube_type.type]
         ent['angles'] = Vec(0, yaw, 0)
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
@@ -1496,12 +1522,6 @@ def make_cube(
             
             if cube_type.model_swap_meth is ModelSwapMeth.CUBE_TYPE:
                 ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
-
-                if cube_type.type is CubeEntType.comp:
-                    # Since we're not using the real cube type, Companion
-                    # cubes don't swap to the right skin.
-                    # We need to set that manually.
-                    ent['skin'] = 1
 
             if isinstance(pack, list):
                 packing.pack_files(vmf, *pack)
@@ -1554,9 +1574,15 @@ def generate_cubes(vmf: VMF):
                 pair.cube_type.model
             )
             if cust_model:
+                # Fire an on-spawn output that swaps the model,
+                # then resets the skin.
                 pair.outputs[CubeOutputs.SPAWN].append(Output(
                     '', '!self', 'RunScriptCode',
-                    'self.SetModel(`{}`)'.format(cust_model),
+                    'self.SetModel(`{}`); '
+                    'self.__KeyValueFromInt(`skin`, {});'.format(
+                        cust_model,
+                        CUBE_SKINS[pair.paint_type, pair.cube_type.type],
+                    ),
                 ))
                 conditions.globals.precache_model(vmf, cust_model)
 
@@ -1588,6 +1614,7 @@ def generate_cubes(vmf: VMF):
             ))
 
         if pair.dropper:
+            assert pair.drop_type is not None
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True)

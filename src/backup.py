@@ -6,7 +6,11 @@ import srctools.logger
 import tk_tools
 if __name__ == '__main__':
     utils.fix_cur_directory()
-    LOGGER = srctools.logger.init_logging('../logs/backup.log', __name__, on_error=tk_tools.on_error)
+    LOGGER = srctools.logger.init_logging(
+        str(utils.install_path('logs/backup.log')),
+        __name__,
+        on_error=tk_tools.on_error,
+    )
     utils.setup_localisations(LOGGER)
 else:
     LOGGER = srctools.logger.get_logger(__name__)

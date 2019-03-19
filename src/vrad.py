@@ -58,7 +58,7 @@ SOUND_MAN_FOLDER = {
 # They are all found in bee2/inject/.
 INJECT_FILES = {
     # Defines choreo lines used on coop death, taunts, etc.
-    'response_data.nut': 'scripts/vscripts/BEE2/coop_response_data.nut',
+    'response_data.nut': 'scripts/vscripts/bee2/coop_response_data.nut',
 
     # The list of soundscripts that the game loads.
     'soundscript_manifest.txt': 'scripts/game_sounds_manifest.txt',
@@ -73,13 +73,13 @@ INJECT_FILES = {
     'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
 
     # Commands for monitor items.
-    'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
+    'monitor_args.nut': 'scripts/vscripts/bee2/mon_camera_args.nut',
 
     # Script for setting model types on cubes.
-    'cube_setmodel.nut': 'scripts/vscripts/BEE2/cube_setmodel.nut',
+    'cube_setmodel.nut': 'scripts/vscripts/bee2/cube_setmodel.nut',
 
     # Plays the tick-tock timer sound.
-    'timer_sound.nut': 'scripts/vscripts/BEE2/timer_sound.nut',
+    'timer_sound.nut': 'scripts/vscripts/bee2/timer_sound.nut',
 }
 
 # Additional parts to add if we have a mdl file.
@@ -373,7 +373,7 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
     sync_funnel = data.bool('sync_funnel')
 
     if 'base' not in data:
-        base = Property('base', 'BEE2/silent_lp.wav')
+        base = Property('base', 'bee2/silent_lp.wav')
         # Don't sync to a 2-second sound.
         sync_funnel = False
     else:

@@ -481,8 +481,14 @@ def res_import_template_setup(res: Property):
         # Spawn everything as detail, so they get put into a brush
         # entity.
         force_type = template_brush.TEMP_TYPES.detail
+        outputs = [
+            Output.parse(prop)
+            for prop in
+            res.find_children('Outputs')
+        ]
     else:
         keys = None
+        outputs = []
     visgroup_mode = res['visgroup', 'none'].casefold()
     if visgroup_mode not in ('none', 'choose'):
         visgroup_mode = srctools.conv_float(visgroup_mode.rstrip('%'), 0.00)
@@ -530,6 +536,7 @@ def res_import_template_setup(res: Property):
         visgroup_force_var,
         keys,
         picker_vars,
+        outputs,
     )
 
 
@@ -585,6 +592,8 @@ def res_import_template(inst: Entity, res: Property):
             out of the template. The key is the name of the picker, the value
             is the fixup name to write to. The output is either 'white',
             'black' or ''.
+    - outputs: Add outputs to the brush ent. Syntax is like VMFs, and all names
+            are local to the instance.
     """
     (
         orig_temp_id,
@@ -602,6 +611,7 @@ def res_import_template(inst: Entity, res: Property):
         visgroup_force_var,
         key_block,
         picker_vars,
+        outputs,
     ) = res.value
 
     if ':' in orig_temp_id:
@@ -688,6 +698,11 @@ def res_import_template(inst: Entity, res: Property):
         if move_dir.startswith('<') and move_dir.endswith('>'):
             move_dir = Vec.from_str(move_dir).rotate(*angles)
             temp_data.detail['movedir'] = move_dir.to_angle()
+
+        for out in outputs:  # type: Output
+            out = out.copy()
+            out.target = conditions.local_name(inst, out.target)
+            temp_data.detail.add_out(out)
 
         # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
         # modify it.

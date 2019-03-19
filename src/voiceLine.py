@@ -34,7 +34,7 @@ ALLOW_MID_VOICES = False
 vmf_file = None  # type: VMF
 
 # The prefix for all voiceline instances.
-INST_PREFIX = 'instances/BEE2/voice/'
+INST_PREFIX = 'instances/bee2/voice/'
 
 # The location of the responses script.
 RESP_LOC = 'bee2/inject/response_data.nut'
