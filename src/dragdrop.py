@@ -10,9 +10,9 @@ from enum import Enum
 from tkinter import ttk, messagebox
 from srctools.logger import get_logger
 from typing import (
-    Union, Generic, TypeVar,
+    Union, Generic, Any, TypeVar,
     Optional, Callable,
-    List, Tuple, Dict
+    List, Tuple, Dict,
 )
 
 __all__ = ['Manager', 'Slot', 'ItemProto']
@@ -32,7 +32,7 @@ class ItemProto(Protocol):
     # If only one item is present for a group, it uses this.
     dnd_group_icon: Optional[tkinter.PhotoImage]
 
-ItemT = TypeVar('ItemT')  # The object the items move around.
+ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 
 
 class Event(Enum):
@@ -123,7 +123,7 @@ class Manager(Generic[ItemT]):
             - label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        slot = Slot(self, parent, source, label)
+        slot = Slot(self, parent, source, label)  # type: Slot[ItemT]
         if source:
             self._sources.append(slot)
         else:
@@ -135,7 +135,7 @@ class Manager(Generic[ItemT]):
         """Update all items to set new icons."""
         # Count the number of items in each group to find
         # which should have group icons.
-        groups = defaultdict(int)
+        groups = defaultdict(int)   # type: Dict[Optional[str], int]
         for slot in self._targets:
             groups[getattr(slot.contents, 'dnd_group', None)] += 1
 
@@ -152,7 +152,7 @@ class Manager(Generic[ItemT]):
             # These are never grouped.
             self._display_item(slot._lbl, slot.contents)
 
-    def reg_callback(self, event: Event, func: Callable[['Slot'], None]) -> None:
+    def reg_callback(self, event: Event, func: Callable[['Slot'], Any]) -> None:
         """Register a callback."""
         self._callbacks[event].append(func)
 
@@ -193,7 +193,7 @@ class Manager(Generic[ItemT]):
         else:
             lbl['image'] = item.dnd_icon
 
-    def _group_update(self, group: Optional[str]):
+    def _group_update(self, group: Optional[str]) -> None:
         """Update all target items with this group."""
         if group is None:
             # None to do..
@@ -255,7 +255,7 @@ class Manager(Generic[ItemT]):
 
     def _evt_move(self, event: tkinter.Event) -> None:
         """Reposition the item whenever moving."""
-        if self._cur_drag is None:
+        if self._cur_drag is None or self._cur_prev_slot is None:
             # We aren't dragging, ignore the event.
             return
 
@@ -273,9 +273,9 @@ class Manager(Generic[ItemT]):
         else:
             self._drag_win.configure(cursor=utils.CURSORS['destroy_item'])
 
-    def _evt_stop(self, event: tkinter.Event):
+    def _evt_stop(self, event: tkinter.Event) -> None:
         """User released the item."""
-        if not self._cur_drag:
+        if self._cur_drag is None or self._cur_prev_slot is None:
             return
 
         sound.fx('config')
@@ -311,7 +311,7 @@ class Slot(Generic[ItemT]):
         self.man = man
         self.is_source = is_source
         self._contents = None  # type: Optional[ItemT]
-        self._pos_type = None
+        self._pos_type = None  # type: Optional[str]
         self._lbl = tkinter.Label(
             parent,
             image=man._img_blank,
@@ -331,7 +331,7 @@ class Slot(Generic[ItemT]):
                 font=('Helvetica', -12),
                 relief='ridge',
                 bg=img.PETI_ITEM_BG_HEX,
-            )
+            )  # type: Optional[tkinter.Label]
         else:
             self._text_lbl = None
 
@@ -340,10 +340,11 @@ class Slot(Generic[ItemT]):
                 self._lbl,
                 image=img.png('icons/gear'),
                 relief='ridge',
-            )
+            )  # type: Optional[tkinter.Label]
 
             @utils.bind_leftclick(self._info_btn)
             def info_button_click(e):
+                """Trigger the callback whenever the gear button was pressed."""
                 config_event(e)
                 # Cancel the event sequence, so it doesn't travel up to the main
                 # window and hide the window again.
@@ -501,14 +502,20 @@ def _test() -> None:
     slot_src = []
 
     class TestItem:
-        def __init__(self, name, icon, group=None, group_icon=None):
+        def __init__(
+            self,
+            name: str,
+            icon: str,
+            group: str=None,
+            group_icon: str=None,
+        ) -> None:
             self.name = name
             self.dnd_icon = img.png('items/clean/{}.png'.format(icon))
             self.dnd_group = group
             if group_icon:
                 self.dnd_group_icon = img.png('items/clean/{}.png'.format(group_icon))
 
-        def __repr__(self):
+        def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)
 
     manager = Manager[TestItem](config_icon=True)
