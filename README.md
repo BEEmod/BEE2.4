@@ -12,9 +12,7 @@ bugfixes and improvements.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
-[Discord Server](https://discord.me/beemod)
-
-[Steam Group](https://steamcommunity.com/groups/beemod)
+[Discord Server](https://discord.gg/hnGFJrz)
 
 ## Download and Use
 - Download the latest releases of the BEE2.4 and items from the following pages:
