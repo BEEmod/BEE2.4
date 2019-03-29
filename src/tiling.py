@@ -35,7 +35,10 @@ LOGGER = srctools.logger.get_logger(__name__)
 # thickness = 2,4,8
 # TILE_TEMP[tile_norm]['tile'] = front_face
 # TILE_TEMP[tile_norm]['back'] = back_face
-TILE_TEMP = {}  # type: Dict[Tuple[float, float, float], Dict[Union[str, Tuple[int, int, int, bool]], Side]]
+TILE_TEMP: Dict[
+    Tuple[float, float, float],
+    Dict[Union[str, Tuple[int, int, int, bool]], Side]
+] = {}
 
 # Maps normals to the index in PrismFace.
 PRISM_NORMALS = {
@@ -64,7 +67,7 @@ UV_NORMALS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 # All the tiledefs in the map.
 # Maps a block center, normal -> the tiledef on the side of that block.
-TILES = {}  # type: Dict[Tuple[Vec_tuple, Vec_tuple], TileDef]
+TILES: Dict[Tuple[Vec_tuple, Vec_tuple], 'TileDef'] = {}
 
 # Special key for Tile.SubTile - This is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
@@ -188,11 +191,11 @@ TILETYPE_TO_CHAR = {
     TileType.CUTOUT_TILE_BROKEN: 'x',
     TileType.CUTOUT_TILE_PARTIAL: 'o',
 }
-TILETYPE_FROM_CHAR = {
+TILETYPE_FROM_CHAR: Dict[str, TileType] = {
     v: k
     for k, v in
     TILETYPE_TO_CHAR.items()
-}  # type: Dict[str, TileType]
+}
 
 
 class BrushType(Enum):
@@ -286,7 +289,7 @@ def order_bbox(bbox: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
     umin, vmin, umax, vmax = bbox
     return umin, vmin, -umax, -vmax
 
-PATTERNS = {
+PATTERNS: Dict[str, List[Pattern]] = {
     'clean': [
         Pattern(TileSize.TILE_1x1, (0, 0, 4, 4)),
         Pattern(TileSize.TILE_2x1,
@@ -295,7 +298,8 @@ PATTERNS = {
             (1, 0, 3, 4),  # Middle - only if no left or right.
             wall_only=True,
         ),
-        Pattern(TileSize.TILE_2x2,
+        Pattern(
+            TileSize.TILE_2x2,
             # Combinations:
             (0, 0, 2, 4), (0, 0, 4, 2), (0, 2, 4, 4), (2, 0, 4, 4),
             (1, 0, 3, 4), (0, 1, 4, 3),
@@ -334,7 +338,7 @@ PATTERNS = {
     ],
     'fizzler_split_u': [],
     'fizzler_split_v': [],
-}  # type: Dict[str, List[Pattern]]
+}
 
 
 def _make_patterns() -> None:
@@ -408,7 +412,7 @@ class TileDef:
         self.pos = pos
         self.normal = normal
         self.brush_type = brush_type
-        self.brush_faces = []  # type: List[Side]
+        self.brush_faces: List[Side] = []
         self.override_tex = override_tex
         self.base_type = base_type
         self.sub_tiles = subtiles
@@ -578,10 +582,10 @@ class TileDef:
 
     def export(self, vmf: VMF) -> Iterator[Solid]:
         """Create the solid for this."""
-        bevels = tuple([  # type: ignore
+        bevels: Tuple[bool, bool, bool, bool] = tuple([  # type: ignore
             self.should_bevel(u, v)
             for u, v in UV_NORMALS
-        ])  # type: Tuple[bool, bool, bool, bool]
+        ])
         front_pos = self.pos + 64 * self.normal
 
         is_wall = bool(self.normal.z)
@@ -687,10 +691,10 @@ class TileDef:
                 # orientation and let VBSP sort out the geometry.
 
                 # So construct a box, and grab the side pointing "down".
-                clip_template = vmf.make_prism(
+                clip_template: Side = vmf.make_prism(
                     self.pos + 64 + 128 * self.normal,
                     self.pos - 64 + 128 * self.normal,
-                )[PRISM_NORMALS[(-self.normal).as_tuple()]]  # type: Side
+                )[PRISM_NORMALS[(-self.normal).as_tuple()]]
 
                 front_axis = front_normal.axis()
 
@@ -883,7 +887,7 @@ def find_tile(origin: Vec, normal: Vec) -> Tuple[TileDef, int, int]:
     tile = TILES[grid_pos.as_tuple(), normal.as_tuple()]
     # except KeyError: raise
 
-    return tile, u, v
+    return tile, int(u), int(v)
 
 
 def edit_quarter_tile(
@@ -998,7 +1002,7 @@ def make_tile(
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
-    back_side = template['back'].copy(vmf_file=vmf)  # type: Side
+    back_side = template['back'].copy(vmf_file=vmf)
     back_side.mat = back_surf
     # The offset was set to zero in the original we copy from.
     back_side.uaxis.scale = BEVEL_BACK_SCALE[bevel_umin, bevel_umax]
@@ -1051,7 +1055,8 @@ def gen_tile_temp() -> None:
      with each side identified.
     """
 
-    categories = {
+    categories: Dict[Tuple[int, bool], Solid] = {}
+    cat_names = {
         (2, True): 'bevel_thin',
         (4, True): 'bevel_norm',
         (8, True): 'bevel_thick',
@@ -1059,12 +1064,12 @@ def gen_tile_temp() -> None:
         (2, False): 'flat_thin',
         (4, False): 'flat_norm',
         (8, False): 'flat_thick',
-    }  # type: Dict[Tuple[int, bool], Solid]
+    }
 
     try:
         template = template_brush.get_template('__TILING_TEMPLATE__')
         # Grab the single world brush for each visgroup.
-        for (key, name) in categories.items():
+        for (key, name) in cat_names.items():
             world, detail, over = template.visgrouped(name)
             [categories[key]] = world
     except (KeyError, ValueError):
@@ -1098,10 +1103,10 @@ def gen_tile_temp() -> None:
                     # Squarebeams.
                     # Rounding the position of the face gives us the direction
                     # it's pointing away from the center.
-                    face_norm = round(face.get_origin().norm())  # type: Vec
+                    face_norm: Vec = round(face.get_origin().norm())
                     face.translate(-16 * face_norm - (thickness / 2) * norm)
                     u_dir, v_dir = face_norm.other_axes(axis_norm)
-                    temp_part[u_dir, v_dir, thickness, bevel] = face
+                    temp_part[int(u_dir), int(v_dir), thickness, bevel] = face
 
 
 def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]]):
@@ -1113,7 +1118,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
     # Face ID -> tileDef, used to match overlays to their face targets.
     # Invalid after we exit, since all the IDs have been freed and may be
     # reused later.
-    face_to_tile = {}  # type: Dict[int, TileDef]
+    face_to_tile: Dict[int, TileDef] = {}
 
     for brush in vmf_file.brushes[:]:
         bbox_min, bbox_max = brush.get_bbox()
@@ -1145,7 +1150,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
     # First grab the instances.
     panel_inst = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
 
-    panels = {}  # type: Dict[str, Entity]
+    panels: Dict[str, Entity] = {}
     for inst in vmf_file.by_class['func_instance']:
         if inst['file'].casefold() in panel_inst:
             panels[inst['targetname']] = inst
@@ -1205,7 +1210,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
             for norm in NORMALS:
                 grid_pos = grid_to_world(pos) - 128 * norm
                 try:
-                    tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]  # type: TileDef
+                    tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
                 except KeyError:
                     continue
 
@@ -1391,7 +1396,10 @@ def generate_brushes(vmf: VMF) -> None:
     # try to merge tiles together with the same texture.
 
     # The key is (normal, plane distance, tile type)
-    full_tiles = defaultdict(list)  # type: Dict[Tuple[float, float, float, float, TileType], List[TileDef]]
+    full_tiles: Dict[
+        Tuple[float, float, float, float, TileType],
+        List[TileDef]
+    ] = defaultdict(list)
 
     for tile in TILES.values():
         if tile.can_merge():
@@ -1414,9 +1422,9 @@ def generate_brushes(vmf: VMF) -> None:
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
-        grid_pos = defaultdict(dict)  # type: Dict[str, Dict[Tuple[int, int], bool]]
+        grid_pos: Dict[str, Dict[Tuple[int, int], bool]] = defaultdict(dict)
 
-        tile_pos = {}  # type: Dict[Tuple[int, int], TileDef]
+        tile_pos: Dict[Tuple[int, int], TileDef] = {}
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
@@ -1435,8 +1443,8 @@ def generate_brushes(vmf: VMF) -> None:
                     tile.base_type.color
                 ).get(pos, tile.base_type.tile_size)
 
-            u_pos = (pos[u_axis] - bbox_min[u_axis]) // 128
-            v_pos = (pos[v_axis] - bbox_min[v_axis]) // 128
+            u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
+            v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
             grid_pos[tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
@@ -1466,7 +1474,7 @@ def generate_brushes(vmf: VMF) -> None:
 
     for over in vmf.by_class['info_overlay']:
         try:
-            over_tiles = over.tiledefs  # type: List[TileDef]
+            over_tiles: List[TileDef] = over.tiledefs  # type: ignore
         except AttributeError:
             continue
         faces = set(over['sides', ''].split(' '))
@@ -1487,12 +1495,12 @@ def generate_goo(vmf: VMF) -> None:
     # We want to use as few brushes as possible.
     # So group them by their min/max Z, and then produce bounding boxes.
 
-    goo_pos = defaultdict(dict)  # type: Dict[Tuple[int, int], Dict[Tuple[int, int], bool]]
+    goo_pos: Dict[Tuple[int, int], Dict[Tuple[int, int], bool]] = defaultdict(dict)
 
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
     # Valve just does it semi-randomly.
-    goo_heights = Counter()  # type: Dict[Tuple[float, float, float], int]
+    goo_heights: Dict[Tuple[float, float, float], int] = Counter()
 
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
