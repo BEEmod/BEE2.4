@@ -558,12 +558,28 @@ class TileDef:
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
 
+    def should_bevel(self, u: int, v: int) -> bool:
+        """Check if this side of the TileDef should be bevelled.
+
+        U and V should be 1 or -1.
+        """
+        if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)] is Block.EMBED:
+            return True
+
+        u_ax, v_ax = Vec.INV_AXIS[self.normal.axis()]
+        side_norm = Vec.with_axes(u_ax, u, v_ax, v)
+
+        try:
+            tiledef = TILES[self.pos.as_tuple(), side_norm.as_tuple()]
+        except KeyError:
+            return False
+
+        return tiledef.base_type is not TileType.VOID
+
     def export(self, vmf: VMF) -> Iterator[Solid]:
         """Create the solid for this."""
         bevels = tuple([  # type: ignore
-            BLOCK_POS[
-                'world': self.uv_offset(128*u, 128*v, 0)
-            ].value not in (1, 2)
+            self.should_bevel(u, v)
             for u, v in UV_NORMALS
         ])  # type: Tuple[bool, bool, bool, bool]
         front_pos = self.pos + 64 * self.normal
