@@ -99,6 +99,8 @@ SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
 # For each item Id, the item class for it.
 CLASS_FOR_ITEM = {}  # type: Dict[str, consts.ItemClass]
+# For each item ID, the positions they embed.
+EMBED_OFFSETS: Dict[str, List[Vec]] = {}
 
 
 xp = Vec_tuple(1, 0, 0)
@@ -663,7 +665,10 @@ def build_solid_dict() -> None:
 
 
 def build_itemclass_dict(prop_block: Property):
-    """Load in the dictionary mapping item classes to item ids"""
+    """Load in the item ID database.
+
+    This maps item IDs to their item class, and their embed locations.
+    """
     for prop in prop_block.find_children('ItemClasses'):
         try:
             it_class = consts.ItemClass(prop.value)
@@ -673,6 +678,25 @@ def build_itemclass_dict(prop_block: Property):
 
         ITEMS_WITH_CLASS[it_class].append(prop.name)
         CLASS_FOR_ITEM[prop.name] = it_class
+
+    # Now load in the embed data.
+    for prop in prop_block.find_children('ItemEmbeds'):
+        if prop.name not in CLASS_FOR_ITEM:
+            LOGGER.warning('Unknown item ID with embeds "{}"!', prop.real_name)
+
+        vecs = EMBED_OFFSETS.setdefault(prop.name, [])
+        if ':' in prop.value:
+            first, last = prop.value.split(':')
+            bbox_min, bbox_max = Vec.bbox(Vec.from_str(first), Vec.from_str(last))
+            vecs.extend(Vec.iter_grid(bbox_min, bbox_max))
+        else:
+            vecs.append(Vec.from_str(prop.value))
+
+    LOGGER.info(
+        'Read {} item IDs, with {} embeds!',
+        len(ITEMS_WITH_CLASS),
+        len(EMBED_OFFSETS),
+    )
 
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''

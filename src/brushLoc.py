@@ -257,18 +257,36 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
     def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool]) -> None:
         """Given the map file, set blocks."""
+        from conditions import EMBED_OFFSETS
+        from instance_traits import get_item_id
         search_locs = []
 
         for ent in vmf.entities:
             pos = ent['origin', None]
             if pos is None:
                 continue
+
             pos = world_to_grid(Vec.from_str(pos))
 
             # Exclude entities outside the main area - elevators mainly.
             # The border should never be set to air!
             if (0, 0, 0) <= pos <= (25, 25, 25):
                 search_locs.append(pos)
+
+            # We need to manually set EmbeddedVoxel locations.
+            # These might not be detected for items where there's a block
+            # which is entirely empty - corridors and obs rooms for example.
+            item_id = get_item_id(ent)
+            if item_id:
+                try:
+                    embed_locs = EMBED_OFFSETS[item_id]
+                except KeyError:
+                    continue
+                angles = Vec.from_str(ent['angles'])
+                for local_pos in embed_locs:
+                    world_pos = local_pos - (0, 0, 1)
+                    world_pos.localise(pos, angles)
+                    self[world_pos] = Block.EMBED
 
         can_have_pit = bottomlessPit.pits_allowed()
 

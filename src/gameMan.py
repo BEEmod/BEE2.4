@@ -880,9 +880,11 @@ class Game:
         cust_inst = Property("CustInstances", [])
         commands = Property("Connections", [])
         item_classes = Property("ItemClasses", [])
+        item_embeds = Property("ItemEmbeds", [])
         root_block = Property(None, [
             instance_locs,
             item_classes,
+            item_embeds,
             cust_inst,
             commands,
         ])
@@ -915,16 +917,17 @@ class Game:
             instance_locs.append(instance_block)
 
             for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block.value[:]:  # type: Property
+                inst_props = list(inst_block)
+                inst_block.clear()
+                for inst in inst_props:
                     if inst.name.isdigit():
                         # Direct Portal 2 value
                         instance_block.append(
                             Property('Instance', inst['Name'])
                         )
+                        # Put it back into the block.
+                        inst_block.append(inst)
                     else:
-                        # It's a custom definition, remove from editoritems
-                        inst_block.value.remove(inst)
-
                         # Allow the name to start with 'bee2_' also to match
                         # the <> definitions - it's ignored though.
                         name = inst.name
@@ -938,6 +941,28 @@ class Game:
                             # other values.
                             inst['name'] if inst.has_children() else inst.value,
                         )
+
+            # Write out the embeddedvoxel data.
+            # We offset it by -128 Z, since that's the actual offset from
+            for embed_prop in item.find_children("Exporting", "EmbeddedVoxels"):
+                try:
+                    if embed_prop.name == 'volume':
+                        value = '{}:{}'.format(
+                            embed_prop['pos1'],
+                            embed_prop['pos2'],
+                        )
+                    elif embed_prop.name == 'voxel':
+                        value = embed_prop['pos']
+                    else:
+                        raise ValueError(
+                            f'Unknown embed type "{embed_prop.real_name}" in '
+                            f'item {item_id}!'
+                        )
+                except LookupError:
+                    raise ValueError(
+                        f'Bad EmbeddedVoxel data in item {item_id}!'
+                    )
+                item_embeds.append(Property(item_id, value))
 
             comm_block = Property(item['Type'], [])
 
