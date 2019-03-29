@@ -9,7 +9,15 @@ from enum import Enum
 import srctools.logger
 import bottomlessPit
 
-from typing import Dict, Union, Set, Iterator, Tuple, Iterable
+from typing import (
+    Union, Any, Tuple,
+    Iterable, Iterator,
+    Dict, ItemsView, MutableMapping
+)
+try:
+    from typing import Deque
+except ImportError:
+    from typing_extensions import Deque
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -65,12 +73,12 @@ class Block(Enum):
             return cls(off + 2)  # Mid
 
     @property
-    def inside_map(self):
+    def inside_map(self) -> bool:
         """Is this inside the map - will entities leak?"""
         return self.value > 1
 
     @property
-    def traversable(self):
+    def traversable(self) -> bool:
         """Is it possible for physics objects to be in this block?
 
         Embed is assumed to be solid.
@@ -78,27 +86,27 @@ class Block(Enum):
         return self.value > 3
 
     @property
-    def is_solid(self):
+    def is_solid(self) -> bool:
         """Is this a solid brush? """
         return self.value in (1, 2)
 
     @property
-    def is_goo(self):
+    def is_goo(self) -> bool:
         """Does this contain goo?"""
         return 10 <= self.value < 20
 
     @property
-    def is_pit(self):
+    def is_pit(self) -> bool:
         """Is this a bottomless pit?"""
         return 20 <= self.value < 30
 
     @property
-    def is_top(self):
+    def is_top(self) -> bool:
         """Is this the top of goo or a bottomless pit?"""
         return self.value in (10, 11, 20, 21)
 
     @property
-    def is_bottom(self):
+    def is_bottom(self) -> bool:
         """Is this the base of goo or a bottomless pit?"""
         return self.value in (10, 13, 20, 23)
 
@@ -120,34 +128,61 @@ BLOCK_LOOKUP['pit'] = {
     Block.PIT_BOTTOM,
 }
 
-_grid_keys = Union[Vec, Vec_tuple, tuple, slice]
+
+_grid_keys = Union[Vec, Tuple[float, float, float], slice]
 
 
-class Grid(Dict[_grid_keys, Block]):
+def _conv_key(pos: _grid_keys) -> Tuple[float, float, float]:
+    """Convert the key given in [] to a grid-position, as a x,y,z tuple."""
+    # TODO: Slices are assumed to be int by typeshed.
+    # type: ignore
+    if isinstance(pos, slice):
+        system, slice_pos = pos.start, pos.stop
+        if system == 'world':
+            return tuple(world_to_grid(Vec(slice_pos)))
+        else:
+            return tuple(slice_pos)
+    x, y, z = pos
+    return x, y, z
+
+
+class _GridItemsView(ItemsView[Vec, Block]):
+    """Implements the Grid.items() view, providing a view over the pos, block pairs."""
+    def __init__(self, grid: Dict[Vec_tuple, Block]):
+        self._grid = grid
+
+    def __len__(self) -> int:
+        return len(self._grid)
+
+    def __contains__(self, item: Any) -> bool:
+        pos, block = item
+        try:
+            return block is self._grid[_conv_key(pos)]
+        except KeyError:
+            return False
+
+    def __iter__(self) -> Iterator[Tuple[Vec, Block]]:
+        for pos, block in self._grid.items():
+            yield (Vec(pos), block)
+
+
+class Grid(MutableMapping[_grid_keys, Block]):
     """Mapping for grid positions.
 
     When doing lookups, the key can be prefixed with 'world': to treat
     as a world position.
     """
-
-    @staticmethod
-    def _conv_key(pos: _grid_keys) -> Vec_tuple:
-        """Convert the key given in [] to a grid-position, as a x,y,z tuple."""
-        if isinstance(pos, slice):
-            system, pos = pos.start, pos.stop
-            pos = Grid._conv_key(pos)
-            if system == 'world':
-                return tuple(world_to_grid(Vec(pos)))
-            else:
-                return pos
-        x, y, z = pos
-        return x, y, z
+    def __init__(self) -> None:
+        self._grid: Dict[Vec_tuple, Block] = {}
 
     def raycast(
         self,
         pos: _grid_keys,
         direction: Vec,
-        collide: Set[Block]=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
+        collide: Iterable[Block]=frozenset({
+            Block.SOLID, Block.EMBED,
+            Block.PIT_BOTTOM, Block.PIT_SINGLE,
+        }),
     ) -> Vec:
         """Move in a direction until hitting a block of a certain type.
 
@@ -161,9 +196,9 @@ class Grid(Dict[_grid_keys, Block]):
         ValueError is raised if VOID is encountered, or this moves outside the
         map.
         """
-        start_pos = pos = Vec(*self._conv_key(pos))
+        start_pos = pos = Vec(*_conv_key(pos))
         direction = Vec(direction)
-        collide = frozenset(collide)
+        collide_set = frozenset(collide)
         # 50x50x50 diagonal = 86, so that's the largest distance
         # you could possibly move.
         for i in range(90):
@@ -176,7 +211,7 @@ class Grid(Dict[_grid_keys, Block]):
                         next_pos, start_pos, direction
                     )
                 )
-            if block in collide:
+            if block in collide_set:
                 return pos
             pos = next_pos
         else:
@@ -186,15 +221,16 @@ class Grid(Dict[_grid_keys, Block]):
         self,
         pos: Vec,
         direction: Vec,
-        collide: Set[Block]=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
+        collide: Iterable[Block]=frozenset({
+            Block.SOLID, Block.EMBED,
+            Block.PIT_BOTTOM, Block.PIT_SINGLE,
+        }),
     ) -> Vec:
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
 
     def __getitem__(self, pos: _grid_keys) -> Block:
-        return super().get(self._conv_key(pos), Block.VOID)
-
-    get = __getitem__
+        return self._grid.get(_conv_key(pos), Block.VOID)
 
     def __setitem__(self, pos: _grid_keys, value: Block) -> None:
         if type(value) is not Block:
@@ -202,17 +238,22 @@ class Grid(Dict[_grid_keys, Block]):
                 type(value).__name__,
             ))
 
-        super().__setitem__(self._conv_key(pos), value)
+        self._grid[_conv_key(pos)] = value
+
+    def __delitem__(self, pos: _grid_keys) -> None:
+        del self._grid[_conv_key(pos)]
 
     def __contains__(self, pos: _grid_keys) -> bool:
-        return super().__contains__(self._conv_key(pos))
+        return _conv_key(pos) in self._grid
 
-    def keys(self) -> Iterator[Vec]:
-        yield from map(Vec, super().keys())
+    def __iter__(self) -> Iterator[Vec]:
+        yield from map(Vec, self._grid)
 
-    def items(self) -> Iterator[Tuple[Vec, Block]]:
-        for pos, block in super().items():
-            yield Vec(pos), block
+    def __len__(self) -> int:
+        return len(self._grid)
+
+    def items(self) -> '_GridItemsView':
+        return _GridItemsView(self._grid)
 
     def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool]) -> None:
         """Given the map file, set blocks."""
@@ -236,8 +277,10 @@ class Grid(Dict[_grid_keys, Block]):
 
             bbox_min, bbox_max = brush.get_bbox()
 
-            if ('nature/toxicslime_a2_bridge_intro' in tex or
-                'nature/toxicslime_puzzlemaker_cheap' in tex):
+            if (
+                'nature/toxicslime_a2_bridge_intro' in tex or
+                'nature/toxicslime_puzzlemaker_cheap' in tex
+            ):
                 # It's goo!
 
                 x = bbox_min.x + 64
@@ -304,7 +347,7 @@ class Grid(Dict[_grid_keys, Block]):
         Since ambient_light ents are placed every 5 blocks, this should
         cover all playable space.
         """
-        queue = deque(search_locs)  # type: deque[Union[Vec, Tuple[float, float, float]]]
+        queue: Deque[Vec] = deque(search_locs)
 
         def iterdel() -> Iterator[Vec]:
             """Iterate as FIFO queue, deleting as we go."""
@@ -330,16 +373,14 @@ class Grid(Dict[_grid_keys, Block]):
             self[pos] = Block.AIR
             x, y, z = pos
             # Continue filling in each other direction.
-            queue.extend([
-                (x, y + 1, z),
-                (x, y - 1, z),
-                (x + 1, y, z),
-                (x - 1, y, z),
-                (x, y, z + 1),
-                (x, y, z - 1),
-            ])
+            queue.append(Vec(x, y + 1, z))
+            queue.append(Vec(x, y - 1, z))
+            queue.append(Vec(x + 1, y, z))
+            queue.append(Vec(x - 1, y, z))
+            queue.append(Vec(x, y, z + 1))
+            queue.append(Vec(x, y, z - 1))
 
-    def dump_to_map(self, vmf: VMF):
+    def dump_to_map(self, vmf: VMF) -> None:
         """Debug purposes: Dump the info as entities in the map.
 
         This makes the map effectively uncompilable...
