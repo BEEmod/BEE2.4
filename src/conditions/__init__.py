@@ -70,9 +70,6 @@ ALL_FLAGS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, E
 ALL_RESULTS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
 ALL_META = []  # type: List[Tuple[str, Decimal, Callable[[srctools.VMF], None]]]
 
-GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
-GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
-
 # A template shaped like embeddedVoxel blocks
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
@@ -626,22 +623,6 @@ def build_solid_dict() -> None:
 
     for solid in VMF.brushes:
         for face in solid:
-            if face.mat.casefold in consts.Goo:
-                # Record all locations containing goo.
-                bbox_min, bbox_max = solid.get_bbox()
-                x = bbox_min.x + 64
-                y = bbox_min.y + 64
-                # If goo is multi-level, we want to record all pos!
-                for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
-                    GOO_LOCS[Vec_tuple(x, y, z)] = face
-
-                # Add the location of the top face
-                GOO_FACE_LOC[Vec_tuple(x, y, bbox_max.z)] = face
-
-                # Indicate that this map contains goo...
-                vbsp.settings['has_attr']['goo'] = True
-                continue
-
             try:
                 mat_type = mat_types[face.mat]
             except KeyError:
