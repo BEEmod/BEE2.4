@@ -6,9 +6,10 @@ import connections
 import srctools.logger
 import template_brush
 import vbsp
+from brushLoc import POS as BLOCK_POS
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    GOO_LOCS, SOLIDS
+    SOLIDS
 )
 import instanceLocs
 from srctools import (
@@ -265,7 +266,7 @@ def make_vac_track(start, all_markers):
 
     # If the end is placed in goo, don't add logic - it isn't visible, and
     # the object is on a one-way trip anyway.
-    if end_loc.as_tuple() not in GOO_LOCS:
+    if BLOCK_POS['world': end_loc].is_goo and end_norm == (0, 0, -1):
         end_logic = end['ent'].copy()
         vbsp.VMF.add_ent(end_logic)
         end_logic['file'] = end['conf']['exit']
