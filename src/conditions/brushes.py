@@ -752,28 +752,6 @@ def res_import_template(inst: Entity, res: Property):
             inst.fixup[picker_var] = ''
 
 
-@make_result('HollowBrush')
-def res_hollow_brush(inst: Entity, res: Property):
-    """Hollow out the attached brush, as if EmbeddedVoxel was set.
-
-    This just removes the surface if it's already an embeddedVoxel. This allows
-    multiple items to embed thinly in the same block without affecting each
-    other.
-    """
-    loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
-    loc += Vec.from_str(inst['origin'])
-
-    try:
-        group = SOLIDS[loc.as_tuple()]
-    except KeyError:
-        LOGGER.warning('No brush for hollowing at ({})', loc)
-        return  # No brush here?
-
-    conditions.hollow_block(
-        group,
-        remove_orig_face=srctools.conv_bool(res['RemoveFace', False])
-    )
-
 # Position -> entity
 # We merge ones within 3 blocks of our item.
 CHECKPOINT_TRIG = {}  # type: Dict[Tuple[float, float, float], Entity]

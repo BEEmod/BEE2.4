@@ -102,15 +102,3 @@ def res_add_output(inst: Entity, res: Property):
     ))
 
 
-@make_result('MarkLocking')
-def res_locking_output():
-    """This result is no longer used."""
-    LOGGER.warning('MarkLocking is no longer used. Configure locking items in the enhanced editoritems configuration.')
-
-
-@make_flag('LockingIO')
-def res_locking_input():
-    """This flag is no longer used."""
-    LOGGER.warning('LockingIO is no longer used. Configure locking items in the enhanced editoritems configuration.')
-    return False
-
