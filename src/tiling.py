@@ -12,14 +12,14 @@ from enum import Enum
 from typing import (
     Tuple, Dict, List,
     Optional, Union,
-    Iterator, Iterable,
+    Iterator,
     cast,
 )
 
 import instanceLocs
 import utils
 import vbsp_options
-from srctools import Vec, Vec_tuple, VMF, Entity, Side, Solid
+from srctools import Vec, Vec_tuple, VMF, Entity, Side, Solid, Output
 import srctools.logger
 from brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from texturing import TileSize, Portalable
@@ -1200,6 +1200,16 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
                 faces.remove(face)
         over['sides'] = ' '.join(faces)
 
+    # Strip out all the original goo triggers. Ignore ones with names
+    # so we don't touch laserfield trigger here.
+    for trig in vmf_file.by_class['trigger_multiple']:
+        if trig['wait'] == '0.1' and trig['targetname', ''] == '':
+            trig.remove()
+
+    for trig in vmf_file.by_class['trigger_hurt']:
+        if trig['targetname', ''] == '':
+            trig.remove()
+
     # Now look at all the blocklocs in the map, applying goo sides.
     # Don't override white surfaces, they can only appear on panels.
     goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
@@ -1532,8 +1542,11 @@ def generate_goo(vmf: VMF) -> None:
     """Generate goo pit brushes and triggers."""
     # We want to use as few brushes as possible.
     # So group them by their min/max Z, and then produce bounding boxes.
-
     goo_pos: Dict[Tuple[int, int], Dict[Tuple[int, int], bool]] = defaultdict(dict)
+
+    # For triggers, we want to only group by the top surface, we don't care
+    # how deep.
+    trig_pos: Dict[int, Dict[Tuple[int, int], bool]] = defaultdict(dict)
 
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
@@ -1543,6 +1556,7 @@ def generate_goo(vmf: VMF) -> None:
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
             goo_pos[pos.z, pos.z][pos.x, pos.y] = True
+            trig_pos[pos.z][pos.x, pos.y] = True
 
             goo_heights[pos.as_tuple()] += 1
         elif block_type is Block.GOO_TOP:
@@ -1551,12 +1565,30 @@ def generate_goo(vmf: VMF) -> None:
             lower_pos = BLOCK_POS.raycast(pos, Vec(0, 0, -1))
 
             goo_pos[lower_pos.z, pos.z][pos.x, pos.y] = True
-
-    LOGGER.info('Goo pos: {}', goo_pos)
+            trig_pos[pos.z][pos.x, pos.y] = True
 
     # No goo.
     if not goo_pos:
         return
+
+    trig_phys = vmf.create_ent(
+        'trigger_multiple',
+        spawnflags='8',  # Physics Objects
+        wait='0.1',
+        origin=pos * 128,
+    )
+    trig_phys.add_out(
+        Output('OnStartTouch', '!activator', 'SilentDissolve'),
+        Output('OnStartTouch', '!activator', 'Kill', delay=0.1),
+    )
+
+    trig_hurt = vmf.create_ent(
+        'trigger_hurt',
+        spawnflags='1',  # Clients
+        damage='1000',
+        damagecap='1000',
+        damagetype=(1 << 18),  # Radiation
+    )
 
     goo_scale = vbsp_options.get(float, 'goo_scale')
 
@@ -1584,3 +1616,23 @@ def generate_goo(vmf: VMF) -> None:
                 ),
             )
             vmf.add_brush(prism.solid)
+
+    bbox_min = Vec()
+
+    for (z, grid) in trig_pos.items():
+        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+            bbox_min = Vec(min_x, min_y, z) * 128
+            bbox_max = Vec(max_x, max_y, z) * 128
+            trig_hurt.solids.append(vmf.make_prism(
+                bbox_min,
+                bbox_max + (128, 128, 77),
+                mat=consts.Tools.TRIGGER,
+            ).solid)
+            trig_phys.solids.append(vmf.make_prism(
+                bbox_min,
+                bbox_max + (128, 128, 26),
+                mat=consts.Tools.TRIGGER,
+            ).solid)
+
+    # Set to any random position for the entity.
+    trig_phys['origin'] = trig_hurt['origin'] = bbox_min + 64

@@ -95,7 +95,7 @@ class TileSize(str, Enum):
 
     CLUMP_GAP = 'gap'  # For clumping, spaces without a clump.
 
-    GOO_SIDE = 'goo'  # For on sides of goo - invalid for roof..
+    GOO_SIDE = 'goo'  # For on sides of goo.
 
     def __str__(self): return self.value
 

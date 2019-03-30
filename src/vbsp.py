@@ -399,6 +399,7 @@ def add_fizz_borders():
 
     This is used in 50s and BTS styles.
     """
+    # Todo: Reimplement this feature.
     if 'fizz_border' not in texturing.SPECIAL:
         # No textures were defined!
         return
@@ -1597,47 +1598,6 @@ def fixup_goo_sides() -> None:
     LOGGER.info("Done!")
 
 
-def collapse_goo_trig() -> None:
-    """Collapse the goo triggers to only use 2 entities for all pits."""
-    LOGGER.info('Collapsing goo triggers...')
-
-    hurt_trig = None
-    cube_trig = None
-    for trig in VMF.by_class['trigger_multiple']:
-        if trig in IGNORED_BRUSH_ENTS:
-            continue
-
-        if trig['wait'] == '0.1' and trig['targetname', ''] == '':
-            if cube_trig is None:
-                cube_trig = trig
-            else:
-                cube_trig.solids.extend(trig.solids)
-                trig.remove()
-
-    for trig in VMF.by_class['trigger_hurt']:
-        if trig in IGNORED_BRUSH_ENTS:
-            continue
-
-        if trig['targetname', ''] == '':
-            if hurt_trig is None:
-                hurt_trig = trig
-            else:
-                hurt_trig.solids.extend(trig.solids)
-                trig.remove()
-
-    if hurt_trig is not None:
-        hurt_trig['damage'] = '99999'
-        hurt_trig.outputs.append(
-            VLib.Output(
-                'OnHurtPlayer',
-                '@goo_fade',
-                'Fade',
-            ),
-        )
-
-    LOGGER.info('Done!')
-
-
 @conditions.meta_cond(priority=-50)
 def set_barrier_frame_type() -> None:
     """Set a $type instvar on glass frame.
@@ -2601,7 +2561,6 @@ def main() -> None:
         #change_brush()
         tiling.generate_brushes(VMF)
         change_overlays()
-        collapse_goo_trig()
         barriers.make_barriers(VMF)
         fix_worldspawn()
 
