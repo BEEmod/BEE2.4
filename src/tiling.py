@@ -134,6 +134,7 @@ class TileType(Enum):
 
     @property
     def is_4x4(self) -> bool:
+        """Is this forced to be 4x4 in size?"""
         return self.value in (1, 3)
 
     @property
@@ -376,7 +377,7 @@ class TileDef:
           Empty before-hand, but after these are faces to attach antlines to.
         brush_type: BrushType - what sort of brush this is.
         base_type: TileSize this tile started with.
-        override_tex: If set, a specific texture to use (skybox, light, backpanels etc)
+        override: If set, a specific texture to use. (skybox, light, backpanels etc)
         sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz, yz or xy.
           If None or a point is not in the dict, it's the same as base_type. (None=1x1 tile).
         is_bullseye: If this tile has a bullseye attached to it (the instance is destroyed.)
@@ -390,11 +391,10 @@ class TileDef:
         'brush_faces',
         'base_type',
         'sub_tiles',
-        'override_tex',
+        'override',
         'is_bullseye',
         'panel_inst',
         'panel_ent',
-        'extra_brushes',
     ]
 
     def __init__(
@@ -404,25 +404,22 @@ class TileDef:
         base_type: TileType,
         brush_type: BrushType=BrushType.NORMAL,
         subtiles: Dict[Tuple[int, int], TileType]=None,
-        override_tex: str=None,
         is_bullseye: bool=False,
         panel_inst: Entity=None,
         panel_ent: Entity=None,
-        extra_brushes: Iterable[Solid]=(),
     ):
         self.pos = pos
         self.normal = normal
         self.brush_type = brush_type
         self.brush_faces: List[Side] = []
-        self.override_tex = override_tex
+        self.override: Optional[Tuple[str, template_brush.ScalingTemplate]] = None
         self.base_type = base_type
         self.sub_tiles = subtiles
         self.is_bullseye = is_bullseye
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent
-        self.extra_brushes = list(extra_brushes)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<{}, {} TileDef>'.format(
             self.base_type.name,
             self.brush_type.name,
@@ -1228,7 +1225,6 @@ def tiledefs_from_cube(face_to_tile: Dict[int, TileDef], brush: Solid, grid_pos:
     """Generate a tiledef matching a 128^3 block."""
     for face in brush:
         normal = -face.normal()
-        special_tex = None
 
         # These cubes don't contain any items, so it's fine
         # if we get rid of sides that aren't useful.
@@ -1243,13 +1239,12 @@ def tiledefs_from_cube(face_to_tile: Dict[int, TileDef], brush: Solid, grid_pos:
             tex_kind = TileType.WHITE
         else:
             tex_kind = TileType.BLACK
-            special_tex = face.mat
+            LOGGER.warning('Unknown cube texture "{}"!', face.mat)
 
         tiledef = TileDef(
             grid_pos,
             normal,
             base_type=tex_kind,
-            override_tex=special_tex,
         )
         TILES[grid_pos.as_tuple(), normal.as_tuple()] = tiledef
         face_to_tile[face.id] = tiledef
@@ -1263,7 +1258,7 @@ def tiledefs_from_large_tile(
     norm: Vec,
 ) -> None:
     """Generate a tiledef matching a 128x128x4 side."""
-    tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
+    tex_kind, front_face = find_front_face(brush, grid_pos, norm)
 
     neighbour_block = BLOCK_POS['world': grid_pos + 128 * norm]
 
@@ -1274,7 +1269,6 @@ def tiledefs_from_large_tile(
         grid_pos,
         norm,
         base_type=tex_kind,
-        override_tex=special_tex,
     )
     TILES[grid_pos.as_tuple(), norm.as_tuple()] = tiledef
     brush.map.remove_brush(brush)
@@ -1290,14 +1284,13 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     norm = Vec(z=1).rotate_by_str(panel_ent['angles'])
     grid_pos -= 128*norm
 
-    tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
+    tex_kind, front_face = find_front_face(brush, grid_pos, norm)
 
     TILES[grid_pos.as_tuple(), norm.as_tuple()] = TileDef(
         grid_pos,
         norm,
         base_type=tex_kind,
         brush_type=BrushType.ANGLED_PANEL,
-        override_tex=special_tex,
         panel_ent=brush_ent,
         panel_inst=panel_ent,
     )
@@ -1329,13 +1322,13 @@ def tiledefs_from_embedface(
 ) -> None:
     """Generate a tiledef matching EmbedFace brushes."""
 
-    tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
+    tex_kind, front_face = find_front_face(brush, grid_pos, norm)
 
     norm_axis = norm.axis()
 
     bbox_min, bbox_max = brush.get_bbox()
     bbox_min[norm_axis] = bbox_max[norm_axis] = 0
-    if bbox_min % 32 or bbox_max % 32 or special_tex is not None:
+    if bbox_min % 32 or bbox_max % 32:
         # Not aligned to grid, leave this here!
         return
 
@@ -1359,17 +1352,20 @@ def find_front_face(
     brush: Solid,
     grid_pos: Vec,
     norm: Vec,
-) -> Tuple[TileType, Optional[str], Side]:
-    """Find the tile face in a brush. Returns color, special_mat, face."""
+) -> Tuple[TileType, Side]:
+    """Find the tile face in a brush. Returns color, face."""
     for face in brush:
         if -face.normal() != norm:
             continue
         if face.mat in consts.BlackPan:
-            return TileType.BLACK, None, face
+            return TileType.BLACK, face
         elif face.mat in consts.WhitePan:
-            return TileType.WHITE, None, face
+            return TileType.WHITE, face
+        elif face.mat == consts.Tools.NODRAW:
+            return TileType.NODRAW, face
         else:
-            return TileType.BLACK, face.mat, face
+            LOGGER.warning('Unknown panel texture "{}"!', face.mat)
+            return TileType.BLACK, face
     else:
         raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
 
@@ -1391,7 +1387,7 @@ def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec) -> None:
 
 def bevel_split(
     rect_points: Dict[Tuple[int, int], bool],
-    tile_pos,
+    tile_pos: Dict[Tuple[int, int], TileDef],
 ) -> Iterator[Tuple[int, int, int, int, Tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v in grid_optim.optimise(rect_points):
