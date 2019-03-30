@@ -17,6 +17,7 @@ from typing import (
 )
 
 import instanceLocs
+import utils
 import vbsp_options
 from srctools import Vec, Vec_tuple, VMF, Entity, Side, Solid
 import srctools.logger
@@ -1388,6 +1389,48 @@ def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec) -> None:
             side.vaxis.offset = 0
 
 
+def bevel_split(
+    rect_points: Dict[Tuple[int, int], bool],
+    tile_pos,
+) -> Iterator[Tuple[int, int, int, int, Tuple[bool, bool, bool, bool]]]:
+    """Split the optimised segments to produce the correct bevelling."""
+    for min_u, min_v, max_u, max_v in grid_optim.optimise(rect_points):
+        u_range = range(min_u, max_u + 1)
+        v_range = range(min_v, max_v + 1)
+
+        # These are sort of reversed around, which is a little confusing.
+        # Bevel U is facing in the U direction, running across the V.
+        bevel_umins: List[bool] = [
+            tile_pos[min_u, v].should_bevel(-1, 0)
+            for v in v_range
+        ]
+        bevel_umaxes: List[bool] = [
+            tile_pos[max_u, v].should_bevel(1, 0)
+            for v in v_range
+        ]
+        bevel_vmins: List[bool] = [
+            tile_pos[u, min_v].should_bevel(0, -1)
+            for u in u_range
+        ]
+        bevel_vmaxes: List[bool] = [
+            tile_pos[u, max_v].should_bevel(0, 1)
+            for u in u_range
+        ]
+
+        u_group = list(utils.group_runs(zip(bevel_umins, bevel_umaxes)))
+        v_group = list(utils.group_runs(zip(bevel_vmins, bevel_vmaxes)))
+
+        for bevel_u, v_ind_min, v_ind_max in u_group:
+            for bevel_v, u_ind_min, u_ind_max in v_group:
+                yield (
+                    min_u + u_ind_min,
+                    min_v + v_ind_min,
+                    min_u + u_ind_max,
+                    min_v + v_ind_max,
+                    bevel_u + bevel_v,
+                )
+
+
 def generate_brushes(vmf: VMF) -> None:
     """Generate all the brushes in the map, then set overlay sides."""
     LOGGER.info('Generating tiles...')
@@ -1449,7 +1492,7 @@ def generate_brushes(vmf: VMF) -> None:
             tile_pos[u_pos, v_pos] = tile
 
         for tex, tex_pos in grid_pos.items():
-            for min_u, min_v, max_u, max_v in grid_optim.optimise(tex_pos):
+            for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
                 center = Vec.with_axes(
                     norm_axis, plane_dist,
                     u_axis, bbox_min[u_axis] + (min_u + max_u) * 64,
@@ -1461,8 +1504,7 @@ def generate_brushes(vmf: VMF) -> None:
                     normal,
                     tex,
                     texturing.SPECIAL.get(center, 'behind'),
-                    # TODO: Check edge tiles, see if any of those would bevel.
-                    bevels=(True, True, True, True),
+                    bevels=bevels,
                     width=(1 + max_u - min_u) * 128,
                     height=(1 + max_v - min_v) * 128,
                 )
