@@ -631,6 +631,31 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
     return list(items)  # Dump the deque
 
 
+ValueT = TypeVar('ValueT')
+
+
+def group_runs(iterable: Iterable[ValueT]) -> Iterator[Tuple[ValueT, int, int]]:
+    """Group runs of equal values.
+
+    Yields (value, min_ind, max_ind) tuples, where all of iterable[min:max+1]
+    is equal to value.
+    """
+    it = iter(iterable)
+    min_ind = max_ind = 0
+    try:
+        obj = next(it)
+    except StopIteration:
+        return
+    for next_obj in it:
+        if next_obj == obj:
+            max_ind += 1
+        else:
+            yield obj, min_ind, max_ind
+            obj = next_obj
+            min_ind = max_ind = max_ind + 1
+    yield obj, min_ind, max_ind
+
+
 def restart_app() -> NoReturn:
     """Restart this python application.
 
