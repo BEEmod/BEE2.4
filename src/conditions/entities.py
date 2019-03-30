@@ -8,6 +8,7 @@ import srctools.logger
 import template_brush
 import texturing
 import tiling
+from brushLoc import POS as BLOCK_POS
 from conditions import make_result, make_result_setup
 from template_brush import TEMP_TYPES
 from srctools import Property, Vec, VMF, Entity
@@ -179,10 +180,10 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
         pos2,
         calc_type,
         fast_check,
-    ) = res.value  # type: str, str, float, Vec, str, str
+    ) = res.value  # type: str, str, float, Vec, Vec, str, str
 
-    pos1 = pos1.copy()  # type: Vec
-    splash_pos = pos1.copy()  # type: Vec
+    pos1 = pos1.copy()
+    splash_pos = pos1.copy()
 
     if calc_type == 'track_platform':
         lin_off = srctools.conv_int(inst.fixup['$travel_distance'])
@@ -225,26 +226,24 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
         # actual surface. In that case check the origin too.
         check_pos.append(Vec(pos1.x, pos1.y, origin.z))
 
-    for pos in check_pos:
-        grid_pos = pos // 128 * 128  # type: Vec
-        grid_pos += (64, 64, 64)
-        try:
-            surf = conditions.GOO_LOCS[grid_pos.as_tuple()]
-        except KeyError:
-            continue
-        break
-    else:
-        return  # Not in goo at all
-
     if pos1.z == pos2.z:
         # Flat - this won't do anything...
         return
 
-    water_pos = surf.get_origin()
+    for pos in check_pos:
+        grid_pos = pos // 128 * 128
+        grid_pos += (64, 64, 64)
+
+        block = BLOCK_POS['world': pos]
+        if block.is_goo:
+            break
+    else:
+        return  # Not in goo at all
+
+    water_pos = grid_pos + (0, 0, 32)
 
     # Check if both positions are above or below the water..
     # that means it won't ever trigger.
-    LOGGER.info('pos1: {}, pos2: {}, water_pos: {}', pos1.z, pos2.z, water_pos.z)
     if max(pos1.z, pos2.z) < water_pos.z - 8:
         return
     if min(pos1.z, pos2.z) > water_pos.z + 8:
