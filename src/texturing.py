@@ -45,7 +45,7 @@ class GenCat(Enum):
     OVERLAYS = 'overlays'  # info_overlay materials.
 
     @property
-    def is_tile(self):
+    def is_tile(self) -> bool:
         return self.value in ('normal', 'panel', 'bullseye')
 
 
@@ -83,6 +83,35 @@ class Orient(Enum):
             return 'ceiling'
         else:
             raise AssertionError(f"No string for {self!r}!")
+
+GEN_CATS = {
+    'overlays': GenCat.OVERLAYS,
+    'overlay': GenCat.OVERLAYS,
+
+    'special': GenCat.SPECIAL,
+
+    'panel': GenCat.PANEL,
+
+    'normal': GenCat.NORMAL,
+    'surf': GenCat.NORMAL,
+
+    'bullseye': GenCat.BULLSEYE,
+    'faithplate': GenCat.BULLSEYE,
+    'faith': GenCat.BULLSEYE,
+    'catapult': GenCat.BULLSEYE,
+}
+
+ORIENTS = {
+    'floor': Orient.FLOOR,
+    'floors': Orient.FLOOR,
+
+    'wall': Orient.WALL,
+    'walls': Orient.WALL,
+
+    'ceil': Orient.CEIL,
+    'ceiling': Orient.CEIL,
+    'ceilings': Orient.CEIL,
+}
 
 
 class TileSize(str, Enum):
@@ -275,6 +304,43 @@ def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generato
         orient = Orient.WALL
 
     return GENERATORS[cat, orient, portalable]
+
+
+def parse_name(name: str) -> Tuple['Generator', str]:
+    """Parse a dotted string into a generator and a texture name."""
+    split_name = name.lower().split('.')
+    try:
+        gen_cat = GEN_CATS[split_name[0]]
+    except KeyError:
+        raise ValueError(
+            f'Invalid generator category in "{name}"!\n'
+            f'Valid categories: \n {",".join([cat.value for cat in GenCat])}'
+        ) from None
+    if gen_cat.is_tile:
+        if len(split_name) != 4:
+            raise ValueError(
+                f'Tile-type generator categories require '
+                f'cat.[floor/wall/ceiling].[white/black].texname, '
+                f'not "{name}"!'
+            )
+        try:
+            gen_orient = ORIENTS[split_name[1]]
+        except KeyError:
+            raise ValueError(f'"{split_name[1]}" is not wall, floor or ceiling!') from None
+
+        try:
+            gen_port = Portalable(split_name[2])
+        except ValueError:
+            raise ValueError(f'"{split_name[2]}" is not white or black!') from None
+
+        return GENERATORS[gen_cat, gen_orient, gen_port], split_name[-1]
+    else:
+        if len(split_name) != 2:
+            raise ValueError(
+                f'Non-tile type generator categories'
+                f' expect cat.texname, not "{name}"!'
+            )
+        return GENERATORS[gen_cat], split_name[-1]
 
 
 def apply(

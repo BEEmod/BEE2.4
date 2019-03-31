@@ -104,10 +104,8 @@ def res_insert_overlay(inst: Entity, res: Property) -> None:
             mat = inst.fixup[mat]
         if mat.startswith('<') or mat.endswith('>'):
             # Lookup in the texture data.
-            mat = texturing.OVERLAYS.get(
-                Vec.from_str(over['basisorigin']),
-                mat[1:-1],
-            )
+            gen, mat = texturing.parse_name(mat[1:-1])
+            mat = gen.get(Vec.from_str(over['basisorigin']), mat)
         over['material'] = mat
         tiledef.bind_overlay(over)
 

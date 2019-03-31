@@ -856,7 +856,8 @@ def retexture_template(
                     mat = fixup[mat]
                 if mat.startswith('<') or mat.endswith('>'):
                     # Lookup in the style data.
-                    mat = vbsp.get_tex(mat[1:-1])
+                    gen, mat = texturing.parse_name(mat[1:-1])
+                    mat = gen.get(face.get_origin(), mat)
                 face.mat = mat
                 continue
 
@@ -924,18 +925,12 @@ def retexture_template(
             if mat[:1] == '$' and fixup is not None:
                 mat = fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):
-                # TODO: Getting Valve textures
-                # Lookup in the style data.
-                mat = texturing.OVERLAYS.get(over_pos, mat[1:-1])
+                mat = mat[1:-1]
+                gen, tex_name = texturing.parse_name(mat[1:-1])
+                mat = gen.get(over_pos, tex_name)
         else:
-            try:
-                gen_type, tex_type = vbsp.TEX_VALVE[mat]
-            except KeyError:
-                # No need to edit.
-                continue
-            else:
-                if gen_type == 'overlay':
-                    mat = texturing.OVERLAYS.get(over_pos, tex_type)
+            gen, tex_name = texturing.parse_name(mat)
+            mat = gen.get(over_pos, tex_name)
 
         if mat == '':
             # If blank, remove the overlay from the map and the list.
