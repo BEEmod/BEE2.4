@@ -10,6 +10,7 @@ from conditions import make_result, make_result_setup, local_name
 from connections import ITEMS
 from instanceLocs import resolve_one as resolve_single
 from srctools import Entity, VMF, Property, Output, Vec
+from texturing import GenCat, Portalable
 
 
 COND_MOD_NAME = 'Piston Platform'
@@ -163,9 +164,9 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
     color_var = conditions.resolve_value(inst, color_var).casefold()
 
     if color_var == 'white':
-        top_color = template_brush.MAT_TYPES.white
+        top_color = Portalable.white
     elif color_var == 'black':
-        top_color = template_brush.MAT_TYPES.black
+        top_color = Portalable.black
     else:
         top_color = None
 

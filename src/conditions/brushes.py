@@ -417,9 +417,9 @@ def res_import_template_setup(res: Property):
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
-        force_colour = template_brush.MAT_TYPES.white
+        force_colour = texturing.Portalable.white
     elif 'black' in force:
-        force_colour = template_brush.MAT_TYPES.black
+        force_colour = texturing.Portalable.black
     elif 'invert' in force:
         force_colour = 'INVERT'
     else:
@@ -652,9 +652,9 @@ def res_import_template(inst: Entity, res: Property):
         # Check traits for the colour it should be.
         traits = instance_traits.get(inst)
         if 'white' in traits:
-            force_colour = template_brush.MAT_TYPES.white
+            force_colour = texturing.Portalable.white
         elif 'black' in traits:
-            force_colour = template_brush.MAT_TYPES.black
+            force_colour = texturing.Portalable.black
         else:
             LOGGER.warning(
                 '"{}": Instance "{}" '
@@ -666,9 +666,9 @@ def res_import_template(inst: Entity, res: Property):
         color_val = conditions.resolve_value(inst, color_var).casefold()
 
         if color_val == 'white':
-            force_colour = template_brush.MAT_TYPES.white
+            force_colour = texturing.Portalable.white
         elif color_val == 'black':
-            force_colour = template_brush.MAT_TYPES.black
+            force_colour = texturing.Portalable.black
     # else: no color var
 
     if srctools.conv_bool(conditions.resolve_value(inst, invert_var)):

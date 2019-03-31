@@ -45,11 +45,13 @@ import template_brush
 import utils
 import comp_consts as const
 import instanceLocs
+from texturing import Portalable
 from srctools import (
     Property,
     Vec_tuple, Vec,
     Entity, Output, Solid, Side
 )
+
 
 COND_MOD_NAME = 'Main Conditions'
 
@@ -616,10 +618,10 @@ def build_solid_dict() -> None:
     import vbsp
     mat_types = {}
     for mat in vbsp.BLACK_PAN:
-        mat_types[mat] = template_brush.MAT_TYPES.black
+        mat_types[mat] = Portalable.black
 
     for mat in vbsp.WHITE_PAN:
-        mat_types[mat] = template_brush.MAT_TYPES.white
+        mat_types[mat] = Portalable.white
 
     for solid in VMF.brushes:
         for face in solid:
