@@ -432,12 +432,20 @@ def res_import_template_setup(res: Property):
     else:
         force_type = template_brush.TEMP_TYPES.default
 
-    for size in ('2x2', '4x4', 'wall', 'special'):
+    force_grid: Optional[texturing.TileSize]
+    for size in texturing.TileSize:
         if size in force:
             force_grid = size
             break
     else:
         force_grid = None
+
+    if 'bullseye' in force:
+        surf_cat = texturing.GenCat.BULLSEYE
+    elif 'special' in force or 'panel' in force:
+        surf_cat = texturing.GenCat.PANEL
+    else:
+        surf_cat = texturing.GenCat.NORMAL
 
     invert_var = res['invertVar', '']
     color_var = res['colorVar', '']
@@ -526,6 +534,7 @@ def res_import_template_setup(res: Property):
         force_colour,
         force_grid,
         force_type,
+        surf_cat,
         replace_brush_pos,
         rem_replace_brush,
         transfer_overlays,
@@ -601,6 +610,7 @@ def res_import_template(inst: Entity, res: Property):
         force_colour,
         force_grid,
         force_type,
+        surf_cat,
         replace_brush_pos,
         rem_replace_brush,
         transfer_overlays,
@@ -738,8 +748,7 @@ def res_import_template(inst: Entity, res: Property):
         replace_tex,
         force_colour,
         force_grid,
-        # Don't allow clumping if using custom keyvalues - then it won't be edited.
-        no_clumping=key_block is not None,
+        surf_cat,
     )
 
     for picker_name, picker_var in picker_vars:

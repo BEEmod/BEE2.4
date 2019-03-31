@@ -686,9 +686,8 @@ def retexture_template(
     fixup: EntityFixup=None,
     replace_tex: dict= srctools.EmptyMapping,
     force_colour: Portalable=None,
-    force_grid: str=None,
-    use_bullseye=False,
-    no_clumping=False,
+    force_grid: TileSize=None,
+    generator: GenCat=GenCat.NORMAL,
 ):
     """Retexture a template at the given location.
 
@@ -701,16 +700,13 @@ def retexture_template(
       The values should either be a list (random), or a single value.
     - If force_colour is set, all tile textures will be switched accordingly.
       If set to 'INVERT', white and black textures will be swapped.
-    - If force_grid is set, all tile textures will be that size:
-      ('wall', '2x2', '4x4', 'special')
-    - If use_bullseye is true, the bullseye textures will be used for all panel
-      sides instead of the normal textures. (This overrides force_grid.)
+    - If force_grid is set, all tile textures will be that size.
+    - generator defines the generator category to use for surfaces.
     - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
     - Set no_clump if the brush is used on a special entity, and therefore
       won't get retextured by the main code. That means we need to directly
       retexture here.
     """
-    import vbsp
 
     template = template_data.template  # type: Template
 
@@ -901,6 +897,9 @@ def retexture_template(
                 continue
             else:
                 assert isinstance(tex_colour, Portalable)
+                # Allow overriding to panel or bullseye types.
+                if gen_type is GenCat.NORMAL:
+                    gen_type = generator
             # Otherwise, it's a panel wall or the like
 
             if force_colour_face[orig_id] is not None:

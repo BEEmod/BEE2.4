@@ -235,8 +235,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
             origin,
             pist_ent.fixup,
             force_colour=top_color,
-            force_grid='special',
-            no_clumping=True,
+            generator=GenCat.PANEL,
         )
 
     if not static_ent.solids:
