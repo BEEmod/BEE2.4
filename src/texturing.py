@@ -14,7 +14,7 @@ from typing import (
     TYPE_CHECKING,
     Union, Type, Any,
     Dict, List, Tuple,
-    Optional
+    Optional,
 )
 
 import utils
@@ -24,13 +24,12 @@ if TYPE_CHECKING:
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-GENERATORS = {}  # type: Dict[Union[GenCat, Tuple[GenCat, Orient, Portalable]], Generator]
 # Algorithms to use.
 GEN_CLASSES = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
-SPECIAL = None  # type: Generator
-OVERLAYS = None  # type: Generator
+SPECIAL: 'Generator'
+OVERLAYS: 'Generator'
 
 Clump = namedtuple('Clump', 'x1 y1 z1 x2 y2 z2 seed')
 
@@ -57,7 +56,7 @@ class Portalable(Enum):
     white = WHITE
     black = BLACK
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
     def __invert__(self) -> 'Portalable':
@@ -74,7 +73,7 @@ class Orient(Enum):
     CEILING = 3
     CEIL = 3
 
-    def __str__(self):
+    def __str__(self) -> str:
         v = self.value
         if v == 1:
             return 'floor'
@@ -82,6 +81,8 @@ class Orient(Enum):
             return 'wall'
         elif v == 3:
             return 'ceiling'
+        else:
+            raise AssertionError(f"No string for {self!r}!")
 
 
 class TileSize(str, Enum):
@@ -97,12 +98,20 @@ class TileSize(str, Enum):
 
     GOO_SIDE = 'goo'  # For on sides of goo.
 
-    def __str__(self): return self.value
+    def __str__(self) -> str: return self.value
+
+GENERATORS: Dict[
+    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
+    'Generator'
+] = {}
 
 # The defaults for each generator.
 # This also defines the texture names allowed, as well
 # as the total number of generators.
-TEX_DEFAULTS = {
+TEX_DEFAULTS: Dict[
+    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
+    Dict[str, str],
+] = {
     # Signage overlays.
     GenCat.OVERLAYS: {
         'exit': consts.Signage.EXIT, 
@@ -120,7 +129,7 @@ TEX_DEFAULTS = {
 
         # If set and enabled, adds frames for >10 sign pairs
         # to distinguish repeats.
-        'shapeframe': (),
+        'shapeframe': '',
     },
     # Misc textures.
     GenCat.SPECIAL: {
@@ -311,6 +320,10 @@ def load_config(conf: Property):
 
     data = {}  # type: Dict[Any, Tuple[Dict[str, Any], Dict[str, List[str]]]]
 
+    gen_cat: GenCat
+    gen_orient: Optional[Orient]
+    gen_portal: Optional[Portalable]
+
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
         if isinstance(gen_key, GenCat):
             # It's a non-tile generator.
@@ -409,7 +422,7 @@ def load_config(conf: Property):
             algo = options['algorithm']
             gen_cat, gen_orient, gen_portal = gen_key
             try:
-                generator = GEN_CLASSES[algo]  # type: Type[Generator]
+                generator: Type[Generator] = GEN_CLASSES[algo]  # type: ignore
             except KeyError:
                 raise ValueError('Invalid algorithm "{}" for {}!'.format(
                     algo, gen_key
@@ -428,16 +441,19 @@ def load_config(conf: Property):
 
 def setup(global_seed, tiles: List['TileDef']):
     """Set randomisation seed on all the generators, and build clumps."""
+    gen_key_str: Union[GenCat, str]
     for gen_key, generator in GENERATORS.items():
         if isinstance(gen_key, tuple):
             gen_cat, gen_orient, gen_portal = gen_key
-            gen_key = '{}.{}.{}'.format(
+            gen_key_str = '{}.{}.{}'.format(
                 gen_cat.value,
                 gen_portal.value,
                 gen_orient,
             )
+        else:
+            gen_key_str = gen_key
 
-        generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key)
+        generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key_str)
         generator.setup(global_seed, tiles)
 
 
@@ -461,7 +477,7 @@ class Generator(abc.ABC):
 
         self._random = random.Random()
         # When set, add the position to that and use to seed the RNG.
-        self.map_seed = None  # type: str
+        self.map_seed = ''
 
         # Tells us the category each generator matches to.
         self.category = category
@@ -545,6 +561,8 @@ class GenClump(Generator):
 
     def setup(self, global_seed: str, tiles: List['TileDef']):
         """Build the list of clump locations."""
+        assert self.portal is not None
+        assert self.orient is not None
 
         # Convert the generator key to a generator-specific seed.
         # That ensures different surfaces don't end up reusing the same
