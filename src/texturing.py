@@ -157,15 +157,13 @@ TEX_DEFAULTS: Dict[
 
     (GenCat.NORMAL, Orient.FLOOR, Portalable.WHITE): {
         TileSize.TILE_4x4: consts.WhitePan.WHITE_FLOOR,
-        # Swap to black in goo.
-        TileSize.GOO_SIDE: consts.BlackPan.BLACK_FLOOR,
     },
     (GenCat.NORMAL, Orient.FLOOR, Portalable.BLACK): {
         TileSize.TILE_4x4: consts.BlackPan.BLACK_FLOOR,
     },
 
     (GenCat.NORMAL, Orient.CEIL, Portalable.WHITE): {
-        TileSize.TILE_4x4: consts.WhitePan.WHITE_FLOOR,
+        TileSize.TILE_4x4: consts.WhitePan.WHITE_4x4,
     },
     (GenCat.NORMAL, Orient.CEIL, Portalable.BLACK): {
         TileSize.TILE_4x4: consts.BlackPan.BLACK_FLOOR,
@@ -176,8 +174,6 @@ TEX_DEFAULTS: Dict[
         TileSize.TILE_2x1: consts.WhitePan.WHITE_2x1,
         TileSize.TILE_2x2: consts.WhitePan.WHITE_2x2,
         TileSize.TILE_4x4: consts.WhitePan.WHITE_4x4,
-
-        TileSize.GOO_SIDE: consts.BlackPan.BLACK_4x4,
     },
     (GenCat.NORMAL, Orient.WALL, Portalable.BLACK): {
         TileSize.TILE_1x1: consts.BlackPan.BLACK_1x1,
