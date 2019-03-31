@@ -1,7 +1,6 @@
 """Templates are sets of brushes which can be copied into the map."""
 import random
 from collections import defaultdict, namedtuple
-from collections.abc import Mapping
 
 from decimal import Decimal
 from enum import Enum
@@ -10,11 +9,11 @@ import srctools
 import vbsp_options
 
 from srctools import Entity, Solid, Side, Property, UVAxis, Vec, VMF
-from texturing import Portalable as MAT_TYPES, Portalable, GenCat, TileSize
+from srctools.vmf import EntityFixup
+from texturing import Portalable, GenCat, TileSize
 from tiling import TileType
 import comp_consts as consts
 import srctools.logger
-import conditions
 import tiling
 import texturing
 
@@ -22,7 +21,7 @@ from typing import (
     Iterable, Union, Callable,
     NamedTuple, Tuple,
     Dict, List, Set,
-    Iterator,
+    Iterator, Mapping,
     Optional,
 )
 
@@ -91,7 +90,10 @@ TILE_SETTER_SKINS = [
 
 B = Portalable.BLACK
 W = Portalable.WHITE
-TEMPLATE_RETEXTURE = {
+TEMPLATE_RETEXTURE: Dict[str, Union[
+    Tuple[GenCat, str, None],
+    Tuple[GenCat, TileSize, Portalable],
+]] = {
     # textures map -> surface types for template brushes.
     # It's mainly for grid size and colour - floor/ceiling textures
     # will be used instead at those orientations
@@ -144,8 +146,8 @@ TEMP_TILE_PIX_SIZE = {
 
 # 'Opposite' values for retexture_template(force_colour)
 TEMP_COLOUR_INVERT = {
-    MAT_TYPES.white: MAT_TYPES.black,
-    MAT_TYPES.black: MAT_TYPES.white,
+    Portalable.white: Portalable.black,
+    Portalable.black: Portalable.white,
     None: 'INVERT',
     'INVERT': None,
 }
@@ -158,7 +160,7 @@ ExportedTemplate = NamedTuple('ExportedTemplate', [
     ('template', 'Template'),
     ('origin', Vec),
     ('angles', Vec),
-    ('picker_results', Dict[str, Optional[texturing.Portalable]]),
+    ('picker_results', Dict[str, Optional[Portalable]]),
 ])
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
@@ -254,7 +256,10 @@ class Template:
         return world_brushes, detail_brushes, overlays
 
 
-class ScalingTemplate(Mapping):
+class ScalingTemplate(Mapping[
+    Union[Vec, Tuple[float, float, float]],
+    Tuple[str, UVAxis, UVAxis, float]
+]):
     """Represents a special version of templates, used for texturing brushes.
 
     The template is a single world-aligned cube brush, with the 6 sides used
@@ -285,14 +290,14 @@ class ScalingTemplate(Mapping):
         """
         axes = {}
 
-        for norm, name in (
-            ((0, 0, 1), 'up'),
-            ((0, 0, -1), 'dn'),
-            ((0, 1, 0), 'n'),
-            ((0, -1, 0), 's'),
-            ((1, 0, 0), 'e'),
-            ((-1, 0, 0), 'w'),
-        ):
+        for norm, name in [
+            ((0.0, 0.0, +1.0), 'up'),
+            ((0.0, 0.0, -1.0), 'dn'),
+            ((0.0, +1.0, 0.0), 'n'),
+            ((0.0, -1.0, 0.0), 's'),
+            ((+1.0, 0.0, 0.0), 'e'),
+            ((-1.0, 0.0, 0.0), 'w'),
+        ]:
             axes[norm] = (
                 ent[name + '_tex'],
                 UVAxis.parse(ent[name + '_uaxis']),
@@ -318,7 +323,9 @@ class ScalingTemplate(Mapping):
         self,
         normal: Union[Vec, Tuple[float, float, float]],
     ) -> Tuple[str, UVAxis, UVAxis, float]:
-        mat, axis_u, axis_v, rotation = self._axes[tuple(normal)]
+        if isinstance(normal, Vec):
+            normal = normal.as_tuple()
+        mat, axis_u, axis_v, rotation = self._axes[normal]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
     def rotate(self, angles: Vec, origin: Vec=(0, 0, 0)) -> 'ScalingTemplate':
@@ -676,9 +683,9 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 def retexture_template(
     template_data: ExportedTemplate,
     origin: Vec,
-    fixup: srctools.vmf.EntityFixup=None,
+    fixup: EntityFixup=None,
     replace_tex: dict= srctools.EmptyMapping,
-    force_colour: MAT_TYPES=None,
+    force_colour: Portalable=None,
     force_grid: str=None,
     use_bullseye=False,
     no_clumping=False,
@@ -730,9 +737,9 @@ def retexture_template(
     }
 
     # For each face, if it needs to be forced to a colour, or None if not.
-    force_colour_face = defaultdict(lambda: None)
+    force_colour_face: Dict[str, Optional[Portalable]] = defaultdict(lambda: None)
     # Picker names to their results.
-    picker_results = template_data.picker_results  # type: Dict[str, Optional[texturing.Portalable]]
+    picker_results: Dict[str, Optional[texturing.Portalable]] = template_data.picker_results
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:
@@ -865,6 +872,7 @@ def retexture_template(
             except KeyError:
                 continue  # It's nodraw, or something we shouldn't change
 
+            tex_colour: Optional[Portalable]
             gen_type, tex_name, tex_colour = tex_type
 
             if not gen_type.is_tile:
@@ -891,6 +899,8 @@ def retexture_template(
                             scale=vbsp_options.get(float, 'goo_scale'),
                         )
                 continue
+            else:
+                assert isinstance(tex_colour, Portalable)
             # Otherwise, it's a panel wall or the like
 
             if force_colour_face[orig_id] is not None:
@@ -909,9 +919,10 @@ def retexture_template(
     for over in template_data.overlay[:]:
         over_pos = Vec.from_str(over['basisorigin'])
         mat = over['material'].casefold()
+
         if mat in replace_tex:
             mat = random.choice(replace_tex[mat])
-            if mat[:1] == '$':
+            if mat[:1] == '$' and fixup is not None:
                 mat = fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):
                 # TODO: Getting Valve textures
