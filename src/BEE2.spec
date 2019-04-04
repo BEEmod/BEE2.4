@@ -1,9 +1,12 @@
-import shutil
 import os
-import io
+from pathlib import Path
 import srctools
 import contextlib
-from zipfile import ZipFile, ZipInfo
+from babel.messages import Catalog
+import babel.messages.frontend
+import babel.messages.extract
+from babel.messages.pofile import read_po, write_po
+from babel.messages.mofile import write_mo
 
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
@@ -24,39 +27,65 @@ data_files = [
 
 ]
 
-def get_localisation(key):
-    """Get localisation files from Loco."""
-    import requests
+
+def do_localisation():
+    """Build localisation."""
 
     # Make the directories.
-    os.makedirs('../i18n/', exist_ok=True)
+    i18n = Path('../i18n')
+    i18n.mkdir(exist_ok=True)
 
-    print('Reading translations... ', end='', flush=True)
-    zip_request = requests.get(
-        'https://localise.biz/api/export/archive/mo.zip',
-        headers={
-            'Authorization': 'Loco ' + key,
-        },
-        params={
-            'path': '{%lang}{_%region}.{%ext}',
-        },
+    print('Reading translations from source...', flush=True)
+
+    catalog = Catalog(
+        header_comment='# BEEMOD2 v4',
+        msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
-    zip_file = ZipFile(io.BytesIO(zip_request.content))
+
+    extracted = babel.messages.extract.extract_from_dir('.')
+    for filename, lineno, message, comments, context in extracted:
+        catalog.add(
+            message,
+            locations=[(os.path.normpath(filename), lineno)],
+            auto_comments=comments,
+            context=context,
+        )
+
+    with open(i18n / 'BEE2.pot', 'wb') as f:
+        write_po(f, catalog, include_lineno=False)
+
     print('Done!')
 
-    print('Translations: ')
+    print('Updating translations: ')
 
-    for file in zip_file.infolist():  # type: ZipInfo
-        if 'README.txt' in file.filename:
-            continue
-        filename = os.path.basename(file.filename)
-        print(filename)
-        # Copy to the dev and output directory.
-        with zip_file.open(file) as src, open('../i18n/' + filename, 'wb') as dest:
-            shutil.copyfileobj(src, dest)
-            data_files.append((dest.name, 'i18n'))
+    for trans in i18n.glob('*.po'):
 
-get_localisation('kV-oMlhZPJEJoYPI5EQ6HaqeAc1zQ73G')
+        locale = trans.stem
+
+        print('>', locale)
+
+        # Update the translations.
+        with trans.open('rb') as src:
+            trans_cat = read_po(src, locale)
+        trans_cat.update(catalog)
+        with trans.open('wb') as dest:
+            write_po(dest, trans_cat)
+
+        # Compile them all.
+        comp = trans.with_suffix('.mo')
+        with comp.open('wb') as dest:
+            write_mo(dest, trans_cat)
+
+        data_files.append((str(comp), 'i18n/'))
+
+    catalog.locale = 'en'
+    with (i18n / 'en.mo').open('wb') as dest:
+        write_mo(dest, catalog)
+
+    data_files.append((str(i18n / 'en.mo'), 'i18n/'))
+
+
+do_localisation()
 
 
 # Exclude bits of modules we don't need, to decrease package size.

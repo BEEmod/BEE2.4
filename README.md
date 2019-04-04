@@ -33,6 +33,7 @@ The packages (item, style, etc definitions) are in the [BEE2-Items](https://gith
 - [markdown](https://pythonhosted.org/Markdown/)
 - [cython](https://cython.org/)
 - [PyInstaller](http://www.pyinstaller.org/)
+- [babel](http://babel.pocoo.org/en/latest/index.html)
 
 ## Building from Source ##
 
@@ -42,7 +43,7 @@ The packages (item, style, etc definitions) are in the [BEE2-Items](https://gith
 * pyglet
 * PyInstaller
 * cython
-* requests (For compilation only.)
+* babel
 
 [AVBin](http://avbin.github.io/AVbin/Download.html) must also be installed, to provide codecs for pyglet.
 
