@@ -85,12 +85,12 @@ class SWITCH_TYPE(Enum):
 
 
 # A dictionary mapping origins to their brushes
-solidGroup = NamedTuple('solidGroup', [
-    ('face', Side),
-    ('solid', Solid),
-    ('normal', Vec),  # The normal of the face.
-    ('color', template_brush.MAT_TYPES),
-])
+class solidGroup(NamedTuple):
+    face: Side
+    solid: Solid
+    normal: Vec  # The normal of the face.
+    color: Portalable
+
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
 
