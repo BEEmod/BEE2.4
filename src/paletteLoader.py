@@ -8,7 +8,7 @@ import srctools.logger
 import BEE2_config
 from srctools import Property, NoKeyError, KeyValError
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -17,10 +17,10 @@ PAL_DIR = utils.conf_location('palettes/')
 
 PAL_EXT = '.bee2_palette'
 
-pal_list = []  # type: List[Palette]
+pal_list: List['Palette'] = []
 
 # Allow translating the names of the built-in palettes
-DEFAULT_PALETTES = {
+TRANS_NAMES: Dict[str, str] = {
     # i18n: Last exported items
     'LAST_EXPORT': _('<Last Export>'),
     # i18n: Empty palette name
@@ -35,6 +35,162 @@ DEFAULT_PALETTES = {
     'PORTAL2': _('Portal 2'),
     # i18n: Aperture Tag's palette
     'APTAG': _('Aperture Tag'),
+}
+
+# The original palette, plus BEEmod 1 and Aperture Tag's palettes.
+DEFAULT_PALETTES: Dict[str, List[Tuple[str, int]]] = {
+    'EMPTY': [],
+    'PORTAL2': [
+        ("ITEM_BUTTON_PEDESTAL", 0),
+        ("ITEM_BUTTON_FLOOR", 0),  # Weighted
+        ("ITEM_BUTTON_FLOOR", 1),  # Cube
+        ("ITEM_BUTTON_FLOOR", 2),  # Ball
+
+        ("ITEM_CUBE", 0),  # Standard
+        ("ITEM_CUBE", 1),  # Companion
+        ("ITEM_CUBE", 3),  # Sphere
+        ("ITEM_CUBE", 4),  # Franken
+
+        ("ITEM_TBEAM", 0),
+        ("ITEM_CATAPULT", 0),
+        ("ITEM_LIGHT_BRIDGE", 0),
+        ("ITEM_PANEL_STAIRS", 0),
+
+        ("ITEM_BARRIER_HAZARD", 0),  # Fizzler
+        ("ITEM_BARRIER", 0),  # Glass
+        ("ITEM_PISTON_PLATFORM", 0),
+        ("ITEM_RAIL_PLATFORM", 0),
+
+        ("ITEM_LASER_EMITTER_CENTER", 0),
+        ("ITEM_LASER_CATCHER_CENTER", 0),
+        ("ITEM_LASER_RELAY_CENTER", 0),
+        ("ITEM_CUBE", 2),  # Reflect
+
+        ("ITEM_PANEL_CLEAR", 0),
+        ("ITEM_PANEL_ANGLED", 0),
+        ("ITEM_PANEL_FLIP", 0),
+        ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+
+        ("ITEM_BARRIER_HAZARD", 1),  # Laserfield
+        ("ITEM_TURRET", 0),
+        ("ITEM_GOO", 0),
+        ("ITEM_LIGHT_PANEL", 0),  # Cold
+
+        ("ITEM_PAINT_SPLAT", 0),  # Bounce
+        ("ITEM_PAINT_SPLAT", 1),  # Speed
+        ("ITEM_PAINT_SPLAT", 2),  # Portal
+        ("ITEM_PAINT_SPLAT", 3),  # Erase
+    ],
+    'BEEMOD': [
+        ("ITEM_BUTTON_PEDESTAL", 0),
+        ("ITEM_BUTTON_FLOOR", 0),
+        ("ITEM_CUBE", 0),
+        ("ITEM_PAINT_SPLAT", 3),  # Erase
+
+        ("ITEM_TBEAM", 0),
+        ("ITEM_CATAPULT", 0),
+        ("ITEM_DRAW_BRIDGE", 0),
+        ("ITEM_PANEL_STAIRS", 0),
+
+        ("ITEM_BARRIER_HAZARD", 0),
+        ("ITEM_LIGHT_BRIDGE", 0),
+        ("ITEM_PISTON_PLATFORM", 0),
+        ("ITEM_RAIL_PLATFORM", 0),
+
+        ("ITEM_LASER_EMITTER_CENTER", 0),
+        ("ITEM_LASER_CATCHER_CENTER", 0),
+        ("ITEM_LASER_RELAY_CENTER", 0),
+        ("ITEM_BARRIER", 0),
+
+        ("ITEM_PANEL_CLEAR", 0),
+        ("ITEM_PANEL_ANGLED", 0),
+        ("ITEM_PANEL_FLIP", 0),
+        ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+
+        ("ITEM_GOO", 0),
+        ("ITEM_TURRET", 0),
+        ("ITEM_CRUSHER", 0),
+        ("ITEM_VENT", 0),
+
+        ("ITEM_HIGH_ENERGY_PELLET_EMITTER", 0),
+        ("ITEM_HIGH_ENERGY_PELLET_CATCHER", 0),
+        ("DOOR", 0),
+        ("ITEM_LIGHT_PANEL", 0),  # Cold
+
+        ("ITEM_TRIGGERS", 0),
+        ("ITEM_BEE_LOGIC", 0),
+        ("ITEM_AUTOPORTAL", 0),
+        ("ITEM_LIGHT_PANEL", 1),  # Warm
+    ],
+
+    'P2_COLLAPSED': [
+        ("ITEM_BUTTON_PEDESTAL", 0),
+        ("ITEM_BUTTON_FLOOR", 0),
+        ("ITEM_CUBE", 0),
+        ("ITEM_PAINT_SPLAT", 3),  # Erase
+        ("ITEM_TBEAM", 0),
+        ("ITEM_CATAPULT", 0),
+        ("ITEM_PANEL_STAIRS", 0),
+        ("ITEM_LIGHT_PANEL", 0),
+        ("ITEM_BARRIER_HAZARD", 0),
+        ("ITEM_LIGHT_BRIDGE", 0),
+        ("ITEM_PISTON_PLATFORM", 0),
+        ("ITEM_RAIL_PLATFORM", 0),
+        ("ITEM_LASER_EMITTER_CENTER", 0),
+        ("ITEM_LASER_CATCHER_CENTER", 0),
+        ("ITEM_LASER_RELAY_CENTER", 0),
+        ("ITEM_BARRIER", 0),
+        ("ITEM_PANEL_CLEAR", 0),
+        ("ITEM_PANEL_ANGLED", 0),
+        ("ITEM_PANEL_FLIP", 0),
+        ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+        ("ITEM_GOO", 0),
+        ("ITEM_TURRET", 0),
+    ],
+
+    'APTAG': [
+        # Original has 4 paint fizzler items at the top.
+
+        ("ITEM_BUTTON_PEDESTAL", 0),
+        ("ITEM_BUTTON_FLOOR", 0),
+        ("ITEM_CUBE", 0),
+        ("ITEM_PAINT_SPLAT", 3),  # Erase
+
+        ("ITEM_TBEAM", 0),
+        ("ITEM_CATAPULT", 0),
+        ("ITEM_DRAW_BRIDGE", 0),
+        ("ITEM_PANEL_STAIRS", 0),
+
+        ("ITEM_BARRIER_HAZARD", 0),
+        ("ITEM_LIGHT_BRIDGE", 0),
+        ("ITEM_PISTON_PLATFORM", 0),
+        ("ITEM_RAIL_PLATFORM", 0),
+
+        ("ITEM_LASER_EMITTER_CENTER", 0),
+        ("ITEM_LASER_CATCHER_CENTER", 0),
+        ("ITEM_LASER_RELAY_CENTER", 0),
+        ("ITEM_BARRIER", 0),
+
+        ("ITEM_PANEL_CLEAR", 0),
+        ("ITEM_PANEL_ANGLED", 0),
+        ("ITEM_PANEL_FLIP", 0),
+        ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+
+        ("ITEM_GOO", 0),
+        ("ITEM_TURRET", 0),
+        ("ITEM_CRUSHER", 0),
+        ("ITEM_VENT", 0),
+
+        ("ITEM_HIGH_ENERGY_PELLET_EMITTER", 0),
+        ("ITEM_HIGH_ENERGY_PELLET_CATCHER", 0),
+        ("DOOR", 0),
+        ("ITEM_LIGHT_PANEL", 0),  # Cold
+
+        ("ITEM_TRIGGERS", 0),
+        ("ITEM_BEE_LOGIC", 0),
+        ("ITEM_AUTOPORTAL", 0),
+        ("ITEM_TAG_GUN_ACTIVATOR", 0),
+    ]
 }
 
 
@@ -54,7 +210,7 @@ class Palette:
         self.trans_name = trans_name
         if trans_name:
             try:
-                self.name = DEFAULT_PALETTES[trans_name.upper()]
+                self.name = TRANS_NAMES[trans_name.upper()]
             except KeyError:
                 LOGGER.warning('Unknown translated palette "{}', trans_name)
 
@@ -161,10 +317,15 @@ class Palette:
 def load_palettes():
     """Scan and read in all palettes in the specified directory."""
 
-    # Load our builtin palettes:
-    for builtin_pal in utils.install_path('palettes/').glob('*' + PAL_EXT):
-        LOGGER.info('Loading builtin "{}"', builtin_pal.stem)
-        pal_list.append(Palette.parse(str(builtin_pal)))
+    # Load our builtin palettes.
+    for name, items in DEFAULT_PALETTES.items():
+        LOGGER.info('Loading builtin "{}"', name)
+        pal_list.append(Palette(
+            name,
+            items,
+            name,
+            prevent_overwrite=True,
+        ))
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
