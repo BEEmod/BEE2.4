@@ -26,7 +26,7 @@ import os
 import sys
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import shutil
 
@@ -38,7 +38,7 @@ from packageLoader import (
 )
 
 # If true, user said * for packages - use last for all.
-PACKAGE_REPEAT = None  # type: RawFileSystem
+PACKAGE_REPEAT: Optional[RawFileSystem] = None
 
 
 def get_package(file: Path) -> RawFileSystem:
@@ -46,7 +46,7 @@ def get_package(file: Path) -> RawFileSystem:
     global PACKAGE_REPEAT
     last_package = GEN_OPTS.get_val('Last_Selected', 'Package_sync_id', '')
     if last_package:
-        if PACKAGE_REPEAT:
+        if PACKAGE_REPEAT is not None:
             return PACKAGE_REPEAT
 
         message = ('Choose package ID for "{}", or '
@@ -81,7 +81,7 @@ def get_package(file: Path) -> RawFileSystem:
             return fsys
 
 
-def check_file(file: Path, portal2: Path, packages: Path):
+def check_file(file: Path, portal2: Path, packages: Path) -> None:
     """Check for the location this file is in, and copy it to the other place."""
     try:
         relative = file.relative_to(portal2)
@@ -121,11 +121,11 @@ def check_file(file: Path, portal2: Path, packages: Path):
     else:
         # In Portal 2, copy to each matching package.
         try:
-            rel_loc = 'resources/instances' / relative.relative_to(
+            rel_loc = Path('resources', 'instances') / relative.relative_to(
                 'sdk_content/maps/instances/bee2'
             )
         except ValueError:
-            rel_loc = 'resources/' / relative.relative_to(
+            rel_loc = Path('resources') / relative.relative_to(
                 'bee2_dev' if (portal2 / 'bee2_dev').exists() else 'bee2'
             )
 
@@ -152,7 +152,7 @@ def check_file(file: Path, portal2: Path, packages: Path):
             shutil.copy(str(file), str(full_loc))
 
 
-def print_package_ids():
+def print_package_ids() -> None:
     """Print all the packages out."""
     id_len = max(len(pack.id) for pack in PACKAGES.values())
     row_count = 128 // (id_len + 2)
@@ -163,7 +163,7 @@ def print_package_ids():
     print()
 
 
-def main(files: List[str]):
+def main(files: List[str]) -> int:
     """Run the transfer."""
     if not files:
         LOGGER.error('No files to copy!')
@@ -208,21 +208,23 @@ def main(files: List[str]):
 
     files_to_check = set()
 
-    for file in file_list:
-        if file.suffix.casefold() in ('.vmx', '.log', '.bsp', '.prt', '.lin'):
+    for file_path in file_list:
+        if file_path.suffix.casefold() in ('.vmx', '.log', '.bsp', '.prt', '.lin'):
             # Ignore these file types.
             continue
-        files_to_check.add(file)
-        if file.suffix == '.mdl':
+        files_to_check.add(file_path)
+        if file_path.suffix == '.mdl':
             for suffix in ['.vvd', '.phy', '.dx90.vtx', '.sw.vtx']:
-                sub_file = file.with_suffix(suffix)
+                sub_file = file_path.with_suffix(suffix)
                 if sub_file.exists():
                     files_to_check.add(sub_file)
 
     LOGGER.info('Processing {} files...', len(files_to_check))
 
-    for file in files_to_check:
-        check_file(file, portal2_loc, package_loc)
+    for file_path in files_to_check:
+        check_file(file_path, portal2_loc, package_loc)
+
+    return 0
 
 
 if __name__ == '__main__':
