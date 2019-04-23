@@ -2511,6 +2511,103 @@ class Music(PakObject):
                             )
 
 
+class Signage(PakObject, allow_mult=True, has_img=False):
+    """Defines different square signage overlays."""
+
+    def __init__(
+        self,
+        sign_id: str,
+        styles: Dict[str, Tuple[str, str]],
+        disp_name: str,
+        secondary_id: str=None,
+    ) -> None:
+        self.id = sign_id
+        self.name = disp_name
+        # style_id -> (world, overlay)
+        self.styles = styles
+        self.sec_id = secondary_id
+
+    @classmethod
+    def parse(cls, data: ParseData) -> 'Signage':
+        styles: Dict[str, Tuple[str, str]] = {}
+        for prop in data.info.find_children('styles'):
+            sty_id = prop.name.upper()
+            if prop.has_children():
+                try:
+                    world_tex = prop['world']
+                except LookupError:
+                    raise ValueError(
+                        f'"{data.id}"" signage has no "world" '
+                        f'option for the "{sty_id}" style!'
+                    )
+                styles[sty_id] = (world_tex, prop['overlay', world_tex])
+            else:
+                styles[sty_id] = (prop.value, prop.value)
+        return cls(
+            data.id,
+            styles,
+            data.info['name'],
+            data.info['secondary', None],
+        )
+
+    def add_over(self, override: 'Signage') -> None:
+        """Append additional styles to the signage."""
+        for sty_id, opts in override.styles.items():
+            if sty_id in self.styles:
+                raise ValueError(
+                    f'Duplicate "{sty_id}" style definition for {self.id}!'
+                )
+            self.styles[sty_id] = opts
+        if override.sec_id:
+            if not self.sec_id:
+                self.sec_id = override.sec_id
+            elif self.sec_id != override.sec_id:
+                raise ValueError(
+                    'Mismatch in secondary IDs for '
+                    f'signage "{self.id}"! '
+                    f'({self.sec_id} != {override.sec_id})'
+                )
+
+    @staticmethod
+    def export(exp_data: ExportData) -> None:
+        """Export the selected signage to the config."""
+        # Timer value -> sign ID.
+        sel_ids: List[Tuple[str, str]] = exp_data.selected
+
+        # Special case, arrow is never selectable.
+        sel_ids.append(('arrow', 'SIGN_ARROW'))
+
+        conf = Property('Signage', [])
+
+        for tim_id, sign_id in sel_ids:
+            try:
+                sign = Signage.by_id(sign_id)
+            except KeyError:
+                LOGGER.warning('Signage "{}" does not exist!', sign_id)
+                continue
+            for potential_style in exp_data.selected_style.bases:
+                try:
+                    world, overlay = sign.styles[potential_style.id.upper()]
+                    break
+                except KeyError:
+                    pass
+            else:
+                LOGGER.warning(
+                    'No valid "{}" style for "{}" signage!',
+                    exp_data.selected_style.id,
+                    sign_id,
+                )
+                continue
+
+            conf.append(Property(str(tim_id), [
+                Property('world', world),
+                Property('overlay', overlay),
+                Property('secondary', sign.sec_id or ''),
+            ]))
+
+        exp_data.vbsp_conf.append(conf)
+
+
 class StyleVar(PakObject, allow_mult=True, has_img=False):
     def __init__(
         self,
