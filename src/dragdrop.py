@@ -246,14 +246,19 @@ class Manager(Generic[ItemT]):
     ) -> None:
         """Display the specified item on the given label."""
         if item is None:
-            lbl['image'] = self._img_blank
+            image = self._img_blank
         elif group:
             try:
-                lbl['image'] = item.dnd_group_icon
+                image = item.dnd_group_icon
             except AttributeError:
-                lbl['image'] = item.dnd_icon
+                image = item.dnd_icon
         else:
-            lbl['image'] = item.dnd_icon
+            image = item.dnd_icon
+        try:
+            lbl['image'] = image
+        except tkinter.TclError:
+            # Not an image...
+            lbl['image'] = img.img_error
 
     def _group_update(self, group: Optional[str]) -> None:
         """Update all target items with this group."""
@@ -313,7 +318,6 @@ class Manager(Generic[ItemT]):
         self._evt_move(event)
 
         self._drag_win.bind(utils.EVENTS['LEFT_MOVE'], self._evt_move)
-        # UI['pre_sel_line'].lift()
 
     def _evt_move(self, event: tkinter.Event) -> None:
         """Reposition the item whenever moving."""
