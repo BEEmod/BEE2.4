@@ -210,9 +210,8 @@ class Manager(Generic[ItemT]):
         canv['scrollregion'] = (
             0, 0,
             col_count * item_width + spacing,
-            row * item_height + spacing,
+            (row + 1) * item_height + spacing,
         )
-
 
     def reg_callback(self, event: Event, func: Callable[['Slot'], Any]) -> None:
         """Register a callback."""
