@@ -35,6 +35,7 @@ import optionWindow
 import helpMenu
 import backup as backup_win
 import tooltip
+import signage_ui
 
 from typing import List, Dict
 
@@ -842,6 +843,7 @@ def export_editoritems(e=None):
 
             'Item': (pal_data, item_versions, item_properties),
             'StyleVar': style_vars,
+            'Signage': signage_ui.export_data(),
 
             # The others don't have one, so it defaults to None.
         },
