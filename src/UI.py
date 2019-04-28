@@ -1997,7 +1997,7 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    def style_select_callback(style_id):
+    def style_select_callback(style_id: str) -> None:
         """Callback whenever a new style is chosen."""
         global selected_style
         selected_style = style_id
@@ -2013,6 +2013,8 @@ def init_windows():
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
+
+        signage_ui.style_changed(style_obj)
 
         tagsPane.filter_items()  # Update filters (authors may have changed)
 

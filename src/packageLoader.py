@@ -2527,6 +2527,8 @@ class Signage(PakObject, allow_mult=True, has_img=False):
         self.styles = styles
         self.sec_id = secondary_id
 
+        # The icon the UI uses.
+        self.dnd_icon = None
     @classmethod
     def parse(cls, data: ParseData) -> 'Signage':
         styles: Dict[str, Tuple[str, str]] = {}
