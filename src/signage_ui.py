@@ -1,12 +1,14 @@
 """Configures which signs are defined for the Signage item."""
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict, overload
 
 import dragdrop
 import img
 import srctools.logger
 import utils
+import BEE2_config
 from packageLoader import Signage, Style
 import tkinter as tk
+from srctools import Property
 from tkinter import ttk
 from tk_tools import TK_ROOT, HidingScroll
 
@@ -48,6 +50,43 @@ def export_data() -> List[Tuple[str, str]]:
         for ind, slot in SLOTS_SELECTED.items()
         if slot.contents is not None
     ]
+
+@overload
+def save_load_signage() -> Property: ...
+@overload
+def save_load_signage(props: Property) -> None: ...
+
+
+@BEE2_config.option_handler('Signage')
+def save_load_signage(props: Property=None) -> Optional[Property]:
+    """Save or load the signage info."""
+    if props is None:  # Save to properties.
+        props = Property('Signage', [])
+        for timer, slot in SLOTS_SELECTED.items():
+            props.append(Property(
+                str(timer),
+                '' if slot.contents is None
+                else slot.contents.id,
+            ))
+        return props
+    else:  # Load from provided properties.
+        for child in props:
+            try:
+                slot = SLOTS_SELECTED[int(child.name)]
+            except (ValueError, TypeError):
+                LOGGER.warning('Non-numeric timer value "{}"!', child.name)
+                continue
+            except KeyError:
+                LOGGER.warning('Invalid timer value {}!', child.name)
+                continue
+
+            if child.value:
+                try:
+                    slot.contents = Signage.by_id(child.value)
+                except KeyError:
+                    LOGGER.warning('No signage with id "{}"!', child.value)
+            else:
+                slot.contents = None
 
 
 def style_changed(new_style: Style) -> None:
