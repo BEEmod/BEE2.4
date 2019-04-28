@@ -147,8 +147,13 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         lambda e: drag_man.flow_slots(canv_all, drag_man.sources()),
     )
 
+    def show_window() -> None:
+        """Show the window."""
+        window.deiconify()
+        utils.center_win(window, TK_ROOT)
+
     return ttk.Button(
         master,
         text=_('Configure Signage'),
-        command=window.deiconify
+        command=show_window,
     )
