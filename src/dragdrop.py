@@ -432,7 +432,7 @@ class Slot(Generic[ItemT]):
         """Set the item in this slot."""
         old_cont = self._contents
 
-        if value is not None:
+        if value is not None and not self.is_source:
             # Make sure this isn't already present.
             for slot in self.man._targets:
                 if slot.contents is value:
