@@ -102,7 +102,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
 
-    normal = Vec(z=1).rotate(*angles)
+    normal = Vec(z=-1).rotate(*angles)
     forward = Vec(x=-1).rotate(*angles)
 
     prim_pos = Vec(0, -16, -64)
@@ -113,7 +113,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
     face_normal = Vec(normal.x, normal.y, -normal.z)
 
-    template_id = res['template_id']
+    template_id = res['template_id', '']
 
     face: Side
 
@@ -141,7 +141,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         block_center = origin // 128 * 128 + (64, 64, 64)
         try:
             face = conditions.SOLIDS[
-                (block_center + 64*face_normal).as_tuple()
+                (block_center + 64*normal).as_tuple()
             ].face
         except KeyError:
             LOGGER.warning(
@@ -203,9 +203,9 @@ def place_sign(
 
     over = make_overlay(
         vmf,
-        normal,
+        -normal,
         pos,
-        uax=-32 * Vec.cross(normal, forward),
+        uax=-32 * Vec.cross(normal, forward).norm(),
         vax=-32 * forward,
         material=texture,
         surfaces=faces,
