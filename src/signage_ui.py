@@ -87,6 +87,7 @@ def save_load_signage(props: Property=None) -> Optional[Property]:
                     LOGGER.warning('No signage with id "{}"!', child.value)
             else:
                 slot.contents = None
+        return None
 
 
 def style_changed(new_style: Style) -> None:
@@ -104,8 +105,11 @@ def style_changed(new_style: Style) -> None:
                 new_style.id,
                 sign.id,
             )
-            sign.dnd_icon = img.img_error
-            continue
+            try:
+                icon = sign.styles['BEE2_CLEAN'].icon
+            except KeyError:
+                sign.dnd_icon = img.img_error
+                continue
         sign.dnd_icon = img.png(icon, resize_to=(64, 64))
     drag_man.refresh_icons()
 
