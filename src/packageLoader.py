@@ -2654,7 +2654,10 @@ class Signage(PakObject, allow_mult=True, has_img=False):
                 style.id,
                 self.id,
             )
-            return
+            try:
+                data = self.styles['BEE2_CLEAN']
+            except KeyError:
+                return
         parent.append(Property('world', data.world))
         parent.append(Property('overlay', data.overlay))
         parent.append(Property('type', data.type))
