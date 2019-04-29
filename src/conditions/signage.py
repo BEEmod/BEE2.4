@@ -190,6 +190,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
             prim_pos,
             normal,
             forward,
+            rotate=True,
         )
 
     if sign_sec is not None:
@@ -203,7 +204,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
             sec_pos,
             normal,
             forward,
-            rotate=has_arrow,
+            rotate=not has_arrow,
         )
 
 
@@ -236,4 +237,8 @@ def place_sign(
         material=texture,
         surfaces=faces,
     )
+
+    over['startu'] = '1'
+    over['endu'] = '0'
+
     vbsp.IGNORED_OVERLAYS.add(over)
