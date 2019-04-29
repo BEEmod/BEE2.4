@@ -99,6 +99,9 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         inst.remove()
         return
 
+    inst.fixup['$has_prim'] = sign_prim is not None
+    inst.fixup['$has_prim'] = sign_sec is not None
+
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
 
