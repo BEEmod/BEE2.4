@@ -5,7 +5,7 @@ import conditions
 import srctools.logger
 import vbsp
 import template_brush
-from srctools import Property, Entity, VMF, Vec, Output, NoKeyError
+from srctools import Property, Entity, VMF, Vec, NoKeyError
 from srctools.vmf import make_overlay, Side
 import comp_consts as const
 
