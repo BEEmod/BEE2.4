@@ -13,26 +13,30 @@ COND_MOD_NAME = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 
-class SignType:
-    def __init__(self, world: str, overlay: str) -> None:
+class Sign:
+    def __init__(
+        self,
+        world: str,
+        overlay: str
+    ) -> None:
         self.world = world
         self.overlay = overlay
-        self.primary: Optional['SignType'] = None
-        self.secondary: Optional['SignType'] = None
+        self.primary: Optional['Sign'] = None
+        self.secondary: Optional['Sign'] = None
 
     @classmethod
-    def parse(cls, prop: Property) -> 'SignType':
+    def parse(cls, prop: Property) -> 'Sign':
         return cls(
             prop['world', ''],
             prop['overlay', ''],
         )
 
 
-SIGNAGES: Dict[str, SignType] = {}
+SIGNAGES: Dict[str, Sign] = {}
 
 # Special connection signage type.
-CONN_SIGNAGES: Dict[str, SignType] = {
-    str(time): SignType('', f'<overlay.{sign}>')
+CONN_SIGNAGES: Dict[str, Sign] = {
+    str(time): Sign('', f'<overlay.{sign}>')
     for time, sign in
     zip(range(3, 31), [
         'square',
@@ -52,19 +56,19 @@ CONN_SIGNAGES: Dict[str, SignType] = {
 def load_signs(conf: Property) -> None:
     """Load in the signage data."""
     for prop in conf.find_children('Signage'):
-        SIGNAGES[prop.name] = sign = SignType.parse(prop)
+        SIGNAGES[prop.name] = sign = Sign.parse(prop)
         try:
             prim = prop.find_key('primary')
         except NoKeyError:
             pass
         else:
-            sign.primary = SignType.parse(prim)
+            sign.primary = Sign.parse(prim)
         try:
             sec = prop.find_key('secondary')
         except NoKeyError:
             pass
         else:
-            sign.secondary = SignType.parse(sec)
+            sign.secondary = Sign.parse(sec)
     if 'arrow' not in SIGNAGES:
         LOGGER.warning('No ARROW signage type!')
 
@@ -72,7 +76,7 @@ def load_signs(conf: Property) -> None:
 @conditions.make_result('SignageItem')
 def res_signage(vmf: VMF, inst: Entity, res: Property):
     """Implement the Signage item."""
-    sign: Optional[SignType]
+    sign: Optional[Sign]
     try:
         sign = (
             CONN_SIGNAGES if
@@ -85,8 +89,8 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
     has_arrow = inst.fixup.bool(const.FixupVars.ST_ENABLED)
 
-    sign_prim: Optional[SignType]
-    sign_sec: Optional[SignType]
+    sign_prim: Optional[Sign]
+    sign_sec: Optional[Sign]
 
     if has_arrow:
         sign_prim = sign
@@ -188,7 +192,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 def place_sign(
     vmf: VMF,
     faces: Iterable[Side],
-    sign: SignType,
+    sign: Sign,
     pos: Vec,
     normal: Vec,
     forward: Vec,
