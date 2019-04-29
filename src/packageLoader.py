@@ -156,6 +156,7 @@ class SignStyle(NamedTuple):
     world: str
     overlay: str
     icon: str
+    type: str
 
 
 class NoVPKExport(Exception):
@@ -2567,6 +2568,7 @@ class Signage(PakObject, allow_mult=True, has_img=False):
                 world_tex,
                 overlay_tex,
                 prop['icon', ''],
+                prop['type', 'square']
             )
         return cls(
             data.id,
@@ -2655,6 +2657,7 @@ class Signage(PakObject, allow_mult=True, has_img=False):
             return
         parent.append(Property('world', data.world))
         parent.append(Property('overlay', data.overlay))
+        parent.append(Property('type', data.type))
 
 
 class StyleVar(PakObject, allow_mult=True, has_img=False):

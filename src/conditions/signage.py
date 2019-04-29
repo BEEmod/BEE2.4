@@ -1,4 +1,5 @@
 from typing import Tuple, Dict, Optional, Iterable, List
+from enum import Enum
 
 import conditions
 import srctools.logger
@@ -13,22 +14,39 @@ COND_MOD_NAME = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 
+class SignType(Enum):
+    """Types of signage placement."""
+    DEFAULT = SQUARE = 'square'  # 1:1 size
+    TALL = 'tall'  # Half-wide
+    WIDE = 'wide'  # Half-height
+
+SIZES: Dict[SignType, Tuple[int, int]] = {
+    SignType.DEFAULT: (32, 32),
+    SignType.TALL: (16, 32),
+    SignType.WIDE: (32, 16),
+}
+
+
 class Sign:
+    """A sign that can be placed."""
     def __init__(
         self,
         world: str,
-        overlay: str
+        overlay: str,
+        sign_type: SignType=SignType.DEFAULT,
     ) -> None:
         self.world = world
         self.overlay = overlay
         self.primary: Optional['Sign'] = None
         self.secondary: Optional['Sign'] = None
+        self.type = sign_type
 
     @classmethod
     def parse(cls, prop: Property) -> 'Sign':
         return cls(
             prop['world', ''],
             prop['overlay', ''],
+            SignType(prop['type', 'square']),
         )
 
 
@@ -208,12 +226,13 @@ def place_sign(
     if texture.startswith('<') and texture.endswith('>'):
         texture = vbsp.get_tex(texture[1:-1])
 
+    width, height = SIZES[sign.type]
     over = make_overlay(
         vmf,
         -normal,
         pos,
-        uax=-32 * Vec.cross(normal, forward).norm(),
-        vax=-32 * forward,
+        uax=-width * Vec.cross(normal, forward).norm(),
+        vax=-height * forward,
         material=texture,
         surfaces=faces,
     )
