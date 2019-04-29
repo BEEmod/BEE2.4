@@ -36,7 +36,7 @@ from typing import (
 if TYPE_CHECKING:
     from gameMan import Game
     from selectorWin import SelitemData
-    from loadScreen import BaseLoadScreen
+    from loadScreen import LoadScreen
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -82,13 +82,14 @@ ObjType = NamedTuple('ObjType', [
     ('has_img', bool),
 ])
 # The arguments to pak_object.export().
-ExportData = NamedTuple('ExportData', [
-    ('selected', Any),  # Usually str, but some items pass other things.
-    ('selected_style', 'Style'),  # Some items need to know which style is selected
-    ('editoritems', Property),
-    ('vbsp_conf', Property),
-    ('game', 'Game'),
-])
+class ExportData(NamedTuple):
+    # Usually str, but some items pass other things.
+    selected: Any
+    # Some items need to know which style is selected
+    selected_style: 'Style'
+    editoritems: Property
+    vbsp_conf: Property
+    game: 'Game'
 
 # The desired variant for an item, before we've figured out the dependencies.
 UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
@@ -239,7 +240,7 @@ class PakObject(metaclass=_PakObjectMeta):
         return cls._id_to_obj[object_id.casefold()]
 
 
-def reraise_keyerror(err, obj_id):
+def reraise_keyerror(err: BaseException, obj_id: str):
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
@@ -395,7 +396,7 @@ def no_packages_err(pak_dir, msg):
 
 def load_packages(
         pak_dir,
-        loader: 'BaseLoadScreen',
+        loader: 'LoadScreen',
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
@@ -1574,8 +1575,8 @@ class Item(PakObject):
                         )
                         # our_style.override_from_folder(style)
 
-    def __repr__(self):
-        return '<Item:' + self.id + '>'
+    def __repr__(self) -> str:
+        return '<Item:{}>'.format(self.id)
 
     @staticmethod
     def export(exp_data: ExportData):
