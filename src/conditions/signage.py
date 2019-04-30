@@ -145,21 +145,21 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
     if template_id:
         brush_faces: List[Side] = []
         if sign_prim and sign_sec:
-            visgroup = 'both'
+            visgroup = ['primary', 'secondary']
         elif sign_prim:
-            visgroup = 'primary'
+            visgroup = ['primary']
         else:
-            visgroup = 'secondary'
+            visgroup = ['secondary']
         template = template_brush.import_template(
             template_id,
             origin,
             angles,
             force_type=template_brush.TEMP_TYPES.detail,
-            additional_visgroups=[visgroup],
+            additional_visgroups=visgroup,
         )
 
         for face in template.detail.sides():
-            if face.normal() == face_normal:
+            if face.normal() == normal:
                 brush_faces.append(face)
     else:
         # Direct on the surface.
