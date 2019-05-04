@@ -124,17 +124,15 @@ class P2C:
         # don't convert encodings automatically for us.
         try:
             with zip_open_bin(zip_file, path + '.p2c') as file:
-                props = Property.parse(
-                    # Decode the P2C as UTF-8, and skip unknown characters.
-                    # We're only using it for display purposes, so that should
-                    # be sufficent.
-                    TextIOWrapper(
-                        file,
-                        encoding='utf-8',
-                        errors='replace',
-                    ),
-                    path,
-                )
+                # Decode the P2C as UTF-8, and skip unknown characters.
+                # We're only using it for display purposes, so that should
+                # be sufficient.
+                with TextIOWrapper(
+                    file,
+                    encoding='utf-8',
+                    errors='replace',
+                ) as textfile:
+                    props = Property.parse(textfile, path)
         except KeyValError:
             # Silently fail if we can't parse the file. That way it's still
             # possible to backup.
