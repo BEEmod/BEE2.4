@@ -2548,6 +2548,13 @@ class Signage(PakObject, allow_mult=True, has_img=False):
         for prop in data.info.find_children('styles'):
             sty_id = prop.name.upper()
 
+            if not prop.has_children():
+                # Style lookup.
+                try:
+                    prop = next(data.info.find_all('styles', prop.value))
+                except StopIteration:
+                    raise ValueError('No style <{}>!'.format(prop.value))
+
             world_tex = prop['world', '']
             overlay_tex = prop['overlay', '']
 
