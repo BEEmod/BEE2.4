@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2019-04-05 09:34+1000\n"
+"POT-Creation-Date: 2019-05-04 12:17+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: zh\n"
@@ -18,30 +18,30 @@ msgstr ""
 msgid "Toggle all checkboxes."
 msgstr "切换所有复选框。"
 
-#: CompilerPane.py:76
+#: CompilerPane.py:66
 msgid "ATLAS"
 msgstr "ATLAS（蓝色机器人）"
 
-#: CompilerPane.py:77
+#: CompilerPane.py:67
 msgid "P-Body"
 msgstr "P-Body（橙色机器人）"
 
-#: CompilerPane.py:78 voiceEditor.py:40
+#: CompilerPane.py:68 voiceEditor.py:40
 msgid "Chell"
 msgstr "Chell（主角雪儿）"
 
-#: CompilerPane.py:79 voiceEditor.py:39
+#: CompilerPane.py:69 voiceEditor.py:39
 msgid "Bendy"
 msgstr "Bendy（小黑人）"
 
-#: CompilerPane.py:132
+#: CompilerPane.py:122
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
 "high, it may help to reduce the size of the map or remove intricate "
 "shapes."
 msgstr "固体实体形成实验室的墙或其它部分。如果这数值很高，可能需要缩减地图大小或删除复杂的形状。"
 
-#: CompilerPane.py:139
+#: CompilerPane.py:129
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
 "complex moving items will help reduce this. Items have their entity count"
@@ -54,31 +54,31 @@ msgstr ""
 "\n"
 "这不完全准确，有些实体类型在此的数目，但不影响游戏中限制。"
 
-#: CompilerPane.py:148
+#: CompilerPane.py:138
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
 "lights. Hiding long antlines or setting them to signage will reduce this."
 msgstr "标记是贴在表面上的较小图像，如标志或指示灯。隐藏蚂蚁线或将它们设置为标志将减轻状况。"
 
-#: CompilerPane.py:284
+#: CompilerPane.py:274
 msgid "Corridor"
 msgstr "走廊"
 
-#: CompilerPane.py:325
+#: CompilerPane.py:315
 msgid ""
 "Randomly choose a corridor. This is saved in the puzzle data and will not"
 " change."
 msgstr ""
 
-#: CompilerPane.py:331
+#: CompilerPane.py:321
 msgid "Random"
 msgstr "随机"
 
-#: CompilerPane.py:430
+#: CompilerPane.py:420
 msgid "Image Files"
 msgstr "图像文件"
 
-#: CompilerPane.py:513
+#: CompilerPane.py:503
 msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
@@ -86,35 +86,35 @@ msgstr ""
 "此面板上的选项可以更改\n"
 "无需导出或重新启动游戏。"
 
-#: CompilerPane.py:528
+#: CompilerPane.py:518
 msgid "Map Settings"
 msgstr "地图设置"
 
-#: CompilerPane.py:533
+#: CompilerPane.py:523
 msgid "Compile Settings"
 msgstr "编译设置"
 
-#: CompilerPane.py:547
+#: CompilerPane.py:537
 msgid "Thumbnail"
 msgstr "缩略图"
 
-#: CompilerPane.py:555
+#: CompilerPane.py:545
 msgid "Auto"
 msgstr "自动"
 
-#: CompilerPane.py:563
+#: CompilerPane.py:553
 msgid "PeTI"
 msgstr "PeTI"
 
-#: CompilerPane.py:571
+#: CompilerPane.py:561
 msgid "Custom:"
 msgstr "自定义："
 
-#: CompilerPane.py:589
+#: CompilerPane.py:579
 msgid "Cleanup old screenshots"
 msgstr "清理旧截图"
 
-#: CompilerPane.py:599
+#: CompilerPane.py:589
 msgid ""
 "Override the map image to use a screenshot automatically taken from the "
 "beginning of a chamber. Press F5 to take a new screenshot. If the map has"
@@ -122,11 +122,11 @@ msgid ""
 "PeTI screenshot will be used instead."
 msgstr "覆盖地图图片以使用从实验室开始自动截取的屏幕截图。按F5拍摄新的截图。如果最近（最近几小时内）未预览地图，则会使用默认的PeTI截图。"
 
-#: CompilerPane.py:607
+#: CompilerPane.py:597
 msgid "Use the normal editor view for the map preview image."
 msgstr "使用默认编辑器视图作为地图预览图像。"
 
-#: CompilerPane.py:609
+#: CompilerPane.py:599
 msgid ""
 "Use a custom image for the map preview image. Click the screenshot to "
 "select.\n"
@@ -135,25 +135,25 @@ msgstr ""
 "使用自定义地图预览图像。单击选择截图。\n"
 "如有必要图像将转换成JPEG。"
 
-#: CompilerPane.py:626
+#: CompilerPane.py:616
 msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
 msgstr "自动删除未使用的自动截图。如果你想保留请禁用。路径是“portal2/screenshots”。"
 
-#: CompilerPane.py:637
+#: CompilerPane.py:627
 msgid "Lighting:"
 msgstr "光影："
 
-#: CompilerPane.py:644
+#: CompilerPane.py:634
 msgid "Fast"
 msgstr "快速"
 
-#: CompilerPane.py:651
+#: CompilerPane.py:641
 msgid "Full"
 msgstr "最好"
 
-#: CompilerPane.py:659
+#: CompilerPane.py:649
 msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
@@ -162,18 +162,18 @@ msgstr ""
 "编译低质量的照明。这缩短了编译时间，但效果并不好。一些阴影可能显示错误。\n"
 "发布时，会忽略此选项。"
 
-#: CompilerPane.py:666
+#: CompilerPane.py:656
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
 "to compute. Use if you're arranging lights. When publishing, this is "
 "always used."
 msgstr "编译高品质的照明。这看起来是正确的，但计算时间较长。如果你布置了灯光请使用。发布时，始终使用此选项。"
 
-#: CompilerPane.py:673
+#: CompilerPane.py:663
 msgid "Dump packed files to:"
 msgstr "将数据包文件转储到："
 
-#: CompilerPane.py:698
+#: CompilerPane.py:688
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -181,93 +181,93 @@ msgstr ""
 "编译时，转储所有地图用得上的数据包文件，用于Hammer编辑地图。\n"
 "（必须用英文路径并且是独立的文件夹，否则同文件夹里的文件被清空。）"
 
-#: CompilerPane.py:704
+#: CompilerPane.py:694
 msgid "Last Compile:"
 msgstr "编译后："
 
-#: CompilerPane.py:714
+#: CompilerPane.py:704
 msgid "Entity"
 msgstr "实体"
 
-#: CompilerPane.py:734
+#: CompilerPane.py:724
 msgid "Overlay"
 msgstr "标记"
 
-#: CompilerPane.py:753
+#: CompilerPane.py:743
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
 msgstr "刷新编译进度条。执行编译后按下以显示新值。"
 
-#: CompilerPane.py:759
+#: CompilerPane.py:749
 msgid "Brush"
 msgstr "固体实体"
 
-#: CompilerPane.py:787
+#: CompilerPane.py:777
 msgid "Voicelines:"
 msgstr "声优："
 
-#: CompilerPane.py:794
+#: CompilerPane.py:784
 msgid "Use voiceline priorities"
 msgstr "优先使用声优"
 
-#: CompilerPane.py:800
+#: CompilerPane.py:790
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
 "disabled any applicable lines will be used."
 msgstr "只选择最高优先级的语音线。这意味着只有当地图中的测试元素很少时，才能选择更多的通用线。如果禁用，将使用任何适用的线。"
 
-#: CompilerPane.py:807
+#: CompilerPane.py:797
 msgid "Spawn at:"
 msgstr "出生于："
 
-#: CompilerPane.py:818
+#: CompilerPane.py:808
 msgid "Entry Door"
 msgstr "入口"
 
-#: CompilerPane.py:825
+#: CompilerPane.py:815
 msgid "Elevator"
 msgstr "电梯"
 
-#: CompilerPane.py:835
+#: CompilerPane.py:825
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. This also "
 "disables the map restarts when you reach the exit door. Use this to "
 "examine the entry and exit corridors."
 msgstr "当在单人模式中预览时，在电梯内出生。这也会禁用到达出口后地图重新开始。使用此选项来检查入口和出口的走廊。"
 
-#: CompilerPane.py:841
+#: CompilerPane.py:831
 msgid ""
 "When previewing in SP, spawn just before the entry door. When you reach "
 "the exit door, the map will restart."
 msgstr "当在单人模式中预览时，就在入口前出生。当你到达出口时，地图将重新开始。"
 
-#: CompilerPane.py:848
+#: CompilerPane.py:838
 msgid "Corridor:"
 msgstr "走廊："
 
-#: CompilerPane.py:867
+#: CompilerPane.py:857
 msgid "SP Entry:"
 msgstr "单人模式入口："
 
-#: CompilerPane.py:872
+#: CompilerPane.py:862
 msgid "SP Exit:"
 msgstr "单人模式出口："
 
-#: CompilerPane.py:877
+#: CompilerPane.py:867
 msgid "Coop:"
 msgstr "合作模式："
 
-#: CompilerPane.py:883
+#: CompilerPane.py:873
 msgid "Player Model (SP):"
 msgstr "玩家模型（单人模式）："
 
-#: CompilerPane.py:908
+#: CompilerPane.py:898
 msgid "Compile Options"
 msgstr "编译选项"
 
-#: CompilerPane.py:925
+#: CompilerPane.py:915
 msgid "Compiler Options - {}"
 msgstr "开发者选项 - {}"
 
@@ -534,7 +534,7 @@ msgstr "键入名字："
 msgid "This palette already exists. Overwrite?"
 msgstr "此样例已存在，要覆盖写入吗？"
 
-#: UI.py:1229 gameMan.py:1429
+#: UI.py:1229 gameMan.py:1497
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
@@ -596,7 +596,7 @@ msgstr "所有物品："
 msgid "Export to \"{}\"..."
 msgstr "导出到\"{}\""
 
-#: UI.py:1664 backup.py:891
+#: UI.py:1664 backup.py:872
 msgid "File"
 msgstr "文件"
 
@@ -604,7 +604,7 @@ msgstr "文件"
 msgid "Export"
 msgstr "导出"
 
-#: UI.py:1676 backup.py:895
+#: UI.py:1676 backup.py:876
 msgid "Add Game"
 msgstr "添加游戏"
 
@@ -656,126 +656,126 @@ msgstr "导出设置"
 msgid "Fill empty spots in the palette with random items."
 msgstr "用随机物品填充样例中的空位。"
 
-#: backup.py:96
+#: backup.py:81
 msgid "Copying maps"
 msgstr "正在复制地图"
 
-#: backup.py:101
+#: backup.py:86
 msgid "Loading maps"
 msgstr "正在载入地图"
 
-#: backup.py:106
+#: backup.py:91
 msgid "Deleting maps"
 msgstr "正在删除地图"
 
-#: backup.py:159
+#: backup.py:142
 msgid "Failed to parse this puzzle file. It can still be backed up."
 msgstr "无法解析此谜题文件。它仍然可以备份。"
 
-#: backup.py:163
+#: backup.py:146
 msgid "No description found."
 msgstr "找不到说明。"
 
-#: backup.py:196
+#: backup.py:177
 msgid "Coop"
 msgstr "合作模式"
 
-#: backup.py:196
+#: backup.py:177
 msgid "SP"
 msgstr "单人模式"
 
-#: backup.py:354
+#: backup.py:339
 msgid "This filename is already in the backup.Do you wish to overwrite it? ({})"
 msgstr "这个文件名已存在备份中。你要覆盖吗？ ({})"
 
-#: backup.py:460
+#: backup.py:445
 msgid "BEE2 Backup"
 msgstr "BEE2 备份"
 
-#: backup.py:461
+#: backup.py:446
 msgid "No maps were chosen to backup!"
 msgstr "请选择地图备份！"
 
-#: backup.py:521
+#: backup.py:506
 msgid ""
 "This map is already in the game directory.Do you wish to overwrite it? "
 "({})"
 msgstr "这个地图已存在游戏目录中。你要覆盖吗？ ({})"
 
-#: backup.py:580
+#: backup.py:565
 msgid "Load Backup"
 msgstr "载入备份"
 
-#: backup.py:581 backup.py:640
+#: backup.py:566 backup.py:625
 msgid "Backup zip"
 msgstr "保存为zip"
 
-#: backup.py:614
+#: backup.py:599
 msgid "Unsaved Backup"
 msgstr "未保存的备份"
 
-#: backup.py:639 backup.py:889
+#: backup.py:624 backup.py:870
 msgid "Save Backup As"
 msgstr "备份另存为"
 
-#: backup.py:734
+#: backup.py:720
 msgid "Confirm Deletion"
 msgstr "确认删除"
 
-#: backup.py:735
+#: backup.py:721
 msgid "Do you wish to delete {} map?\n"
 msgid_plural "Do you wish to delete {} maps?\n"
 msgstr[0] "你确定要删除 {} 张地图？"
 
-#: backup.py:772
+#: backup.py:758
 msgid "Restore:"
 msgstr "还原："
 
-#: backup.py:773
+#: backup.py:759
 msgid "Backup:"
 msgstr "备份："
 
-#: backup.py:810
+#: backup.py:796
 msgid "Checked"
 msgstr "已选中"
 
-#: backup.py:818
+#: backup.py:804
 msgid "Delete Checked"
 msgstr "删除已选"
 
-#: backup.py:867
+#: backup.py:854
 msgid "BEEMOD {} - Backup / Restore Puzzles"
 msgstr "BEEMOD {} - 备份/恢复谜题"
 
-#: backup.py:886 backup.py:1005
+#: backup.py:867 backup.py:995
 msgid "New Backup"
 msgstr "新建备份"
 
-#: backup.py:887 backup.py:1012
+#: backup.py:868 backup.py:1002
 msgid "Open Backup"
 msgstr "打开备份"
 
-#: backup.py:888 backup.py:1019
+#: backup.py:869 backup.py:1009
 msgid "Save Backup"
 msgstr "保存备份"
 
-#: backup.py:896
+#: backup.py:877
 msgid "Remove Game"
 msgstr "移除游戏"
 
-#: backup.py:899
+#: backup.py:880
 msgid "Game"
 msgstr "游戏"
 
-#: backup.py:936
+#: backup.py:926
 msgid "Automatic Backup After Export"
 msgstr "导出后自动备份"
 
-#: backup.py:968
+#: backup.py:958
 msgid "Keep (Per Game):"
 msgstr "保持（每场游戏）："
 
-#: backup.py:986
+#: backup.py:976
 msgid "Backup/Restore Puzzles"
 msgstr "备份/恢复 谜题"
 
@@ -919,62 +919,68 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "当放置时更改此物品的默认设置。"
 
-#: gameMan.py:779
+#: gameMan.py:742 gameMan.py:849
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败"
 
-#: gameMan.py:780
+#: gameMan.py:743
+msgid ""
+"Compiler file {file} missing. Exit Steam applications, then press OK to "
+"verify your game cache. You can then export again."
+msgstr ""
+
+#: gameMan.py:850
 msgid "Copying compiler file {file} failed.Ensure the {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行。"
 
-#: gameMan.py:1166
+#: gameMan.py:1234
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
 msgstr ""
 
-#: gameMan.py:1170
+#: gameMan.py:1238
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
-#: gameMan.py:1352
+#: gameMan.py:1420
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件所在的文件夹 ({appname})..."
 
-#: gameMan.py:1355 gameMan.py:1370 gameMan.py:1380 gameMan.py:1388
-#: gameMan.py:1396 gameMan.py:1405
+#: gameMan.py:1423 gameMan.py:1438 gameMan.py:1448 gameMan.py:1456
+#: gameMan.py:1464 gameMan.py:1473
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: gameMan.py:1358
+#: gameMan.py:1426
 msgid "Find Game Exe"
 msgstr "寻找游戏的可执行文件"
 
-#: gameMan.py:1359
+#: gameMan.py:1427
 msgid "Executable"
 msgstr "可执行文件"
 
-#: gameMan.py:1367
+#: gameMan.py:1435
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: gameMan.py:1377
+#: gameMan.py:1445
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门故事：梅尔》的编辑器！"
 
-#: gameMan.py:1387
+#: gameMan.py:1455
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: gameMan.py:1395
+#: gameMan.py:1463
 msgid "This name is already taken!"
 msgstr "此名称已存在！"
 
-#: gameMan.py:1404
+#: gameMan.py:1472
 msgid "Please enter a name for this game!"
 msgstr "请输入此游戏的名称！"
 
-#: gameMan.py:1423
+#: gameMan.py:1491
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"

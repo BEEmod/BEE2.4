@@ -17,7 +17,6 @@ import shutil
 import math
 import re
 
-
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
 from srctools import (
@@ -26,12 +25,14 @@ from srctools import (
     VMF, Output,
     FileSystem, FileSystemChain,
 )
+from PyInstaller.archive.readers import CArchiveReader
 import srctools.logger
 import backup
 import loadScreen
 import packageLoader
 import utils
 import srctools
+import webbrowser
 
 from typing import List, Tuple, Set, Iterable, Iterator, Dict, Union
 
@@ -57,12 +58,12 @@ CONFIG = ConfigFile('games.cfg')
 
 FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
-    ('VBSP',        'bin/vbsp',                         '.exe'),
-    ('VRAD',        'bin/vrad',                         '.exe'),
-    ('VBSP',        'bin/vbsp_osx',   ''),
-    ('VRAD',        'bin/vrad_osx',   ''),
-    ('VBSP',        'bin/vbsp_linux', ''),
-    ('VRAD',        'bin/vrad_linux', ''),
+    ('Windows VBSP', 'bin/vbsp',       '.exe'),
+    ('Windows VRAD', 'bin/vrad',       '.exe'),
+    ('OSX VBSP',     'bin/vbsp_osx',   ''),
+    ('OSX VRAD',     'bin/vrad_osx',   ''),
+    ('Linux VBSP',   'bin/vbsp_linux', ''),
+    ('Linux VRAD',   'bin/vrad_linux', ''),
 ]
 
 _UNLOCK_ITEMS = [
@@ -408,6 +409,7 @@ class Game:
                         file.write(line)
         if not add_line:
             # Restore the original files!
+
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
@@ -686,7 +688,75 @@ class Game:
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
-                if os.path.isfile(item_path) and not os.path.isfile(backup_path):
+
+                if not os.path.isfile(item_path):
+                    # We can't backup at all.
+                    should_backup = False
+                elif name == 'Editoritems':
+                    should_backup = not os.path.isfile(backup_path)
+                else:
+                    # See if the PyInstaller archive is present,
+                    # to check if this is ours.
+                    try:
+                        CArchiveReader(backup_path)
+                        backup_ours = True
+                    except FileNotFoundError:
+                        # Pretend it's ours, since it's not a valid backup.
+                        backup_ours = True
+                    except Exception:
+                        backup_ours = False
+
+                    # Now check if the normal name is ours - if not, always
+                    # backup.
+                    try:
+                        CArchiveReader(item_path)
+                        norm_ours = True
+                    except FileNotFoundError:
+                        # Pretend it's ours, since it's not a valid backup.
+                        norm_ours = True
+                    except Exception:
+                        norm_ours = False
+
+                    LOGGER.info(
+                        '{}{}: normal={}, backup={}',
+                        file, ext,
+                        'BEE2' if norm_ours else 'Valve',
+                        'BEE2' if backup_ours else 'Valve',
+                    )
+
+                    if norm_ours and backup_ours:
+                        # It's a BEE2 application, we have a problem.
+                        # Both the real and backup are bad, we need to get a
+                        # new one.
+                        try:
+                            os.remove(backup_path)
+                        except FileNotFoundError:
+                            pass
+                        try:
+                            os.remove(item_path)
+                        except FileNotFoundError:
+                            pass
+
+                        export_screen.reset()
+                        if messagebox.askokcancel(
+                            title=_('BEE2 - Export Failed!'),
+                            message=_(
+                                'Compiler file {file} missing. '
+                                'Exit Steam applications, then press OK '
+                                'to verify your game cache. You can then '
+                                'export again.'
+                            ).format(
+                                file=file + ext,
+                            ),
+                            master=TK_ROOT,
+                        ):
+                            webbrowser.open('steam://validate/' + str(self.steamID))
+                        return False, vpk_success
+
+                    # Always backup the non-_original file, it'd be newer.
+                    should_backup = not norm_ours
+
+                if should_backup:
                     LOGGER.info('Backing up original {}!', name)
                     shutil.copy(item_path, backup_path)
                 export_screen.step('BACK')
@@ -985,9 +1055,7 @@ class Game:
 
     def launch(self):
         """Try and launch the game."""
-        import webbrowser
-        url = 'steam://rungameid/' + str(self.steamID)
-        webbrowser.open(url)
+        webbrowser.open('steam://rungameid/' + str(self.steamID))
 
     def copy_mod_music(self) -> Set[str]:
         """Copy music files from Tag and PS:Mel.

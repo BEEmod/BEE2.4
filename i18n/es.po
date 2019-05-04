@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2019-04-05 09:34+1000\n"
+"POT-Creation-Date: 2019-05-04 12:17+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -18,23 +18,23 @@ msgstr ""
 msgid "Toggle all checkboxes."
 msgstr "Activar todas las casillas."
 
-#: CompilerPane.py:76
+#: CompilerPane.py:66
 msgid "ATLAS"
 msgstr "ATLAS"
 
-#: CompilerPane.py:77
+#: CompilerPane.py:67
 msgid "P-Body"
 msgstr "P-Body"
 
-#: CompilerPane.py:78 voiceEditor.py:40
+#: CompilerPane.py:68 voiceEditor.py:40
 msgid "Chell"
 msgstr "Chell"
 
-#: CompilerPane.py:79 voiceEditor.py:39
+#: CompilerPane.py:69 voiceEditor.py:39
 msgid "Bendy"
 msgstr "Bendy"
 
-#: CompilerPane.py:132
+#: CompilerPane.py:122
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
 "high, it may help to reduce the size of the map or remove intricate "
@@ -44,7 +44,7 @@ msgstr ""
 " esto es alto, te puede servir como guía para que puedas reducir el "
 "tamaño del mapa o eliminar formas complejas del mismo."
 
-#: CompilerPane.py:139
+#: CompilerPane.py:129
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
 "complex moving items will help reduce this. Items have their entity count"
@@ -59,7 +59,7 @@ msgstr ""
 "enlistado en la parte superior derecha de la ventana de descripción de "
 "los mismos."
 
-#: CompilerPane.py:148
+#: CompilerPane.py:138
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
 "lights. Hiding long antlines or setting them to signage will reduce this."
@@ -68,59 +68,59 @@ msgstr ""
 "pueden ser los símbolos, indicadores o las lineas de conexión. Ocultando "
 "largas lineas de conexión o cambiándolas a indicadores reducirá esto."
 
-#: CompilerPane.py:284
+#: CompilerPane.py:274
 msgid "Corridor"
 msgstr "Pasillo"
 
-#: CompilerPane.py:325
+#: CompilerPane.py:315
 msgid ""
 "Randomly choose a corridor. This is saved in the puzzle data and will not"
 " change."
 msgstr ""
 
-#: CompilerPane.py:331
+#: CompilerPane.py:321
 msgid "Random"
 msgstr ""
 
-#: CompilerPane.py:430
+#: CompilerPane.py:420
 msgid "Image Files"
 msgstr "Archivos de imagenes"
 
-#: CompilerPane.py:513
+#: CompilerPane.py:503
 msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
 msgstr ""
 
-#: CompilerPane.py:528
+#: CompilerPane.py:518
 msgid "Map Settings"
 msgstr "Configuración del Mapa"
 
-#: CompilerPane.py:533
+#: CompilerPane.py:523
 msgid "Compile Settings"
 msgstr "Configuración de la Compilación"
 
-#: CompilerPane.py:547
+#: CompilerPane.py:537
 msgid "Thumbnail"
 msgstr "Miniatura"
 
-#: CompilerPane.py:555
+#: CompilerPane.py:545
 msgid "Auto"
 msgstr "Automático"
 
-#: CompilerPane.py:563
+#: CompilerPane.py:553
 msgid "PeTI"
 msgstr "PeTI"
 
-#: CompilerPane.py:571
+#: CompilerPane.py:561
 msgid "Custom:"
 msgstr "Personalizada:"
 
-#: CompilerPane.py:589
+#: CompilerPane.py:579
 msgid "Cleanup old screenshots"
 msgstr "Limpiar viejas capturas de pantalla"
 
-#: CompilerPane.py:599
+#: CompilerPane.py:589
 msgid ""
 "Override the map image to use a screenshot automatically taken from the "
 "beginning of a chamber. Press F5 to take a new screenshot. If the map has"
@@ -133,11 +133,11 @@ msgstr ""
 "recientemente (en las últimas horas), se utilizará una captura por "
 "defecto de la visión del editor del juego."
 
-#: CompilerPane.py:607
+#: CompilerPane.py:597
 msgid "Use the normal editor view for the map preview image."
 msgstr "Utiliza la imagen por defecto del editor del juego."
 
-#: CompilerPane.py:609
+#: CompilerPane.py:599
 msgid ""
 "Use a custom image for the map preview image. Click the screenshot to "
 "select.\n"
@@ -147,7 +147,7 @@ msgstr ""
 "tu mapa. Haz clic en el rectángulo negro de abajo para seleccionarla. \n"
 "Las imágenes serán convertidas a formato JPEG de ser necesario."
 
-#: CompilerPane.py:626
+#: CompilerPane.py:616
 msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
@@ -156,19 +156,19 @@ msgstr ""
 "utilizadas. Deshabilita esta casilla si deseas mantener esas capturas. "
 "Las mismas se encuentran en: \"portal2/screenshots\"."
 
-#: CompilerPane.py:637
+#: CompilerPane.py:627
 msgid "Lighting:"
 msgstr "Iluminación:"
 
-#: CompilerPane.py:644
+#: CompilerPane.py:634
 msgid "Fast"
 msgstr "Rápida"
 
-#: CompilerPane.py:651
+#: CompilerPane.py:641
 msgid "Full"
 msgstr "Completa"
 
-#: CompilerPane.py:659
+#: CompilerPane.py:649
 msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
@@ -179,7 +179,7 @@ msgstr ""
 "incorrectas. En el momento que se publica el mapa, esta opción no será "
 "tenida en cuenta."
 
-#: CompilerPane.py:666
+#: CompilerPane.py:656
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
 "to compute. Use if you're arranging lights. When publishing, this is "
@@ -190,11 +190,11 @@ msgstr ""
 "efectos lumínicos. En el momento que se publica el mapa, esto siempre se "
 "activará de forma automática."
 
-#: CompilerPane.py:673
+#: CompilerPane.py:663
 msgid "Dump packed files to:"
 msgstr "Envíar archivos empacados a:"
 
-#: CompilerPane.py:698
+#: CompilerPane.py:688
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -203,19 +203,19 @@ msgstr ""
 " empacados dentro del mapa. Útil si tienes la intención de editar los "
 "mapas en Hammer."
 
-#: CompilerPane.py:704
+#: CompilerPane.py:694
 msgid "Last Compile:"
 msgstr "Última Compilación:"
 
-#: CompilerPane.py:714
+#: CompilerPane.py:704
 msgid "Entity"
 msgstr "Entidades"
 
-#: CompilerPane.py:734
+#: CompilerPane.py:724
 msgid "Overlay"
 msgstr "Overlays"
 
-#: CompilerPane.py:753
+#: CompilerPane.py:743
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
@@ -224,19 +224,19 @@ msgstr ""
 "Pulse después de que se haya realizado una compilación para mostrar los "
 "nuevos valores."
 
-#: CompilerPane.py:759
+#: CompilerPane.py:749
 msgid "Brush"
 msgstr ""
 
-#: CompilerPane.py:787
+#: CompilerPane.py:777
 msgid "Voicelines:"
 msgstr "Líneas de voz:"
 
-#: CompilerPane.py:794
+#: CompilerPane.py:784
 msgid "Use voiceline priorities"
 msgstr "Usar líneas de voces prioritarias"
 
-#: CompilerPane.py:800
+#: CompilerPane.py:790
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
@@ -247,19 +247,19 @@ msgstr ""
 " prueba en el mapa. Si se deshabilita, cualquier línea aplicable será "
 "utilizada."
 
-#: CompilerPane.py:807
+#: CompilerPane.py:797
 msgid "Spawn at:"
 msgstr "Aparecer en:"
 
-#: CompilerPane.py:818
+#: CompilerPane.py:808
 msgid "Entry Door"
 msgstr "Puerta de entrada"
 
-#: CompilerPane.py:825
+#: CompilerPane.py:815
 msgid "Elevator"
 msgstr "Elevador"
 
-#: CompilerPane.py:835
+#: CompilerPane.py:825
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. This also "
 "disables the map restarts when you reach the exit door. Use this to "
@@ -270,7 +270,7 @@ msgstr ""
 "si se llega atravesar la puerta de salida. Utilizar esta opción si deseas"
 " examinar los pasillos de entrada y salida del mapa."
 
-#: CompilerPane.py:841
+#: CompilerPane.py:831
 msgid ""
 "When previewing in SP, spawn just before the entry door. When you reach "
 "the exit door, the map will restart."
@@ -279,31 +279,31 @@ msgstr ""
 "antes de la puerta de entrada. Cuando atravieses la puerta de salida, el "
 "mapa se reiniciará."
 
-#: CompilerPane.py:848
+#: CompilerPane.py:838
 msgid "Corridor:"
 msgstr "Pasillo:"
 
-#: CompilerPane.py:867
+#: CompilerPane.py:857
 msgid "SP Entry:"
 msgstr "Entrada SP:"
 
-#: CompilerPane.py:872
+#: CompilerPane.py:862
 msgid "SP Exit:"
 msgstr "Salida SP:"
 
-#: CompilerPane.py:877
+#: CompilerPane.py:867
 msgid "Coop:"
 msgstr "Coop:"
 
-#: CompilerPane.py:883
+#: CompilerPane.py:873
 msgid "Player Model (SP):"
 msgstr "Modelo del jugador (SP):"
 
-#: CompilerPane.py:908
+#: CompilerPane.py:898
 msgid "Compile Options"
 msgstr "Opciones de Compilación"
 
-#: CompilerPane.py:925
+#: CompilerPane.py:915
 msgid "Compiler Options - {}"
 msgstr "Opciones de Compilación - {}"
 
@@ -597,7 +597,7 @@ msgstr ""
 msgid "This palette already exists. Overwrite?"
 msgstr "Esta paleta ya existe. Desea reemplazarla?"
 
-#: UI.py:1229 gameMan.py:1429
+#: UI.py:1229 gameMan.py:1497
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Estas seguro que deseas borrar \"{}?\""
 
@@ -659,7 +659,7 @@ msgstr "Todos los Elementos:"
 msgid "Export to \"{}\"..."
 msgstr ""
 
-#: UI.py:1664 backup.py:891
+#: UI.py:1664 backup.py:872
 msgid "File"
 msgstr "Archivo"
 
@@ -667,7 +667,7 @@ msgstr "Archivo"
 msgid "Export"
 msgstr "Exportar"
 
-#: UI.py:1676 backup.py:895
+#: UI.py:1676 backup.py:876
 msgid "Add Game"
 msgstr "Añadir Juego"
 
@@ -720,129 +720,129 @@ msgstr "Opciones de Exportación"
 msgid "Fill empty spots in the palette with random items."
 msgstr "Rellenar espacios vacíos de la paleta con elementos aleatorios."
 
-#: backup.py:96
+#: backup.py:81
 msgid "Copying maps"
 msgstr "Copiando mapas"
 
-#: backup.py:101
+#: backup.py:86
 msgid "Loading maps"
 msgstr "Cargando mapas"
 
-#: backup.py:106
+#: backup.py:91
 msgid "Deleting maps"
 msgstr ""
 
-#: backup.py:159
+#: backup.py:142
 msgid "Failed to parse this puzzle file. It can still be backed up."
 msgstr "Error al analizar este mapa. Pero es posible hacer una copia de seguridad."
 
-#: backup.py:163
+#: backup.py:146
 msgid "No description found."
 msgstr "No se ha encontrado una descripción."
 
-#: backup.py:196
+#: backup.py:177
 msgid "Coop"
 msgstr "Cooperativo"
 
-#: backup.py:196
+#: backup.py:177
 msgid "SP"
 msgstr "Un solo jugador"
 
-#: backup.py:354
+#: backup.py:339
 msgid "This filename is already in the backup.Do you wish to overwrite it? ({})"
 msgstr ""
 "Este nombre de archivo ya está en la copia de seguridad. Desea "
 "reemplazarlo? ({})"
 
-#: backup.py:460
+#: backup.py:445
 msgid "BEE2 Backup"
 msgstr "BEE2 Copia de seguridad"
 
-#: backup.py:461
+#: backup.py:446
 msgid "No maps were chosen to backup!"
 msgstr "No se ha elegido ningún mapa para realizar copias de seguridad!"
 
-#: backup.py:521
+#: backup.py:506
 msgid ""
 "This map is already in the game directory.Do you wish to overwrite it? "
 "({})"
 msgstr "Este mapa ya está en el directorio del juego. ¿Desea reemplazarlo? ({})"
 
-#: backup.py:580
+#: backup.py:565
 msgid "Load Backup"
 msgstr "Cargar Copia de Seguridad"
 
-#: backup.py:581 backup.py:640
+#: backup.py:566 backup.py:625
 msgid "Backup zip"
 msgstr "Copia de seguridad zip"
 
-#: backup.py:614
+#: backup.py:599
 msgid "Unsaved Backup"
 msgstr "Copia de seguridad no guardada"
 
-#: backup.py:639 backup.py:889
+#: backup.py:624 backup.py:870
 msgid "Save Backup As"
 msgstr "Guardar Copia de Seguridad como"
 
-#: backup.py:734
+#: backup.py:720
 msgid "Confirm Deletion"
 msgstr ""
 
-#: backup.py:735
+#: backup.py:721
 msgid "Do you wish to delete {} map?\n"
 msgid_plural "Do you wish to delete {} maps?\n"
 msgstr[0] ""
 msgstr[1] ""
 
-#: backup.py:772
+#: backup.py:758
 msgid "Restore:"
 msgstr "Restaurar:"
 
-#: backup.py:773
+#: backup.py:759
 msgid "Backup:"
 msgstr "Copia de Seguridad:"
 
-#: backup.py:810
+#: backup.py:796
 msgid "Checked"
 msgstr "Marcado"
 
-#: backup.py:818
+#: backup.py:804
 msgid "Delete Checked"
 msgstr "Eliminar marcado"
 
-#: backup.py:867
+#: backup.py:854
 msgid "BEEMOD {} - Backup / Restore Puzzles"
 msgstr "BEEMOD {} - Copia de Seguridad / Restaurar Mapas"
 
-#: backup.py:886 backup.py:1005
+#: backup.py:867 backup.py:995
 msgid "New Backup"
 msgstr "Nueva Copia de Seguridad"
 
-#: backup.py:887 backup.py:1012
+#: backup.py:868 backup.py:1002
 msgid "Open Backup"
 msgstr "Abrir Copia de Seguridad"
 
-#: backup.py:888 backup.py:1019
+#: backup.py:869 backup.py:1009
 msgid "Save Backup"
 msgstr "Guardar Copia de Seguridad"
 
-#: backup.py:896
+#: backup.py:877
 msgid "Remove Game"
 msgstr "Borrar Juego"
 
-#: backup.py:899
+#: backup.py:880
 msgid "Game"
 msgstr "Juego"
 
-#: backup.py:936
+#: backup.py:926
 msgid "Automatic Backup After Export"
 msgstr "Crear una Copia de Seguridad automáticamente luego de exportar"
 
-#: backup.py:968
+#: backup.py:958
 msgid "Keep (Per Game):"
 msgstr "Mantener (Por Juego):"
 
-#: backup.py:986
+#: backup.py:976
 msgid "Backup/Restore Puzzles"
 msgstr "Copia De Seguridad / Restaurar Mapas"
 
@@ -997,66 +997,72 @@ msgstr ""
 "Cambia la configuración predeterminada de este elemento cuando es "
 "colocado en el mapa."
 
-#: gameMan.py:779
+#: gameMan.py:742 gameMan.py:849
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - ¡Exportación Fallida!"
 
-#: gameMan.py:780
+#: gameMan.py:743
+msgid ""
+"Compiler file {file} missing. Exit Steam applications, then press OK to "
+"verify your game cache. You can then export again."
+msgstr ""
+
+#: gameMan.py:850
 msgid "Copying compiler file {file} failed.Ensure the {game} is not running."
 msgstr ""
 "Copiando archivo del compilador {file} ha fallado. Asegurese de que el "
 "{game} no esta abierto.\n"
 
-#: gameMan.py:1166
+#: gameMan.py:1234
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
 msgstr ""
 
-#: gameMan.py:1170
+#: gameMan.py:1238
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
-#: gameMan.py:1352
+#: gameMan.py:1420
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 "Selecciona el directorio donde se encuentre el ejecutable del juego "
 "({appname})..."
 
-#: gameMan.py:1355 gameMan.py:1370 gameMan.py:1380 gameMan.py:1388
-#: gameMan.py:1396 gameMan.py:1405
+#: gameMan.py:1423 gameMan.py:1438 gameMan.py:1448 gameMan.py:1456
+#: gameMan.py:1464 gameMan.py:1473
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - Añadir juego"
 
-#: gameMan.py:1358
+#: gameMan.py:1426
 msgid "Find Game Exe"
 msgstr "Encontrar Ejecutable del Juego"
 
-#: gameMan.py:1359
+#: gameMan.py:1427
 msgid "Executable"
 msgstr "Ejecutable"
 
-#: gameMan.py:1367
+#: gameMan.py:1435
 msgid "This does not appear to be a valid game folder!"
 msgstr "Eso no parece ser un directorio de juego valido!"
 
-#: gameMan.py:1377
+#: gameMan.py:1445
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr ""
 
-#: gameMan.py:1387
+#: gameMan.py:1455
 msgid "Enter the name of this game:"
 msgstr "Coloca el nombre de este juego:"
 
-#: gameMan.py:1395
+#: gameMan.py:1463
 msgid "This name is already taken!"
 msgstr "Este nombre ya fue tomado!"
 
-#: gameMan.py:1404
+#: gameMan.py:1472
 msgid "Please enter a name for this game!"
 msgstr "Por favor colocale un nombre a este juego!"
 
-#: gameMan.py:1423
+#: gameMan.py:1491
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
