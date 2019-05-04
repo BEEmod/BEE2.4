@@ -121,9 +121,6 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         inst.remove()
         return
 
-    inst.fixup['$has_prim'] = sign_prim is not None
-    inst.fixup['$has_prim'] = sign_sec is not None
-
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
 
@@ -135,8 +132,6 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
     prim_pos.localise(origin, angles)
     sec_pos.localise(origin, angles)
-
-    face_normal = Vec(normal.x, normal.y, -normal.z)
 
     template_id = res['template_id', '']
 
