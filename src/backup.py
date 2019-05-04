@@ -1,52 +1,37 @@
 """Backup and restore P2C maps.
 
 """
-import utils
-import srctools.logger
-import tk_tools
-if __name__ == '__main__':
-    utils.fix_cur_directory()
-    LOGGER = srctools.logger.init_logging(
-        str(utils.install_path('logs/backup.log')),
-        __name__,
-        on_error=tk_tools.on_error,
-    )
-    utils.setup_localisations(LOGGER)
-else:
-    LOGGER = srctools.logger.get_logger(__name__)
-
-
-import tkinter as tk
-from tkinter import ttk
-from tkinter import filedialog
-from tkinter import messagebox
-
-from tk_tools import TK_ROOT
-
-from datetime import datetime
-from io import BytesIO, TextIOWrapper
-import time
+import atexit
 import os
 import shutil
 import string
-import atexit
-
-from FakeZip import FakeZip, zip_names, zip_open_bin
+import time
+from datetime import datetime
+from io import BytesIO, TextIOWrapper
+from typing import List, TYPE_CHECKING, Dict, Any
 from zipfile import ZipFile, ZIP_LZMA
 
-from tooltip import add_tooltip
-from srctools import Property, KeyValError
-from CheckDetails import CheckDetails, Item as CheckItem
-import loadScreen
 import img
+import loadScreen
+import srctools.logger
 import tk_tools
-import gameMan
-import srctools
+import tkinter as tk
+import utils
+from CheckDetails import CheckDetails, Item as CheckItem
+from FakeZip import FakeZip, zip_names, zip_open_bin
+from srctools import Property, KeyValError
+from tk_tools import TK_ROOT
+from tkinter import filedialog
+from tkinter import messagebox
+from tkinter import ttk
+from tooltip import add_tooltip
+if TYPE_CHECKING:
+    import gameMan
 
-from typing import List
+LOGGER = srctools.logger.get_logger(__name__)
 
 # The backup window - either a toplevel, or TK_ROOT.
-window = None  # type: tk.Toplevel
+window: tk.Toplevel
 
 UI = {}  # Holds all the widgets
 
@@ -70,7 +55,7 @@ PUZZLE_FOLDERS = {
 }
 
 # The currently-loaded backup files.
-BACKUPS = {
+BACKUPS: Dict[str, Any] = {
     'game': [],
     'back': [],
 
@@ -161,8 +146,6 @@ class P2C:
             props = props.find_key('portal2_puzzle', [])
             title = props['title', None]
             desc = props['description', _('No description found.')]
-
-
 
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
@@ -287,6 +270,10 @@ def load_backup(zip_file):
             )
             reading_loader.step('READ')
     LOGGER.info('Done!')
+
+    # It takes a while before the detail headers update positions,
+    # so delay a refresh call.
+    TK_ROOT.after(500, UI['game_details'].refresh)
 
     return maps
 
@@ -652,6 +639,7 @@ def ui_save_backup_as():
 
 def ui_refresh_game():
     """Reload the game maps list."""
+    import gameMan
     if gameMan.selected_game is not None:
         load_game(gameMan.selected_game)
 
@@ -861,6 +849,7 @@ def init():
 
 def init_application():
     """Initialise the standalone application."""
+    import gameMan
     global window
     window = TK_ROOT
     TK_ROOT.title(
@@ -871,12 +860,6 @@ def init_application():
 
     UI['bar'] = bar = tk.Menu(TK_ROOT)
     window.option_add('*tearOff', False)
-
-    gameMan.load()
-    ui_new_backup()
-
-    # UI.py isn't present, so we use this callback
-    gameMan.setgame_callback = load_game
 
     if utils.MAC:
         # Name is used to make this the special 'BEE2' menu item
@@ -897,6 +880,7 @@ def init_application():
     game_menu.add_separator()
 
     bar.add_cascade(menu=game_menu, label=_('Game'))
+    gameMan.game_menu = game_menu
 
     import helpMenu
     # Add the 'Help' menu here too.
@@ -904,8 +888,16 @@ def init_application():
 
     window['menu'] = bar
 
+    window.deiconify()
+    window.update()
+
+    gameMan.load()
+    ui_new_backup()
+
+    # UI.py isn't present, so we use this callback
+    gameMan.setgame_callback = load_game
+
     gameMan.add_menu_opts(game_menu)
-    gameMan.game_menu = game_menu
 
 
 def init_backup_settings():
@@ -1030,6 +1022,7 @@ def init_toplevel():
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
 
+    TK_ROOT.update()
     ui_new_backup()
 
 
@@ -1041,19 +1034,3 @@ def deinit():
         if obj is not None:
             obj.close()
 
-
-if __name__ == '__main__':
-    # Run this standalone.
-
-    init_application()
-
-    TK_ROOT.deiconify()
-
-    def fix_details():
-        # It takes a while before the detail headers update positions,
-        # so delay a refresh call.
-        TK_ROOT.update_idletasks()
-        UI['game_details'].refresh()
-    TK_ROOT.after(500, fix_details)
-
-    TK_ROOT.mainloop()
