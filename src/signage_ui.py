@@ -93,6 +93,10 @@ def save_load_signage(props: Property=None) -> Optional[Property]:
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
     for sign in Signage.all():
+        if sign.hidden:
+            # Don't bother with making the icon.
+            continue
+
         for potential_style in new_style.bases:
             try:
                 icon = sign.styles[potential_style.id.upper()].icon
@@ -101,7 +105,7 @@ def style_changed(new_style: Style) -> None:
                 pass
         else:
             LOGGER.warning(
-                'No valid "{}" style for "{}" signage!',
+                'No valid <{}> style for "{}" signage!',
                 new_style.id,
                 sign.id,
             )
@@ -110,7 +114,15 @@ def style_changed(new_style: Style) -> None:
             except KeyError:
                 sign.dnd_icon = img.img_error
                 continue
-        sign.dnd_icon = img.png(icon, resize_to=(64, 64))
+        if icon:
+            sign.dnd_icon = img.png(icon, resize_to=(64, 64))
+        else:
+            LOGGER.warning(
+                'No icon for "{}" signage in <{}> style!',
+                sign.id,
+                new_style.id,
+            )
+            sign.dnd_icon = img.img_error
     drag_man.refresh_icons()
 
 
