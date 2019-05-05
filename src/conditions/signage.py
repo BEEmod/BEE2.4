@@ -137,14 +137,24 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
     face: Side
 
+    if inst.fixup.bool(const.FixupVars.ST_REVERSED):
+        # Flip around.
+        forward = -forward
+        prim_visgroup = 'secondary'
+        sec_visgroup = 'primary'
+        prim_pos, sec_pos = sec_pos, prim_pos
+    else:
+        prim_visgroup = 'primary'
+        sec_visgroup = 'secondary'
+
     if template_id:
         brush_faces: List[Side] = []
         if sign_prim and sign_sec:
-            visgroup = ['primary', 'secondary']
+            visgroup = [prim_visgroup, sec_visgroup]
         elif sign_prim:
-            visgroup = ['primary']
+            visgroup = [prim_visgroup]
         else:
-            visgroup = ['secondary']
+            visgroup = [sec_visgroup]
         template = template_brush.import_template(
             template_id,
             origin,
@@ -171,11 +181,6 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
             )
             return
         brush_faces = [face]
-
-    if inst.fixup.bool(const.FixupVars.ST_REVERSED):
-        # Flip around.
-        forward = -forward
-        prim_pos, sec_pos = sec_pos, prim_pos
 
     if sign_prim is not None:
         place_sign(
