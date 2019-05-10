@@ -16,7 +16,8 @@ import vbsp_options
 import antlines
 import packing
 
-from typing import Optional, Iterable, Dict, List, Set, Tuple
+from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator
+
 
 COND_MOD_NAME = "Item Connections"
 
@@ -68,7 +69,7 @@ class ConnType(Enum):
     BOTH = 'both'  # Trigger both simultaneously.
 
 
-CONN_TYPE_NAMES = {
+CONN_TYPE_NAMES: Dict[str, ConnType] = {
     'none': ConnType.DEFAULT,
     'a': ConnType.PRIMARY,
     'prim': ConnType.PRIMARY,
@@ -78,9 +79,12 @@ CONN_TYPE_NAMES = {
 
     'ab': ConnType.BOTH,
     'a+b': ConnType.BOTH,
-}  # type: Dict[str, ConnType]
+}
 
-CONN_TYPE_NAMES.update(ConnType._value2member_map_)
+CONN_TYPE_NAMES.update(
+    (conn.name, conn)
+    for conn in ConnType
+)
 
 
 class InputType(Enum):
@@ -199,20 +203,30 @@ class ShapeSignage:
 
         self.overlay_frames = []  # type: List[Entity]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Entity]:
         return iter(self.overlays)
 
-    def __lt__(self, other: 'ShapeSignage'):
+    def __lt__(self, other: object) -> bool:
         """Allow sorting in a consistent order."""
-        return self.name < other.name
+        if isinstance(other, ShapeSignage):
+            return self.name < other.name
+        return NotImplemented
 
-    def __gt__(self, other: 'ShapeSignage'):
+    def __gt__(self, other: object) -> bool:
         """Allow sorting in a consistent order."""
-        return self.name > other.name
+        if isinstance(other, ShapeSignage):
+            return self.name > other.name
+        return NotImplemented
 
 
 class ItemType:
-    """Represents an item, with inputs and outputs."""
+    """Represents a type of item, with inputs and outputs.
+
+    This is shared by all items of the same type.
+    """
+    output_act: Optional[Tuple[Optional[str], str]]
+    output_deact: Optional[Tuple[Optional[str], str]]
+
     def __init__(
         self,
         id: str,
@@ -222,25 +236,25 @@ class ItemType:
         spawn_fire: FeatureMode=FeatureMode.NEVER,
 
         invert_var: str = '0',
-        enable_cmd: List[Output]=(),
-        disable_cmd: List[Output]=(),
+        enable_cmd: Iterable[Output]=(),
+        disable_cmd: Iterable[Output]=(),
 
         sec_invert_var: str='0',
-        sec_enable_cmd: List[Output]=(),
-        sec_disable_cmd: List[Output]=(),
+        sec_enable_cmd: Iterable[Output]=(),
+        sec_disable_cmd: Iterable[Output]=(),
 
         output_type: ConnType=ConnType.DEFAULT,
         output_act: Optional[Tuple[Optional[str], str]]=None,
         output_deact: Optional[Tuple[Optional[str], str]]=None,
 
-        lock_cmd: List[Output]=(),
-        unlock_cmd: List[Output]=(),
+        lock_cmd: Iterable[Output]=(),
+        unlock_cmd: Iterable[Output]=(),
         output_lock: Optional[Tuple[Optional[str], str]]=None,
         output_unlock: Optional[Tuple[Optional[str], str]]=None,
         inf_lock_only: bool=False,
 
         timer_sound_pos: Optional[Vec]=None,
-        timer_done_cmd: List[Output]=(),
+        timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
 
         timer_start: Optional[List[Tuple[Optional[str], str]]]=None,
@@ -304,7 +318,7 @@ class ItemType:
         # If set, automatically play tick-tock sounds when output is on.
         self.timer_sound_pos = timer_sound_pos
         # These are fired when the time elapses.
-        self.timer_done_cmd = timer_done_cmd
+        self.timer_done_cmd = list(timer_done_cmd)
         # If True, always add tick-tock sounds. If false, only when we have
         # a timer dial.
         self.force_timer_sound = force_timer_sound
@@ -401,9 +415,11 @@ class ItemType:
 
             sec_invert_var = conf['sec_invertVar', '0']
         else:
+            # No dual type, set to dummy values.
             sec_enable_cmd = []
             sec_disable_cmd = []
-            default_dual = sec_invert_var = None
+            default_dual = ConnType.DEFAULT
+            sec_invert_var = ''
 
         try:
             output_type = CONN_TYPE_NAMES[
@@ -469,7 +485,7 @@ class Item:
     def __init__(
         self,
         inst: Entity,
-        item_type: Optional[ItemType],
+        item_type: ItemType,
         ant_floor_style: antlines.AntType,
         ant_wall_style: antlines.AntType,
         panels: Iterable[Entity]=(),
@@ -512,14 +528,11 @@ class Item:
 
         assert self.name, 'Blank name!'
 
-    def __repr__(self):
-        if self.item_type is None:
-            return '<Item (NO IO): "{}">'.format(self.name)
-        else:
-            return '<Item {}: "{}">'.format(self.item_type.id, self.name)
+    def __repr__(self) -> str:
+        return '<Item {}: "{}">'.format(self.item_type.id, self.name)
 
     @property
-    def traits(self):
+    def traits(self) -> Set[str]:
         """Return the set of instance traits for the item."""
         return instance_traits.get(self.inst)
 
@@ -534,9 +547,9 @@ class Item:
         return self.inst['targetname']
 
     @name.setter
-    def name(self, name: str):
+    def name(self, value: str) -> None:
         """Set the targetname of the item."""
-        self.inst['targetname'] = name
+        self.inst['targetname'] = value
 
     def output_act(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output used when this is activated."""
@@ -574,7 +587,7 @@ class Item:
             return [] if out is None else [out]
         return self.item_type.timer_stop
 
-    def delete_antlines(self):
+    def delete_antlines(self) -> None:
         """Delete the antlines and checkmarks outputting from this item."""
         for ent in self.antlines:
             ent.remove()
@@ -588,7 +601,7 @@ class Item:
         self.ind_panels.clear()
         self.shape_signs.clear()
 
-    def transfer_antlines(self, item: 'Item'):
+    def transfer_antlines(self, item: 'Item') -> None:
         """Transfer the antlines and checkmarks from this item to another."""
         item.antlines.update(self.antlines)
         item.ind_panels.update(self.ind_panels)
@@ -597,6 +610,7 @@ class Item:
         self.antlines.clear()
         self.ind_panels.clear()
         self.shape_signs.clear()
+
 
 class Connection:
     """Represents a connection between two items."""
@@ -610,25 +624,25 @@ class Connection:
         from_item: Item,  # Item this comes from
         conn_type=ConnType.DEFAULT,
         outputs: Iterable[Output]=(),
-    ):
+    ) -> None:
         self._to = to_item
         self._from = from_item
         self.type = conn_type
         self.outputs = list(outputs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Connection {} {} -> {}>'.format(
             CONN_NAMES[self.type],
             self._from.name,
             self._to.name,
         )
 
-    def add(self):
+    def add(self) -> None:
         """Add this to the directories."""
         self._from.outputs.add(self)
         self._to.inputs.add(self)
 
-    def remove(self):
+    def remove(self) -> None:
         """Remove this from the directories."""
         self._from.outputs.discard(self)
         self._to.inputs.discard(self)
@@ -650,17 +664,17 @@ class Connection:
         return self._from
 
     @from_item.setter
-    def from_item(self, item: Item):
+    def from_item(self, item: Item) -> None:
         self._from.outputs.discard(self)
         self._from = item
         item.outputs.add(self)
 
 
-def collapse_item(item: Item):
+def collapse_item(item: Item) -> None:
     """Remove an item with a single input, transferring all IO."""
     try:
-        [input_conn] = item.inputs  # type: Connection
-        input_item = input_conn.from_item  # type: Item
+        [input_conn] = item.inputs
+        input_item = input_conn.from_item
     except ValueError:
         raise ValueError('Too many inputs for "{}"!'.format(item.name))
 
@@ -681,7 +695,7 @@ def collapse_item(item: Item):
     item.inst.remove()
 
 
-def read_configs(conf: Property):
+def read_configs(conf: Property) -> None:
     """Build our connection configuration from the config files."""
     for prop in conf.find_children('Connections'):
         if prop.name in ITEM_TYPES:
@@ -701,7 +715,7 @@ def calc_connections(
     enable_shape_frame: bool,
     antline_wall: antlines.AntType,
     antline_floor: antlines.AntType,
-):
+) -> None:
     """Compute item connections from the map file.
 
     This also fixes cases where items have incorrect checkmark/timer signs.
@@ -780,8 +794,8 @@ def calc_connections(
 
     # Now build the connections and items.
     for item in ITEMS.values():
-        input_items = []  # Instances we trigger
-        inputs = defaultdict(list)  # type: Dict[str, List[Output]]
+        input_items: List[Item] = []  # Instances we trigger
+        inputs: Dict[str, List[Output]] = defaultdict(list)
 
         if item.inst.outputs and item.item_type is None:
             raise ValueError(
@@ -839,7 +853,7 @@ def calc_connections(
                             )
                         )
 
-        for inp_item in input_items:  # type: Item
+        for inp_item in input_items:
             # Default A/B type.
             conn_type = ConnType.DEFAULT
             in_outputs = inputs[inp_item.name]
@@ -895,7 +909,7 @@ def res_change_io_type_parse(props: Property):
 
 
 @conditions.make_result('ChangeIOType')
-def res_change_io_type(inst: Entity, res: Property):
+def res_change_io_type(inst: Entity, res: Property) -> None:
     """Switch an item to use different inputs or outputs.
 
     Must be done before priority level -250.
@@ -917,7 +931,7 @@ def res_change_io_type(inst: Entity, res: Property):
     item.sec_disable_cmd = res.value.sec_disable_cmd
 
 
-def do_item_optimisation(vmf: VMF):
+def do_item_optimisation(vmf: VMF) -> None:
     """Optimise redundant logic items."""
     needs_global_toggle = False
 
@@ -967,7 +981,7 @@ def do_item_optimisation(vmf: VMF):
 
 
 @conditions.meta_cond(-250, only_once=True)
-def gen_item_outputs(vmf: VMF):
+def gen_item_outputs(vmf: VMF) -> None:
     """Create outputs for all items with connections.
 
     This performs an optimization pass over items with outputs to remove
@@ -1140,14 +1154,14 @@ def gen_item_outputs(vmf: VMF):
     LOGGER.info('Item IO generated.')
 
 
-def add_locking(item: Item):
+def add_locking(item: Item) -> None:
     """Create IO to control buttons from the target item.
 
     This allows items to customise how buttons behave.
     """
     # If more than one, it's not logical to lock the button.
     try:
-        [lock_conn] = item.inputs  # type: Connection
+        [lock_conn] = item.inputs
     except ValueError:
         return
 
@@ -1191,8 +1205,10 @@ def add_locking(item: Item):
             )
 
 
-def add_timer_relay(item: Item, has_sounds:bool):
+def add_timer_relay(item: Item, has_sounds: bool) -> None:
     """Make a relay to play timer sounds, or fire once the outputs are done."""
+    assert item.timer is not None
+
     rl_name = item.name + '_timer_rl'
 
     relay = item.inst.map.create_ent(
@@ -1272,7 +1288,7 @@ def add_item_inputs(
     enable_cmd: Iterable[Output],
     disable_cmd: Iterable[Output],
     invert_var: str,
-):
+) -> None:
     """Handle either the primary or secondary inputs to an item."""
     item.inst.fixup[count_var] = len(inputs)
 
@@ -1595,7 +1611,7 @@ def add_item_indicators(
     item: Item,
     inst_type: PanelSwitchingStyle,
     pan_item: ItemType,
-):
+) -> None:
     """Generate the commands for antlines, and restyle them."""
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
