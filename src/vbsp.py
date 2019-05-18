@@ -351,6 +351,10 @@ def load_settings():
     # Fizzler data
     fizzler.read_configs(conf)
 
+    # Signage items
+    from conditions.signage import load_signs
+    load_signs(conf)
+
     # Get configuration for the elevator, defaulting to ''.
     elev = conf.find_key('elevator', [])
     settings['elevator'] = {

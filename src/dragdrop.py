@@ -13,6 +13,7 @@ from typing import (
     Union, Generic, Any, TypeVar,
     Optional, Callable,
     List, Tuple, Dict,
+    Iterator, Iterable,
 )
 
 __all__ = ['Manager', 'Slot', 'ItemProto']
@@ -34,6 +35,8 @@ class ItemProto(Protocol):
 
 ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 
+# Tag used on canvases for our flowed slots.
+_CANV_TAG = '_BEE2_dragdrop_item'
 
 class Event(Enum):
     """Callbacks that can be registered to be called by the manager."""
@@ -152,6 +155,64 @@ class Manager(Generic[ItemT]):
             # These are never grouped.
             self._display_item(slot._lbl, slot.contents)
 
+    def sources(self) -> 'Iterator[Slot[ItemT]]':
+        """Yield all source slots."""
+        return iter(self._sources)
+
+    def targets(self) -> 'Iterator[Slot[ItemT]]':
+        """Yield all target slots."""
+        return iter(self._targets)
+
+    def flow_slots(
+        self,
+        canv: tkinter.Canvas,
+        slots: 'Iterable[Slot[ItemT]]',
+        spacing: int=16 if utils.MAC else 8,
+    ) -> None:
+        """Place all the slots in a grid on the provided canvas.
+
+        Any previously added slots will be removed.
+        padding is the amount added on each side of each slot.
+        """
+        canv.delete(_CANV_TAG)
+        item_width = self.width + spacing * 2
+        item_height = self.width + spacing * 2
+
+        col_count = (canv.winfo_width() - spacing) // item_width - 1
+        if col_count < 1:
+            # Oh well, they're going to stick out.
+            col_count = 1
+
+        row = col = 0
+        for slot in slots:
+            if slot._pos_type in ['place', 'pack', 'grid']:
+                raise ValueError("Can't add already positioned slot!")
+
+            obj_id = canv.create_window(
+                spacing + col * item_width,
+                spacing + row * item_height,
+                width=self.width,
+                height=self.height,
+                anchor='nw',
+                window=slot._lbl,
+                tags=[_CANV_TAG],
+            )
+            slot._pos_type = f'_canvas_{obj_id}'
+
+            col += 1
+            if col > col_count:
+                col = 0
+                row += 1
+
+        if col == 0:
+            row -= 1
+
+        canv['scrollregion'] = (
+            0, 0,
+            col_count * item_width + spacing,
+            (row + 1) * item_height + spacing,
+        )
+
     def reg_callback(self, event: Event, func: Callable[['Slot'], Any]) -> None:
         """Register a callback."""
         self._callbacks[event].append(func)
@@ -184,14 +245,19 @@ class Manager(Generic[ItemT]):
     ) -> None:
         """Display the specified item on the given label."""
         if item is None:
-            lbl['image'] = self._img_blank
+            image = self._img_blank
         elif group:
             try:
-                lbl['image'] = item.dnd_group_icon
+                image = item.dnd_group_icon
             except AttributeError:
-                lbl['image'] = item.dnd_icon
+                image = item.dnd_icon
         else:
-            lbl['image'] = item.dnd_icon
+            image = item.dnd_icon
+        try:
+            lbl['image'] = image
+        except tkinter.TclError:
+            # Not an image...
+            lbl['image'] = img.img_error
 
     def _group_update(self, group: Optional[str]) -> None:
         """Update all target items with this group."""
@@ -240,7 +306,7 @@ class Manager(Generic[ItemT]):
         sound.fx('config')
 
         self._drag_win.deiconify()
-        self._drag_win.lift(TK_ROOT)
+        self._drag_win.lift(slot._lbl.winfo_toplevel())
         # grab makes this window the only one to receive mouse events, so
         # it is guaranteed that it'll drop when the mouse is released.
         self._drag_win.grab_set_global()
@@ -251,7 +317,6 @@ class Manager(Generic[ItemT]):
         self._evt_move(event)
 
         self._drag_win.bind(utils.EVENTS['LEFT_MOVE'], self._evt_move)
-        # UI['pre_sel_line'].lift()
 
     def _evt_move(self, event: tkinter.Event) -> None:
         """Reposition the item whenever moving."""
@@ -299,6 +364,9 @@ class Manager(Generic[ItemT]):
 # noinspection PyProtectedMember
 class Slot(Generic[ItemT]):
     """Represents a single slot."""
+    _text_lbl: Optional[tkinter.Label]
+    _info_btn: Optional[tkinter.Label]
+
     def __init__(
         self,
         man: Manager,
@@ -310,8 +378,8 @@ class Slot(Generic[ItemT]):
 
         self.man = man
         self.is_source = is_source
-        self._contents = None  # type: Optional[ItemT]
-        self._pos_type = None  # type: Optional[str]
+        self._contents: Optional[ItemT] = None
+        self._pos_type: Optional[str] = None
         self._lbl = tkinter.Label(
             parent,
             image=man._img_blank,
@@ -331,7 +399,7 @@ class Slot(Generic[ItemT]):
                 font=('Helvetica', -12),
                 relief='ridge',
                 bg=img.PETI_ITEM_BG_HEX,
-            )  # type: Optional[tkinter.Label]
+            )
         else:
             self._text_lbl = None
 
@@ -340,7 +408,7 @@ class Slot(Generic[ItemT]):
                 self._lbl,
                 image=img.png('icons/gear'),
                 relief='ridge',
-            )  # type: Optional[tkinter.Label]
+            )
 
             @utils.bind_leftclick(self._info_btn)
             def info_button_click(e):
@@ -364,7 +432,7 @@ class Slot(Generic[ItemT]):
         """Set the item in this slot."""
         old_cont = self._contents
 
-        if value is not None:
+        if value is not None and not self.is_source:
             # Make sure this isn't already present.
             for slot in self.man._targets:
                 if slot.contents is value:
@@ -408,14 +476,19 @@ class Slot(Generic[ItemT]):
         """Remove this slot from the set position manager."""
         if self._pos_type is None:
             raise ValueError('Not added to a geometry manager yet!')
-        getattr(self._lbl, self._pos_type + '_forget')()
+        elif self._pos_type.startswith('_canvas_'):
+            # Attached via canvas, with an ID as suffix.
+            canv: tkinter.Canvas = self._lbl.winfo_parent()
+            canv.delete(self._pos_type[8:])
+        else:
+            getattr(self._lbl, self._pos_type + '_forget')()
         self._pos_type = None
 
     def _evt_start(self, event: tkinter.Event) -> None:
         """Start dragging."""
         self.man._start(self, event)
 
-    def _evt_fastdrag(self, event: tkinter.Event):
+    def _evt_fastdrag(self, event: tkinter.Event) -> None:
         """Quickly add/remove items by shift-clicking."""
         if self.is_source:
             # Add this item to the first free position.
@@ -443,7 +516,7 @@ class Slot(Generic[ItemT]):
             self._lbl['relief'] = 'ridge'
 
         # Show configure icon for items.
-        if self._info_btn and self._contents is not None:
+        if self._info_btn is not None and self._contents is not None:
             self._info_btn.place(
                 x=self._lbl.winfo_width() - padding,
                 y=self._lbl.winfo_height() - padding,
@@ -491,11 +564,11 @@ def _test() -> None:
     print('Done.')
 
     left_frm = ttk.Frame(TK_ROOT)
-    right_frm = ttk.Frame(TK_ROOT)
+    right_canv = tkinter.Canvas(TK_ROOT)
 
     left_frm.grid(row=0, column=0, sticky='NSEW', padx=8)
-    right_frm.grid(row=0, column=1, sticky='NSEW', padx=8)
-    TK_ROOT.columnconfigure(0, weight=1)
+    right_canv.grid(row=0, column=1, sticky='NSEW', padx=8)
+    TK_ROOT.rowconfigure(0, weight=1)
     TK_ROOT.columnconfigure(1, weight=1)
 
     slot_dest = []
@@ -550,15 +623,20 @@ def _test() -> None:
 
     for y in range(8):
         for x in range(4):
-            slot = manager.slot(left_frm, source=False, label=(format(x + 4*y, '02') if y < 2 else ''))
+            slot = manager.slot(left_frm, source=False, label=(format(x + 4*y, '02') if y < 3 else ''))
             slot.grid(column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
 
     for i, item in enumerate(items):
-            slot = manager.slot(right_frm, source=True, label=format(i+1, '02'))
-            slot.grid(column=i % 5, row=i // 5, padx=1, pady=1)
+            slot = manager.slot(right_canv, source=True, label=format(i+1, '02'))
             slot_src.append(slot)
             slot.contents = item
+
+    def configure(e):
+        manager.flow_slots(right_canv, slot_src)
+
+    configure(None)
+    right_canv.bind('<Configure>', configure)
 
     ttk.Button(
         TK_ROOT,
