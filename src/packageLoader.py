@@ -2034,11 +2034,11 @@ class QuotePack(PakObject):
             self.cam_yaw = override.cam_yaw
             self.turret_hate = override.turret_hate
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export the quotepack."""
         if exp_data.selected is None:
             return  # No quote pack!
@@ -2098,7 +2098,7 @@ class QuotePack(PakObject):
                 LOGGER.info('No {} voice config!', pretty)
 
     @staticmethod
-    def strip_quote_data(prop: Property, _depth=0):
+    def strip_quote_data(prop: Property, _depth=0) -> Property:
         """Strip unused property blocks from the config files.
 
         This removes data like the captions which the compiler doesn't need.
@@ -2126,13 +2126,13 @@ class QuotePack(PakObject):
 
 class Skybox(PakObject):
     def __init__(
-            self,
-            sky_id,
-            selitem_data: 'SelitemData',
-            config: Property,
-            fog_opts: Property,
-            mat,
-            ):
+        self,
+        sky_id,
+        selitem_data: 'SelitemData',
+        config: Property,
+        fog_opts: Property,
+        mat,
+    ) -> None:
         self.id = sky_id
         self.selitem_data = selitem_data
         self.material = mat
