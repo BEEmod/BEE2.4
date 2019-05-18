@@ -2084,15 +2084,9 @@ class QuotePack(PakObject):
                 ('', 'normal'),
                 ('mid_', 'MidChamber'),
                 ('resp_', 'Responses')]:
-            path = os.path.join(
-                os.getcwd(),
-                '..',
-                'config',
-                'voice',
-                prefix.upper() + voice.id + '.cfg',
-            )
-            LOGGER.info(path)
-            if os.path.isfile(path):
+            path = utils.conf_location('config/voice/') / (prefix.upper() + voice.id + '.cfg')
+            LOGGER.info('Voice conf path: {}', path)
+            if path.is_file():
                 shutil.copy(
                     path,
                     exp_data.game.abs_path(
