@@ -71,6 +71,7 @@ def res_piston_plat_setup(res: Property):
         template,
         visgroup_names,
         inst,
+        res.bool('has_dn_fizz'),
         res['auto_var', ''],
         res['color_var', ''],
         res['source_ent', ''],
@@ -81,19 +82,30 @@ def res_piston_plat_setup(res: Property):
 
 
 @make_result('PistonPlatform')
-def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
+def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
     """Generates piston platforms with optimized logic."""
+    template: template_brush.Template
+    visgroup_names: List[str]
+    inst_filenames: Dict[str, str]
+    has_dn_fizz: bool
+    automatic_var: str
+    color_var: str
+    source_ent: str
+    snd_start: str
+    snd_loop: str
+    snd_stop: str
     (
         template,
         visgroup_names,
         inst_filenames,
+        has_dn_fizz,
         automatic_var,
         color_var,
         source_ent,
         snd_start,
         snd_loop,
         snd_stop,
-    ) = res.value  # type: template_brush.Template, List[str], Dict[str, str], str, str, str, str, str, str
+    ) = res.value
 
     min_pos = inst.fixup.int(FixupVars.PIST_BTM)
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
@@ -139,6 +151,9 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         vscript_init_code=init_script,
         origin=inst['origin'],
     )
+
+    if has_dn_fizz:
+        script_ent['thinkfunction'] = 'FizzThink'
 
     if start_up:
         st_pos, end_pos = max_pos, min_pos
