@@ -56,6 +56,8 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
     marker_names = set()
 
+    inst = None
+
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() in marker:
             marker_names.add(inst['targetname'])
