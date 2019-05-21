@@ -82,7 +82,7 @@ CONN_TYPE_NAMES: Dict[str, ConnType] = {
 }
 
 CONN_TYPE_NAMES.update(
-    (conn.name, conn)
+    (conn.value.casefold(), conn)
     for conn in ConnType
 )
 
