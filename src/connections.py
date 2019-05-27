@@ -392,7 +392,7 @@ class ItemType:
             if spawn_fire_bool is None:
                 raise  # Nope, not a bool.
 
-            spawn_fire = FeatureMode.DYNAMIC if spawn_fire_bool else FeatureMode.NEVER
+            spawn_fire = FeatureMode.ALWAYS if spawn_fire_bool else FeatureMode.NEVER
 
         if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
