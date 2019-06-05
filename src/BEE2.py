@@ -53,6 +53,7 @@ DEFAULT_SETTINGS = {
 GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
+LOGGER.debug('Starting loading screen...')
 loadScreen.main_loader.set_length('UI', 14)
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
@@ -64,6 +65,8 @@ logWindow.init(
     GEN_OPTS.get_bool('Debug', 'show_log_win'),
     GEN_OPTS['Debug']['window_log_level']
 )
+
+LOGGER.debug('Loading settings...')
 
 UI.load_settings()
 
