@@ -25,6 +25,7 @@ if __name__ == '__main__':
     import srctools.logger
     import tk_tools
     import utils
+
     if len(sys.argv) > 1:
         log_name = app_name = sys.argv[1].lower()
         if app_name not in ('backup', 'compilepane'):
@@ -41,6 +42,9 @@ if __name__ == '__main__':
         on_error=tk_tools.on_error,
     )
     utils.setup_localisations(LOGGER)
+
+    LOGGER.info('Arguments: {}', sys.argv)
+    LOGGER.info('Running "{}":', app_name)
 
     if app_name == 'bee2':
         import BEE2
