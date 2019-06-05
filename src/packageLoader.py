@@ -81,6 +81,8 @@ ObjType = NamedTuple('ObjType', [
     ('allow_mult', bool),
     ('has_img', bool),
 ])
+
+
 # The arguments to pak_object.export().
 class ExportData(NamedTuple):
     # Usually str, but some items pass other things.
@@ -173,7 +175,7 @@ class _PakObjectMeta(type):
         Making a metaclass allows us to hook into the creation of all subclasses.
         """
         # Defer to type to create the class..
-        cls = type.__new__(mcs, name, bases, namespace)  # type: Type[PakObject]
+        cls = type.__new__(mcs, name, bases, namespace)
 
         # Only register subclasses of PakObject - those with a parent class.
         # PakObject isn't created yet so we can't directly check that.
@@ -2553,13 +2555,15 @@ class Signage(PakObject, allow_mult=True, has_img=False):
             world_tex = prop['world', '']
             overlay_tex = prop['overlay', '']
 
-            if not world_tex:
-                LOGGER.warning(
-                    '"{}" signage has no "world" value '
-                    'for the "{}" style!',
-                    data.id,
-                    sty_id
-                )
+            # Don't warn, we don't actually need this yet.
+
+            # if not world_tex:
+            #     LOGGER.warning(
+            #         '"{}" signage has no "world" value '
+            #         'for the "{}" style!',
+            #         data.id,
+            #         sty_id
+            #     )
             if not overlay_tex:
                 raise ValueError(
                     f'"{data.id}"" signage has no "overlay" value '
