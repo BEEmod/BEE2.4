@@ -245,7 +245,7 @@ def quit_application():
     sys.exit()
 
 
-def app_is_bee2(file: str) -> bool:
+def should_backup_app(file: str) -> bool:
     """Check if the given application is Valve's, or ours.
 
     We do this by checking for the PyInstaller archive.
@@ -257,12 +257,20 @@ def app_is_bee2(file: str) -> bool:
     try:
         f = open(file, 'rb')
     except FileNotFoundError:
-        # Treat missing as ours - we don't want to back those up.
-        return True
+        # We don't want to backup missing files.
+        return False
+
+    SIZE = 4096
 
     with f:
-        f.seek(4096, io.SEEK_END)
-        return b'MEI\014\013\012\013\016' in f.read(4096)
+        f.seek(0, io.SEEK_END)
+        if f.tell() < SIZE:
+            return False  # Too small.
+
+        # Read out the last 4096 bytes, and look for the sig in there.
+        f.seek(-SIZE,io.SEEK_END)
+
+        return b'MEI\014\013\012\013\016' not in f.read(SIZE)
 
 
 class Game:
@@ -715,17 +723,18 @@ class Game:
                 elif name == 'Editoritems':
                     should_backup = not os.path.isfile(backup_path)
                 else:
-                    # If the normal one is not ours, always backup.
-                    norm_ours = app_is_bee2(item_path)
-                    backup_ours = app_is_bee2(backup_path)
+                    # Always backup the non-_original file, it'd be newer.
+                    # But only if it's Valves - not our own.
+                    should_backup = should_backup_app(item_path)
+                    backup_is_good = should_backup_app(backup_path)
                     LOGGER.info(
                         '{}{}: normal={}, backup={}',
                         file, ext,
-                        'BEE2' if norm_ours else 'Valve',
-                        'BEE2' if backup_ours else 'Valve',
+                        'Valve' if should_backup else 'BEE2',
+                        'Valve' if backup_is_good else 'BEE2',
                     )
 
-                    if norm_ours and backup_ours:
+                    if not should_backup and not backup_is_good:
                         # It's a BEE2 application, we have a problem.
                         # Both the real and backup are bad, we need to get a
                         # new one.
@@ -753,9 +762,6 @@ class Game:
                         ):
                             webbrowser.open('steam://validate/' + str(self.steamID))
                         return False, vpk_success
-
-                    # Always backup the non-_original file, it'd be newer.
-                    should_backup = not norm_ours
 
                 if should_backup:
                     LOGGER.info('Backing up original {}!', name)
