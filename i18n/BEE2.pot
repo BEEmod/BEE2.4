@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2019-05-04 12:17+1000\n"
+"POT-Creation-Date: 2019-06-05 13:22+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1058,10 +1058,6 @@ msgid "No Properties available!"
 msgstr ""
 
 #: itemconfig.py
-msgid "No Item Configuration!"
-msgstr ""
-
-#: itemconfig.py
 msgid "Choose a Color"
 msgstr ""
 
@@ -1441,6 +1437,18 @@ msgstr[1] ""
 
 #: selectorWin.py
 msgid "Color: R={r}, G={g}, B={b}"
+msgstr ""
+
+#: signage_ui.py signage_ui.py
+msgid "Configure Signage"
+msgstr ""
+
+#: signage_ui.py
+msgid "Selected"
+msgstr ""
+
+#: signage_ui.py
+msgid "Signage: {}"
 msgstr ""
 
 #: tagsPane.py
