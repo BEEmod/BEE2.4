@@ -16,6 +16,7 @@ import os
 import shutil
 import math
 import re
+import io
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
@@ -25,7 +26,6 @@ from srctools import (
     VMF, Output,
     FileSystem, FileSystemChain,
 )
-from PyInstaller.archive.readers import CArchiveReader
 import srctools.logger
 import backup
 import loadScreen
@@ -243,6 +243,26 @@ def quit_application():
     """
     import sys
     sys.exit()
+
+
+def app_is_bee2(file: str) -> bool:
+    """Check if the given application is Valve's, or ours.
+
+    We do this by checking for the PyInstaller archive.
+    """
+    # We can't import PyInstaller properly while frozen, so copy over
+    # the important code.
+
+    # from PyInstaller.archive.readers import CArchiveReader
+    try:
+        f = open(file, 'rb')
+    except FileNotFoundError:
+        # Treat missing as ours - we don't want to back those up.
+        return True
+
+    with f:
+        f.seek(4096, io.SEEK_END)
+        return b'MEI\014\013\012\013\016' in f.read(4096)
 
 
 class Game:
@@ -695,28 +715,9 @@ class Game:
                 elif name == 'Editoritems':
                     should_backup = not os.path.isfile(backup_path)
                 else:
-                    # See if the PyInstaller archive is present,
-                    # to check if this is ours.
-                    try:
-                        CArchiveReader(backup_path)
-                        backup_ours = True
-                    except FileNotFoundError:
-                        # Pretend it's ours, since it's not a valid backup.
-                        backup_ours = True
-                    except Exception:
-                        backup_ours = False
-
-                    # Now check if the normal name is ours - if not, always
-                    # backup.
-                    try:
-                        CArchiveReader(item_path)
-                        norm_ours = True
-                    except FileNotFoundError:
-                        # Pretend it's ours, since it's not a valid backup.
-                        norm_ours = True
-                    except Exception:
-                        norm_ours = False
-
+                    # If the normal one is not ours, always backup.
+                    norm_ours = app_is_bee2(item_path)
+                    backup_ours = app_is_bee2(backup_path)
                     LOGGER.info(
                         '{}{}: normal={}, backup={}',
                         file, ext,
