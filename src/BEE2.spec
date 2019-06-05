@@ -19,7 +19,6 @@ data_files = [
     ('../images/BEE2/*.png', 'images/BEE2/'),
     ('../images/icons/*.png', 'images/icons/'),
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
-    ('../palettes/*.bee2_palette', 'palettes/'),
 
     # Add the FGD data for us.
     (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools'),
