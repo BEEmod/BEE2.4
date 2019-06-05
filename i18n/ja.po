@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2019-06-05 13:22+1000\n"
+"POT-Creation-Date: 2019-06-05 14:36+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -520,7 +520,7 @@ msgstr ""
 msgid "This palette already exists. Overwrite?"
 msgstr ""
 
-#: UI.py:1231 gameMan.py:1497
+#: UI.py:1231 gameMan.py:1498
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr ""
 
@@ -904,68 +904,68 @@ msgstr ""
 msgid "Change the default settings for this item when placed."
 msgstr ""
 
-#: gameMan.py:742 gameMan.py:849
+#: gameMan.py:743 gameMan.py:850
 msgid "BEE2 - Export Failed!"
 msgstr ""
 
-#: gameMan.py:743
+#: gameMan.py:744
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr ""
 
-#: gameMan.py:850
+#: gameMan.py:851
 msgid "Copying compiler file {file} failed.Ensure the {game} is not running."
 msgstr ""
 
-#: gameMan.py:1234
+#: gameMan.py:1235
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
 msgstr ""
 
-#: gameMan.py:1238
+#: gameMan.py:1239
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
-#: gameMan.py:1420
+#: gameMan.py:1421
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 
-#: gameMan.py:1423 gameMan.py:1438 gameMan.py:1448 gameMan.py:1456
-#: gameMan.py:1464 gameMan.py:1473
+#: gameMan.py:1424 gameMan.py:1439 gameMan.py:1449 gameMan.py:1457
+#: gameMan.py:1465 gameMan.py:1474
 msgid "BEE2 - Add Game"
 msgstr ""
 
-#: gameMan.py:1426
+#: gameMan.py:1427
 msgid "Find Game Exe"
 msgstr ""
 
-#: gameMan.py:1427
+#: gameMan.py:1428
 msgid "Executable"
 msgstr ""
 
-#: gameMan.py:1435
+#: gameMan.py:1436
 msgid "This does not appear to be a valid game folder!"
 msgstr ""
 
-#: gameMan.py:1445
+#: gameMan.py:1446
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr ""
 
-#: gameMan.py:1455
+#: gameMan.py:1456
 msgid "Enter the name of this game:"
 msgstr ""
 
-#: gameMan.py:1463
+#: gameMan.py:1464
 msgid "This name is already taken!"
 msgstr ""
 
-#: gameMan.py:1472
+#: gameMan.py:1473
 msgid "Please enter a name for this game!"
 msgstr ""
 
-#: gameMan.py:1491
+#: gameMan.py:1492
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
