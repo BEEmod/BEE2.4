@@ -1,36 +1,26 @@
-import tk_tools
-import utils
-from srctools.logger import init_logging, get_logger
-
-if __name__ == '__main__':
-    utils.fix_cur_directory()
-    LOGGER = init_logging(
-        str(utils.install_path('logs/compiler_pane.log')),
-        __name__,
-        on_error=tk_tools.on_error
-    )
-    utils.setup_localisations(LOGGER)
-else:
-    LOGGER = get_logger(__name__)
-
-
 from tkinter import *
-from tk_tools import TK_ROOT, FileField
-from tkinter import ttk
 from tkinter import filedialog
-
-from PIL import Image, ImageTk
-from BEE2_config import ConfigFile, GEN_OPTS, option_handler
-from packageLoader import CORRIDOR_COUNTS, CorrDesc
+from tkinter import ttk
 from tooltip import add_tooltip, set_tooltip
-from srctools import Property, AtomicWriter
-import selectorWin
-import tkMarkdown
-import SubPane
-import img
 import base64
 
+from PIL import Image, ImageTk
+
+import SubPane
+import img
+import selectorWin
+import tkMarkdown
+import utils
+from BEE2_config import ConfigFile, GEN_OPTS, option_handler
+from packageLoader import CORRIDOR_COUNTS, CorrDesc
+from srctools import Property, AtomicWriter
+from srctools.logger import get_logger
+from tk_tools import TK_ROOT, FileField
+
 from typing import Dict, Tuple, Optional
+
+
+LOGGER = get_logger(__name__)
 
 # The size of PeTI screenshots
 PETI_WIDTH = 555
@@ -463,7 +453,7 @@ def load_screenshot(path):
     set_screenshot(img)
 
 
-def set_screenshot(img: Image.Image=None):
+def set_screenshot(img: Image=None):
     # Make the visible screenshot small
     global tk_screenshot
     if img is None:
@@ -927,11 +917,4 @@ def init_application():
 
     make_widgets()
 
-
-if __name__ == '__main__':
-    # Run this standalone.
-
-    init_application()
-
     TK_ROOT.deiconify()
-    TK_ROOT.mainloop()

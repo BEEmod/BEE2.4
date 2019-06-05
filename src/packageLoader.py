@@ -36,7 +36,7 @@ from typing import (
 if TYPE_CHECKING:
     from gameMan import Game
     from selectorWin import SelitemData
-    from loadScreen import BaseLoadScreen
+    from loadScreen import LoadScreen
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -81,14 +81,17 @@ ObjType = NamedTuple('ObjType', [
     ('allow_mult', bool),
     ('has_img', bool),
 ])
+
+
 # The arguments to pak_object.export().
-ExportData = NamedTuple('ExportData', [
-    ('selected', Any),  # Usually str, but some items pass other things.
-    ('selected_style', 'Style'),  # Some items need to know which style is selected
-    ('editoritems', Property),
-    ('vbsp_conf', Property),
-    ('game', 'Game'),
-])
+class ExportData(NamedTuple):
+    # Usually str, but some items pass other things.
+    selected: Any
+    # Some items need to know which style is selected
+    selected_style: 'Style'
+    editoritems: Property
+    vbsp_conf: Property
+    game: 'Game'
 
 # The desired variant for an item, before we've figured out the dependencies.
 UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
@@ -151,6 +154,14 @@ class MusicChannel(Enum):
     SPEED = 'SpeedGel'  # Moving fast horizontally
 
 
+class SignStyle(NamedTuple):
+    """Signage information for a specific style."""
+    world: str
+    overlay: str
+    icon: str
+    type: str
+
+
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
 
@@ -164,7 +175,7 @@ class _PakObjectMeta(type):
         Making a metaclass allows us to hook into the creation of all subclasses.
         """
         # Defer to type to create the class..
-        cls = type.__new__(mcs, name, bases, namespace)  # type: Type[PakObject]
+        cls = type.__new__(mcs, name, bases, namespace)
 
         # Only register subclasses of PakObject - those with a parent class.
         # PakObject isn't created yet so we can't directly check that.
@@ -239,7 +250,7 @@ class PakObject(metaclass=_PakObjectMeta):
         return cls._id_to_obj[object_id.casefold()]
 
 
-def reraise_keyerror(err, obj_id):
+def reraise_keyerror(err: BaseException, obj_id: str):
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
@@ -395,7 +406,7 @@ def no_packages_err(pak_dir, msg):
 
 def load_packages(
         pak_dir,
-        loader: 'BaseLoadScreen',
+        loader: 'LoadScreen',
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
@@ -1574,8 +1585,8 @@ class Item(PakObject):
                         )
                         # our_style.override_from_folder(style)
 
-    def __repr__(self):
-        return '<Item:' + self.id + '>'
+    def __repr__(self) -> str:
+        return '<Item:{}>'.format(self.id)
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -2033,11 +2044,11 @@ class QuotePack(PakObject):
             self.cam_yaw = override.cam_yaw
             self.turret_hate = override.turret_hate
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export the quotepack."""
         if exp_data.selected is None:
             return  # No quote pack!
@@ -2083,15 +2094,9 @@ class QuotePack(PakObject):
                 ('', 'normal'),
                 ('mid_', 'MidChamber'),
                 ('resp_', 'Responses')]:
-            path = os.path.join(
-                os.getcwd(),
-                '..',
-                'config',
-                'voice',
-                prefix.upper() + voice.id + '.cfg',
-            )
-            LOGGER.info(path)
-            if os.path.isfile(path):
+            path = utils.conf_location('config/voice/') / (prefix.upper() + voice.id + '.cfg')
+            LOGGER.info('Voice conf path: {}', path)
+            if path.is_file():
                 shutil.copy(
                     path,
                     exp_data.game.abs_path(
@@ -2103,7 +2108,7 @@ class QuotePack(PakObject):
                 LOGGER.info('No {} voice config!', pretty)
 
     @staticmethod
-    def strip_quote_data(prop: Property, _depth=0):
+    def strip_quote_data(prop: Property, _depth=0) -> Property:
         """Strip unused property blocks from the config files.
 
         This removes data like the captions which the compiler doesn't need.
@@ -2131,13 +2136,13 @@ class QuotePack(PakObject):
 
 class Skybox(PakObject):
     def __init__(
-            self,
-            sky_id,
-            selitem_data: 'SelitemData',
-            config: Property,
-            fog_opts: Property,
-            mat,
-            ):
+        self,
+        sky_id,
+        selitem_data: 'SelitemData',
+        config: Property,
+        fog_opts: Property,
+        mat,
+    ) -> None:
         self.id = sky_id
         self.selitem_data = selitem_data
         self.material = mat
@@ -2511,6 +2516,159 @@ class Music(PakObject):
                             )
 
 
+class Signage(PakObject, allow_mult=True, has_img=False):
+    """Defines different square signage overlays."""
+
+    def __init__(
+        self,
+        sign_id: str,
+        styles: Dict[str, SignStyle],
+        disp_name: str,
+        primary_id: str=None,
+        secondary_id: str=None,
+        hidden: bool=False,
+    ) -> None:
+        self.hidden = hidden or sign_id == 'SIGN_ARROW'
+        self.id = sign_id
+        self.name = disp_name
+        # style_id -> (world, overlay)
+        self.styles = styles
+        self.prim_id = primary_id
+        self.sec_id = secondary_id
+
+        # The icon the UI uses.
+        self.dnd_icon = None
+
+    @classmethod
+    def parse(cls, data: ParseData) -> 'Signage':
+        styles: Dict[str, SignStyle] = {}
+        for prop in data.info.find_children('styles'):
+            sty_id = prop.name.upper()
+
+            if not prop.has_children():
+                # Style lookup.
+                try:
+                    prop = next(data.info.find_all('styles', prop.value))
+                except StopIteration:
+                    raise ValueError('No style <{}>!'.format(prop.value))
+
+            world_tex = prop['world', '']
+            overlay_tex = prop['overlay', '']
+
+            # Don't warn, we don't actually need this yet.
+
+            # if not world_tex:
+            #     LOGGER.warning(
+            #         '"{}" signage has no "world" value '
+            #         'for the "{}" style!',
+            #         data.id,
+            #         sty_id
+            #     )
+            if not overlay_tex:
+                raise ValueError(
+                    f'"{data.id}"" signage has no "overlay" value '
+                    f'option for the "{sty_id}" style!'
+                )
+
+            styles[sty_id] = SignStyle(
+                world_tex,
+                overlay_tex,
+                prop['icon', ''],
+                prop['type', 'square']
+            )
+        return cls(
+            data.id,
+            styles,
+            data.info['name'],
+            data.info['primary', None],
+            data.info['secondary', None],
+            data.info.bool('hidden'),
+        )
+
+    def add_over(self, override: 'Signage') -> None:
+        """Append additional styles to the signage."""
+        for sty_id, opts in override.styles.items():
+            if sty_id in self.styles:
+                raise ValueError(
+                    f'Duplicate "{sty_id}" style definition for {self.id}!'
+                )
+            self.styles[sty_id] = opts
+        if override.sec_id:
+            if not self.sec_id:
+                self.sec_id = override.sec_id
+            elif self.sec_id != override.sec_id:
+                raise ValueError(
+                    'Mismatch in secondary IDs for '
+                    f'signage "{self.id}"! '
+                    f'({self.sec_id} != {override.sec_id})'
+                )
+
+    @staticmethod
+    def export(exp_data: ExportData) -> None:
+        """Export the selected signage to the config."""
+        # Timer value -> sign ID.
+        sel_ids: List[Tuple[str, str]] = exp_data.selected
+
+        # Special case, arrow is never selectable.
+        sel_ids.append(('arrow', 'SIGN_ARROW'))
+
+        conf = Property('Signage', [])
+
+        for tim_id, sign_id in sel_ids:
+            try:
+                sign = Signage.by_id(sign_id)
+            except KeyError:
+                LOGGER.warning('Signage "{}" does not exist!', sign_id)
+                continue
+            prop_block = Property(str(tim_id), [])
+
+            sign._serialise(prop_block, exp_data.selected_style)
+
+            for sub_name, sub_id in [
+                ('primary', sign.prim_id),
+                ('secondary', sign.sec_id),
+            ]:
+                if sub_id:
+                    try:
+                        sub_sign = Signage.by_id(sub_id)
+                    except KeyError:
+                        LOGGER.warning(
+                            'Signage "{}"\'s {} "{}" '
+                            'does not exist!', sign_id, sub_name, sub_id)
+                    else:
+                        sub_block = Property(sub_name, [])
+                        sub_sign._serialise(sub_block, exp_data.selected_style)
+                        if sub_block:
+                            prop_block.append(sub_block)
+
+            if prop_block:
+                conf.append(prop_block)
+
+        exp_data.vbsp_conf.append(conf)
+
+    def _serialise(self, parent: Property, style: Style) -> None:
+        """Write this sign's data for the style to the provided property."""
+        for potential_style in style.bases:
+            try:
+                data = self.styles[potential_style.id.upper()]
+                break
+            except KeyError:
+                pass
+        else:
+            LOGGER.warning(
+                'No valid "{}" style for "{}" signage!',
+                style.id,
+                self.id,
+            )
+            try:
+                data = self.styles['BEE2_CLEAN']
+            except KeyError:
+                return
+        parent.append(Property('world', data.world))
+        parent.append(Property('overlay', data.overlay))
+        parent.append(Property('type', data.type))
+
+
 class StyleVar(PakObject, allow_mult=True, has_img=False):
     def __init__(
         self,
@@ -2822,7 +2980,7 @@ class Elevator(PakObject):
             elevator = None
         else:
             try:
-                elevator = Elevator.by_id(exp_data.selected)  # type: Elevator
+                elevator = Elevator.by_id(exp_data.selected)
             except KeyError:
                 raise Exception(
                     "Selected elevator ({}) "

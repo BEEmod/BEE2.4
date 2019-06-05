@@ -35,6 +35,7 @@ import optionWindow
 import helpMenu
 import backup as backup_win
 import tooltip
+import signage_ui
 
 from typing import List, Dict
 
@@ -842,6 +843,7 @@ def export_editoritems(e=None):
 
             'Item': (pal_data, item_versions, item_properties),
             'StyleVar': style_vars,
+            'Signage': signage_ui.export_data(),
 
             # The others don't have one, so it defaults to None.
         },
@@ -1997,7 +1999,7 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    def style_select_callback(style_id):
+    def style_select_callback(style_id: str) -> None:
         """Callback whenever a new style is chosen."""
         global selected_style
         selected_style = style_id
@@ -2013,6 +2015,8 @@ def init_windows():
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
+
+        signage_ui.style_changed(style_obj)
 
         tagsPane.filter_items()  # Update filters (authors may have changed)
 

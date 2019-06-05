@@ -1,22 +1,23 @@
 """Handles Aperture Tag modifications in the compiler."""
+import itertools
 import math
 import os
-import itertools
 
-import srctools.logger
 import instanceLocs
+import srctools.logger
 import utils
-import vbsp_options
 import vbsp
+import vbsp_options
 from conditions import (
     meta_cond, make_result,
     PETI_INST_ANGLE, RES_EXHAUSTED,
     local_name,
     make_result_setup,
 )
-from connections import ITEMS, Item, ItemType
-from fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
+from connections import ITEMS, ItemType
+from fizzler import FIZZLERS, FIZZ_TYPES
 from srctools import Vec, Property, VMF, Entity, Output
+
 
 COND_MOD_NAME = None
 
@@ -135,36 +136,6 @@ def ap_tag_modifications(vmf: VMF):
             )
 
 
-def calc_fizzler_orient(fizzler: Fizzler):
-    # Figure out how to compare for this fizzler.
-
-    s, l = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
-
-    # If it's horizontal, signs should point to the center:
-    if abs(s.z - l.z) == 2:
-        return (
-            'z',
-            s.x + l.x / 2,
-            s.y + l.y / 2,
-            s.z + 1,
-        )
-    # For the vertical directions, we want to compare based on the line segment.
-    if abs(s.x - l.x) == 2:  # Y direction
-        return (
-            'y',
-            s.y,
-            l.y,
-            s.x + 1,
-        )
-    else:  # Extends in X direction
-        return (
-            'x',
-            s.x,
-            l.x,
-            s.y + 1,
-        )
-
-
 @make_result_setup('TagFizzler')
 def res_make_tag_fizzler_setup(res: Property):
     """We need this to pre-parse the fizzler type."""
@@ -254,6 +225,8 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         Vec(0, 0, -64).rotate_by_str(inst['angles'])
     )
 
+    fizz_norm_axis = fizzler.normal().axis()
+
     # Now deal with the visual aspect:
     # Blue signs should be on top.
 
@@ -305,52 +278,63 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         sign_floor_loc = sign_loc.copy()
         sign_floor_loc.z = 0  # We don't care about z-positions.
 
-        # Grab the data saved earlier in res_find_potential_tag_fizzlers()
-        axis, side_min, side_max, normal = calc_fizzler_orient(fizzler)
+        s, l = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
 
-        # The Z-axis fizzler (horizontal) must be treated differently.
-        if axis == 'z':
-            # For z-axis, just compare to the center point.
-            # The values are really x, y, z, not what they're named.
-            sign_dir = sign_floor_loc - (side_min, side_max, normal)
+        if fizz_norm_axis == 'z':
+            # For z-axis, just compare to the center point of the emitters.
+            sign_dir = ((s.x + l.x) / 2, (s.y + l.y) / 2, 0) - sign_floor_loc
         else:
             # For the other two, we compare to the line,
             # or compare to the closest side (in line with the fizz)
-            other_axis = 'x' if axis == 'y' else 'y'
+
+            if fizz_norm_axis == 'x':  #  Extends in Y direction
+                other_axis = 'y'
+                side_min = s.y
+                side_max = l.y
+                normal = s.x
+            else:  # Extends in X direction
+                other_axis = 'x'
+                side_min = s.x
+                side_max = l.x
+                normal = s.y
+
+            # Right in line with the fizzler. Point at the closest emitter.
             if abs(sign_floor_loc[other_axis] - normal) < 32:
-                # Compare to the closest side. Use ** to swap x/y arguments
-                # appropriately. The closest side is the one with the
-                # smallest magnitude.
+                # Compare to the closest side.
                 sign_dir = min(
-                    sign_floor_loc - Vec.with_axes(
-                        axis,side_min,
+                    (sign_floor_loc - Vec.with_axes(
+                        fizz_norm_axis, side_min,
                         other_axis, normal,
                     ),
                     sign_floor_loc - Vec.with_axes(
-                        axis, side_max,
+                        fizz_norm_axis, side_max,
                         other_axis, normal,
-                    ),
+                    )),
                     key=Vec.mag,
                 )
             else:
                 # Align just based on whether we're in front or behind.
-                sign_dir = Vec()
-                sign_dir[other_axis] = sign_floor_loc[other_axis] - normal
+                sign_dir = Vec.with_axes(
+                    fizz_norm_axis, normal - sign_floor_loc[fizz_norm_axis]
+                ).norm()
 
-        sign_angle = math.degrees(
+        sign_yaw = math.degrees(
             math.atan2(sign_dir.y, sign_dir.x)
         )
         # Round to nearest 90 degrees
         # Add 45 so the switchover point is at the diagonals
-        sign_angle = (sign_angle + 45) // 90 * 90
+        sign_yaw = (sign_yaw + 45) // 90 * 90
 
         # Rotate to fit the instances - south is down
-        sign_angle = int(sign_angle + 90) % 360
+        sign_yaw = int(sign_yaw - 90) % 360
+
         if inst_normal.z > 0:
-            sign_angle = '0 {} 0'.format(sign_angle)
+            sign_angle = '0 {} 0'.format(sign_yaw)
         elif inst_normal.z < 0:
             # Flip upside-down for ceilings
-            sign_angle = '0 {} 180'.format(sign_angle)
+            sign_angle = '0 {} 180'.format(sign_yaw)
+        else:
+            raise AssertionError('Cannot be zero here!')
     else:
         # On a wall, face upright
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
@@ -390,7 +374,6 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # Signs will associate with the given side!
 
     bbox_min, bbox_max = fizzler.emitters[0]
-    fizz_norm_axis = fizzler.normal().axis()
 
     sign_center = (bbox_min[fizz_norm_axis] + bbox_max[fizz_norm_axis]) / 2
 

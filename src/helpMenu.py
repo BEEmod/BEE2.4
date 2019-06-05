@@ -41,7 +41,7 @@ SEPERATOR = object()
 
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
-DISCORD_SERVER = 'https://discord.me/beemod'
+DISCORD_SERVER = 'https://discord.gg/hnGFJrz'
 # Open https://steamcommunity.com/groups/beemod direct in the Steam Client
 STEAM_GROUP = 'steam://url/GroupSteamIDPage/103582791458212641'
 MUSIC_CHANGER = 'https://beemmc.boards.net/'

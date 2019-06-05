@@ -220,11 +220,10 @@ def res_make_vactubes(res: Property):
             # Mark as no-connections
             marker['next'] = None
 
+    # We do generation only from the start of chains.
     for marker in markers.values():
         if marker['no_prev']:
-            continue
-
-        make_vac_track(marker, markers)
+            make_vac_track(marker, markers)
 
     return RES_EXHAUSTED
 

@@ -61,21 +61,6 @@ packages/
 # Ignore palettes
 palettes/*.bee2_palette
 
-# But not the default ones
-!palettes/ap_tag.bee2_palette
-!palettes/beemod.bee2_palette
-!palettes/blank.bee2_palette
-!palettes/collapsed.bee2_palette
-!palettes/original.bee2_palette
-
-#These folders are generated automatically by the BEE2
-images/cache/
-inst_cache/
-source_cache/
-cache/
-vpk_cache/
-sounds/music_samp/
-
 # The config files automatically regenerate with the defaults.
 config/
 
