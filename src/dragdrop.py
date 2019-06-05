@@ -38,6 +38,7 @@ ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'
 
+
 class Event(Enum):
     """Callbacks that can be registered to be called by the manager."""
     # Fires when items are right-clicked on. If one is registered, the gear
@@ -67,6 +68,7 @@ class Manager(Generic[ItemT]):
     """Manages a set of drag-drop points."""
     def __init__(
         self,
+        master: tkinter.Toplevel,
         *,
         size: Tuple[int, int]=(64, 64),
         config_icon: bool=False
@@ -97,9 +99,9 @@ class Manager(Generic[ItemT]):
             for event in Event
         }  # type: Dict[Event, List[Callable[[Slot], None]]]
 
-        self._drag_win = drag_win = tkinter.Toplevel(TK_ROOT)
+        self._drag_win = drag_win = tkinter.Toplevel(master)
         drag_win.withdraw()
-        drag_win.transient(master=TK_ROOT)
+        drag_win.transient(master=master)
         drag_win.wm_overrideredirect(True)
 
         self._drag_lbl = drag_lbl = tkinter.Label(
@@ -591,7 +593,7 @@ def _test() -> None:
         def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)
 
-    manager = Manager[TestItem](config_icon=True)
+    manager = Manager[TestItem](TK_ROOT, config_icon=True)
 
     def func(ev):
         def call(slot):

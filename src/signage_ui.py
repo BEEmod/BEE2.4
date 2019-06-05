@@ -17,7 +17,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 
-drag_man: dragdrop.Manager[Signage] = dragdrop.Manager()
+drag_man: dragdrop.Manager[Signage]
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
 
 DEFAULT_IDS = {
@@ -131,8 +131,11 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
 
     If no signages are defined, this returns None.
     """
+    global drag_man
+    drag_man = dragdrop.Manager(master.winfo_toplevel())
+
     if not any(Signage.all()):
-        return None
+        return ttk.Label(master)
 
     window.protocol("WM_DELETE_WINDOW", window.withdraw)
     window.resizable(True, True)
