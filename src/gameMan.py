@@ -16,7 +16,7 @@ import os
 import shutil
 import math
 import re
-
+import io
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
@@ -32,6 +32,7 @@ import loadScreen
 import packageLoader
 import utils
 import srctools
+import webbrowser
 
 from typing import List, Tuple, Set, Iterable, Iterator, Dict, Union
 
@@ -57,12 +58,12 @@ CONFIG = ConfigFile('games.cfg')
 
 FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
-    ('VBSP',        'bin/vbsp',                         '.exe'),
-    ('VRAD',        'bin/vrad',                         '.exe'),
-    ('VBSP',        'bin/vbsp_osx',   ''),
-    ('VRAD',        'bin/vrad_osx',   ''),
-    ('VBSP',        'bin/vbsp_linux', ''),
-    ('VRAD',        'bin/vrad_linux', ''),
+    ('Windows VBSP', 'bin/vbsp',       '.exe'),
+    ('Windows VRAD', 'bin/vrad',       '.exe'),
+    ('OSX VBSP',     'bin/vbsp_osx',   ''),
+    ('OSX VRAD',     'bin/vrad_osx',   ''),
+    ('Linux VBSP',   'bin/vbsp_linux', ''),
+    ('Linux VRAD',   'bin/vrad_linux', ''),
 ]
 
 _UNLOCK_ITEMS = [
@@ -244,6 +245,34 @@ def quit_application():
     sys.exit()
 
 
+def should_backup_app(file: str) -> bool:
+    """Check if the given application is Valve's, or ours.
+
+    We do this by checking for the PyInstaller archive.
+    """
+    # We can't import PyInstaller properly while frozen, so copy over
+    # the important code.
+
+    # from PyInstaller.archive.readers import CArchiveReader
+    try:
+        f = open(file, 'rb')
+    except FileNotFoundError:
+        # We don't want to backup missing files.
+        return False
+
+    SIZE = 4096
+
+    with f:
+        f.seek(0, io.SEEK_END)
+        if f.tell() < SIZE:
+            return False  # Too small.
+
+        # Read out the last 4096 bytes, and look for the sig in there.
+        f.seek(-SIZE,io.SEEK_END)
+
+        return b'MEI\014\013\012\013\016' not in f.read(SIZE)
+
+
 class Game:
     def __init__(
         self,
@@ -408,6 +437,7 @@ class Game:
                         file.write(line)
         if not add_line:
             # Restore the original files!
+
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
@@ -686,7 +716,54 @@ class Game:
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
-                if os.path.isfile(item_path) and not os.path.isfile(backup_path):
+
+                if not os.path.isfile(item_path):
+                    # We can't backup at all.
+                    should_backup = False
+                elif name == 'Editoritems':
+                    should_backup = not os.path.isfile(backup_path)
+                else:
+                    # Always backup the non-_original file, it'd be newer.
+                    # But only if it's Valves - not our own.
+                    should_backup = should_backup_app(item_path)
+                    backup_is_good = should_backup_app(backup_path)
+                    LOGGER.info(
+                        '{}{}: normal={}, backup={}',
+                        file, ext,
+                        'Valve' if should_backup else 'BEE2',
+                        'Valve' if backup_is_good else 'BEE2',
+                    )
+
+                    if not should_backup and not backup_is_good:
+                        # It's a BEE2 application, we have a problem.
+                        # Both the real and backup are bad, we need to get a
+                        # new one.
+                        try:
+                            os.remove(backup_path)
+                        except FileNotFoundError:
+                            pass
+                        try:
+                            os.remove(item_path)
+                        except FileNotFoundError:
+                            pass
+
+                        export_screen.reset()
+                        if messagebox.askokcancel(
+                            title=_('BEE2 - Export Failed!'),
+                            message=_(
+                                'Compiler file {file} missing. '
+                                'Exit Steam applications, then press OK '
+                                'to verify your game cache. You can then '
+                                'export again.'
+                            ).format(
+                                file=file + ext,
+                            ),
+                            master=TK_ROOT,
+                        ):
+                            webbrowser.open('steam://validate/' + str(self.steamID))
+                        return False, vpk_success
+
+                if should_backup:
                     LOGGER.info('Backing up original {}!', name)
                     shutil.copy(item_path, backup_path)
                 export_screen.step('BACK')
@@ -1010,9 +1087,7 @@ class Game:
 
     def launch(self):
         """Try and launch the game."""
-        import webbrowser
-        url = 'steam://rungameid/' + str(self.steamID)
-        webbrowser.open(url)
+        webbrowser.open('steam://rungameid/' + str(self.steamID))
 
     def copy_mod_music(self) -> Set[str]:
         """Copy music files from Tag and PS:Mel.

@@ -8,10 +8,11 @@ This also contains a version of ConfigParser that can be easily resaved.
 It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
-from configparser import ConfigParser, NoOptionError, SectionProxy
+from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from typing import Any, Mapping
+import os
 
-from srctools import AtomicWriter, Property
+from srctools import AtomicWriter, Property, KeyValError
 
 import utils
 import srctools.logger
@@ -50,12 +51,21 @@ def apply_settings(props: Property):
 
 def read_settings() -> None:
     """Read and apply the settings from disk."""
+    path = utils.conf_location('config/config.vdf')
     try:
-        file = open(utils.conf_location('config/config.vdf'), encoding='utf8')
+        file = open(path, encoding='utf8')
     except FileNotFoundError:
         return
-    with file:
-        props = Property.parse(file)
+    try:
+        with file:
+            props = Property.parse(file)
+    except KeyValError:
+        LOGGER.warning('Cannot parse config.vdf!', exc_info=True)
+        # Try and move to a backup name, if not don't worry about it.
+        try:
+            path.replace(path.with_suffix('.err.vdf'))
+        except IOError:
+            pass
     apply_settings(props)
 
 
@@ -119,12 +129,23 @@ class ConfigFile(ConfigParser):
         try:
             with open(self.filename, 'r') as conf:
                 self.read_file(conf)
-        except (FileNotFoundError, IOError):
+        # If we fail, just continue - we just use the default values
+        except FileNotFoundError:
             LOGGER.warning(
                 'Config "{}" not found! Using defaults...',
                 self.filename,
             )
-            # If we fail, just continue - we just use the default values
+        except (IOError, ParsingError):
+            LOGGER.warning(
+                'Config "{}" cannot be read! Using defaults...',
+                self.filename,
+                exc_info=True,
+            )
+            try:
+                self.filename.replace(self.filename.with_suffix('.err.cfg'))
+            except IOError:
+                pass
+
         # We're not different to the file on disk..
         self.has_changed = False
 

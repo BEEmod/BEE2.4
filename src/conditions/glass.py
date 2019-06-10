@@ -7,7 +7,8 @@ import srctools.logger
 import comp_consts as const
 import template_brush
 
-from typing import Iterator, Any, Tuple, Dict, List
+from typing import Iterator, Any, Tuple, Dict, List, Optional
+
 
 COND_MOD_NAME = 'Breakable Glass'
 
@@ -75,7 +76,7 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
     This yields (targetname, min, max, normal, config) tuples.
     """
     # targetname -> min, max, normal, config
-    glass_items = {}
+    glass_items = {}  # type: Dict[str, Tuple[Vec, Vec, Vec, dict]]
     for inst in vmf.by_class['func_instance']:  # type: Entity
         try:
             conf = config[inst['file'].casefold()]
@@ -102,9 +103,16 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
         yield targ, bbox_min, bbox_max, norm, conf
 
 
-def make_frames(vmf: VMF, targ: str, conf: dict, bbox_min: Vec, bbox_max: Vec, norm: Vec):
+def make_frames(
+    vmf: VMF,
+    targ: str,
+    conf: dict,
+    bbox_min: Vec,
+    bbox_max: Vec,
+    norm: Vec,
+) -> None:
     """Generate frames for a rectangular glass item."""
-    def make_frame(frame_type, loc, angles):
+    def make_frame(frame_type: str, loc: Vec, angles: Vec) -> None:
         """Make a frame instance."""
         vmf.create_ent(
             classname='func_instance',
@@ -237,6 +245,8 @@ def res_breakable_glass(inst: Entity, res: Property):
 
     glass_items = find_glass_items(BREAKABLE_GLASS_CONF, vmf)
 
+    damage_filter = None  # type: Optional[Entity]
+
     for targ, bbox_min, bbox_max, norm, conf in glass_items:
         LOGGER.info('Making glass "{}"', targ)
         norm_axis = norm.axis()
@@ -276,9 +286,9 @@ def res_breakable_glass(inst: Entity, res: Property):
         solid_max -= norm
 
         # func_breakable_surf allows several P2 things to pass through.
-        # Place a thin func_brush inside the surf to block collisions.
-        # Since it's inside, the breakable will recieve physics impacts to
-        # destroy it.
+        # Place a thin func_breakable inside the surf to block collisions.
+        # Since it's inside, the surf will recieve physics impacts to
+        # destroy it. This recieves explosive impacts.
         clip_min = bbox_min.copy()
         clip_max = bbox_max.copy()
         clip_min[uaxis] -= 64
@@ -288,12 +298,25 @@ def res_breakable_glass(inst: Entity, res: Property):
         clip_min += (conf['offset'] + 0.3) * norm
         clip_max += (conf['offset'] + 0.6) * norm
 
+        if damage_filter is None:
+            damage_filter = vmf.create_ent(
+                'filter_damage_type',
+                # BURN = 8
+                # BLAST = 64
+                damagetype=64,
+                targetname='@brk_glass_filter',
+                origin=bbox_min - 32 * norm,
+            )
+
         clip = vmf.create_ent(
             targetname=targ + '-clip',
-            classname='func_brush',
+            classname='func_breakable',
             # Make sure it's inside the map.
             origin=bbox_min - 32 * norm,
-            spawnflags=0,
+            spawnflags=3072,  # No physics damage, no bullet penetration
+            damagefilter='@brk_glass_filter',
+            material=0,  # Glass
+            health=10,
         )
         clip.solids.append(
             vmf.make_prism(
@@ -305,6 +328,9 @@ def res_breakable_glass(inst: Entity, res: Property):
 
         breakable_surf.add_out(
             Output('OnBreak', targ + '-clip', 'Kill', only_once=True),
+        )
+        clip.add_out(
+            Output('OnBreak', targ + '-surf', 'Shatter', '.5 .5 0', only_once=True),
         )
 
         # We need to set "lowerleft", "upperright" etc keyvalues to the corner

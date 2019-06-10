@@ -56,12 +56,15 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
     marker_names = set()
 
+    inst = None
+
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() in marker:
             marker_names.add(inst['targetname'])
             # Unconditionally delete from the map, so it doesn't
             # appear even if placed wrongly.
             inst.remove()
+    del inst  # Make sure we don't use this later.
 
     if not marker_names:  # No markers in the map - abort
         return RES_EXHAUSTED
@@ -169,7 +172,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
         ]
 
         # Use 'keys' and 'localkeys' blocks to set all the other keyvalues.
-        conditions.set_ent_keys(trig_ent, inst, res)
+        conditions.set_ent_keys(trig_ent, inst1, res)
 
         if is_coop:
             trig_ent['spawnflags'] = '1'  # Clients
@@ -177,7 +180,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
             out_ent = manager = vmf.create_ent(
                 classname='logic_coop_manager',
-                targetname=conditions.local_name(inst, 'man'),
+                targetname=conditions.local_name(inst1, 'man'),
                 origin=origin,
             )
 

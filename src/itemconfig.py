@@ -14,6 +14,7 @@ import utils
 import srctools.logger
 import img
 import sound
+import signage_ui
 
 from typing import Union, Callable, List, Tuple, Optional
 
@@ -271,11 +272,6 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
 
 def make_pane(parent: ttk.Frame):
     """Create all the widgets we use."""
-    if not CONFIG_ORDER:
-        # No configs at all...
-        ttk.Label(parent, text=_('No Item Configuration!')).pack(fill='both')
-        return
-
     CONFIG_ORDER.sort(key=lambda grp: grp.name)
 
     parent.columnconfigure(0, weight=1)
@@ -298,7 +294,10 @@ def make_pane(parent: ttk.Frame):
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)
 
-    for conf_row, config in enumerate(CONFIG_ORDER):
+    sign_button = signage_ui.init_widgets(canvas_frame)
+    sign_button.grid(row=0, column=0, sticky='ew')
+
+    for conf_row, config in enumerate(CONFIG_ORDER, start=1):
         frame = ttk.LabelFrame(canvas_frame, text=config.name)
         frame.columnconfigure(0, weight=1)
         frame.grid(row=conf_row, column=0, sticky='nsew')

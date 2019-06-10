@@ -1,20 +1,4 @@
 """Run the BEE2."""
-
-# First do a few things as early as possible.
-import utils
-import srctools.logger
-
-utils.fix_cur_directory()
-# We need to initialise logging as early as possible - that way
-# it can record any errors in the initialisation of modules.
-import tk_tools
-LOGGER = srctools.logger.init_logging(
-    str(utils.install_path('logs/BEE2.log')),
-    on_error=tk_tools.on_error,
-)
-
-utils.setup_localisations(LOGGER)
-
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
 
@@ -27,7 +11,11 @@ import packageLoader
 import gameMan
 import logWindow
 import img
+import utils
 import music_conf
+import srctools.logger
+
+LOGGER = srctools.logger.get_logger('BEE2')
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -65,6 +53,7 @@ DEFAULT_SETTINGS = {
 GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
+LOGGER.debug('Starting loading screen...')
 loadScreen.main_loader.set_length('UI', 14)
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
@@ -76,6 +65,8 @@ logWindow.init(
     GEN_OPTS.get_bool('Debug', 'show_log_win'),
     GEN_OPTS['Debug']['window_log_level']
 )
+
+LOGGER.debug('Loading settings...')
 
 UI.load_settings()
 
@@ -127,5 +118,3 @@ loadScreen.main_loader.destroy()
 # Directly run TK_ROOT.lift() in TCL, instead
 # of building a callable.
 TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
-
-TK_ROOT.mainloop()
