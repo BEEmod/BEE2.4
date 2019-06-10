@@ -7,14 +7,13 @@ from enum import Enum
 from collections import defaultdict
 
 from srctools import VMF, Entity, Output, Property, conv_bool, Vec
-from antlines import Antline
+from antlines import Antline, AntType
 import comp_consts as const
 import instanceLocs
 import conditions
 import instance_traits
 import srctools.logger
 import vbsp_options
-import antlines
 import packing
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator
@@ -487,8 +486,8 @@ class Item:
         self,
         inst: Entity,
         item_type: ItemType,
-        ant_floor_style: antlines.AntType,
-        ant_wall_style: antlines.AntType,
+        ant_floor_style: AntType,
+        ant_wall_style: AntType,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
@@ -711,8 +710,8 @@ def calc_connections(
     antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
-    antline_wall: antlines.AntType,
-    antline_floor: antlines.AntType,
+    antline_wall: AntType,
+    antline_floor: AntType,
 ) -> None:
     """Compute item connections from the map file.
 
