@@ -672,11 +672,14 @@ class Connection:
 
 def collapse_item(item: Item) -> None:
     """Remove an item with a single input, transferring all IO."""
+    input_conn: Connection
     try:
         [input_conn] = item.inputs
         input_item = input_conn.from_item
     except ValueError:
         raise ValueError('Too many inputs for "{}"!'.format(item.name))
+
+    LOGGER.debug('Merging "{}" into "{}"...', item.name, input_item.name)
 
     input_conn.remove()
 
@@ -1662,6 +1665,14 @@ def add_item_indicators(
             # VBSP and/or Hammer seems to get confused with totally empty
             # instance var, so give it a blank name.
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = '-'
+
+        # Overwrite the timer delay value, in case a sign changed ownership.
+        if item.timer is not None:
+            pan.fixup[const.FixupVars.TIM_DELAY] = item.timer
+            pan.fixup[const.FixupVars.TIM_ENABLED] = '1'
+        else:
+            pan.fixup[const.FixupVars.TIM_DELAY] = '99999999999'
+            pan.fixup[const.FixupVars.TIM_ENABLED] = '0'
 
         for outputs, input_cmds in [
             (item.timer_output_start(), pan_item.enable_cmd),
