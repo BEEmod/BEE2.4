@@ -25,6 +25,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
     This is run once to affect all of an item.  
     Options:
+
     * `markerInst`: <ITEM_ID:1,2> value referencing the marker instances, or a filename.
     * `markerItem`: The item's ID
     * `previewConf`: A item config which enables/disables the preview overlay.
@@ -36,17 +37,13 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
     * `previewScale`: The scale for the func_brush materials.
     * `previewActivate`, `previewDeactivate`: The VMF output to turn the
         previewInst on and off.
-
     * `triggerActivate, triggerDeactivate`: The `instance:name;Output`
         outputs used when the trigger turns on or off.
-
     * `coopVar`: The instance variable which enables detecting both Coop players.
         The trigger will be a trigger_playerteam.
-
     * `coopActivate, coopDeactivate`: The `instance:name;Output` outputs used
         when coopVar is enabled. These should be suitable for a logic_coop_manager.
     * `coopOnce`: If true, kill the manager after it first activates.
-
     * `keys`: A block of keyvalues for the trigger brush. Origin and targetname
         will be set automatically.
     * `localkeys`: The same as above, except values will be changed to use

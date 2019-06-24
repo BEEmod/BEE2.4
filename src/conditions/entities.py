@@ -126,8 +126,8 @@ def res_insert_overlay(inst: Entity, res: Property):
 def res_create_entity(vmf: VMF, inst: Entity, res: Property):
     """Create an entity.
 
-    'keys' and 'localkeys' defines the new keyvalues used.
-    'Origin' will be used to offset the given amount from the current location.
+    * `keys` and `localkeys` defines the new keyvalues used.
+    * `Origin` will be used to offset the given amount from the current location.
     """
 
     origin = Vec.from_str(inst['origin'])
@@ -163,16 +163,17 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
     """Creates splashes when something goes in and out of water.
 
     Arguments:
-        - parent: The name of the parent entity.
-        - name: The name given to the env_splash.
-        - scale: The size of the effect (8 by default).
-        - position: The offset position to place the entity.
-        - position2: The offset to which the entity will move.
-        - type: Use certain fixup values to calculate pos2 instead:
-           'piston_1/2/3/4': Use $bottom_level and $top_level as offsets.
-           'track_platform': Use $travel_direction, $travel_distance, etc.
-        - fast_check: Check faster for movement. Needed for items which
-          move quickly.
+
+    - `parent`: The name of the parent entity.
+    - `name`: The name given to the env_splash.
+    - `scale`: The size of the effect (8 by default).
+    - `position`: The offset position to place the entity.
+    - `position2`: The offset to which the entity will move.
+    - `type`: Use certain fixup values to calculate pos2 instead:
+       `piston_1`/`2`/`3`/`4`: Use `$bottom_level` and `$top_level` as offsets.
+       `track_platform`: Use `$travel_direction`, `$travel_distance`, etc.
+    - `fast_check`: Check faster for movement. Needed for items which
+      move quickly.
     """
     (
         name,
