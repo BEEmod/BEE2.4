@@ -1051,8 +1051,9 @@ def gen_item_outputs(vmf: VMF) -> None:
             else:
                 add_item_indicators(item, pan_switching_timer, pan_timer_type)
 
-        # Special case - inverted spawnfire items with no inputs need to fire
-        # off the activation outputs. There's no way to then deactivate those.
+        # Special case - spawnfire items with no inputs need to fire
+        # off the outputs. There's no way to control those, so we can just
+        # fire it off.
         if not item.inputs and item.item_type.spawn_fire is FeatureMode.ALWAYS:
             if item.is_logic:
                 # Logic gates need to trigger their outputs.
@@ -1064,7 +1065,11 @@ def gen_item_outputs(vmf: VMF) -> None:
 
                 auto_logic.append(item.inst)
             else:
-                for cmd in item.enable_cmd:
+                is_inverted = conv_bool(conditions.resolve_value(
+                    item.inst,
+                    item.item_type.invert_var,
+                ))
+                for cmd in (item.enable_cmd if is_inverted else item.disable_cmd):
                     logic_auto.add_out(
                         Output(
                             'OnMapSpawn',
