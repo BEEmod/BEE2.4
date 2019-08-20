@@ -1000,11 +1000,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
-    logic_auto = vmf.create_ent(
-        'logic_auto',
-        origin=vbsp_options.get(Vec, 'global_ents_loc')
-    )
-
     auto_logic = []
 
     # Apply input A/B types to connections.
@@ -1069,6 +1064,11 @@ def gen_item_outputs(vmf: VMF) -> None:
                     item.inst,
                     item.item_type.invert_var,
                 ))
+                logic_auto = vmf.create_ent(
+                    'logic_auto',
+                    origin=item.inst['origin'],
+                    spawnflags=1,
+                )
                 for cmd in (item.enable_cmd if is_inverted else item.disable_cmd):
                     logic_auto.add_out(
                         Output(
@@ -1148,6 +1148,11 @@ def gen_item_outputs(vmf: VMF) -> None:
 
         # Make sure this is packed, since parsing the VScript isn't trivial.
         packing.pack_files(vmf, timer_sound, file_type='sound')
+
+    logic_auto = vmf.create_ent(
+        'logic_auto',
+        origin=vbsp_options.get(Vec, 'global_ents_loc')
+    )
 
     for ent in auto_logic:
         # Condense all these together now.
