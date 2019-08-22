@@ -2324,12 +2324,20 @@ def add_extra_ents(mode):
     # Don't add our logic if an instance was provided.
     # If this settings is set, we have a music config.
     if settings['music_conf'] and not inst:
-        music = VMF.create_ent(
+        music_starter = VMF.create_ent(
             classname='ambient_generic',
-            spawnflags='17',  # Looping, Infinite Range, Starts Silent
-            targetname='@music',
-            origin=loc,
-            message='music.BEE2',
+            spawnflags='49',  # Non-looping, Infinite Range, Starts Silent
+            targetname='@music_starter',
+            origin=loc + (-16, 0, 0),
+            message='music.BEE2_start',
+            health='10',  # Volume
+        )
+        music_stopper = VMF.create_ent(
+            classname='ambient_generic',
+            spawnflags='49',  # Non-looping, Infinite Range, Starts Silent
+            targetname='@music_stopper',
+            origin=loc + (16, 0, 0),
+            message='music.BEE2_stop',
             health='10',  # Volume
         )
 
@@ -2346,8 +2354,7 @@ def add_extra_ents(mode):
             origin=loc + (16, 0, -16),
         )
         music_stop.add_out(
-            VLib.Output('OnTrigger', music, 'StopSound'),
-            VLib.Output('OnTrigger', music, 'Volume', '0'),
+            VLib.Output('OnTrigger', music_stopper, 'PlaySound'),
         )
 
         # In SinglePlayer, music gets killed during reload,
@@ -2379,10 +2386,8 @@ def add_extra_ents(mode):
             )
 
             music_restart.add_out(
-                VLib.Output('OnTrigger', music, 'StopSound'),
-                VLib.Output('OnTrigger', music, 'Volume', '0'),
-                VLib.Output('OnTrigger', music, 'Volume', '10', delay=0.1),
-                VLib.Output('OnTrigger', music, 'PlaySound', delay=0.1),
+                VLib.Output('OnTrigger', music_stopper, 'PlaySound'),
+                VLib.Output('OnTrigger', music_starter, 'PlaySound', delay=0.1),
             )
 
             if GAME_MODE == 'SP':

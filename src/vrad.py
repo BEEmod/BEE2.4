@@ -198,7 +198,7 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
         with builder.play_entry:
             builder.entry_name("music.BEE2_base")
 
-    # We need to stop the sub-tracks after the main track stops...
+    # We need to stop the sub-tracks after the main track stops
     with sound_stop.stack_start.build() as builder:
         builder.import_stack("P2_null_player_start")
         with builder.stop_entry:
@@ -281,6 +281,22 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
             with builder.volume_lfo_scale:
                 builder.input2("0.4")
 
+        # Restart base to sync properly
+        if sync_funnel:
+            with sound_funnel.stack_stop.build() as builder:
+                with builder.restart_main:
+                    builder.operator("sys_start_entry")
+                    builder.entry_name("music.BEE2_base")
+
+            # Stop existing bases when we restart the base.
+            with sound_base.stack_start.build() as builder:
+                with builder.stop_existing:
+                    builder.operator("sys_stop_entries")
+                    builder.input_max_entries("0")
+                    builder.match_entity("false")
+                    builder.match_substring("true")
+                    builder.match_entry("music.BEE2_")
+
     if has_bounce:
         sound_bounce = snd.Sound(
             "music.BEE2_gel_bounce",
@@ -320,7 +336,7 @@ def generate_music_script(data: Property, pack_list: PackList) -> bytes:
             with builder.volume_fade_out:
                 builder.input_max("0.1")
 
-    # If we want syncronisation, do that using opvars to keep it even when
+    # If we want synchronisation, do that using opvars to keep it even when
     # the base track is paused by the funnel.
     # We sync to the base track if the funnel isn't synced, otherwise the main.
 
