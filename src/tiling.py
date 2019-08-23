@@ -13,13 +13,12 @@ from typing import (
     Tuple, Dict, List,
     Optional, Union,
     Iterator,
-    cast,
 )
 
 import instanceLocs
 import utils
 import vbsp_options
-from srctools import Vec, Vec_tuple, VMF, Entity, Side, Solid, Output
+from srctools import Vec, VMF, Entity, Side, Solid, Output
 import srctools.logger
 from brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from texturing import TileSize, Portalable
@@ -481,7 +480,7 @@ class TileDef:
             raise IndexError(u, v)
         
         if self._sub_tiles is None:
-            self._sub_tiles = tile = {
+            self._sub_tiles = {
                 (x, y): value if u == x and v == y else self.base_type
                 for x in range(4) for y in range(4)
             }
@@ -543,7 +542,7 @@ class TileDef:
 
     def calc_patterns(
         self,
-        tiles: Dict[Union[Tuple[int, int], object], TileType],
+        tiles: Dict[Tuple[int, int], TileType],
         is_wall: bool=False,
         _pattern: str=None,
     ) -> Iterator[Tuple[float, float, float, float, TileSize, TileType]]:
@@ -563,7 +562,8 @@ class TileDef:
                 # Output the split patterns for centered fizzlers.
                 # We need to remove it also so our iteration doesn't choke on it.
                 # 'u' or 'v'
-                split_type = cast(str, tiles.pop(SUBTILE_FIZZ_KEY))
+                split_type: str
+                split_type = tiles.pop(SUBTILE_FIZZ_KEY) # type: ignore
                 patterns = self.calc_patterns(
                     tiles,
                     is_wall,
@@ -613,7 +613,7 @@ class TileDef:
 
         U and V should be 1 or -1.
         """
-        if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)] is Block.EMBED:
+        if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)].inside_map:
             return True
 
         u_ax, v_ax = Vec.INV_AXIS[self.normal.axis()]
@@ -801,7 +801,7 @@ class TileDef:
     def gen_multitile_pattern(
         self,
         vmf: VMF,
-        pattern: Dict,
+        pattern: Dict[Tuple[int, int], TileType],
         is_wall: bool,
         bevels: Tuple[bool, bool, bool, bool],
         normal: Vec,
@@ -814,16 +814,32 @@ class TileDef:
         brushes = []
         faces = []
 
+        def neighbour_empty(u: int, v: int) -> bool:
+            """For bevelling, check if this neighbour is VOID. If out of this tile ignore."""
+            if 0 <= u < 4 and 0 <= v < 4:
+                return pattern[u, v] is TileType.VOID
+            return False
+
         # NOTE: calc_patterns can produce 0, 1, 1.5, 2, 2.5, 3, 4!
         # Half-values are for nodrawing fizzlers which are center-aligned.
         for umin, umax, vmin, vmax, grid_size, tile_type in self.calc_patterns(pattern, is_wall):
-            # We bevel only the grid-edge tiles.
+            # We bevel only the grid-edge tiles, or ones adjacent to VOID.
+            # The first equality check ensures we don't go out of bounds in the
+            # genexp lookups.
+            u_range = range(max(int(umin), 0), min(int(umax), 4))
+            v_range = range(max(int(vmin), 0), min(int(vmax), 4))
+
             tile_bevels = (
-                umin == 0 and bevels[0],
-                umax == 4 and bevels[1],
-                vmin == 0 and bevels[2],
-                vmax == 4 and bevels[3],
+                bevels[0] if umin == 0 else
+                any(neighbour_empty(int(umin)-1, i) for i in v_range),
+                bevels[1] if umax == 4 else
+                any(neighbour_empty(int(umax), i) for i in v_range),
+                bevels[2] if vmin == 0 else
+                any(neighbour_empty(i, int(vmin)-1) for i in u_range),
+                bevels[3] if vmax == 4 else
+                any(neighbour_empty(i, int(vmax)) for i in u_range),
             )
+
             tile_center = self.uv_offset(
                 (umin + umax) * 16 - 64,
                 (vmin + vmax) * 16 - 64,
