@@ -467,7 +467,7 @@ class TileDef:
         """Lookup the tile type at a particular sub-location."""
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
-            raise ValueError(f'Invalid coordinates: {u}, {v}')
+            raise IndexError(u, v)
         
         if self._sub_tiles is None:
             return self.base_type
@@ -478,7 +478,7 @@ class TileDef:
         """Lookup the tile type at a particular sub-location."""
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
-            raise ValueError(f'Invalid coordinates: {u}, {v}')
+            raise IndexError(u, v)
         
         if self._sub_tiles is None:
             self._sub_tiles = tile = {
