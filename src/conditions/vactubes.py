@@ -1,15 +1,16 @@
 """Implements the cutomisable vactube items.
 """
 from collections import namedtuple
+from typing import Dict, Tuple, List
 
 import connections
 import srctools.logger
 import template_brush
+import tiling
 import vbsp
 from brushLoc import POS as BLOCK_POS
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    SOLIDS
 )
 import instanceLocs
 from srctools import (
@@ -69,10 +70,10 @@ CORNER_ANG = {
     (yn, xp): CornerAng('0 0 90', 'z'),
 }
 
-SUPPORT_POS = {}
+SUPPORT_POS: Dict[Tuple[float, float, float], List[Tuple[Vec, Vec]]] = {}
 
 
-def _make_support_table():
+def _make_support_table() -> None:
     """Make a table of angle/offset values for each direction."""
     for norm in (xp, xn, yp, yn, zp, zn):
         table = SUPPORT_POS[norm] = []
@@ -80,7 +81,7 @@ def _make_support_table():
             ang = Vec(norm).to_angle(roll=x)
             table.append((
                 ang,
-                Vec(0, 0, -64).rotate(*ang)
+                Vec(0, 0, -128).rotate(*ang)
             ))
 _make_support_table()  # Ensure local vars are destroyed
 
@@ -360,7 +361,15 @@ def make_straight(
         )
 
         for supp_ang, supp_off in support_positions:
-            if (position + supp_off).as_tuple() in SOLIDS:
+            try:
+                tile = tiling.TILES[
+                    (position + supp_off).as_tuple(),
+                    (-supp_off).norm().as_tuple()
+                ]
+            except KeyError:
+                continue
+            # Check all 4 center tiles are present.
+            if all(tile[u, v].is_tile for u in (1,2) for v in (1, 2)):
                 vbsp.VMF.create_ent(
                     classname='func_instance',
                     origin=position,
