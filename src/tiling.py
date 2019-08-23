@@ -68,7 +68,7 @@ UV_NORMALS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 # All the tiledefs in the map.
 # Maps a block center, normal -> the tiledef on the side of that block.
-TILES: Dict[Tuple[Vec_tuple, Vec_tuple], 'TileDef'] = {}
+TILES: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], 'TileDef'] = {}
 
 # Special key for Tile.SubTile - This is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
@@ -378,8 +378,8 @@ class TileDef:
         brush_type: BrushType - what sort of brush this is.
         base_type: TileSize this tile started with.
         override: If set, a specific texture to use. (skybox, light, backpanels etc)
-        sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz, yz or xy.
-          If None or a point is not in the dict, it's the same as base_type. (None=1x1 tile).
+        _sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz, yz or xy.
+          If None, it's the same as base_type.
         is_bullseye: If this tile has a bullseye attached to it (the instance is destroyed.)
         panel_inst: The instance for this panel, if it's a panel brush_type.
         panel_ent: The brush entity for the panel, if it's a panel brush_type.
@@ -390,7 +390,7 @@ class TileDef:
         'brush_type',
         'brush_faces',
         'base_type',
-        'sub_tiles',
+        '_sub_tiles',
         'override',
         'is_bullseye',
         'panel_inst',
@@ -414,7 +414,7 @@ class TileDef:
         self.brush_faces: List[Side] = []
         self.override: Optional[Tuple[str, template_brush.ScalingTemplate]] = None
         self.base_type = base_type
-        self.sub_tiles = subtiles
+        self._sub_tiles = subtiles
         self.is_bullseye = is_bullseye
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent
@@ -428,10 +428,9 @@ class TileDef:
     def print_tiles(self) -> None:
         """Debug utility, log the subtile shape."""
         out = []
-        tiles = self.get_subtiles()
         for v in reversed(range(4)):
             for u in range(4):
-                out.append(TILETYPE_TO_CHAR[tiles[u, v]])
+                out.append(TILETYPE_TO_CHAR[self[u, v]])
             out.append('\n')
         LOGGER.info('Subtiles: \n{}', ''.join(out))
 
@@ -451,19 +450,68 @@ class TileDef:
                 norm,
                 tile_type,
             )
-        tile.get_subtiles()
         return tile
 
-    def get_subtiles(self) -> Dict[Tuple[int, int], TileType]:
+    def _get_subtiles(self) -> Dict[Tuple[int, int], TileType]:
         """Returns subtiles, creating it if not present."""
-        if self.sub_tiles is None:
-            self.sub_tiles = tile = {
+        if self._sub_tiles is None:
+            self._sub_tiles = tile = {
                 (x, y): self.base_type
                 for x in range(4) for y in range(4)
             }
             return tile
         else:
-            return self.sub_tiles
+            return self._sub_tiles
+
+    def __getitem__(self, item: Tuple[int, int]) -> TileType:
+        """Lookup the tile type at a particular sub-location."""
+        u, v = item
+        if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
+            raise ValueError(f'Invalid coordinates: {u}, {v}')
+        
+        if self._sub_tiles is None:
+            return self.base_type
+        else:
+            return self._sub_tiles[u, v]
+
+    def __setitem__(self, item: Tuple[int, int], value: TileType) -> None:
+        """Lookup the tile type at a particular sub-location."""
+        u, v = item
+        if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
+            raise ValueError(f'Invalid coordinates: {u}, {v}')
+        
+        if self._sub_tiles is None:
+            self._sub_tiles = tile = {
+                (x, y): value if u == x and v == y else self.base_type
+                for x in range(4) for y in range(4)
+            }
+        else:
+            self._sub_tiles[u, v] = value
+            
+            if SUBTILE_FIZZ_KEY not in self._sub_tiles:
+                # Check if we can merge this down to a single value.
+                try:
+                    [base_type] = set(self._sub_tiles.values())
+                except ValueError:
+                    pass
+                else:
+                    self.base_type = base_type
+                    self._sub_tiles = None
+
+    def __iter__(self) -> Iterator[Tuple[int, int, TileType]]:
+        """Iterate over the axes and tile type."""
+        for u in range(4):
+            for v in range(4):
+                # Check each time, in case users modify while iterating.
+                if self._sub_tiles is None:
+                    yield u, v, self.base_type
+                else:
+                    yield u, v, self._sub_tiles[u, v]
+
+    def set_fizz_orient(self, axis: str) -> None:
+        """Set the centered fizzler nodraw strip."""
+        # This violates the _sub_tiles type definition.
+        self._get_subtiles()[SUBTILE_FIZZ_KEY] = axis  # type: ignore
 
     def uv_offset(self, u: float, v: float, norm: float) -> Vec:
         """Return a u/v offset from our position.
@@ -488,9 +536,9 @@ class TileDef:
         adjusted to include the face IDs.
         """
         try:
-            overlays = over.tiledefs
+            overlays = over.tiledefs  # type: ignore
         except AttributeError:
-            overlays = over.tiledefs = []
+            overlays = over.tiledefs = []  # type: ignore
         overlays.append(self)
 
     def calc_patterns(
@@ -580,22 +628,22 @@ class TileDef:
 
     def export(self, vmf: VMF) -> Iterator[Solid]:
         """Create the solid for this."""
-        bevels: Tuple[bool, bool, bool, bool] = tuple([  # type: ignore
+        bevels: Tuple[bool, bool, bool, bool] = tuple([
             self.should_bevel(u, v)
             for u, v in UV_NORMALS
-        ])
+        ])  # type: ignore
         front_pos = self.pos + 64 * self.normal
 
         is_wall = bool(self.normal.z)
 
-        if self.sub_tiles is None:
+        if self._sub_tiles is None:
             # Force subtiles to be all the parts we need.
-            self.sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
+            self._sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
 
         if self.brush_type is BrushType.NORMAL:
             faces, brushes = self.gen_multitile_pattern(
                 vmf,
-                self.sub_tiles,
+                self._sub_tiles,
                 is_wall,
                 bevels,
                 self.normal,
@@ -626,7 +674,7 @@ class TileDef:
             if static_angle is PanelAngle.ANGLE_90:
                 faces, brushes = self.gen_multitile_pattern(
                     vmf,
-                    self.sub_tiles,
+                    self._sub_tiles,
                     is_wall=bool(front_normal.z),
                     bevels=bevels,
                     normal=-front_normal,
@@ -637,7 +685,7 @@ class TileDef:
             else:
                 faces, brushes = self.gen_multitile_pattern(
                     vmf,
-                    self.sub_tiles,
+                    self._sub_tiles,
                     is_wall,
                     bevels,
                     self.normal,
@@ -725,11 +773,11 @@ class TileDef:
                     tile_type.inverted
                     if invert_black or tile_type.color is Portalable.WHITE else
                     tile_type
-                ) for uv, tile_type in self.sub_tiles.items()
+                ) for uv, tile_type in self._sub_tiles.items()
             }
             front_faces, brushes = self.gen_multitile_pattern(
                 vmf,
-                self.sub_tiles,
+                self._sub_tiles,
                 is_wall,
                 (False, False, False, False),
                 self.normal,
@@ -849,7 +897,7 @@ class TileDef:
         """Check if this tile is a simple tile that can merge with neighbours."""
         if (
             self.is_bullseye or
-            self.sub_tiles is not None or
+            self._sub_tiles is not None or
             self.panel_ent is not None or
             self.panel_inst is not None
         ):
@@ -913,12 +961,10 @@ def edit_quarter_tile(
             )
         return
 
-    subtiles = tile.get_subtiles()
-
-    old_tile = subtiles[u, v]
+    old_tile = tile[u, v]
 
     if force:
-        subtiles[u, v] = tile_type
+        tile[u, v] = tile_type
         return
 
     # Don't replace void spaces with other things
@@ -935,7 +981,7 @@ def edit_quarter_tile(
     ):
         return
 
-    subtiles[u, v] = tile_type
+    tile[u, v] = tile_type
 
 
 def make_tile(
@@ -1146,11 +1192,11 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
 
     # Look for Angled and Flip Panels, to link the tiledef to the instance.
     # First grab the instances.
-    panel_inst = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
+    panel_fname = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
 
     panels: Dict[str, Entity] = {}
     for inst in vmf_file.by_class['func_instance']:
-        if inst['file'].casefold() in panel_inst:
+        if inst['file'].casefold() in panel_fname:
             panels[inst['targetname']] = inst
 
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
@@ -1190,7 +1236,8 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
     # remove them.
     for over in vmf_file.by_class['info_overlay']:
         faces = over['sides', ''].split(' ')
-        tiles = over.tiledefs = []
+        tiles: List[TileDef]
+        tiles = over.tiledefs = []  # type: ignore
         for face in faces[:]:
             try:
                 tiles.append(face_to_tile[int(face)])
@@ -1222,13 +1269,9 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
                 except KeyError:
                     continue
 
-                if tile.sub_tiles is None:
-                    if tile.base_type in goo_replaceable:
-                        tile.base_type = TileType.GOO_SIDE
-                else:
-                    for uv, tile_type in tile.sub_tiles.items():
-                        if tile_type in goo_replaceable:
-                            tile.sub_tiles[uv] = TileType.GOO_SIDE
+                for u, v, tile_type in tile:
+                    if tile_type in goo_replaceable:
+                        tile[u, v] = TileType.GOO_SIDE
 
 
 def tiledefs_from_cube(face_to_tile: Dict[int, TileDef], brush: Solid, grid_pos: Vec):
@@ -1353,9 +1396,8 @@ def tiledefs_from_embedface(
     u_min, u_max = u_min // 32, u_max // 32 - 1
     v_min, v_max = v_min // 32, v_max // 32 - 1
 
-    subtiles = tile.get_subtiles()
     for uv in iter_uv(u_min, u_max, v_min, v_max):
-        subtiles[uv] = tex_kind
+        tile[uv] = tex_kind
 
 
 def find_front_face(
@@ -1542,16 +1584,18 @@ def generate_goo(vmf: VMF) -> None:
     """Generate goo pit brushes and triggers."""
     # We want to use as few brushes as possible.
     # So group them by their min/max Z, and then produce bounding boxes.
-    goo_pos: Dict[Tuple[int, int], Dict[Tuple[int, int], bool]] = defaultdict(dict)
+    goo_pos: Dict[Tuple[float, float], Dict[Tuple[float, float], bool]] = defaultdict(dict)
 
     # For triggers, we want to only group by the top surface, we don't care
     # how deep.
-    trig_pos: Dict[int, Dict[Tuple[int, int], bool]] = defaultdict(dict)
+    trig_pos: Dict[float, Dict[Tuple[float, float], bool]] = defaultdict(dict)
 
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
     # Valve just does it semi-randomly.
     goo_heights: Dict[Tuple[float, float, float], int] = Counter()
+
+    pos = None
 
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
@@ -1568,7 +1612,7 @@ def generate_goo(vmf: VMF) -> None:
             trig_pos[pos.z][pos.x, pos.y] = True
 
     # No goo.
-    if not goo_pos:
+    if not goo_pos or pos is None:
         return
 
     trig_phys = vmf.create_ent(

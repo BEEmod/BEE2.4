@@ -124,9 +124,9 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
             except KeyError:
                 continue
 
-            tile_type = tiledef.get_subtiles()[u, v]
+            tile_type = tiledef[u, v]
             if should_remove:
-                tiledef.get_subtiles()[u, v] = tiling.TileType.VOID
+                tiledef[u, v] = tiling.TileType.VOID
             if tile_type.is_tile:
                 if tile_type.color is tiling.Portalable.WHITE:
                     white_count += 1
@@ -146,9 +146,9 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
         except KeyError:
             tile_type = tiling.TileType.VOID
         else:
-            tile_type = tiledef.get_subtiles()[u, v]
+            tile_type = tiledef[u, v]
             if should_remove:
-                tiledef.get_subtiles()[u, v] = tiling.TileType.VOID
+                tiledef[u, v] = tiling.TileType.VOID
 
     if result_var:
         if tile_type.is_tile:

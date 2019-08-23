@@ -449,13 +449,12 @@ class Fizzler:
                 (origin - 64 * normal).as_tuple(),
                 normal.as_tuple()
             ]  # type: tiling.TileDef
-            subtiles = tile.get_subtiles()
 
             # Reversed?
             if up_axis == u_axis:
-                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'v'  # type: ignore
+                tile.set_fizz_orient('v')
             elif up_axis == v_axis:
-                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'u'  # type: ignore
+                tile.set_fizz_orient('u')  # type: ignore
             else:
                 LOGGER.error(
                     'Not U or V?: {} @ {} ("{}")',

@@ -758,10 +758,8 @@ def retexture_template(
                 picker_results[color_picker.name] = None
             continue
 
-        if tiledef.sub_tiles is None:
-            tile_type = tiledef.base_type
-        else:
-            tile_type = tiledef.sub_tiles[u, v]
+        tile_type = tiledef[u, v]
+
         try:
             tile_color = tile_type.color
         except ValueError:
@@ -773,7 +771,7 @@ def retexture_template(
             picker_results[color_picker.name] = tile_color
 
         if color_picker.remove_brush:
-            tiledef.get_subtiles()[u, v] = TileType.VOID
+            tiledef[u, v] = TileType.VOID
 
         for side in color_picker.sides:
             # Only do the highest priority successful one.
