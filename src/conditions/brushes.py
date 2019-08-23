@@ -165,37 +165,6 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
     door_ent['spawnflags'] = str(flags)
 
 
-@make_result("_ResetGridded")
-def res_temp_reset_gridded(inst: Entity):
-    """Temporary result - reset gridded state on a surface.
-
-    Used for antline routers to undo ItemLightStrip's 4x4 texturing.
-    This should be removed after geometry is done.
-    """
-    pos = Vec(0, 0, -64)
-    pos.localise(
-        Vec.from_str(inst['origin']),
-        Vec.from_str(inst['angles'])
-    )
-    norm = Vec(z=-1).rotate_by_str(inst['angles'])
-    for axis in 'xyz':
-        # Don't realign things in the normal's axis -
-        # those are already fine.
-        if not norm[axis]:
-            pos[axis] //= 128
-            pos[axis] *= 128
-            pos[axis] += 64
-    brush = SOLIDS.get(pos.as_tuple(), None)
-
-    if brush is None:
-        return
-
-    if brush.color is template_brush.MAT_TYPES.white:
-        brush.face.mat = const.WhitePan.WHITE_1x1
-    else:
-        brush.face.mat = const.BlackPan.BLACK_1
-
-
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
 def res_set_texture(inst: Entity, res: Property):
     """Set the brush face at a location to a particular texture.
