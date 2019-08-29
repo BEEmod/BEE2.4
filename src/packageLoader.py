@@ -166,6 +166,7 @@ class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
 
 T = TypeVar('T')
+PakT = TypeVar('PakT', bound='PakObject')
 
 
 class _PakObjectMeta(type):
@@ -240,12 +241,17 @@ class PakObject(metaclass=_PakObjectMeta):
         raise NotImplementedError
 
     @classmethod
-    def all(cls: Type[T]) -> Iterable[T]:
+    def post_parse(cls) -> None:
+        """Do processing after all objects have been fully parsed."""
+        pass
+
+    @classmethod
+    def all(cls: Type[PakT]) -> Iterable[PakT]:
         """Get the list of objects parsed."""
         return cls._id_to_obj.values()
 
     @classmethod
-    def by_id(cls: Type[T], object_id: str) -> T:
+    def by_id(cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
         return cls._id_to_obj[object_id.casefold()]
 
@@ -525,8 +531,9 @@ def load_packages(
         data.items()
     ))
 
-    LOGGER.info('Checking music objects...')
-    Music.check_objects()
+    for name, obj_type in OBJ_TYPES.items():
+        LOGGER.info('Post-process {} objects...', name)
+        obj_type.cls.post_parse()
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
@@ -2477,7 +2484,7 @@ class Music(PakObject):
             )
 
     @classmethod
-    def check_objects(cls):
+    def post_parse(cls):
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
