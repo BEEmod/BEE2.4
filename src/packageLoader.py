@@ -38,18 +38,17 @@ if TYPE_CHECKING:
     from gameMan import Game
     from selectorWin import SelitemData
     from loadScreen import LoadScreen
+    from typing import NoReturn
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 all_obj = {}
-obj_override = {}
-packages = {}  # type: Dict[str, Package]
-OBJ_TYPES = {}
+packages: Dict[str, 'Package'] = {}
+OBJ_TYPES: Dict[str, 'ObjType'] = {}
 
 # Maps a package ID to the matching filesystem for reading files easily.
-PACKAGE_SYS = {}  # type: Dict[str, FileSystem]
-
+PACKAGE_SYS: Dict[str, FileSystem] = {}
 
 # Don't change face IDs when copying to here.
 # This allows users to refer to the stuff in templates specifically.
@@ -262,7 +261,7 @@ class PakObject(metaclass=_PakObjectMeta):
         return cls._id_to_obj[object_id.casefold()]
 
 
-def reraise_keyerror(err: BaseException, obj_id: str):
+def reraise_keyerror(err: BaseException, obj_id: str) -> 'NoReturn':
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
@@ -455,7 +454,8 @@ def load_packages(
                 'essential resources and objects.'
             )
 
-        data = {}  # type: Dict[str, List[PakObject]]
+        data: Dict[str, List[PakObject]] = {}
+        obj_override: Dict[str, Dict[str, List[ParseData]]] = {}
 
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
@@ -470,7 +470,7 @@ def load_packages(
                 continue
 
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
-            parse_package(pack, has_tag_music, has_mel_music)
+            parse_package(pack, obj_override, has_tag_music, has_mel_music)
             loader.step("PAK")
 
         loader.set_length("OBJ", sum(
@@ -507,6 +507,7 @@ def load_packages(
                     )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
+                    raise
 
                 if not hasattr(object_, 'id'):
                     raise ValueError(
@@ -519,9 +520,7 @@ def load_packages(
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
                 for override_data in obj_override[obj_type].get(obj_id, []):
-                    override = OBJ_TYPES[obj_type].cls.parse(
-                        override_data
-                    )
+                    override = OBJ_TYPES[obj_type].cls.parse(override_data)
                     object_.add_over(override)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
@@ -551,16 +550,21 @@ def load_packages(
     return data, PACKAGE_SYS.values()
 
 
-def parse_package(pack: 'Package', has_tag=False, has_mel=False):
+def parse_package(
+    pack: 'Package',
+    obj_override: Dict[str, Dict[str, List[ParseData]]],
+    has_tag: bool=False,
+    has_mel: bool=False,
+) -> None:
     """Parse through the given package to find all the components."""
     for pre in Property.find_key(pack.info, 'Prerequisites', []):
         # Special case - disable these packages when the music isn't copied.
         if pre.value == '<TAG_MUSIC>':
             if not has_tag:
-                return 0
+                return
         elif pre.value == '<MEL_MUSIC>':
             if not has_mel:
-                return 0
+                return
         elif pre.value not in packages:
             LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
@@ -568,7 +572,7 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                 pre=pre.value,
                 id=pack.id,
             )
-            return 0
+            return
 
     # First read through all the components we have, so we can match
     # overrides to the originals
@@ -1428,18 +1432,18 @@ class Style(PakObject):
 class Item(PakObject):
     """An item in the editor..."""
     def __init__(
-            self,
-            item_id,
-            versions,
-            def_version,
-            needs_unlock=False,
-            all_conf=None,
-            unstyled=False,
-            isolate_versions=False,
-            glob_desc=(),
-            desc_last=False,
-            folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
-            ):
+        self,
+        item_id: str,
+        versions,
+        def_version,
+        needs_unlock: bool=False,
+        all_conf: Optional[Property]=None,
+        unstyled: bool=False,
+        isolate_versions: bool=False,
+        glob_desc: tkMarkdown.MarkdownData=(),
+        desc_last: bool=False,
+        folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
+    ) -> None:
         self.id = item_id
         self.versions = versions
         self.def_ver = def_version
@@ -1463,7 +1467,7 @@ class Item(PakObject):
         # The folders we parse for this - we don't want to parse the same
         # one twice. First they're set to True if we need to read them,
         # then parse_item_folder() replaces that with the actual values
-        folders = {}  # type: Dict[str, Optional[ItemVariant]]
+        folders: Dict[str, Optional[ItemVariant]] = {}
         unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
@@ -1515,7 +1519,7 @@ class Item(PakObject):
                     )
                 # We need to parse the folder now if set.
                 if folder.folder:
-                    folders[folder.folder] = True
+                    folders[folder.folder] = None
 
                 # The first style is considered the 'default', and is used
                 # if not otherwise present.
@@ -1953,26 +1957,26 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 class QuotePack(PakObject):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
-            self,
-            quote_id,
-            selitem_data: 'SelitemData',
-            config: Property,
-            chars=None,
-            skin=None,
-            studio: str=None,
-            studio_actor='',
-            cam_loc: Vec=None,
-            turret_hate=False,
-            interrupt=0.0,
-            cam_pitch=0.0,
-            cam_yaw=0.0,
-            ):
+        self,
+        quote_id,
+        selitem_data: 'SelitemData',
+        config: Property,
+        chars: Optional[Set[str]]=None,
+        skin: Optional[int]=None,
+        studio: str=None,
+        studio_actor: str='',
+        cam_loc: Vec=None,
+        turret_hate: bool=False,
+        interrupt: float=0.0,
+        cam_pitch: float=0.0,
+        cam_yaw: float=0.0,
+    ) -> None:
         self.id = quote_id
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
         set_cond_source(config, 'QuotePack <{}>'.format(quote_id))
-        self.chars = chars or ['??']
+        self.chars = chars or {'??'}
         self.studio = studio
         self.studio_actor = studio_actor
         self.cam_loc = cam_loc
@@ -2111,7 +2115,7 @@ class QuotePack(PakObject):
             LOGGER.info('Voice conf path: {}', path)
             if path.is_file():
                 shutil.copy(
-                    path,
+                    str(path),
                     exp_data.game.abs_path(
                         'bin/bee2/{}voice.cfg'.format(prefix)
                     )
@@ -2424,7 +2428,7 @@ class Music(PakObject):
     def has_channel(self, channel: MusicChannel):
         """Check if this track or its children has a channel."""
         if self.sound[channel]:
-             return True
+            return True
         if channel is MusicChannel.BASE and self.inst:
             # The instance provides the base track.
             return True
@@ -3222,7 +3226,13 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
         (-1, 0, 0): 'w',
     }
 
-    def __init__(self, temp_id: str, vmf_file: VMF, force=None, keep_brushes=True):
+    def __init__(
+        self,
+        temp_id: str,
+        vmf_file: VMF,
+        force: str=None,
+        keep_brushes: bool=True,
+    ) -> None:
         """Import in a BrushTemplate object.
 
         This copies the solids out of VMF_FILE and into TEMPLATE_FILE.
@@ -3440,7 +3450,7 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
         )
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Write the template VMF file."""
         # Sort the visgroup list by name, to make it easier to search through.
         TEMPLATE_FILE.vis_tree.sort(key=lambda vis: vis.name)
@@ -3501,7 +3511,7 @@ def desc_parse(
     return tkMarkdown.convert('\n'.join(lines))
 
 
-def get_selitem_data(info):
+def get_selitem_data(info: Property) -> 'SelitemData':
     """Return the common data for all item types - name, author, description.
     """
     from selectorWin import SelitemData
@@ -3531,7 +3541,10 @@ def get_selitem_data(info):
     )
 
 
-def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
+def join_selitem_data(
+    our_data: 'SelitemData',
+    over_data: 'SelitemData'
+) -> 'SelitemData':
     """Join together two sets of selitem data.
 
     This uses the over_data values if defined, using our_data if not.
