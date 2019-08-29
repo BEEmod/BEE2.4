@@ -7,6 +7,7 @@ Does stuff related to the actual games.
 """
 from pathlib import Path
 
+import tk_tools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -19,7 +20,6 @@ import re
 import io
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from query_dialogs import ask_string
 from srctools import (
     Vec, VPK,
     Property,
@@ -1459,11 +1459,11 @@ def add_game(e=None, refresh_menu=True):
 
         invalid_names = [gm.name for gm in all_games]
         while True:
-            name = ask_string(
-                prompt=_("Enter the name of this game:"),
-                title=_('BEE2 - Add Game'),
+            name = tk_tools.prompt(
+                _('BEE2 - Add Game'),
+                _("Enter the name of this game:"),
                 initialvalue=name,
-                )
+            )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,

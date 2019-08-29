@@ -9,7 +9,6 @@ import random
 from srctools import Property
 import music_conf
 from tk_tools import TK_ROOT
-from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
@@ -1188,7 +1187,7 @@ def pal_shuffle():
 def pal_save_as(e: Event=None):
     name = ""
     while True:
-        name = ask_string(
+        name = tk_tools.prompt(
             _("BEE2 - Save Palette"),
             _("Enter a name:"),
         )
