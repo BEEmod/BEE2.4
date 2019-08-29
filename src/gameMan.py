@@ -268,7 +268,7 @@ def should_backup_app(file: str) -> bool:
             return False  # Too small.
 
         # Read out the last 4096 bytes, and look for the sig in there.
-        f.seek(-SIZE,io.SEEK_END)
+        f.seek(-SIZE, io.SEEK_END)
 
         return b'MEI\014\013\012\013\016' not in f.read(SIZE)
 
@@ -292,15 +292,15 @@ class Game:
         """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():
-            raise ValueError(
-                'Game {} has invalid Steam ID: {}'.format(gm_id, steam_id)
-            )
+            raise ValueError(f'Game {gm_id} has invalid Steam ID: {steam_id}')
 
         folder = config.get_val(gm_id, 'Dir', '')
         if not folder:
-            raise ValueError(
-                'Game {} has no folder!'.format(gm_id)
-            )
+            raise ValueError(f'Game {gm_id} has no folder!')
+
+        if not os.path.exists(folder):
+            raise ValueError(f'Folder {folder} does not exist for game {gm_id}!')
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
@@ -1405,6 +1405,7 @@ def load():
                     CONFIG,
                 )
             except ValueError:
+                LOGGER.warning("Can't parse game: ", exc_info=True)
                 continue
             all_games.append(new_game)
             new_game.edit_gameinfo(True)
