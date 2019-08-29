@@ -60,32 +60,36 @@ TEMPLATE_FILE = VMF(preserve_ids=True)
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
 
-# Temporary data stored when parsing info.txt, but before .parse() is called.
-# This allows us to parse all packages before loading objects.
-ObjData = NamedTuple('ObjData', [
-    ('fsys', FileSystem),
-    ('info_block', Property),
-    ('pak_id', str),
-    ('disp_name', str),
-])
-# The arguments for pak_object.parse().
-ParseData = NamedTuple('ParseData', [
-    ('fsys', FileSystem),
-    ('id', str),
-    ('info', Property),
-    ('pak_id', str),
-    ('is_override', bool),
-])
-# The values stored for OBJ_TYPES
-ObjType = NamedTuple('ObjType', [
-    ('cls', Type['PakObject']),
-    ('allow_mult', bool),
-    ('has_img', bool),
-])
+
+class ObjData(NamedTuple):
+    """Temporary data stored when parsing info.txt, but before .parse() is called.
+
+    This allows us to parse all packages before loading objects.
+    """
+    fsys: FileSystem
+    info_block: Property
+    pak_id: str
+    disp_name: str
 
 
-# The arguments to pak_object.export().
+class ParseData(NamedTuple):
+    """The arguments for pak_object.parse()."""
+    fsys: FileSystem
+    id: str
+    info: Property
+    pak_id: str
+    is_override: bool
+
+
+class ObjType(NamedTuple):
+    """The values stored for OBJ_TYPES"""
+    cls: Type['PakObject']
+    allow_mult: bool
+    has_img: bool
+
+
 class ExportData(NamedTuple):
+    """The arguments to pak_object.export()."""
     # Usually str, but some items pass other things.
     selected: Any
     # Some items need to know which style is selected
@@ -94,20 +98,21 @@ class ExportData(NamedTuple):
     vbsp_conf: Property
     game: 'Game'
 
-# The desired variant for an item, before we've figured out the dependencies.
-UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
-    ('filesys', FileSystem),  # The original filesystem.
-    ('folder', Optional[str]),  # If set, use the given folder from our package.
-    ('style', Optional[str]),  # Inherit from a specific style (implies folder is None)
-    ('config', Optional[Property]),  # Config for editing
-])
 
-# Name, description and icon for each corridor in a style.
-CorrDesc = NamedTuple('CorrDesc', [
-    ('name', str),
-    ('icon', str),
-    ('desc', str),
-])
+class UnParsedItemVariant(NamedTuple):
+    """The desired variant for an item, before we've figured out the dependencies."""
+    filesys: FileSystem  # The original filesystem.
+    folder: Optional[str]  # If set, use the given folder from our package.
+    style: Optional[str] # Inherit from a specific style (implies folder is None)
+    config: Optional[Property]  # Config for editing
+
+
+class CorrDesc(NamedTuple):
+    """Name, description and icon for each corridor in a style."""
+    name: str
+    icon: str
+    desc: str
+
 
 # Corridor type to size.
 CORRIDOR_COUNTS = {
