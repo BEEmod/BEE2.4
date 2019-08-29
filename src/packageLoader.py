@@ -29,6 +29,7 @@ from typing import (
     Match,
     TypeVar,
     Callable,
+    Set,
 )
 
 
@@ -2139,6 +2140,38 @@ class QuotePack(PakObject):
             else:
                 children.append(Property(sub_prop.real_name, sub_prop.value))
         return Property(prop.real_name, children)
+
+    @classmethod
+    def post_parse(cls) -> None:
+        """Verify no quote packs have duplicate IDs."""
+
+        def iter_lines(conf: Property) -> Iterator[Property]:
+            """Iterate over the varios line blocks."""
+            yield from conf.find_all("Quotes", "Group", "Quote", "Line")
+
+            yield from conf.find_all("Quotes", "Midchamber", "Quote", "Line")
+
+            for group in conf.find_children("Quotes", "CoopResponses"):
+                if group.has_children():
+                    yield from group
+
+        for voice in cls.all():
+            used: Set[str] = set()
+            for quote in iter_lines(voice.config):
+                try:
+                    quote_id = quote['id']
+                except LookupError:
+                    quote_id = quote['name', '']
+                    LOGGER.warning(
+                        'Quote Pack "{}" has no specific ID for "{}"!',
+                        voice.id, quote_id,
+                    )
+                if quote_id in used:
+                    LOGGER.warning(
+                        'Quote Pack "{}" has duplicate '
+                        'voice ID "{}"!', voice.id, quote_id,
+                    )
+                used.add(quote_id)
 
 
 class Skybox(PakObject):
