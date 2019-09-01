@@ -159,6 +159,9 @@ TEX_DEFAULTS: Dict[
         # If set and enabled, adds frames for >10 sign pairs
         # to distinguish repeats.
         'shapeframe': '',
+
+        # Faith Plate bullseye for non-moving surfaces.
+        'bullseye': consts.Special.BULLSEYE,
     },
     # Misc textures.
     GenCat.SPECIAL: {
@@ -219,12 +222,12 @@ TEX_DEFAULTS: Dict[
     (GenCat.PANEL, Orient.WALL, Portalable.BLACK): {},
 
     # Bullseye:
-    (GenCat.PANEL, Orient.FLOOR, Portalable.WHITE): {},
-    (GenCat.PANEL, Orient.FLOOR, Portalable.BLACK): {},
-    (GenCat.PANEL, Orient.CEIL, Portalable.WHITE): {},
-    (GenCat.PANEL, Orient.CEIL, Portalable.BLACK): {},
-    (GenCat.PANEL, Orient.WALL, Portalable.WHITE): {},
-    (GenCat.PANEL, Orient.WALL, Portalable.BLACK): {},
+    (GenCat.BULLSEYE, Orient.FLOOR, Portalable.WHITE): {},
+    (GenCat.BULLSEYE, Orient.FLOOR, Portalable.BLACK): {},
+    (GenCat.BULLSEYE, Orient.CEIL, Portalable.WHITE): {},
+    (GenCat.BULLSEYE, Orient.CEIL, Portalable.BLACK): {},
+    (GenCat.BULLSEYE, Orient.WALL, Portalable.WHITE): {},
+    (GenCat.BULLSEYE, Orient.WALL, Portalable.BLACK): {},
 }
 
 # Default values for tile options.

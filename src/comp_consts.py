@@ -208,6 +208,7 @@ class Special(MaterialGroup):
     GLASS = "glass/glasswindow007a_less_shiny"
     GRATING = "metal/metalgrate018"
     LASERFIELD = "effects/laserplane"
+    BULLSEYE = "signage/mgf_overlay_bullseye"
 
 
 class Goo(MaterialGroup):

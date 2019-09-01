@@ -418,7 +418,7 @@ class TileDef:
     brush_faces: List[Side]
     brush_type: BrushType
     _sub_tiles: Optional[Dict[Tuple[int, int], TileType]]
-    override: Optional[Tuple[str, template_brush.ScalingTemplate]]
+    override: Optional[Tuple[str, 'template_brush.ScalingTemplate']]
 
     bullseye_count: int
     portal_helper: Union[int, Vec]
@@ -740,8 +740,8 @@ class TileDef:
                     vmf,
                     self.normal,
                     front_pos,
-                    Vec(x=1).rotate(*angles),
-                    Vec(y=1).rotate(*angles),
+                    Vec(y=64).rotate(*angles),
+                    Vec(z=64).rotate(*angles),
                     texturing.OVERLAYS.get(front_pos, 'bullseye'),
                     self.brush_faces,
                 )
@@ -780,15 +780,30 @@ class TileDef:
                 )
                 if self.bullseye_count > 0:
                     # Add the bullseye overlay.
-                    angles = self.normal.to_angle()
+                    angles = (-front_normal).to_angle()
                     srctools.vmf.make_overlay(
                         vmf,
                         -front_normal,
-                        front_pos + 8 * self.normal,
-                        64 * self.normal,
-                        64 * hinge_axis,
+                        self.pos + 128 * self.normal - 64 * front_normal,
+                        Vec(y=64).rotate(*angles),
+                        Vec(z=64).rotate(*angles),
                         texturing.OVERLAYS.get(front_pos, 'bullseye'),
                         faces,
+                    )
+
+                if has_helper:
+                    # We need to make a placement helper.
+                    if force_helper:
+                        helper_angles = (-front_normal).to_angle_roll(self.normal)
+                    else:
+                        helper_angles = (-front_normal).to_angle()
+                    vmf.create_ent(
+                        'info_placement_helper',
+                        angles=helper_angles,
+                        origin=self.pos + 128 * self.normal - 64 * front_normal,
+                        force_placement=int(force_helper),
+                        snap_to_helper_angles=int(force_helper),
+                        radius=96,
                     )
             else:
                 faces, brushes = self.gen_multitile_pattern(
@@ -822,6 +837,22 @@ class TileDef:
                     back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
                 )
                 vmf.add_brush(brush)
+
+                if has_helper:
+                    # We need to make a placement helper.
+                    if force_helper:
+                        helper_angles = self.normal.to_angle_roll(self.portal_helper)
+                    else:
+                        helper_angles = self.normal.to_angle()
+                    vmf.create_ent(
+                        'info_placement_helper',
+                        angles=helper_angles,
+                        origin=front_pos + 8 * self.normal,
+                        force_placement=int(force_helper),
+                        snap_to_helper_angles=int(force_helper),
+                        radius=96,
+                    )
+
                 if self.bullseye_count > 0:
                     # Add the bullseye overlay.
                     angles = self.normal.to_angle()
@@ -829,8 +860,8 @@ class TileDef:
                         vmf,
                         self.normal,
                         front_pos + 8 * self.normal,
-                        Vec(x=64).rotate(*angles),
                         Vec(y=64).rotate(*angles),
+                        Vec(z=64).rotate(*angles),
                         texturing.OVERLAYS.get(front_pos, 'bullseye'),
                         faces,
                     )
@@ -921,8 +952,9 @@ class TileDef:
             self.panel_ent['noise1'] = vbsp_options.get(str, 'flip_sound_start')
             self.panel_ent['noise2'] = vbsp_options.get(str, 'flip_sound_stop')
 
-            if has_helper:
-                # We need to make a placement helper. On a flip panel,
+            if self.portal_helper > 0:
+                # We need to make a placement helper. Don't check portalability
+                # since the panel can change. On a flip panel,
                 # we don't want to parent so it is always on the front side.
                 if force_helper:
                     helper_angles = self.normal.to_angle_roll(self.portal_helper)
@@ -936,7 +968,7 @@ class TileDef:
                     force_placement=int(force_helper),
                     snap_to_helper_angles=int(force_helper),
                     attach_target_name=self.panel_ent['targetname'],
-                    radius=96,  # Expand since it should be restricted to this panel.
+                    radius=64,
                 )
 
     def gen_multitile_pattern(
@@ -986,6 +1018,17 @@ class TileDef:
                 any(neighbour_empty(i, int(vmax)) for i in u_range),
             )
 
+            # Check if this tile needs to use a bullseye material.
+            tile_is_bullseye = add_bullseye and not (
+                umin > 2 or vmin > 2 or
+                umax < 1 or vmax < 1
+            )
+            gen_cat = (
+                texturing.GenCat.BULLSEYE
+                if tile_is_bullseye else
+                texturing.GenCat.NORMAL
+            )
+
             tile_center = self.uv_offset(
                 (umin + umax) * 16 - 64,
                 (vmin + vmax) * 16 - 64,
@@ -999,18 +1042,14 @@ class TileDef:
                     # This forces a specific size.
                     u_size = v_size = 4
                     tex = texturing.gen(
-                        texturing.GenCat.NORMAL,
-                        normal,
-                        Portalable.BLACK
+                        gen_cat, normal, Portalable.BLACK
                     ).get(tile_center, TileSize.GOO_SIDE)
                 else:
                     if tile_type.is_4x4:
                         grid_size = TileSize.TILE_4x4
                     u_size, v_size = TILE_SIZES[grid_size]
                     tex = texturing.gen(
-                        texturing.GenCat.NORMAL,
-                        normal,
-                        tile_type.color,
+                        gen_cat, normal, tile_type.color,
                     ).get(tile_center, grid_size)
                 brush, face = make_tile(
                     vmf,
