@@ -662,23 +662,25 @@ class TileDef:
         """Check if this tile could be portalled (in the center)."""
 
         # If any of the middle 2x2 are black, then nope.
-        if (not self[1, 1].is_white or not self[1, 2].is_white or
+        if (
+            not self[1, 1].is_white or not self[1, 2].is_white or
             not self[2, 1].is_white or not self[2, 2].is_white
         ):
             return False
 
         # If the top and bottom is white, you can always fit a portal.
-        if (self[1, 0].is_white and self[2, 1].is_white and
+        if (
+            self[1, 0].is_white and self[2, 1].is_white and
             self[3, 0].is_white and self[3, 1].is_white
         ):
             return True
 
         # Finally, for floors/ceilings you can place it 'sideways'.
-        if (self.normal.z != 0 and
+        return (
+            self.normal.z != 0 and
             self[0, 1].is_white and self[0, 2].is_white and
             self[3, 1].is_white and self[3, 2].is_white
-        ):
-            return True
+        )
 
     def export(self, vmf: VMF) -> None:
         """Create the brushes for this.
@@ -1485,7 +1487,6 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
                 tile = TILES[(origin - 128 * norm).as_tuple(), norm.as_tuple()]
             except KeyError:
                 continue
-            assert isinstance(tile.portal_helper, int), repr(tile)
             assert isinstance(tile.portal_helper, int), repr(tile)
             tile.bullseye_count += 1
             tile.portal_helper += 1
