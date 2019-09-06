@@ -201,6 +201,8 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
         inst.remove()
         del connections.ITEMS[targ]
 
+    return  # TODO: Reimplement cutout tiles.
+
     for start_floor, end_floor in FLOOR_IO:
         box_min = Vec(INST_LOCS[start_floor])
         box_min.min(INST_LOCS[end_floor])
