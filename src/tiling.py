@@ -386,12 +386,14 @@ class TileDef:
           Empty before-hand, but after these are faces to attach antlines to.
         brush_type: BrushType - what sort of brush this is.
         base_type: TileSize this tile started with.
-        override: If set, a specific texture to use. (skybox, light, backpanels etc)
-        _sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz, yz or xy.
+        override: If set, a specific texture to use. (skybox, light,
+        backpanels etc)
+        _sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz,
+        yz or xy.
           If None, it's the same as base_type.
         bullseye_count: The number of bullseye items on this surface. If > 0,
           we have some.
-        portal_helper: The number of portal placement helpers here. If > 0,
+        _portal_helper: The number of portal placement helpers here. If > 0,
           a non-anglesnap helper is present. If a Vector instead, a forced
           helper is present pointing this direction.
         panel_inst: The instance for this panel, if it's a panel brush_type.
@@ -406,7 +408,7 @@ class TileDef:
         '_sub_tiles',
         'override',
         'bullseye_count',
-        'portal_helper',
+        '_portal_helper',
         'panel_inst',
         'panel_ent',
     ]
@@ -421,7 +423,7 @@ class TileDef:
     override: Optional[Tuple[str, 'template_brush.ScalingTemplate']]
 
     bullseye_count: int
-    portal_helper: Union[int, Vec]
+    _portal_helper: Union[int, Vec]
 
     panel_inst: Optional[Entity]
     panel_ent: Optional[Entity]
@@ -446,7 +448,29 @@ class TileDef:
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent
         self.bullseye_count = 0
-        self.portal_helper = 0
+        self._portal_helper = 0
+
+    @property
+    def has_portal_helper(self) -> bool:
+        """Check if the portal helper is present."""
+        return isinstance(self._portal_helper, Vec) or self._portal_helper != 0
+
+    @property
+    def has_oriented_portal_helper(self) -> bool:
+        """Check if we have a portal helper with a specific direction."""
+        return isinstance(self._portal_helper, Vec)
+
+    @property
+    def portal_helper_orient(self) -> Vec:
+        """Return the direction of the 'top' of the portal helper."""
+        if isinstance(self._portal_helper, Vec):
+            return self._portal_helper
+        elif self.normal.z == 0:
+            # Wall, upward.
+            return Vec(0, 0, 1)
+        else:
+            # floor/ceiling, any direction. So just specify +X.
+            return Vec(1, 0, 0)
 
     def __repr__(self) -> str:
         return '<{}, {} TileDef @ {} of {}>'.format(
@@ -696,10 +720,10 @@ class TileDef:
 
         is_wall = bool(self.normal.z)
 
-        if isinstance(self.portal_helper, Vec):
+        if self.has_oriented_portal_helper:
             force_helper = True
-            has_helper = False
-        elif self.portal_helper > 0 and self.can_portal():
+            has_helper = True
+        elif self.has_portal_helper and self.can_portal():
             force_helper = False
             has_helper = True
         else:
@@ -723,7 +747,7 @@ class TileDef:
             if has_helper:
                 # We need to make a placement helper.
                 if force_helper:
-                    helper_angles = self.normal.to_angle_roll(self.portal_helper)
+                    helper_angles = self.normal.to_angle_roll(self.portal_helper_orient)
                 else:
                     helper_angles = self.normal.to_angle()
 
@@ -843,7 +867,7 @@ class TileDef:
                 if has_helper:
                     # We need to make a placement helper.
                     if force_helper:
-                        helper_angles = self.normal.to_angle_roll(self.portal_helper)
+                        helper_angles = self.normal.to_angle_roll(self._portal_helper)
                     else:
                         helper_angles = self.normal.to_angle()
                     vmf.create_ent(
@@ -954,18 +978,13 @@ class TileDef:
             self.panel_ent['noise1'] = vbsp_options.get(str, 'flip_sound_start')
             self.panel_ent['noise2'] = vbsp_options.get(str, 'flip_sound_stop')
 
-            if self.portal_helper > 0:
+            if self.has_portal_helper:
                 # We need to make a placement helper. Don't check portalability
                 # since the panel can change. On a flip panel,
                 # we don't want to parent so it is always on the front side.
-                if force_helper:
-                    helper_angles = self.normal.to_angle_roll(self.portal_helper)
-                else:
-                    helper_angles = self.normal.to_angle()
-
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=helper_angles,
+                    angles=self.normal.to_angle_roll(self.portal_helper_orient),
                     origin=front_pos,
                     force_placement=int(force_helper),
                     snap_to_helper_angles=int(force_helper),
@@ -1103,7 +1122,7 @@ class TileDef:
             self.panel_ent is not None or
             self.panel_inst is not None or
             self.bullseye_count > 0 or
-            self.portal_helper != 0
+            self._portal_helper != 0
         ):
             return False
 
@@ -1114,6 +1133,34 @@ class TileDef:
             return False
 
         return self.base_type.is_tile
+
+    def add_portal_helper(self, orient: Vec=None) -> None:
+        """Add a portal placement helper to the tile.
+
+        If orient is provided, it should be the direction towards the
+        top of the portal.
+        """
+        # Specific direction overrides everything.
+        if orient is not None:
+            if self.normal.dot(orient) != 0:
+                raise ValueError(
+                    'Portal orient of {} is not flat on a '
+                    'plane with normal of {}!',
+                    orient, self.normal,
+                )
+            self._portal_helper = orient
+        elif isinstance(self._portal_helper, int):
+            self._portal_helper += 1
+        # else: it's already a Vec, so don't override with a generic helper.
+
+    def remove_portal_helper(self) -> None:
+        """Remove a single "generic" placement helper.
+
+        Specifically applied orients are never removed.
+        """
+        # Clamp at zero.
+        if isinstance(self._portal_helper, int):
+            self._portal_helper = max(0, self._portal_helper - 1)
 
 
 def find_tile(origin: Vec, normal: Vec) -> Tuple[TileDef, int, int]:
@@ -1476,20 +1523,6 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
                 for u, v, tile_type in tile:
                     if tile_type in goo_replaceable:
                         tile[u, v] = TileType.GOO_SIDE
-
-    # Loop over catapult targets, recording those.
-    faith_targ_file = instanceLocs.resolve('<ITEM_CATAPULT_TARGET>')
-    for inst in vmf_file.by_class['func_instance']:
-        if inst['file'].casefold() in faith_targ_file:
-            origin = Vec.from_str(inst['origin'])
-            norm = Vec(z=1).rotate_by_str(inst['angles'])
-            try:
-                tile = TILES[(origin - 128 * norm).as_tuple(), norm.as_tuple()]
-            except KeyError:
-                continue
-            assert isinstance(tile.portal_helper, int), repr(tile)
-            tile.bullseye_count += 1
-            tile.portal_helper += 1
 
 
 def tiledefs_from_cube(face_to_tile: Dict[int, TileDef], brush: Solid, grid_pos: Vec):
