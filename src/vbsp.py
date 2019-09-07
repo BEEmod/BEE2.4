@@ -8,7 +8,6 @@ import os
 import sys
 import shutil
 import random
-import itertools
 import logging
 from enum import Enum
 from io import StringIO
@@ -34,6 +33,7 @@ import connections
 import instance_traits
 import template_brush
 import fizzler
+import faithplate
 import comp_consts as consts
 import cubes
 import barriers
@@ -2557,6 +2557,8 @@ def main() -> None:
 
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
+        faithplate.analyse_map(VMF)
+
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
@@ -2564,6 +2566,7 @@ def main() -> None:
         fixup_goo_sides()  # Must be done before change_brush()!
         #change_brush()
         tiling.generate_brushes(VMF)
+        faithplate.gen_faithplates(VMF)
         change_overlays()
         barriers.make_barriers(VMF)
         fix_worldspawn()

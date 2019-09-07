@@ -15,6 +15,8 @@ from typing import (
     Iterator,
 )
 
+import math
+
 import instanceLocs
 import utils
 import vbsp_options
@@ -1161,6 +1163,45 @@ class TileDef:
         # Clamp at zero.
         if isinstance(self._portal_helper, int):
             self._portal_helper = max(0, self._portal_helper - 1)
+
+    def position_bullseye(self, target: Entity) -> None:
+        """Position a faith plate target to hit this panel.
+
+        This needs to set origin and targetname.
+        """
+        if self.brush_type is BrushType.ANGLED_PANEL:
+            assert self.panel_inst is not None
+            assert self.panel_ent is not None
+
+            if self.panel_inst.fixup.int('$connectioncount') != 0:
+                target['origin'] = self.pos + 64 * self.normal
+                target['parentname'] = self.panel_ent['targetname']
+                target['targetname']  = (
+                    self.panel_inst['targetname'] +
+                    '-bullseye_target'
+                )
+                # Everything else uses a generic name.
+                return
+
+            static_angle = PanelAngle.from_inst(self.panel_inst)
+            if static_angle is PanelAngle.ANGLE_FLAT:
+                target['origin'] = self.pos + 68 * self.normal
+            else:
+                panel_top = Vec(
+                    x=-64 + 64 * math.cos(math.radians(static_angle.value)),
+                    z=-64 + 64 * math.sin(math.radians(static_angle.value)),
+                )
+                panel_top.localise(
+                    Vec.from_str(self.panel_inst['origin']),
+                    Vec.from_str(self.panel_inst['angles']),
+                )
+                target['origin'] = panel_top
+        else:
+            # Otherwise, flat on the surface.
+            target['origin'] = self.pos + 64 * self.normal
+
+        target['targetname'] = 'faith_target_'
+        target.make_unique()
 
 
 def find_tile(origin: Vec, normal: Vec) -> Tuple[TileDef, int, int]:
