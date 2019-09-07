@@ -65,8 +65,6 @@ NORM_ANGLES = {
     Vec(z=1).as_tuple(): Vec(270, 270,  0),
     Vec(z=-1).as_tuple(): Vec(90, 90, 0),
 }
-# U-min, max, V-min, max in order.
-UV_NORMALS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 NORM_NAMES = {
     Vec(x=1).as_tuple(): 'east',
@@ -715,10 +713,13 @@ class TileDef:
         This is only called on special tiles with different patterns,
         or which have items modifying them.
         """
-        bevels: Tuple[bool, bool, bool, bool] = tuple([
-            self.should_bevel(u, v)
-            for u, v in UV_NORMALS
-        ])  # type: ignore
+        bevels: Tuple[bool, bool, bool, bool] = (
+            self.should_bevel(-1, 0),
+            self.should_bevel(+1, 0),
+            self.should_bevel(0, -1),
+            self.should_bevel(0, +1),
+        )
+
         front_pos = self.pos + 64 * self.normal
 
         is_wall = bool(self.normal.z)
