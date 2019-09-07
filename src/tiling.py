@@ -796,7 +796,8 @@ class TileDef:
                 static_angle = None
                 thickness = vbsp_options.get(int, 'dynamic_pan_thickness')
             else:
-                # Static panels can be straight.
+                # Static panels can be flat on the sides since they don't need
+                # to actually retract..
                 bevels = (False, False, False, False)
                 static_angle = PanelAngle.from_inst(self.panel_inst)
                 thickness = vbsp_options.get(int, 'static_pan_thickness')
@@ -880,17 +881,13 @@ class TileDef:
 
                 if has_helper:
                     # We need to make a placement helper.
-                    if force_helper:
-                        helper_angles = self.normal.to_angle_roll(self._portal_helper)
-                    else:
-                        helper_angles = self.normal.to_angle()
                     vmf.create_ent(
                         'info_placement_helper',
-                        angles=helper_angles,
+                        angles=self.normal.to_angle_roll(self.portal_helper_orient),
                         origin=front_pos + 8 * self.normal,
                         force_placement=int(force_helper),
                         snap_to_helper_angles=int(force_helper),
-                        radius=96,
+                        radius=64,
                     )
 
                 if has_bullseye:
@@ -913,7 +910,13 @@ class TileDef:
                 # Figure out if we want to rotate +ve or -ve.
                 # We know rotating the surface 90 degrees will point
                 # the end straight up, so check if it points at the normal.
-                if Vec(y=1).rotate(*hinge_axis.rotation_around()) == self.normal:
+                maybe_rotate = Vec(x=1).rotate(*hinge_axis.rotation_around()) == self.normal
+
+                # This direction is inverted...
+                if front_normal == (-1, 0, 0):
+                    maybe_rotate = not maybe_rotate
+
+                if maybe_rotate:
                     rotation = hinge_axis.rotation_around(static_angle.value)
                 else:
                     rotation = hinge_axis.rotation_around(-static_angle.value)
@@ -953,6 +956,40 @@ class TileDef:
                         clip_face.vaxis = clip_template.vaxis.copy()
                         clip_face.planes = [p.copy() for p in clip_template.planes]
                         clip_face.mat = consts.Tools.NODRAW
+
+                # Helpfully the angled surfaces are always going to be forced
+                # upright, so we don't need to compute the orientation matching
+                # the item axis.
+                angled_normal = self.normal.copy().rotate(*rotation)
+                top_center = (
+                    (64 * front_normal).rotate(*rotation) -
+                    64 * front_normal +
+                    front_pos
+                )
+
+                if has_helper:
+                    # We need to make a placement helper.
+                    vmf.create_ent(
+                        'info_placement_helper',
+                        angles=angled_normal.to_angle(),
+                        origin=top_center,
+                        force_placement=int(force_helper),
+                        snap_to_helper_angles=int(force_helper),
+                        radius=64,
+                    )
+
+                if has_bullseye:
+                    # Add the bullseye overlay.
+                    angles = self.normal.to_angle()
+                    srctools.vmf.make_overlay(
+                        vmf,
+                        self.normal,
+                        top_center,
+                        (64 * front_normal).rotate(*rotation),
+                        (64 * hinge_axis),
+                        texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                        faces,
+                    )
 
         elif self.brush_type is BrushType.FLIP_PANEL:
             assert self.panel_inst is not None
