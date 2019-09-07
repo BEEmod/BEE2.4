@@ -106,7 +106,7 @@ def analyse_map(vmf: VMF) -> None:
                 out
                 for out in
                 trig.outputs
-                if not out.inst_out
+                if not out.inst_in
             ]
         else:
             LOGGER.warning('Unknown trigger "{}"?', name)
