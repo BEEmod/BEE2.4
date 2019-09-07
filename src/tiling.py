@@ -439,6 +439,7 @@ class TileDef:
         subtiles: Dict[Tuple[int, int], TileType]=None,
         panel_inst: Entity=None,
         panel_ent: Entity=None,
+        has_helper: bool=False,
     ) -> None:
         self.pos = pos
         self.normal = normal
@@ -450,7 +451,7 @@ class TileDef:
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent
         self.bullseye_count = 0
-        self._portal_helper = 0
+        self._portal_helper = 1 if has_helper else 0
 
     @property
     def has_portal_helper(self) -> bool:
@@ -1638,6 +1639,8 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         brush_type=BrushType.ANGLED_PANEL,
         panel_ent=brush_ent,
         panel_inst=panel_ent,
+        # Add a helper if portalable.
+        has_helper=tex_kind.is_white,
     )
 
 
@@ -1656,6 +1659,8 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         brush_type=BrushType.FLIP_PANEL,
         panel_ent=brush_ent,
         panel_inst=panel_ent,
+        # Flip panels always are portalable at some point, so add a helper.
+        has_helper=True,
     )
 
 
