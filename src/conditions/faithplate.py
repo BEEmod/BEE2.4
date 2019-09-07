@@ -1,15 +1,11 @@
 """Modify and inspect faith plates."""
-from typing import Callable
-
 import srctools.logger
-import connections
 import faithplate
 import template_brush
 from conditions import (
     make_flag, make_result, make_result_setup,
-    resolve_value, local_name,
 )
-from srctools import Property, Entity, Output, Vec, VMF
+from srctools import Property, Entity, VMF
 
 
 COND_MOD_NAME = 'Faith Plates'
@@ -21,8 +17,8 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.faithplate')
 def flag_faith_type(inst: Entity, flag: Property) -> bool:
     """Determine the type of faith plate used.
 
-    The value can be set to 'straight', 'angled', or 'any' to detect those
-    types of plates.
+    The value can be set to 'straight', 'straightup', 'angled',
+    or 'any' to detect those types of plates.
     """
     plate = faithplate.PLATES.get(inst['targetname'])
 
@@ -30,14 +26,14 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
 
     if des_type == 'any':
         return plate is not None
-    elif des_type == 'straight':
+    elif des_type in ('straight', 'straightup'):
         return isinstance(plate, faithplate.StraightPlate)
     elif des_type == 'angled':
         return isinstance(plate, faithplate.AngledPlate)
     else:
         LOGGER.warning(
             'Unknown faith plate type "{}" '
-            '(expected straight, angled, any).',
+            '(expected straight, straightup, angled, any).',
             des_type,
         )
         return plate is not None
