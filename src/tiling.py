@@ -732,6 +732,16 @@ class TileDef:
         else:
             force_helper = has_helper = False
 
+        # If all four center blocks can't accept the overlay,
+        # we can't add a bullseye.
+        if (
+            self[1, 1].is_tile or not self[1, 2].is_tile or
+            self[2, 1].is_tile or not self[2, 2].is_tile
+        ):
+            has_bullseye = self.bullseye_count > 0
+        else:
+            has_bullseye = False
+
         if self._sub_tiles is None:
             # Force subtiles to be all the parts we need.
             self._sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
@@ -762,7 +772,7 @@ class TileDef:
                     snap_to_helper_angles=int(force_helper),
                     radius=64,
                 )
-            if self.bullseye_count > 0:
+            if has_bullseye:
                 # Add the bullseye overlay.
                 angles = self.normal.to_angle()
                 srctools.vmf.make_overlay(
@@ -807,7 +817,7 @@ class TileDef:
                     thickness=thickness,
                     is_panel=True,
                 )
-                if self.bullseye_count > 0:
+                if has_bullseye:
                     # Add the bullseye overlay.
                     angles = (-front_normal).to_angle()
                     srctools.vmf.make_overlay(
@@ -882,7 +892,7 @@ class TileDef:
                         radius=96,
                     )
 
-                if self.bullseye_count > 0:
+                if has_bullseye:
                     # Add the bullseye overlay.
                     angles = self.normal.to_angle()
                     srctools.vmf.make_overlay(
@@ -962,7 +972,7 @@ class TileDef:
                 is_wall,
                 (False, False, False, False),
                 self.normal,
-                add_bullseye=self.bullseye_count > 0,
+                add_bullseye=has_bullseye,
             )
             self.panel_ent.solids.extend(brushes)
             back_faces, brushes = self.gen_multitile_pattern(
@@ -972,7 +982,7 @@ class TileDef:
                 (False, False, False, False),
                 -self.normal,
                 offset=64-8,
-                add_bullseye=self.bullseye_count > 0,
+                add_bullseye=has_bullseye,
             )
             self.panel_ent.solids.extend(brushes)
             inset_flip_panel(self.panel_ent, front_pos, self.normal)
