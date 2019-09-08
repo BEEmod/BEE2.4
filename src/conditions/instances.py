@@ -150,6 +150,33 @@ def flag_instvar(inst: Entity, flag: Property):
         return inst.fixup.bool(flag.value)
 
 
+@make_flag('offsetDist')
+def flag_offset_distance(inst: Entity, flag: Property) -> bool:
+    """Check if the given instance is in an offset position.
+
+    This computes the distance between the instance location and the center
+    of the voxel.
+    The value can be the distance for an exact check, '< x', '> $var', etc.
+    """
+    origin = Vec.from_str(inst['origin'])
+    grid_pos = origin // 128 * 128 + 64
+    offset = (origin - grid_pos).mag()
+
+    try:
+        op, comp_val = flag.value.split()
+    except ValueError:
+        # A single value.
+        op = '='
+        comp_val = flag.value
+
+    try:
+        value = float(conditions.resolve_value(inst, comp_val))
+    except ValueError:
+        return False
+
+    return INSTVAR_COMP.get(op, operator.eq)(offset, value)
+
+
 @make_result('rename', 'changeInstance')
 def res_change_instance(inst: Entity, res: Property):
     """Set the file to a value."""
