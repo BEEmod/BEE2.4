@@ -8,8 +8,7 @@ import connections
 import instanceLocs
 import tiling
 import template_brush
-import instance_traits
-from srctools import Entity, Vec, VMF, Output
+from srctools import Entity, Vec, VMF
 from srctools.logger import get_logger
 
 from typing import Dict, Optional, List, Tuple, Union
@@ -18,7 +17,7 @@ from typing import Dict, Optional, List, Tuple, Union
 LOGGER = get_logger(__name__)
 
 # Targetname -> plate.
-PLATES: Dict[str, 'FaithPlate'] = {}
+PLATES: Dict[str, Union['AngledPlate', 'StraightPlate']] = {}
 
 
 class FaithPlate:

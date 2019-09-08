@@ -1,40 +1,37 @@
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 import os
 import math
 
 import connections
 from conditions import (
-    make_result, make_result_setup, meta_cond, RES_EXHAUSTED,
+    make_result, make_result_setup, meta_cond,
     local_name
 )
 import instanceLocs
+import faithplate
 from srctools import Property, Vec, Entity, VMF, Output
 import srctools.logger
 import vbsp_options
 import voiceLine
 
-from typing import Optional, List, Dict, Tuple
+from typing import List
 
 
 COND_MOD_NAME = 'Monitors'
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.monitor')
 
-ALL_MONITORS = []  # type: List[Monitor]
-ALL_CAMERAS = []  # type: List[Camera]
+Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
 
-# Keep a counter of the number of monitor bullseyes at a pos.
-# This allows us to ensure we don't remove catapults also aiming here,
-# and that we remove when more than one camera is pointed here.
-BULLSYE_LOCS = defaultdict(int)  # type: Dict[Tuple[float, float, float], int]
+ALL_CAMERAS: List[Camera] = []
 
 MON_ARGS_SCRIPT = os.path.join('bee2', 'inject', 'monitor_args.nut')
 
-Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
-Monitor = namedtuple('Monitor', 'inst')
-
 # Are there monitors that should be shot?
 NEEDS_TURRET = False
+
+# Do any monitors exist?
+HAS_MONITOR = False
 
 # ai_relationships used for monitors.
 # If non-emtpy we have monitors to shoot by turrets.
@@ -61,6 +58,7 @@ def res_monitor(inst: Entity, res: Property) -> None:
     """Result for the monitor component.
 
     """
+    global HAS_MONITOR
     import vbsp
 
     (
@@ -70,7 +68,7 @@ def res_monitor(inst: Entity, res: Property) -> None:
         bullseye_parent,
     ) = res.value
 
-    ALL_MONITORS.append(Monitor(inst))
+    HAS_MONITOR = True
 
     has_laser = vbsp.settings['has_attr']['laser']
     # Allow turrets if the monitor is setup to allow it, and the actor should
@@ -136,25 +134,36 @@ def res_camera(inst: Entity, res: Property):
     base_yaw = math.degrees(math.atan2(normal.y, normal.x)) % 360
     inst['angles'] = '0 {:g} 0'.format(base_yaw)
 
-    inst_name = inst['targetname']
+    base_loc = Vec.from_str(inst['origin'])
 
     try:
-        [target] = inst.map.by_target[inst_name + '-target']  # type: Entity
-    except ValueError:
-        # No targets with that name
+        plate = faithplate.PLATES.pop(inst['targetname'])
+    except KeyError:
+        LOGGER.warning(
+            'No faith plate info found for camera {}!',
+            inst['targetname'],
+        )
         inst.remove()
         return
 
-    for trig in inst.map.by_class['trigger_catapult']:  # type: Entity
-        if trig['targetname'].startswith(inst_name):
-            trig.remove()
+    # Remove the triggers.
+    plate.trig.remove()
 
-    target_loc = Vec.from_str(target['origin'])
-    target.remove()  # Not needed...
-
-    BULLSYE_LOCS[target_loc.as_tuple()] += 1
-
-    base_loc = Vec.from_str(inst['origin'])
+    if isinstance(plate, faithplate.StraightPlate):
+        # Just point straight ahead.
+        target_loc = base_loc + 512 * normal
+        # And remove the helper.
+        plate.helper_trig.remove()
+    else:
+        if isinstance(plate.target, Vec):
+            target_loc = plate.target
+        else:
+            # We don't particularly care about aiming to the front of angled
+            # panels.
+            target_loc = plate.target.pos + 64 * plate.target.normal
+            # Remove the helper and a bullseye.
+            plate.target.remove_portal_helper()
+            plate.target.bullseye_count -= 1
 
     # Move three times to position the camera arms and lens.
     yaw_pos = Vec(conf['yaw_off']).rotate_by_str(inst['angles'])
@@ -193,33 +202,12 @@ def res_camera(inst: Entity, res: Property):
     ALL_CAMERAS.append(Camera(inst, res.value, cam_pos, cam_angles))
 
 
-@meta_cond(priority=-5, only_once=False)
-def mon_remove_bullseyes(inst: Entity) -> Optional[object]:
-    """Remove bullsyes used for cameras."""
-    if not BULLSYE_LOCS:
-        return RES_EXHAUSTED
-
-    if inst['file'].casefold() not in instanceLocs.resolve('<ITEM_CATAPULT_TARGET>'):
-        return
-
-    origin = Vec(0, 0, -64)
-    origin.localise(Vec.from_str(inst['origin']), Vec.from_str(inst['angles']))
-    origin = origin.as_tuple()
-
-    LOGGER.info('Pos: {} -> ', origin, BULLSYE_LOCS[origin])
-
-    if BULLSYE_LOCS[origin]:
-        BULLSYE_LOCS[origin] -= 1
-        inst.remove()
-
-
 @meta_cond(priority=-275, only_once=True)
 def mon_camera_link() -> None:
     """Link cameras to monitors."""
     import vbsp
-    LOGGER.info('Bullseye {}', BULLSYE_LOCS)
 
-    if not ALL_MONITORS:
+    if not HAS_MONITOR:
         return
 
     ALL_CAMERAS.sort(key=Camera.cam_pos.fget)
@@ -361,7 +349,7 @@ def make_voice_studio(vmf: VMF) -> bool:
     studio_file = vbsp_options.get(str, 'voice_studio_inst')
     loc = voiceLine.get_studio_loc()
 
-    if ALL_MONITORS and studio_file:
+    if HAS_MONITOR and studio_file:
         vmf.create_ent(
             classname='func_instance',
             file=studio_file,
