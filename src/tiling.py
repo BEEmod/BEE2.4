@@ -760,14 +760,9 @@ class TileDef:
 
             if has_helper:
                 # We need to make a placement helper.
-                if force_helper:
-                    helper_angles = self.normal.to_angle_roll(self.portal_helper_orient)
-                else:
-                    helper_angles = self.normal.to_angle()
-
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=helper_angles,
+                    angles=self.normal.to_angle_roll(self.portal_helper_orient),
                     origin=front_pos,
                     force_placement=int(force_helper),
                     snap_to_helper_angles=int(force_helper),
@@ -1172,8 +1167,7 @@ class TileDef:
             self._sub_tiles is not None or
             self.panel_ent is not None or
             self.panel_inst is not None or
-            self.bullseye_count > 0 or
-            self._portal_helper != 0
+            self.bullseye_count > 0
         ):
             return False
 
@@ -1534,11 +1528,25 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
     # Look for Angled and Flip Panels, to link the tiledef to the instance.
     # First grab the instances.
     panel_fname = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
+    # Also find PeTI-placed placement helpers, and move them into the tiledefs.
+    placement_helper_file = instanceLocs.resolve('<ITEM_PLACEMENT_HELPER>')
 
     panels: Dict[str, Entity] = {}
     for inst in vmf_file.by_class['func_instance']:
-        if inst['file'].casefold() in panel_fname:
+        filename = inst['file'].casefold()
+        if filename in panel_fname:
             panels[inst['targetname']] = inst
+        elif filename in placement_helper_file:
+            angles = Vec.from_str(inst['angles'])
+            pos = Vec(0, 0, -128)
+            pos.localise(Vec.from_str(inst['origin']), angles)
+            try:
+                tile = TILES[pos.as_tuple(), Vec(z=1).rotate(*angles).as_tuple()]
+            except KeyError:
+                pass  # On goo or the like.
+            else:
+                tile.add_portal_helper()
+            inst.remove()
 
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
     import conditions
@@ -1563,6 +1571,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
         # Strip '-flipping_panel'...
         panel_inst = panels[brush_ent['targetname'][:-15]]
         tiledef_from_flip_panel(brush_ent, panel_inst)
+
 
     # Tell the antlines which tiledefs they attach to.
     for side, segments in side_to_ant_seg.items():
@@ -1847,6 +1856,17 @@ def generate_brushes(vmf: VMF) -> None:
                 plane_dist,
                 tile.base_type,
             ].append(tile)
+
+            if tile.has_portal_helper:
+                # Add the portal helper in directly.
+                vmf.create_ent(
+                    'info_placement_helper',
+                    angles=tile.normal.to_angle_roll(tile.portal_helper_orient),
+                    origin=pos,
+                    force_placement=int(tile.has_oriented_portal_helper),
+                    snap_to_helper_angles=int(tile.has_oriented_portal_helper),
+                    radius=64,
+                )
         else:
             tile.export(vmf)
 
