@@ -891,3 +891,31 @@ def res_set_tile(inst: Entity, res: Property) -> None:
             pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
 
             tiling.edit_quarter_tile(pos, norm, new_tile, force_tile)
+
+
+@make_result('addPlacementHelper')
+def res_add_placement_helper(inst: Entity, res: Property):
+    """Add a placement helper to a specific tile.
+
+    `Offset` and `normal` specify the position and direction out of the surface
+    the helper should be added to. If `upDir` is specified, this is the
+    direction of the top of the portal.
+    """
+    angles = Vec.from_str(inst['angles'])
+
+    pos = conditions.resolve_offset(inst, res['offset', '0 0 0'], zoff=-64)
+    normal = res.vec('normal', 0, 0, 1).rotate(*angles)
+
+    try:
+        up_dir = Vec.from_str(res['upDir']).rotate(*angles)
+    except NoKeyError:
+        up_dir = None
+
+    try:
+        tile = tiling.TILES[(pos - 64 * normal).as_tuple(), normal.as_tuple()]
+    except KeyError:
+        LOGGER.warning('No tile at {} @ {}', pos, normal)
+        inst.map.create_ent('hammer_notes', origin=pos)
+        return
+
+    tile.add_portal_helper(up_dir)
