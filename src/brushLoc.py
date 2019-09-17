@@ -12,7 +12,8 @@ import bottomlessPit
 from typing import (
     Union, Any, Tuple,
     Iterable, Iterator,
-    Dict, ItemsView, MutableMapping
+    Dict, ItemsView, MutableMapping,
+    List,
 )
 try:
     from typing import Deque
@@ -243,7 +244,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def __delitem__(self, pos: _grid_keys) -> None:
         del self._grid[_conv_key(pos)]
 
-    def __contains__(self, pos: _grid_keys) -> bool:
+    def __contains__(self, pos: object) -> bool:
         return _conv_key(pos) in self._grid
 
     def __iter__(self) -> Iterator[Vec]:
@@ -259,19 +260,23 @@ class Grid(MutableMapping[_grid_keys, Block]):
         """Given the map file, set blocks."""
         from conditions import EMBED_OFFSETS
         from instance_traits import get_item_id
-        search_locs = []
+
+        # Starting points to fill air and goo.
+        # We want to fill goo first...
+        air_search_locs: List[Tuple[Vec, bool]] = []
+        goo_search_locs: List[Tuple[Vec, bool]] = []
 
         for ent in vmf.entities:
-            pos = ent['origin', None]
-            if pos is None:
+            str_pos = ent['origin', None]
+            if str_pos is None:
                 continue
 
-            pos = world_to_grid(Vec.from_str(pos))
+            pos = world_to_grid(Vec.from_str(str_pos))
 
             # Exclude entities outside the main area - elevators mainly.
             # The border should never be set to air!
             if (0, 0, 0) <= pos <= (25, 25, 25):
-                search_locs.append(pos)
+                air_search_locs.append((Vec(pos.x, pos.y, pos.z), False))
 
             # We need to manually set EmbeddedVoxel locations.
             # These might not be detected for items where there's a block
@@ -322,13 +327,12 @@ class Grid(MutableMapping[_grid_keys, Block]):
                     # If goo has totally submerged tunnels, they are not filled.
                     # Add each horizontal neighbour to the search list.
                     # If not found they'll be ignored.
-                    if ind != top_ind:  # Don't bother on the top level..
-                        search_locs.extend([
-                            (g_x - 1, g_y, g_z),
-                            (g_x + 1, g_y, g_z),
-                            (g_x, g_y + 1, g_z),
-                            (g_x, g_y - 1, g_z),
-                        ])
+                    goo_search_locs += [
+                        (Vec(g_x - 1, g_y, g_z), True),
+                        (Vec(g_x + 1, g_y, g_z), True),
+                        (Vec(g_x, g_y + 1, g_z), True),
+                        (Vec(g_x, g_y - 1, g_z), True),
+                    ]
 
                 # Remove the brush, since we're not going to use it.
                 vmf.remove_brush(brush)
@@ -352,33 +356,47 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
         LOGGER.info(
             'Analysed map, filling air... ({} starting positions..)',
-            len(search_locs)
+            len(air_search_locs)
         )
-        self.fill_air(search_locs)
+        self.fill_air(goo_search_locs + air_search_locs)
         LOGGER.info('Air filled!')
 
-    def fill_air(self, search_locs: Iterable[Vec]):
-        """Flood-fill the area, making all inside spaces air.
+    def fill_air(self, search_locs: Iterable[Tuple[Vec, bool]]) -> None:
+        """Flood-fill the area, making all inside spaces air or goo.
 
         This assumes the map is sealed.
         We start by assuming all instance positions are air.
         Since ambient_light ents are placed every 5 blocks, this should
         cover all playable space.
-        """
-        queue: Deque[Vec] = deque(search_locs)
 
-        def iterdel() -> Iterator[Vec]:
+        This will also fill the submerged tunnels with goo.
+        """
+        queue: Deque[Tuple[Vec, bool]] = deque(search_locs)
+
+        def iterdel() -> Iterator[Tuple[Vec, bool]]:
             """Iterate as FIFO queue, deleting as we go."""
             try:
                 while True:
-                    yield Vec(queue.popleft())
+                    yield queue.popleft()
             except IndexError:  # We're empty!
                 return
 
+        # Air pockets need to be filled, and bottomless pits.
+        # Otherwise we could have those appearing next to real goo pits,
+        # with complicated room heights.
+        goo_fillable = [
+            Block.AIR,
+            Block.OCCUPIED,
+            Block.PIT_BOTTOM,
+            Block.PIT_MID,
+            Block.PIT_TOP,
+            Block.PIT_SINGLE,
+        ]
+
         # This will iterate every item we add to the queue..
-        for pos in iterdel():
-            if pos in self:
-                # Already set...
+        for pos, is_goo in iterdel():
+            # Already set. But allow the goo to fill certain types.
+            if pos in self and not (is_goo and self[pos] in goo_fillable):
                 continue
 
             # We got outside the map somehow?
@@ -388,15 +406,33 @@ class Grid(MutableMapping[_grid_keys, Block]):
                 LOGGER.warning('Attempted leak at {}', pos)
                 continue
 
-            self[pos] = Block.AIR
+            # For go we need to determine which kind to use.
+            # We only fill from underneath the surface, so
+            # use "mid" even for toplevel pits.
+            if is_goo:
+                if self[pos].is_pit:
+                    self[pos] = Block.from_pitgoo_attr(
+                        False,
+                        self[pos].is_top,
+                        self[pos].is_bottom,
+                    )
+                elif self[pos.x, pos.y - 1, pos.z].is_solid:
+                    self[pos] = Block.GOO_BOTTOM
+                else:
+                    self[pos] = Block.GOO_MID
+            else:
+                self[pos] = Block.AIR
+
             x, y, z = pos
             # Continue filling in each other direction.
-            queue.append(Vec(x, y + 1, z))
-            queue.append(Vec(x, y - 1, z))
-            queue.append(Vec(x + 1, y, z))
-            queue.append(Vec(x - 1, y, z))
-            queue.append(Vec(x, y, z + 1))
-            queue.append(Vec(x, y, z - 1))
+            # But not up for goo.
+            if not is_goo:
+                queue.append((Vec(x, y + 1, z), False))
+            queue.append((Vec(x, y - 1, z), is_goo))
+            queue.append((Vec(x + 1, y, z), is_goo))
+            queue.append((Vec(x - 1, y, z), is_goo))
+            queue.append((Vec(x, y, z + 1), is_goo))
+            queue.append((Vec(x, y, z - 1), is_goo))
 
     def dump_to_map(self, vmf: VMF) -> None:
         """Debug purposes: Dump the info as entities in the map.
