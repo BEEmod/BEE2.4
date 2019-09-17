@@ -1,6 +1,6 @@
 """Templates are sets of brushes which can be copied into the map."""
 import random
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 from decimal import Decimal
 from enum import Enum
@@ -58,24 +58,35 @@ class TEMP_TYPES(Enum):
     world = 1  # Import and add to world
     detail = 2  # Import as a func_detail
 
-ColorPicker = namedtuple('ColorPicker', [
-    'priority',  # Decimal order to do them in.
-    'name',  # Name to reference from other ents.
-    'offset',
-    'normal',  # Normal of the surface.
-    'sides',
-    'grid_snap',  # Snap to grid on non-normal axes
-    'remove_brush',  # Remove the brush after
-])
 
-TileSetter = namedtuple('TileSetter', [
-    'offset',
-    'normal',
-    'color',
-    'tile_type',
-    'picker_name',
-])
+class AfterPickMode(Enum):
+    """Value used for ColorPicker's remove_brush option."""
+    NONE = '0'  # Don't do anything.
+    VOID = '1'  # Remove the tile entirely.
+    NODRAW = '2'  # Convert to nodraw.
 
+
+class ColorPicker(NamedTuple):
+    """Color pickers allow applying the existing colors onto faces."""
+    priority: Decimal  # Decimal order to do them in.
+    name: str # Name to reference from other ents.
+    offset: Vec
+    normal: Vec  # Normal of the surface.
+    sides: List[str]
+    grid_snap: bool  # Snap to grid on non-normal axes
+    after: AfterPickMode  # What to do after the color is picked.
+
+
+class TileSetter(NamedTuple):
+    """Set tiles in a particular position."""
+    offset: Vec
+    normal: Vec
+    color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
+    tile_type: TileType  # Type to produce.
+    picker_name: str  # Name of colorpicker to use for the color.
+
+# We use the skins value on the tilesetter to specify type, allowing visualising it.
+# So this is the type for each index.
 TILE_SETTER_SKINS = [
     TileType.BLACK,
     TileType.BLACK_4x4,
@@ -417,6 +428,16 @@ def load_templates() -> None:
                 temp_id.upper(),
             )
             priority = Decimal(0)
+
+        try:
+            remove_after = AfterPickMode(ent['remove_brush', '0'])
+        except ValueError:
+            LOGGER.warning(
+                'Bad remove-brush mode for colorpicker in "{}" template!',
+                temp_id.upper(),
+            )
+            remove_after = AfterPickMode.NONE
+
         color_pickers[temp_id].append(ColorPicker(
             priority,
             name=ent['targetname'],
@@ -424,7 +445,7 @@ def load_templates() -> None:
             normal=Vec(x=1).rotate_by_str(ent['angles']),
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
-            remove_brush=srctools.conv_bool(ent['remove_brush']),
+            after=remove_after,
         ))
 
     for ent in vmf.by_class['bee2_template_tilesetter']:
@@ -770,8 +791,10 @@ def retexture_template(
         if color_picker.name:
             picker_results[color_picker.name] = tile_color
 
-        if color_picker.remove_brush:
+        if color_picker.after is AfterPickMode.VOID:
             tiledef[u, v] = TileType.VOID
+        elif color_picker.after is AfterPickMode.NODRAW:
+            tiledef[u, v] = TileType.NODRAW
 
         for side in color_picker.sides:
             # Only do the highest priority successful one.
