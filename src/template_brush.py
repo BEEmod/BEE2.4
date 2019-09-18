@@ -75,6 +75,9 @@ class ColorPicker(NamedTuple):
     sides: List[str]
     grid_snap: bool  # Snap to grid on non-normal axes
     after: AfterPickMode  # What to do after the color is picked.
+    # Instead of just changing the colour, copy the entire face from the
+    # tiledef.
+    use_pattern: bool
 
 
 class TileSetter(NamedTuple):
@@ -447,6 +450,7 @@ def load_templates() -> None:
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
             after=remove_after,
+            use_pattern=srctools.conv_bool(ent['use_pattern']),
         ))
 
     for ent in vmf.by_class['bee2_template_tilesetter']:
@@ -759,6 +763,11 @@ def retexture_template(
     # Picker names to their results.
     picker_results: Dict[str, Optional[texturing.Portalable]] = template_data.picker_results
 
+    # If the "use patterns" option is enabled, face ID -> temp face to copy from.
+    picker_patterned: Dict[str, Optional[Side]] = defaultdict(lambda: None)
+    # Then also a cache of the tiledef -> dict of template faces.
+    pattern_cache: Dict[tiling.TileDef, Dict[Tuple[int, int], Side]] = {}
+
     # Already sorted by priority.
     for color_picker in template.color_pickers:
         picker_pos = color_picker.offset.copy().rotate(*template_data.angles)
@@ -792,15 +801,38 @@ def retexture_template(
         if color_picker.name:
             picker_results[color_picker.name] = tile_color
 
+        if color_picker.use_pattern:
+            # Generate the brushwork for the tile to determine the top faces
+            # required. We can then throw away the brushes themselves.
+            try:
+                pattern = pattern_cache[tiledef]
+            except KeyError:
+                pattern = pattern_cache[tiledef] = {}
+                tiledef.gen_multitile_pattern(
+                    VMF(), {
+                        (u, v): tiledef[u, v]
+                        for u in (0, 1, 2, 3)
+                        for v in (0, 1, 2, 3)
+                    },
+                    is_wall=tiledef.normal.z != 0,
+                    bevels=(False, False, False, False),
+                    normal=tiledef.normal,
+                    face_output=pattern,
+                )
+
+            for side in color_picker.sides:
+                if picker_patterned[side] is None and (u, v) in pattern:
+                    picker_patterned[side] = pattern[u, v]
+        else:
+            # Only do the highest priority successful one.
+            for side in color_picker.sides:
+                if force_colour_face[side] is None:
+                    force_colour_face[side] = tile_color
+
         if color_picker.after is AfterPickMode.VOID:
             tiledef[u, v] = TileType.VOID
         elif color_picker.after is AfterPickMode.NODRAW:
             tiledef[u, v] = TileType.NODRAW
-
-        for side in color_picker.sides:
-            # Only do the highest priority successful one.
-            if force_colour_face[side] is None:
-                force_colour_face[side] = tile_color
 
     for tile_setter in template.tile_setters:
         setter_pos = tile_setter.offset.copy().rotate(*template_data.angles)
@@ -842,6 +874,13 @@ def retexture_template(
             orig_id = rev_id_mapping[face.id]
 
             if orig_id in template.skip_faces:
+                continue
+
+            template_face = picker_patterned[orig_id]
+            if template_face is not None:
+                face.mat = template_face.mat
+                face.uaxis = template_face.uaxis.copy()
+                face.vaxis = template_face.vaxis.copy()
                 continue
 
             folded_mat = face.mat.casefold()

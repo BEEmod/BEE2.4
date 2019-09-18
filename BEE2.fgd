@@ -113,6 +113,8 @@
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
 	grid_snap(boolean): "Snap To Grid" : 0 : "For items like fizzlers, snap to the closest grid position in side directions."
+	use_pattern(boolean): "Use Tile Pattern": 0 : "Force this surface to use the texture of the tile that would be here. " +
+		"Should be used ONLY on brushes pointing straight up, and that are split on the 32x32 lines to replace the normal surface entirely."
 
 	remove_brush(choices): "Remove Tile" : 0 : "After grabbing the surface, should the tile be removed?" = 
 		[

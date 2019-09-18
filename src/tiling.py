@@ -1050,11 +1050,14 @@ class TileDef:
         vec_offset: Vec=None,
         is_panel: bool=False,
         add_bullseye: bool=False,
+        face_output: Optional[Dict[Tuple[int, int], Side]]=None,
     ) -> Tuple[List[Side], List[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
 
         This does the complex job of generating a surface with multiple
         tile types.
+        
+        If face_output is set, it will be filled with (u, v) -> top face.
         """
         brushes = []
         faces = []
@@ -1159,6 +1162,16 @@ class TileDef:
                 )
                 faces.append(face)
                 brushes.append(brush)
+            elif tile_type is TileType.VOID:
+                continue
+            else:
+                raise AssertionError("Can't gen {} yet.".format(tile_type))
+
+            if face_output is not None:
+                for u in u_range:
+                    for v in v_range:
+                        if 0 <= u < 4 and 0 <= v < 4:
+                            face_output[u, v] = face
         return faces, brushes
 
     def can_merge(self) -> bool:
