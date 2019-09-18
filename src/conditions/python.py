@@ -1,5 +1,6 @@
 """The Operation result allows executing math on instvars."""
 import ast
+from typing import List, Dict, Any
 
 from conditions import make_result_setup, make_result
 from srctools import Property, Vec, Entity, conv_bool
@@ -30,7 +31,7 @@ FUNC_GLOBALS = {
     '__builtins__': None,
 }
 
-AST_PRETTY = {
+BANNED_COMPS = {
     ast.Is: 'is',
     ast.IsNot: 'is not',
     ast.In: 'in',
@@ -75,10 +76,20 @@ class Checker(ast.NodeVisitor):
 
     def visit_Compare(self, node):
         """ < comps etc."""
-        if isinstance(node.op, (ast.Is, ast.IsNot, ast.In, ast.NotIn)):
-            raise Exception("The {} operator is not allowed!".format(
-                [type(node.op)]
-            ))
+        try:
+            ops = node.ops
+        except AttributeError:
+            if isinstance(node.op, tuple(BANNED_COMPS)):
+                raise Exception("The {} operator is not allowed!".format(
+                    BANNED_COMPS[type(node.op)]
+                ))
+        else:
+            for op in ops:
+                if isinstance(op, tuple(BANNED_COMPS)):
+                    raise Exception("The {} operator is not allowed!".format(
+                        BANNED_COMPS[type(op)]
+                    ))
+
         self.visit(node.left)
         for right in node.comparators:
             self.visit(right)
@@ -117,8 +128,8 @@ def res_python_setup(res: Property):
     if not result_var:
         raise Exception('No destination specified!')
 
-    for name in ('_bee2_generated_func', '_fixup'):
-        if name in variables:
+    for name in variables:
+        if name.startswith('_'):
             raise Exception('"{}" is not permitted as a variable name!'.format(name))
 
     # Allow $ in the variable names..
@@ -138,7 +149,7 @@ def res_python_setup(res: Property):
 
     # For each variable, do
     # var = func(_fixup['var'])
-    statements = [
+    statements: List[ast.AST] = [
         ast.Assign(
             targets=[ast.Name(id=var_name, ctx=ast.Store())],
             value=ast.Call(
@@ -178,7 +189,7 @@ def res_python_setup(res: Property):
     # Fill in lineno and col_offset
     ast.fix_missing_locations(func)
 
-    ns = {}
+    ns: Dict[str, Any] = {}
     eval(compile(func, '<bee2_op>', mode='exec'), FUNC_GLOBALS, ns)
     compiled_func = ns['_bee2_generated_func']
     compiled_func.__name__ = '<bee2_func>'
