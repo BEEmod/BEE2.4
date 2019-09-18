@@ -17,7 +17,7 @@ from conditions import (
 )
 from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Callable, Set, Iterable
 
 
 COND_MOD_NAME = 'Brushes'
@@ -497,28 +497,35 @@ def res_import_template_setup(res: Property):
     else:
         keys = None
         outputs = []
-    visgroup_mode = res['visgroup', 'none'].casefold()
-    if visgroup_mode not in ('none', 'choose'):
-        visgroup_mode = srctools.conv_float(visgroup_mode.rstrip('%'), 0.00)
-        if visgroup_mode == 0:
-            visgroup_mode = 'none'
 
-    # Generate the function which picks which visgroups to add to the map.
-    if visgroup_mode == 'none':
-        def visgroup_func(_):
-            """none = don't add any visgroups."""
-            return ()
-    elif visgroup_mode == 'choose':
-        def visgroup_func(groups):
-            """choose = add one random group."""
-            return [random.choice(groups)]
+    visgroup_func: Callable[[Set[str]], Iterable[str]]
+
+    def visgroup_func(groups):
+        """none = don't add any visgroups."""
+        return ()
+
+    visgroup_prop = res.find_key('visgroup', 'none')
+    if visgroup_prop.has_children():
+        visgroup_vars = list(visgroup_prop)
     else:
-        def visgroup_func(groups):
-            """Number = percent chance for each to be added"""
-            for group in groups:
-                val = random.uniform(0, 100)
-                if val <= visgroup_mode:
-                    yield group
+        visgroup_vars = []
+        visgroup_mode = res['visgroup', 'none'].casefold()
+        # Generate the function which picks which visgroups to add to the map.
+        if visgroup_mode == 'none':
+            pass
+        elif visgroup_mode == 'choose':
+            def visgroup_func(groups):
+                """choose = add one random group."""
+                return [random.choice(groups)]
+        else:
+            percent = srctools.conv_float(visgroup_mode.rstrip('%'), 0.00)
+            if percent > 0.0:
+                def visgroup_func(groups):
+                    """Number = percent chance for each to be added"""
+                    for group in groups:
+                        val = random.uniform(0, 100)
+                        if val <= percent:
+                            yield group
 
     # If true, force visgroups to all be used.
     visgroup_force_var = res['forceVisVar', '']
@@ -543,6 +550,7 @@ def res_import_template_setup(res: Property):
         color_var,
         visgroup_func,
         visgroup_force_var,
+        visgroup_vars,
         keys,
         picker_vars,
         outputs,
@@ -591,9 +599,12 @@ def res_import_template(inst: Entity, res: Property):
     - invertVar: If this fixup value is true, tile colour will be
             swapped to the opposite of the current force option. This applies
             after colorVar.
-    - visgroup: Sets how visgrouped parts are handled. If 'none' (default),
-            they are ignored. If 'choose', one is chosen. If a number, that
-            is the percentage chance for each visgroup to be added.
+    - visgroup: Sets how visgrouped parts are handled. Several values are possible:
+            - A property block: Each name should match a visgroup, and the
+              value should be a block of flags that if true enables that group.
+            - 'none' (default): All extra groups are ignored.
+            - 'choose': One group is chosen randomly.
+            - a number: The percentage chance for each visgroup to be added.
     - visgroup_force_var: If set and True, visgroup is ignored and all groups
             are added.
     - pickerVars:
@@ -619,6 +630,7 @@ def res_import_template(inst: Entity, res: Property):
         color_var,
         visgroup_func,
         visgroup_force_var,
+        visgroup_instvars,
         key_block,
         picker_vars,
         outputs,
@@ -657,6 +669,10 @@ def res_import_template(inst: Entity, res: Property):
             )
         # We don't want an error, just quit.
         return
+
+    for vis_flag_block in visgroup_instvars:
+        if all(conditions.check_flag(flag, inst) for flag in vis_flag_block):
+            visgroups.add(vis_flag_block.real_name)
 
     if color_var.casefold() == '<editor>':
         # Check traits for the colour it should be.
@@ -718,27 +734,11 @@ def res_import_template(inst: Entity, res: Property):
         # modify it.
         vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)
 
-    try:
-        # This is the original brush the template is replacing. We fix overlay
-        # face IDs, so this brush is replaced by the faces in the template
-        # pointing
-        # the same way.
-        if replace_brush_pos is None:
-            raise KeyError  # Not set, raise to jump out of the try block
-
-        pos = Vec(replace_brush_pos).rotate(angles.x, angles.y, angles.z)
-        pos += origin
-        brush_group = SOLIDS[pos.as_tuple()]
-    except KeyError:
-        # Not set or solid group doesn't exist, skip..
-        pass
-    else:
-        conditions.steal_from_brush(
-            temp_data,
-            brush_group,
-            rem_replace_brush,
-            map(int, additional_replace_ids | template.overlay_faces),
-            conv_bool(conditions.resolve_value(inst, transfer_overlays), True),
+    if replace_brush_pos is not None:
+        LOGGER.warning(
+            '"{}": "Replace" option in templates is no longer available.'
+            'Use tilesetters instead.',
+            template.id,
         )
 
     template_brush.retexture_template(
@@ -801,7 +801,7 @@ def res_checkpoint_trigger(inst: Entity, res: Property) -> None:
 
     pos = brushLoc.POS.raycast_world(
         Vec.from_str(inst['origin']),
-        direction=(0, 0, -1),
+        direction=Vec(0, 0, -1),
     )
     bbox_min = pos - (192, 192, 64)
     bbox_max = pos + (192, 192, 64)
@@ -906,6 +906,7 @@ def res_add_placement_helper(inst: Entity, res: Property):
     pos = conditions.resolve_offset(inst, res['offset', '0 0 0'], zoff=-64)
     normal = res.vec('normal', 0, 0, 1).rotate(*angles)
 
+    up_dir: Optional[Vec]
     try:
         up_dir = Vec.from_str(res['upDir']).rotate(*angles)
     except NoKeyError:
@@ -915,7 +916,6 @@ def res_add_placement_helper(inst: Entity, res: Property):
         tile = tiling.TILES[(pos - 64 * normal).as_tuple(), normal.as_tuple()]
     except KeyError:
         LOGGER.warning('No tile at {} @ {}', pos, normal)
-        inst.map.create_ent('hammer_notes', origin=pos)
         return
 
     tile.add_portal_helper(up_dir)

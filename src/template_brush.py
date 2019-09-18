@@ -366,6 +366,7 @@ def parse_temp_name(name) -> Tuple[str, Set[str]]:
             vis.strip().casefold()
             for vis in
             visgroups.split(',')
+            if not vis.isspace()
         }
     else:
         return name.casefold(), set()
