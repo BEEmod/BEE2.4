@@ -153,7 +153,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
     if result_var:
         if tile_type.is_tile:
             # Don't distinguish between 4x4, goo sides
-            inst.fixup[result_var] = tile_type.color.name
+            inst.fixup[result_var] = tile_type.color.value
         elif tile_type is tiling.TileType.VOID:
             inst.fixup[result_var] = 'none'
         else:
