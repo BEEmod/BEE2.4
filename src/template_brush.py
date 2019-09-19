@@ -710,10 +710,11 @@ def retexture_template(
     template_data: ExportedTemplate,
     origin: Vec,
     fixup: EntityFixup=None,
-    replace_tex: dict= srctools.EmptyMapping,
+    replace_tex: Mapping[str, Union[List[str], str]]=srctools.EmptyMapping,
     force_colour: Portalable=None,
     force_grid: TileSize=None,
     generator: GenCat=GenCat.NORMAL,
+    sense_offset: Optional[Vec]=None,
 ):
     """Retexture a template at the given location.
 
@@ -729,12 +730,11 @@ def retexture_template(
     - If force_grid is set, all tile textures will be that size.
     - generator defines the generator category to use for surfaces.
     - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
-    - Set no_clump if the brush is used on a special entity, and therefore
-      won't get retextured by the main code. That means we need to directly
-      retexture here.
+    - If sense_offset is set, color pickers and tilesetters will be treated
+      as if they were locally offset this far in the template.
     """
 
-    template = template_data.template  # type: Template
+    template = template_data.template
 
     rev_id_mapping = {
         new_id: str(old_id)
@@ -742,7 +742,7 @@ def retexture_template(
         template_data.orig_ids.items()
     }
 
-    all_brushes = list(template_data.world)  # type: List[Solid]
+    all_brushes = list(template_data.world)
     if template_data.detail is not None:
         all_brushes.extend(template_data.detail.solids)
 
@@ -758,6 +758,11 @@ def retexture_template(
         replace_tex.items()
     }
 
+    if sense_offset is None:
+        sense_offset = Vec()
+    else:
+        sense_offset = sense_offset.copy().rotate(*template_data.angles)
+
     # For each face, if it needs to be forced to a colour, or None if not.
     force_colour_face: Dict[str, Optional[Portalable]] = defaultdict(lambda: None)
     # Picker names to their results.
@@ -771,7 +776,7 @@ def retexture_template(
     # Already sorted by priority.
     for color_picker in template.color_pickers:
         picker_pos = color_picker.offset.copy().rotate(*template_data.angles)
-        picker_pos += template_data.origin
+        picker_pos += template_data.origin + sense_offset
         picker_norm = color_picker.normal.copy().rotate(*template_data.angles)
 
         if color_picker.grid_snap:
@@ -836,7 +841,7 @@ def retexture_template(
 
     for tile_setter in template.tile_setters:
         setter_pos = tile_setter.offset.copy().rotate(*template_data.angles)
-        setter_pos += template_data.origin
+        setter_pos += template_data.origin + sense_offset
         setter_norm = tile_setter.normal.copy().rotate(*template_data.angles)
         setter_type = tile_setter.tile_type  # type: TileType
 
@@ -902,6 +907,7 @@ def retexture_template(
                     face.uaxis = uaxis.copy()
                     face.vaxis = vaxis.copy()
 
+            override_mat: Optional[List[str]]
             try:
                 override_mat = replace_tex['#' + orig_id]
             except KeyError:
@@ -909,6 +915,7 @@ def retexture_template(
                     override_mat = replace_tex[folded_mat]
                 except KeyError:
                     override_mat = None
+
 
             if override_mat is not None:
                 # Replace_tex overrides everything.

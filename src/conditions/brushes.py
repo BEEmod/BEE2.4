@@ -554,6 +554,7 @@ def res_import_template_setup(res: Property):
         keys,
         picker_vars,
         outputs,
+        res.vec('senseOffset'),
     )
 
 
@@ -614,6 +615,8 @@ def res_import_template(inst: Entity, res: Property):
             'black' or ''.
     - outputs: Add outputs to the brush ent. Syntax is like VMFs, and all names
             are local to the instance.
+    - senseOffset: If set, colorpickers and tilesetters will be treated
+            as being offset by this amount.
     """
     (
         orig_temp_id,
@@ -634,6 +637,7 @@ def res_import_template(inst: Entity, res: Property):
         key_block,
         picker_vars,
         outputs,
+        sense_offset,
     ) = res.value
 
     if ':' in orig_temp_id:
@@ -749,6 +753,7 @@ def res_import_template(inst: Entity, res: Property):
         force_colour,
         force_grid,
         surf_cat,
+        sense_offset,
     )
 
     for picker_name, picker_var in picker_vars:
