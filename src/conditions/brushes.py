@@ -846,7 +846,8 @@ def res_set_tile(inst: Entity, res: Property) -> None:
         "Tile" "b..b"
         "Tile" "b..b"
         "Tile" "bbbb"
-    If `Force` is true, the specified tiles will override any existing ones.
+    If `Force` is true, the specified tiles will override any existing ones
+    and create the tile if necessary.
     Otherwise they will be merged in - white/black tiles will not replace
     tiles set to nodraw or void for example.
 

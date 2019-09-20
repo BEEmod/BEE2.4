@@ -1260,11 +1260,11 @@ class TileDef:
         target.make_unique()
 
 
-def find_tile(origin: Vec, normal: Vec) -> Tuple[TileDef, int, int]:
+def find_tile(origin: Vec, normal: Vec, force: bool=False) -> Tuple[TileDef, int, int]:
     """Locate the tiledef for a specific tile.
 
     The tiledef and the subtile UV are returned, or KeyError is raised
-    if the position has no tile.
+    if the position has no tile. If force is true, create a tile at this location.
     """
     norm_axis = normal.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
@@ -1278,8 +1278,11 @@ def find_tile(origin: Vec, normal: Vec) -> Tuple[TileDef, int, int]:
     if u != round(u) or v != round(v):
         raise KeyError('Badly offset into a tile!')
 
-    tile = TILES[grid_pos.as_tuple(), normal.as_tuple()]
-    # except KeyError: raise
+    if force:
+        tile = TileDef.ensure(grid_pos, normal)
+    else:
+        tile = TILES[grid_pos.as_tuple(), normal.as_tuple()]
+        # except KeyError: raise
 
     return tile, int(u), int(v)
 
@@ -1288,18 +1291,18 @@ def edit_quarter_tile(
     origin: Vec,
     normal: Vec,
     tile_type: TileType,
-    force=False,
-    silent=False,
+    force: bool=False,
+    silent: bool=False,
 ):
     """Alter a 1/4 tile section of a tile.
 
     If force is True, this overwrites any existing tile - by default nodraw
-    prevents being set back to a tile, etc.
+    prevents being set back to a tile, etc. It'll also create the tile.
     If silent is True, no warning is given when the tile is missing.
     """
 
     try:
-        tile, u, v = find_tile(origin, normal)
+        tile, u, v = find_tile(origin, normal, force)
     except KeyError:
         if not silent:
             LOGGER.warning(
