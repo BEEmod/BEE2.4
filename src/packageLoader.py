@@ -44,7 +44,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 all_obj = {}
 obj_override = {}
 packages = {}  # type: Dict[str, Package]
-OBJ_TYPES = {}
+OBJ_TYPES = {}  # type: Dict[str, ObjType]
 
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS = {}  # type: Dict[str, FileSystem]

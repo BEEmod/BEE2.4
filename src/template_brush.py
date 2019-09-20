@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from decimal import Decimal
 from enum import Enum
+from operator import attrgetter
 
 import srctools
 import vbsp_options
@@ -166,16 +167,25 @@ TEMP_COLOUR_INVERT = {
     'INVERT': None,
 }
 
-ExportedTemplate = NamedTuple('ExportedTemplate', [
-    ('world', List[Solid]),
-    ('detail', Entity),
-    ('overlay', List[Entity]),
-    ('orig_ids', Dict[int, int]),
-    ('template', 'Template'),
-    ('origin', Vec),
-    ('angles', Vec),
-    ('picker_results', Dict[str, Optional[Portalable]]),
-])
+
+class ExportedTemplate(NamedTuple):
+    """The result of importing a template.
+
+    THis contains all the changes made. orig_ids is a dict mapping the original
+    IDs in the template file to the new ones produced.
+    Once retexture_template() is caled, picker_results contains the detected
+    surface types for colorpickers.
+
+    """
+    world: List[Solid]
+    detail: Optional[Entity]
+    overlay: List[Entity]
+    orig_ids: Dict[int, int]
+    template: 'Template'
+    origin: Vec
+    angles: Vec
+    picker_results: Dict[str, Optional[Portalable]]
+
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
 realign_solid = VMF().make_prism(Vec(-16,-16,-16), Vec(16,16,16)).solid  # type: Solid
@@ -226,7 +236,7 @@ class Template:
         # Sort so high IDs are first.
         self.color_pickers = sorted(
             color_pickers,
-            key=ColorPicker.priority.__get__,
+            key=attrgetter('priority'),
             reverse=True,
         )
         self.tile_setters = list(tile_setters)
@@ -342,10 +352,12 @@ class ScalingTemplate(Mapping[
         mat, axis_u, axis_v, rotation = self._axes[normal]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Vec, origin: Vec=(0, 0, 0)) -> 'ScalingTemplate':
+    def rotate(self, angles: Vec, origin: Optional[Vec]=None) -> 'ScalingTemplate':
         """Rotate this template, and return a new template with those angles."""
         new_axis = {}
-        origin = Vec(origin)
+        if origin is None:
+            origin = Vec()
+
         for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
             axis_u = axis_u.localise(origin, angles)
             axis_v = axis_v.localise(origin, angles)
@@ -534,11 +546,11 @@ def get_template(temp_name) -> Template:
 
 def import_template(
     temp_name: Union[str, Template],
-    origin,
-    angles=None,
-    targetname='',
-    force_type=TEMP_TYPES.default,
-    add_to_map=True,
+    origin: Vec,
+    angles: Optional[Vec]=None,
+    targetname: str='',
+    force_type: TEMP_TYPES=TEMP_TYPES.default,
+    add_to_map: bool=True,
     additional_visgroups: Iterable[str]=(),
     visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
 ) -> ExportedTemplate:
@@ -629,6 +641,8 @@ def import_template(
     if add_to_map:
         vbsp.VMF.add_brushes(new_world)
 
+    detail_ent: Optional[Entity] = None
+
     if new_detail:
         detail_ent = vbsp.VMF.create_ent(
             classname='func_detail'
@@ -638,9 +652,6 @@ def import_template(
         detail_ent.solids = new_detail
         if not add_to_map:
             detail_ent.remove()
-    else:
-        detail_ent = None
-        new_detail = []
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!

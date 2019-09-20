@@ -17,7 +17,7 @@ from conditions import (
 )
 from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
-from typing import Dict, Tuple, Optional, Callable, Set, Iterable
+from typing import Dict, Tuple, Optional, Callable, Set, Iterable, List
 
 
 COND_MOD_NAME = 'Brushes'
@@ -447,9 +447,6 @@ def res_import_template_setup(res: Property):
     else:
         surf_cat = texturing.GenCat.NORMAL
 
-    invert_var = res['invertVar', '']
-    color_var = res['colorVar', '']
-
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
@@ -527,9 +524,6 @@ def res_import_template_setup(res: Property):
                         if val <= percent:
                             yield group
 
-    # If true, force visgroups to all be used.
-    visgroup_force_var = res['forceVisVar', '']
-
     picker_vars = [
         (prop.real_name, prop.value)
         for prop in res.find_children('pickerVars')
@@ -546,10 +540,11 @@ def res_import_template_setup(res: Property):
         rem_replace_brush,
         transfer_overlays,
         additional_ids,
-        invert_var,
-        color_var,
+        res['invertVar', ''],
+        res['colorVar', ''],
         visgroup_func,
-        visgroup_force_var,
+        # If true, force visgroups to all be used.
+        res['forceVisVar', ''],
         visgroup_vars,
         keys,
         picker_vars,
