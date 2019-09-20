@@ -70,7 +70,7 @@ class AfterPickMode(Enum):
 class ColorPicker(NamedTuple):
     """Color pickers allow applying the existing colors onto faces."""
     priority: Decimal  # Decimal order to do them in.
-    name: str # Name to reference from other ents.
+    name: str  # Name to reference from other ents.
     offset: Vec
     normal: Vec  # Normal of the surface.
     sides: List[str]
@@ -79,6 +79,11 @@ class ColorPicker(NamedTuple):
     # Instead of just changing the colour, copy the entire face from the
     # tiledef.
     use_pattern: bool
+
+    # Or, use a pair of preset white/black textures.
+    force_tex_white: str
+    force_tex_black: str
+
 
 
 class TileSetter(NamedTuple):
@@ -463,6 +468,8 @@ def load_templates() -> None:
             grid_snap=srctools.conv_bool(ent['grid_snap']),
             after=remove_after,
             use_pattern=srctools.conv_bool(ent['use_pattern']),
+            force_tex_white=ent['tex_white'],
+            force_tex_black=ent['tex_black'],
         ))
 
     for ent in vmf.by_class['bee2_template_tilesetter']:
@@ -775,7 +782,8 @@ def retexture_template(
         sense_offset = sense_offset.copy().rotate(*template_data.angles)
 
     # For each face, if it needs to be forced to a colour, or None if not.
-    force_colour_face: Dict[str, Optional[Portalable]] = defaultdict(lambda: None)
+    # If a string it's forced to that string specifically.
+    force_colour_face: Dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
     # Picker names to their results.
     picker_results: Dict[str, Optional[texturing.Portalable]] = template_data.picker_results
 
@@ -843,7 +851,10 @@ def retexture_template(
             # Only do the highest priority successful one.
             for side in color_picker.sides:
                 if force_colour_face[side] is None:
-                    force_colour_face[side] = tile_color
+                    if tile_color is tile_color.WHITE:
+                        force_colour_face[side] = color_picker.force_tex_white or tile_color
+                    else:
+                        force_colour_face[side] = color_picker.force_tex_black or tile_color
 
         if color_picker.after is AfterPickMode.VOID:
             tiledef[u, v] = TileType.VOID
@@ -927,7 +938,6 @@ def retexture_template(
                 except KeyError:
                     override_mat = None
 
-
             if override_mat is not None:
                 # Replace_tex overrides everything.
                 mat = random.choice(override_mat)
@@ -984,6 +994,9 @@ def retexture_template(
 
             if force_colour_face[orig_id] is not None:
                 tex_colour = force_colour_face[orig_id]
+                if isinstance(tex_colour, str):
+                    face.mat = tex_colour
+                    continue
             elif force_colour == 'INVERT':
                 # Invert the texture
                 tex_colour = ~tex_colour
