@@ -860,9 +860,11 @@ def res_set_tile(inst: Entity, res: Property) -> None:
     - `w`: White 4x4 only tile.
     - `B`: Black tile.
     - `b`: Black 4x4 only tile.
-    - `g`: Goo sides.
+    - `g`: Goo sides (4x4 black, in Clean).
     - `n`: Nodraw surface.
-    - `.`: Void (leave this space empty).
+    - `1`: Convert to a 1x1 only tile, if a black/white tile.
+    - `4`: Convert to a 4x4 only tile, if a black/white tile.
+    - `.`: Void (remove the tile in this position).
     - `_` or ` `: Placeholder (don't modify this space).
     - `x`: Cutout Tile (Broken)
     - `o`: Cutout Tile (Partial)
@@ -877,8 +879,8 @@ def res_set_tile(inst: Entity, res: Property) -> None:
 
     force_tile = res.bool('force')
 
-    tiles = [
-        row.value.strip()
+    tiles: List[str] = [
+        row.value
         for row in res.find_all('tile')
     ]
 
@@ -887,15 +889,43 @@ def res_set_tile(inst: Entity, res: Property) -> None:
             if val in '_ ':
                 continue
 
-            try:
-                new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
-            except KeyError:
-                LOGGER.warning('Unknown tiletype "{}"!', val)
-                continue
-
             pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
 
-            tiling.edit_quarter_tile(pos, norm, new_tile, force_tile)
+            if val == '4':
+                size = tiling.TileSize.TILE_4x4
+            elif val == '1':
+                size = tiling.TileSize.TILE_1x1
+            else:
+                try:
+                    new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
+                except KeyError:
+                    LOGGER.warning('Unknown tiletype "{}"!', val)
+                else:
+                    tiling.edit_quarter_tile(pos, norm, new_tile, force_tile)
+                continue
+
+            # Edit the existing tile.
+            try:
+                tile, u, v = tiling.find_tile(pos, norm)
+            except KeyError:
+                LOGGER.warning(
+                    'Expected tile, but none found: {}, {}',
+                    pos,
+                    norm,
+                )
+                continue
+
+            if tile[u, v].is_tile:
+                tile[u, v] = tiling.TileType.with_color_and_size(
+                    size,
+                    tile[u, v].color
+                )
+            elif force_tile:
+                # If forcing, make it black. Otherwise no need to change.
+                tile[u, v] = tiling.TileType.with_color_and_size(
+                    size,
+                    tiling.Portalable.BLACK
+                )
 
 
 @make_result('addPlacementHelper')
