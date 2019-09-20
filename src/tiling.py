@@ -722,7 +722,7 @@ class TileDef:
 
         front_pos = self.pos + 64 * self.normal
 
-        is_wall = bool(self.normal.z)
+        is_wall = self.normal.z == 0
 
         if self.has_oriented_portal_helper:
             force_helper = True
@@ -807,7 +807,7 @@ class TileDef:
                 faces, brushes = self.gen_multitile_pattern(
                     vmf,
                     self._sub_tiles,
-                    is_wall=bool(front_normal.z),
+                    is_wall=front_normal.z == 0,
                     bevels=bevels,
                     normal=-front_normal,
                     vec_offset=64 * self.normal - 64 * front_normal,
