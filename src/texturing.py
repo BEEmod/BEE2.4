@@ -433,6 +433,13 @@ def load_config(conf: Property):
                     prop.value for prop in
                     gen_conf.find_all(str(tex_name))
                 ]
+
+            # In case someone switches them around, add on 2x1 to 1x2 textures.
+            textures[TileSize.TILE_2x1] += [
+                prop.value for prop in
+                gen_conf.find_all('1x2')
+            ]
+
             if not any(textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
                     textures[tex_name] = [tex_default]
