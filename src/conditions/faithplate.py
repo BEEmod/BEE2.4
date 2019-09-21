@@ -4,6 +4,7 @@ import faithplate
 import template_brush
 from conditions import (
     make_flag, make_result, make_result_setup,
+    RES_EXHAUSTED,
 )
 from srctools import Property, Entity, VMF
 
@@ -21,6 +22,11 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
     or 'any' to detect those types of plates.
     """
     plate = faithplate.PLATES.get(inst['targetname'])
+
+    # Paint droppers are not faith plates and can be detected by
+    # instance filename. So pretend we didn't find it.
+    if isinstance(plate, faithplate.PaintDropper):
+        plate = None
 
     des_type = flag.value.casefold()
 
@@ -58,6 +64,8 @@ def res_set_faith_setup(res: Property) -> tuple:
 def res_set_faith(inst: Entity, res: Property) -> None:
     """Modify the `trigger_catapult`s used for `ItemFaithPlate` items.
 
+    This can also be used to modify the catapult for bomb-type Gel Droppers.
+
     - `template`: The template used for the catapult trigger. For the additional
       helper trigger, it will be offset upward.
     - `offset`: Allow shifting the triggers around.
@@ -84,24 +92,18 @@ def res_set_faith(inst: Entity, res: Property) -> None:
 
 
 @make_result('faithMods')
-def res_faith_mods(vmf: VMF, inst: Entity, res: Property) -> None:
-    """Modify the `trigger_catapult` that is created for `ItemFaithPlate` items.
+def res_faith_mods() -> None:
+    """This result is deprecated.
 
-    Values:
-
-    - `raise_trig`: Raise or lower the `trigger_catapult`s by this amount.
-    - `angled_targ`, `angled_in`: Instance entity and input for angled plates
-    - `straight_targ`, `straight_in`: Instance entity and input for
-      straight plates
-    - `instvar`: A $replace value to set to either 'angled' or '
-      'straight'.
-    - `enabledVar`: A `$replace` value which will be copied to the main
-      trigger's Start Disabled value (and inverted).
-    - `trig_temp`: An ID for a template brush to add. This will be offset by
-      the trigger's position (in the case of the `helper` trigger).
+    The functions provided by this have been replaced by other features:
+    - `FaithType` can be used to check the type of a plate.
+    - `setFaithAttrs` can be used to modify the trigger.
+    - Use the `comp_kv_setter` entity to add outputs or modify keyvalues
+      on the trigger(s).
     """
     LOGGER.warning(
         'The "faithMods" result is deprecated. '
         'Use "FaithType" and "setFaithAttrs" instead, '
         'along with comp_kv_setter.'
     )
+    return RES_EXHAUSTED

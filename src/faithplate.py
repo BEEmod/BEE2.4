@@ -1,5 +1,6 @@
 """Implement Faith Plates and allow customising trigger sizes/shapes.
 
+This also handles Bomb-type Paint Droppers.
 """
 import collections
 
@@ -17,7 +18,7 @@ from typing import Dict, Optional, List, Tuple, Union
 LOGGER = get_logger(__name__)
 
 # Targetname -> plate.
-PLATES: Dict[str, Union['AngledPlate', 'StraightPlate']] = {}
+PLATES: Dict[str, Union['AngledPlate', 'StraightPlate', 'PaintDropper']] = {}
 
 
 class FaithPlate:
@@ -75,6 +76,20 @@ class StraightPlate(FaithPlate):
         self.helper_trig = helper_trig
 
 
+class PaintDropper(FaithPlate):
+    """A special case - bomb-type Paint Droppers use this to aim the bomb."""
+    VISGROUP = 'paintdrop'
+
+    def __init__(
+        self,
+        inst: Entity,
+        trig: Entity,
+        target: Union[Vec, tiling.TileDef],
+    ) -> None:
+        super().__init__(inst, trig)
+        self.target = target
+
+
 def analyse_map(vmf: VMF) -> None:
     """Parse through the map, collecting all faithplate segments.
 
@@ -89,9 +104,12 @@ def analyse_map(vmf: VMF) -> None:
     # Find all the triggers and targets first.
     triggers: Dict[str, Entity] = {}
     helper_trigs: Dict[str, Entity] = {}
+    paint_trigs: Dict[str, Entity] = {}
 
     for trig in vmf.by_class['trigger_catapult']:
         name = trig['targetname']
+        # Conveniently, we can determine what sort of catapult was made by
+        # examining the local name used.
         if name.endswith('-helperTrigger'):
             helper_trigs[name[:-14]] = trig
             # Also store None in the main trigger if no key is there,
@@ -107,6 +125,9 @@ def analyse_map(vmf: VMF) -> None:
                 trig.outputs
                 if not out.inst_in
             ]
+        elif name.endswith('-catapult'):
+            # Paint droppers.
+            paint_trigs[name[:-9]] = trig
         else:
             LOGGER.warning('Unknown trigger "{}"?', name)
 
@@ -183,6 +204,16 @@ def analyse_map(vmf: VMF) -> None:
             # Target position, angled plate.
             PLATES[name] = AngledPlate(instances[name], trig, pos)
 
+    # And paint droppers
+    for name, trig in paint_trigs.items():
+        try:
+            pos = target_to_pos[name]
+        except KeyError:
+            LOGGER.warning('No target for paint dropper {}!', name)
+            continue
+        # Target position, angled plate.
+        PLATES[name] = PaintDropper(instances[name], trig, pos)
+
 
 def gen_faithplates(vmf: VMF) -> None:
     """Place the targets and catapults into the map."""
@@ -193,7 +224,7 @@ def gen_faithplates(vmf: VMF) -> None:
     ] = collections.defaultdict(list)
 
     for plate in PLATES.values():
-        if isinstance(plate, AngledPlate):
+        if isinstance(plate, (AngledPlate, PaintDropper)):
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:
