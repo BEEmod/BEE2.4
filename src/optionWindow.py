@@ -1,4 +1,7 @@
 # coding=utf-8
+from collections import defaultdict
+from pathlib import Path
+
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
@@ -11,9 +14,12 @@ from tooltip import add_tooltip
 import sound
 import utils
 import tk_tools
-import srctools
+import srctools.logger
 import contextWin
 import logWindow
+
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class AfterExport(Enum):
@@ -430,4 +436,63 @@ def init_dev_tab(f):
         tooltip=_('Make all props_map_editor models available for use. '
                   'Portal 2 has a limit of 1024 models loaded in memory at '
                   'once, so we need to disable unused ones to free this up.'),
-    ).grid(row=2, column=1, sticky=W)
+    ).grid(row=2, column=1, sticky='w')
+
+    ttk.Separator(orient='horizontal').grid(
+        row=9, column=0, columnspan=2, sticky='ew'
+    )
+
+    ttk.Button(
+        f,
+        text=_('Dump All objects'),
+        command=report_all_obj,
+    ).grid(row=10, column=0)
+
+    ttk.Button(
+        f,
+        text=_('Dump Items list'),
+        command=report_items,
+    ).grid(row=10, column=1)
+
+# Various "reports" that can be produced.
+
+
+def get_report_file(filename: str) -> Path:
+    """The folder where reports are dumped to."""
+    reports = Path('reports')
+    reports.mkdir(parents=True, exist_ok=True)
+    file = (reports / filename).resolve()
+    LOGGER.info('Producing {}...', file)
+    return file
+
+
+def report_all_obj() -> None:
+    """Print a list of every object type and ID."""
+    from packageLoader import OBJ_TYPES
+    for type_name, obj_type in OBJ_TYPES.items():
+        with get_report_file(f'obj_{type_name}.txt').open('w') as f:
+            f.write(f'{len(obj_type.cls.all())} {type_name}:\nb')
+            for obj in obj_type.cls.all():
+                f.write(f'- {obj.id}\n')
+
+
+def report_items() -> None:
+    """Print out all the item IDs used, with subtypes."""
+    from packageLoader import Item
+    with get_report_file('items.txt').open('w') as f:
+        for item in sorted(Item.all(), key=lambda it: it.id):
+            for vers_name, version in item.versions.items():
+                if len(item.versions) == 1:
+                    f.write(f'- <{item.id}>\n')
+                else:
+                    f.write(f'- <{item.id}:{vers_name}>\n')
+
+                variant_to_id = defaultdict(list)
+                for sty_id, variant in version['styles'].items():
+                    variant_to_id[variant].append(sty_id)
+
+                for variant, style_ids in variant_to_id.items():
+                    f.write(
+                        f'\t- [ ] {", ".join(sorted(style_ids))}:\n'
+                        f'\t  {variant.source}\n'
+                    )
