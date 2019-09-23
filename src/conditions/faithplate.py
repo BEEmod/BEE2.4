@@ -45,7 +45,7 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
         return plate is not None
 
 
-@make_result_setup('setFaithAttrs', 'setFaith')
+@make_result_setup('setFaithAttrs', 'setFaith', 'setFaithAttr')
 def res_set_faith_setup(res: Property) -> tuple:
     temp_name = res['template', '']
 
@@ -60,7 +60,7 @@ def res_set_faith_setup(res: Property) -> tuple:
     )
 
 
-@make_result('setFaithAttrs', 'setFaith')
+@make_result('setFaithAttrs', 'setFaith', 'setFaithAttr')
 def res_set_faith(inst: Entity, res: Property) -> None:
     """Modify the `trigger_catapult`s used for `ItemFaithPlate` items.
 
