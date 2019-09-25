@@ -15,7 +15,10 @@ import instance_traits
 from conditions import (
     make_result, make_result_setup, SOLIDS
 )
-from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
+from srctools import (
+    Property, NoKeyError, Vec, Output, Entity, Side, conv_bool,
+    VMF,
+)
 
 from typing import Dict, Tuple, Optional, Callable, Set, Iterable, List
 
@@ -60,12 +63,26 @@ FLAG_ROTATING = {
 
 
 @make_result('GenRotatingEnt')
-def res_fix_rotation_axis(ent: Entity, res: Property):
-    """Generate a `func_rotating`, `func_door_rotating` or any similar entity.
+def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
+    """Properly setup rotating brush entities to match the instance.
 
-    This uses the orientation of the instance to detemine the correct
-    spawnflags to make it rotate in the correct direction. The brush
-    will be 2x2x2 units large, and always set to be non-solid.
+    This uses the orientation of the instance to determine the correct
+    spawnflags to make it rotate in the correct direction.
+
+    This can either modify an existing entity (which may be in an instance),
+    or generate a new one. The generated brush will be 2x2x2 units large,
+    and always set to be non-solid.
+
+    For both modes:
+    - `Axis`: specifies the rotation axis local to the instance.
+    - `Reversed`: If set, flips the direction around.
+    - `Classname`: Specifies which entity, since the spawnflags required varies.
+
+    For application to an existing entity:
+    - `ModifyTarget`: The local name of the entity to modify.
+
+    For brush generation mode:
+
     - `Pos` and `name` are local to the
       instance, and will set the `origin` and `targetname` respectively.
     - `Keys` are any other keyvalues to be be set.
@@ -86,83 +103,91 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
        * `func_platrot`
     """
     des_axis = res['axis', 'z'].casefold()
-    reverse = srctools.conv_bool(res['reversed', '0'])
+    reverse = res.bool('reversed')
     door_type = res['classname', 'func_door_rotating']
 
-    # Extra stuff to apply to the flags (USE, toggle, etc)
-    flags = sum(map(
-        # Add together multiple values
-        srctools.conv_int,
-        res['flags', '0'].split('+')
-    ))
-
-    name = conditions.local_name(ent, res['name', ''])
-
     axis = Vec.with_axes(des_axis, 1).rotate_by_str(ent['angles', '0 0 0'])
-
-    pos = Vec.from_str(
-        res['Pos', '0 0 0']
-    ).rotate_by_str(ent['angles', '0 0 0'])
-    pos += Vec.from_str(ent['origin', '0 0 0'])
-
-    door_ent = vbsp.VMF.create_ent(
-        classname=door_type,
-        targetname=name,
-        origin=pos.join(' '),
-    )
-
-    conditions.set_ent_keys(door_ent, ent, res)
-
-    for output in res.find_all('AddOut'):
-        door_ent.add_out(Output(
-            out=output['Output', 'OnUse'],
-            inp=output['Input', 'Use'],
-            targ=output['Target', ''],
-            inst_in=output['Inst_targ', None],
-            param=output['Param', ''],
-            delay=srctools.conv_float(output['Delay', '']),
-            times=(
-                1 if
-                srctools.conv_bool(output['OnceOnly', False])
-                else -1),
-        ))
-
-    # Generate brush
-    door_ent.solids = [vbsp.VMF.make_prism(pos - 1, pos + 1).solid]
 
     if axis.x > 0 or axis.y > 0 or axis.z > 0:
         # If it points forward, we need to reverse the rotating door
         reverse = not reverse
 
-    flag_values = FLAG_ROTATING[door_type]
-    # Make the door always non-solid!
-    flags |= flag_values.get('solid_flags', 0)
-    # Add or remove flags as needed.
-    # flags |= bit sets it to 1.
-    # flags |= ~bit sets it to 0.
-    if axis.x != 0:
-        flags |= flag_values.get('x', 0)
-    else:
-        flags &= ~flag_values.get('x', 0)
+    try:
+        flag_values = FLAG_ROTATING[door_type]
+    except KeyError:
+        LOGGER.warning('Unknown rotating brush type "{}"!', door_type)
+        return
 
-    if axis.y != 0:
-        flags |= flag_values.get('y', 0)
+    name = res['ModifyTarget', '']
+    if name:
+        name = conditions.local_name(ent, name)
+        setter_loc = ent['origin']
     else:
-        flags &= ~flag_values.get('y', 0)
+        # Generate a brush.
+        name = conditions.local_name(ent, res['name', ''])
 
-    if axis.z != 0:
-        flags |= flag_values.get('z', 0)
-    else:
-        flags &= ~flag_values.get('z', 0)
+        pos = res.vec('Pos').rotate_by_str(ent['angles', '0 0 0'])
+        pos += Vec.from_str(ent['origin', '0 0 0'])
+        setter_loc = str(pos)
 
+        door_ent = vmf.create_ent(
+            classname=door_type,
+            targetname=name,
+            origin=pos.join(' '),
+            # Extra stuff to apply to the flags (USE, toggle, etc)
+            spawnflags=sum(map(
+                # Add together multiple values
+                srctools.conv_int,
+                res['flags', '0'].split('+')
+                # Make the door always non-solid!
+            )) | flag_values.get('solid_flags', 0),
+        )
+
+        conditions.set_ent_keys(door_ent, ent, res)
+
+        for output in res.find_all('AddOut'):
+            door_ent.add_out(Output(
+                out=output['Output', 'OnUse'],
+                inp=output['Input', 'Use'],
+                targ=output['Target', ''],
+                inst_in=output['Inst_targ', None],
+                param=output['Param', ''],
+                delay=srctools.conv_float(output['Delay', '']),
+                times=(
+                    1 if
+                    srctools.conv_bool(output['OnceOnly', False])
+                    else -1),
+            ))
+
+        # Generate brush
+        door_ent.solids = [vbsp.VMF.make_prism(pos - 1, pos + 1).solid]
+
+    # Add or remove flags as needed by creating KV setters.
+
+    for flag, value in zip(
+        ('x', 'y', 'z', 'rev'),
+        [axis.x != 0, axis.y != 0, axis.z != 0, reverse],
+    ):
+        if flag in flag_values:
+            vmf.create_ent(
+                'comp_kv_setter',
+                origin=setter_loc,
+                target=name,
+                mode='flags',
+                kv_name=flag_values[flag],
+                kv_value_local=value,
+            )
+
+    # This ent uses a keyvalue for reversing...
     if door_type == 'momentary_rot_button':
-        door_ent['startdirection'] = '1' if reverse else '-1'
-    else:
-        if reverse:
-            flags |= flag_values.get('rev', 0)
-        else:
-            flags &= ~flag_values.get('rev', 0)
-    door_ent['spawnflags'] = str(flags)
+        vmf.create_ent(
+            'comp_kv_setter',
+            origin=setter_loc,
+            target=name,
+            mode='kv',
+            kv_name='StartDirection',
+            kv_value_local='1' if reverse else '-1',
+        )
 
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
