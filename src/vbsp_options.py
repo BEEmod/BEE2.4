@@ -369,6 +369,10 @@ DEFAULTS = [
         
         Must be either 2, 4 or 8.
         """),
+    Opt('dynamic_pan_nodraw', False,
+        """If set, apply nodraw to the side and bottom of dynamic 
+        angled panels.
+        """),
 
     Opt('ind_pan_check_switching', 'custom',
         """Specify the type of switching behaviour used in the instance.

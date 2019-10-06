@@ -854,8 +854,17 @@ class TileDef:
                 )
             self.panel_ent.solids.extend(brushes)
 
-            if static_angle is None or static_angle is PanelAngle.ANGLE_90:
-                # Dynamic panel, do nothing.
+            if static_angle is None:
+                # Dynamic panel, if requested apply nodraw to everything that's
+                # not the front.
+                if vbsp_options.get(bool, 'dynamic_pan_nodraw'):
+                    for side in self.panel_ent.sides():
+                        if side.normal() != -self.normal:
+                            side.mat = consts.Tools.NODRAW
+                            side.offset = 0
+                            side.scale = 0.25
+
+            elif static_angle is PanelAngle.ANGLE_90:
                 # 90 degree panels don't rotate either.
                 pass
             elif static_angle is PanelAngle.ANGLE_FLAT:
