@@ -854,6 +854,10 @@ class TileDef:
                 )
             self.panel_ent.solids.extend(brushes)
 
+            if static_angle is not None:
+                # This is a static rotated panel.
+                self.panel_ent.keys = {'classname': 'func_detail'}
+
             if static_angle is None:
                 # Dynamic panel, if requested apply nodraw to everything that's
                 # not the front.
@@ -868,8 +872,6 @@ class TileDef:
                 # 90 degree panels don't rotate either.
                 pass
             elif static_angle is PanelAngle.ANGLE_FLAT:
-                # Make it a func_detail.
-                self.panel_ent.keys = {'classname': 'func_detail'}
                 # Add nodraw behind to seal.
                 brush, face = make_tile(
                     vmf,
@@ -907,9 +909,6 @@ class TileDef:
                         faces,
                     )
             else:
-                # This is a static rotated panel.
-                self.panel_ent.keys = {'classname': 'func_detail'}
-
                 # Rotate the panel to match the panel shape:
                 # Figure out if we want to rotate +ve or -ve.
                 # We know rotating the surface 90 degrees will point
