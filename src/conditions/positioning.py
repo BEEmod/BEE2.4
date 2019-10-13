@@ -170,6 +170,27 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
     )
 
 
+@make_result('ReadSurfType')
+def res_brush_at_loc(inst: Entity, res: Property):
+    """Read the type of surface at a particular location.
+
+    - `Pos` is the position of the tile, where `0 0 0` is the floor-position
+       of the brush.
+    - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
+    - `Pos2`: If set, causes the check to average the tiles in a bounding box.
+      If no tiles are present they're treated as a lack of them.
+      Otherwise the dominant colour wins, with ties treated as black.
+    - `ResultVar` is the variable which is set. This will be set to
+      `black`, `white` or `none`.
+    - If `gridPos` is true, the position will be snapped so it aligns with
+      the 128 grid (Useful with fizzler/light strip items).
+    - `RemoveTile`: If set to `1`, the tile will be removed if found.
+    """
+    # Alias PosIsSolid to also be a result, for using the variable mode by itself.
+    res['setVar'] = res['resultVar']
+    flag_brush_at_loc(inst, res)
+
+
 @make_flag('PosIsGoo')
 def flag_goo_at_loc(inst: Entity, flag: Property):
     """Check to see if a given location is submerged in goo.
