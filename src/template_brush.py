@@ -85,7 +85,6 @@ class ColorPicker(NamedTuple):
     force_tex_black: str
 
 
-
 class TileSetter(NamedTuple):
     """Set tiles in a particular position."""
     offset: Vec
@@ -93,6 +92,7 @@ class TileSetter(NamedTuple):
     color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
     tile_type: TileType  # Type to produce.
     picker_name: str  # Name of colorpicker to use for the color.
+    force: bool  # Force overwrite existing values.
 
 # We use the skins value on the tilesetter to specify type, allowing visualising it.
 # So this is the type for each index.
@@ -497,6 +497,7 @@ def load_templates() -> None:
             color=color,
             tile_type=tile_type,
             picker_name=ent['color_picker'],
+            force=srctools.conv_bool(ent['force']),
         ))
 
     temp_ids = set(conf_ents).union(
@@ -882,7 +883,10 @@ def retexture_template(
                 else:
                     setter_color = force_colour
             else:
-                raise ValueError('"{}": Tile Setter requires a valid color value!')
+                raise ValueError(
+                    '"{}": Tile Setter set to match colour value from the '
+                    'template, but not given one!'.format(template.id)
+                )
 
             setter_type = TileType.with_color_and_size(
                 setter_type.tile_size,
@@ -894,6 +898,7 @@ def retexture_template(
             setter_norm,
             setter_type,
             silent=True,  # Don't log missing positions.
+            force=tile_setter.force,
         )
 
     for brush in all_brushes:

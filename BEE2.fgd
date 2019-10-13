@@ -134,11 +134,14 @@
 @PointClass
 	base(Angles)
 	studioprop("models/BEE2/editor/tile_setter.mdl")
+	line(64 64 64, targetname, color_picker)
 	= bee2_template_tilesetter:
 	"Applies a tile type to a surface."
 	[
 	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
 	color_picker(target_destination): "Color Picker": "" : "If set, use this colorpicker to reuse existing textures."
+
+	force(boolean) : "Force Place" : 0 : "If enabled, place the tile regardless of what's already in this position."
 	
 	color(choices): "Color" : "tile" : "The color to use for tiles (if applicable). If set to Match Var or Invert Var, the template must provide a color." = 
 		[
@@ -187,7 +190,7 @@
 	min(vecline) : "Maximum Position" : "64 64 0" : "The maximum position of the hollowed area."
 	]
 
-@PointClass wirebox(min, max)= bee2_editor_embedface: "Defines a EmbedFace section for an item."
+@PointClass wirebox(min, max) = bee2_editor_embedface: "Defines a EmbedFace section for an item."
 	[
 	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the brush section. Vertical position is ignored."
 	min(vecline) : "Maximum Position" : "64 64 0" : "The minimum position of the brush section. Vertical position is ignored."
