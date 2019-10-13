@@ -300,6 +300,13 @@ DEFAULTS = [
         """Remove the exit sign overlays for singleplayer.
         """),
 
+    Opt('_tiling_template_', '__TILING_TEMPLATE__',
+        """Change the template used for generating brushwork. 
+        
+        If changing this use caution and only modify texture orientations.
+        DO NOT change brush shapes or positions!
+        """),
+
     Opt('rotate_edge', False,
         """Rotate squarebeams textures 90 degrees.
         """),

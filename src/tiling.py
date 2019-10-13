@@ -1470,7 +1470,7 @@ def gen_tile_temp() -> None:
     }
 
     try:
-        template = template_brush.get_template('__TILING_TEMPLATE__')
+        template = template_brush.get_template(vbsp_options.get(str, '_tiling_template_'))
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
             world, detail, over = template.visgrouped(name)
