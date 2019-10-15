@@ -797,8 +797,9 @@ class Game:
             self.edit_gameinfo(True)
             export_screen.step('EXP')
 
-            LOGGER.info('Adding ents to FGD.')
-            self.edit_fgd(True)
+            if not GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+                LOGGER.info('Adding ents to FGD.')
+                self.edit_fgd(True)
             export_screen.step('EXP')
 
             LOGGER.info('Writing instance list...')
