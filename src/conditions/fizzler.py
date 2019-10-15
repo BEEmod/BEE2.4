@@ -42,12 +42,13 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     """Convert a fizzler connected via the output to a new shape.
 
     This allows for different placing of fizzler items.
-    Each `segment` parameter should be a `x y z;x y z` pair of positions
+
+    * Each `segment` parameter should be a `x y z;x y z` pair of positions
     that represent the ends of the fizzler.
-    `up_axis` should be set to a normal vector pointing in the new 'upward'
+    * `up_axis` should be set to a normal vector pointing in the new 'upward'
     direction.
-    `default` is the ID of a fizzler type which should be used if no outputs
-    are fired.
+    * `default` is the ID of a fizzler type which should be used if no outputs
+    are present.
     """
     shape_name = shape_inst['targetname']
     shape_item = connections.ITEMS.pop(shape_name)

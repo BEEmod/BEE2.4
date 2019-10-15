@@ -82,16 +82,6 @@ INJECT_FILES = {
     'timer_sound.nut': 'scripts/vscripts/bee2/timer_sound.nut',
 }
 
-# Additional parts to add if we have a mdl file.
-MDL_ADDITIONAL_EXT = [
-    '.sw.vtx',
-    '.dx80.vtx',
-    '.dx90.vtx',
-    '.vvd',
-    '.phy',
-]
-
-
 # Various parts of the soundscript generated for BG music.
 
 # Things that can appear at the beginning of filenames..
@@ -730,6 +720,7 @@ def main(argv: List[str]) -> None:
     root_folder = game.path.parent
     fsys = game.get_filesystem()
 
+    # Put the Mel and Tag filesystems in so we can pack from there.
     fsys_tag = fsys_mel = None
     if is_peti and 'mel_vpk' in CONF:
         fsys_mel = VPKFileSystem(CONF['mel_vpk'])
@@ -737,6 +728,13 @@ def main(argv: List[str]) -> None:
     if is_peti and 'tag_dir' in CONF:
         fsys_tag = RawFileSystem(CONF['tag_dir'])
         fsys.add_sys(fsys_tag)
+
+    # Special case - move the BEE2 fsys FIRST, so we always pack files found
+    # there.
+    for child_sys in fsys.systems[:]:
+        if 'bee2' in child_sys[0].path.casefold():
+            fsys.systems.remove(child_sys)
+            fsys.systems.insert(0, child_sys)
 
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
@@ -753,6 +751,10 @@ def main(argv: List[str]) -> None:
     fsys.open_ref()
 
     LOGGER.info('Done!')
+
+    LOGGER.debug('Filesystems:')
+    for child_sys in fsys.systems[:]:
+        LOGGER.debug('- {}: {!r}', child_sys[1], child_sys[0])
 
     LOGGER.info('Reading our FGD files...')
     fgd = load_fgd()

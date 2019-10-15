@@ -934,12 +934,13 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     Each cube should be the name of an ID, with `!` before to exclude it.
     It succeeds if a target is any of the included types, and not any of the
     excluded types (exclusions override inclusion).
+
     The IDs may also be:
     * `<any>` to detect all cube types (including franken)
     * `<companion>` to detect 'companion' items.
     * `<sphere>` to detect sphere-type items.
 
-    The 'resultvar' fixup will be set to the name to use.
+    The `resultvar` fixup will be set to the name to use.
     """
     inst.fixup[res['ResultVar']] = cube_filter(
         vmf,
@@ -961,11 +962,13 @@ def res_script_cube_predicate(res: Property):
     It succeeds if a target is any of the included types, and not any of the
     excluded types (exclusions override inclusion).
     The IDs may also be:
+
     * `<any>` to detect all cube types (including franken)
     * `<companion>` to detect 'companion' items.
     * `<sphere>` to detect sphere-type items.
 
     Config options:
+
     * `function`: Name of the function - called with an entity as an argument.
     * `filename`: Path to the .nut script, relative to scripts/vscripts/.
     * `Cube`: A cube to include.

@@ -29,7 +29,6 @@ class ResIcon(Enum):
     APERTURE = 'ap_black'
     BUGS = 'menu_github'
     DISCORD = 'menu_discord'
-    STEAM = 'menu_steam'
     MUSIC_CHANGER = 'menu_music_changer'
 
     PORTAL2 = 'menu_p2'
@@ -42,8 +41,6 @@ SEPERATOR = object()
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
 DISCORD_SERVER = 'https://discord.gg/hnGFJrz'
-# Open https://steamcommunity.com/groups/beemod direct in the Steam Client
-STEAM_GROUP = 'steam://url/GroupSteamIDPage/103582791458212641'
 MUSIC_CHANGER = 'https://beemmc.boards.net/'
 
 
@@ -68,7 +65,6 @@ WEB_RESOURCES = [
     ),
     # i18n: The chat program.
     Res(_('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
-    Res(_('Steam Group...'), STEAM_GROUP, ResIcon.STEAM),
     Res(_("aerond's Music Changer..."), MUSIC_CHANGER, ResIcon.MUSIC_CHANGER),
     SEPERATOR,
     Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),

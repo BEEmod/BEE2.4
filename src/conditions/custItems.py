@@ -43,6 +43,7 @@ def res_cust_antline(inst: Entity, res: Property):
     """Customise the output antlines.
 
     Options:
+
     * `wall`: The configuration for antlines on walls. Same as global
         style options.
     * `floor`: The configuration for floor/ceiling antlines. If not provided,

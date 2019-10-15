@@ -68,19 +68,21 @@ def add_signage_loc(sign_locs: Set[Tuple[float, float, float]], loc: Vec):
 def res_cutout_tile(vmf: srctools.VMF, res: Property):
     """Generate random quarter tiles, like in Destroyed or Retro maps.
 
-    - "MarkerItem" is the instance to look for.
-    - "TileSize" can be "2x2" or "4x4".
-    - rotateMax is the amount of degrees to rotate squarebeam models.
+    - `MarkerItem` is the instance file to look for (`<ITEM_BEE2_CUTOUT_TILE>`)
+    - `floor_chance`: The percentage change for a segment in the middle of the floor to be a normal tile.
+    - `floor_glue_chance`: The chance for any tile to be glue - this should be higher than the regular chance, as that overrides this.
+    - `rotateMax` is the maximum angle to rotate squarebeam models.
+    - `squarebeamsSkin` sets the skin to use for the squarebeams floor frame.
+    - `dispBase`, if true makes the floor a displacement with random alpha.
+    - `Materials` blocks specify the possible materials to use:
+          - `squarebeams` is the squarebeams variant to use.
+          - `ceilingwalls` are the sides of the ceiling section.
+          - `floorbase` is the texture under floor sections.
+            If `dispBase` is True this is a displacement material.
+          - `tile_glue` is used on top of a thinner tile segment.
+          - `clip` is the player_clip texture used over floor segments.
+            (This allows customising the surfaceprop.)
 
-    Materials:
-    - "squarebeams" is the squarebeams variant to use.
-    - "ceilingwalls" are the sides of the ceiling section.
-    - "floorbase" is the texture under floor sections.
-    - "tile_glue" is used on top of a thinner tile segment.
-    - "clip" is the player_clip texture used over floor segments.
-        (This allows customising the surfaceprop.)
-    - "Floor4x4Black", "Ceil2x2White" and other combinations can be used to
-       override the textures used.
     """
     marker_filenames = instanceLocs.resolve(res['markeritem'])
 

@@ -26,10 +26,11 @@ def flag_angles(inst: Entity, flag: Property):
 
     The value should be either just the angle to check, or a block of
     options:
+
     - `Angle`: A unit vector (XYZ value) pointing in a direction, or some
         keywords: `+z`, `-y`, `N`/`S`/`E`/`W`, `up`/`down`, `floor`/`ceiling`, or `walls` for any wall side.
     - `From_dir`: The direction the unrotated instance is pointed in.
-        This lets the flag check multiple directions
+        This lets the flag check multiple directions.
     - `Allow_inverse`: If true, this also returns True if the instance is
         pointed the opposite direction .
     """
@@ -213,21 +214,22 @@ def flag_blockpos_type(inst: Entity, flag: Property):
     be checked.
 
     The type should be a space-seperated list of locations:
+
     * `VOID` (Outside the map)
     * `SOLID` (Full wall cube)
     * `EMBED` (Hollow wall cube)
     * `AIR` (Inside the map, may be occupied by items)
     * `OCCUPIED` (Known to be occupied by items)
     * `PIT` (Bottomless pits, any)
-      * `PIT_SINGLE` (one-high)
-      * `PIT_TOP`
-      * `PIT_MID`
-      * `PIT_BOTTOM`
+        * `PIT_SINGLE` (one-high)
+        * `PIT_TOP`
+        * `PIT_MID`
+        * `PIT_BOTTOM`
     * `GOO`
-      * `GOO_SINGLE` (one-deep goo)
-      * `GOO_TOP` (goo surface)
-      * `GOO_MID`
-      * `GOO_BOTTOM` (floor)
+        * `GOO_SINGLE` (one-deep goo)
+        * `GOO_TOP` (goo surface)
+        * `GOO_MID`
+        * `GOO_BOTTOM` (floor)
     """
     pos2 = None
 

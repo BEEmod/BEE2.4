@@ -89,7 +89,7 @@ do_localisation()
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
-    # We just use idlelib.WidgetRedirector
+    # We just use idlelib.WidgetRedirector and idlelib.query
     'idlelib.ClassBrowser',
     'idlelib.ColorDelegator',
     'idlelib.Debugger',

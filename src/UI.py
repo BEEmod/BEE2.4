@@ -9,7 +9,6 @@ import random
 from srctools import Property
 import music_conf
 from tk_tools import TK_ROOT
-from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
@@ -1188,7 +1187,7 @@ def pal_shuffle():
 def pal_save_as(e: Event=None):
     name = ""
     while True:
-        name = ask_string(
+        name = tk_tools.prompt(
             _("BEE2 - Save Palette"),
             _("Enter a name:"),
         )
@@ -1320,11 +1319,18 @@ def init_option(pane: SubPane):
         command=pal_save_as,
     ).grid(row=1, sticky="EW", padx=5)
 
+    def save_settings_changed():
+        GEN_OPTS['General'][
+            'palette_save_settings'
+        ] = srctools.bool_as_int(var_pal_save_settings.get())
+
     ttk.Checkbutton(
         frame,
         text=_('Save Settings in Palettes'),
         variable=var_pal_save_settings,
+        command=save_settings_changed,
     ).grid(row=2, sticky="EW", padx=5)
+    var_pal_save_settings.set(GEN_OPTS.get_bool('General', 'palette_save_settings'))
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 

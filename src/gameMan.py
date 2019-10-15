@@ -7,6 +7,7 @@ Does stuff related to the actual games.
 """
 from pathlib import Path
 
+import tk_tools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -19,7 +20,6 @@ import re
 import io
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from query_dialogs import ask_string
 from srctools import (
     Vec, VPK,
     Property,
@@ -268,7 +268,7 @@ def should_backup_app(file: str) -> bool:
             return False  # Too small.
 
         # Read out the last 4096 bytes, and look for the sig in there.
-        f.seek(-SIZE,io.SEEK_END)
+        f.seek(-SIZE, io.SEEK_END)
 
         return b'MEI\014\013\012\013\016' not in f.read(SIZE)
 
@@ -292,15 +292,15 @@ class Game:
         """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():
-            raise ValueError(
-                'Game {} has invalid Steam ID: {}'.format(gm_id, steam_id)
-            )
+            raise ValueError(f'Game {gm_id} has invalid Steam ID: {steam_id}')
 
         folder = config.get_val(gm_id, 'Dir', '')
         if not folder:
-            raise ValueError(
-                'Game {} has no folder!'.format(gm_id)
-            )
+            raise ValueError(f'Game {gm_id} has no folder!')
+
+        if not os.path.exists(folder):
+            raise ValueError(f'Folder {folder} does not exist for game {gm_id}!')
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
@@ -797,8 +797,9 @@ class Game:
             self.edit_gameinfo(True)
             export_screen.step('EXP')
 
-            LOGGER.info('Adding ents to FGD.')
-            self.edit_fgd(True)
+            if not GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+                LOGGER.info('Adding ents to FGD.')
+                self.edit_fgd(True)
             export_screen.step('EXP')
 
             LOGGER.info('Writing instance list...')
@@ -1430,6 +1431,7 @@ def load():
                     CONFIG,
                 )
             except ValueError:
+                LOGGER.warning("Can't parse game: ", exc_info=True)
                 continue
             all_games.append(new_game)
             new_game.edit_gameinfo(True)
@@ -1483,11 +1485,11 @@ def add_game(e=None, refresh_menu=True):
 
         invalid_names = [gm.name for gm in all_games]
         while True:
-            name = ask_string(
-                prompt=_("Enter the name of this game:"),
-                title=_('BEE2 - Add Game'),
+            name = tk_tools.prompt(
+                _('BEE2 - Add Game'),
+                _("Enter the name of this game:"),
                 initialvalue=name,
-                )
+            )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,

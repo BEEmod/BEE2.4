@@ -1,4 +1,7 @@
 # coding=utf-8
+from collections import defaultdict
+from pathlib import Path
+
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
@@ -11,9 +14,12 @@ from tooltip import add_tooltip
 import sound
 import utils
 import tk_tools
-import srctools
+import srctools.logger
 import contextWin
 import logWindow
+
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class AfterExport(Enum):
@@ -27,6 +33,7 @@ PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
+PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
 AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
@@ -51,20 +58,20 @@ win.title(_('BEE2 Options'))
 win.withdraw()
 
 
-def show():
+def show() -> None:
     """Display the option window."""
     win.deiconify()
     contextWin.hide_context()  # Ensure this closes
     utils.center_win(win)
 
 
-def load():
+def load() -> None:
     """Load the current settings from config."""
     for var in VARS.values():
         var.load()
 
 
-def save():
+def save() -> None:
     """Save settings into the config and apply them to other windows."""
     for var in VARS.values():
         var.save()
@@ -77,7 +84,7 @@ def save():
         func()
 
 
-def clear_caches():
+def clear_caches() -> None:
     """Wipe the cache times in configs.
 
      This will force package resources to be extracted again.
@@ -85,13 +92,10 @@ def clear_caches():
     import gameMan
     import packageLoader
 
-    restart_ok = messagebox.askokcancel(
-        title=_('Allow Restart?'),
-        message=_('Restart the BEE2 to re-extract packages?'),
+    message = _(
+        'Package cache times have been reset. '
+        'These will now be extracted during the next export.'
     )
-
-    if not restart_ok:
-        return
 
     for game in gameMan.all_games:
         game.mod_times.clear()
@@ -101,24 +105,36 @@ def clear_caches():
     for pack_id in packageLoader.packages:
         packageLoader.PACK_CONFIG[pack_id]['ModTime'] = '0'
 
+    # This needs to be disabled, since otherwise we won't actually export
+    # anything...
+    if PRESERVE_RESOURCES.get():
+        PRESERVE_RESOURCES.set(False)
+        message += '\n\n' + _('"Preserve Game Resources" has been disabled.')
+
     save()  # Save any option changes..
 
     gameMan.CONFIG.save_check()
     GEN_OPTS.save_check()
     packageLoader.PACK_CONFIG.save_check()
 
-    utils.restart_app()
+    # Since we've saved, dismiss this window.
+    win.withdraw()
+    
+    messagebox.showinfo(
+        title=_('Packages Reset'),
+        message=message,
+    )
 
 
 def make_checkbox(
-        frame,
-        section,
-        item,
-        desc,
-        default=False,
-        var: BooleanVar=None,
-        tooltip='',
-        ):
+    frame: Misc,
+    section: str,
+    item: str,
+    desc: str,
+    default: bool=False,
+    var: BooleanVar=None,
+    tooltip='',
+) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
 
     section and item are the location in GEN_OPTS for this config.
@@ -167,7 +183,7 @@ def make_checkbox(
     return widget
 
 
-def init_widgets():
+def init_widgets() -> None:
     """Create all the widgets."""
     UI['nbook'] = nbook = ttk.Notebook(
         win,
@@ -212,11 +228,11 @@ def init_widgets():
         sticky=E,
     )
 
-    def ok():
+    def ok() -> None:
         save()
         win.withdraw()
 
-    def cancel():
+    def cancel() -> None:
         win.withdraw()
         load()  # Rollback changes
 
@@ -237,7 +253,7 @@ def init_widgets():
     save()  # And ensure they are applied to other windows
 
 
-def init_gen_tab(f):
+def init_gen_tab(f: ttk.Frame) -> None:
     """Make widgets in the 'General' tab."""
     def load_after_export():
         """Read the 'After Export' radio set."""
@@ -334,11 +350,11 @@ def init_gen_tab(f):
     reset_cache.grid(row=1, column=1, sticky='EW')
     add_tooltip(
         reset_cache,
-        _('Force re-extracting all package resources. This requires a restart.'),
+        _('Force re-extracting all package resources.'),
     )
 
 
-def init_win_tab(f):
+def init_win_tab(f: ttk.Frame) -> None:
     UI['keep_inside'] = keep_inside = make_checkbox(
         f,
         section='General',
@@ -359,7 +375,7 @@ def init_win_tab(f):
     reset_win.grid(row=1, column=0, sticky=EW)
 
 
-def init_dev_tab(f):
+def init_dev_tab(f: ttk.Frame) -> None:
     f.columnconfigure(1, weight=1)
     f.columnconfigure(2, weight=1)
 
@@ -406,6 +422,7 @@ def init_dev_tab(f):
         section='General',
         item='preserve_bee2_resource_dir',
         desc=_('Preserve Game Directories'),
+        var=PRESERVE_RESOURCES,
         tooltip=_('When exporting, do not overwrite \n"bee2/" and'
                   '\n"sdk_content/maps/bee2/".\n'
                   "Enable if you're"
@@ -430,4 +447,63 @@ def init_dev_tab(f):
         tooltip=_('Make all props_map_editor models available for use. '
                   'Portal 2 has a limit of 1024 models loaded in memory at '
                   'once, so we need to disable unused ones to free this up.'),
-    ).grid(row=2, column=1, sticky=W)
+    ).grid(row=2, column=1, sticky='w')
+
+    ttk.Separator(orient='horizontal').grid(
+        row=9, column=0, columnspan=2, sticky='ew'
+    )
+
+    ttk.Button(
+        f,
+        text=_('Dump All objects'),
+        command=report_all_obj,
+    ).grid(row=10, column=0)
+
+    ttk.Button(
+        f,
+        text=_('Dump Items list'),
+        command=report_items,
+    ).grid(row=10, column=1)
+
+# Various "reports" that can be produced.
+
+
+def get_report_file(filename: str) -> Path:
+    """The folder where reports are dumped to."""
+    reports = Path('reports')
+    reports.mkdir(parents=True, exist_ok=True)
+    file = (reports / filename).resolve()
+    LOGGER.info('Producing {}...', file)
+    return file
+
+
+def report_all_obj() -> None:
+    """Print a list of every object type and ID."""
+    from packageLoader import OBJ_TYPES
+    for type_name, obj_type in OBJ_TYPES.items():
+        with get_report_file(f'obj_{type_name}.txt').open('w') as f:
+            f.write(f'{len(obj_type.cls.all())} {type_name}:\nb')
+            for obj in obj_type.cls.all():
+                f.write(f'- {obj.id}\n')
+
+
+def report_items() -> None:
+    """Print out all the item IDs used, with subtypes."""
+    from packageLoader import Item
+    with get_report_file('items.txt').open('w') as f:
+        for item in sorted(Item.all(), key=lambda it: it.id):
+            for vers_name, version in item.versions.items():
+                if len(item.versions) == 1:
+                    f.write(f'- <{item.id}>\n')
+                else:
+                    f.write(f'- <{item.id}:{vers_name}>\n')
+
+                variant_to_id = defaultdict(list)
+                for sty_id, variant in version['styles'].items():
+                    variant_to_id[variant].append(sty_id)
+
+                for variant, style_ids in variant_to_id.items():
+                    f.write(
+                        f'\t- [ ] {", ".join(sorted(style_ids))}:\n'
+                        f'\t  {variant.source}\n'
+                    )

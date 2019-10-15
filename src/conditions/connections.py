@@ -50,6 +50,7 @@ def res_add_output(inst: Entity, res: Property):
     """Add an output from an instance to a global or local name.
 
     Values:
+
     - `output`: The output name. Can be `<ITEM_ID:activate>` or `<ITEM_ID:deactivate>`
       to lookup that item type.
     - `target`: The name of the target entity

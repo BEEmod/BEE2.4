@@ -2,11 +2,11 @@
 General code used for tkinter portions.
 
 """
-from typing import Union, Callable
+from typing import Union, Callable, Optional
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog
+from tkinter import filedialog, commondialog, simpledialog
 import tkinter as tk
 
 import os.path
@@ -15,10 +15,23 @@ try:
     # Python 3.6+
     # noinspection PyCompatibility
     from idlelib.redirector import WidgetRedirector
+    from idlelib.query import Query
 except ImportError:
     # Python 3.5 and below
     # noinspection PyCompatibility, PyUnresolvedReferences
     from idlelib.WidgetRedirector import WidgetRedirector
+
+    class QueryShim(simpledialog._QueryString):
+        """Replicate the new API with the old simpledialog code."""
+        def __init__(self, parent, title, message, text0):
+            super().__init__(title, message, initialvalue=text0, parent=parent)
+
+        def body(self, master):
+            """Ensure the window icon is changed."""
+            super().body(master)
+            set_window_icon(self)
+
+    Query = QueryShim  # type: ignore
 
 import utils
 
@@ -161,7 +174,8 @@ def hook_tk_errors():
         TK_ROOT.quit()
         sys.exit()
 
-    TK_ROOT.report_callback_exception = tk_error
+    TK_ROOT.report_callback_exception = tk_error  # type: ignore
+
 hook_tk_errors()  # Always do this.
 
 
@@ -169,6 +183,19 @@ def event_cancel(*args, **kwargs):
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
 
+def prompt(
+    title: str, message: str,
+    initialvalue: str='',
+    parent: tk.Misc=TK_ROOT,
+) -> Optional[str]:
+    """Ask the user to enter a string."""
+    from loadScreen import surpress_screens
+    with surpress_screens():
+        return Query(
+            parent,
+            title, message,
+            text0=initialvalue,
+        ).result
 
 class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
@@ -252,6 +279,7 @@ _file_field_char_len = _file_field_font.measure('x')
 class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
     """
+    browser: commondialog.Dialog
     def __init__(
         self,
         master,
@@ -278,7 +306,7 @@ class FileField(ttk.Frame):
             self.browser = filedialog.Directory(
                 self,
                 initialdir=loc,
-            )  # type: commondialog.Dialog
+            )
         else:
             self.browser = filedialog.SaveAs(
                 self,
