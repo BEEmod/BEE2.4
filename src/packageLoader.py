@@ -3357,16 +3357,16 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
                     export_detail = force_is_detail
                 else:
                     export_detail = is_detail
-                if len(vis_ids) > 1:
-                    raise ValueError(
-                        'Template "{}" has brush with two '
-                        'visgroups!'.format(temp_id)
-                    )
                 visgroups = [
                     visgroup_names[vis_id]
                     for vis_id in
                     vis_ids
                 ]
+                if len(visgroups) > 1:
+                    raise ValueError(
+                        'Template "{}" has brush with two '
+                        'visgroups! ({})'.format(temp_id, ', '.join(visgroups))
+                    )
                 # No visgroup = ''
                 visgroup = visgroups[0] if visgroups else ''
 
