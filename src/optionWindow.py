@@ -33,6 +33,7 @@ PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
+PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
 AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
@@ -57,20 +58,20 @@ win.title(_('BEE2 Options'))
 win.withdraw()
 
 
-def show():
+def show() -> None:
     """Display the option window."""
     win.deiconify()
     contextWin.hide_context()  # Ensure this closes
     utils.center_win(win)
 
 
-def load():
+def load() -> None:
     """Load the current settings from config."""
     for var in VARS.values():
         var.load()
 
 
-def save():
+def save() -> None:
     """Save settings into the config and apply them to other windows."""
     for var in VARS.values():
         var.save()
@@ -83,7 +84,7 @@ def save():
         func()
 
 
-def clear_caches():
+def clear_caches() -> None:
     """Wipe the cache times in configs.
 
      This will force package resources to be extracted again.
@@ -91,13 +92,10 @@ def clear_caches():
     import gameMan
     import packageLoader
 
-    restart_ok = messagebox.askokcancel(
-        title=_('Allow Restart?'),
-        message=_('Restart the BEE2 to re-extract packages?'),
+    message = _(
+        'Package cache times have been reset. '
+        'These will now be extracted during the next export.'
     )
-
-    if not restart_ok:
-        return
 
     for game in gameMan.all_games:
         game.mod_times.clear()
@@ -107,24 +105,36 @@ def clear_caches():
     for pack_id in packageLoader.packages:
         packageLoader.PACK_CONFIG[pack_id]['ModTime'] = '0'
 
+    # This needs to be disabled, since otherwise we won't actually export
+    # anything...
+    if PRESERVE_RESOURCES.get():
+        PRESERVE_RESOURCES.set(False)
+        message += '\n\n' + _('"Preserve Game Resources" has been disabled.')
+
     save()  # Save any option changes..
 
     gameMan.CONFIG.save_check()
     GEN_OPTS.save_check()
     packageLoader.PACK_CONFIG.save_check()
 
-    utils.restart_app()
+    # Since we've saved, dismiss this window.
+    win.withdraw()
+    
+    messagebox.showinfo(
+        title=_('Packages Reset'),
+        message=message,
+    )
 
 
 def make_checkbox(
-        frame,
-        section,
-        item,
-        desc,
-        default=False,
-        var: BooleanVar=None,
-        tooltip='',
-        ):
+    frame: Misc,
+    section: str,
+    item: str,
+    desc: str,
+    default: bool=False,
+    var: BooleanVar=None,
+    tooltip='',
+) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
 
     section and item are the location in GEN_OPTS for this config.
@@ -173,7 +183,7 @@ def make_checkbox(
     return widget
 
 
-def init_widgets():
+def init_widgets() -> None:
     """Create all the widgets."""
     UI['nbook'] = nbook = ttk.Notebook(
         win,
@@ -218,11 +228,11 @@ def init_widgets():
         sticky=E,
     )
 
-    def ok():
+    def ok() -> None:
         save()
         win.withdraw()
 
-    def cancel():
+    def cancel() -> None:
         win.withdraw()
         load()  # Rollback changes
 
@@ -243,7 +253,7 @@ def init_widgets():
     save()  # And ensure they are applied to other windows
 
 
-def init_gen_tab(f):
+def init_gen_tab(f: ttk.Frame) -> None:
     """Make widgets in the 'General' tab."""
     def load_after_export():
         """Read the 'After Export' radio set."""
@@ -340,11 +350,11 @@ def init_gen_tab(f):
     reset_cache.grid(row=1, column=1, sticky='EW')
     add_tooltip(
         reset_cache,
-        _('Force re-extracting all package resources. This requires a restart.'),
+        _('Force re-extracting all package resources.'),
     )
 
 
-def init_win_tab(f):
+def init_win_tab(f: ttk.Frame) -> None:
     UI['keep_inside'] = keep_inside = make_checkbox(
         f,
         section='General',
@@ -365,7 +375,7 @@ def init_win_tab(f):
     reset_win.grid(row=1, column=0, sticky=EW)
 
 
-def init_dev_tab(f):
+def init_dev_tab(f: ttk.Frame) -> None:
     f.columnconfigure(1, weight=1)
     f.columnconfigure(2, weight=1)
 
@@ -412,6 +422,7 @@ def init_dev_tab(f):
         section='General',
         item='preserve_bee2_resource_dir',
         desc=_('Preserve Game Directories'),
+        var=PRESERVE_RESOURCES,
         tooltip=_('When exporting, do not overwrite \n"bee2/" and'
                   '\n"sdk_content/maps/bee2/".\n'
                   "Enable if you're"
