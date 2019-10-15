@@ -1319,11 +1319,18 @@ def init_option(pane: SubPane):
         command=pal_save_as,
     ).grid(row=1, sticky="EW", padx=5)
 
+    def save_settings_changed():
+        GEN_OPTS['General'][
+            'palette_save_settings'
+        ] = srctools.bool_as_int(var_pal_save_settings.get())
+
     ttk.Checkbutton(
         frame,
         text=_('Save Settings in Palettes'),
         variable=var_pal_save_settings,
+        command=save_settings_changed,
     ).grid(row=2, sticky="EW", padx=5)
+    var_pal_save_settings.set(GEN_OPTS.get_bool('General', 'palette_save_settings'))
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
