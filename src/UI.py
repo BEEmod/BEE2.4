@@ -925,7 +925,7 @@ def export_editoritems(e=None):
 
 
 def set_disp_name(item, e=None):
-    UI['pre_disp_name'].configure(text=_('Item: {}').format(item.name))
+    UI['pre_disp_name'].configure(text=item.name)
 
 
 def clear_disp_name(e=None):
