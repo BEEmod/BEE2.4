@@ -937,7 +937,7 @@ class Game:
 
         if mdl_count != 0:
             LOGGER.info(
-                '{}/{} ({:.0%})editor models used.',
+                '{}/{} ({:.0%}) editor models used.',
                 len(used_models),
                 mdl_count,
                 len(used_models) / mdl_count,
@@ -1186,6 +1186,11 @@ class Game:
 
         for item in trans_prop.find_key("lang", []).find_key("tokens", []):
             TRANS_DATA[item.real_name] = item.value
+
+        if _('Quit') == '####':
+            # Dummy translations installed, apply here too.
+            for key in TRANS_DATA:
+                TRANS_DATA[key] = _(key)
 
 
 def find_steam_info(game_dir):
