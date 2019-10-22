@@ -1609,3 +1609,5 @@ msgstr "没有名称！"
 msgid "No Name?"
 msgstr "没有名称？"
 
+msgid "Properties:"
+msgstr "物品属性:"
