@@ -209,7 +209,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
 
     If the value is single value, that should be the type.
     Otherwise, the value should be a block with 'offset' and 'type' values.
-    The offset is in block increments, with 0 0 0 equal to the mounting surface.
+    The offset is in block increments, with 0 0 0 equal to the mounting voxel.
     If 'offset2' is also provided, all positions in the bounding box will
     be checked.
 
@@ -237,7 +237,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
         pos1 = resolve_offset(inst, flag['offset', '0 0 0'], scale=128, zoff=-128)
         types = flag['type'].split()
         if 'offset2' in flag:
-            pos2 = resolve_offset(inst, flag.value, scale=128, zoff=-128)
+            pos2 = resolve_offset(inst, flag['offset2', '0 0 0'], scale=128, zoff=-128)
     else:
         types = flag.value.split()
         pos1 = Vec()
