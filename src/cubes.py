@@ -526,6 +526,12 @@ class CubePair:
 
         self.tint = tint  # If set, Colorizer color to use.
 
+        # Copy from the dropper, allowing specific droppers to update this.
+        if drop_type is not None:
+            self.spawn_offset = drop_type.cube_pos
+        else:
+            self.spawn_offset = Vec()
+
         # Addons to attach to the cubes.
         # Use a set to ensure it doesn't have two copies.
         self.addons = set()  # type: Set[CubeAddon]
@@ -925,6 +931,17 @@ def res_dropper_addon(inst: Entity, res: Property):
         return
 
     pair.addons.add(addon)
+
+
+@make_result('SetDropperOffset')
+def res_set_dropper_off(inst: Entity, res: Property) -> None:
+    """Update the position cubes will be spawned at for a dropper."""
+    try:
+        pair = inst.bee2_cube_data  # type: CubePair
+    except AttributeError:
+        LOGGER.warning('SetDropperOffset applied to non cube ("{}")', res.value)
+    else:
+        pair.spawn_offset = Vec.from_str(conditions.resolve_value(inst, res.value))
 
 
 @make_result('CubeFilter')
@@ -1619,7 +1636,7 @@ def generate_cubes(vmf: VMF):
         if pair.dropper:
             assert pair.drop_type is not None
             pos = Vec.from_str(pair.dropper['origin'])
-            pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
+            pos += pair.spawn_offset.copy().rotate_by_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True)
             cubes.append(drop_cube)
 
