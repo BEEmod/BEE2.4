@@ -440,7 +440,11 @@ def res_add_brush(inst: Entity, res: Property) -> None:
 
 @make_result_setup('TemplateBrush')
 def res_import_template_setup(res: Property):
-    temp_id = res['id']
+    if res.has_children():
+        temp_id = res['id']
+    else:
+        temp_id = res.value
+        res = Property('TemplateBrush', [])
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
@@ -584,7 +588,8 @@ def res_import_template_setup(res: Property):
 def res_import_template(inst: Entity, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
-    It will be placed overlapping the given instance.  
+    It will be placed overlapping the given instance. If no block is used, only
+    ID can be specified.
     Options:
 
     - `ID`: The ID of the template to be inserted. Add visgroups to additionally
