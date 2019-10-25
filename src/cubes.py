@@ -557,7 +557,10 @@ class CubePair:
             cube.bee2_cube_data = self
             CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
-    def __repr__(self):
+        # Cache of comp_kv_setters adding outputs to dropper ents.
+        self._kv_setters: Dict[str, Entity] = {}
+
+    def __repr__(self) -> str:
         drop_id = drop = cube = ''
         if self.dropper:
             drop = self.dropper['targetname']
@@ -568,6 +571,19 @@ class CubePair:
         return '<CubePair {} -> "{}": {!r} -> {!r}, {!s}>'.format(
             drop_id, self.cube_type.id, drop, cube, self.tint,
         )
+
+    def get_kv_setter(self, name: str) -> Entity:
+        """Get a KV setter setting this dropper-local name, creating if required."""
+        name = conditions.local_name(self.dropper, name)
+        try:
+            return self._kv_setters[name]
+        except KeyError:
+            kv_setter = self._kv_setters[name] = self.dropper.map.create_ent(
+                'comp_kv_setter',
+                origin=self.dropper['origin'],
+                target=name,
+            )
+            return kv_setter
 
 
 def parse_conf(conf: Property):
@@ -1017,13 +1033,13 @@ def res_script_cube_predicate(res: Property):
         cube_type.add_models(models)
 
     # Normalise the names to a consistent format.
-    models = {
+    flat_models = {
         model.lower().replace('\\', '/')
         for model in models
     }
 
     buffer.write(script_function + ' <- __BEE2_CUBE_FUNC__({\n')
-    for model in models:
+    for model in flat_models:
         buffer.write(' ["{}"]=1,\n'.format(model))
     buffer.write('});\n')
 
@@ -1433,14 +1449,13 @@ def make_cube(
                 # Manually add the dropper outputs here, so they only add to the
                 # actual dropper (not the other cube if present).
                 drop_name, drop_cmd = drop_type.out_finish_drop
-                pair.dropper.add_out(
+                pair.get_kv_setter(drop_name).add_out(
                     # Paint the cube, so it now has the functionality.
                     Output(
                         drop_cmd,
                         '!activator',
                         'SetPaint',
                         pair.paint_type.value,
-                        inst_out=drop_name,
                     )
                 )
             else:
@@ -1458,13 +1473,12 @@ def make_cube(
                 # Manually add the dropper outputs here, so they only add to the
                 # actual dropper.
                 drop_name, drop_cmd = drop_type.out_finish_drop
-                pair.dropper.add_out(
+                pair.get_kv_setter(drop_name).add_out(
                     # Fire an input to activate the effects.
                     Output(
                         drop_cmd,
                         conditions.local_name(pair.dropper, 'painter_blue'),
                         'FireUser1',
-                        inst_out=drop_name,
                     ),
                     # And also paint the cube itself.
                     Output(
@@ -1472,7 +1486,6 @@ def make_cube(
                         '!activator',
                         'SetPaint',
                         pair.paint_type.value,
-                        inst_out=drop_name,
                     )
                 )
                 # Don't paint it on spawn.
@@ -1653,22 +1666,19 @@ def generate_cubes(vmf: VMF):
 
             drop_done_name, drop_done_command = pair.drop_type.out_finish_drop
             for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
-                out = setup_output(
+                pair.get_kv_setter(drop_done_name).add_out(setup_output(
                     temp_out,
                     pair.dropper,
                     drop_done_command,
                     self_name='!activator',
-                )
-                out.inst_out = drop_done_name
-                pair.dropper.add_out(out)
+                ))
 
             # We always enable portal funnelling after dropping,
             # since we turn it off inside.
-            pair.dropper.add_out(Output(
+            pair.get_kv_setter(drop_done_name).add_out(Output(
                 drop_done_command,
                 '!activator',
                 'EnablePortalFunnel',
-                inst_out=drop_done_name,
             ))
 
             # We FireUser4 after the template ForceSpawns.
@@ -1712,11 +1722,10 @@ def generate_cubes(vmf: VMF):
 
                 # For FrankenTurrets, we also pop it out after finishing
                 # spawning.
-                pair.dropper.add_out(Output(
+                pair.get_kv_setter(drop_done_name).add_out(Output(
                     drop_done_command,
                     '!activator',
                     'BecomeMonster',
-                    inst_out=drop_done_name,
                     delay=0.2,
                 ))
 
@@ -1848,12 +1857,11 @@ def generate_cubes(vmf: VMF):
 
             # Fizzle the cube when triggering the dropper.
             drop_fizzle_name, drop_fizzle_command = pair.drop_type.out_start_drop
-            pair.dropper.add_out(Output(
+            pair.get_kv_setter(drop_fizzle_name).add_out(Output(
                 drop_fizzle_command,
                 cube['targetname'],
                 'Dissolve',
                 only_once=True,
-                inst_out=drop_fizzle_name
             ))
 
         # Voice events to add to all cubes.
