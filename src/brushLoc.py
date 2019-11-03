@@ -427,11 +427,11 @@ class Grid(MutableMapping[_grid_keys, Block]):
             # Continue filling in each other direction.
             # But not up for goo.
             if not is_goo:
-                queue.append((Vec(x, y + 1, z), False))
+                queue.append((Vec(x, y, z + 1), is_goo))
+            queue.append((Vec(x, y + 1, z), is_goo))
             queue.append((Vec(x, y - 1, z), is_goo))
             queue.append((Vec(x + 1, y, z), is_goo))
             queue.append((Vec(x - 1, y, z), is_goo))
-            queue.append((Vec(x, y, z + 1), is_goo))
             queue.append((Vec(x, y, z - 1), is_goo))
 
     def dump_to_map(self, vmf: VMF) -> None:
