@@ -725,7 +725,11 @@ class GenClump(Generator):
 
         if clump_seed is None:
             # No clump found - return the gap texture.
-            return self._random.choice(self.textures[TileSize.CLUMP_GAP])
+            # But if the texture is GOO, do that instead.
+            self._random.seed(self.gen_seed)
+            return self._random.choice(self.textures[
+                tex_name if tex_name == TileSize.GOO_SIDE else TileSize.CLUMP_GAP
+            ])
 
         # Mix these three values together to determine the texture.
         # The clump seed makes each clump different, and adding the texture
