@@ -6,7 +6,7 @@ import random
 import abc
 
 import srctools.logger
-from srctools import Property, Side, Vec
+from srctools import Property, Side, Solid, Vec
 
 import comp_consts as consts
 
@@ -239,7 +239,8 @@ OPTION_DEFAULTS = {
     # For clumping algorithm, the sizes to generate.
     'Clump_length': 4,  # Long direction max
     'Clump_width': 2,  # Other direction max
-    'Clump_number': 6,  # Adjust having more or less clumps
+    'Clump_number': 6.0,  # Adjust having more or less clumps
+    'clump_debug': False,  # If true, dump them all as skip brushes.
 }
 
 # Copy left to right if right isn't set.
@@ -622,14 +623,15 @@ class GenClump(Generator):
     This creates groups of the same texture in roughly rectangular sections.
     """
 
-    # The clump locations are shared among all generators.
-    clump_locs = []  # type: List[Clump]
+    # If the configs are the same, match them across generators.
+    _all_clumps: Dict[tuple, List[Clump]] = {}
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         # A seed only unique to this generator, in int form.
         self.gen_seed = 0
+        self._clump_locs = []  # type: List[Clump]
 
     def setup(self, global_seed: str, tiles: List['TileDef']):
         """Build the list of clump locations."""
@@ -646,30 +648,44 @@ class GenClump(Generator):
             'big',
         )
 
-        # We only do this once, as it applies to all generators.
-        if GenClump.clump_locs:
-            return
-
         LOGGER.info('Generating texture clumps...')
 
-        clump_length = self.global_settings['clump_length']  # type: int
-        clump_width = self.global_settings['clump_width']  # type: int
-        clump_number = self.global_settings['clump_number']  # type: int
+        clump_length: int = self.options['clump_length']
+        clump_width: int = self.options['clump_width']
+        clump_number: float = self.options['clump_number']
+
+        # We only do this once for any matching config.
+        clump_key = (clump_length, clump_number, clump_width)
+        try:
+            self._clump_locs = self._all_clumps[clump_key]
+            return
+        except KeyError:
+            self._all_clumps[clump_key] = self._clump_locs
 
         # Clump_number adjusts the amount of clumps in the map, to control
         # how much they overlap each other.
         clump_numb = len(tiles) // (clump_length * clump_width * clump_width)
         clump_numb *= clump_number
+        clump_count = int(round(clump_numb))
 
         # A global RNG for picking clump positions.
         clump_rand = random.Random(global_seed + '_clumping')
 
-        LOGGER.info('{} Clumps for {} tiles', clump_numb, len(tiles))
+        LOGGER.info('{} Clumps for {} tiles', clump_count, len(tiles))
 
         pos_min = Vec()
         pos_max = Vec()
 
-        for _ in range(clump_numb):
+        # For debugging, generate skip brushes with the shape of the clumps.
+        if self.options['clump_debug']:
+            import vbsp
+            debug_visgroup = vbsp.VMF.create_visgroup(
+                f'{self.category.name}_{self.orient.name}_{self.portal.name}'
+            )
+        else:
+            debug_visgroup = None
+
+        for _ in range(clump_count):
             # Picking out of the map origins helps ensure at least 1 texture is
             # modded by a clump
             tile = clump_rand.choice(tiles)  # type: TileDef
@@ -686,13 +702,23 @@ class GenClump(Generator):
                 pos_min[axis] = pos[axis] - clump_rand.randint(0, dist) * 128
                 pos_max[axis] = pos[axis] + clump_rand.randint(0, dist) * 128
 
-                self.clump_locs.append(Clump(
-                    pos_min.x, pos_min.y, pos_min.z,
-                    pos_max.x, pos_max.y, pos_max.z,
-                    # We use this to reseed an RNG, giving us the same textures
-                    # each time for the same clump.
-                    clump_rand.getrandbits(32),
-                ))
+            self._clump_locs.append(Clump(
+                pos_min.x, pos_min.y, pos_min.z,
+                pos_max.x, pos_max.y, pos_max.z,
+                # We use this to reseed an RNG, giving us the same textures
+                # each time for the same clump.
+                clump_rand.getrandbits(32),
+            ))
+            if debug_visgroup is not None:
+                # noinspection PyUnboundLocalVariable
+                debug_brush: Solid = vbsp.VMF.make_prism(
+                    pos_min-1,
+                    pos_max+1,
+                    'tools/toolsskip',
+                ).solid
+                debug_brush.visgroup_ids.add(debug_visgroup.id)
+                debug_brush.vis_shown = False
+                vbsp.VMF.add_brush(debug_brush)
 
     def _get(self, loc: Vec, tex_name: str) -> str:
         clump_seed = self._find_clump(loc)
@@ -714,7 +740,7 @@ class GenClump(Generator):
 
     def _find_clump(self, loc: Vec) -> Optional[int]:
         """Return the clump seed matching a location."""
-        for clump in self.clump_locs:
+        for clump in self._clump_locs:
             if (
                 clump.x1 <= loc.x <= clump.x2 and
                 clump.y1 <= loc.y <= clump.y2 and
