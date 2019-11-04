@@ -1,4 +1,5 @@
 """Manages the list of textures used for brushes, and how they are applied."""
+import itertools
 from collections import namedtuple
 from enum import Enum
 
@@ -15,6 +16,7 @@ from typing import (
     Union, Type, Any,
     Dict, List, Tuple,
     Optional,
+    Set,
 )
 
 import utils
@@ -68,21 +70,26 @@ class Portalable(Enum):
 
 class Orient(Enum):
     """Floor, wall or ceiling."""
-    FLOOR = 1
-    WALL = 2
-    CEILING = 3
-    CEIL = 3
+    FLOOR = +1
+    WALL = 0
+    CEILING = -1
+    CEIL = -1
 
     def __str__(self) -> str:
         v = self.value
-        if v == 1:
+        if v == +1:
             return 'floor'
-        elif v == 2:
+        elif v == 0:
             return 'wall'
-        elif v == 3:
+        elif v == -1:
             return 'ceiling'
         else:
             raise AssertionError(f"No string for {self!r}!")
+
+    @property
+    def z(self) -> float:
+        """Return the Z value of the normal expected for this surface."""
+        return self.value
 
 GEN_CATS = {
     'overlays': GenCat.OVERLAYS,
@@ -239,7 +246,6 @@ OPTION_DEFAULTS = {
     # For clumping algorithm, the sizes to generate.
     'Clump_length': 4,  # Long direction max
     'Clump_width': 2,  # Other direction max
-    'Clump_number': 6.0,  # Adjust having more or less clumps
     'clump_debug': False,  # If true, dump them all as skip brushes.
 }
 
@@ -623,9 +629,6 @@ class GenClump(Generator):
     This creates groups of the same texture in roughly rectangular sections.
     """
 
-    # If the configs are the same, match them across generators.
-    _all_clumps: Dict[tuple, List[Clump]] = {}
-
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
@@ -652,26 +655,16 @@ class GenClump(Generator):
 
         clump_length: int = self.options['clump_length']
         clump_width: int = self.options['clump_width']
-        clump_number: float = self.options['clump_number']
 
-        # We only do this once for any matching config.
-        clump_key = (clump_length, clump_number, clump_width)
-        try:
-            self._clump_locs = self._all_clumps[clump_key]
-            return
-        except KeyError:
-            self._all_clumps[clump_key] = self._clump_locs
-
-        # Clump_number adjusts the amount of clumps in the map, to control
-        # how much they overlap each other.
-        clump_numb = len(tiles) // (clump_length * clump_width * clump_width)
-        clump_numb *= clump_number
-        clump_count = int(round(clump_numb))
+        # The tiles currently present in the map.
+        orient_z = self.orient.z
+        remaining_tiles: Set[Tuple[float, float, float]] = {
+            (tile.pos + 64 * tile.normal // 128 * 128).as_tuple() for tile in tiles
+            if tile.normal.z == orient_z
+        }
 
         # A global RNG for picking clump positions.
         clump_rand = random.Random(global_seed + '_clumping')
-
-        LOGGER.info('{} Clumps for {} tiles', clump_count, len(tiles))
 
         pos_min = Vec()
         pos_max = Vec()
@@ -685,11 +678,16 @@ class GenClump(Generator):
         else:
             debug_visgroup = None
 
-        for _ in range(clump_count):
-            # Picking out of the map origins helps ensure at least 1 texture is
-            # modded by a clump
-            tile = clump_rand.choice(tiles)  # type: TileDef
-            pos = tile.pos // 128 * 128  # type: Vec
+        while remaining_tiles:
+            # Pick from a random tile.
+            tile_pos = next(itertools.islice(
+                remaining_tiles,
+                clump_rand.randrange(0, len(remaining_tiles)),
+                len(remaining_tiles),
+            ))
+            remaining_tiles.remove(tile_pos)
+
+            pos = Vec(tile_pos)
 
             # Clumps are long strips mainly extended in one direction
             # In the other directions extend by 'width'. It can point any axis.
@@ -702,6 +700,11 @@ class GenClump(Generator):
                 pos_min[axis] = pos[axis] - clump_rand.randint(0, dist) * 128
                 pos_max[axis] = pos[axis] + clump_rand.randint(0, dist) * 128
 
+            remaining_tiles.difference_update(map(
+                Vec.as_tuple,
+                Vec.iter_grid(pos_min, pos_max, 128)
+            ))
+
             self._clump_locs.append(Clump(
                 pos_min.x, pos_min.y, pos_min.z,
                 pos_max.x, pos_max.y, pos_max.z,
@@ -712,13 +715,22 @@ class GenClump(Generator):
             if debug_visgroup is not None:
                 # noinspection PyUnboundLocalVariable
                 debug_brush: Solid = vbsp.VMF.make_prism(
-                    pos_min-1,
-                    pos_max+1,
+                    pos_min - 64,
+                    pos_max + 64,
                     'tools/toolsskip',
                 ).solid
                 debug_brush.visgroup_ids.add(debug_visgroup.id)
                 debug_brush.vis_shown = False
                 vbsp.VMF.add_brush(debug_brush)
+
+        LOGGER.info(
+            '{}.{}.{}: {} Clumps for {} tiles',
+            self.category.name,
+            self.orient.name,
+            self.portal.name,
+            len(self._clump_locs),
+            len(tiles),
+        )
 
     def _get(self, loc: Vec, tex_name: str) -> str:
         clump_seed = self._find_clump(loc)
