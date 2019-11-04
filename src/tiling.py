@@ -736,8 +736,8 @@ class TileDef:
         # If all four center blocks can't accept the overlay,
         # we can't add a bullseye.
         if (
-            self[1, 1].is_tile or not self[1, 2].is_tile or
-            self[2, 1].is_tile or not self[2, 2].is_tile
+            self[1, 1].is_tile or self[1, 2].is_tile or
+            self[2, 1].is_tile or self[2, 2].is_tile
         ):
             has_bullseye = self.bullseye_count > 0
         else:
