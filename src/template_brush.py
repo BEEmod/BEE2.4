@@ -768,14 +768,32 @@ def retexture_template(
     # Template faces are randomised per block and side. This means
     # multiple templates in the same block get the same texture, so they
     # can clip into each other without looking bad.
-    rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*(origin // 128))
+    rand_prefix = 'TEMPLATE_{0.x}_{0.y}_{0.z}:'.format(origin // 128)
 
-    # Ensure all values are lists.
-    replace_tex = {
-        key.casefold(): ([value] if isinstance(value, str) else value)
-        for key, value in
-        replace_tex.items()
-    }
+    # Reprocess the replace_tex passed in, converting values.
+    evalled_replace_tex: Dict[str, List[str]] = {}
+    for key, value in replace_tex.items():
+        if isinstance(value, str):
+            value = [value]
+        if fixup is not None:
+            # Convert the material and key for fixup names.
+            value = [
+                fixup[mat] if mat.startswith('$') else mat
+                for mat in value
+            ]
+            if key.startswith('$'):
+                key = fixup[key]
+        # If starting with '#', it's a face id, or a list of those.
+        if key.startswith('#'):
+            for k in key[1:].split():
+                try:
+                    old_id = int(k)
+                except (ValueError, TypeError):
+                    pass
+                else:
+                    evalled_replace_tex.setdefault('#' + str(old_id), []).extend(value)
+        else:
+            evalled_replace_tex.setdefault(key.casefold(), []).extend(value)
 
     if sense_offset is None:
         sense_offset = Vec()
@@ -936,10 +954,10 @@ def retexture_template(
 
             override_mat: Optional[List[str]]
             try:
-                override_mat = replace_tex['#' + orig_id]
+                override_mat = evalled_replace_tex['#' + orig_id]
             except KeyError:
                 try:
-                    override_mat = replace_tex[folded_mat]
+                    override_mat = evalled_replace_tex[folded_mat]
                 except KeyError:
                     override_mat = None
 
@@ -948,12 +966,14 @@ def retexture_template(
                 mat = random.choice(override_mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
-                if mat.startswith('<') or mat.endswith('>'):
+                if mat.startswith('<') and mat.endswith('>'):
                     # Lookup in the style data.
                     gen, mat = texturing.parse_name(mat[1:-1])
                     mat = gen.get(face.get_origin(), mat)
-                face.mat = mat
-                continue
+                # If blank, don't set.
+                if mat:
+                    face.mat = mat
+                    continue
 
             if folded_mat == 'tile/white_wall_tile003b':
                 LOGGER.warning('"{}": white_wall_tile003b has changed definitions.', template.id)

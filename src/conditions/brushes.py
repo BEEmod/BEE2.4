@@ -604,7 +604,8 @@ def res_import_template(inst: Entity, res: Property):
     - `replace`: A block of template material -> replacement textures.
             This is case insensitive - any texture here will not be altered
             otherwise. If the material starts with a `#`, it is instead a
-            face ID.
+            list of face IDs separated by spaces. If the result evaluates
+            to "", no change occurs. Both can be $fixups (parsed first).
     - `replaceBrush`: The position of a brush to replace (`0 0 0`=the surface).
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal. Can alternately be a block:
