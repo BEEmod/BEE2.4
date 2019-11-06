@@ -3410,6 +3410,12 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
         for conf_ent in conf_classes:
             new_ent = conf_ent.copy(vmf_file=TEMPLATE_FILE, keep_vis=False)
             new_ent['template_id'] = temp_id
+            new_ent['visgroups'] = ' '.join([
+                visgroup_names[vis_id]
+                for vis_id in
+                conf_ent.visgroup_ids
+            ])
+
             TEMPLATE_FILE.add_ent(new_ent)
             has_conf_data = True
 

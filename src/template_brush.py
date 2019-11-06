@@ -71,6 +71,7 @@ class ColorPicker(NamedTuple):
     """Color pickers allow applying the existing colors onto faces."""
     priority: Decimal  # Decimal order to do them in.
     name: str  # Name to reference from other ents.
+    visgroups: Set[str]  # Visgroups applied to this picker.
     offset: Vec
     normal: Vec  # Normal of the surface.
     sides: List[str]
@@ -89,6 +90,7 @@ class TileSetter(NamedTuple):
     """Set tiles in a particular position."""
     offset: Vec
     normal: Vec
+    visgroups: Set[str]  # Visgroups applied to this picker.
     color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
     tile_type: TileType  # Type to produce.
     picker_name: str  # Name of colorpicker to use for the color.
@@ -189,6 +191,7 @@ class ExportedTemplate(NamedTuple):
     template: 'Template'
     origin: Vec
     angles: Vec
+    visgroups: Set[str]
     picker_results: Dict[str, Optional[Portalable]]
 
 
@@ -227,6 +230,11 @@ class Template:
         all_groups.update(world)
         all_groups.update(detail)
         all_groups.update(overlays)
+        for ent in tile_setters:
+            all_groups.update(ent.visgroups)
+        for ent in color_pickers:
+            all_groups.update(ent.visgroups)
+
         for group in all_groups:
             data[group] = (
                 world.get(group, []),
@@ -462,6 +470,7 @@ def load_templates() -> None:
         color_pickers[temp_id].append(ColorPicker(
             priority,
             name=ent['targetname'],
+            visgroups=set(ent['visgroups'].split(' ')) - {''},
             offset=Vec.from_str(ent['origin']),
             normal=Vec(x=1).rotate_by_str(ent['angles']),
             sides=ent['faces'].split(' '),
@@ -494,6 +503,7 @@ def load_templates() -> None:
         tile_setters[temp_id].append(TileSetter(
             offset=Vec.from_str(ent['origin']),
             normal=Vec(z=1).rotate_by_str(ent['angles']),
+            visgroups=set(ent['visgroups'].split(' ')) - {''},
             color=color,
             tile_type=tile_type,
             picker_name=ent['color_picker'],
@@ -587,6 +597,7 @@ def import_template(
 
     chosen_groups.update(additional_visgroups)
     chosen_groups.update(visgroup_choose(template.visgroups))
+    chosen_groups.add('')
 
     orig_world, orig_detail, orig_over = template.visgrouped(chosen_groups)
 
@@ -669,14 +680,15 @@ def import_template(
         vbsp.IGNORED_FACES.update(solid.sides)
 
     return ExportedTemplate(
-        new_world,
-        detail_ent,
-        new_over,
-        id_mapping,
-        template,
-        origin,
-        angles or Vec(0, 0, 0),
-        {},  # Filled by retexture_template.
+        world=new_world,
+        detail=detail_ent,
+        overlay=new_over,
+        orig_ids=id_mapping,
+        template=template,
+        origin=origin,
+        angles=angles or Vec(0, 0, 0),
+        visgroups=chosen_groups,
+        picker_results={},  # Filled by retexture_template.
     )
 
 
@@ -813,9 +825,12 @@ def retexture_template(
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:
+        if not color_picker.visgroups.issubset(template_data.visgroups):
+            continue
+
         picker_pos = color_picker.offset.copy().rotate(*template_data.angles)
         picker_pos += template_data.origin + sense_offset
-        picker_norm = color_picker.normal.copy().rotate(*template_data.angles)
+        picker_norm = Vec(color_picker.normal).rotate(*template_data.angles)
 
         if color_picker.grid_snap:
             for axis in 'xyz':
@@ -827,9 +842,9 @@ def retexture_template(
         try:
             tiledef, u, v = tiling.find_tile(picker_pos, picker_norm)
         except KeyError:
-            # Doesn't exist.
+            # Doesn't exist. But only set if not already present.
             if color_picker.name:
-                picker_results[color_picker.name] = None
+                picker_results.setdefault(color_picker.name, None)
             continue
 
         tile_type = tiledef[u, v]
@@ -838,10 +853,10 @@ def retexture_template(
             tile_color = tile_type.color
         except ValueError:
             # Not a tile with color (void, etc). Treat as missing.
-            picker_results[color_picker.name] = None
+            picker_results.setdefault(color_picker.name, None)
             continue
 
-        if color_picker.name:
+        if color_picker.name and picker_results.get(color_picker.name, None) is None:
             picker_results[color_picker.name] = tile_color
 
         if color_picker.use_pattern:
@@ -881,9 +896,12 @@ def retexture_template(
             tiledef[u, v] = TileType.NODRAW
 
     for tile_setter in template.tile_setters:
-        setter_pos = tile_setter.offset.copy().rotate(*template_data.angles)
+        if not tile_setter.visgroups.issubset(template_data.visgroups):
+            continue
+
+        setter_pos = Vec(tile_setter.offset).rotate(*template_data.angles)
         setter_pos += template_data.origin + sense_offset
-        setter_norm = tile_setter.normal.copy().rotate(*template_data.angles)
+        setter_norm = Vec(tile_setter.normal).rotate(*template_data.angles)
         setter_type = tile_setter.tile_type  # type: TileType
 
         if setter_type.is_tile:
