@@ -642,7 +642,8 @@ class FizzlerBrush:
             # Fizzlers are larger resolution..
             tex_size = FIZZLER_TEX_SIZE
 
-        if (field_length == 128 and not short_tex) or trigger_tex or fitted_tex:
+        # Treat 127.9999 as 128, etc.
+        if (round(field_length) == 128 and short_tex) or trigger_tex or fitted_tex:
             # We need only one brush.
             brush = vmf.make_prism(
                 p1=(origin
@@ -694,7 +695,7 @@ class FizzlerBrush:
                         side.uaxis.scale = 0.25
         else:
             # Generate the three brushes for fizzlers.
-            if field_length <= 128:
+            if round(field_length) <= 128:
                 side_len = field_length / 2
                 center_len = 0
             else:
