@@ -27,7 +27,7 @@ def flag_angles(inst: Entity, flag: Property):
     The value should be either just the angle to check, or a block of
     options:
 
-    - `Angle`: A unit vector (XYZ value) pointing in a direction, or some
+    - `direction`: A unit vector (XYZ value) pointing in a direction, or some
         keywords: `+z`, `-y`, `N`/`S`/`E`/`W`, `up`/`down`, `floor`/`ceiling`, or `walls` for any wall side.
     - `From_dir`: The direction the unrotated instance is pointed in.
         This lets the flag check multiple directions.
