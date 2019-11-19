@@ -387,7 +387,7 @@ class TileDef:
         brush_type: BrushType - what sort of brush this is.
         base_type: TileSize this tile started with.
         override: If set, a specific texture to use. (skybox, light,
-        backpanels etc)
+        backpanels etc) This only applies to .is_tile tiles.
         _sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz,
         yz or xy.
           If None, it's the same as base_type.
@@ -1129,6 +1129,13 @@ class TileDef:
                     tex = texturing.gen(
                         gen_cat, normal, tile_type.color,
                     ).get(tile_center, grid_size)
+
+                template: Optional[template_brush.ScalingTemplate]
+                if self.override is not None:
+                    tex, template = self.override
+                else:
+                    template = None
+
                 brush, face = make_tile(
                     vmf,
                     tile_center,
@@ -1143,6 +1150,9 @@ class TileDef:
                     thickness=thickness,
                     panel_edge=is_panel,
                 )
+                if template is not None:
+                    template.apply(face)
+
                 faces.append(face)
                 brushes.append(brush)
 
@@ -1188,7 +1198,8 @@ class TileDef:
             self._sub_tiles is not None or
             self.panel_ent is not None or
             self.panel_inst is not None or
-            self.bullseye_count > 0
+            self.bullseye_count > 0 or
+            self.override is not None
         ):
             return False
 
