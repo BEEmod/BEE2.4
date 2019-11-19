@@ -194,39 +194,21 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
 def res_set_texture(inst: Entity, res: Property):
-    """Set the brush face at a location to a particular texture.
+    """Set the tile at a particular place to use a specific texture.
 
-    pos is the position, relative to the instance
-      (0 0 0 is the floor-surface).
-    dir is the normal of the texture.
-    If gridPos is true, the position will be snapped so it aligns with
+    This can only be set for an entire voxel side at once.
+
+    `pos` is the position, relative to the instance (0 0 0 is the floor-surface).
+    `dir` is the normal of the texture (pointing out)
+    If `gridPos` is true, the position will be snapped so it aligns with
      the 128 brushes (Useful with fizzler/light strip items).
 
-    tex is the texture used.
-    If tex begins and ends with `<>`, certain
-    textures will be used based on style:
-    - `<delete>` will remove the brush entirely (it should be hollow).
-      Caution should be used to ensure no leaks occur.
-    - `<special>` the brush will be given a special texture
-      like angled and flip panels.
-    - `<white>` and `<black>` will use the regular textures for the
-      given color.
-    - `<white-2x2>`, `<white-4x4>`, `<black-2x2>`, `<black-4x4>` will use
-      the given wall-sizes. If on floors or ceilings these always use 4x4.
-    - `<2x2>` or `<4x4>` will force to the given wall-size, keeping color.
-    - `<special-white>` and `<special-black>` will use a special texture
-       of the given color.
-    If tex begins and ends with `[]`, it is an option in the `Textures` list.
-    These are composed of a group and texture, separated by `.`. `white.wall`
-    are the white wall textures; `special.goo` is the goo texture.
+    `tex` is the texture to use.
 
     If `template` is set, the template should be an axis aligned cube. This
     will be rotated by the instance angles, and then the face with the same
     orientation will be applied to the face (with the rotation and texture).
     """
-    # TODO: reimplement & replace
-    return
-    import vbsp
     pos = Vec.from_str(res['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
     pos = pos.rotate_by_str(inst['angles', '0 0 0'])
@@ -247,79 +229,35 @@ def res_set_texture(inst: Entity, res: Property):
                 pos[axis] *= 128
                 pos[axis] += 64
 
-    brush = SOLIDS.get(pos.as_tuple(), None)
-
-    if not brush or brush.normal != norm:
+    try:
+        tile, u, v = tiling.find_tile(pos, norm)
+    except KeyError:
+        LOGGER.warning(
+            '"{}": Could not find tile at {} with orient {}!',
+            inst['targetname'],
+            pos, norm,
+        )
         return
 
-    face_to_mod = brush.face  # type: Side
-
-    # Don't allow this to get overwritten later.
-    vbsp.IGNORED_FACES.add(face_to_mod)
-
-    temp = res['template', None]
-    if temp:
-        # Grab the scaling template and apply it to the brush.
-        template_brush.get_scaling_template(temp).rotate(
-            Vec.from_str(inst['angles']),
-            Vec.from_str(inst['origin']),
-        ).apply(face_to_mod)
-        return
+    temp_id = res['template', None]
+    if temp_id:
+        temp = template_brush.get_scaling_template(temp_id)
+    else:
+        temp = template_brush.ScalingTemplate.world()
 
     tex = res['tex']
 
-    if tex.startswith('[') and tex.endswith(']'):
-        face_to_mod.mat = vbsp.get_tex(tex[1:-1])
-    elif tex.startswith('<') and tex.endswith('>'):
-        # Special texture names!
-        tex = tex[1:-1].casefold()
-        if tex == 'delete':
-            vbsp.VMF.remove_brush(brush)
-            return
-
-        if tex == 'white':
-            face_to_mod.mat = 'tile/white_wall_tile003a'
-        elif tex == 'black':
-            face_to_mod.mat = 'metal/black_wall_metal_002c'
-
-        if tex == 'black' or tex == 'white':
-            # For these two, run the regular logic to apply textures
-            # correctly.
-            vbsp.alter_mat(
-                face_to_mod,
-                vbsp.face_seed(face_to_mod),
-                vbsp_options.get(bool, 'tile_texture_lock'),
-            )
-
-        if tex == 'special':
-            vbsp.set_special_mat(face_to_mod, str(brush.color))
-        elif tex == 'special-white':
-            vbsp.set_special_mat(face_to_mod, 'white')
-            return
-        elif tex == 'special-black':
-            vbsp.set_special_mat(face_to_mod, 'black')
-
-        # Do <4x4>, <white-2x4>, etc
-        color = str(brush.color)
-        if tex.startswith('black') or tex.endswith('white'):
-            # Override the color used for 2x2/4x4 brushes
-            color = tex[:5]
-        if tex.endswith('2x2') or tex.endswith('4x4'):
-            # 4x4 and 2x2 instructions are ignored on floors and ceilings.
-            orient = vbsp.get_face_orient(face_to_mod)
-            if orient == vbsp.ORIENT.wall:
-                face_to_mod.mat = vbsp.get_tex(
-                    color + '.' + tex[-3:]
-                )
-            else:
-                face_to_mod.mat = vbsp.get_tex(
-                    color + '.' + str(orient)
-                )
+    if (
+        tex.startswith('[') and tex.endswith(']') or
+        tex.startswith('<') and tex.endswith('>')
+    ):
+        LOGGER.warning(
+            'Special lookups for AlterTexture are '
+            'no longer usable! ("{}")',
+            tex
+        )
     else:
-        face_to_mod.mat = tex
-
-    # Don't allow this to get overwritten later.
-    vbsp.IGNORED_FACES.add(brush.face)
+        tile.override = (tex, temp)
 
 
 @make_result('AddBrush')
