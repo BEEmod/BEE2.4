@@ -510,61 +510,6 @@ def add_fizz_borders():
             )
 
 
-# Dict mapping locations -> func_brush face, name
-ANGLED_PAN_BRUSH = {}   # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, str]]
-# locations -> white, black faces
-FLIP_PAN_BRUSH = {}  # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, VLib.Side]]
-
-# Record info_targets at the angled panel positions, so we can correct
-# their locations for static panels
-PANEL_FAITH_TARGETS = defaultdict(list) # type: Dict[Tuple[float, float, float], List[VLib.Entity]]
-
-
-@conditions.meta_cond(-1000)
-def find_panel_locs() -> None:
-    """Find the locations of panels, used for FaithBullseye."""
-
-    non_panel_mats = {
-        consts.Special.SQUAREBEAMS,
-        consts.Special.BACKPANELS,
-        consts.Special.BACKPANELS_CHEAP
-    }
-
-    # Angled Panels
-    for brush in VMF.by_class['func_brush']:
-        if "-model_arms" not in brush['parentname', '']:
-            continue
-        for face in brush.sides():
-            # Find the face which isn't backpanel/squarebeams
-            if face.mat.casefold() not in non_panel_mats:
-                ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = (
-                    face,
-                    # Repeat the change done later in change_func_brush()
-                    brush['targetname'].replace(
-                        '_panel_top',
-                        '-brush',
-                    ),
-                )
-                break
-
-    # Flip panels
-    for brush in VMF.by_class['func_door_rotating']:
-        white_face = None
-        black_face = None
-        for face in brush.sides():
-            if face.mat in consts.WhitePan:
-                white_face = face
-            if face.mat in consts.BlackPan:
-                black_face = face
-        if white_face and black_face:
-            # The white face is positioned facing outward, so its origin is
-            # centered nicely.
-            FLIP_PAN_BRUSH[white_face.get_origin().as_tuple()] = (
-                white_face,
-                black_face,
-            )
-
-
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
