@@ -293,9 +293,6 @@ DEFAULTS = [
         """Remove the glass/grating info_lighting entities.
         This should be used when the border is made of brushes.
         """),
-    Opt('remove_pedestal_plat', False,
-        """Remove the PeTI-generated pedestal button platforms.
-        """),
     Opt('remove_exit_signs', False,
         """Remove the exit sign overlays for singleplayer.
         """),

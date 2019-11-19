@@ -1596,6 +1596,12 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
         panel_inst = panels[brush_ent['targetname'][:-15]]
         tiledef_from_flip_panel(brush_ent, panel_inst)
 
+    # Remove the pedestal platforms. Use templates instead if you need to.
+    for ent in vmf_file.by_class['func_detail']:
+        for side in ent.sides():
+            if side == consts.Special.PED_SIDE:
+                vmf_file.remove_ent(ent)
+                break  # Skip to next entity
 
     # Tell the antlines which tiledefs they attach to.
     for side, segments in side_to_ant_seg.items():

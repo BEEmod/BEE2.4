@@ -1697,17 +1697,6 @@ def change_brush() -> None:
     )
     mist_solids = set()
 
-    if vbsp_options.get(bool, 'remove_pedestal_plat'):
-        # Remove the pedestal platforms
-        for ent in VMF.by_class['func_detail']:
-            if ent in IGNORED_BRUSH_ENTS:
-                continue
-
-            for side in ent.sides():
-                if side.mat.casefold() == 'plastic/plasticwall004a':
-                    VMF.remove_ent(ent)
-                    break  # Skip to next entity
-
     make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
 
