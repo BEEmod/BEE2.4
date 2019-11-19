@@ -320,7 +320,7 @@ class ScalingTemplate(Mapping[
         }, axes.keys()
 
     @classmethod
-    def parse(cls, ent: Entity):
+    def parse(cls, ent: Entity) -> 'ScalingTemplate':
         """Parse a template from a config entity.
 
         This should be a 'bee2_template_scaling' entity.
@@ -342,6 +342,16 @@ class ScalingTemplate(Mapping[
                 srctools.conv_float(ent[name + '_rotation']),
             )
         return cls(ent['template_id'], axes)
+
+    @classmethod
+    def world(cls) -> 'ScalingTemplate':
+        """Return a scaling template that produces world-aligned brushes."""
+        nd = consts.Tools.NODRAW
+        return cls('', {
+            norm: (nd, uaxis, vaxis, 0.0)
+            for norm, (uaxis, vaxis) in
+            REALIGN_UVS.items()
+        })
 
     def __len__(self) -> int:
         return 6
