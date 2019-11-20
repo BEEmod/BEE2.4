@@ -433,11 +433,12 @@ class Fizzler:
                 mat=const.Tools.TRIGGER,
             ).solid)
 
-    def nodraw_behind_models(self, origin: Vec, normal: Vec):
-        """Set the tile surface behind a model to nodraw.
+    def set_tiles_behind_models(self, origin: Vec, normal: Vec, to_nodraw: bool):
+        """Set the tile surface behind a model to specific values.
 
         position is the center-point on the wall.
         normal is the direction out of the model.
+        If to_nodraw is true, set to nodraw. Otherwise, set to 4x4 if grid aligned.
         """
         up_axis = self.up_axis.axis()
         u_axis, v_axis = Vec.INV_AXIS[normal.axis()]
@@ -445,6 +446,11 @@ class Fizzler:
         if origin % 64 == (0, 0, 0):
             # Aligned with the 64-grid - it's centered in the tile.
             # That means we need to set special values.
+
+            # Don't bother if not nodrawing.
+            if not to_nodraw:
+                return
+
             tile = tiling.TILES[
                 (origin - 64 * normal).as_tuple(),
                 normal.as_tuple()
@@ -462,7 +468,7 @@ class Fizzler:
                     normal,
                     self.base_inst['targetname'],
                 )
-        else:
+        elif to_nodraw:
             # Side-aligned, we just edit quarter-tiles.
             for off in [-48, -16, 16, 48]:
                 tiling.edit_quarter_tile(
@@ -470,7 +476,22 @@ class Fizzler:
                     normal,
                     tiling.TileType.NODRAW,
                 )
-
+        else:
+            # Swap surfaces to 4x4 sizes.
+            for off in [-48, -16, 16, 48]:
+                try:
+                    tile, u, v = tiling.find_tile(
+                        origin + Vec.with_axes(up_axis, off),
+                        normal,
+                    )
+                except KeyError:
+                    continue
+                orig = tile[u, v]
+                if orig.is_tile and not orig.is_4x4:
+                    tile[u, v] = tiling.TileType.with_color_and_size(
+                        tiling.TileSize.TILE_4x4,
+                        orig.color,
+                    )
 
 
 class FizzlerBrush:
@@ -1208,9 +1229,9 @@ def generate_fizzlers(vmf: VMF):
             min_inst.fixup.update(fizz.base_inst.fixup)
             instance_traits.get(min_inst).update(fizz_traits)
 
-            if fizz.embedded and fizz_type.nodraw_behind:
-                fizz.nodraw_behind_models(seg_min, forward)
-                fizz.nodraw_behind_models(seg_max, -forward)
+            if fizz.embedded:
+                fizz.set_tiles_behind_models(seg_min, forward, fizz_type.nodraw_behind)
+                fizz.set_tiles_behind_models(seg_max, -forward, fizz_type.nodraw_behind)
 
             if fizz_type.inst[FizzInst.GRID, is_static]:
                 # Generate one instance for each position.
