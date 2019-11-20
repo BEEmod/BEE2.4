@@ -216,7 +216,7 @@ def res_set_texture(inst: Entity, res: Property):
     # Relative to the instance origin
     pos += Vec.from_str(inst['origin', '0 0 0'])
 
-    norm = Vec.from_str(res['dir', '0 0 -1']).rotate_by_str(
+    norm = Vec.from_str(res['dir', '0 0 1']).rotate_by_str(
         inst['angles', '0 0 0']
     )
 
@@ -230,7 +230,9 @@ def res_set_texture(inst: Entity, res: Property):
                 pos[axis] += 64
 
     try:
-        tile, u, v = tiling.find_tile(pos, norm)
+        # The user expects the tile to be at it's surface pos, not the
+        # position of the voxel.
+        tile = tiling.TILES[(pos - 64 * norm).as_tuple(), norm.as_tuple()]
     except KeyError:
         LOGGER.warning(
             '"{}": Could not find tile at {} with orient {}!',
