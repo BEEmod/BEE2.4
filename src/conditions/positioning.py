@@ -90,7 +90,8 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
 
-    pos = flag.vec('pos')
+    # Allow using pos1 instead, to match pos2.
+    pos = flag.vec('pos1' if 'pos1' in flag else 'pos')
     pos.z -= 64  # Subtract so origin is the floor-position
 
     pos.localise(origin, angles)
