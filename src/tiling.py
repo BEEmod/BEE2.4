@@ -381,7 +381,7 @@ class TileDef:
     
     Attributes:
         pos: Vec for the center of the block.
-        normal: The direction out of the block.
+        normal: The direction out of the block, towards the face.
         brush_faces: A list of brush faces which this tiledef has exported.
           Empty before-hand, but after these are faces to attach antlines to.
         brush_type: BrushType - what sort of brush this is.
@@ -1151,7 +1151,7 @@ class TileDef:
                     panel_edge=is_panel,
                 )
                 if template is not None:
-                    template.apply(face)
+                    template.apply(face, change_mat=False)
 
                 faces.append(face)
                 brushes.append(brush)
