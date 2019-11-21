@@ -1151,7 +1151,9 @@ class TileDef:
                     panel_edge=is_panel,
                 )
                 if template is not None:
-                    template.apply(face, change_mat=False)
+                    # If the texture isn't supplied, use the one from the
+                    # template.
+                    template.apply(face, change_mat=not tex)
 
                 faces.append(face)
                 brushes.append(brush)

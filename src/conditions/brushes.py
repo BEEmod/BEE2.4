@@ -209,16 +209,14 @@ def res_set_texture(inst: Entity, res: Property):
     will be rotated by the instance angles, and then the face with the same
     orientation will be applied to the face (with the rotation and texture).
     """
+    angles = Vec.from_str(inst['angles'])
+    origin = Vec.from_str(inst['origin'])
+
     pos = Vec.from_str(res['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
-    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
+    pos.localise(origin, angles)
 
-    # Relative to the instance origin
-    pos += Vec.from_str(inst['origin', '0 0 0'])
-
-    norm = Vec.from_str(res['dir', '0 0 1']).rotate_by_str(
-        inst['angles', '0 0 0']
-    )
+    norm = Vec.from_str(res['dir', '0 0 1']).rotate(*angles)
 
     if srctools.conv_bool(res['gridpos', '0']):
         for axis in 'xyz':
@@ -243,11 +241,11 @@ def res_set_texture(inst: Entity, res: Property):
 
     temp_id = res['template', None]
     if temp_id:
-        temp = template_brush.get_scaling_template(temp_id)
+        temp = template_brush.get_scaling_template(temp_id).rotate(angles, origin)
     else:
         temp = template_brush.ScalingTemplate.world()
 
-    tex = res['tex']
+    tex = res['tex', '']
 
     if (
         tex.startswith('[') and tex.endswith(']') or
