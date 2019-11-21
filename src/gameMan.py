@@ -1172,20 +1172,18 @@ class Game:
         except FileNotFoundError:
             return
         with basemod_file:
-            if lang == 'english':
-                def filterer(file):
-                    """The English language has some unused language text.
-
-                    This needs to be skipped since it has invalid quotes."""
-                    for line in file:
-                        if line.count('"') <= 4:
-                            yield line
-                basemod_file = filterer(basemod_file)
-
-            trans_prop = Property.parse(basemod_file, 'basemodui.txt')
-
-        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
-            TRANS_DATA[item.real_name] = item.value
+            # This file is in keyvalues format, supposedly.
+            # But it's got a bunch of syntax errors - extra quotes,
+            # missing brackets.
+            # The structure doesn't matter, so just process line by line.
+            for line in basemod_file:
+                try:
+                    __, key, __, value, __ = line.split('"')
+                except ValueError:
+                    continue
+                # Ignore non-puzzlemaker keys.
+                if key.startswith('PORTAL2_PuzzleEditor'):
+                    TRANS_DATA[key] = value.replace("\\'", "'")
 
         if _('Quit') == '####':
             # Dummy translations installed, apply here too.
