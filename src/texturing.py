@@ -257,7 +257,6 @@ TILE_INHERIT = [
     (TileSize.TILE_2x2, TileSize.TILE_2x1),
     (TileSize.TILE_2x1, TileSize.TILE_1x1),
 
-    (TileSize.TILE_4x4, TileSize.CLUMP_GAP),
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
 
@@ -737,11 +736,13 @@ class GenClump(Generator):
 
         if clump_seed is None:
             # No clump found - return the gap texture.
-            # But if the texture is GOO, do that instead.
-            self._random.seed(self.gen_seed)
-            return self._random.choice(self.textures[
-                tex_name if tex_name == TileSize.GOO_SIDE else TileSize.CLUMP_GAP
-            ])
+            # But if the texture is GOO_SIDE, do that instead.
+            # If we don't have a gap texture, just use any one.
+            self._random.seed(self.gen_seed ^ hash(loc.as_tuple()))
+            if tex_name == TileSize.GOO_SIDE or TileSize.CLUMP_GAP not in self:
+                return self._random.choice(self.textures[tex_name])
+            else:
+                return self._random.choice(self.textures[TileSize.CLUMP_GAP])
 
         # Mix these three values together to determine the texture.
         # The clump seed makes each clump different, and adding the texture
