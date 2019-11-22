@@ -93,7 +93,7 @@ INCLUDES = [
     pkgutil.iter_modules(['conditions'])
 ]
 
-bee_version = input('BEE2 Version (or blank for dev): ')
+bee_version = "2 v" + input('BEE2 Version ("x.y.z" or blank for dev): ')
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
