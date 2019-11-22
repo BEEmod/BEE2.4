@@ -25,7 +25,7 @@ DEFAULT_SETTINGS = {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
         'play_sounds': '1',
-        'show_wip_items': '0',
+        'palette_save_settings': '0',
 
         # A token used to indicate the time the current cache/ was extracted.
         # This tells us whether to copy it to the game folder.

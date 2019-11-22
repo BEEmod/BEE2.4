@@ -63,6 +63,7 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
     This uses the orientation of the instance to detemine the correct
     spawnflags to make it rotate in the correct direction. The brush
     will be 2x2x2 units large, and always set to be non-solid.
+
     - `Pos` and `name` are local to the
       instance, and will set the `origin` and `targetname` respectively.
     - `Keys` are any other keyvalues to be be set.
@@ -71,16 +72,18 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
     - `Classname` specifies which entity will be created, as well as
        which other values will be set to specify the correct orientation.
     - `AddOut` is used to add outputs to the generated entity. It takes
-       the options `Output`, `Target`, `Input`, `Param` and `Delay`. If
+       the options `Output`, `Target`, `Input`, `Inst_targ`, `Param` and `Delay`. If
        `Inst_targ` is defined, it will be used with the input to construct
        an instance proxy input. If `OnceOnly` is set, the output will be
-       deleted when fired.  
+       deleted when fired.
 
     Permitted entities:
-       * `func_rotating`
-       * `func_door_rotating`
-       * `func_rot_button`
-       * `func_platrot`
+
+       * [`func_door_rotating`](https://developer.valvesoftware.com/wiki/func_door_rotating)
+       * [`func_platrot`](https://developer.valvesoftware.com/wiki/func_platrot)
+       * [`func_rot_button`](https://developer.valvesoftware.com/wiki/func_rot_button)
+       * [`func_rotating`](https://developer.valvesoftware.com/wiki/func_rotating)
+       * [`momentary_rot_button`](https://developer.valvesoftware.com/wiki/momentary_rot_button)
     """
     des_axis = res['axis', 'z'].casefold()
     reverse = srctools.conv_bool(res['reversed', '0'])
@@ -536,49 +539,52 @@ def res_import_template(inst: Entity, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance.  
-    Options:  
-    - ID: The ID of the template to be inserted. Add visgroups to additionally
-            add after a colon, comma-seperated (temp_id:vis1,vis2)
-    - force: a space-seperated list of overrides. If 'white' or 'black' is
+    Options:
+
+    - `ID`: The ID of the template to be inserted. Add visgroups to additionally
+            add after a colon, comma-seperated (`temp_id:vis1,vis2`).
+            Either section, or the whole value can be a `$fixup`.
+    - `force`: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overridden. If `invert` is
             added, white/black tiles will be swapped. If a tile size
-            ('2x2', '4x4', 'wall', 'special') is included, all tiles will
+            (`2x2`, `4x4`, `wall`, `special`) is included, all tiles will
             be switched to that size (if not a floor/ceiling). If 'world' or
             'detail' is present, the brush will be forced to that type.
-    - replace: A block of template material -> replacement textures.
+    - `replace`: A block of template material -> replacement textures.
             This is case insensitive - any texture here will not be altered
-            otherwise. If the material starts with a '#', it is instead a
+            otherwise. If the material starts with a `#`, it is instead a
             face ID.
-    - replaceBrush: The position of a brush to replace (0 0 0=the surface).
+    - `replaceBrush`: The position of a brush to replace (`0 0 0`=the surface).
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal. Can alternately be a block:
-            - Pos: The position to replace.
-            - additionalIDs: Space-separated list of face IDs in the template
+
+            - `Pos`: The position to replace.
+            - `additionalIDs`: Space-separated list of face IDs in the template
               to also fix for overlays. The surface should have close to a
               vertical normal, to prevent rescaling the overlay.
-            - removeBrush: If true, the original brush will not be removed.
-            - transferOverlay: Allow disabling transferring overlays to this
-              template. The IDs will be removed instead. (This can be an instvar).
-    - keys/localkeys: If set, a brush entity will instead be generated with
+            - `removeBrush`: If true, the original brush will not be removed.
+            - `transferOverlay`: Allow disabling transferring overlays to this
+              template. The IDs will be removed instead. (This can be a `$fixup`).
+    - `keys`/`localkeys`: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail.
             Specially-handled keys:
-            - "origin", offset automatically.
-            - "movedir" on func_movelinear - set a normal surrounded by <>,
+            - `"origin"`, offset automatically.
+            - `"movedir"` on func_movelinear - set a normal surrounded by `<>`,
               this gets replaced with angles.
-    - colorVar: If this fixup var is set
+    - `colorVar`: If this fixup var is set
             to `white` or `black`, that colour will be forced.
             If the value is `<editor>`, the colour will be chosen based on
             the color of the surface for ItemButtonFloor, funnels or
             entry/exit frames.
-    - invertVar: If this fixup value is true, tile colour will be
+    - `invertVar`: If this fixup value is true, tile colour will be
             swapped to the opposite of the current force option. This applies
             after colorVar.
-    - visgroup: Sets how visgrouped parts are handled. If 'none' (default),
-            they are ignored. If 'choose', one is chosen. If a number, that
+    - `visgroup`: Sets how visgrouped parts are handled. If `none` (default),
+            they are ignored. If `choose`, one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
-    - visgroup_force_var: If set and True, visgroup is ignored and all groups
+    - `visgroup_force_var`: If set and True, visgroup is ignored and all groups
             are added.
-    - outputs: Add outputs to the brush ent. Syntax is like VMFs, and all names
+    - `outputs`: Add outputs to the brush ent. Syntax is like VMFs, and all names
             are local to the instance.
     """
     (

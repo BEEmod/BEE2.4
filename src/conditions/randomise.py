@@ -90,9 +90,10 @@ def res_random_setup(res: Property) -> object:
 def res_random(inst: Entity, res: Property) -> None:
     """Randomly choose one of the sub-results to execute.
 
-    The "chance" value defines the percentage chance for any result to be
-    chosen. "weights" defines the weighting for each result. Wrap a set of
-    results in a "group" property block to treat them as a single result to be
+    The `chance` value defines the percentage chance for any result to be
+    chosen. `weights` defines the weighting for each result. Both are
+    comma-separated, matching up with the results following. Wrap a set of
+    results in a `group` property block to treat them as a single result to be
     executed in order.
     """
     # Note: 'global' results like "Has" won't delete themselves!
@@ -153,8 +154,10 @@ def res_add_variant(inst: Entity, res: Property) -> None:
 
     A suffix will be added in the form `_var4`.
     Two properties should be given:
-        Number: The number of random instances.
-        Weights: A comma-separated list of weights for each instance.
+
+    - `Number`: The number of random instances.
+    - `Weights`: A comma-separated list of weights for each instance.
+
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of `2, 1, 1` means the first instance has a 2/4 chance of
     being chosen, and the other 2 have a 1/4 chance of being chosen.  
@@ -197,9 +200,9 @@ def res_rand_num(inst: Entity, res: Property) -> None:
 def res_rand_vec(inst: Entity, res: Property) -> None:
     """A modification to RandomNum which generates a random vector instead.
 
-    'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
-    are for each section. If the min and max are equal that number will be used
-    instead.
+    `decimal`, `seed` and `ResultVar` work like RandomNum. `min_x`, `max_y` etc
+    are used to define the boundaries. If the min and max are equal that number
+    will be always used instead.
     """
     is_float = srctools.conv_bool(res['decimal'])
     var = res['resultvar', '$random']

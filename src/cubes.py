@@ -907,7 +907,7 @@ def flag_dropper_color(inst: Entity, res: Property):
     if res.value:
         inst.fixup[res.value] = data.tint
 
-    return bool(data.tint)
+    return data.tint is not None
 
 
 @make_result('CubeAddon', 'DropperAddon')
@@ -934,12 +934,13 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     Each cube should be the name of an ID, with `!` before to exclude it.
     It succeeds if a target is any of the included types, and not any of the
     excluded types (exclusions override inclusion).
+
     The IDs may also be:
     * `<any>` to detect all cube types (including franken)
     * `<companion>` to detect 'companion' items.
     * `<sphere>` to detect sphere-type items.
 
-    The 'resultvar' fixup will be set to the name to use.
+    The `resultvar` fixup will be set to the name to use.
     """
     inst.fixup[res['ResultVar']] = cube_filter(
         vmf,
@@ -961,11 +962,13 @@ def res_script_cube_predicate(res: Property):
     It succeeds if a target is any of the included types, and not any of the
     excluded types (exclusions override inclusion).
     The IDs may also be:
+
     * `<any>` to detect all cube types (including franken)
     * `<companion>` to detect 'companion' items.
     * `<sphere>` to detect sphere-type items.
 
     Config options:
+
     * `function`: Name of the function - called with an entity as an argument.
     * `filename`: Path to the .nut script, relative to scripts/vscripts/.
     * `Cube`: A cube to include.
@@ -1230,7 +1233,7 @@ def link_cubes(vmf: VMF):
         voice_attr['cube'] = True
 
     for pair in PAIRS:
-        if pair.tint:
+        if pair.tint is not None:
             pair.cube_type.color_in_map = True
         else:
             pair.cube_type.in_map = True
@@ -1487,7 +1490,7 @@ def make_cube(
     if is_frank:
         # No tinting or custom models for this.
         cust_model = pack = None
-    elif pair.tint:
+    elif pair.tint is not None:
         cust_model = cube_type.model_color
         pack = cube_type.pack_color
         # Multiply the two tints together.
@@ -1570,7 +1573,7 @@ def generate_cubes(vmf: VMF):
             # Add the custom model logic.
             cust_model = (
                 pair.cube_type.model_color
-                if pair.tint else
+                if pair.tint is not None else
                 pair.cube_type.model
             )
             if cust_model:

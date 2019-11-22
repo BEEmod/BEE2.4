@@ -922,15 +922,18 @@ def set_player_portalgun() -> None:
 
     This does not apply to coop. It checks the 'blueportal' and
     'orangeportal' attributes to see what are in the map.
+
     - If there are no spawners in the map, the player gets a dual portal
       device.
     - If there are only blue portal spawners, the player gets a orange-only
       gun.
     - If there are only orange portal spawners, the player gets a blue-
-      only gun (Regular single portal device)
+      only gun (Regular single portal device).
     - If there are both spawner types, the player doesn't get a gun.
-    - 'PortalGunOnOff' or 'NeedsPortalMan' will also be checked to
-      activate that logic.
+    - If the attribute `PortalGunOnOff` is present, special logic is added for that.
+    - If the attribute `NeedsPortalMan` is present, or the player has a non-dual
+      device the `@portalgun` manager script is added to enable these features.
+      `NeedsPortalMan` still works to add this in Coop.
     """
 
     if vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:

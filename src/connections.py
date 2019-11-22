@@ -672,11 +672,14 @@ class Connection:
 
 def collapse_item(item: Item) -> None:
     """Remove an item with a single input, transferring all IO."""
+    input_conn: Connection
     try:
         [input_conn] = item.inputs
         input_item = input_conn.from_item
     except ValueError:
         raise ValueError('Too many inputs for "{}"!'.format(item.name))
+
+    LOGGER.debug('Merging "{}" into "{}"...', item.name, input_item.name)
 
     input_conn.remove()
 
@@ -997,11 +1000,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
-    logic_auto = vmf.create_ent(
-        'logic_auto',
-        origin=vbsp_options.get(Vec, 'global_ents_loc')
-    )
-
     auto_logic = []
 
     # Apply input A/B types to connections.
@@ -1048,8 +1046,9 @@ def gen_item_outputs(vmf: VMF) -> None:
             else:
                 add_item_indicators(item, pan_switching_timer, pan_timer_type)
 
-        # Special case - inverted spawnfire items with no inputs need to fire
-        # off the activation outputs. There's no way to then deactivate those.
+        # Special case - spawnfire items with no inputs need to fire
+        # off the outputs. There's no way to control those, so we can just
+        # fire it off.
         if not item.inputs and item.item_type.spawn_fire is FeatureMode.ALWAYS:
             if item.is_logic:
                 # Logic gates need to trigger their outputs.
@@ -1061,7 +1060,16 @@ def gen_item_outputs(vmf: VMF) -> None:
 
                 auto_logic.append(item.inst)
             else:
-                for cmd in item.enable_cmd:
+                is_inverted = conv_bool(conditions.resolve_value(
+                    item.inst,
+                    item.item_type.invert_var,
+                ))
+                logic_auto = vmf.create_ent(
+                    'logic_auto',
+                    origin=item.inst['origin'],
+                    spawnflags=1,
+                )
+                for cmd in (item.enable_cmd if is_inverted else item.disable_cmd):
                     logic_auto.add_out(
                         Output(
                             'OnMapSpawn',
@@ -1140,6 +1148,11 @@ def gen_item_outputs(vmf: VMF) -> None:
 
         # Make sure this is packed, since parsing the VScript isn't trivial.
         packing.pack_files(vmf, timer_sound, file_type='sound')
+
+    logic_auto = vmf.create_ent(
+        'logic_auto',
+        origin=vbsp_options.get(Vec, 'global_ents_loc')
+    )
 
     for ent in auto_logic:
         # Condense all these together now.
@@ -1662,6 +1675,14 @@ def add_item_indicators(
             # VBSP and/or Hammer seems to get confused with totally empty
             # instance var, so give it a blank name.
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = '-'
+
+        # Overwrite the timer delay value, in case a sign changed ownership.
+        if item.timer is not None:
+            pan.fixup[const.FixupVars.TIM_DELAY] = item.timer
+            pan.fixup[const.FixupVars.TIM_ENABLED] = '1'
+        else:
+            pan.fixup[const.FixupVars.TIM_DELAY] = '99999999999'
+            pan.fixup[const.FixupVars.TIM_ENABLED] = '0'
 
         for outputs, input_cmds in [
             (item.timer_output_start(), pan_item.enable_cmd),

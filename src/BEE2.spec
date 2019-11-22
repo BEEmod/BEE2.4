@@ -89,7 +89,7 @@ do_localisation()
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
-    # We just use idlelib.WidgetRedirector
+    # We just use idlelib.WidgetRedirector and idlelib.query
     'idlelib.ClassBrowser',
     'idlelib.ColorDelegator',
     'idlelib.Debugger',
@@ -165,7 +165,7 @@ INCLUDE_LIBS = [
     if os.path.exists(path)
 ]
 
-bee_version = input('BEE2 Version: ')
+bee_version = input('BEE2 Version (x.y.z): ')
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.

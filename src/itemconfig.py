@@ -2,13 +2,14 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
-
 from functools import lru_cache
+import math
 
 from srctools import Property, Vec, conv_int, conv_bool
 from packageLoader import PakObject, ExportData, ParseData, desc_parse
 import BEE2_config
 from tooltip import add_tooltip
+from tk_tools import ttk_Spinbox
 import tkMarkdown
 import utils
 import srctools.logger
@@ -404,6 +405,16 @@ def widget_sfx(*args):
     sound.fx_blockable('config')
 
 
+def decimal_points(num: float) -> int:
+    """Count the number of decimal points required to display a number."""
+    str_num = format(num, 'g')
+    if '.' in str_num:
+        whole, frac = str_num.split('.')
+        return len(frac)
+    else:
+        return 0
+
+
 # ------------
 # Widget types
 # ------------
@@ -495,16 +506,63 @@ def widget_checkmark_multi(
 @WidgetLookup('range', 'slider')
 def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
     """Provides a slider for setting a number in a range."""
-    scale = tk.Scale(
-        parent,
-        orient='horizontal',
-        from_=conf.float('min'),
-        to=conf.float('max', 100),
-        resolution=conf.float('step', 1),
-        variable=var,
-        command=widget_sfx,
+    limit_min = conf.float('min', 0)
+    limit_max = conf.float('max', 100)
+    step = conf.float('step', 1)
+
+    # We have to manually translate the UI position to a value.
+    ui_min = 0
+    ui_max = abs(math.ceil((limit_max - limit_min) / step))
+    ui_var = tk.StringVar()
+
+    # The formatting of the text display is a little complex.
+    # We want to keep the same number of decimal points for all values.
+    txt_format = '.{}f'.format(max(
+        decimal_points(limit_min + step * offset)
+        for offset in range(0, int(ui_max) + 1)
+    ))
+    # Then we want to figure out the longest value with this format to set
+    # the widget width
+    widget_width = max(
+        len(format(limit_min + step * offset, txt_format))
+        for offset in range(0, int(ui_max) + 1)
     )
-    return scale
+
+    def change_cmd(*args) -> None:
+        new_pos = format(limit_min + step * round(scale.get()), txt_format)
+        if var.get() != new_pos:
+            widget_sfx()
+            var.set(new_pos)
+
+    def trace_func(*args) -> None:
+        off = (float(var.get()) - limit_min) / step
+        ui_var.set(str(round(off)))
+
+    trace_func()
+    ui_var.trace_add('write', trace_func)
+
+    frame = ttk.Frame(parent)
+    frame.columnconfigure(1, weight=1)
+
+    disp = ttk.Label(
+        frame,
+        textvariable=var,
+        width=widget_width,
+        justify='right'
+    )
+    scale = ttk.Scale(
+        frame,
+        orient='horizontal',
+        from_=ui_min,
+        to=ui_max,
+        variable=ui_var,
+        command=change_cmd,
+    )
+
+    disp.grid(row=0, column=0)
+    scale.grid(row=0, column=1, sticky='ew')
+
+    return frame
 
 
 @WidgetLookup('color', 'colour', 'rgb')
@@ -519,7 +577,7 @@ def widget_color_single(
     """
     # Isolates the swatch so it doesn't resize.
     frame = ttk.Frame(parent)
-    swatch = make_color_swatch(frame, var)
+    swatch = make_color_swatch(frame, var, 24)
     swatch.grid(row=0, column=0, sticky='w')
     return frame
 
@@ -529,12 +587,12 @@ def widget_color_multi(
         parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
     """For color swatches, display in a more compact form."""
     for row, column, tim_text, var in multi_grid(values):
-        swatch = make_color_swatch(parent, var)
+        swatch = make_color_swatch(parent, var, 16)
         swatch.grid(row=row, column=column)
         add_tooltip(swatch, tim_text, delay=0)
 
 
-def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label:
+def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Label:
     """Make a single swatch."""
     # Note: tkinter requires RGB as ints, not float!
 
@@ -566,10 +624,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label
             r, g, b = map(int, new_color)  # Returned as floats, which is wrong.
             var.set('{} {} {}'.format(int(r), int(g), int(b)))
 
-    swatch = ttk.Label(
-        parent,
-        relief='raised',
-    )
+    swatch = ttk.Label(parent)
 
     def update_image(var_name: str, var_index: str, operation: str):
         r, g, b = get_color()
@@ -690,6 +745,9 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
 
     validate_cmd = parent.register(validate)
 
+    # Unfortunately we can't use ttk.Spinbox() here, it doesn't support
+    # the validation options.
+    # TODO: Update when possible.
     spinbox = tk.Spinbox(
         parent,
         exportselection=False,

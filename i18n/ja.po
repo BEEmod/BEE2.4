@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2019-06-05 14:36+1000\n"
+"POT-Creation-Date: 2019-11-22 10:50+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -387,34 +387,34 @@ msgstr ""
 msgid "Hide/Show the \"{}\" window."
 msgstr ""
 
-#: UI.py:68
+#: UI.py:67
 msgid "Export..."
 msgstr ""
 
-#: UI.py:595
+#: UI.py:594
 msgid "Select Skyboxes"
 msgstr ""
 
-#: UI.py:596
+#: UI.py:595
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers)."
 msgstr ""
 
-#: UI.py:604
+#: UI.py:603
 msgid "3D Skybox"
 msgstr ""
 
-#: UI.py:605
+#: UI.py:604
 msgid "Fog Color"
 msgstr ""
 
-#: UI.py:612
+#: UI.py:611
 msgid "Select Additional Voice Lines"
 msgstr ""
 
-#: UI.py:613
+#: UI.py:612
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -422,31 +422,31 @@ msgid ""
 "Style Properties."
 msgstr ""
 
-#: UI.py:618
+#: UI.py:617
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr ""
 
-#: UI.py:620
+#: UI.py:619
 msgid "<Multiverse Cave only>"
 msgstr ""
 
-#: UI.py:624
+#: UI.py:623
 msgid "Characters"
 msgstr "キャラクター"
 
-#: UI.py:625
+#: UI.py:624
 msgid "Turret Shoot Monitor"
 msgstr ""
 
-#: UI.py:626
+#: UI.py:625
 msgid "Monitor Visuals"
 msgstr ""
 
-#: UI.py:633
+#: UI.py:632
 msgid "Select Style"
 msgstr ""
 
-#: UI.py:634
+#: UI.py:633
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -455,38 +455,38 @@ msgid ""
 "The style broadly defines the time period a chamber is set in."
 msgstr ""
 
-#: UI.py:645
+#: UI.py:644
 msgid "Elevator Videos"
 msgstr "エレベータービデオ"
 
-#: UI.py:652
+#: UI.py:651
 msgid "Select Elevator Video"
 msgstr ""
 
-#: UI.py:653
+#: UI.py:652
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
 "will be selected each time the map is played, like in the default PeTI."
 msgstr ""
 
-#: UI.py:657
+#: UI.py:656
 msgid "This style does not have a elevator video screen."
 msgstr ""
 
-#: UI.py:660
+#: UI.py:659
 msgid "Choose a random video."
 msgstr ""
 
-#: UI.py:664
+#: UI.py:663
 msgid "Multiple Orientations"
 msgstr ""
 
-#: UI.py:885
+#: UI.py:884
 msgid "Selected Items and Style successfully exported!"
 msgstr ""
 
-#: UI.py:887
+#: UI.py:886
 msgid ""
 "\n"
 "\n"
@@ -494,151 +494,147 @@ msgid ""
 "editor wall previews are changed."
 msgstr ""
 
-#: UI.py:900
+#: UI.py:899
 msgid ""
 "\n"
 " Launch Game?"
 msgstr ""
 
-#: UI.py:929
-msgid "Item: {}"
-msgstr ""
-
-#: UI.py:1115
+#: UI.py:1114
 msgid "Delete Palette \"{}\""
 msgstr ""
 
-#: UI.py:1192
+#: UI.py:1191
 msgid "BEE2 - Save Palette"
 msgstr ""
 
-#: UI.py:1193
+#: UI.py:1192
 msgid "Enter a name:"
 msgstr ""
 
-#: UI.py:1202
+#: UI.py:1201
 msgid "This palette already exists. Overwrite?"
 msgstr ""
 
-#: UI.py:1231 gameMan.py:1498
+#: UI.py:1230 gameMan.py:1509
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr ""
 
-#: UI.py:1258
+#: UI.py:1257
 msgid "Clear Palette"
 msgstr ""
 
-#: UI.py:1294 UI.py:1717
+#: UI.py:1293 UI.py:1723
 msgid "Delete Palette"
 msgstr ""
 
-#: UI.py:1314
+#: UI.py:1313
 msgid "Save Palette..."
 msgstr ""
 
-#: UI.py:1319 UI.py:1740
+#: UI.py:1318 UI.py:1746
 msgid "Save Palette As..."
 msgstr ""
 
-#: UI.py:1325 UI.py:1728
+#: UI.py:1329 UI.py:1734
 msgid "Save Settings in Palettes"
 msgstr ""
 
-#: UI.py:1341 music_conf.py:204
+#: UI.py:1347 music_conf.py:204
 msgid "Music: "
 msgstr "音楽："
 
-#: UI.py:1367
+#: UI.py:1373
 msgid "{arr} Use Suggested {arr}"
 msgstr ""
 
-#: UI.py:1383
+#: UI.py:1389
 msgid "Style: "
 msgstr ""
 
-#: UI.py:1385
+#: UI.py:1391
 msgid "Voice: "
 msgstr ""
 
-#: UI.py:1386
+#: UI.py:1392
 msgid "Skybox: "
 msgstr ""
 
-#: UI.py:1387
+#: UI.py:1393
 msgid "Elev Vid: "
 msgstr "エレベータービデオ："
 
-#: UI.py:1405
+#: UI.py:1411
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr ""
 
-#: UI.py:1508
+#: UI.py:1514
 msgid "All Items: "
 msgstr ""
 
-#: UI.py:1642
+#: UI.py:1648
 msgid "Export to \"{}\"..."
 msgstr ""
 
-#: UI.py:1666 backup.py:872
+#: UI.py:1672 backup.py:872
 msgid "File"
 msgstr "ファイル"
 
-#: UI.py:1671
+#: UI.py:1677
 msgid "Export"
 msgstr ""
 
-#: UI.py:1678 backup.py:876
+#: UI.py:1684 backup.py:876
 msgid "Add Game"
 msgstr ""
 
-#: UI.py:1682
+#: UI.py:1688
 msgid "Uninstall from Selected Game"
 msgstr ""
 
-#: UI.py:1686
+#: UI.py:1692
 msgid "Backup/Restore Puzzles..."
 msgstr ""
 
-#: UI.py:1690
+#: UI.py:1696
 msgid "Manage Packages..."
 msgstr ""
 
-#: UI.py:1695
+#: UI.py:1701
 msgid "Options"
 msgstr "環境設定"
 
-#: UI.py:1700
+#: UI.py:1706 gameMan.py:1188
 msgid "Quit"
 msgstr "終了"
 
-#: UI.py:1710
+#: UI.py:1716
 msgid "Palette"
 msgstr ""
 
-#: UI.py:1712
+#: UI.py:1718
 msgid "Clear"
 msgstr ""
 
-#: UI.py:1721
+#: UI.py:1727
 msgid "Fill Palette"
 msgstr ""
 
-#: UI.py:1735
+#: UI.py:1741
 msgid "Save Palette"
 msgstr ""
 
-#: UI.py:1862
+#: UI.py:1868
 msgid "Palettes"
 msgstr ""
 
-#: UI.py:1887
+#: UI.py:1893
 msgid "Export Options"
 msgstr ""
 
-#: UI.py:1918
+#: UI.py:1924
 msgid "Fill empty spots in the palette with random items."
 msgstr ""
 
@@ -875,6 +871,10 @@ msgid ""
 " Cubes only."
 msgstr ""
 
+#: contextWin.py:438
+msgid "Properties:"
+msgstr ""
+
 #: contextWin.py:460
 msgid ""
 "The number of entities used for this item. The Source engine limits this "
@@ -904,138 +904,134 @@ msgstr ""
 msgid "Change the default settings for this item when placed."
 msgstr ""
 
-#: gameMan.py:743 gameMan.py:850
+#: gameMan.py:752 gameMan.py:857
 msgid "BEE2 - Export Failed!"
 msgstr ""
 
-#: gameMan.py:744
+#: gameMan.py:753
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr ""
 
-#: gameMan.py:851
+#: gameMan.py:858
 msgid "Copying compiler file {file} failed.Ensure the {game} is not running."
 msgstr ""
 
-#: gameMan.py:1235
+#: gameMan.py:1245
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
 msgstr ""
 
-#: gameMan.py:1239
+#: gameMan.py:1249
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
-#: gameMan.py:1421
+#: gameMan.py:1432
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 
-#: gameMan.py:1424 gameMan.py:1439 gameMan.py:1449 gameMan.py:1457
-#: gameMan.py:1465 gameMan.py:1474
+#: gameMan.py:1435 gameMan.py:1450 gameMan.py:1460 gameMan.py:1467
+#: gameMan.py:1476 gameMan.py:1485
 msgid "BEE2 - Add Game"
 msgstr ""
 
-#: gameMan.py:1427
+#: gameMan.py:1438
 msgid "Find Game Exe"
 msgstr ""
 
-#: gameMan.py:1428
+#: gameMan.py:1439
 msgid "Executable"
 msgstr ""
 
-#: gameMan.py:1436
+#: gameMan.py:1447
 msgid "This does not appear to be a valid game folder!"
 msgstr ""
 
-#: gameMan.py:1446
+#: gameMan.py:1457
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr ""
 
-#: gameMan.py:1456
+#: gameMan.py:1468
 msgid "Enter the name of this game:"
 msgstr ""
 
-#: gameMan.py:1464
+#: gameMan.py:1475
 msgid "This name is already taken!"
 msgstr ""
 
-#: gameMan.py:1473
+#: gameMan.py:1484
 msgid "Please enter a name for this game!"
 msgstr ""
 
-#: gameMan.py:1492
+#: gameMan.py:1503
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
 msgstr ""
 
-#: helpMenu.py:63
+#: helpMenu.py:60
 msgid "Wiki..."
 msgstr "ウィキ。。。"
 
-#: helpMenu.py:65
+#: helpMenu.py:62
 msgid "Original Items..."
 msgstr ""
 
-#: helpMenu.py:70
+#: helpMenu.py:67
 msgid "Discord Server..."
 msgstr ""
 
-#: helpMenu.py:71
-msgid "Steam Group..."
-msgstr ""
-
-#: helpMenu.py:72
+#: helpMenu.py:68
 msgid "aerond's Music Changer..."
 msgstr ""
 
-#: helpMenu.py:74
+#: helpMenu.py:70
 msgid "Application Repository..."
 msgstr ""
 
-#: helpMenu.py:75
+#: helpMenu.py:71
 msgid "Items Repository..."
 msgstr ""
 
-#: helpMenu.py:77
+#: helpMenu.py:73
 msgid "Submit Application Bugs..."
 msgstr ""
 
-#: helpMenu.py:78
+#: helpMenu.py:74
 msgid "Submit Item Bugs..."
 msgstr ""
 
-#: helpMenu.py:80 paletteLoader.py:35
+#: helpMenu.py:76 paletteLoader.py:35
 msgid "Portal 2"
 msgstr "Portal 2"
 
-#: helpMenu.py:81 paletteLoader.py:37
+#: helpMenu.py:77 paletteLoader.py:37
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
-#: helpMenu.py:82
+#: helpMenu.py:78
 msgid "Portal Stories: Mel"
 msgstr "Portal Stories: Mel"
 
-#: helpMenu.py:83
+#: helpMenu.py:79
 msgid "Thinking With Time Machine"
 msgstr "Thinking With Time Machine"
 
-#: helpMenu.py:247 itemPropWin.py:325
+#: helpMenu.py:243 itemPropWin.py:347
 msgid "Close"
 msgstr "閉じる"
 
-#: helpMenu.py:271
+#: helpMenu.py:267
 msgid "Help"
 msgstr "ヘルプ"
 
-#: helpMenu.py:282
+#: helpMenu.py:278
 msgid "BEE2 Credits"
 msgstr "BEE2のクレジット"
 
-#: helpMenu.py:299
+#: helpMenu.py:295
 msgid "Credits..."
 msgstr "クレジット。。。"
 
@@ -1053,11 +1049,11 @@ msgid ""
 "(0=infinite)"
 msgstr ""
 
-#: itemPropWin.py:324
+#: itemPropWin.py:346
 msgid "No Properties available!"
 msgstr ""
 
-#: itemconfig.py:563
+#: itemconfig.py:621
 msgid "Choose a Color"
 msgstr ""
 
@@ -1069,7 +1065,7 @@ msgstr ""
 msgid "Version: "
 msgstr "バージョン："
 
-#: loadScreen.py:195 optionWindow.py:230 packageMan.py:114 selectorWin.py:723
+#: loadScreen.py:195 optionWindow.py:246 packageMan.py:114 selectorWin.py:723
 msgid "Cancel"
 msgstr "キャンセル"
 
@@ -1206,148 +1202,154 @@ msgstr ""
 msgid "Speed:"
 msgstr ""
 
-#: optionWindow.py:50
+#: optionWindow.py:57
 msgid "BEE2 Options"
 msgstr ""
 
-#: optionWindow.py:89
-msgid "Allow Restart?"
+#: optionWindow.py:95
+msgid ""
+"Package cache times have been reset. These will now be extracted during "
+"the next export."
 msgstr ""
 
-#: optionWindow.py:90
-msgid "Restart the BEE2 to re-extract packages?"
+#: optionWindow.py:112
+msgid "\"Preserve Game Resources\" has been disabled."
 msgstr ""
 
-#: optionWindow.py:189
+#: optionWindow.py:124
+msgid "Packages Reset"
+msgstr ""
+
+#: optionWindow.py:205
 msgid "General"
 msgstr ""
 
-#: optionWindow.py:195
+#: optionWindow.py:211
 msgid "Windows"
 msgstr ""
 
-#: optionWindow.py:201
+#: optionWindow.py:217
 msgid "Development"
 msgstr ""
 
-#: optionWindow.py:225 packageMan.py:108 selectorWin.py:701
+#: optionWindow.py:241 packageMan.py:108 selectorWin.py:701
 msgid "OK"
 msgstr "OK"
 
-#: optionWindow.py:256
+#: optionWindow.py:272
 msgid "After Export:"
 msgstr ""
 
-#: optionWindow.py:273
+#: optionWindow.py:289
 msgid "Do Nothing"
 msgstr ""
 
-#: optionWindow.py:279
+#: optionWindow.py:295
 msgid "Minimise BEE2"
 msgstr ""
 
-#: optionWindow.py:285
+#: optionWindow.py:301
 msgid "Quit BEE2"
 msgstr ""
 
-#: optionWindow.py:293
+#: optionWindow.py:309
 msgid "After exports, do nothing and keep the BEE2 in focus."
 msgstr ""
 
-#: optionWindow.py:295
+#: optionWindow.py:311
 msgid "After exports, minimise to the taskbar/dock."
 msgstr ""
 
-#: optionWindow.py:296
+#: optionWindow.py:312
 msgid "After exports, quit the BEE2."
 msgstr ""
 
-#: optionWindow.py:303
+#: optionWindow.py:319
 msgid "Launch Game"
 msgstr ""
 
-#: optionWindow.py:304
+#: optionWindow.py:320
 msgid "After exporting, launch the selected game automatically."
 msgstr ""
 
-#: optionWindow.py:313 optionWindow.py:319
+#: optionWindow.py:329 optionWindow.py:335
 msgid "Play Sounds"
 msgstr ""
 
-#: optionWindow.py:324
+#: optionWindow.py:340
 msgid ""
 "Pyglet is either not installed or broken.\n"
 "Sound effects have been disabled."
 msgstr ""
 
-#: optionWindow.py:331
+#: optionWindow.py:347
 msgid "Reset Package Caches"
 msgstr ""
 
-#: optionWindow.py:337
-msgid "Force re-extracting all package resources. This requires a restart."
+#: optionWindow.py:353
+msgid "Force re-extracting all package resources."
 msgstr ""
 
-#: optionWindow.py:346
+#: optionWindow.py:362
 msgid "Keep windows inside screen"
 msgstr ""
 
-#: optionWindow.py:347
+#: optionWindow.py:363
 msgid ""
 "Prevent sub-windows from moving outside the screen borders. If you have "
 "multiple monitors, disable this."
 msgstr ""
 
-#: optionWindow.py:355
+#: optionWindow.py:371
 msgid "Reset All Window Positions"
 msgstr ""
 
-#: optionWindow.py:370
+#: optionWindow.py:386
 msgid "Log missing entity counts"
 msgstr ""
 
-#: optionWindow.py:371
+#: optionWindow.py:387
 msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
 msgstr ""
 
-#: optionWindow.py:379
+#: optionWindow.py:395
 msgid "Log when item doesn't have a style"
 msgstr ""
 
-#: optionWindow.py:380
+#: optionWindow.py:396
 msgid ""
 "Log items have no applicable version for a particular style.This usually "
 "means it will look very bad."
 msgstr ""
 
-#: optionWindow.py:388
+#: optionWindow.py:404
 msgid "Log when item uses parent's style"
 msgstr ""
 
-#: optionWindow.py:389
+#: optionWindow.py:405
 msgid ""
 "Log when an item reuses a variant from a parent style (1970s using 1950s "
 "items, for example). This is usually fine, but may need to be fixed."
 msgstr ""
 
-#: optionWindow.py:398
+#: optionWindow.py:414
 msgid "Log missing packfile resources"
 msgstr ""
 
-#: optionWindow.py:399
+#: optionWindow.py:415
 msgid ""
 "Log when the resources a \"PackList\" refers to are not present in the "
 "zip. This may be fine (in a prerequisite zip), but it often indicates an "
 "error."
 msgstr ""
 
-#: optionWindow.py:408
+#: optionWindow.py:424
 msgid "Preserve Game Directories"
 msgstr ""
 
-#: optionWindow.py:409
+#: optionWindow.py:426
 msgid ""
 "When exporting, do not overwrite \n"
 "\"bee2/\" and\n"
@@ -1355,23 +1357,31 @@ msgid ""
 "Enable if you're developing new content, to ensure it is not overwritten."
 msgstr ""
 
-#: optionWindow.py:420
+#: optionWindow.py:437
 msgid "Show Log Window"
 msgstr ""
 
-#: optionWindow.py:422
+#: optionWindow.py:439
 msgid "Show the log file in real-time."
 msgstr ""
 
-#: optionWindow.py:429
+#: optionWindow.py:446
 msgid "Force Editor Models"
 msgstr ""
 
-#: optionWindow.py:430
+#: optionWindow.py:447
 msgid ""
 "Make all props_map_editor models available for use. Portal 2 has a limit "
 "of 1024 models loaded in memory at once, so we need to disable unused "
 "ones to free this up."
+msgstr ""
+
+#: optionWindow.py:458
+msgid "Dump All objects"
+msgstr ""
+
+#: optionWindow.py:464
+msgid "Dump Items list"
 msgstr ""
 
 #: packageMan.py:62
@@ -1441,15 +1451,15 @@ msgstr[0] ""
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr ""
 
-#: signage_ui.py:139 signage_ui.py:212
+#: signage_ui.py:140 signage_ui.py:213
 msgid "Configure Signage"
 msgstr ""
 
-#: signage_ui.py:143
+#: signage_ui.py:144
 msgid "Selected"
 msgstr ""
 
-#: signage_ui.py:166
+#: signage_ui.py:167
 msgid "Signage: {}"
 msgstr ""
 
@@ -1473,7 +1483,7 @@ msgstr "全て"
 msgid "Available Tags (click):"
 msgstr ""
 
-#: utils.py:789
+#: utils.py:814
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr "YES"
 
@@ -1606,5 +1616,20 @@ msgstr "名前ありません？"
 #~ msgstr ""
 
 #~ msgid "No Item Configuration!"
+#~ msgstr ""
+
+#~ msgid "Item: {}"
+#~ msgstr ""
+
+#~ msgid "Steam Group..."
+#~ msgstr ""
+
+#~ msgid "Allow Restart?"
+#~ msgstr ""
+
+#~ msgid "Restart the BEE2 to re-extract packages?"
+#~ msgstr ""
+
+#~ msgid "Force re-extracting all package resources. This requires a restart."
 #~ msgstr ""
 

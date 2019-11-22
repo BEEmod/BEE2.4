@@ -47,15 +47,16 @@ def flag_game(flag: Property) -> bool:
     """Checks which game is being modded.
 
     Accepts the following aliases instead of a Steam ID:
-    - PORTAL2
-    - APTAG
-    - ALATAG
-    - TAG
-    - Aperture Tag
-    - TWTM,
-    - Thinking With Time Machine
-    - DEST_AP
-    - Destroyed Aperture
+
+    - `PORTAL2`
+    - `APTAG`
+    - `ALATAG`
+    - `TAG`
+    - `Aperture Tag`
+    - `TWTM`
+    - `Thinking With Time Machine`
+    - `DEST_AP`
+    - `Destroyed Aperture`
     """
     return vbsp_options.get(str, 'game_id') == utils.STEAM_IDS.get(
         flag.value.upper(),
@@ -68,8 +69,8 @@ def flag_voice_char(flag: Property) -> bool:
     """Checks to see if the given charcter is present in the voice pack.
 
     `<NONE>` means no voice pack is chosen.
-    This is case-insensitive, and allows partial matches - 'Cave' matches
-    a voice pack with 'Cave Johnson'.
+    This is case-insensitive, and allows partial matches - `Cave` matches
+    a voice pack with `Cave Johnson`.
     """
     targ_char = flag.value.casefold()
     if targ_char == '<none>':
@@ -82,9 +83,7 @@ def flag_voice_char(flag: Property) -> bool:
 
 @make_flag('HasCavePortrait')
 def res_cave_portrait() -> bool:
-    """Checks to see if the Cave Portrait option is set for the given
-
-    voice pack.
+    """Checks to see if the Cave Portrait option is set for the given voice pack.
     """
     return vbsp_options.get(int, 'cave_port_skin') is not None
 
@@ -132,7 +131,7 @@ def res_set_option(res: Property) -> bool:
 
 @make_flag('ItemConfig')
 def res_match_item_config(inst: Entity, res: Property) -> bool:
-    """Check if an item config panel value matches another value.
+    """Check if an Item Config Panel value matches another value.
 
     * `ID` is the ID of the group.
     * `Name` is the name of the widget.

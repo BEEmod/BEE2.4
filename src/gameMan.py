@@ -7,6 +7,7 @@ Does stuff related to the actual games.
 """
 from pathlib import Path
 
+import tk_tools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -19,7 +20,6 @@ import re
 import io
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from query_dialogs import ask_string
 from srctools import (
     Vec, VPK,
     Property,
@@ -268,7 +268,7 @@ def should_backup_app(file: str) -> bool:
             return False  # Too small.
 
         # Read out the last 4096 bytes, and look for the sig in there.
-        f.seek(-SIZE,io.SEEK_END)
+        f.seek(-SIZE, io.SEEK_END)
 
         return b'MEI\014\013\012\013\016' not in f.read(SIZE)
 
@@ -292,15 +292,15 @@ class Game:
         """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():
-            raise ValueError(
-                'Game {} has invalid Steam ID: {}'.format(gm_id, steam_id)
-            )
+            raise ValueError(f'Game {gm_id} has invalid Steam ID: {steam_id}')
 
         folder = config.get_val(gm_id, 'Dir', '')
         if not folder:
-            raise ValueError(
-                'Game {} has no folder!'.format(gm_id)
-            )
+            raise ValueError(f'Game {gm_id} has no folder!')
+
+        if not os.path.exists(folder):
+            raise ValueError(f'Folder {folder} does not exist for game {gm_id}!')
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
@@ -797,8 +797,9 @@ class Game:
             self.edit_gameinfo(True)
             export_screen.step('EXP')
 
-            LOGGER.info('Adding ents to FGD.')
-            self.edit_fgd(True)
+            if not GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+                LOGGER.info('Adding ents to FGD.')
+                self.edit_fgd(True)
             export_screen.step('EXP')
 
             LOGGER.info('Writing instance list...')
@@ -936,7 +937,7 @@ class Game:
 
         if mdl_count != 0:
             LOGGER.info(
-                '{}/{} ({:.0%})editor models used.',
+                '{}/{} ({:.0%}) editor models used.',
                 len(used_models),
                 mdl_count,
                 len(used_models) / mdl_count,
@@ -1171,20 +1172,23 @@ class Game:
         except FileNotFoundError:
             return
         with basemod_file:
-            if lang == 'english':
-                def filterer(file):
-                    """The English language has some unused language text.
+            # This file is in keyvalues format, supposedly.
+            # But it's got a bunch of syntax errors - extra quotes,
+            # missing brackets.
+            # The structure doesn't matter, so just process line by line.
+            for line in basemod_file:
+                try:
+                    __, key, __, value, __ = line.split('"')
+                except ValueError:
+                    continue
+                # Ignore non-puzzlemaker keys.
+                if key.startswith('PORTAL2_PuzzleEditor'):
+                    TRANS_DATA[key] = value.replace("\\'", "'")
 
-                    This needs to be skipped since it has invalid quotes."""
-                    for line in file:
-                        if line.count('"') <= 4:
-                            yield line
-                basemod_file = filterer(basemod_file)
-
-            trans_prop = Property.parse(basemod_file, 'basemodui.txt')
-
-        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
-            TRANS_DATA[item.real_name] = item.value
+        if _('Quit') == '####':
+            # Dummy translations installed, apply here too.
+            for key in TRANS_DATA:
+                TRANS_DATA[key] = _(key)
 
 
 def find_steam_info(game_dir):
@@ -1405,6 +1409,7 @@ def load():
                     CONFIG,
                 )
             except ValueError:
+                LOGGER.warning("Can't parse game: ", exc_info=True)
                 continue
             all_games.append(new_game)
             new_game.edit_gameinfo(True)
@@ -1458,11 +1463,11 @@ def add_game(e=None, refresh_menu=True):
 
         invalid_names = [gm.name for gm in all_games]
         while True:
-            name = ask_string(
-                prompt=_("Enter the name of this game:"),
-                title=_('BEE2 - Add Game'),
+            name = tk_tools.prompt(
+                _('BEE2 - Add Game'),
+                _("Enter the name of this game:"),
                 initialvalue=name,
-                )
+            )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
