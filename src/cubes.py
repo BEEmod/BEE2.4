@@ -929,7 +929,7 @@ def flag_dropper_color(inst: Entity, res: Property):
     if res.value:
         inst.fixup[res.value] = data.tint
 
-    return bool(data.tint)
+    return data.tint is not None
 
 
 @make_result('CubeAddon', 'DropperAddon')
@@ -1266,7 +1266,7 @@ def link_cubes(vmf: VMF):
         voice_attr['cube'] = True
 
     for pair in PAIRS:
-        if pair.tint:
+        if pair.tint is not None:
             pair.cube_type.color_in_map = True
         else:
             pair.cube_type.in_map = True
@@ -1520,7 +1520,7 @@ def make_cube(
     if is_frank:
         # No tinting or custom models for this.
         cust_model = pack = None
-    elif pair.tint:
+    elif pair.tint is not None:
         cust_model = cube_type.model_color
         pack = cube_type.pack_color
         # Multiply the two tints together.
@@ -1603,7 +1603,7 @@ def generate_cubes(vmf: VMF):
             # Add the custom model logic.
             cust_model = (
                 pair.cube_type.model_color
-                if pair.tint else
+                if pair.tint is not None else
                 pair.cube_type.model
             )
             if cust_model:

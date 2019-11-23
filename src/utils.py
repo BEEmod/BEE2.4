@@ -789,23 +789,48 @@ def setup_localisations(logger: logging.Logger) -> None:
 
     lang_folder = install_path('i18n')
 
+    trans: gettext.NullTranslations
+
     for lang in expanded_langs:
         try:
             file = open(lang_folder / (lang + '.mo').format(lang), 'rb')
         except FileNotFoundError:
             continue
         with file:
-            trans = gettext.GNUTranslations(file)  # type: gettext.NullTranslations
+            trans = gettext.GNUTranslations(file)
             break
     else:
+        # To help identify missing translations, replace everything with
+        # something noticable.
+        if lang_code == 'dummy':
+            class DummyTranslations(gettext.NullTranslations):
+                """Dummy form for identifying missing translation entries."""
+                def gettext(self, message: str) -> str:
+                    """Generate placeholder of the right size."""
+                    # We don't want to leave {arr} intact.
+                    return ''.join([
+                        '#' if s.isalnum() or s in '{}' else s
+                        for s in message
+                    ])
+
+                def ngettext(self, msgid1: str, msgid2: str, n: int) -> str:
+                    """Generate placeholder of the right size for plurals."""
+                    return self.gettext(msgid1 if n == 1 else msgid2)
+
+                lgettext = gettext
+                lngettext = ngettext
+
+            trans = DummyTranslations()
         # No translations, fallback to English.
         # That's fine if the user's language is actually English.
-        if 'en' not in expanded_langs:
-            logger.warning(
-                "Can't find translation for codes: {!r}!",
-                expanded_langs,
-            )
-        trans = gettext.NullTranslations()
+        else:
+            if 'en' not in expanded_langs:
+                logger.warning(
+                    "Can't find translation for codes: {!r}!",
+                    expanded_langs,
+                )
+            trans = gettext.NullTranslations()
+
     # Add these functions to builtins, plus _=gettext
     trans.install(['gettext', 'ngettext'])
 

@@ -435,7 +435,7 @@ def init_widgets():
 
     ttk.Label(
         f,
-        text="Properties:",
+        text=_("Properties:"),
         anchor="center",
     ).grid(
         row=0,

@@ -164,7 +164,12 @@ DEFAULTS = {  # default values for this item
 last_angle = '0'
 
 is_open = False
+# ttk.Scale works on floating point values,
+# so it can be put partway. We need to suppress calling our callbacks
+# whilst we fix it.
 enable_tim_callback = True
+enable_pist_callback = True
+
 
 def callback(name):
     """Do nothing by default!"""
@@ -196,11 +201,11 @@ def save_angle(key, new_angle):
 def save_tim(key, val):
     global enable_tim_callback
     if enable_tim_callback:
-        new_val = math.floor(float(val) + 0.5)
+        new_val = round(float(val))
 
+        # Lock to whole numbers
         enable_tim_callback = False
         widgets[key].set(new_val)
-        # Lock to whole numbers
         enable_tim_callback = True
 
         labels[key]['text'] = (
@@ -217,27 +222,45 @@ def save_tim(key, val):
 
 
 def save_pist(key, val):
-    if widgets['toplevel'].get() == widgets['bottomlevel'].get():
+    """The top and bottom positions are closely interrelated."""
+    global enable_pist_callback
+    if not enable_pist_callback:
+        return
+    try:
+        top_wid: ttk.Scale = widgets['toplevel']
+        btm_wid: ttk.Scale = widgets['bottomlevel']
+    except KeyError:
+        return  # Both don't exist yet.
+
+    # The ttk Scale widget doesn't snap to integers, so we need to do that.
+    prev_top = top_wid.get()
+    new_top = round(prev_top)
+    prev_btm = btm_wid.get()
+    new_btm = round(prev_btm)
+
+    enable_pist_callback = False
+    top_wid.set(new_top)
+    btm_wid.set(new_btm)
+    enable_pist_callback = True
+
+    if top_wid.get() == btm_wid.get():
         # user moved them to match, switch the other one around
         sound.fx_blockable('swap')
-        widgets[
-            'toplevel' if key == 'bottomlevel' else 'bottomlevel'
-            ].set(values[key])
-    else:
+        (top_wid if key == 'bottomlevel' else btm_wid).set(values[key])
+    elif prev_top != new_top or prev_btm != new_btm:
+        # Only play when we've actually changed.
         sound.fx_blockable('move')
 
-    start_pos = widgets['toplevel'].get()
-    end_pos = widgets['bottomlevel'].get()
-
-    values['toplevel'] = start_pos
-    values['bottomlevel'] = end_pos
+    values['toplevel'] = start_pos = top_wid.get()
+    values['bottomlevel'] = end_pos = btm_wid.get()
 
     values['startup'] = srctools.bool_as_int(start_pos > end_pos)
     out_values['toplevel'] = str(max(start_pos, end_pos))
     out_values['bottomlevel'] = str(min(start_pos, end_pos))
 
 
-def save_rail(key):
+def save_rail(key) -> None:
+    """Rail oscillation prevents Start Active from having any effect."""
     if values[key].get() == 0:
         widgets['startactive'].state(['disabled'])
         values['startactive'].set(False)
@@ -246,6 +269,7 @@ def save_rail(key):
 
 
 def toggleCheck(key, var, e=None):
+    """Toggle a checkbox."""
     if var.get():
         var.set(0)
     else:
@@ -258,11 +282,7 @@ def set_check(key):
     out_values[key] = str(values[key].get())
 
 
-def paint_fx(e=None):
-    sound.fx_blockable('config')
-
-
-def exit_win(e=None):
+def exit_win(e=None) -> None:
     """Quit and save the new settings."""
     global is_open
     win.grab_release()
@@ -315,6 +335,8 @@ def init(cback):
             'moveableModal',
             ''
         )
+    # Stop our init from triggering UI sounds.
+    sound.block_fx()
 
     frame = ttk.Frame(win, padding=10)
     frame.grid(row=0, column=0, sticky='NSEW')
@@ -392,25 +414,24 @@ def init(cback):
             out_values[key] = str(DEFAULTS[key])
 
         elif prop_type is PropTypes.PISTON:
-            widgets[key] = Scale(
+            widgets[key] = pist_scale = ttk.Scale(
                 frame,
                 from_=0,
                 to=4,
                 orient="horizontal",
-                showvalue=False,
                 command=func_partial(save_pist, key),
                 )
             values[key] = DEFAULTS[key]
             out_values[key] = str(DEFAULTS[key])
             if ((key == 'toplevel' and DEFAULTS['startup']) or
                     (key == 'bottomlevel' and not DEFAULTS['startup'])):
-                widgets[key].set(max(
+                pist_scale.set(max(
                     DEFAULTS['toplevel'],
                     DEFAULTS['bottomlevel']
                     ))
             if ((key == 'toplevel' and not DEFAULTS['startup']) or
                     (key == 'bottomlevel' and DEFAULTS['startup'])):
-                widgets[key].set(min(
+                pist_scale.set(min(
                     DEFAULTS['toplevel'],
                     DEFAULTS['bottomlevel']))
 

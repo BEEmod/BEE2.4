@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2019-06-05 14:36+1000\n"
+"POT-Creation-Date: 2019-11-22 10:50+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -501,10 +501,6 @@ msgid ""
 msgstr ""
 
 #: UI.py
-msgid "Item: {}"
-msgstr ""
-
-#: UI.py
 msgid "Delete Palette \"{}\""
 msgstr ""
 
@@ -610,7 +606,7 @@ msgstr ""
 msgid "Options"
 msgstr ""
 
-#: UI.py
+#: UI.py gameMan.py
 msgid "Quit"
 msgstr ""
 
@@ -877,6 +873,10 @@ msgid ""
 msgstr ""
 
 #: contextWin.py
+msgid "Properties:"
+msgstr ""
+
+#: contextWin.py
 msgid ""
 "The number of entities used for this item. The Source engine limits this "
 "to 2048 in total. This provides a guide to how many of these items can be"
@@ -981,10 +981,6 @@ msgstr ""
 
 #: helpMenu.py
 msgid "Discord Server..."
-msgstr ""
-
-#: helpMenu.py
-msgid "Steam Group..."
 msgstr ""
 
 #: helpMenu.py
@@ -1208,11 +1204,17 @@ msgid "BEE2 Options"
 msgstr ""
 
 #: optionWindow.py
-msgid "Allow Restart?"
+msgid ""
+"Package cache times have been reset. These will now be extracted during "
+"the next export."
 msgstr ""
 
 #: optionWindow.py
-msgid "Restart the BEE2 to re-extract packages?"
+msgid "\"Preserve Game Resources\" has been disabled."
+msgstr ""
+
+#: optionWindow.py
+msgid "Packages Reset"
 msgstr ""
 
 #: optionWindow.py
@@ -1282,7 +1284,7 @@ msgid "Reset Package Caches"
 msgstr ""
 
 #: optionWindow.py
-msgid "Force re-extracting all package resources. This requires a restart."
+msgid "Force re-extracting all package resources."
 msgstr ""
 
 #: optionWindow.py
@@ -1369,6 +1371,14 @@ msgid ""
 "Make all props_map_editor models available for use. Portal 2 has a limit "
 "of 1024 models loaded in memory at once, so we need to disable unused "
 "ones to free this up."
+msgstr ""
+
+#: optionWindow.py
+msgid "Dump All objects"
+msgstr ""
+
+#: optionWindow.py
+msgid "Dump Items list"
 msgstr ""
 
 #: packageMan.py
