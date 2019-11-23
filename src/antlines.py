@@ -378,9 +378,13 @@ def parse_antlines(vmf: VMF) -> Tuple[
             long_axis = Vec(y=1).rotate_by_str(over['angles']).axis()
             side_axis = Vec(x=1).rotate_by_str(over['angles']).axis()
 
-            # The order of these isn't correct, but we need the neigbours to
+            # The order of these isn't correct, but we need the neighbours to
             # fix that.
             start, end = overlay_bounds(over)
+            # For whatever reason, Valve sometimes generates antlines which are
+            # shortened by 1 unit. So snap those to grid.
+            start = round(start / 16) * 16
+            end = round(end / 16) * 16
 
             if end[long_axis] - start[long_axis] == 16:
                 # Special case.
