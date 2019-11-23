@@ -16,7 +16,7 @@ import srctools.logger
 import vbsp_options
 import packing
 
-from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator
+from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator, Union
 
 
 COND_MOD_NAME = "Item Connections"
@@ -470,13 +470,12 @@ class ItemType:
 class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
-        'inst',
+        'inst', 'item_type', '_kv_setters',
         'ind_panels',
         'antlines', 'shape_signs',
         'ant_wall_style', 'ant_floor_style',
         'timer',
         'inputs', 'outputs',
-        'item_type', 'io_outputs',
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
         'ant_toggle_var',
@@ -514,15 +513,21 @@ class Item:
         self.timer = timer_count
 
         # From this item
-        self.outputs = set()  # type: Set[Connection]
+        self.outputs: Set[Connection] = set()
         # To this item
-        self.inputs = set()  # type: Set[Connection]
+        self.inputs: Set[Connection] = set()
 
+        # Copy these, allowing them to be altered for a specific item.
         self.enable_cmd = item_type.enable_cmd
         self.disable_cmd = item_type.disable_cmd
 
         self.sec_enable_cmd = item_type.sec_enable_cmd
         self.sec_disable_cmd = item_type.sec_disable_cmd
+
+        # The postcompiler entities to add outputs to the instance.
+        # This eliminates needing io_proxies.
+        # The key is the name of the local ent.
+        self._kv_setters: Dict[str, Entity] = {}
 
         assert self.name, 'Blank name!'
 
@@ -606,6 +611,54 @@ class Item:
         self.antlines.clear()
         self.ind_panels.clear()
         self.shape_signs.clear()
+
+    def add_io_command(
+        self,
+        output: Optional[Tuple[Optional[str], str]],
+        target: Union[Entity, str],
+        inp_cmd: str,
+        params: str = '',
+        delay: float = 0.0,
+        times: int = -1,
+        inst_in: Optional[str]=None,
+    ) -> None:
+        """Add an output to this item.
+
+        For convenience, if the output is None this does nothing.
+        inst_in is simply appended to the targetname if set.
+        """
+        if output is None:
+            return
+
+        out_name, out_cmd = output
+
+        if not out_name:
+            out_name = ''  # Dump the None.
+
+        if inst_in is not None:
+            target = f'{target}-{inst_in}'
+
+        try:
+            kv_setter = self._kv_setters[out_name]
+        except KeyError:
+            if out_name:
+                full_name = conditions.local_name(self.inst, out_name)
+            else:
+                full_name = self.name
+            kv_setter = self._kv_setters[out_name] = self.inst.map.create_ent(
+                'comp_kv_setter',
+                origin=self.inst['origin'],
+                target=full_name,
+            )
+
+        kv_setter.add_out(Output(
+            out_cmd,
+            target,
+            inp_cmd,
+            params,
+            delay=delay,
+            times=times,
+        ))
 
 
 class Connection:
@@ -1196,22 +1249,18 @@ def add_locking(item: Item) -> None:
         if not output:
             continue
 
-        out_name, out_cmd = output
         for cmd in input_cmds:
             if cmd.target:
                 target = conditions.local_name(lock_button.inst, cmd.target)
             else:
                 target = lock_button.inst
-            item.inst.add_out(
-                Output(
-                    out_cmd,
-                    target,
-                    cmd.input,
-                    cmd.params,
-                    delay=cmd.delay,
-                    times=cmd.times,
-                    inst_out=out_name,
-                )
+            item.add_io_command(
+                output,
+                target,
+                cmd.input,
+                cmd.params,
+                delay=cmd.delay,
+                times=cmd.times,
             )
 
 
@@ -1286,8 +1335,8 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         (item.timer_output_start(), 'Trigger'),
         (item.timer_output_stop(), 'CancelPending')
     ]:
-        for out_name, out_cmd in outputs:
-            item.inst.add_out(Output(out_cmd, rl_name, cmd, inst_out=out_name))
+        for output in outputs:
+            item.add_io_command(output, rl_name, cmd)
 
 
 def add_item_inputs(
@@ -1306,87 +1355,68 @@ def add_item_inputs(
         return  # The rest of this function requires at least one input.
 
     if logic_type is InputType.DEFAULT:
-        # 'Original' PeTI proxies.
+        # 'Original' PeTI proxy style inputs. We're not actually using the
+        # proxies though.
         for conn in inputs:
             inp_item = conn.from_item
             for output, input_cmds in [
                 (inp_item.output_act(), enable_cmd),
                 (inp_item.output_deact(), disable_cmd)
             ]:
-                if not output or not input_cmds:
-                    continue
-
-                out_name, out_cmd = output
                 for cmd in input_cmds:
-                    inp_item.inst.add_out(
-                        Output(
-                            out_cmd,
-                            item.inst,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            inst_out=out_name,
-                            inst_in=cmd.inst_in,
-                            delay=cmd.delay,
-                        )
+                    inp_item.add_io_command(
+                        output,
+                        item.inst,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        inst_in=cmd.inst_in,
+                        delay=cmd.delay,
                     )
         return
     elif logic_type is InputType.DAISYCHAIN:
         # Another special case, these items AND themselves with their inputs.
-        # We aren't called if we have no inputs, so we don't need to handle that.
+        # Create the counter for that.
 
-        # We transform the instance into a counter, but first duplicate the
-        # instance as a new entity. This way references to the instance add
-        # outputs to the counter instead.
-        orig_inst = item.inst.copy()
-        orig_inst.map.add_ent(orig_inst)
-        orig_inst.outputs.clear()
+        # Note that we use the instance name itself for the counter.
+        # This will break if we've got dual inputs, but we're only
+        # using this for laser catchers...
+        # We have to do this so that the name is something that can be
+        # targeted by other items.
+        # TODO: Do this by generating an AND gate proxy-instance...
+        counter = item.inst.map.create_ent(
+            'math_counter',
+            origin=item.inst['origin'],
+            targetname=item.name,
+            min=0,
+            max=len(inputs) + 1,
+        )
 
-        counter = item.inst
-        counter.clear_keys()
-
-        counter['origin'] = orig_inst['origin']
-        counter['targetname'] = orig_inst['targetname'] + COUNTER_NAME[count_var]
-        counter['classname'] = 'math_counter'
-        counter['min'] = 0
-        counter['max'] = len(inputs) + 1
-
-        for output, input_name in [
-            (item.item_type.output_act, 'Add'),
-            (item.item_type.output_deact, 'Subtract')
-        ]:
-            if not output:
-                continue
-
-            out_name, out_cmd = output
-            orig_inst.add_out(
-                Output(
-                    out_cmd,
-                    counter,
-                    input_name,
-                    '1',
-                    inst_out=out_name,
-                )
+        if (
+            count_var is const.FixupVars.BEE_CONN_COUNT_A or
+            count_var is const.FixupVars.BEE_CONN_COUNT_B
+        ):
+            LOGGER.warning(
+                '{}: Daisychain logic type is '
+                'incompatible with dual inputs in item type {}! '
+                'This will not work well...',
+                item.name,
+                item.item_type.id,
             )
+
+        # Use the item type's output, we've overridden the normal one.
+        item.add_io_command(
+            item.item_type.output_act,
+            counter, 'Add', '1',
+        )
+        item.add_io_command(
+            item.item_type.output_deact,
+            counter, 'Subtract', '1',
+        )
 
         for conn in inputs:
             inp_item = conn.from_item
-            for output, input_name in [
-                (inp_item.output_act(), 'Add'),
-                (inp_item.output_deact(), 'Subtract')
-            ]:
-                if not output:
-                    continue
-
-                out_name, out_cmd = output
-                inp_item.inst.add_out(
-                    Output(
-                        out_cmd,
-                        counter,
-                        input_name,
-                        '1',
-                        inst_out=out_name,
-                    )
-                )
+            inp_item.add_io_command(inp_item.output_act(), counter, 'Add', '1')
+            inp_item.add_io_command(inp_item.output_deact(), counter, 'Subtract', '1')
 
         return
 
@@ -1478,8 +1508,6 @@ def add_item_inputs(
             ('On' + enable_user, enable_cmd),
             ('On' + disable_user, disable_cmd)
         ]:
-            if not input_cmds:
-                continue
             for cmd in input_cmds:
                 spawn_relay.add_out(
                     Output(
@@ -1512,46 +1540,24 @@ def add_item_inputs(
 
     if needs_counter:
         if logic_type.is_logic:
-            # Logic items are the counter. We convert the instance to that
-            # so we keep outputs added by items evaluated earlier.
-            origin = item.inst['origin']
-            name = item.name
-
-            counter = item.inst
-            counter.clear_keys()
-
-            counter['origin'] = origin
-            counter['targetname'] = name
-            counter['classname'] = 'math_counter'
+            # Logic items are the counter.
+            counter_name = item.name
         else:
-            counter = item.inst.map.create_ent(
-                classname='math_counter',
-                targetname=item.name + COUNTER_NAME[count_var],
-                origin=item.inst['origin'],
-            )
+            counter_name = item.name + COUNTER_NAME[count_var]
+
+        counter = item.inst.map.create_ent(
+            classname='math_counter',
+            targetname=counter_name,
+            origin=item.inst['origin'],
+        )
 
         counter['min'] = counter['startvalue'] = counter['StartDisabled'] = 0
         counter['max'] = len(inputs)
 
         for conn in inputs:
             inp_item = conn.from_item
-            for output, input_name in [
-                (inp_item.output_act(), 'Add'),
-                (inp_item.output_deact(), 'Subtract')
-            ]:
-                if not output:
-                    continue
-
-                out_name, out_cmd = output
-                inp_item.inst.add_out(
-                    Output(
-                        out_cmd,
-                        counter,
-                        input_name,
-                        '1',
-                        inst_out=out_name,
-                    )
-                )
+            inp_item.add_io_command(inp_item.output_act(), counter, 'Add', '1')
+            inp_item.add_io_command(inp_item.output_deact(), counter, 'Subtract', '1')
 
         if logic_type is InputType.AND:
             count_on = COUNTER_AND_ON
@@ -1572,8 +1578,6 @@ def add_item_inputs(
             (count_on, enable_cmd),
             (count_off, disable_cmd)
         ]:
-            if not input_cmds:
-                continue
             for cmd in input_cmds:
                 counter.add_out(
                     Output(
@@ -1596,24 +1600,17 @@ def add_item_inputs(
                 (inp_item.output_act(), enable_cmd),
                 (inp_item.output_deact(), disable_cmd)
             ]:
-                if not output or not input_cmds:
-                    continue
-
-                out_name, out_cmd = output
                 for cmd in input_cmds:
-                    inp_item.inst.add_out(
-                        Output(
-                            out_cmd,
-                            conditions.local_name(
-                                item.inst,
-                                conditions.resolve_value(item.inst, cmd.target),
-                            ) or item.inst,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            inst_out=out_name,
-                            delay=cmd.delay,
-                            times=cmd.times,
-                        )
+                    inp_item.add_io_command(
+                        output,
+                        conditions.local_name(
+                            item.inst,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or item.inst,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        delay=cmd.delay,
+                        times=cmd.times,
                     )
 
 
@@ -1686,23 +1683,18 @@ def add_item_indicators(
             (item.timer_output_start(), pan_item.enable_cmd),
             (item.timer_output_stop(), pan_item.disable_cmd)
         ]:
-            if not input_cmds:
-                continue
-            for out_name, out in outputs:
+            for output in outputs:
                 for cmd in input_cmds:
-                    item.inst.add_out(
-                        Output(
-                            out,
-                            conditions.local_name(
-                                pan,
-                                conditions.resolve_value(item.inst, cmd.target),
-                            ) or pan,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            inst_out=out_name,
-                            inst_in=cmd.inst_in,
-                            times=cmd.times,
-                        )
+                    item.add_io_command(
+                        output,
+                        conditions.local_name(
+                            pan,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or pan,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        inst_in=cmd.inst_in,
+                        times=cmd.times,
                     )
 
     if needs_toggle:
@@ -1713,19 +1705,15 @@ def add_item_indicators(
             target=ant_name,
         )
         # Don't use the configurable inputs - if they want that, use custAntline.
-        for output, skin in [
-            (item.output_act(), '1'),
-            (item.output_deact(), '0')
-        ]:
-            if not output:
-                continue
-            out_name, out = output
-            item.inst.add_out(
-                Output(
-                    out,
-                    toggle,
-                    'SetTextureIndex',
-                    skin,
-                    inst_out=out_name,
-                )
-            )
+        item.add_io_command(
+            item.output_deact(),
+            toggle,
+            'SetTextureIndex',
+            '0',
+        )
+        item.add_io_command(
+            item.output_act(),
+            toggle,
+            'SetTextureIndex',
+            '1',
+        )
