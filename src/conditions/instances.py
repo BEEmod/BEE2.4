@@ -70,18 +70,21 @@ def flag_has_trait(inst: Entity, flag: Property):
         * `cube_ball`: Edgeless Safety Cube.
         * `cube_reflect`: Discouragment Redirection Cube.
         * `cube_franken`: FrankenTurret.
-    * `coop_corridor`: A Coop exit Corridor.
-    * `sp_corridor`: SP entry or exit corridor.
-    * `corridor_frame`: White/black door frame.
-    * `corridor_1`-`7`: The specified entry/exit corridor.
-    * `elevator`: An elevator instance.
-    * `entry_elevator`: Entry Elevator.
-    * `exit_elevator`: Exit Elevator.
-    * `entry_corridor`: Entry SP Corridor.
-    * `exit_corridor`: Exit SP/Coop Corridor.
+    * `preplaced`: The various pre-existing instances:
+        * `coop_corridor`: A Coop exit Corridor.
+        * `sp_corridor`: SP entry or exit corridor.
+        * `corridor_frame`: White/black door frame.
+        * `corridor_1`-`7`: The specified entry/exit corridor.
+        * `elevator`: An elevator instance.
+        * `entry_elevator`: Entry Elevator.
+        * `exit_elevator`: Exit Elevator.
+        * `entry_corridor`: Entry SP Corridor.
+        * `exit_corridor`: Exit SP/Coop Corridor.
     * `fizzler`: A fizzler item:
         * `fizzler_base`: Logic instance.
         * `fizzler_model`: Model instance.
+        * `cust_shape`: Set if the fizzler has been moved to a custom position
+          by ReshapeFizzler.
     * `locking_targ`: Target of a locking pedestal button.
     * `locking_btn`: Locking pedestal button.
     * `paint_dropper`: Gel Dropper:
