@@ -635,6 +635,9 @@ class Item:
         if not out_name:
             out_name = ''  # Dump the None.
 
+        if isinstance(target, Entity):
+            target = target['targetname']
+
         if inst_in is not None:
             target = f'{target}-{inst_in}'
 
