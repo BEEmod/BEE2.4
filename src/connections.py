@@ -1080,6 +1080,9 @@ def gen_item_outputs(vmf: VMF) -> None:
         if item.item_type is None:
             continue
 
+        # Try to add the locking IO.
+        add_locking(item)
+
         # Check we actually have timers, and that we want the relay.
         if item.timer is not None and (
             item.item_type.timer_sound_pos is not None or
@@ -1164,9 +1167,6 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.item_type.sec_invert_var,
             )
         else:
-            # If we have commands defined, try to add locking.
-            if item.item_type.output_unlock is not None:
-                add_locking(item)
             add_item_inputs(
                 item,
                 item.item_type.input_type,
@@ -1222,6 +1222,16 @@ def add_locking(item: Item) -> None:
 
     This allows items to customise how buttons behave.
     """
+    if item.item_type.output_lock is None:
+        return
+    if item.item_type.input_type is InputType.DUAL:
+        LOGGER.warning(
+            'Item type ({}) with locking IO, but dual inputs. '
+            'Locking functionality is ignored!',
+            item.item_type.id
+        )
+        return
+
     # If more than one, it's not logical to lock the button.
     try:
         [lock_conn] = item.inputs
@@ -1241,6 +1251,11 @@ def add_locking(item: Item) -> None:
 
     instance_traits.get(item.inst).add('locking_targ')
     instance_traits.get(lock_button.inst).add('locking_btn')
+
+    # Force the item to not have a timer.
+    for pan in item.ind_panels:
+        pan.remove()
+    item.ind_panels.clear()
 
     for output, input_cmds in [
         (item.item_type.output_lock, lock_button.item_type.lock_cmd),
