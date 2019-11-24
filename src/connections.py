@@ -625,7 +625,6 @@ class Item:
         """Add an output to this item.
 
         For convenience, if the output is None this does nothing.
-        inst_in is simply appended to the targetname if set.
         """
         if output is None:
             return
@@ -637,9 +636,6 @@ class Item:
 
         if isinstance(target, Entity):
             target = target['targetname']
-
-        if inst_in is not None:
-            target = f'{target}-{inst_in}'
 
         try:
             kv_setter = self._kv_setters[out_name]
@@ -661,6 +657,7 @@ class Item:
             params,
             delay=delay,
             times=times,
+            inst_in=inst_in,
         ))
 
 
