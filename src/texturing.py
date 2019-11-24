@@ -261,6 +261,17 @@ TILE_INHERIT = [
 ]
 
 
+def format_gen_key(
+    gen_key: Union[GenCat, Tuple[GenCat, Orient, Portalable]]
+) -> str:
+    """Convert the GenCat into a string for nice display."""
+    if isinstance(gen_key, GenCat):
+        return gen_key.value
+    else:
+        gen_cat, orient, portal = gen_key
+        return f'{gen_cat.value}.{portal}.{orient}'
+
+
 def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> Dict[str, Any]:
     """Parse the options for a generator block."""
     options = {}
@@ -461,7 +472,26 @@ def load_config(conf: Property):
 
         data[gen_key] = options, textures
 
-    # Now do textures.
+        # Next, do a check to see if any texture names were specified that
+        # we don't recognise.
+        extra_keys = {prop.name for prop in gen_conf}
+        extra_keys.discard('options')  # Not a texture name, but valid.
+
+        if isinstance(gen_key, GenCat):
+            extra_keys.difference_update(map(str.casefold, tex_defaults.keys()))
+        else:
+            # The defaults are just the size values.
+            extra_keys.difference_update(map(str, TileSize))
+        
+        if extra_keys:
+            LOGGER.warning(
+                '{}: Unknown texture names {}',
+                format_gen_key(gen_key),
+                ', '.join(sorted(extra_keys))
+            )
+
+    # Now complete textures for tile types,
+    # copying over data from other generators.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
         if isinstance(gen_key, GenCat):
             continue
