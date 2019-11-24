@@ -141,7 +141,6 @@ TEMPLATE_RETEXTURE: Dict[str, Union[
 
     consts.Special.BACKPANELS: (GenCat.SPECIAL, 'behind', None),
     consts.Special.BACKPANELS_CHEAP: (GenCat.SPECIAL, 'behind', None),
-    consts.Special.PED_SIDE: (GenCat.SPECIAL, 'pedestalside', None),
     consts.Special.SQUAREBEAMS: (GenCat.SPECIAL, 'edge', None),
     consts.Special.GLASS: (GenCat.SPECIAL, 'glass', None),
     consts.Special.GRATING: (GenCat.SPECIAL, 'grating', None),

@@ -179,9 +179,6 @@ TEX_DEFAULTS: Dict[
         'edge': consts.Special.SQUAREBEAMS,
         'panel_edge': consts.Special.SQUAREBEAMS,
 
-        # Texture on the side of the special pedestal platform.
-        'pedestalside': consts.Special.PED_SIDE,
-
         # Reflective and cheap Goo
         'goo': consts.Goo.REFLECTIVE,
         'goo_cheap': consts.Goo.CHEAP,
@@ -482,7 +479,7 @@ def load_config(conf: Property):
         else:
             # The defaults are just the size values.
             extra_keys.difference_update(map(str, TileSize))
-        
+
         if extra_keys:
             LOGGER.warning(
                 '{}: Unknown texture names {}',
