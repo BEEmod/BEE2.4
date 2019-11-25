@@ -30,7 +30,7 @@ def deprecator(func, ret_val):
 
 
 deprecate_result = deprecator(make_result, RES_EXHAUSTED)
-deprecate_flag = deprecator(make_flag, True)
+deprecate_flag = deprecator(make_flag, False)
 
 
 deprecate_result('HollowBrush')
