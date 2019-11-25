@@ -208,7 +208,10 @@ def prompt(
     with surpress_screens():
         # If the main loop isn't running, this doesn't work correctly.
         # Probably also if it's not visible. So swap back to the old style.
-        if Query is None or not _main_loop_running or not TK_ROOT.winfo_viewable():
+        # It's also only a problem on Windows.
+        if Query is None or (utils.WIN and (
+            not _main_loop_running or not TK_ROOT.winfo_viewable()
+        )):
             query_cls = QueryShim
         else:
             query_cls = Query
