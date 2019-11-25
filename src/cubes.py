@@ -727,6 +727,7 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
                 # Parent class which is True for everything.
                 classname='filter_base',
                 targetname='@filter_nothing',
+                origin=pos,
                 negated=True,
             )['targetname']
             return filter_name
