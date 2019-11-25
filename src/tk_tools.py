@@ -20,24 +20,27 @@ except ImportError:
     # Python 3.5 and below
     # noinspection PyCompatibility, PyUnresolvedReferences
     from idlelib.WidgetRedirector import WidgetRedirector
+    Query = None
 
-    class QueryShim(simpledialog._QueryString):
-        """Replicate the new API with the old simpledialog code."""
-        def __init__(self, parent, title, message, text0):
-            super().__init__(title, message, initialvalue=text0, parent=parent)
-
-        def body(self, master):
-            """Ensure the window icon is changed."""
-            super().body(master)
-            set_window_icon(self)
-
-    Query = QueryShim  # type: ignore
 
 import utils
 
 # Put this in a module so it's a singleton, and we can always import the same
 # object.
 TK_ROOT = tk.Tk()
+
+
+def _run_main_loop(*args, **kwargs) -> None:
+    """Allow determining if this is running."""
+    global _main_loop_running
+    _main_loop_running = True
+    _orig_mainloop(*args, **kwargs)
+
+
+_main_loop_running = False
+_orig_mainloop = TK_ROOT.mainloop
+TK_ROOT.mainloop = _run_main_loop
+del _run_main_loop
 
 # Set icons for the application.
 
@@ -75,9 +78,9 @@ elif utils.MAC:
             '-imageFile',
             ICO_PATH,
         )
-        
+
     set_window_icon(TK_ROOT)
-    
+
     LISTBOX_BG_SEL_COLOR = '#C2DDFF'
     LISTBOX_BG_COLOR = 'white'
 else:  # Linux
@@ -183,6 +186,18 @@ def event_cancel(*args, **kwargs):
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
 
+
+class QueryShim(simpledialog._QueryString):
+    """Replicate the new API with the old simpledialog code."""
+    def __init__(self, parent, title, message, text0):
+        super().__init__(title, message, initialvalue=text0, parent=parent)
+
+    def body(self, master):
+        """Ensure the window icon is changed."""
+        super().body(master)
+        set_window_icon(self)
+
+
 def prompt(
     title: str, message: str,
     initialvalue: str='',
@@ -191,11 +206,18 @@ def prompt(
     """Ask the user to enter a string."""
     from loadScreen import surpress_screens
     with surpress_screens():
-        return Query(
+        # If the main loop isn't running, this doesn't work correctly.
+        # Probably also if it's not visible. So swap back to the old style.
+        if Query is None or not _main_loop_running or not TK_ROOT.winfo_viewable():
+            query_cls = QueryShim
+        else:
+            query_cls = Query
+        return query_cls(
             parent,
             title, message,
             text0=initialvalue,
         ).result
+
 
 class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
@@ -231,7 +253,7 @@ class ReadOnlyEntry(ttk.Entry):
 
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     """This is missing from ttk, but still exists."""
-    def __init__(self, master, range: Union[range, slice]=None, **kw):
+    def __init__(self, master: tk.Misc, range: Union[range, slice]=None, **kw) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -254,16 +276,16 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
         ttk.Widget.__init__(self, master, 'ttk::spinbox', kw)
 
     @property
-    def value(self):
+    def value(self) -> int:
         """Get the value of the spinbox."""
         return self.tk.call(self._w, 'get')
 
     @value.setter
-    def value(self, value):
+    def value(self, value: int) -> None:
         """Set the spinbox to a value."""
         self.tk.call(self._w, 'set', value)
 
-    def validate(self):
+    def validate(self) -> bool:
         """Values must be integers."""
         try:
             self.old_val = int(self.value)
