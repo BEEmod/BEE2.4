@@ -81,11 +81,12 @@ class AntType:
         self.tex_corner = tex_corner
 
         if broken_chance == 0:
-            broken_corner = broken_straight = []
+            broken_corner: List[AntTex] = []
+            broken_straight: List[AntTex] = []
 
         # Cannot have broken corners if corners/straights are the same.
         if not tex_corner:
-            broken_corner = []
+            broken_corner: List[AntTex] = []
 
         self.broken_corner = broken_corner
         self.broken_straight = broken_straight
@@ -95,10 +96,10 @@ class AntType:
     def parse(cls, prop: Property) -> 'AntType':
         """Parse this from a property block."""
         broken_chance = prop.float('broken_chance')
-        tex_straight = []  # type: List[AntTex]
-        tex_corner = []  # type: List[AntTex]
-        brok_straight = []  # type: List[AntTex]
-        brok_corner = []  # type: List[AntTex]
+        tex_straight: List[AntTex] = []
+        tex_corner: List[AntTex] = []
+        brok_straight: List[AntTex] = []
+        brok_corner: List[AntTex] = []
         for ant_list, name in zip(
             [tex_straight, tex_corner, brok_straight, brok_corner],
             ('straight', 'corner', 'broken_straight', 'broken_corner'),
@@ -241,8 +242,9 @@ class Antline:
             conf = floor_conf if seg.on_floor else wall_conf
             random.seed('ant {} {}'.format(seg.start, seg.end))
             if seg.type is SegType.CORNER:
+                mat: AntTex
                 if random.randrange(100) < conf.broken_chance:
-                    mat = random.choice(conf.broken_corner or conf.broken_straight)  # type: AntTex
+                    mat = random.choice(conf.broken_corner or conf.broken_straight)
                 else:
                     mat = random.choice(conf.tex_corner or conf.tex_straight)
 
