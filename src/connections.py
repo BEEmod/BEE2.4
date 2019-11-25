@@ -1222,7 +1222,7 @@ def add_locking(item: Item) -> None:
 
     This allows items to customise how buttons behave.
     """
-    if item.item_type.output_lock is None:
+    if item.item_type.output_lock is None and item.item_type.output_unlock is None:
         return
     if item.item_type.input_type is InputType.DUAL:
         LOGGER.warning(
