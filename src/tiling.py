@@ -1921,7 +1921,7 @@ def generate_brushes(vmf: VMF) -> None:
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
-        grid_pos: Dict[str, Dict[Tuple[int, int], bool]] = defaultdict(dict)
+        grid_pos: Dict[Tuple[TileType, str], Dict[Tuple[int, int], bool]] = defaultdict(dict)
 
         tile_pos: Dict[Tuple[int, int], TileDef] = {}
 
@@ -1935,6 +1935,8 @@ def generate_brushes(vmf: VMF) -> None:
                     normal,
                     Portalable.BLACK
                 ).get(pos, TileSize.GOO_SIDE)
+            elif tile_type is TileType.NODRAW:
+                tex = consts.Tools.NODRAW
             else:
                 tex = texturing.gen(
                     texturing.GenCat.NORMAL,
@@ -1944,16 +1946,30 @@ def generate_brushes(vmf: VMF) -> None:
 
             u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
             v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
-            grid_pos[tex][u_pos, v_pos] = True
+            grid_pos[tile.base_type, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
-        for tex, tex_pos in grid_pos.items():
+        for (tile_type, tex), tex_pos in grid_pos.items():
             for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
                 center = Vec.with_axes(
                     norm_axis, plane_dist,
+                    # Compute avg(128*min, 128*max)
+                    # = (128 * min + 128 * max) / 2
+                    # = (min + max) * 64
                     u_axis, bbox_min[u_axis] + (min_u + max_u) * 64,
                     v_axis, bbox_min[v_axis] + (min_v + max_v) * 64,
                 )
+                gen = texturing.gen(
+                    texturing.GenCat.NORMAL,
+                    normal,
+                    tile_type.color
+                )
+                if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (1 + max_v - min_v) % 2 == 0:
+                    is_double = True
+                    tex = gen.get(center, TileSize.TILE_DOUBLE)
+                else:
+                    is_double = False
+
                 brush, front = make_tile(
                     vmf,
                     center,
@@ -1965,6 +1981,25 @@ def generate_brushes(vmf: VMF) -> None:
                     height=(1 + max_v - min_v) * 128,
                 )
                 vmf.add_brush(brush)
+                if is_double:
+                    # Compute the offset so that a 0,0 aligned brush can be
+                    # offset so that point is at the minimum point of the tile,
+                    # then round to the nearest 256 tile.
+                    # That will ensure it gets the correct texturing.
+                    # We know the scale is 0.25, so don't bother looking that up.
+                    tile_min = Vec.with_axes(
+                        norm_axis, plane_dist,
+                        u_axis, bbox_min[u_axis] + 128 * min_u - 64,
+                        v_axis, bbox_min[v_axis] + 128 * min_v - 64,
+                    )
+                    vmf.create_ent('info_null', origin=tile_min)
+                    front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256/0.25)
+                    front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256/0.25)
+                    if gen.options['scaleup256']:
+                        # It's actually a 128x128 tile, that we want to double scale for.
+                        front.scale = 0.5
+                        front.uaxis.offset /= 2
+                        front.vaxis.offset /= 2
 
                 for u in range(min_u, max_u + 1):
                     for v in range(min_v, max_v + 1):
