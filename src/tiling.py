@@ -543,16 +543,17 @@ class TileDef:
             }
         else:
             self._sub_tiles[u, v] = value
-            
+
+            # Check if we can merge this down to a single value.
+            # We can if we don't have the special fizzler key, and all
+            # the subtiles are the same.
             if SUBTILE_FIZZ_KEY not in self._sub_tiles:
-                # Check if we can merge this down to a single value.
-                try:
-                    [base_type] = set(self._sub_tiles.values())
-                except ValueError:
-                    pass
-                else:
-                    self.base_type = base_type
-                    self._sub_tiles = None
+                base_type = self._sub_tiles[0, 0]
+                for tile in self._sub_tiles.values():
+                    if tile is not base_type:
+                        return
+                self.base_type = base_type
+                self._sub_tiles = None
 
     def __iter__(self) -> Iterator[Tuple[int, int, TileType]]:
         """Iterate over the axes and tile type."""
