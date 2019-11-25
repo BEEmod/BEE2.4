@@ -384,13 +384,26 @@ def annotation_caller(
     # Double function to make a closure, to allow reference to the function
     # more directly.
     # Lambdas are expressions, so we can return the result directly.
-    return eval(
+    reorder_func = eval(
         '(lambda func: lambda {}: func({}))(func)'.format(
             ', '.join(inputs),
             ', '.join(outputs),
         ),
         {'func': func},
     )
+    # Add some introspection attributes to this generated function.
+    try:
+        reorder_func.__name__ = func.__name__
+        reorder_func.__qualname__ = func.__qualname__
+        reorder_func.__wrapped__ = func
+        reorder_func.__doc__ = '{0}({1}) -> {0}({2})'.format(
+            func.__name__,
+            ', '.join(inputs),
+            ', '.join(outputs),
+        )
+    except AttributeError:
+        pass
+    return reorder_func
 
 
 def add_meta(func, priority: Union[Decimal, int], only_once=True):
@@ -980,7 +993,7 @@ def steal_from_brush(
         for face_id in
         additional
     }
-    new_ids = []  # type: List[str]
+    new_ids: Optional[List[str]] = []
 
     for brush in temp_brushes:
         for face in brush.sides:
