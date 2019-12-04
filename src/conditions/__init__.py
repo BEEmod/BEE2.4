@@ -1116,8 +1116,9 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
     orig_solid = solid_group.solid  # type: Solid
 
     bbox_min, bbox_max = orig_solid.get_bbox()
-    if 4 in (bbox_max - bbox_min):
-        # If it's 4 units thick, skip hollowing - PeTI did it already.
+    if (bbox_max - bbox_min) != (128, 128, 128):
+        # If it's not a full block, it's a embed block and we want to skip
+        # modifying this.
         if remove_orig_face:
             VMF.remove_brush(orig_solid)
             del SOLIDS[solid_group.face.get_origin().as_tuple()]
@@ -1157,7 +1158,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             for new_face in brush.sides:
                 # The SKIP brush is the surface, all the others are nodraw.
                 if new_face.mat.casefold() != 'tools/toolsskip':
-                     continue
+                    continue
 
                 # Overwrite all the properties, to make the new brush
                 # the same as the original.
