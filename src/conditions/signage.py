@@ -147,6 +147,13 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         prim_visgroup = 'primary'
         sec_visgroup = 'secondary'
 
+    if sign_prim and sign_sec:
+        inst['file'] = res['large_clip', '']
+        inst['origin'] = (prim_pos + sec_pos) / 2
+    else:
+        inst['file'] = res['small_clip', '']
+        inst['origin'] = prim_pos if sign_prim else sec_pos
+
     if template_id:
         brush_faces: List[Side] = []
         if sign_prim and sign_sec:
