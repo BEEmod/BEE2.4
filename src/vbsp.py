@@ -1493,63 +1493,6 @@ def fit_goo_mist(
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 
-def fixup_goo_sides() -> None:
-    """Replace the textures on the sides of goo and bottomless pits.
-
-    For goo these can use special textures, or black 4x4 walls.
-    For pits sides use normal black walls.
-    """
-    # TODO: Reimplement this
-    return
-
-    if vbsp_options.get(str, 'goo_wall_scale_temp'):
-        scale = template_brush.get_scaling_template(
-            vbsp_options.get(str, 'goo_wall_scale_temp')
-        )
-    else:
-        scale = None
-
-    LOGGER.info("Changing goo sides...")
-    for solid in VMF.brushes[:]:
-        for face in solid:
-            if face in IGNORED_FACES:
-                continue
-            if face.mat.casefold() != 'tools/toolsnodraw':
-                origin = face.get_origin()
-                norm = face.normal()
-                if len(norm) != 1:
-                    continue  # Not aligned to grid...
-
-                block_type = brushLoc.POS['world': origin - 64 * norm]
-
-                # We only want to alter black panel surfaces..
-                if block_type.is_goo and face.mat.casefold() in BLACK_PAN:
-                    face.mat = ''
-                    if norm.z != 0:
-                        face.mat = get_tex('special.goo_floor')
-
-                    if face.mat == '':  # goo_floor is invalid, or not used
-                        face.mat = get_tex('special.goo_wall')
-
-                    if face.mat == '':  # No overrides, use normal textures.
-                        face.mat = get_tex('black.4x4')
-
-                    if scale is not None:
-                        # Allow altering the orientation of the texture.
-                        scale.apply(face, change_mat=False)
-
-                    IGNORED_FACES.add(face)
-
-                if block_type.is_pit:
-                    if block_type.is_bottom and norm.z != 0:
-                        bottomlessPit.fix_base_brush(VMF, solid, face)
-                    else:
-                        # Use the black textures, this should be textured normally.
-                        face.mat = BLACK_PAN[1]
-
-    LOGGER.info("Done!")
-
-
 @conditions.meta_cond(priority=-50)
 def set_barrier_frame_type() -> None:
     """Set a $type instvar on glass frame.
@@ -2500,8 +2443,6 @@ def main() -> None:
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()
-        fixup_goo_sides()  # Must be done before change_brush()!
-        #change_brush()
         tiling.generate_brushes(VMF)
         faithplate.gen_faithplates(VMF)
         change_overlays()
