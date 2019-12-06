@@ -914,24 +914,41 @@ def retexture_template(
         setter_type = tile_setter.tile_type  # type: TileType
 
         if setter_type.is_tile:
-            if isinstance(tile_setter.color, Portalable):
-                # The color was specifically set. Inverting
-                # is the only thing that has an effect.
-                if force_colour == 'INVERT':
-                    setter_color = ~tile_setter.color
-                else:
-                    setter_color = tile_setter.color
-            # Otherwise it copies the forced colour - it needs to be white or black.
+
+            if tile_setter.picker_name:
+                # If a color picker is set, it overrides everything else.
+                try:
+                    setter_color = picker_results[tile_setter.picker_name]
+                except KeyError:
+                    raise ValueError(
+                        '"{}": Tile Setter specified color picker '
+                        '"{}" which does not exist!'.format(
+                            template.id, tile_setter.picker_name
+                        )
+                    )
+                if setter_color is None:
+                    raise ValueError(
+                        '"{}": Color picker "{}" has no tile to pick!'.format(
+                            template.id, tile_setter.picker_name
+                        ))
+            elif isinstance(tile_setter.color, Portalable):
+                # The color was specifically set.
+                setter_color = tile_setter.color
             elif isinstance(force_colour, Portalable):
-                if tile_setter.color == 'INVERT':
-                    setter_color = ~force_colour
-                else:
-                    setter_color = force_colour
+                # Otherwise it copies the forced colour -
+                # it needs to be white or black.
+                setter_color = force_colour
             else:
+                # We need a forced color, but none was provided.
                 raise ValueError(
-                    '"{}": Tile Setter set to match colour value from the '
-                    'template, but not given one!'.format(template.id)
+                    '"{}": Tile Setter set to use colour value from the '
+                    "template's overall color, "
+                    'but not given one!'.format(template.id)
                 )
+
+            # Inverting applies to all of these.
+            if force_colour == 'INVERT':
+                setter_color = ~setter_color
 
             setter_type = TileType.with_color_and_size(
                 setter_type.tile_size,
