@@ -105,6 +105,7 @@ def brush_at_loc(inst: Entity, props: Property) -> Tuple[tiling.TileType, bool]:
         bbox_min, bbox_max = Vec.bbox(pos, pos2)
 
         white_count = black_count = 0
+        all_tiles = True
 
         for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
             try:
@@ -120,8 +121,10 @@ def brush_at_loc(inst: Entity, props: Property) -> Tuple[tiling.TileType, bool]:
                     white_count += 1
                 else:
                     black_count += 1
+            else:
+                all_tiles = False
 
-        is_different = white_count > 0 and black_count > 0
+        is_different = all_tiles and white_count > 0 and black_count > 0
 
         if white_count == black_count == 0:
             tile_type = tiling.TileType.VOID
@@ -172,6 +175,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
       - `1x1` requires a tile that does not force a size.
       - `Same` and `Different`/`Diff` only function when `Pos2` is provided,
         allowing checking that the tiles have the same/different colors.
+        For this case, any non-tile is treated as being different.
     - `SetVar` defines an instvar which will be given a value of `black`,
       `white` or `none` to allow the result to be reused.
     - If `gridPos` is true, the position will be snapped so it aligns with
