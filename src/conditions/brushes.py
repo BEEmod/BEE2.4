@@ -7,18 +7,14 @@ import conditions
 import srctools.logger
 import template_brush
 import vbsp
-import vbsp_options
 import tiling
 import texturing
 import comp_consts as const
 import instance_traits
 from conditions import (
-    make_result, make_result_setup, SOLIDS
+    make_result, make_result_setup
 )
-from srctools import (
-    Property, NoKeyError, Vec, Output, Entity, Side, conv_bool,
-    VMF,
-)
+from srctools import Property, NoKeyError, Vec, Output, Entity, VMF
 
 from typing import Dict, Tuple, Optional, Callable, Set, Iterable, List
 
@@ -402,6 +398,7 @@ def res_import_template_setup(res: Property):
         force_type = template_brush.TEMP_TYPES.default
 
     force_grid: Optional[texturing.TileSize]
+    size: texturing.TileSize
     for size in texturing.TileSize:
         if size in force:
             force_grid = size
@@ -423,13 +420,14 @@ def res_import_template_setup(res: Property):
     rem_replace_brush = True
     additional_ids = set()
     transfer_overlays = '1'
+    replace_brush_pos: Optional[Vec]
     try:
         replace_brush = res.find_key('replaceBrush')
     except NoKeyError:
         replace_brush_pos = None
     else:
         if replace_brush.has_children():
-            replace_brush_pos = replace_brush['Pos', '0 0 0']
+            replace_brush_pos_raw = replace_brush['Pos', '0 0 0']
             additional_ids = set(map(
                 srctools.conv_int,
                 replace_brush['additionalIDs', ''].split(),
@@ -437,9 +435,9 @@ def res_import_template_setup(res: Property):
             rem_replace_brush = replace_brush.bool('removeBrush', True)
             transfer_overlays = replace_brush['transferOverlay', '1']
         else:
-            replace_brush_pos = replace_brush.value  # type: str
+            replace_brush_pos_raw = replace_brush.value
 
-        replace_brush_pos = Vec.from_str(replace_brush_pos)
+        replace_brush_pos = Vec.from_str(replace_brush_pos_raw)
         replace_brush_pos.z -= 64  # 0 0 0 defaults to the floor.
 
     key_values = res.find_key("Keys", [])
