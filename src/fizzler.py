@@ -256,9 +256,6 @@ class FizzlerType:
             if not instances and is_static:
                 inst[inst_type, True] = inst[inst_type, False]
 
-        if not inst[FizzInst.BASE, False]:
-            LOGGER.warning('No base instance set! for "{}"!', fizz_id)
-
         voice_attrs = []
         for prop in conf.find_all('Has'):
             if prop.has_children():
