@@ -804,6 +804,10 @@ def calc_connections(
             inst.remove()
         elif 'indicator_panel' in traits:
             panels[inst['targetname']] = inst
+        elif 'fizzler_model' in traits:
+            # Ignore fizzler models - they shouldn't have the connections.
+            # Just the base itself.
+            pass
         else:
             # Normal item.
             try:
@@ -821,6 +825,7 @@ def calc_connections(
                 # invalid.
                 if item_type.input_type is InputType.DUAL:
                     del inst.fixup[const.FixupVars.CONN_COUNT]
+                    del inst.fixup[const.FixupVars.CONN_COUNT_TBEAM]
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
@@ -1637,16 +1642,12 @@ def add_item_indicators(
     """Generate the commands for antlines and the overlays themselves."""
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
+    has_ant = len(item.antlines) > 0
 
     for ant in item.antlines:
         ant.name = ant_name
 
         ant.export(item.inst.map, item.ant_wall_style, item.ant_floor_style)
-
-    # If the antline material doesn't toggle, the name is removed by
-    # style_antline(). So check if the overlay actually exists still, to
-    # see if we need to add the toggle.
-    has_ant = len(item.inst.map.by_target[ant_name]) > 0
 
     # Special case - the item wants full control over its antlines.
     if has_ant and item.ant_toggle_var:
