@@ -883,7 +883,8 @@ def res_set_tile(inst: Entity, res: Property) -> None:
                 )
                 continue
 
-            if tile[u, v].is_tile:
+            # Unless forcing is enabled don't alter the size of GOO_SIDE.
+            if tile[u, v].is_tile and tile[u, v] is not tiling.TileType.GOO_SIDE:
                 tile[u, v] = tiling.TileType.with_color_and_size(
                     size,
                     tile[u, v].color
