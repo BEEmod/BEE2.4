@@ -1610,12 +1610,22 @@ def generate_cubes(vmf: VMF):
             if cust_model:
                 # Fire an on-spawn output that swaps the model,
                 # then resets the skin.
+
+                # If we have a bounce cube painter, it needs to be the normal skin.
+                if (
+                    pair.paint_type is CubePaintType.BOUNCE and
+                    pair.drop_type.bounce_paint_file.casefold() != '<prepaint>'
+                ):
+                    spawn_paint = None
+                else:
+                    spawn_paint = pair.paint_type
+
                 pair.outputs[CubeOutputs.SPAWN].append(Output(
                     '', '!self', 'RunScriptCode',
                     'self.SetModel(`{}`); '
                     'self.__KeyValueFromInt(`skin`, {});'.format(
                         cust_model,
-                        CUBE_SKINS[pair.paint_type, pair.cube_type.type],
+                        CUBE_SKINS[spawn_paint, pair.cube_type.type],
                     ),
                 ))
                 conditions.globals.precache_model(vmf, cust_model)
