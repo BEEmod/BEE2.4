@@ -14,8 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 SETTINGS = {}
 
-# Overwritten by VBSP to get the actual values.
-ITEM_CONFIG = ConfigFile(None)
+ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
 
 
 class TYPE(Enum):
@@ -548,9 +547,6 @@ DEFAULTS = [
     ######
     # The following are set by the BEE2.4 app automatically:
 
-    Opt('bee2_loc', TYPE.STR,
-        """(Automatic) The location of the BEE2 application.
-        """),
     Opt('game_id', "620",
         """(Automatic) The game's steam ID.
         """),

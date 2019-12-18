@@ -171,7 +171,7 @@ BLACK_PAN = [
     "metal/black_wall_metal_002b",  # 4x4
     ]
 
-BEE2_config = None  # type: ConfigFile
+BEE2_config = ConfigFile('compile.cfg')
 
 GAME_MODE = 'ERR'  # SP or COOP?
 # Are we in preview mode? (Spawn in entry door instead of elevator)
@@ -244,7 +244,6 @@ def get_tile_type(mat: str, orient: ORIENT) -> str:
 
 def load_settings():
     """Load in all our settings from vbsp_config."""
-    global BEE2_config
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
@@ -362,15 +361,6 @@ def load_settings():
         'tonemap_exp_min': fog_config['tonemap_exposure_min', '.5'],
         'tonemap_exp_max': fog_config['tonemap_exposure_max', '3'],
     })
-
-    # Find the location of the BEE2 app, and load the options
-    # set in the 'Compiler Pane'.
-    bee2_loc = vbsp_options.get(str, 'BEE2_loc')
-    if bee2_loc:
-        BEE2_config = ConfigFile('compile.cfg')
-        vbsp_options.ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
-    else:
-        BEE2_config = ConfigFile(None)
 
     LOGGER.info("Settings Loaded!")
     return ant_floor, ant_wall

@@ -692,10 +692,6 @@ class Game:
                 export_screen.step('EXP')
 
             vbsp_config.set_key(
-                ('Options', 'BEE2_loc'),
-                os.path.dirname(os.getcwd())  # Go up one dir to our actual location
-            )
-            vbsp_config.set_key(
                 ('Options', 'Game_ID'),
                 self.steamID,
             )
