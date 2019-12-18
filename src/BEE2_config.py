@@ -9,8 +9,7 @@ It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
-from typing import Any, Mapping
-import os
+from typing import Any, Mapping, Optional
 
 from srctools import AtomicWriter, Property, KeyValError
 
@@ -53,7 +52,7 @@ def read_settings() -> None:
     """Read and apply the settings from disk."""
     path = utils.conf_location('config/config.vdf')
     try:
-        file = open(path, encoding='utf8')
+        file = path.open(encoding='utf8')
     except FileNotFoundError:
         return
     try:
@@ -91,7 +90,7 @@ class ConfigFile(ConfigParser):
     """
     def __init__(
         self,
-        filename: str,
+        filename: Optional[str],
         *,
         in_conf_folder: bool=True,
         auto_load: bool=True,

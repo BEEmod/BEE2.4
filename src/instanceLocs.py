@@ -18,12 +18,12 @@ from typing import (
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# The list of instance each item uses.
-INSTANCE_FILES = {}
+# The list of instances each item uses.
+INSTANCE_FILES: Dict[str, List[str]] = {}
 
 # Item ID and index/special name for instances set in editoritems.
 # Note this is imperfect - two items could reuse the same instance.
-ITEM_FOR_FILE = {}  # type: Dict[str, Tuple[str, Union[int, str]]]
+ITEM_FOR_FILE: Dict[str, Tuple[str, Union[int, str]]] = {}
 
 _RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
@@ -38,12 +38,12 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES = defaultdict(dict)  # type: Dict[str, Dict[str, str]]
+CUST_INST_FILES: Dict[str, Dict[str, str]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
 # or indicator panels.
-SPECIAL_INST = {
+SPECIAL_INST: Dict[str, str] = {
     # Glass only generates borders for genuine ITEM_BARRIER items,
     # so it's possible to define special names.
     'glass_128':                 '<ITEM_BARRIER:0>',
@@ -132,11 +132,11 @@ SPECIAL_INST = {
 }
 
 # The resolved versions of SPECIAL_INST
-INST_SPECIAL = None  # type: dict
+INST_SPECIAL: Dict[str, List[str]] = {}
 
 # Gives names to reusable instance fields, so you don't need to remember
 # indexes
-SUBITEMS = {
+SUBITEMS: Dict[str, Union[int, Tuple[int, ...]]] = {
     # Cube
     'standard': 0,
     'companion': 1,
@@ -218,8 +218,6 @@ SPECIAL_INST_FOLDED = {
 
 def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
-    global INST_SPECIAL
-
     # Extra definitions: key -> filename.
     # Make sure to do this first, so numbered instances are set in
     # ITEM_FOR_FILE.
@@ -238,11 +236,12 @@ def load_conf(prop_block: Property):
             inst_list.append(file)
             ITEM_FOR_FILE[file] = (prop.name, ind)
 
-    INST_SPECIAL = {
+    INST_SPECIAL.clear()
+    INST_SPECIAL.update({
         key.casefold(): resolve(val_string, silent=True)
         for key, val_string in
         SPECIAL_INST.items()
-    }
+    })
 
 
 def resolve(path: str, silent: bool=False) -> List[str]:
