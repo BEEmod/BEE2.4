@@ -41,6 +41,7 @@ import barriers
 from typing import (
     Dict, Tuple, List,
     Set,
+    Any,
 )
 
 COND_MOD_NAME = 'VBSP'
@@ -50,13 +51,13 @@ settings = {
     "textures":       {},
     "options":        {},
     "fog":            {},
-    "elev_opt":       {},
+    "elevator":       {},
     'music_conf':     None,
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
     "packtrigger":    defaultdict(list),
-}
+}  # type: Dict[str, Dict[str, Any]]
 
 
 TEX_VALVE = {
@@ -1645,54 +1646,6 @@ def change_brush() -> None:
         LOGGER.info('Done!')
 
 
-def can_clump() -> bool:
-    """Check the clump algorithm is enabled."""
-    return vbsp_options.get(bool, "clump_wall_tex")
-
-
-def face_seed(face: VLib.Side) -> str:
-    """Create a seed unique to this brush face.
-
-    This is the same regardless of side direction.
-    """
-    origin = face.get_origin()
-    for axis in "xyz":
-        if origin[axis] % 128 < 2:
-            origin[axis] = (origin[axis] // 64) * 64
-        else:
-            origin[axis] = (origin[axis] // 128) * 128 + 64
-    return origin.join(' ')
-
-
-def random_walls() -> None:
-    """The original wall style, with completely randomised walls."""
-    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
-    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
-    edge_off = vbsp_options.get(bool, 'reset_edge_off')
-    edge_scale = vbsp_options.get(float, 'edge_scale')
-
-    for solid in VMF.iter_wbrushes(world=True, detail=True):
-        for face in solid:
-            if face in IGNORED_FACES:
-                continue
-
-            if face.mat == consts.Special.SQUAREBEAMS:
-                fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
-
-            # Conditions can define special clumps for items, we want to
-            # do those if needed.
-            origin = face.get_origin()
-            for clump in PRESET_CLUMPS:
-                if clump.min_pos <= origin <= clump.max_pos:
-                    face.mat = clump.tex[get_tile_type(
-                        face.mat.casefold(),
-                        get_face_orient(face),
-                    )]
-                    break
-            else:  # No clump..
-                alter_mat(face, face_seed(face), texture_lock)
-
-
 Clump = namedtuple('Clump', [
     'min_pos',
     'max_pos',
@@ -1755,19 +1708,6 @@ def cond_force_clump(inst: Entity, res: Property):
         max_pos,
         tex_data
     ))
-
-
-def get_face_orient(face: VLib.Side) -> ORIENT:
-    """Determine the orientation of an on-grid face."""
-    norm = face.normal()
-    # Even if not axis-aligned, make mostly-flat surfaces
-    # floor/ceiling (+-40 degrees)
-    # sin(40) = ~0.707
-    if norm.z < -0.8:
-        return ORIENT.floor
-    if norm.z > 0.8:
-        return ORIENT.ceiling
-    return ORIENT.wall
 
 
 def change_overlays() -> None:
@@ -1834,7 +1774,7 @@ def change_overlays() -> None:
                     over[prop] = val.join(' ')
 
 
-def add_extra_ents(mode):
+def add_extra_ents(game_mode: str) -> None:
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
@@ -1882,7 +1822,7 @@ def add_extra_ents(mode):
         # looping.
 
         # In either case, we need @music_restart to do that safely.
-        if GAME_MODE == 'SP' or snd_length > 0:
+        if game_mode == 'SP' or snd_length > 0:
 
             music_restart = VMF.create_ent(
                 classname='logic_relay',
@@ -1909,7 +1849,7 @@ def add_extra_ents(mode):
                 VLib.Output('OnTrigger', music, 'PlaySound', delay=0.1),
             )
 
-            if GAME_MODE == 'SP':
+            if game_mode == 'SP':
                 # Trigger on level loads.
                 VMF.create_ent(
                     classname='logic_auto',
@@ -2298,7 +2238,7 @@ def main() -> None:
     """Main program code.
 
     """
-    global MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
+    global MAP_RAND_SEED
     LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
     conditions.import_conditions()  # Import all the conditions and
@@ -2440,7 +2380,7 @@ def main() -> None:
         faithplate.analyse_map(VMF)
 
         conditions.check_all()
-        add_extra_ents(mode=GAME_MODE)
+        add_extra_ents(GAME_MODE)
 
         change_ents()
         tiling.generate_brushes(VMF)
