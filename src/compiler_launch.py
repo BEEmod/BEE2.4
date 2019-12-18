@@ -3,10 +3,10 @@ import os
 import sys
 
 if hasattr(sys, 'frozen'):
-    app_name = os.path.basename(sys.executable)
+    app_name = os.path.basename(sys.executable).casefold()
 else:
     # Sourcecode-launch - check first sys arg.
-    app_name = sys.argv.pop(1)
+    app_name = sys.argv.pop(1).casefold()
 
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
     import vbsp
