@@ -186,6 +186,9 @@ TEX_DEFAULTS: Dict[
         # Textures for glass and grating.
         'glass': consts.Special.GLASS,
         'grating': consts.Special.GRATING,
+
+        # Fizzler border material (1950s style mainly)
+        'fizz_border': '',
     },
 
 
