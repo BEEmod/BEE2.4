@@ -385,7 +385,7 @@ class ItemType:
         invert_var = conf['invertVar', '0']
 
         try:
-            spawn_fire = FeatureMode(conf['spawnfire', 'never'])
+            spawn_fire = FeatureMode(conf['spawnfire', 'never'].casefold())
         except ValueError:
             # Older config option - it was a bool for always/never.
             spawn_fire_bool = conf.bool('spawnfire', None)
