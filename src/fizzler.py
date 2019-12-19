@@ -549,7 +549,6 @@ class Fizzler:
         cent_pos = (seg_min + seg_max) / 2
 
         if tiledefs_up:
-            vmf.create_ent('prop_static', origin=cent_pos + 60 * up, model='models/editor/cone_helper.mdl', angles=up.to_angle())
             over = srctools.vmf.make_overlay(
                 vmf,
                 normal=-up,
@@ -566,7 +565,6 @@ class Fizzler:
                 tile.bind_overlay(over)
 
         if tiledefs_dn:
-            vmf.create_ent('prop_static', origin=cent_pos - 60 * up, model='models/editor/cone_helper.mdl', angles=(-up).to_angle())
             over = srctools.vmf.make_overlay(
                 vmf,
                 normal=up,
