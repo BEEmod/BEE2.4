@@ -923,3 +923,183 @@ def res_add_placement_helper(inst: Entity, res: Property):
         return
 
     tile.add_portal_helper(up_dir)
+
+
+@make_result('SetPanelOptions')
+def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
+    """Modify an existing panel associated with this instance.
+
+    See `CreatePanel` to add new ones.
+    This is used for panel-type items, allowing them to generate the correct
+    brushwork regardless of the kind of tiles used on the surface.
+    It can also be used to generate some flat "slabs" protruding from a surface.
+    All parameters are optional, using existing values if not set.
+
+    Options:
+
+    - `normal`: The direction facing out of the surface. This defaults to "up".
+    - `pos1`, `pos2`: The position of the tile on two diagnonally opposite
+       corners. This allows only modifying some of the tiles. These default to
+        a full tile.
+    - `type`: Change the specially handled behaviours set for the panel.
+       Availible options:
+        - `NORMAL`: No special behaviour.
+        - `FLIP_BLACK`: Apply black tiles to the backside of the panel,
+          doubling it in thickness.
+        - `FLIP_INVERT`: Apply the inverse colour to the backside of the panel,
+          doubling it in thickness.
+        - `ANGLED_30`, `ANGLED_45`, `ANGLED_60`: Rotate the panel to match
+          an extended panel of these angles.
+    - `thickness`: The thickness of the surface. Must be 2, 4 or 8.
+    - `bevel`: If true, angle the sides. Otherwise leave them straight.
+    - `nodraw_sides`: If true, apply nodraw to the sides and back instead of
+      squarebeams/backpanels materials.
+    - `offset`: Offset the brush in any direction. It starts flush where a
+      normal surface would be.
+    - `keys`, `localkeys`: Make the panel use a brush entity with these options.
+      If not provided or the classname is set to '', the panel is generated as
+      a world brush.
+    """
+    edit_panel(vmf, inst, props, create=False)
+
+
+@make_result('CreatePanel')
+def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
+    """Convert a set of tiles into a dynamic entity.
+
+    See `SetPanelOptions` to add new ones.
+    This is used for panel-type items, allowing them to generate the correct
+    brushwork regardless of the kind of tiles used on the surface.
+    It can also be used to generate some flat "slabs" protruding from a surface.
+    All parameters are optional.
+
+    Options:
+
+    - `normal`: The direction facing out of the surface. This defaults to "up".
+    - `pos1`, `pos2`: The position of the tile on two diagnonally opposite
+       corners. This allows only modifying some of the tiles. These default to
+        a full tile.
+    - `type`: Instructs the panel to use some specially handled behaviours.
+       Availible options:
+        - `NORMAL`: No special behaviour.
+        - `FLIP_BLACK`: Apply black tiles to the backside of the panel,
+          doubling it in thickness.
+        - `FLIP_INVERT`: Apply the inverse colour to the backside of the panel,
+          doubling it in thickness.
+        - `ANGLED_30`, `ANGLED_45`, `ANGLED_60`: Rotate the panel to match
+          an extended panel of these angles.
+    - `thickness`: The thickness of the surface. Must be 2, 4 or 8.
+    - `bevel`: If true, angle the sides. Otherwise leave them straight.
+    - `offset`: Offset the brush in any direction. It starts flush where a
+      normal surface would be.
+    - `keys`, `localkeys`: Make the panel use a brush entity with these options.
+      If not provided the panel is generated as a world brush.
+    """
+    edit_panel(vmf, inst, props, create=True)
+
+
+def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
+    """Implements SetPanelOptions and CreatePanel."""
+    normal = props.vec('normal', 0, 0, 1).rotate_by_str(inst['angles'])
+    pos1, pos2 = Vec.bbox(
+        conditions.resolve_offset(inst, props['pos1', '-48 -48 0'], zoff=-64),
+        conditions.resolve_offset(inst, props['pos2', '48 48 0'], zoff=-64),
+    )
+    tiles_to_uv: Dict[tiling.TileDef, Set[Tuple[int, int]]] = defaultdict(set)
+    for pos in Vec.iter_grid(pos1, pos2, 32):
+        try:
+            tile, u, v = tiling.find_tile(pos, normal)
+        except KeyError:
+            vmf.create_ent('info_particle_system', origin=pos, angles=normal.to_angle())
+            continue
+        tiles_to_uv[tile].add((u, v))
+
+    if not tiles_to_uv:
+        LOGGER.warning(
+            'No tiles found for panels within {} - {} @ {}',
+            pos1, pos2, normal
+        )
+        return
+
+    for tile, uvs in tiles_to_uv.items():
+        umin = vmin = 999
+        umax = vmax = -999
+        for u, v in uvs:
+            umin = min(umin, u)
+            umax = max(umax, u)
+            vmin = min(vmin, v)
+            vmax = max(vmax, v)
+        bounds = (umin, vmin, umax, vmax)
+
+        if create:
+            panel = tiling.Panel(
+                None, inst, tiling.PanelType.NORMAL,
+                thickness=4,
+                bevel=True,
+                bounds=bounds,
+            )
+            tile.panels.append(panel)
+        else:
+            for panel in tile.panels:
+                if panel.inst is inst and panel.bounds == bounds:
+                    break
+            else:
+                LOGGER.warning(
+                    'No panel to modify found for "{}"!',
+                    inst['targetname']
+                )
+                continue
+
+        try:
+            panel.pan_type = tiling.PanelType(props['type'])
+        except NoKeyError:
+            pass
+        except ValueError:
+            raise ValueError('Unknown panel type "{}"!'.format(props['type']))
+
+        if 'thickness' in props:
+            panel.thickness = props.int('thickness', 4)
+            if panel.thickness not in (2, 4, 8):
+                raise ValueError(
+                    '"{}": Invalid panel thickess {}!\n'
+                    'Must be 2, 4 or 8.',
+                    inst['targetname'],
+                    panel.thickness,
+                )
+        if 'bevel' in props:
+            panel.bevel = props.bool('bevel')
+        if 'offset' in props:
+            panel.offset = props.vec('offset')
+        if 'nodraw' in props:
+            panel.nodraw = props.bool('nodraw')
+        if 'keys' in props or 'localkeys' in props:
+            if panel.brush_ent is None:
+                panel.brush_ent = vmf.create_ent('')
+
+            old_pos = panel.brush_ent.keys.pop('origin', None)
+
+            conditions.set_ent_keys(panel.brush_ent, inst, props)
+            if not panel.brush_ent['classname']:
+                if create:  # This doesn't make sense, you could just omit the prop.
+                    LOGGER.warning(
+                        'No classname provided for panel "{}"!',
+                        inst['targetname'],
+                    )
+                # Make it a world brush.
+                panel.brush_ent.remove()
+                panel.brush_ent = None
+            else:
+                # We want to do some post-processing.
+                # Localise any origin value.
+                if 'origin' in panel.brush_ent.keys:
+                    panel.brush_ent['origin'] = Vec.from_str(
+                        panel.brush_ent['origin'],
+                    ).rotate_by_str(panel.inst['angles'])
+                elif old_pos is not None:
+                    panel.brush_ent['origin'] = old_pos
+
+                # If it's func_detail, clear out all the keys.
+                # Particularly `origin`, but the others are useless too.
+                if panel.brush_ent['classname'] == 'func_detail':
+                    panel.brush_ent.clear_keys()
+                    panel.brush_ent['classname'] = 'func_detail'
