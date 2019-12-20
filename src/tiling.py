@@ -10,8 +10,8 @@ from collections import defaultdict, Counter
 
 from enum import Enum
 from typing import (
+    Optional, Union, cast,
     Tuple, Dict, List,
-    Optional, Union,
     Iterator,
 )
 
@@ -81,7 +81,8 @@ TILES: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], 'Tile
 
 # Special key for Tile.SubTile - This is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
-SUBTILE_FIZZ_KEY = object()
+# This isn't a U,V tuple, but allow us to store it there anyway.
+SUBTILE_FIZZ_KEY: Tuple[int, int] = cast(Tuple[int, int], object())
 
 # Given the two bevel options, determine the correct texturing
 # values.
@@ -220,21 +221,44 @@ class BrushType(Enum):
     FLIP_PANEL = 4  # Flip panels - these are double-sided.
 
 
-class PanelAngle(Enum):
-    """Angles for static angled panels."""
-    ANGLE_FLAT = 0  # Start disabled, so it's flat sticking out slightly.
-    ANGLE_30 = 30
-    ANGLE_45 = 45
-    ANGLE_60 = 60
-    ANGLE_90 = 90
+class PanelType(Enum):
+    """Special functionality for tiling panels."""
+    NORMAL = 'normal'
+    FLIP_BLACK = 'flip_black'
+    FLIP_INVERT = 'flip_invert'
+    ANGLE_30 = 'angle_30'
+    ANGLE_45 = 'angle_45'
+    ANGLE_60 = 'angle_60'
+    ANGLE_90 = 'angle_90'
 
-    @classmethod
-    def from_inst(cls, inst: Entity) -> 'PanelAngle':
+    @staticmethod
+    def from_panel(inst: Entity) -> 'PanelType':
         """Get the angle desired for a panel."""
         if not inst.fixup.bool('$start_deployed'):
-            return cls.ANGLE_FLAT
+            return PanelType.NORMAL
         # "ramp_90_deg_open" -> 90
-        return cls(int(inst.fixup['$animation'][5:7]))
+        return PanelType('angle_' + inst.fixup['$animation'][5:7])
+
+    @property
+    def is_angled(self) -> bool:
+        """Check if this is an ANGLE panel type."""
+        return self.value[:5] == 'angle'
+
+    @property
+    def is_flip(self) -> bool:
+        """Check if this is a FLIP panel type."""
+        return self.value[:4] == 'flip'
+
+    @property
+    def angle(self) -> int:
+        """Return the angle, if is_angled is True."""
+        try:
+            return int(self.value[6:])
+        except ValueError:
+            raise ValueError(
+                f"PanelType.{self.name} "
+                "is not an angled panel!"
+            ) from None
 
 
 def round_grid(vec: Vec) -> Vec:
@@ -376,6 +400,277 @@ def _make_patterns() -> None:
 _make_patterns()
 
 
+class Panel:
+    """Represents a potentially dynamic specially positioned part of a tile.
+
+    This is used for angled/flip panel items, and things like those.
+    The U/V bbox is removed from the original tile, and transferred to this.
+
+    Attributes:
+        brush_ent: The brush entity the panel will be added to,
+          or None if it should be a world brush.
+        inst: The instance for the associated item.
+        bounds (min_u, min_v, max_u, max_v): The bounding box of UVs this
+          will use. Others will generate as a standard tile.
+        pan_type: Specifies which special features to enable.
+          FLIP generates an inverted copy on the other side.
+          ANGLED_30/45/60/90 rotates it to match static panels.
+          NORMAL generates a regular slab.
+        thickness: 2, 4 or 8 units thick.
+        bevel: If true, the surface will be bevelled on all sides.
+        offset: Offset the tile by this much (local to the instance).
+    """
+
+    def __init__(
+        self,
+        brush_ent: Optional[Entity],
+        inst: Entity,
+        pan_type: PanelType,
+        thickness: int,
+        bevel: bool,
+        bounds: Tuple[int, int, int, int]=(0, 0, 3, 3),
+    ) -> None:
+        self.moves_bullseye = False
+        self.brush_ent = brush_ent
+        self.inst = inst
+        self.bounds = bounds
+        self.pan_type = pan_type
+        self.thickness = thickness
+        self.bevel = bevel
+        self.nodraw = False
+        self.offset = Vec()
+
+    def export(
+        self,
+        tile: 'TileDef',
+        vmf: VMF,
+        sub_tiles: Dict[Tuple[int, int], TileType],
+        has_helper: bool,
+        force_helper: bool,
+    ) -> None:
+        """Generate the panel brushes."""
+        # We need to do the checks to handle multiple panels with shared
+        # data.
+        if all(tile is TileType.VOID for tile in sub_tiles.values()):
+            # The brush entity isn't used.
+            if self.brush_ent in vmf.entities:
+                self.brush_ent.remove()
+            return
+        else:
+            # We do use it.
+            if self.brush_ent is not None and self.brush_ent not in vmf.entities:
+                vmf.add_ent(self.brush_ent)
+
+        is_static = (
+            self.brush_ent is None or
+            self.brush_ent['classname'].casefold() == 'func_detail'
+        )
+        use_bullseye = tile.use_bullseye()
+
+        angles = Vec.from_str(self.inst['angles'])
+        inst_normal = Vec(z=1).rotate(*angles)
+        if inst_normal != tile.normal:
+            # It's not aligned to ourselves, so dump the rotation.
+            import conditions
+            angles = Vec.from_str(conditions.PETI_INST_ANGLE[tile.normal.as_tuple()])
+        # Points towards the open end on angled panels.
+        front_normal = Vec(x=1).rotate(*angles)
+        # Point along the hinge axis on angled panels.
+        side_normal = Vec(y=1).rotate(*angles)
+        front_pos = tile.pos + 64 * tile.normal
+
+        is_wall = tile.normal.z == 0
+
+        all_brushes: List[Solid] = []
+
+        faces, brushes = tile.gen_multitile_pattern(
+            vmf,
+            sub_tiles,
+            is_wall,
+            (self.bevel, ) * 4,
+            tile.normal,
+            thickness=self.thickness,
+            is_panel=True,
+            add_bullseye=use_bullseye and not is_static,
+        )
+        all_brushes += brushes
+
+        # If requested apply nodraw to everything that's not the front.
+        if self.nodraw:
+            for brush in brushes:
+                for side in brush:
+                    if side.normal() != -tile.normal:
+                        side.mat = consts.Tools.NODRAW
+                        side.offset = 0
+                        side.scale = 0.25
+
+        # If it's a flip panel, always create a helper.
+        if has_helper or self.pan_type.is_flip:
+            # We need to make a placement helper.
+            helper = vmf.create_ent(
+                'info_placement_helper',
+                angles=tile.normal.to_angle_roll(tile.portal_helper_orient),
+                origin=front_pos,
+                force_placement=int(force_helper),
+                snap_to_helper_angles=int(force_helper),
+                radius=64,
+            )
+            # We need to make a placement helper. Don't check portalability
+            # since the panel can change. On a flip panel,
+            # we don't want to parent so it is always on the front side.
+            if not is_static:
+                if self.pan_type.is_flip:
+                    helper['attach_target_name'] = self.brush_ent['targetname']
+                else:
+                    helper['parentname'] = self.brush_ent['targetname']
+
+        if self.pan_type.is_flip:
+            # Two surfaces, forward and backward - each is 4 thick.
+            invert_black = self.pan_type is PanelType.FLIP_INVERT
+            inv_subtiles = {
+                uv: (
+                    tile_type.inverted
+                    if invert_black or tile_type.color is Portalable.WHITE else
+                    tile_type
+                ) for uv, tile_type in sub_tiles.items()
+            }
+            back_faces, brushes = tile.gen_multitile_pattern(
+                vmf,
+                inv_subtiles,
+                is_wall,
+                (self.bevel, ) * 4,
+                -tile.normal,
+                thickness=self.thickness,
+                offset=64 - 2*self.thickness,
+                add_bullseye=use_bullseye and not is_static,
+            )
+            all_brushes += brushes
+            inset_flip_panel(all_brushes, front_pos, tile.normal)
+
+        if self.pan_type.is_angled:
+            # Rotate the panel to match the panel shape:
+            # Figure out if we want to rotate +ve or -ve.
+            # We know rotating the surface 90 degrees will point
+            # the end straight up, so check if it points at the normal.
+            rotate_forward = Vec(x=1).rotate(*side_normal.rotation_around()) == tile.normal
+
+            # This direction is inverted...
+            if front_normal == (-1, 0, 0):
+                rotate_forward = not rotate_forward
+
+            if rotate_forward:
+                rotation = side_normal.rotation_around(self.pan_type.angle)
+            else:
+                rotation = side_normal.rotation_around(-self.pan_type.angle)
+
+            # Shift so the rotation axis is 0 0 0, then shift back
+            # to rotate correctly.
+            panel_offset = front_pos - 64 * front_normal
+
+            # Rotating like this though will make the brush clip into the
+            # surface it's attached on. We need to clip the hinge edge
+            # so it doesn't do that.
+            # We can just produce any plane that is the correct
+            # orientation and let VBSP sort out the geometry.
+
+            # So construct a box, and grab the side pointing "down".
+            clip_template: Side = vmf.make_prism(
+                tile.pos + 64 + 128 * tile.normal,
+                tile.pos - 64 + 128 * tile.normal,
+            )[PRISM_NORMALS[(-tile.normal).as_tuple()]]
+
+            front_axis = front_normal.axis()
+
+            for brush in brushes:
+                clip_face = None
+                for face in brush:
+                    if (
+                        face.normal() == front_normal
+                        and face.get_origin()[front_axis]
+                        == panel_offset[front_axis]
+                    ):
+                        clip_face = face
+                        break
+                brush.localise(-panel_offset)
+                brush.localise(panel_offset, rotation)
+                if clip_face is not None:
+                    clip_face.uaxis = clip_template.uaxis.copy()
+                    clip_face.vaxis = clip_template.vaxis.copy()
+                    clip_face.planes = [p.copy() for p in clip_template.planes]
+                    clip_face.mat = consts.Tools.NODRAW
+
+            # Helpfully the angled surfaces are always going to be forced
+            # upright, so we don't need to compute the orientation matching
+            # the item axis.
+            angled_normal = tile.normal.copy().rotate(*rotation)
+            top_center = (
+                (64 * front_normal).rotate(*rotation) -
+                64 * front_normal +
+                front_pos
+            )
+
+            if has_helper:
+                # We need to make a placement helper.
+                vmf.create_ent(
+                    'info_placement_helper',
+                    angles=angled_normal.to_angle(),
+                    origin=top_center,
+                    force_placement=int(force_helper),
+                    snap_to_helper_angles=int(force_helper),
+                    radius=64,
+                )
+
+            if use_bullseye and is_static:
+                # Add the bullseye overlay.
+                angles = tile.normal.to_angle()
+                srctools.vmf.make_overlay(
+                    vmf,
+                    tile.normal,
+                    top_center,
+                    (64 * front_normal).rotate(*rotation),
+                    (64 * side_normal),
+                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                    faces,
+                )
+        else:
+            if use_bullseye and is_static:
+                # Add the bullseye overlay.
+                angles = tile.normal.to_angle()
+                srctools.vmf.make_overlay(
+                    vmf,
+                    tile.normal,
+                    front_pos,
+                    Vec(y=64).rotate(*angles),
+                    Vec(z=64).rotate(*angles),
+                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                    faces,
+                )
+
+        if self.offset:
+            offset = self.offset.copy().rotate_by_str(self.inst['angles'])
+            for brush in all_brushes:
+                brush.localise(offset, Vec())
+
+        if self.brush_ent is None:
+            vmf.add_brushes(all_brushes)
+        else:
+            self.brush_ent.solids.extend(all_brushes)
+
+    def position_bullseye(self, target: Entity):
+        """Compute the position required for the bullseye overlay."""
+        if self.pan_type.is_angled:
+            angle = self.pan_type.angle
+            panel_top = Vec(
+                x=-64 + 64 * math.cos(math.radians(angle)),
+                z=-64 + 64 * math.sin(math.radians(angle)),
+            )
+            panel_top.localise(
+                Vec.from_str(self.inst['origin']),
+                Vec.from_str(self.inst['angles']),
+            )
+            target['origin'] = panel_top
+
+
 class TileDef:
     """Represents one 128 block side.
     
@@ -384,10 +679,9 @@ class TileDef:
         normal: The direction out of the block, towards the face.
         brush_faces: A list of brush faces which this tiledef has exported.
           Empty before-hand, but after these are faces to attach antlines to.
-        brush_type: BrushType - what sort of brush this is.
         base_type: TileSize this tile started with.
-        override: If set, a specific texture to use. (skybox, light,
-        backpanels etc) This only applies to .is_tile tiles.
+        override: If set, a specific texture to use and orientation.
+          This only applies to .is_tile tiles.
         _sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz,
         yz or xy.
           If None, it's the same as base_type.
@@ -396,21 +690,20 @@ class TileDef:
         _portal_helper: The number of portal placement helpers here. If > 0,
           a non-anglesnap helper is present. If a Vector instead, a forced
           helper is present pointing this direction.
-        panel_inst: The instance for this panel, if it's a panel brush_type.
-        panel_ent: The brush entity for the panel, if it's a panel brush_type.
+        panels: A list of "panels" for the tiledef, allowing moving or split parts.
+          If present, each of these "steals" some UV positions and instead
+          generates them (potentially offset) as a brush entity.
     """
     __slots__ = [
         'pos',
         'normal',
-        'brush_type',
         'brush_faces',
         'base_type',
         '_sub_tiles',
         'override',
         'bullseye_count',
         '_portal_helper',
-        'panel_inst',
-        'panel_ent',
+        'panels',
     ]
 
     pos: Vec
@@ -418,36 +711,28 @@ class TileDef:
     base_type: TileType
 
     brush_faces: List[Side]
-    brush_type: BrushType
+    panels: List[Panel]
     _sub_tiles: Optional[Dict[Tuple[int, int], TileType]]
     override: Optional[Tuple[str, 'template_brush.ScalingTemplate']]
 
     bullseye_count: int
     _portal_helper: Union[int, Vec]
 
-    panel_inst: Optional[Entity]
-    panel_ent: Optional[Entity]
-
     def __init__(
         self,
         pos: Vec, 
         normal: Vec,
         base_type: TileType,
-        brush_type: BrushType=BrushType.NORMAL,
         subtiles: Dict[Tuple[int, int], TileType]=None,
-        panel_inst: Entity=None,
-        panel_ent: Entity=None,
         has_helper: bool=False,
     ) -> None:
         self.pos = pos
         self.normal = normal
-        self.brush_type = brush_type
         self.brush_faces = []
         self.override = None
         self.base_type = base_type
         self._sub_tiles = subtiles
-        self.panel_inst = panel_inst
-        self.panel_ent = panel_ent
+        self.panels = []
         self.bullseye_count = 0
         self._portal_helper = 1 if has_helper else 0
 
@@ -474,9 +759,8 @@ class TileDef:
             return Vec(1, 0, 0)
 
     def __repr__(self) -> str:
-        return '<{}, {} TileDef @ {} of {}>'.format(
+        return '<{} TileDef @ {} of {}>'.format(
             self.base_type.name,
-            self.brush_type.name,
             NORM_NAMES.get(self.normal.as_tuple(), self.normal),
             self.pos,
         )
@@ -568,7 +852,7 @@ class TileDef:
     def set_fizz_orient(self, axis: str) -> None:
         """Set the centered fizzler nodraw strip."""
         # This violates the _sub_tiles type definition.
-        self._get_subtiles()[SUBTILE_FIZZ_KEY] = axis  # type: ignore
+        self._get_subtiles()[SUBTILE_FIZZ_KEY] = cast(TileType, axis)
 
     def uv_offset(self, u: float, v: float, norm: float) -> Vec:
         """Return a u/v offset from our position.
@@ -708,6 +992,18 @@ class TileDef:
             self[3, 1].is_white and self[3, 2].is_white
         )
 
+    def use_bullseye(self) -> bool:
+        """Check if this should use a bullseye overlay."""
+        # If all four center blocks can't accept the overlay,
+        # we can't add a bullseye.
+        if (
+            self[1, 1].is_tile or self[1, 2].is_tile or
+            self[2, 1].is_tile or self[2, 2].is_tile
+        ):
+            return self.bullseye_count > 0
+        else:
+            return False
+
     def export(self, vmf: VMF) -> None:
         """Create the brushes for this.
 
@@ -734,318 +1030,63 @@ class TileDef:
         else:
             force_helper = has_helper = False
 
-        # If all four center blocks can't accept the overlay,
-        # we can't add a bullseye.
-        if (
-            self[1, 1].is_tile or self[1, 2].is_tile or
-            self[2, 1].is_tile or self[2, 2].is_tile
-        ):
-            has_bullseye = self.bullseye_count > 0
-        else:
-            has_bullseye = False
+        sub_tiles: Dict[Tuple[int, int], TileType] = {
+            (u, v): tile
+            for u, v, tile in self
+        }
 
-        if self._sub_tiles is None:
-            # Force subtiles to be all the parts we need.
-            self._sub_tiles = dict.fromkeys(iter_uv(), self.base_type)
-
-        if self.brush_type is BrushType.NORMAL:
-            faces, brushes = self.gen_multitile_pattern(
-                vmf,
-                self._sub_tiles,
-                is_wall,
-                bevels,
-                self.normal,
-            )
-            self.brush_faces.extend(faces)
-            vmf.add_brushes(brushes)
-
-            if has_helper:
-                # We need to make a placement helper.
-                vmf.create_ent(
-                    'info_placement_helper',
-                    angles=self.normal.to_angle_roll(self.portal_helper_orient),
-                    origin=front_pos,
-                    force_placement=int(force_helper),
-                    snap_to_helper_angles=int(force_helper),
-                    radius=64,
-                )
-            if has_bullseye:
-                # Add the bullseye overlay.
-                angles = self.normal.to_angle()
-                srctools.vmf.make_overlay(
-                    vmf,
-                    self.normal,
-                    front_pos,
-                    Vec(y=64).rotate(*angles),
-                    Vec(z=64).rotate(*angles),
-                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
-                    self.brush_faces,
-                )
-
-        elif self.brush_type is BrushType.ANGLED_PANEL:
-            assert self.panel_inst is not None
-            assert self.panel_ent is not None
-
-            if self.panel_inst.fixup.int('$connectioncount') > 0:
-                # Dynamic panels are always beveled.
-                bevels = (True, True, True, True)
-                static_angle = None
-                thickness = vbsp_options.get(int, 'dynamic_pan_thickness')
-            else:
-                # Static panels can be flat on the sides since they don't need
-                # to actually retract..
-                bevels = (False, False, False, False)
-                static_angle = PanelAngle.from_inst(self.panel_inst)
-                thickness = vbsp_options.get(int, 'static_pan_thickness')
-
-            panel_angles = Vec.from_str(self.panel_inst['angles'])
-            hinge_axis = Vec(y=1).rotate(*panel_angles)
-            front_normal = Vec(x=1).rotate(*panel_angles)
-
-            # For static 90 degree panels, we want to generate as if it's
-            # in that position - that way we get the right textures.
-            if static_angle is PanelAngle.ANGLE_90:
-                faces, brushes = self.gen_multitile_pattern(
-                    vmf,
-                    self._sub_tiles,
-                    is_wall=front_normal.z == 0,
-                    bevels=bevels,
-                    normal=-front_normal,
-                    vec_offset=64 * self.normal - 64 * front_normal,
-                    thickness=thickness,
-                    is_panel=True,
-                )
-                if has_bullseye:
-                    # Add the bullseye overlay.
-                    angles = (-front_normal).to_angle()
-                    srctools.vmf.make_overlay(
-                        vmf,
-                        -front_normal,
-                        self.pos + 128 * self.normal - 64 * front_normal,
-                        Vec(y=64).rotate(*angles),
-                        Vec(z=64).rotate(*angles),
-                        texturing.OVERLAYS.get(front_pos, 'bullseye'),
-                        faces,
-                    )
-
-                if has_helper:
-                    # We need to make a placement helper.
-                    if force_helper:
-                        helper_angles = (-front_normal).to_angle_roll(self.normal)
-                    else:
-                        helper_angles = (-front_normal).to_angle()
-                    vmf.create_ent(
-                        'info_placement_helper',
-                        angles=helper_angles,
-                        origin=self.pos + 128 * self.normal - 64 * front_normal,
-                        force_placement=int(force_helper),
-                        snap_to_helper_angles=int(force_helper),
-                        radius=96,
-                    )
-            else:
-                faces, brushes = self.gen_multitile_pattern(
-                    vmf,
-                    self._sub_tiles,
-                    is_wall,
-                    bevels,
-                    self.normal,
-                    offset=(64+8 if static_angle is PanelAngle.ANGLE_FLAT else 64),
-                    thickness=(8 if static_angle is PanelAngle.ANGLE_FLAT else thickness),
-                    is_panel=True,
-                )
-            self.panel_ent.solids.extend(brushes)
-
-            if static_angle is not None:
-                # This is a static rotated panel.
-                self.panel_ent.keys = {'classname': 'func_detail'}
-
-            if static_angle is None:
-                # Dynamic panel, if requested apply nodraw to everything that's
-                # not the front.
-                if vbsp_options.get(bool, 'dynamic_pan_nodraw'):
-                    for side in self.panel_ent.sides():
-                        if side.normal() != -self.normal:
-                            side.mat = consts.Tools.NODRAW
-                            side.offset = 0
-                            side.scale = 0.25
-
-            elif static_angle is PanelAngle.ANGLE_90:
-                # 90 degree panels don't rotate either.
-                pass
-            elif static_angle is PanelAngle.ANGLE_FLAT:
-                # Add nodraw behind to seal.
-                brush, face = make_tile(
-                    vmf,
-                    self.pos + self.normal * 64,
-                    self.normal,
-                    top_surf=consts.Tools.NODRAW,
-                    width=128,
-                    height=128,
-                    bevels=(True, True, True, True),
-                    back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
-                )
-                vmf.add_brush(brush)
-
-                if has_helper:
-                    # We need to make a placement helper.
-                    vmf.create_ent(
-                        'info_placement_helper',
-                        angles=self.normal.to_angle_roll(self.portal_helper_orient),
-                        origin=front_pos + 8 * self.normal,
-                        force_placement=int(force_helper),
-                        snap_to_helper_angles=int(force_helper),
-                        radius=64,
-                    )
-
-                if has_bullseye:
-                    # Add the bullseye overlay.
-                    angles = self.normal.to_angle()
-                    srctools.vmf.make_overlay(
-                        vmf,
-                        self.normal,
-                        front_pos + 8 * self.normal,
-                        Vec(y=64).rotate(*angles),
-                        Vec(z=64).rotate(*angles),
-                        texturing.OVERLAYS.get(front_pos, 'bullseye'),
-                        faces,
-                    )
-            else:
-                # Rotate the panel to match the panel shape:
-                # Figure out if we want to rotate +ve or -ve.
-                # We know rotating the surface 90 degrees will point
-                # the end straight up, so check if it points at the normal.
-                maybe_rotate = Vec(x=1).rotate(*hinge_axis.rotation_around()) == self.normal
-
-                # This direction is inverted...
-                if front_normal == (-1, 0, 0):
-                    maybe_rotate = not maybe_rotate
-
-                if maybe_rotate:
-                    rotation = hinge_axis.rotation_around(static_angle.value)
-                else:
-                    rotation = hinge_axis.rotation_around(-static_angle.value)
-
-                # Shift so the rotation axis is 0 0 0, then shift back
-                # to rotate correctly.
-                panel_offset = front_pos - 64 * front_normal
-
-                # Rotating like this though will make the brush clip into the
-                # surface it's attached on. We need to clip the hinge edge
-                # so it doesn't do that.
-                # We can just produce any plane that is the correct
-                # orientation and let VBSP sort out the geometry.
-
-                # So construct a box, and grab the side pointing "down".
-                clip_template: Side = vmf.make_prism(
-                    self.pos + 64 + 128 * self.normal,
-                    self.pos - 64 + 128 * self.normal,
-                )[PRISM_NORMALS[(-self.normal).as_tuple()]]
-
-                front_axis = front_normal.axis()
-
-                for brush in brushes:
-                    clip_face = None
-                    for face in brush:
-                        if (
-                            face.normal() == front_normal
-                            and face.get_origin()[front_axis]
-                            == panel_offset[front_axis]
-                        ):
-                            clip_face = face
-                            break
-                    brush.localise(-panel_offset)
-                    brush.localise(panel_offset, rotation)
-                    if clip_face is not None:
-                        clip_face.uaxis = clip_template.uaxis.copy()
-                        clip_face.vaxis = clip_template.vaxis.copy()
-                        clip_face.planes = [p.copy() for p in clip_template.planes]
-                        clip_face.mat = consts.Tools.NODRAW
-
-                # Helpfully the angled surfaces are always going to be forced
-                # upright, so we don't need to compute the orientation matching
-                # the item axis.
-                angled_normal = self.normal.copy().rotate(*rotation)
-                top_center = (
-                    (64 * front_normal).rotate(*rotation) -
-                    64 * front_normal +
-                    front_pos
-                )
-
-                if has_helper:
-                    # We need to make a placement helper.
-                    vmf.create_ent(
-                        'info_placement_helper',
-                        angles=angled_normal.to_angle(),
-                        origin=top_center,
-                        force_placement=int(force_helper),
-                        snap_to_helper_angles=int(force_helper),
-                        radius=64,
-                    )
-
-                if has_bullseye:
-                    # Add the bullseye overlay.
-                    angles = self.normal.to_angle()
-                    srctools.vmf.make_overlay(
-                        vmf,
-                        self.normal,
-                        top_center,
-                        (64 * front_normal).rotate(*rotation),
-                        (64 * hinge_axis),
-                        texturing.OVERLAYS.get(front_pos, 'bullseye'),
-                        faces,
-                    )
-
-        elif self.brush_type is BrushType.FLIP_PANEL:
-            assert self.panel_inst is not None
-            assert self.panel_ent is not None
-
-            # Two surfaces, forward and backward - each is 4 thick.
-            invert_black = self.panel_inst.fixup.bool('$start_reversed')
-            inv_subtiles = {
-                uv: (
-                    tile_type.inverted
-                    if invert_black or tile_type.color is Portalable.WHITE else
-                    tile_type
-                ) for uv, tile_type in self._sub_tiles.items()
+        for panel in self.panels:
+            pan_min_u, pan_min_v, pan_max_u, pan_max_v = panel.bounds
+            panel_tiles = {
+                (u, v): tile if (
+                    pan_min_u <= u <= pan_max_u and
+                    pan_min_v <= v <= pan_max_v
+                ) else TileType.VOID
+                for u, v, tile in self
             }
-            front_faces, brushes = self.gen_multitile_pattern(
+            panel.export(self, vmf, panel_tiles, has_helper, force_helper)
+            for pos in iter_uv(pan_min_u, pan_max_u, pan_min_v, pan_max_v):
+                sub_tiles[pos] = TileType.VOID
+
+        if all(tile is TileType.VOID for tile in sub_tiles.values()):
+            return
+
+        # Copy this across, so we do generate this in the main one only.
+        if self._sub_tiles is not None and SUBTILE_FIZZ_KEY in self._sub_tiles:
+            sub_tiles[SUBTILE_FIZZ_KEY] = self._sub_tiles[SUBTILE_FIZZ_KEY]
+
+        faces, brushes = self.gen_multitile_pattern(
+            vmf,
+            sub_tiles,
+            is_wall,
+            bevels,
+            self.normal,
+        )
+        self.brush_faces.extend(faces)
+        vmf.add_brushes(brushes)
+
+        if has_helper and self.can_portal():
+            # We need to make a placement helper.
+            vmf.create_ent(
+                'info_placement_helper',
+                angles=self.normal.to_angle_roll(self.portal_helper_orient),
+                origin=front_pos,
+                force_placement=int(force_helper),
+                snap_to_helper_angles=int(force_helper),
+                radius=64,
+            )
+        if self.use_bullseye():
+            # Add the bullseye overlay.
+            angles = self.normal.to_angle()
+            srctools.vmf.make_overlay(
                 vmf,
-                self._sub_tiles,
-                is_wall,
-                (False, False, False, False),
                 self.normal,
-                add_bullseye=has_bullseye,
+                front_pos,
+                Vec(y=64).rotate(*angles),
+                Vec(z=64).rotate(*angles),
+                texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                self.brush_faces,
             )
-            self.panel_ent.solids.extend(brushes)
-            back_faces, brushes = self.gen_multitile_pattern(
-                vmf,
-                inv_subtiles,
-                is_wall,
-                (False, False, False, False),
-                -self.normal,
-                offset=64-8,
-                add_bullseye=has_bullseye,
-            )
-            self.panel_ent.solids.extend(brushes)
-            inset_flip_panel(self.panel_ent, front_pos, self.normal)
-
-            # Allow altering the flip panel sounds.
-            self.panel_ent['noise1'] = vbsp_options.get(str, 'flip_sound_start')
-            self.panel_ent['noise2'] = vbsp_options.get(str, 'flip_sound_stop')
-
-            if self.has_portal_helper:
-                # We need to make a placement helper. Don't check portalability
-                # since the panel can change. On a flip panel,
-                # we don't want to parent so it is always on the front side.
-                vmf.create_ent(
-                    'info_placement_helper',
-                    angles=self.normal.to_angle_roll(self.portal_helper_orient),
-                    origin=front_pos,
-                    force_placement=int(force_helper),
-                    snap_to_helper_angles=int(force_helper),
-                    attach_target_name=self.panel_ent['targetname'],
-                    radius=64,
-                )
 
     def gen_multitile_pattern(
         self,
@@ -1060,6 +1101,7 @@ class TileDef:
         is_panel: bool=False,
         add_bullseye: bool=False,
         face_output: Optional[Dict[Tuple[int, int], Side]]=None,
+        flat_neighbour: bool=False,
     ) -> Tuple[List[Side], List[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
 
@@ -1071,11 +1113,19 @@ class TileDef:
         brushes = []
         faces = []
 
-        def neighbour_empty(u: int, v: int) -> bool:
-            """For bevelling, check if this neighbour is VOID. If out of this tile ignore."""
-            if 0 <= u < 4 and 0 <= v < 4:
-                return pattern[u, v] is TileType.VOID
-            return False
+        if flat_neighbour:
+            def neighbour_empty(u: int, v: int) -> bool:
+                """Always use flat surfaces between tiles."""
+                return False
+        else:
+            def neighbour_empty(u: int, v: int) -> bool:
+                """For bevelling, check if this neighbour is VOID.
+
+                If out of this tile ignore.
+                """
+                if 0 <= u < 4 and 0 <= v < 4:
+                    return pattern[u, v] is TileType.VOID
+                return False
 
         # NOTE: calc_patterns can produce 0, 1, 1.5, 2, 2.5, 3, 4!
         # Half-values are for nodrawing fizzlers which are center-aligned.
@@ -1199,16 +1249,9 @@ class TileDef:
         """Check if this tile is a simple tile that can merge with neighbours."""
         if (
             self._sub_tiles is not None or
-            self.panel_ent is not None or
-            self.panel_inst is not None or
+            self.panels or
             self.bullseye_count > 0 or
             self.override is not None
-        ):
-            return False
-
-        if (
-            self.brush_type is not BrushType.NORMAL and
-            self.brush_type is not BrushType.NODRAW
         ):
             return False
 
@@ -1245,41 +1288,16 @@ class TileDef:
     def position_bullseye(self, target: Entity) -> None:
         """Position a faith plate target to hit this panel.
 
-        This needs to set origin and targetname.
+        This needs to set origin.
         """
-        if self.brush_type is BrushType.ANGLED_PANEL:
-            assert self.panel_inst is not None
-            assert self.panel_ent is not None
-
-            if self.panel_inst.fixup.int('$connectioncount') != 0:
-                target['origin'] = self.pos + 64 * self.normal
-                target['parentname'] = self.panel_ent['targetname']
-                target['targetname']  = (
-                    self.panel_inst['targetname'] +
-                    '-bullseye_target'
-                )
-                # Everything else uses a generic name.
-                return
-
-            static_angle = PanelAngle.from_inst(self.panel_inst)
-            if static_angle is PanelAngle.ANGLE_FLAT:
-                target['origin'] = self.pos + 68 * self.normal
-            else:
-                panel_top = Vec(
-                    x=-64 + 64 * math.cos(math.radians(static_angle.value)),
-                    z=-64 + 64 * math.sin(math.radians(static_angle.value)),
-                )
-                panel_top.localise(
-                    Vec.from_str(self.panel_inst['origin']),
-                    Vec.from_str(self.panel_inst['angles']),
-                )
-                target['origin'] = panel_top
+        # Ask each panel to position, which they will if angled.
+        for panel in self.panels:
+            if panel.moves_bullseye:
+                panel.position_bullseye(target)
+                break
         else:
-            # Otherwise, flat on the surface.
+            # No panels, default to flat on the surface.
             target['origin'] = self.pos + 64 * self.normal
-
-        target['targetname'] = 'faith_target_'
-        target.make_unique()
 
 
 def find_tile(origin: Vec, normal: Vec, force: bool=False) -> Tuple[TileDef, int, int]:
@@ -1733,16 +1751,20 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
 
     tex_kind, front_face = find_front_face(brush, grid_pos, norm)
 
-    TILES[grid_pos.as_tuple(), norm.as_tuple()] = TileDef(
+    TILES[grid_pos.as_tuple(), norm.as_tuple()] = tile = TileDef(
         grid_pos,
         norm,
         base_type=tex_kind,
-        brush_type=BrushType.ANGLED_PANEL,
-        panel_ent=brush_ent,
-        panel_inst=panel_ent,
         # Add a helper if portalable.
         has_helper=tex_kind.is_white,
     )
+    tile.panels.append(Panel(
+        brush_ent,
+        panel_ent,
+        PanelType.NORMAL,
+        thickness=2,
+        bevel=True,
+    ))
 
 
 def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
@@ -1752,17 +1774,21 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     norm = Vec(z=1).rotate_by_str(panel_ent['angles'])
     grid_pos -= 128*norm
 
-    TILES[grid_pos.as_tuple(), norm.as_tuple()] = TileDef(
+    TILES[grid_pos.as_tuple(), norm.as_tuple()] = tile = TileDef(
         grid_pos,
         norm,
         # It's always white in the forward direction
         base_type=TileType.WHITE,
-        brush_type=BrushType.FLIP_PANEL,
-        panel_ent=brush_ent,
-        panel_inst=panel_ent,
         # Flip panels always are portalable at some point, so add a helper.
         has_helper=True,
     )
+    tile.panels.append(Panel(
+        brush_ent,
+        panel_ent,
+        PanelType.FLIP_BLACK,
+        thickness=4,
+        bevel=False,
+    ))
 
 
 def tiledefs_from_embedface(
@@ -1820,19 +1846,20 @@ def find_front_face(
         raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
 
 
-def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec) -> None:
+def inset_flip_panel(panel: List[Solid], pos: Vec, normal: Vec) -> None:
     """Inset the sides of a flip panel, to not hit the borders."""
     norm_axis = normal.axis()
-    for side in panel.sides():
-        norm = side.normal()
-        if norm.axis() == norm_axis:
-            continue  # Front or back
+    for brush in panel:
+        for side in brush:
+            norm = side.normal()
+            if norm.axis() == norm_axis:
+                continue  # Front or back
 
-        u_off, v_off = (side.get_origin() - pos).other_axes(norm_axis)
-        if abs(u_off) == 64 or abs(v_off) == 64:
-            side.translate(2 * norm)
-            # Snap squarebeams to each other.
-            side.vaxis.offset = 0
+            u_off, v_off = (side.get_origin() - pos).other_axes(norm_axis)
+            if abs(u_off) == 64 or abs(v_off) == 64:
+                side.translate(2 * norm)
+                # Snap squarebeams to each other.
+                side.vaxis.offset = 0
 
 
 def bevel_split(

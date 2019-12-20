@@ -160,6 +160,8 @@ INST_ANGLE = {
 PETI_INST_ANGLE = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
+    zp: "0 0 0",
+    zn: "180 0 0",
 
     yn: "0 0 90",
     xp: "0 90 90",
