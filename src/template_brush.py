@@ -192,6 +192,7 @@ class ExportedTemplate(NamedTuple):
     angles: Vec
     visgroups: Set[str]
     picker_results: Dict[str, Optional[Portalable]]
+    picker_type_results: Dict[str, Optional[TileType]]
 
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
@@ -505,7 +506,7 @@ def load_templates() -> None:
             color = 'INVERT'
         elif color == 'match':
             color = None
-        else:
+        elif color != 'copy':
             raise ValueError('Invalid TileSetter color '
                              '"{}" for "{}"'.format(color, temp_id))
 
@@ -698,6 +699,7 @@ def import_template(
         angles=angles or Vec(0, 0, 0),
         visgroups=chosen_groups,
         picker_results={},  # Filled by retexture_template.
+        picker_type_results={},
     )
 
 
@@ -825,7 +827,8 @@ def retexture_template(
     # If a string it's forced to that string specifically.
     force_colour_face: Dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
     # Picker names to their results.
-    picker_results: Dict[str, Optional[texturing.Portalable]] = template_data.picker_results
+    picker_results: Dict[str, Optional[Portalable]] = template_data.picker_results
+    picker_type_results: Dict[str, Optional[TileType]] = {}
 
     # If the "use patterns" option is enabled, face ID -> temp face to copy from.
     picker_patterned: Dict[str, Optional[Side]] = defaultdict(lambda: None)
@@ -854,14 +857,17 @@ def retexture_template(
             # Doesn't exist. But only set if not already present.
             if color_picker.name:
                 picker_results.setdefault(color_picker.name, None)
+                picker_type_results.setdefault(color_picker.name, None)
             continue
 
         tile_type = tiledef[u, v]
 
+        picker_type_results[color_picker.name] = tile_type
+
         try:
             tile_color = tile_type.color
         except ValueError:
-            # Not a tile with color (void, etc). Treat as missing.
+            # Not a tile with color (void, etc). Treat as missing a color.
             picker_results.setdefault(color_picker.name, None)
             continue
 
@@ -913,8 +919,28 @@ def retexture_template(
         setter_norm = Vec(tile_setter.normal).rotate(*template_data.angles)
         setter_type = tile_setter.tile_type  # type: TileType
 
-        if setter_type.is_tile:
-
+        if tile_setter.color == 'copy':
+            if not tile_setter.picker_name:
+                raise ValueError(
+                    '"{}": Tile Setter set to copy mode '
+                    'must have a color picker!'.format(template.id)
+                )
+            # If a color picker is set, it overrides everything else.
+            try:
+                setter_type = picker_type_results[tile_setter.picker_name]
+            except KeyError:
+                raise ValueError(
+                    '"{}": Tile Setter specified color picker '
+                    '"{}" which does not exist!'.format(
+                        template.id, tile_setter.picker_name
+                    )
+                )
+            if setter_type is None:
+                raise ValueError(
+                    '"{}": Color picker "{}" has no tile to pick!'.format(
+                        template.id, tile_setter.picker_name
+                    ))
+        elif setter_type.is_tile:
             if tile_setter.picker_name:
                 # If a color picker is set, it overrides everything else.
                 try:

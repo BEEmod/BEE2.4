@@ -148,6 +148,7 @@
 		"tile": "Use tile colour"
 		"match": "Match var"
 		"invert": "Invert var"
+		"copy": "Copy type, not color"
 		]
 	
 	skin(choices): "Tile Type" : "4": "The tile type to apply." = 
