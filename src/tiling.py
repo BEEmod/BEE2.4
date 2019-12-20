@@ -479,6 +479,8 @@ class Panel:
         side_normal = Vec(y=1).rotate(*angles)
         front_pos = tile.pos + 64 * tile.normal
 
+        offset = self.offset.copy().rotate_by_str(self.inst['angles'])
+
         is_wall = tile.normal.z == 0
 
         all_brushes: List[Solid] = []
@@ -503,26 +505,6 @@ class Panel:
                         side.mat = consts.Tools.NODRAW
                         side.offset = 0
                         side.scale = 0.25
-
-        # If it's a flip panel, always create a helper.
-        if has_helper or self.pan_type.is_flip:
-            # We need to make a placement helper.
-            helper = vmf.create_ent(
-                'info_placement_helper',
-                angles=tile.normal.to_angle_roll(tile.portal_helper_orient),
-                origin=front_pos,
-                force_placement=int(force_helper),
-                snap_to_helper_angles=int(force_helper),
-                radius=64,
-            )
-            # We need to make a placement helper. Don't check portalability
-            # since the panel can change. On a flip panel,
-            # we don't want to parent so it is always on the front side.
-            if not is_static:
-                if self.pan_type.is_flip:
-                    helper['attach_target_name'] = self.brush_ent['targetname']
-                else:
-                    helper['parentname'] = self.brush_ent['targetname']
 
         if self.pan_type.is_flip:
             # Two surfaces, forward and backward - each is 4 thick.
@@ -633,21 +615,42 @@ class Panel:
                     faces,
                 )
         else:
+            # Do non-angled helpers.
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
                 angles = tile.normal.to_angle()
                 srctools.vmf.make_overlay(
                     vmf,
                     tile.normal,
-                    front_pos,
+                    front_pos + offset,
                     Vec(y=64).rotate(*angles),
                     Vec(z=64).rotate(*angles),
                     texturing.OVERLAYS.get(front_pos, 'bullseye'),
                     faces,
                 )
 
-        if self.offset:
-            offset = self.offset.copy().rotate_by_str(self.inst['angles'])
+            # If it's a flip panel, always create a helper.
+            if has_helper or self.pan_type.is_flip:
+                # We need to make a placement helper.
+                helper = vmf.create_ent(
+                    'info_placement_helper',
+                    angles=tile.normal.to_angle_roll(
+                        tile.portal_helper_orient),
+                    origin=front_pos + offset,
+                    force_placement=int(force_helper),
+                    snap_to_helper_angles=int(force_helper),
+                    radius=64,
+                )
+                # On a flip panel, we don't want to parent so it is
+                # always on the front side.
+                if not is_static:
+                    if self.pan_type.is_flip:
+                        helper['attach_target_name'] = self.brush_ent[
+                            'targetname']
+                    else:
+                        helper['parentname'] = self.brush_ent['targetname']
+
+        if offset:
             for brush in all_brushes:
                 brush.localise(offset, Vec())
 
