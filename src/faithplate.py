@@ -263,8 +263,9 @@ def gen_faithplates(vmf: VMF) -> None:
         else:
             # Static target.
             target['origin'] = Vec(pos_or_tile)
-            target['targetname'] = 'faith_target_1'
-            target.make_unique()
+
+        target['targetname'] = 'faith_target_1'
+        target.make_unique()
 
         for trig in trigs:
             trig['launchTarget'] = target['targetname']
