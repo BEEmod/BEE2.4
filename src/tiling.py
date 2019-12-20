@@ -958,15 +958,29 @@ class TileDef:
 
         U and V should be 1 or -1.
         """
+        # If there's a fully solid block on this side, we don't need to.
         if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)].inside_map:
             return True
 
+        # Otherwise, check for another tile attached to our side.
         u_ax, v_ax = Vec.INV_AXIS[self.normal.axis()]
         side_norm = Vec.with_axes(u_ax, u, v_ax, v)
 
         try:
             tiledef = TILES[self.pos.as_tuple(), side_norm.as_tuple()]
         except KeyError:
+            # No tile. As a special case, if we're an EMBED and this side is
+            # empty then embed so the instance can fit.
+            if BLOCK_POS['world': self.pos] is Block.EMBED:
+                try:
+                    tiledef = TILES[
+                        (self.pos + 128 * side_norm).as_tuple(),
+                        self.normal.as_tuple()
+                    ]
+                except KeyError:
+                    return True
+                else:
+                    return tiledef.base_type is TileType.VOID
             return False
 
         return tiledef.base_type is not TileType.VOID

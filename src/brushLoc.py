@@ -75,8 +75,8 @@ class Block(Enum):
 
     @property
     def inside_map(self) -> bool:
-        """Is this inside the map - will entities leak?"""
-        return self.value > 1
+        """Is this inside the map main map?"""
+        return self.value > 2
 
     @property
     def traversable(self) -> bool:
