@@ -830,6 +830,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
     - `b`: Black 4x4 only tile.
     - `g`: Goo sides (4x4 black, in Clean).
     - `n`: Nodraw surface.
+    - `i`: Invert the tile surface, if black/white.
     - `1`: Convert to a 1x1 only tile, if a black/white tile.
     - `4`: Convert to a 4x4 only tile, if a black/white tile.
     - `.`: Void (remove the tile in this position).
@@ -851,6 +852,8 @@ def res_set_tile(inst: Entity, res: Property) -> None:
         row.value
         for row in res.find_all('tile')
     ]
+    if not tiles:
+        raise ValueError('No "tile" parameters in SetTile!')
 
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
@@ -863,6 +866,8 @@ def res_set_tile(inst: Entity, res: Property) -> None:
                 size = tiling.TileSize.TILE_4x4
             elif val == '1':
                 size = tiling.TileSize.TILE_1x1
+            elif val == 'i':
+                size = None
             else:
                 try:
                     new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
@@ -881,6 +886,11 @@ def res_set_tile(inst: Entity, res: Property) -> None:
                     pos,
                     norm,
                 )
+                continue
+
+            if size is None:
+                # Invert the tile.
+                tile[u, v] = tile[u, v].inverted
                 continue
 
             # Unless forcing is enabled don't alter the size of GOO_SIDE.
