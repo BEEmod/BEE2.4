@@ -1296,13 +1296,16 @@ class TileDef:
             self._portal_helper += 1
         # else: it's already a Vec, so don't override with a generic helper.
 
-    def remove_portal_helper(self) -> None:
-        """Remove a single "generic" placement helper.
+    def remove_portal_helper(self, *, all: bool=False) -> None:
+        """Remove a "generic" placement helper.
 
-        Specifically applied orients are never removed.
+        If "all" is checked, all helpers are removed.
+        Otherwise, specifically applied orients are never removed.
         """
-        # Clamp at zero.
-        if isinstance(self._portal_helper, int):
+        if all:
+            self._portal_helper = 0
+        elif isinstance(self._portal_helper, int):
+            # Clamp at zero.
             self._portal_helper = max(0, self._portal_helper - 1)
 
     def position_bullseye(self, target: Entity) -> None:

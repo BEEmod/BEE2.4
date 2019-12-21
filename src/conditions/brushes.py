@@ -9,6 +9,7 @@ import template_brush
 import vbsp
 import tiling
 import texturing
+import faithplate
 import comp_consts as const
 import instance_traits
 from conditions import (
@@ -1116,3 +1117,82 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                 if panel.brush_ent['classname'] == 'func_detail':
                     panel.brush_ent.clear_keys()
                     panel.brush_ent['classname'] = 'func_detail'
+
+
+def _fill_norm_rotations() -> Dict[
+    Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+    Tuple[float, float, float]
+]:
+    """Given a norm->norm rotation, return the angles producing that."""
+    rotations = {}
+    for norm_ax in 'xyz':
+        for norm_mag in [-1, +1]:
+            norm = Vec.with_axes(norm_ax, norm_mag)
+            for angle_ax in 'xyz':
+                for angle_mag in (-90, 90):
+                    angle = Vec.with_axes(angle_ax, angle_mag)
+                    new_norm = norm.copy().rotate(*angle)
+                    if new_norm != norm:
+                        rotations[tuple(norm), tuple(new_norm)] = angle.as_tuple()
+            # Assign a null rotation as well.
+            rotations[tuple(norm), tuple(norm)] = (0.0, 0.0, 0.0)
+            rotations[tuple(norm), tuple(-norm)] = (0.0, 0.0, 0.0)
+    return rotations
+
+
+NORM_ROTATIONS = _fill_norm_rotations()
+del _fill_norm_rotations
+
+
+@make_result("TransferBullseye")
+def res_transfer_bullseye(inst: Entity, props: Property):
+    """Transfer catapult targets and placement helpers from one tile to another."""
+    start_pos = conditions.resolve_offset(inst, props['start_pos', ''])
+    end_pos = conditions.resolve_offset(inst, props['end_pos', ''])
+    start_norm = props.vec('start_norm', 0, 0, 1).rotate_by_str(inst['angles'])
+    end_norm = props.vec('end_norm', 0, 0, 1).rotate_by_str(inst['angles'])
+
+    try:
+        start_tile = tiling.TILES[
+            (start_pos - 64 * start_norm).as_tuple(),
+            start_norm.as_tuple()
+        ]
+    except KeyError:
+        LOGGER.warning('"{}": Cannot find tile to transfer from at {}, {}!'.format(
+            inst['targetname'],
+            start_pos,
+            start_norm
+        ))
+        return
+
+    end_tile = tiling.TileDef.ensure(
+        end_pos - 64 * end_norm,
+        end_norm,
+    )
+    # Now transfer the stuff.
+    if start_tile.has_oriented_portal_helper:
+        # We need to rotate this.
+        orient = start_tile.portal_helper_orient.copy()
+        # If it's directly opposite, just mirror - we have no clue what the
+        # intent is.
+        if Vec.dot(start_norm, end_norm) != -1.0:
+            # Use the dict to compute the rotation to apply.
+            orient.rotate(*NORM_ROTATIONS[
+                start_norm.as_tuple(),
+                end_norm.as_tuple()
+            ])
+        end_tile.add_portal_helper(orient)
+    elif start_tile.has_portal_helper:
+        # Non-oriented, don't orient.
+        end_tile.add_portal_helper()
+    start_tile.remove_portal_helper(all=True)
+
+    if start_tile.bullseye_count:
+        end_tile.bullseye_count = start_tile.bullseye_count
+        start_tile.bullseye_count = 0
+        # Then transfer the targets across.
+        for plate in faithplate.PLATES.values():
+            if getattr(plate, 'target', None) is start_tile:
+                plate.target = end_tile
+
+
