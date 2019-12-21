@@ -136,6 +136,21 @@ class TileSize(str, Enum):
 
     def __str__(self) -> str: return self.value
 
+    @property
+    def size(self) -> Tuple[int, int]:
+        """Return the number of 32-size tiles this takes up."""
+        if self.value in ('4x4', 'goo'):
+            return 1, 1
+        elif self.value in ('1x1', 'gap'):
+            return 4, 4
+        elif self.value == '2x2':
+            return 2, 2
+        elif self.value == '2x1':
+            return 2, 4
+        elif self.value == 'double':
+            return 8, 8
+        raise AssertionError(self)
+
 GENERATORS: Dict[
     Union[GenCat, Tuple[GenCat, Orient, Portalable]],
     'Generator'

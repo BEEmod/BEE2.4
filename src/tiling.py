@@ -210,17 +210,6 @@ TILETYPE_FROM_CHAR: Dict[str, TileType] = {
 }
 
 
-class BrushType(Enum):
-    NORMAL = 0  # Normal surface.
-    NODRAW = 1  # Nodraw brush, but needed to seal void and make backpanels.
-
-    # Replaced by a template or off-grid embedFace. Shouldn't be modified by
-    # us beyond retexturing and setting overlays.
-    TEMPLATE = 2
-    ANGLED_PANEL = 3  # Angled Panel - needs special handling for static versions.
-    FLIP_PANEL = 4  # Flip panels - these are double-sided.
-
-
 class PanelType(Enum):
     """Special functionality for tiling panels."""
     NORMAL = 'normal'
@@ -279,13 +268,6 @@ def iter_uv(
         for v in vrange:
             yield u, v
 
-TILE_SIZES = {
-    TileSize.TILE_1x1: (4, 4),
-    TileSize.TILE_2x1: (2, 4),
-    TileSize.TILE_2x2: (2, 2),
-    TileSize.TILE_4x4: (1, 1),
-}
-
 
 class Pattern:
     """Represents a position a tile can be positioned in."""
@@ -298,7 +280,7 @@ class Pattern:
         self.tex = tex
         self.wall_only = wall_only
         self.tiles = list(tiles)
-        tile_u, tile_v = TILE_SIZES[tex]
+        tile_u, tile_v = tex.size
         # Do some sanity checks on values..
         for umin, vmin, umax, vmax in tiles:
             tile_tex = '{} -> {} {} {} {}'.format(tex, umin, vmin, umax, vmax)
@@ -1196,7 +1178,7 @@ class TileDef:
                 else:
                     if tile_type.is_4x4:
                         grid_size = TileSize.TILE_4x4
-                    u_size, v_size = TILE_SIZES[grid_size]
+                    u_size, v_size = grid_size.size
                     tex = texturing.gen(
                         gen_cat, normal, tile_type.color,
                     ).get(tile_center, grid_size)
