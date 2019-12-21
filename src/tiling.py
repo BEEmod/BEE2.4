@@ -342,7 +342,7 @@ PATTERNS: Dict[str, List[Pattern]] = {
             (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
             (0, 1, 4, 3),  # Special case - horizontal 2x1, don't use center.
             (1, 1, 3, 3),  # Center
-            (1, 0, 3, 4), (1, 2, 3, 4),  # Vertical
+            (1, 0, 3, 2), (1, 2, 3, 4),  # Vertical
             (0, 1, 2, 3), (2, 1, 4, 3),  # Horizontal
         ),
 
