@@ -1092,9 +1092,12 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                 # We want to do some post-processing.
                 # Localise any origin value.
                 if 'origin' in panel.brush_ent.keys:
-                    panel.brush_ent['origin'] = Vec.from_str(
-                        panel.brush_ent['origin'],
-                    ).rotate_by_str(panel.inst['angles'])
+                    pos = Vec.from_str(panel.brush_ent['origin'])
+                    pos.localise(
+                        Vec.from_str(panel.inst['origin']),
+                        Vec.from_str(panel.inst['angles']),
+                    )
+                    panel.brush_ent['origin'] = pos
                 elif old_pos is not None:
                     panel.brush_ent['origin'] = old_pos
 
