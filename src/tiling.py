@@ -430,7 +430,6 @@ class Panel:
         bevel: bool,
         bounds: Tuple[int, int, int, int]=(0, 0, 3, 3),
     ) -> None:
-        self.moves_bullseye = False
         self.brush_ent = brush_ent
         self.inst = inst
         self.bounds = bounds
@@ -1309,7 +1308,7 @@ class TileDef:
         """
         # Ask each panel to position, which they will if angled.
         for panel in self.panels:
-            if panel.moves_bullseye:
+            if panel.pan_type.is_angled:
                 panel.position_bullseye(target)
                 break
         else:
