@@ -941,6 +941,8 @@ class TileDef:
                 continue
             for umin, vmin, umax, vmax in pattern.tiles:
                 tile_type = tiles[umin, vmin]
+                if tile_type is TileType.VOID:
+                    continue
                 for uv in iter_uv(umin, umax-1, vmin, vmax-1):
                     if tiles[uv] is not tile_type:
                         break
