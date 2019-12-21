@@ -607,7 +607,7 @@ class Panel:
                 angles = tile.normal.to_angle()
                 srctools.vmf.make_overlay(
                     vmf,
-                    tile.normal,
+                    angled_normal,
                     top_center,
                     (64 * front_normal).rotate(*rotation),
                     (64 * side_normal),
