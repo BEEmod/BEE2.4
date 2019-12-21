@@ -1062,14 +1062,16 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                 continue
 
         try:
-            panel.pan_type = tiling.PanelType(props['type'])
+            panel.pan_type = tiling.PanelType(conditions.resolve_value(inst, props['type']))
         except NoKeyError:
             pass
         except ValueError:
             raise ValueError('Unknown panel type "{}"!'.format(props['type']))
 
         if 'thickness' in props:
-            panel.thickness = props.int('thickness', 4)
+            panel.thickness = srctools.conv_int(
+                conditions.resolve_value(inst, props['thickness'])
+            )
             if panel.thickness not in (2, 4, 8):
                 raise ValueError(
                     '"{}": Invalid panel thickess {}!\n'
@@ -1078,11 +1080,17 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                     panel.thickness,
                 )
         if 'bevel' in props:
-            panel.bevel = props.bool('bevel')
+            panel.bevel = srctools.conv_bool(
+                conditions.resolve_value(inst, props['bevel'])
+            )
         if 'offset' in props:
-            panel.offset = props.vec('offset')
+            panel.offset = Vec.from_str(
+                conditions.resolve_value(inst, props['offset'])
+            )
         if 'nodraw' in props:
-            panel.nodraw = props.bool('nodraw')
+            panel.nodraw = srctools.conv_bool(
+                conditions.resolve_value(inst, props['nodraw'])
+            )
         if 'keys' in props or 'localkeys' in props:
             if panel.brush_ent is None:
                 panel.brush_ent = vmf.create_ent('')
