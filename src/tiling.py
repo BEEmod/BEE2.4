@@ -493,6 +493,7 @@ class Panel:
             thickness=self.thickness,
             is_panel=True,
             add_bullseye=use_bullseye and not is_static,
+            flat_neighbour=True,
         )
         all_brushes += brushes
 
@@ -524,6 +525,7 @@ class Panel:
                 thickness=self.thickness,
                 offset=64 - 2*self.thickness,
                 add_bullseye=use_bullseye and not is_static,
+                flat_neighbour=True,
             )
             all_brushes += brushes
             inset_flip_panel(all_brushes, front_pos, tile.normal)
