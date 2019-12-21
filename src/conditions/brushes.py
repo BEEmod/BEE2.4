@@ -1087,6 +1087,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.offset = Vec.from_str(
                 conditions.resolve_value(inst, props['offset'])
             )
+        if 'template' in props:
+            panel.template = conditions.resolve_value(inst, props['template'])
         if 'nodraw' in props:
             panel.nodraw = srctools.conv_bool(
                 conditions.resolve_value(inst, props['nodraw'])
