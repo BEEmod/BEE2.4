@@ -952,6 +952,8 @@ def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
     - `pos1`, `pos2`: The position of the tile on two diagnonally opposite
        corners. This allows only modifying some of the tiles. These default to
         a full tile.
+    - `point`: Alternatively, individually specify each point to to produce
+       irregular shapes.
     - `type`: Change the specially handled behaviours set for the panel.
        Availible options:
         - `NORMAL`: No special behaviour.
@@ -1012,47 +1014,52 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
 def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     """Implements SetPanelOptions and CreatePanel."""
     normal = props.vec('normal', 0, 0, 1).rotate_by_str(inst['angles'])
-    pos1, pos2 = Vec.bbox(
-        conditions.resolve_offset(inst, props['pos1', '-48 -48 0'], zoff=-64),
-        conditions.resolve_offset(inst, props['pos2', '48 48 0'], zoff=-64),
-    )
+
+    points: Set[Tuple[float, float, float]] = set()
+
+    if 'point' in props:
+        for prop in props.find_all('point'):
+            points.add(conditions.resolve_offset(inst, prop.value, zoff=-64).as_tuple())
+    elif 'pos1' in props and 'pos2' in props:
+        pos1, pos2 = Vec.bbox(
+            conditions.resolve_offset(inst, props['pos1', '-48 -48 0'], zoff=-64),
+            conditions.resolve_offset(inst, props['pos2', '48 48 0'], zoff=-64),
+        )
+        points.update(map(Vec.as_tuple, Vec.iter_grid(pos1, pos2, 32)))
+    else:
+        # Default to the full tile.
+        origin = Vec.from_str(inst['origin'])
+        points.update({
+            (Vec(u, v).rotate_by_str(inst['angles']) + origin).as_tuple()
+            for u in [-48.0, -16.0, 16.0, 48.0]
+            for v in [-48.0, -16.0, 16.0, 48.0]
+        })
+
     tiles_to_uv: Dict[tiling.TileDef, Set[Tuple[int, int]]] = defaultdict(set)
-    for pos in Vec.iter_grid(pos1, pos2, 32):
+    for pos in points:
+        vmf.create_ent('info_particle_system', origin=Vec(pos), angles=normal.to_angle())
         try:
-            tile, u, v = tiling.find_tile(pos, normal)
+            tile, u, v = tiling.find_tile(Vec(pos), normal)
         except KeyError:
-            vmf.create_ent('info_particle_system', origin=pos, angles=normal.to_angle())
             continue
         tiles_to_uv[tile].add((u, v))
 
     if not tiles_to_uv:
-        LOGGER.warning(
-            'No tiles found for panels within {} - {} @ {}',
-            pos1, pos2, normal
-        )
+        LOGGER.warning('"{}": No tiles found for panels!', inst['targetname'])
         return
 
     for tile, uvs in tiles_to_uv.items():
-        umin = vmin = 999
-        umax = vmax = -999
-        for u, v in uvs:
-            umin = min(umin, u)
-            umax = max(umax, u)
-            vmin = min(vmin, v)
-            vmax = max(vmax, v)
-        bounds = (umin, vmin, umax, vmax)
-
         if create:
             panel = tiling.Panel(
                 None, inst, tiling.PanelType.NORMAL,
                 thickness=4,
                 bevel=True,
-                bounds=bounds,
             )
+            panel.points = uvs
             tile.panels.append(panel)
         else:
             for panel in tile.panels:
-                if panel.inst is inst and panel.bounds == bounds:
+                if panel.inst is inst and panel.points == uvs:
                     break
             else:
                 LOGGER.warning(

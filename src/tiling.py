@@ -13,6 +13,7 @@ from typing import (
     Optional, Union, cast,
     Tuple, Dict, List,
     Iterator,
+    Set,
 )
 
 import math
@@ -392,8 +393,8 @@ class Panel:
         brush_ent: The brush entity the panel will be added to,
           or None if it should be a world brush.
         inst: The instance for the associated item.
-        bounds (min_u, min_v, max_u, max_v): The bounding box of UVs this
-          will use. Others will generate as a standard tile.
+        points: The set of UVs this will use. Others will generate as a
+          standard tile.
         pan_type: Specifies which special features to enable.
           FLIP generates an inverted copy on the other side.
           ANGLED_30/45/60/90 rotates it to match static panels.
@@ -413,11 +414,10 @@ class Panel:
         pan_type: PanelType,
         thickness: int,
         bevel: bool,
-        bounds: Tuple[int, int, int, int]=(0, 0, 3, 3),
     ) -> None:
         self.brush_ent = brush_ent
         self.inst = inst
-        self.bounds = bounds
+        self.points = set(iter_uv(0, 0, 3, 3))
         self.template = ''
         self.pan_type = pan_type
         self.thickness = thickness
@@ -1055,37 +1055,36 @@ class TileDef:
         else:
             force_helper = has_helper = False
 
-        sub_tiles: Dict[Tuple[int, int], TileType] = {
-            (u, v): tile
-            for u, v, tile in self
-        }
+        # The tiles used by panels can't be re-placed by other panels
+        # or the "base".
+        filled_tiles: Dict[Tuple[int, int], TileType] = {}
 
         for panel in self.panels:
-            pan_min_u, pan_min_v, pan_max_u, pan_max_v = panel.bounds
             # Compute a copy of subtiles with only the tiles the panel
             # has, and also without the fizzler key if present.
             panel_tiles = {
                 (u, v): tile if (
-                    pan_min_u <= u <= pan_max_u and
-                    pan_min_v <= v <= pan_max_v
+                    (u, v) in panel.points
+                    and (u, v) not in filled_tiles
                 ) else TileType.VOID
                 for u, v, tile in self
             }
             panel.export(self, vmf, panel_tiles, has_helper, force_helper)
-            # Then clear these tiles from the main static tile.
-            for pos in iter_uv(pan_min_u, pan_max_u, pan_min_v, pan_max_v):
-                sub_tiles[pos] = TileType.NODRAW if panel.seal else TileType.VOID
+            # Then mark these tiles so later panels or the main panel don't
+            # use them. If seal is true, use nodraw.
+            for pos in panel.points:
+                filled_tiles[pos] = TileType.NODRAW if panel.seal else TileType.VOID
 
-        if all(tile is TileType.VOID for tile in sub_tiles.values()):
+        # Then copy the void/nodraw tiles down onto ourselves.
+        for pos, tile in filled_tiles.items():
+            self[pos] = tile
+
+        if all(tile is TileType.VOID for u, v, tile in self):
             return
-
-        # Copy this across, so we do generate this in the main one only.
-        if self._sub_tiles is not None and SUBTILE_FIZZ_KEY in self._sub_tiles:
-            sub_tiles[SUBTILE_FIZZ_KEY] = self._sub_tiles[SUBTILE_FIZZ_KEY]
 
         faces, brushes = self.gen_multitile_pattern(
             vmf,
-            sub_tiles,
+            self._get_subtiles(),
             is_wall,
             bevels,
             self.normal,
