@@ -1093,6 +1093,10 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.nodraw = srctools.conv_bool(
                 conditions.resolve_value(inst, props['nodraw'])
             )
+        if 'seal' in props:
+            panel.seal = srctools.conv_bool(
+                conditions.resolve_value(inst, props['seal'])
+            )
         if 'keys' in props or 'localkeys' in props:
             if panel.brush_ent is None:
                 panel.brush_ent = vmf.create_ent('')

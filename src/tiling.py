@@ -402,6 +402,7 @@ class Panel:
         template: If set, generate this template and include it in the brush.
         bevel: If true, the surface will be bevelled on all sides.
         nodraw: If true, apply nodraw to the squarebeam and backpanel faces.
+        seal: If true, place nodraw tiles behind the panel instead of void.
         offset: Offset the tile by this much (local to the instance).
     """
 
@@ -422,6 +423,7 @@ class Panel:
         self.thickness = thickness
         self.bevel = bevel
         self.nodraw = False
+        self.seal = False
         self.offset = Vec()
 
     def export(
@@ -1060,6 +1062,8 @@ class TileDef:
 
         for panel in self.panels:
             pan_min_u, pan_min_v, pan_max_u, pan_max_v = panel.bounds
+            # Compute a copy of subtiles with only the tiles the panel
+            # has, and also without the fizzler key if present.
             panel_tiles = {
                 (u, v): tile if (
                     pan_min_u <= u <= pan_max_u and
@@ -1068,8 +1072,9 @@ class TileDef:
                 for u, v, tile in self
             }
             panel.export(self, vmf, panel_tiles, has_helper, force_helper)
+            # Then clear these tiles from the main static tile.
             for pos in iter_uv(pan_min_u, pan_max_u, pan_min_v, pan_max_v):
-                sub_tiles[pos] = TileType.VOID
+                sub_tiles[pos] = TileType.NODRAW if panel.seal else TileType.VOID
 
         if all(tile is TileType.VOID for tile in sub_tiles.values()):
             return
