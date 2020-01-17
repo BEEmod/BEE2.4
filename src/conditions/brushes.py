@@ -1030,14 +1030,13 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         # Default to the full tile.
         origin = Vec.from_str(inst['origin'])
         points.update({
-            (Vec(u, v).rotate_by_str(inst['angles']) + origin).as_tuple()
+            (Vec(u, v, -64.0).rotate_by_str(inst['angles']) + origin).as_tuple()
             for u in [-48.0, -16.0, 16.0, 48.0]
             for v in [-48.0, -16.0, 16.0, 48.0]
         })
 
     tiles_to_uv: Dict[tiling.TileDef, Set[Tuple[int, int]]] = defaultdict(set)
     for pos in points:
-        vmf.create_ent('info_particle_system', origin=Vec(pos), angles=normal.to_angle())
         try:
             tile, u, v = tiling.find_tile(Vec(pos), normal)
         except KeyError:
