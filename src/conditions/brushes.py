@@ -1091,9 +1091,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                 conditions.resolve_value(inst, props['bevel'])
             )
         if 'offset' in props:
-            panel.offset = Vec.from_str(
-                conditions.resolve_value(inst, props['offset'])
-            )
+            panel.offset = conditions.resolve_offset(inst, props['offset'])
+            panel.offset -= Vec.from_str(inst['origin'])
         if 'template' in props:
             panel.template = conditions.resolve_value(inst, props['template'])
         if 'nodraw' in props:

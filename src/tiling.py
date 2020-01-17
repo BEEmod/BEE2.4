@@ -465,7 +465,7 @@ class Panel:
         side_normal = Vec(y=1).rotate(*angles)
         front_pos = tile.pos + 64 * tile.normal
 
-        offset = self.offset.copy().rotate_by_str(self.inst['angles'])
+        offset = self.offset.copy()
 
         is_wall = tile.normal.z == 0
 
