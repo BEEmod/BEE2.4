@@ -880,7 +880,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
 
             # Edit the existing tile.
             try:
-                tile, u, v = tiling.find_tile(pos, norm)
+                tile, u, v = tiling.find_tile(pos, norm, force_tile)
             except KeyError:
                 LOGGER.warning(
                     'Expected tile, but none found: {}, {}',
