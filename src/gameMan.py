@@ -856,8 +856,8 @@ class Game:
                         export_screen.reset()
                         messagebox.showerror(
                             title=_('BEE2 - Export Failed!'),
-                            message=_('Copying compiler file {file} failed.'
-                                      'Ensure the {game} is not running.').format(
+                            message=_('Copying compiler file {file} failed. '
+                                      'Ensure {game} is not running.').format(
                                         file=comp_file,
                                         game=self.name,
                                     ),
