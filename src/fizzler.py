@@ -1146,6 +1146,7 @@ def generate_fizzlers(vmf: VMF):
         # Static versions are only used for fizzlers which start on.
         # Permanently-off fizzlers are kinda useless, so we don't need
         # to bother optimising for it.
+        # TODO: This needs to use connections to correctly check this.
         is_static = bool(
             fizz.base_inst.fixup.int('$connectioncount', 0) == 0
             and fizz.base_inst.fixup.bool('$start_enabled', 1)
