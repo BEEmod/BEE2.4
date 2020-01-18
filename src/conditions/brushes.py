@@ -1047,6 +1047,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         LOGGER.warning('"{}": No tiles found for panels!', inst['targetname'])
         return
 
+    panels: List[tiling.Panel] = []
+
     for tile, uvs in tiles_to_uv.items():
         if create:
             panel = tiling.Panel(
@@ -1066,6 +1068,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                     inst['targetname']
                 )
                 continue
+        panels.append(panel)
 
         try:
             panel.pan_type = tiling.PanelType(conditions.resolve_value(inst, props['type']))
@@ -1093,7 +1096,11 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.offset = conditions.resolve_offset(inst, props['offset'])
             panel.offset -= Vec.from_str(inst['origin'])
         if 'template' in props:
-            panel.template = conditions.resolve_value(inst, props['template'])
+            # We only want the template inserted once. So remove it from all but one.
+            if len(panels) == 1:
+                panel.template = conditions.resolve_value(inst, props['template'])
+            else:
+                panel.template = ''
         if 'nodraw' in props:
             panel.nodraw = srctools.conv_bool(
                 conditions.resolve_value(inst, props['nodraw'])
@@ -1102,40 +1109,60 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.seal = srctools.conv_bool(
                 conditions.resolve_value(inst, props['seal'])
             )
-        if 'keys' in props or 'localkeys' in props:
-            if panel.brush_ent is None:
-                panel.brush_ent = vmf.create_ent('')
+    if 'keys' in props or 'localkeys' in props:
+        # First grab the existing ent, so we can edit it.
+        # These should all have the same value, unless they were independently
+        # edited with mismatching point sets. In that case destroy all those existing ones.
+        existing_ents: Set[Optional[Entity]] = {panel.brush_ent for panel in panels}
+        try:
+            [brush_ent] = existing_ents
+        except ValueError:
+            LOGGER.warning(
+                'Multiple independent panels for "{}" were made, then the'
+                'brush entity was edited as a group! Discarding '
+                'individual ents...',
+                inst['targetname']
+            )
+            for brush_ent in existing_ents:
+                if brush_ent is not None and brush_ent in vmf.entities:
+                    brush_ent.remove()
+            brush_ent = None
 
-            old_pos = panel.brush_ent.keys.pop('origin', None)
+        if brush_ent is None:
+            brush_ent = vmf.create_ent('')
 
-            conditions.set_ent_keys(panel.brush_ent, inst, props)
-            if not panel.brush_ent['classname']:
-                if create:  # This doesn't make sense, you could just omit the prop.
-                    LOGGER.warning(
-                        'No classname provided for panel "{}"!',
-                        inst['targetname'],
-                    )
-                # Make it a world brush.
-                panel.brush_ent.remove()
-                panel.brush_ent = None
-            else:
-                # We want to do some post-processing.
-                # Localise any origin value.
-                if 'origin' in panel.brush_ent.keys:
-                    pos = Vec.from_str(panel.brush_ent['origin'])
-                    pos.localise(
-                        Vec.from_str(panel.inst['origin']),
-                        Vec.from_str(panel.inst['angles']),
-                    )
-                    panel.brush_ent['origin'] = pos
-                elif old_pos is not None:
-                    panel.brush_ent['origin'] = old_pos
+        old_pos = brush_ent.keys.pop('origin', None)
 
-                # If it's func_detail, clear out all the keys.
-                # Particularly `origin`, but the others are useless too.
-                if panel.brush_ent['classname'] == 'func_detail':
-                    panel.brush_ent.clear_keys()
-                    panel.brush_ent['classname'] = 'func_detail'
+        conditions.set_ent_keys(brush_ent, inst, props)
+        if not brush_ent['classname']:
+            if create:  # This doesn't make sense, you could just omit the prop.
+                LOGGER.warning(
+                    'No classname provided for panel "{}"!',
+                    inst['targetname'],
+                )
+            # Make it a world brush.
+            brush_ent.remove()
+            brush_ent = None
+        else:
+            # We want to do some post-processing.
+            # Localise any origin value.
+            if 'origin' in brush_ent.keys:
+                pos = Vec.from_str(brush_ent['origin'])
+                pos.localise(
+                    Vec.from_str(inst['origin']),
+                    Vec.from_str(inst['angles']),
+                )
+                brush_ent['origin'] = pos
+            elif old_pos is not None:
+                brush_ent['origin'] = old_pos
+
+            # If it's func_detail, clear out all the keys.
+            # Particularly `origin`, but the others are useless too.
+            if brush_ent['classname'] == 'func_detail':
+                brush_ent.clear_keys()
+                brush_ent['classname'] = 'func_detail'
+        for panel in panels:
+            panel.brush_ent = brush_ent
 
 
 def _fill_norm_rotations() -> Dict[
