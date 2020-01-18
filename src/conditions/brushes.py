@@ -1070,12 +1070,14 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                 continue
         panels.append(panel)
 
+        pan_type = '<nothing?>'
         try:
-            panel.pan_type = tiling.PanelType(conditions.resolve_value(inst, props['type']))
+            pan_type = conditions.resolve_value(inst, props['type'])
+            panel.pan_type = tiling.PanelType(pan_type.lower())
         except NoKeyError:
             pass
         except ValueError:
-            raise ValueError('Unknown panel type "{}"!'.format(props['type']))
+            raise ValueError('Unknown panel type "{}"!'.format(pan_type))
 
         if 'thickness' in props:
             panel.thickness = srctools.conv_int(
