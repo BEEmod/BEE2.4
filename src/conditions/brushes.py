@@ -955,7 +955,7 @@ def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
     - `point`: Alternatively, individually specify each point to to produce
        irregular shapes.
     - `type`: Change the specially handled behaviours set for the panel.
-       Availible options:
+       Available options:
         - `NORMAL`: No special behaviour.
         - `FLIP_BLACK`: Apply black tiles to the backside of the panel,
           doubling it in thickness.
@@ -967,6 +967,14 @@ def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
     - `bevel`: If true, angle the sides. Otherwise leave them straight.
     - `nodraw_sides`: If true, apply nodraw to the sides and back instead of
       squarebeams/backpanels materials.
+    - `seal`: If enabled, nodraw tiles will be generated at the original
+      position to seal in the map.
+    - `template`: If set, additionally insert this template at the instance's
+      location, merging the brushes into this entity. This can be used for
+      irregularly-shaped tiles, clips or other extra brushes you wish to include.
+      Don't include the sections of panel you're planning to template in the
+      panel's points, or it will generate those tiles as well. Instead use a
+      tile_setter or color_picker to remove them through the template.
     - `offset`: Offset the brush in any direction. It starts flush where a
       normal surface would be.
     - `keys`, `localkeys`: Make the panel use a brush entity with these options.
@@ -993,7 +1001,7 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
        corners. This allows only modifying some of the tiles. These default to
         a full tile.
     - `type`: Instructs the panel to use some specially handled behaviours.
-       Availible options:
+       Available options:
         - `NORMAL`: No special behaviour.
         - `FLIP_BLACK`: Apply black tiles to the backside of the panel,
           doubling it in thickness.
@@ -1003,6 +1011,16 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
           an extended panel of these angles.
     - `thickness`: The thickness of the surface. Must be 2, 4 or 8.
     - `bevel`: If true, angle the sides. Otherwise leave them straight.
+    - `nodraw_sides`: If true, apply nodraw to the sides and back instead of
+      squarebeams/backpanels materials.
+    - `seal`: If enabled, nodraw tiles will be generated at the original
+      position to seal in the map.
+    - `template`: If set, additionally insert this template at the instance's
+      location, merging the brushes into this entity. This can be used for
+      irregularly-shaped tiles, clips or other extra brushes you wish to include.
+      Don't include the sections of panel you're planning to template in the
+      panel's points, or it will generate those tiles as well. Instead use a
+      tile_setter or color_picker to remove them through the template.
     - `offset`: Offset the brush in any direction. It starts flush where a
       normal surface would be.
     - `keys`, `localkeys`: Make the panel use a brush entity with these options.
