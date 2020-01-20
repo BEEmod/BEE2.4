@@ -924,7 +924,7 @@ def res_add_placement_helper(inst: Entity, res: Property):
     up_dir: Optional[Vec]
     try:
         up_dir = Vec.from_str(res['upDir']).rotate(*angles)
-    except NoKeyError:
+    except LookupError:
         up_dir = None
 
     try:
