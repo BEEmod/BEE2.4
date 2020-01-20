@@ -574,7 +574,7 @@ class Panel:
 
             front_axis = front_normal.axis()
 
-            for brush in brushes:
+            for brush in all_brushes:
                 clip_face = None
                 for face in brush:
                     if (
