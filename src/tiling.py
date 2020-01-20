@@ -1005,8 +1005,8 @@ class TileDef:
 
         # If the top and bottom is white, you can always fit a portal.
         if (
-            self[1, 0].is_white and self[2, 1].is_white and
-            self[3, 0].is_white and self[3, 1].is_white
+            self[1, 0].is_white and self[2, 0].is_white and
+            self[1, 3].is_white and self[2, 3].is_white
         ):
             return True
 
