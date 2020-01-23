@@ -1761,23 +1761,13 @@ class Item(PakObject):
         has_input = False
         has_secondary = False
         has_output = False
-        try:
-            [input_conf] = item.find_all('Exporting', 'Inputs', 'BEE2')
-        except ValueError:
-            pass
-        else:
-            input_conf = input_conf.copy()
-            input_conf.name = None
-            comm_block += input_conf
-        try:
-            [output_conf] = item.find_all('Exporting', 'Outputs', 'BEE2')
-            output_conf.name = None
-        except ValueError:
-            pass
-        else:
-            output_conf = output_conf.copy()
-            output_conf.name = None
-            comm_block += output_conf
+
+        for prop in item.find_children('Exporting', 'Inputs', 'BEE2'):
+            comm_block.append(prop.copy())
+
+        for prop in item.find_children('Exporting', 'Outputs', 'BEE2'):
+            comm_block.append(prop.copy())
+
         for block in item.find_all('Exporting', 'Inputs', CONN_NORM):
             has_input = True
             conv_peti_input(block, 'enable_cmd', 'activate')
