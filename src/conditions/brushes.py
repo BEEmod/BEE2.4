@@ -1056,7 +1056,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     tiles_to_uv: Dict[tiling.TileDef, Set[Tuple[int, int]]] = defaultdict(set)
     for pos in points:
         try:
-            tile, u, v = tiling.find_tile(Vec(pos), normal)
+            tile, u, v = tiling.find_tile(Vec(pos), normal, force=create)
         except KeyError:
             continue
         tiles_to_uv[tile].add((u, v))
