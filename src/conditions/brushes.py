@@ -1092,7 +1092,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         try:
             pan_type = conditions.resolve_value(inst, props['type'])
             panel.pan_type = tiling.PanelType(pan_type.lower())
-        except NoKeyError:
+        except LookupError:
             pass
         except ValueError:
             raise ValueError('Unknown panel type "{}"!'.format(pan_type))
