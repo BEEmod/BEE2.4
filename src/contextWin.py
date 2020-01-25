@@ -274,6 +274,8 @@ def load_item_data():
 
     editor_data = item_data.editor.copy()
 
+    # Reuse the exporting logic to parse out whether an item has I/O.
+    # This takes into account a bunch of special cases.
     comm_block = Property(selected_item.id, [])
     (
         has_inputs,
@@ -299,10 +301,10 @@ def load_item_data():
             set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
-                wid['sprite', SPR.INPUT].tooltip_text = _(
+                tooltip.set_tooltip(wid['sprite', SPR.INPUT], _(
                     'Excursion Funnels accept a on/off '
                     'input and a directional input.'
-                )
+                ))
         else:
             set_sprite(SPR.INPUT, 'in_norm')
     else:
