@@ -192,23 +192,6 @@ IGNORED_OVERLAYS = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def alter_mat(
-    face: VLib.Side,
-    seed: str=None,
-    texture_lock: bool=True,
-) -> bool:
-    """Randomise the texture used for a face, based on configured textures.
-
-    This uses the TEX_VALVE dict to identify the kind of texture, but
-    uses the face orientation to determine the wall direction - the
-    PeTI often uses textures on the wrong sides for various reasons.
-
-    If texture_lock is false, the offset of the texture will be reset to 0,0.
-    That ensures embedface will have aligned textures.
-    """
-    raise NotImplementedError("Don't use!")
-
-
 def get_tile_type(mat: str, orient: ORIENT) -> str:
     """Get the texture command for a texture."""
     surf_type = 'white' if mat in consts.WhitePan else 'black'
