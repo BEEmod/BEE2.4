@@ -327,9 +327,6 @@ def res_add_brush(inst: Entity, res: Property) -> None:
 
     solids = vbsp.VMF.make_prism(point1, point2)
 
-    # Ensure the faces aren't re-textured later
-    vbsp.IGNORED_FACES.update(solids.solid.sides)
-
     solids.north.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.N),
@@ -701,10 +698,6 @@ def res_import_template(inst: Entity, res: Property):
             out = out.copy()
             out.target = conditions.local_name(inst, out.target)
             temp_data.detail.add_out(out)
-
-        # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
-        # modify it.
-        vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)
 
     if replace_brush_pos is not None:
         LOGGER.warning(

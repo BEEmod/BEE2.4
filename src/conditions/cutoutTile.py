@@ -541,9 +541,6 @@ def make_tile(vmf: VMF, p1: Vec, p2: Vec, top_mat, bottom_mat, beam_mat):
     w.uaxis = e.uaxis.copy()
     w.vaxis = e.vaxis.copy()
 
-    # Ensure the squarebeams textures aren't replaced, as well as floor tex
-    vbsp.IGNORED_FACES.update(brush.sides)
-
     return prism
 
 
@@ -800,8 +797,6 @@ def add_floor_sides(vmf: VMF, locs):
             # Swap these to flip the texture diagonally, so the beam is at top
             face.uaxis, face.vaxis = face.vaxis, face.uaxis
             face.uaxis.offset = 48
-
-            vbsp.IGNORED_FACES.add(face)
 
     # Look for the ones without a texture - these are open to the void and
     # need to be sealed. The template chamfers the edges

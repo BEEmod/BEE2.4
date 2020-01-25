@@ -185,11 +185,9 @@ MAP_RAND_SEED = ''
 # The actual map.
 VMF = None  # type: VLib.VMF
 
-# These are faces, overlays and brush entitites which have been modified by
+# These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
-IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
-IGNORED_BRUSH_ENTS = set()
 
 GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
 

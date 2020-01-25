@@ -676,18 +676,9 @@ def import_template(
         detail_ent = vbsp.VMF.create_ent(
             classname='func_detail'
         )
-        # Don't let this be touched later..
-        vbsp.IGNORED_BRUSH_ENTS.add(detail_ent)
         detail_ent.solids = new_detail
         if not add_to_map:
             detail_ent.remove()
-
-    # Don't let these get retextured normally - that should be
-    # done by retexture_template(), if at all!
-    for solid in new_world:
-        vbsp.IGNORED_FACES.update(solid.sides)
-    for solid in new_detail:
-        vbsp.IGNORED_FACES.update(solid.sides)
 
     return ExportedTemplate(
         world=new_world,

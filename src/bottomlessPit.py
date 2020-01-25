@@ -239,10 +239,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             side_dirs
         ])
 
-    if tele_trig is not None:
-        vbsp.IGNORED_BRUSH_ENTS.add(tele_trig)
     if hurt_trig is not None:
-        vbsp.IGNORED_BRUSH_ENTS.add(hurt_trig)
         hurt_trig.outputs.append(
             Output(
                 'OnHurtPlayer',
@@ -318,8 +315,6 @@ def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
     """Retexture the brush forming the bottom of a pit."""
     if SETTINGS['skybox'] != '':
         face.mat = 'tools/toolsskybox'
-        import vbsp
-        vbsp.IGNORED_FACES.add(face)
     else:
         # We have a pit shell, we don't want a bottom.
         vmf.remove_brush(solid)
