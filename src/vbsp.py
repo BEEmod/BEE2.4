@@ -189,11 +189,7 @@ VMF = None  # type: VLib.VMF
 # conditions, and shouldn't be restyled or modified later.
 IGNORED_OVERLAYS = set()
 
-GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
-
-
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
-
 
 
 def alter_mat(
@@ -622,6 +618,8 @@ def set_player_portalgun() -> None:
         has['spawn_nogun'] = True
 
     ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    
+    logic_auto = VMF.create_ent('logic_auto', origin=ent_pos, flags='1')
 
     if not blue_portal or not oran_portal or force_portal_man:
         pgun_script = VMF.create_ent(
@@ -742,7 +740,7 @@ def set_player_portalgun() -> None:
             ))
 
         if GAME_MODE == 'SP':
-            GLOBAL_OUTPUTS.append(VLib.Output(
+            logic_auto.add_out(VLib.Output(
                 'OnMapSpawn',
                 '@portalgun',
                 'RunScriptCode',
@@ -765,14 +763,14 @@ def set_player_portalgun() -> None:
         ), relay_name='@map_won')
 
     if blue_portal:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '@player_has_blue',
             'Trigger',
             only_once=True,
         ))
     if oran_portal:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '@player_has_oran',
             'Trigger',
@@ -847,7 +845,9 @@ def add_fog_ents():
         fog_controller['fogcolor2'] = fog_opt['secondary']
         fog_controller['use_angles'] = '1'
 
-    GLOBAL_OUTPUTS.extend([
+    logic_auto = VMF.create_ent(classname='logic_auto', origin=pos, flags='1')
+
+    logic_auto.add_out(
         VLib.Output(
             'OnMapSpawn',
             '@clientcommand',
@@ -883,10 +883,10 @@ def add_fog_ents():
             fog_opt['tonemap_exp_max'],
             only_once=True,
         ),
-    ])
+    )
 
     if fog_opt['tonemap_bloom_scale']:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetBloomScale',
@@ -895,7 +895,7 @@ def add_fog_ents():
         ))
 
     if GAME_MODE == 'SP':
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '!player',
             'SetFogController',
@@ -903,14 +903,13 @@ def add_fog_ents():
             only_once=True,
         ))
     else:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '!player_blue',
             'SetFogController',
             '@fog_controller',
             only_once=True,
-        ))
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        ), VLib.Output(
             'OnMapSpawn',
             '!player_orange',
             'SetFogController',
@@ -1831,14 +1830,6 @@ def add_extra_ents(game_mode: str) -> None:
             glados_scripts.append('bee2/coop_responses.nut')
 
         global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
-
-    # Add a logic_auto with the set of global outputs.
-    logic_auto = VMF.create_ent(
-        classname='logic_auto',
-        spawnflags='0',  # Don't remove on fire
-        origin=global_ents_pos + (0, 0, 16),
-    )
-    logic_auto.outputs = GLOBAL_OUTPUTS
 
 
 def change_ents():
