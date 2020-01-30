@@ -472,7 +472,7 @@ def set_player_model():
     if GAME_MODE == 'COOP':  # Not in coop..
         return
 
-    loc = vbsp_options.get(Vec, 'model_changer_loc')
+    loc = vbsp_options.get(Vec, 'global_ents_loc')
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -481,31 +481,17 @@ def set_player_model():
 
     model_path, pgun_skin = PLAYER_MODELS[chosen_model]
 
-    # Plug leaks
-    VMF.add_brushes(VMF.make_hollow(
-        loc - (32, 32, 64),
-        loc + (32, 32, 64),
-    ))
-
     # Precache the model, so we can switch to it.
     VMF.create_ent(
-        classname='prop_dynamic_override',
-        origin=loc + (0, 0, -60),
+        classname='comp_precache_model',
+        origin=loc,
         model='models/' + model_path + '.mdl',
-
-        rendermode=10,
-        startDisabled=1,
-        holdAnimation=1,
-        disableshadows=1,
-        disableshadowdepth=1,
-        disableflashlight=1,
-        disablereceiveshadows=1,
     )
 
     auto = VMF.create_ent(
         classname='logic_auto',
         spawnflags=0,  # Don't remove on fire.
-        origin=loc + (0, 0, 32),
+        origin=loc,
     )
 
     # The delay is required to ensure the portalgun parents properly
