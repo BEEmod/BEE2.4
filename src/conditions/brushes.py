@@ -929,7 +929,12 @@ def res_add_placement_helper(inst: Entity, res: Property):
     tile.add_portal_helper(up_dir)
 
 
-@make_result('SetPanelOptions')
+@make_result('SetPanelOptions', *[
+    alter + pan + opts  # All the combinations
+    for alter in ['Set', 'Alter']
+    for pan in ['Panel', 'Pan']
+    for opts in ['Options', 'Opts']
+])
 def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
     """Modify an existing panel associated with this instance.
 
