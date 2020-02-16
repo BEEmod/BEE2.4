@@ -471,6 +471,13 @@ def make_flag(orig_name: str, *aliases: str):
 
 def make_result(orig_name: str, *aliases: str):
     """Decorator to add results to the lookup."""
+    folded_name = orig_name.casefold()
+    # Discard the original name from aliases, if it's also there.
+    aliases = tuple([
+        name for name in aliases
+        if name.casefold() != folded_name
+    ])
+
     def x(func):
         try:
             func.group = func.__globals__['COND_MOD_NAME']
@@ -482,7 +489,7 @@ def make_result(orig_name: str, *aliases: str):
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
-        RESULT_LOOKUP[orig_name.casefold()] = wrapper
+        RESULT_LOOKUP[folded_name] = wrapper
         for name in aliases:
             RESULT_LOOKUP[name.casefold()] = wrapper
         return func
