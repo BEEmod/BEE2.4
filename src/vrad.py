@@ -315,7 +315,7 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def dump_files(zipfile: ZipFile):
+def dump_files(bsp: BSP):
     """Dump packed files to a location.
     """
     dump_folder = CONF['packfile_dump', '']
@@ -344,8 +344,9 @@ def dump_files(zipfile: ZipFile):
         else:
             os.remove(name)
 
-    for zipinfo in zipfile.infolist():
-        zipfile.extract(zipinfo, dump_folder)
+    with bsp.packfile() as zipfile:
+        for zipinfo in zipfile.infolist():
+            zipfile.extract(zipinfo, dump_folder)
 
 
 def generate_music_script(data: Property, pack_list: PackList) -> bytes:
@@ -818,28 +819,24 @@ def main(argv: List[str]) -> None:
 
     if '-no_pack' not in args:
         # Cubemap files packed into the map already.
-        existing = set(zipfile.infolist())
+        with bsp_file.packfile() as zipfile:
+            existing = set(zipfile.namelist())
 
         LOGGER.info('Writing to BSP...')
         packlist.pack_into_zip(
-            zipfile,
+            bsp_file,
             ignore_vpk=True,
             whitelist=pack_whitelist,
             blacklist=pack_blacklist,
         )
 
-        LOGGER.info('Packed files:\n{}', '\n'.join([
-            zipinfo.filename
-            for zipinfo in zipfile.infolist()
-            if zipinfo.filename not in existing
-        ]))
+        with bsp_file.packfile() as zipfile:
+            LOGGER.info('Packed files:\n{}', '\n'.join(
+                set(zipfile.namelist()) - existing
+            ))
 
-    dump_files(zipfile)
+    dump_files(bsp_file)
 
-    zipfile.close()  # Finalise the zip modification
-
-    # Copy the zipfile into the BSP file, and adjust the headers.
-    bsp_file.lumps[BSP_LUMPS.PAKFILE].data = zip_data.getvalue()
     # Copy new entity data.
     bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
 
