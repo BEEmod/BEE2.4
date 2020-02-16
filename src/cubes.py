@@ -430,7 +430,7 @@ class CubeType:
             raise ValueError('Bad cube type "{}" for {}'.format(
                 conf['cubetype'], cube_id)
             ) from None
-        except NoKeyError:
+        except LookupError:
             raise ValueError('No cube type for "{}"!'.format(cube_id)) from None
 
         try:
