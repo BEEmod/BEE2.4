@@ -967,6 +967,9 @@ def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
       squarebeams/backpanels materials.
     - `seal`: If enabled, nodraw tiles will be generated at the original
       position to seal in the map.
+    - `move_bullseye`: If set, this will move any bullseye target on the tile.
+      This only affects the actual trajectory, not the visual
+      (which always appears).
     - `template`: If set, additionally insert this template at the instance's
       location, merging the brushes into this entity. This can be used for
       irregularly-shaped tiles, clips or other extra brushes you wish to include.
@@ -1013,6 +1016,9 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
       squarebeams/backpanels materials.
     - `seal`: If enabled, nodraw tiles will be generated at the original
       position to seal in the map.
+    - `move_bullseye`: If set, this will move any bullseye target on the tile.
+      This only affects the actual trajectory, not the visual
+      (which always appears).
     - `template`: If set, additionally insert this template at the instance's
       location, merging the brushes into this entity. This can be used for
       irregularly-shaped tiles, clips or other extra brushes you wish to include.
@@ -1126,6 +1132,10 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         if 'seal' in props:
             panel.seal = srctools.conv_bool(
                 conditions.resolve_value(inst, props['seal'])
+            )
+        if 'move_bullseye' in props:
+            panel.steals_bullseye = srctools.conv_bool(
+                conditions.resolve_value(inst, props['move_bullseye'])
             )
     if 'keys' in props or 'localkeys' in props:
         # First grab the existing ent, so we can edit it.

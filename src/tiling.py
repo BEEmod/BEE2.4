@@ -13,7 +13,6 @@ from typing import (
     Optional, Union, cast,
     Tuple, Dict, List,
     Iterator,
-    Set,
 )
 
 import math
@@ -429,6 +428,7 @@ class Panel:
         self.bevel = bevel
         self.nodraw = False
         self.seal = False
+        self.steals_bullseye = False
         self.offset = Vec()
 
     def export(
@@ -670,7 +670,7 @@ class Panel:
         else:
             self.brush_ent.solids.extend(all_brushes)
 
-    def position_bullseye(self, target: Entity):
+    def position_bullseye(self, tile: 'TileDef', target: Entity) -> None:
         """Compute the position required for the bullseye overlay."""
         if self.pan_type.is_angled:
             angle = self.pan_type.angle
@@ -682,7 +682,16 @@ class Panel:
                 Vec.from_str(self.inst['origin']),
                 Vec.from_str(self.inst['angles']),
             )
-            target['origin'] = panel_top
+        else:
+            panel_top = tile.pos + 64 * tile.normal
+        target['origin'] = panel_top + self.offset
+
+        if (
+            self.brush_ent is not None and
+            self.brush_ent['classname'] != 'func_detail'
+        ):
+            self.brush_ent.make_unique('panel')  # In case it's unnamed.
+            target['parentname'] = self.brush_ent['targetname']
 
 
 class TileDef:
@@ -1325,8 +1334,8 @@ class TileDef:
         """
         # Ask each panel to position, which they will if angled.
         for panel in self.panels:
-            if panel.pan_type.is_angled:
-                panel.position_bullseye(target)
+            if panel.steals_bullseye:
+                panel.position_bullseye(self, target)
                 break
         else:
             # No panels, default to flat on the surface.
