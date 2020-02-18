@@ -31,12 +31,7 @@ TEX_DEFAULT = [
 MATS: Dict[str, List[str]] = defaultdict(list)
 
 # We want to force tiles with these overlay materials to appear!
-FORCE_TILE_MATS = {
-    mat
-    for mat, (group, name) in
-    vbsp.TEX_VALVE.items()
-    if group == 'overlay'
-}
+FORCE_TILE_MATS = list(consts.Signage)
 
 # The template used to seal sides open to the void.
 FLOOR_TEMP_SIDE_WORLD = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_WORLD'

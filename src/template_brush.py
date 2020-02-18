@@ -1106,10 +1106,13 @@ def retexture_template(
                 mat = mat[1:-1]
                 gen, tex_name = texturing.parse_name(mat[1:-1])
                 mat = gen.get(over_pos, tex_name)
-        elif mat in consts.Signage:
-            import vbsp
-            sign_type = vbsp.TEX_VALVE[mat][1]
-            mat = texturing.OVERLAYS.get(over_pos, sign_type)
+        else:
+            try:
+                sign_type = consts.Signage(mat)
+            except ValueError:
+                pass
+            else:
+                mat = texturing.OVERLAYS.get(over_pos, sign_type)
 
         if mat == '':
             # If blank, remove the overlay from the map and the list.

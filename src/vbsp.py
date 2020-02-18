@@ -9,7 +9,6 @@ import sys
 import shutil
 import random
 import logging
-from enum import Enum
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
@@ -38,11 +37,7 @@ import comp_consts as consts
 import cubes
 import barriers
 
-from typing import (
-    Dict, Tuple, List,
-    Set,
-    Any,
-)
+from typing import Any, Dict, Tuple, List, Set
 
 COND_MOD_NAME = 'VBSP'
 
@@ -59,98 +54,6 @@ settings = {
     "packtrigger":    defaultdict(list),
 }  # type: Dict[str, Dict[str, Any]]
 
-
-TEX_VALVE = {
-    # all the non-wall textures produced by the Puzzlemaker, and their
-    # replacement keys:
-    consts.Signage.EXIT: ('overlay', 'exit'),
-    consts.Signage.ARROW: ('overlay', 'arrow'),
-    consts.Signage.SHAPE_DOT: ('overlay', 'dot'),
-    consts.Signage.SHAPE_MOON: ('overlay', 'moon'),
-    consts.Signage.SHAPE_TRIANGLE: ('overlay', 'triangle'),
-    consts.Signage.SHAPE_CROSS: ('overlay', 'cross'),
-    consts.Signage.SHAPE_SQUARE: ('overlay', 'square'),
-    consts.Signage.SHAPE_CIRCLE: ('overlay', 'circle'),
-    consts.Signage.SHAPE_SINE: ('overlay', 'sine'),
-    consts.Signage.SHAPE_SLASH: ('overlay', 'slash'),
-    consts.Signage.SHAPE_STAR: ('overlay', 'star'),
-    consts.Signage.SHAPE_WAVY: ('overlay', 'wavy'),
-    consts.Special.BACKPANELS_CHEAP: ('special', 'behind'),
-    consts.Special.PED_SIDE: ('special', 'pedestalside'),
-    consts.Special.SQUAREBEAMS: ('special', 'edge'),
-    consts.Goo.REFLECTIVE: ('special', 'goo'),
-    consts.Goo.CHEAP: ('special', 'goo_cheap'),
-    consts.Special.GLASS: ('special', 'glass'),
-    consts.Special.GRATING: ('special', 'grating'),
-    consts.Special.LASERFIELD: ('special', 'laserfield'),
-}
-
-
-TEX_DEFAULTS = [
-    # Extra default replacements we need to specially handle.
-
-    # These have the same item so we can't store this in the regular
-    # dictionary.
-    (consts.BlackPan.BLACK_FLOOR,    'black.floor'),
-    (consts.WhitePan.WHITE_FLOOR,    'white.floor'),
-    (consts.BlackPan.BLACK_FLOOR,    'black.ceiling'),
-    (consts.WhitePan.WHITE_FLOOR,    'white.ceiling'),
-    (consts.WhitePan.WHITE_1x1,     'white.wall'),
-    (consts.WhitePan.WHITE_2x1,     'white.wall'),
-    (consts.WhitePan.WHITE_2x2,     'white.2x2'),
-    (consts.WhitePan.WHITE_4x4,     'white.4x4'),
-    (consts.BlackPan.BLACK_1x1, 'black.wall'),
-    (consts.BlackPan.BLACK_2x1, 'black.wall'),
-    (consts.BlackPan.BLACK_2x2,  'black.2x2'),
-    (consts.BlackPan.BLACK_4x4,  'black.4x4'),
-
-    # This must be specially handled, switching between these.
-    (consts.Goo.REFLECTIVE, 'special.goo'),
-    (consts.Goo.CHEAP, 'special.goo_cheap'),
-
-    # These replacements are deactivated when unset
-    ('', 'special.white'),
-    ('', 'special.black'),
-    ('', 'special.white_wall'),
-    ('', 'special.black_wall'),
-    ('', 'special.white_gap'),
-    ('', 'special.black_gap'),
-    ('', 'special.goo_wall'),
-    ('', 'special.goo_floor'),
-    ('', 'special.edge_special'),
-    ('', 'special.fizz_border'),
-
-    # If set and enabled, adds frames for >10 sign pairs
-    # to distinguish repeats.
-    ('', 'overlay.shapeframe'),
-
-    # Only used if set - replace the decals with textures
-    ('', 'special.bullseye_white_wall'),
-    ('', 'special.bullseye_white_floor'),
-    ('', 'special.bullseye_white_ceiling'),
-    ('', 'special.bullseye_black_wall'),
-    ('', 'special.bullseye_black_floor'),
-    ('', 'special.bullseye_black_ceiling'),
-]
-
-
-class ORIENT(Enum):
-    """The different orientations a surface can have.
-
-    This mainly affects which textures are added.
-    """
-    floor = 1
-    wall = 2
-    ceiling = 3
-    ceil = 3
-
-    def __str__(self):
-        if self is ORIENT.floor:
-            return 'floor'
-        elif self is ORIENT.wall:
-            return 'wall'
-        elif self is ORIENT.ceiling:
-            return 'ceiling'
 
 # The textures used for white surfaces.
 WHITE_PAN = [
@@ -192,34 +95,7 @@ IGNORED_OVERLAYS = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def get_tile_type(mat: str, orient: ORIENT) -> str:
-    """Get the texture command for a texture."""
-    surf_type = 'white' if mat in consts.WhitePan else 'black'
-    # We need to handle specially the 4x4 and 2x4 variants.
-    # These are used in the embedface brushes, so they should
-    # remain having small tile size. Wall textures have 4x4 and 2x2,
-    # but floor/ceilings only have 4x4 sizes (since they usually
-    # just stay the same).
-    if orient == ORIENT.wall:
-        if mat == consts.BlackPan.BLACK_4x4 or mat == consts.WhitePan.WHITE_4x4:
-            return surf_type + '.4x4'
-        elif mat == consts.BlackPan.BLACK_2x2 or mat == consts.WhitePan.WHITE_2x2:
-            return surf_type + '.2x2'
-        else:
-            return surf_type + '.wall'
-    elif orient == ORIENT.floor:
-        return surf_type + '.floor'
-    elif orient == ORIENT.ceiling:
-        return surf_type + '.ceiling'
-
-    raise AssertionError(mat, orient)
-
-##################
-# MAIN functions #
-##################
-
-
-def load_settings():
+def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     """Load in all our settings from vbsp_config."""
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
@@ -1588,34 +1464,37 @@ def change_overlays() -> None:
 
         case_mat = over['material'].casefold()
 
-        if case_mat in consts.Signage:
-            sign_type = TEX_VALVE[case_mat][1]
-            if sign_inst is not None:
-                new_inst = VMF.create_ent(
-                    classname='func_instance',
-                    origin=over['origin'],
-                    angles=over['angles', '0 0 0'],
-                    file=sign_inst,
-                )
-                if sign_inst_pack:
-                    packing.pack_list(VMF, sign_inst_pack)
-                new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
+        try:
+            sign_type = consts.Signage(case_mat)
+        except ValueError:
+            continue
 
-            # Delete the overlay's targetname - signs aren't ever dynamic
-            # This also means items set to signage only won't get toggle
-            # instances.
-            del over['targetname']
+        if sign_inst is not None:
+            new_inst = VMF.create_ent(
+                classname='func_instance',
+                origin=over['origin'],
+                angles=over['angles', '0 0 0'],
+                file=sign_inst,
+            )
+            if sign_inst_pack:
+                packing.pack_list(VMF, sign_inst_pack)
+            new_inst.fixup['mat'] = sign_type.name.lower()
 
-            over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
-            if sign_size != 16:
-                # Resize the signage overlays
-                # These are the 4 vertex locations
-                # Each axis is set to -16, 16 or 0 by default
-                for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
-                    val = Vec.from_str(over[prop])
-                    val /= 16
-                    val *= sign_size
-                    over[prop] = val.join(' ')
+        # Delete the overlay's targetname - signs aren't ever dynamic.
+        # This also means items set to signage only won't get toggle
+        # instances.
+        del over['targetname']
+
+        over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        if sign_size != 16:
+            # Resize the signage overlays
+            # These are the 4 vertex locations
+            # Each axis is set to -16, 16 or 0 by default
+            for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
+                val = Vec.from_str(over[prop])
+                val /= 16
+                val *= sign_size
+                over[prop] = val.join(' ')
 
 
 def add_extra_ents(game_mode: str) -> None:
