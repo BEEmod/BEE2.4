@@ -5,7 +5,7 @@ This also handles Bomb-type Paint Droppers.
 import collections
 
 import brushLoc
-import connections
+import conditions
 import instanceLocs
 import tiling
 import template_brush
@@ -90,16 +90,15 @@ class PaintDropper(FaithPlate):
         self.target = target
 
 
-def analyse_map(vmf: VMF) -> None:
+@conditions.meta_cond(-900)
+def associate_faith_plates(vmf: VMF) -> None:
     """Parse through the map, collecting all faithplate segments.
 
     Tiling, instancelocs and connections must have been parsed first.
     Once complete all targets have been removed.
+
+    This is done as a meta-condition to allow placing tiles we will attach to.
     """
-    if not tiling.TILES:
-        raise ValueError('Tiles not parsed!')
-    if not connections.ITEMS:
-        raise ValueError('Connections not parsed!')
 
     # Find all the triggers and targets first.
     triggers: Dict[str, Entity] = {}
@@ -135,9 +134,11 @@ def analyse_map(vmf: VMF) -> None:
 
     for targ in vmf.by_class['info_target']:
         name = targ['targetname']
+        # All should be faith targets, with this name.
         if not name.endswith('-target'):
             LOGGER.warning('Unknown info_target "{}" @ {}?', name, targ['origin'])
             continue
+        name = name[:-7]
 
         # Find the tile we're attached to. Unfortunately no angles, so we
         # have to try both directions.
@@ -168,7 +169,7 @@ def analyse_map(vmf: VMF) -> None:
 
         # We don't need the entity anymore, we'll regenerate them later.
         targ.remove()
-        target_to_pos[name[:-7]] = tile
+        target_to_pos[name] = tile
 
     # Loop over instances, recording plates and moving targets into the tiledefs.
     instances: Dict[str, Entity] = {}
@@ -264,8 +265,7 @@ def gen_faithplates(vmf: VMF) -> None:
             # Static target.
             target['origin'] = Vec(pos_or_tile)
 
-        target['targetname'] = 'faith_target_1'
-        target.make_unique()
+        target.make_unique('faith_target')
 
         for trig in trigs:
             trig['launchTarget'] = target['targetname']

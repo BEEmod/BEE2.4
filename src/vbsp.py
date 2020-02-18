@@ -2213,8 +2213,6 @@ def main() -> None:
 
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
-        faithplate.analyse_map(VMF)
-
         conditions.check_all()
         add_extra_ents(GAME_MODE)
 
