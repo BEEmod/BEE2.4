@@ -204,8 +204,8 @@ def prompt(
     parent: tk.Misc=TK_ROOT,
 ) -> Optional[str]:
     """Ask the user to enter a string."""
-    from loadScreen import surpress_screens
-    with surpress_screens():
+    from loadScreen import suppress_screens
+    with suppress_screens():
         # If the main loop isn't running, this doesn't work correctly.
         # Probably also if it's not visible. So swap back to the old style.
         # It's also only a problem on Windows.
