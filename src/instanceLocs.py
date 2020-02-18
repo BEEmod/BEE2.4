@@ -171,7 +171,7 @@ SUBITEMS: Dict[str, Union[int, Tuple[int, ...]]] = {
     'edgeless_white': 4,
     'edgeless_black': 5,
 
-    # Combined buttom parts
+    # Combined button parts
     'btn_weighted': (0, 1),
     'btn_floor': (0, 1),
     'btn_cube': (2, 3),
@@ -378,7 +378,7 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
                     '"' + val + '" is not a valid instance'
                                 ' subtype or index!'
                 )
-        # SUBITEMS has tuple values, which represent multiple subitems.
+        # SUBITEMS has tuple values, which represent multiple sub-items.
         if isinstance(ind, tuple):
             output.extend(ind)
         else:
