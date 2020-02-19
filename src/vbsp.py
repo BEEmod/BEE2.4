@@ -1485,7 +1485,7 @@ def change_overlays() -> None:
         # instances.
         del over['targetname']
 
-        over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type.name.lower())
         if sign_size != 16:
             # Resize the signage overlays
             # These are the 4 vertex locations
