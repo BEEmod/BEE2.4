@@ -8,6 +8,7 @@ import abc
 
 import srctools.logger
 from srctools import Property, Side, Solid, Vec
+from srctools.vmf import VisGroup
 
 import comp_consts as consts
 
@@ -15,7 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Union, Type, Any,
     Dict, List, Tuple,
-    Optional,
+    Optional, Iterable,
     Set,
 )
 
@@ -556,7 +557,15 @@ def load_config(conf: Property):
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = generator(gen_cat, gen_orient, gen_portal, options, textures)
+        GENERATORS[gen_key] = gen = generator(gen_cat, gen_orient, gen_portal, options, textures)
+
+        # Allow it to use the default enums as direct lookups.
+        if isinstance(gen, GenRandom):
+            if gen_portal is None:
+                gen.set_enum(tex_defaults.items())
+            else:
+                # Tiles always use TileSize.
+                gen.set_enum((size.value, size) for size in TileSize)
 
     SPECIAL = GENERATORS[GenCat.SPECIAL]
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
@@ -661,8 +670,26 @@ class GenRandom(Generator):
     Each texture will be randomly chosen whenever asked.
     This is used for Overlay and Signage as well.
     """
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # For enum constants, use the id() to lookup - this
+        # way we're effectively comparing by identity.
+        self.enum_data: Dict[int, str] = {}
+
+    def set_enum(self, defaults: Iterable[Tuple[str, str]]) -> None:
+        """For OVERLAY and SPECIAL, allow also passing in the enum constants."""
+        for key, default in defaults:
+            if type(default) != str:
+                self.enum_data[id(default)] = key
 
     def _get(self, loc: Vec, tex_name: str):
+        if type(tex_name) != str:
+            try:
+                tex_name = self.enum_data[id(tex_name)]
+            except KeyError:
+                raise ValueError(
+                    f'Unknown enum value {tex_name!r} '
+                    f'for generator type {self.category}!') from None
         return self._random.choice(self.textures[tex_name])
 
 
@@ -714,6 +741,7 @@ class GenClump(Generator):
         pos_max = Vec()
 
         # For debugging, generate skip brushes with the shape of the clumps.
+        debug_visgroup: Optional[VisGroup]
         if self.options['clump_debug']:
             import vbsp
             debug_visgroup = vbsp.VMF.create_visgroup(
