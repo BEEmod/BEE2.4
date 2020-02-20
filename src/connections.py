@@ -1077,8 +1077,6 @@ def gen_item_outputs(vmf: VMF) -> None:
 
     do_item_optimisation(vmf)
 
-    has_timer_relay = False
-
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
@@ -1095,7 +1093,6 @@ def gen_item_outputs(vmf: VMF) -> None:
         ):
             has_sound = item.item_type.force_timer_sound or len(item.ind_panels) > 0
             add_timer_relay(item, has_sound)
-            has_timer_relay = has_timer_relay or has_sound
 
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
@@ -1195,15 +1192,6 @@ def gen_item_outputs(vmf: VMF) -> None:
             pan['file'] = desired_panel_inst
             pan.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
 
-    if has_timer_relay:
-        # Write this VScript out.
-        timer_sound = vbsp_options.get(str, 'timer_sound')
-        with open('bee2/inject/timer_sound.nut', 'w') as f:
-            f.write(TIMER_SOUND_SCRIPT.format(snd=timer_sound))
-
-        # Make sure this is packed, since parsing the VScript isn't trivial.
-        packing.pack_files(vmf, timer_sound, file_type='sound')
-
     logic_auto = vmf.create_ent(
         'logic_auto',
         origin=vbsp_options.get(Vec, 'global_ents_loc')
@@ -1297,9 +1285,6 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         spawnflags=0,
     )
 
-    if has_sounds:
-        relay['vscripts'] = 'bee2/timer_sound.nut'
-
     if item.item_type.timer_sound_pos:
         relay_loc = item.item_type.timer_sound_pos.copy()
         relay_loc.localise(
@@ -1333,6 +1318,20 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
             timer_cc = 'Portal.room1_TickTock'
         if timer_cc:
             timer_cc = 'cc_emit ' + timer_cc
+
+        # Write out the VScript code to precache the sound, and play it on
+        # demand.
+        relay['vscript_init_code'] = (
+            'function Precache() {'
+            f'self.PrecacheSoundScript(`{timer_sound}`)'
+            '}'
+        )
+        relay['vscript_init_code2'] = (
+            'function snd() {'
+            f'self.EmitSound(`{timer_sound}`)'
+            '}'
+        )
+        packing.pack_files(item.inst.map, timer_sound, file_type='sound')
 
         for delay in range(item.timer):
             relay.add_out(Output(

@@ -18,7 +18,7 @@ from typing import Iterator, List, Tuple, Set
 
 import srctools
 import utils
-from srctools import Property, Vec
+from srctools import Property
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
@@ -71,9 +71,6 @@ INJECT_FILES = {
 
     # Applied to @glados's entity scripts.
     'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
-
-    # Plays the tick-tock timer sound.
-    'timer_sound.nut': 'scripts/vscripts/bee2/timer_sound.nut',
 }
 
 # Various parts of the soundscript generated for BG music.
