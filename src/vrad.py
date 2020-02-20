@@ -72,12 +72,6 @@ INJECT_FILES = {
     # Applied to @glados's entity scripts.
     'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
 
-    # Commands for monitor items.
-    'monitor_args.nut': 'scripts/vscripts/bee2/mon_camera_args.nut',
-
-    # Script for setting model types on cubes.
-    'cube_setmodel.nut': 'scripts/vscripts/bee2/cube_setmodel.nut',
-
     # Plays the tick-tock timer sound.
     'timer_sound.nut': 'scripts/vscripts/bee2/timer_sound.nut',
 }

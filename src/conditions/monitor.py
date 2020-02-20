@@ -1,5 +1,3 @@
-from collections import namedtuple
-import os
 import math
 
 import connections
@@ -14,28 +12,28 @@ import srctools.logger
 import vbsp_options
 import voiceLine
 
-from typing import List
+from typing import List, NamedTuple
 
 
 COND_MOD_NAME = 'Monitors'
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.monitor')
 
-Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
+
+class Camera(NamedTuple):
+    """Generated camera positions."""
+    inst: Entity
+    cam_pos: Vec
+    cam_angles: Vec
 
 ALL_CAMERAS: List[Camera] = []
 
-MON_ARGS_SCRIPT = os.path.join('bee2', 'inject', 'monitor_args.nut')
-
-# Are there monitors that should be shot?
-NEEDS_TURRET = False
-
 # Do any monitors exist?
-HAS_MONITOR = False
+HAS_MONITOR: bool = False
 
 # ai_relationships used for monitors.
 # If non-emtpy we have monitors to shoot by turrets.
-MONITOR_RELATIONSHIP_ENTS = []  # type: List[Entity]
+MONITOR_RELATIONSHIP_ENTS: List[Entity] = []
 
 
 def get_studio_pose() -> Vec:
@@ -43,10 +41,34 @@ def get_studio_pose() -> Vec:
     return voiceLine.get_studio_loc() + vbsp_options.get(Vec, 'voice_studio_cam_loc')
 
 
+def scriptvar_set(
+    targ: Entity,
+    pos: Vec,
+    varname: str,
+    value: object='',
+    *,
+    mode: str='const',
+    index: int=None,
+    angles: object='0 0 0',
+) -> None:
+    """Add in a comp_scriptvar_setter entity."""
+    if index is not None:
+        varname = f'{varname}[{index}]'
+    targ.map.create_ent(
+        'comp_scriptvar_setter',
+        origin=pos,
+        angles=str(angles),
+        target=targ['targetname'],
+        variable=varname,
+        mode=mode,
+        const=str(value),
+    )
+
+
 @make_result_setup('Monitor')
 def res_monitor_setup(res: Property):
+    """Pre-parse options for monitors."""
     return (
-        res['breakInst', None],
         res['bullseye_name', ''],
         res.vec('bullseye_loc'),
         res['bullseye_parent', ''],
@@ -57,12 +79,18 @@ def res_monitor_setup(res: Property):
 def res_monitor(inst: Entity, res: Property) -> None:
     """Result for the monitor component.
 
+    Options:
+    - bullseye_name: If possible to break this, this is the name to give the npc_bullseye.
+    - bullseye_loc: This is the position to place the bullseye at.
+    - bullseye_parent: This is the parent to give the bullseye.
+
+    The fixup variable $is_breakable is set to True if lasers or turrets
+    are present to indicate the func_breakable should be added.
     """
     global HAS_MONITOR
     import vbsp
 
     (
-        break_inst,
         bullseye_name,
         bullseye_loc,
         bullseye_parent,
@@ -96,6 +124,7 @@ def res_monitor(inst: Entity, res: Property) -> None:
         relation = inst.map.create_ent(
             classname='ai_relationship',
             targetname='@monitor_turr_hate',
+            parentname=bullseye_name,  # When killed, destroy this too.
             spawnflags=2,  # Notify turrets about monitor locations
             disposition=1,  # Hate
             origin=loc,
@@ -107,6 +136,7 @@ def res_monitor(inst: Entity, res: Property) -> None:
 
 @make_result_setup('Camera')
 def res_camera_setup(res: Property):
+    """Pre-parse the data for cameras."""
     return {
         'cam_off': Vec.from_str(res['CamOff', '']),
         'yaw_off': Vec.from_str(res['YawOff', '']),
@@ -116,14 +146,24 @@ def res_camera_setup(res: Property):
         'pitch_inst': instanceLocs.resolve_one(res['pitchInst', '']),
 
         'yaw_range': srctools.conv_int(res['YawRange', ''], 90),
-        'pitch_range': srctools.conv_int(res['YawRange', ''], 90),
+        'pitch_range': srctools.conv_int(res['PitchRange', ''], 90),
     }
 
 
 @make_result('Camera')
 def res_camera(inst: Entity, res: Property):
-    """Result for the camera component.
+    """Result for the camera item.
 
+    Options:
+    - cam_off: The position that the camera yaws around.
+    - yaw_off: The offset from cam_off that the camera rotates up/down.
+    - pitch_off: The offset from yaw_off that is where the sensor is.
+
+    - yaw_inst: The instance to place for the yaw rotation.
+    - pitch_inst: The instance to place for the up/down rotation.
+
+    - yaw_range: How many degrees can the camera rotate from a forward position?
+    - pitch_range: How many degrees can the camera rotate up/down?
     """
     conf = res.value
     normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
@@ -199,18 +239,18 @@ def res_camera(inst: Entity, res: Property):
     # Recompute, since this can be slightly different if the camera is large.
     cam_angles = (target_loc - cam_pos).to_angle()
 
-    ALL_CAMERAS.append(Camera(inst, res.value, cam_pos, cam_angles))
+    ALL_CAMERAS.append(Camera(inst, cam_pos, cam_angles))
 
 
-@meta_cond(priority=-275, only_once=True)
-def mon_camera_link() -> None:
+@meta_cond(priority=-275)
+def mon_camera_link(vmf: VMF) -> None:
     """Link cameras to monitors."""
     import vbsp
 
     if not HAS_MONITOR:
         return
 
-    ALL_CAMERAS.sort(key=Camera.cam_pos.fget)
+    ALL_CAMERAS.sort(key=lambda cam: cam.cam_pos)
 
     fog_opt = vbsp.settings['fog']
 
@@ -246,6 +286,7 @@ def mon_camera_link() -> None:
             start_angles = cam.cam_angles
             break
     else:
+        # No cameras start active, we need to be positioned elsewhere.
         if vbsp_options.get(str, 'voice_studio_inst'):
             # Start at the studio, if it exists.
             start_pos = get_studio_pose()
@@ -259,10 +300,10 @@ def mon_camera_link() -> None:
                 relation['StartActive'] = '1'
         else:
             # Start in arrival_departure_transition_ents...
-            start_pos = '-2500 -2500 0'
+            start_pos = Vec(-2500, -2500, 0)
             start_angles = '0 90 0'
 
-    cam = vbsp.VMF.create_ent(
+    cam_ent = vmf.create_ent(
         classname='point_camera',
         targetname='@camera',
         spawnflags='0',  # Start on
@@ -276,68 +317,70 @@ def mon_camera_link() -> None:
         fogColor=fog_opt['primary'],
         fogStart=fog_opt['start'],
         fogEnd=fog_opt['end'],
-    )  # type: Entity
+    )
 
     if not ALL_CAMERAS:
-        # No cameras in the map - we don't move at all.
-        # So we don't need the script.
         return
+        # We only need the script if we're moving at all.
+    cam_ent['vscripts'] = 'BEE2/mon_camera.nut'
+    cam_ent['thinkfunction'] = 'Think'
 
-    # Set the vscripts
-    cam['vscripts'] = 'BEE2/mon_camera_args.nut BEE2/mon_camera.nut'
-    cam['thinkfunction'] = 'Think'
-
-
-# Note that we must happen after voiceline adding!
-
-@meta_cond(priority=150, only_once=True)
-def mon_camera_script() -> None:
-    """Write out a script containing the arguments to the camera."""
+    # Now start adding all the variables the script needs.
+    # Tell it the number of cameras, and how many start active.
+    # That lets it trivially determine when they're all off.
+    # We keep the list of active counts to reuse after.
     active_counts = [
         srctools.conv_int(cam.inst.fixup['$start_enabled', '0'])
         for cam in
         ALL_CAMERAS
     ]
+    scriptvar_set(cam_ent, start_pos - (0, 0, 16), 'CAM_NUM', len(ALL_CAMERAS))
+    scriptvar_set(cam_ent, start_pos - (0, 0, 16), 'CAM_ACTIVE_NUM', sum(active_counts))
+    # Then add the values for each camera. We can use the setter's modes
+    # to include the position as the actual loc.
+    for i, (cam, active) in enumerate(zip(ALL_CAMERAS, active_counts)):
+        scriptvar_set(
+            cam_ent,
+            cam.cam_pos,
+            'CAM_LOC',
+            index=i,
+            angles=cam.cam_angles,
+            mode='pos',
+        )
+        scriptvar_set(
+            cam_ent,
+            cam.cam_pos,
+            'CAM_ANGLES',
+            index=i,
+            angles=cam.cam_angles,
+            mode='ang',
+        )
+        scriptvar_set(
+            cam_ent,
+            cam.cam_pos + (0, 0, 8),
+            'CAM_ACTIVE',
+            index=i,
+            value=active,
+        )
 
-    with open(MON_ARGS_SCRIPT, 'w') as scr:
-        scr.write('CAM_NUM <- {};\n'.format(len(ALL_CAMERAS)))
-        scr.write('CAM_ACTIVE_NUM <- {};\n'.format(sum(active_counts)))
-        scr.write('CAM_ACTIVE <- {!r};\n'.format(active_counts))
-        scr.write('CAM_LOC <- [\n')
-        scr.write(',\n'.join([
-            ' Vector({0.x:.3f}, {0.y:.3f}, {0.z:.3f})'.format(cam.cam_pos)
-            for cam in ALL_CAMERAS
-        ]))
-        scr.write('\n];\n')
-        scr.write('CAM_ANGLES <- [\n')
-        scr.write(',\n'.join([
-            ' Vector({0.x:.3f}, {0.y:.3f})'.format(cam.cam_angles)
-            for cam in ALL_CAMERAS
-        ]))
-        scr.write('\n];\n')
+    if vbsp_options.get(str, 'voice_studio_inst'):
+        # We have a voice studio, send values to the script.
+        scriptvar_set(cam_ent, get_studio_pose(), 'CAM_STUDIO_LOC', mode='pos')
+        scriptvar_set(
+            cam_ent, get_studio_pose(), 'CAM_STUDIO_ANG', mode='ang',
+            angles='{:g} {:g} 0'.format(
+                vbsp_options.get(float, 'voice_studio_cam_pitch'),
+                vbsp_options.get(float, 'voice_studio_cam_yaw'),
+            ),
+        )
+        use_turret = '1' if MONITOR_RELATIONSHIP_ENTS else '0'
+        swap_chance = vbsp_options.get(float, 'voice_studio_inter_chance')
+    else:
+        use_turret = '0'
+        swap_chance = -1
 
-        if vbsp_options.get(str, 'voice_studio_inst'):
-            # We have a voice studio, send values to the script.
-            scr.write(
-                'CAM_STUDIO_LOC <- Vector({0.x:.3f}, '
-                '{0.y:.3f}, {0.z:.3f});\n'.format(get_studio_pose()),
-            )
-            scr.write(
-                'CAM_STUDIO_CHANCE <- {chance};\n'
-                'CAM_STUDIO_PITCH <- {pitch};\n'
-                'CAM_STUDIO_YAW <- {yaw};\n'
-                'CAM_STUDIO_TURRET <- {turret!r};\n'.format(
-                    chance=vbsp_options.get(float, 'voice_studio_inter_chance'),
-                    pitch=vbsp_options.get(float, 'voice_studio_cam_pitch'),
-                    yaw=vbsp_options.get(float, 'voice_studio_cam_yaw'),
-                    turret='1' if MONITOR_RELATIONSHIP_ENTS else '0',
-                )
-            )
-        else:
-            scr.write(
-                'CAM_STUDIO_CHANCE <- -1;\n'
-                'CAM_STUDIO_TURRET <- 0;\n'
-            )
+    scriptvar_set(cam_ent, start_pos + (0, 0, 16), 'CAM_STUDIO_TURRET', use_turret)
+    scriptvar_set(cam_ent, start_pos + (0, 0, 16), 'CAM_STUDIO_CHANCE', swap_chance)
 
 
 def make_voice_studio(vmf: VMF) -> bool:
