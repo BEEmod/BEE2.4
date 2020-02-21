@@ -489,6 +489,10 @@ class Panel:
         )
         all_brushes += brushes
 
+        if is_static:
+            # Include these as faces to apply antlines etc to.
+            tile.brush_faces += faces
+
         # If requested apply nodraw to everything that's not the front.
         if self.nodraw:
             for brush in brushes:
