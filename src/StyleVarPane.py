@@ -223,16 +223,16 @@ def flow_stylevar(e=None):
     UI['style_can']['scrollregion'] = UI['style_can'].bbox(ALL)
 
 
-def make_pane(tool_frame):
+def make_pane(tool_frame: Frame, menu_bar: Menu):
     """Create the styleVar pane.
 
     """
     global window
     window = SubPane(
         TK_ROOT,
-        options=BEE2_config.GEN_OPTS,
         title=_('Style/Item Properties'),
         name='style',
+        menu_bar=menu_bar,
         resize_y=True,
         tool_frame=tool_frame,
         tool_img=img.png('icons/win_stylevar'),
