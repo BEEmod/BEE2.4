@@ -29,7 +29,7 @@ def res_import_template_setup(
 
     replace_tex = defaultdict(list)  # type: Dict[str, List[str]]
     for prop in res.find_key('replace', []):
-        replace_tex[prop.name].append(prop.value)
+        replace_tex[prop.name.replace('\\', '/')].append(prop.value)
 
     offset = Vec.from_str(res['offset', '0 0 0'])
 
@@ -77,8 +77,12 @@ def res_insert_overlay(inst: Entity, res: Property) -> None:
         inst['angles', '0 0 0']
     )
 
+    # Shift so that the user perceives the position as the pos of the face
+    # itself.
+    face_pos -= 64 * normal
+
     try:
-        tiledef, u, v = tiling.find_tile(face_pos, normal)
+        tiledef = tiling.TILES[face_pos.as_tuple(), normal.as_tuple()]
     except KeyError:
         LOGGER.warning(
             'Overlay brush position is not valid: {}',
@@ -96,10 +100,12 @@ def res_insert_overlay(inst: Entity, res: Property) -> None:
 
     for over in temp.overlay:  # type: Entity
         random.seed('TEMP_OVERLAY_' + over['basisorigin'])
-        mat = random.choice(replace.get(
-            over['material'],
-            (over['material'], ),
-        ))
+        mat = over['material']
+        try:
+            mat = random.choice(replace[over['material'].casefold().replace('\\', '/')])
+        except KeyError:
+            pass
+
         if mat[:1] == '$':
             mat = inst.fixup[mat]
         if mat.startswith('<') or mat.endswith('>'):
