@@ -9,6 +9,7 @@ It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
+from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from srctools import AtomicWriter, Property, KeyValError
@@ -88,6 +89,10 @@ class ConfigFile(ConfigParser):
     get_val, get_bool, and get_int are modified to return defaults instead
     of erroring.
     """
+    has_changed: bool
+    filename: Optional[Path]
+    _writer: Optional[AtomicWriter]
+
     def __init__(
         self,
         filename: Optional[str],
@@ -108,17 +113,17 @@ class ConfigFile(ConfigParser):
 
         if filename is not None:
             if in_conf_folder:
-                self.filename = utils.conf_location('config/' + filename)
+                self.filename = utils.conf_location('config') / filename
             else:
-                self.filename = filename
+                self.filename = Path(filename)
 
-            self.writer = AtomicWriter(self.filename)
+            self._writer = AtomicWriter(self.filename)
             self.has_changed = False
 
             if auto_load:
                 self.load()
         else:
-            self.filename = self.writer = None
+            self.filename = self._writer = None
 
     def load(self) -> None:
         """Load config options from disk."""
@@ -151,10 +156,10 @@ class ConfigFile(ConfigParser):
     def save(self) -> None:
         """Write our values out to disk."""
         LOGGER.info('Saving changes in config "{}"!', self.filename)
-        if self.filename is None:
+        if self.filename is None or self._writer is None:
             raise ValueError('No filename provided!')
 
-        with self.writer as conf:
+        with self._writer as conf:
             self.write(conf)
         self.has_changed = False
 
@@ -232,9 +237,9 @@ class ConfigFile(ConfigParser):
         self.has_changed = True
         super().add_section(section)
 
-    def remove_section(self, section: str) -> None:
+    def remove_section(self, section: str) -> bool:
         self.has_changed = True
-        super().remove_section(section)
+        return super().remove_section(section)
 
     def set(self, section: str, option: str, value: str) -> None:
         orig_val = self.get(section, option, fallback=None)
