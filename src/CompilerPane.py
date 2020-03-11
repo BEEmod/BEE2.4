@@ -889,14 +889,14 @@ def make_map_widgets(frame: ttk.Frame):
     model_frame.columnconfigure(0, weight=1)
 
 
-def make_pane(tool_frame):
+def make_pane(tool_frame: Frame, menu_bar: Menu) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
         TK_ROOT,
-        options=GEN_OPTS,
         title=_('Compile Options'),
         name='compiler',
+        menu_bar=menu_bar,
         resize_x=True,
         resize_y=False,
         tool_frame=tool_frame,
