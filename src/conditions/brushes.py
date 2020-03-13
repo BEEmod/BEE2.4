@@ -620,6 +620,10 @@ def res_import_template(inst: Entity, res: Property):
             """Use all the groups."""
             yield from group
 
+    # Special case - if blank, just do nothing silently.
+    if not temp_id:
+        return
+
     temp_name, visgroups = template_brush.parse_temp_name(temp_id)
     try:
         template = template_brush.get_template(temp_name)
