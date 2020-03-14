@@ -18,7 +18,6 @@ from srctools import (
 )
 import srctools.logger
 import conditions.globals
-import vbsp
 from srctools.vmf import EntityFixup
 
 
@@ -961,6 +960,25 @@ def res_set_dropper_off(inst: Entity, res: Property) -> None:
         pair.spawn_offset = Vec.from_str(conditions.resolve_value(inst, res.value))
 
 
+@make_result('ChangeCubeType', 'SetCubeType')
+def flag_cube_type(inst: Entity, res: Property):
+    """Change the cube type of a cube item
+
+    This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and instances
+    marked as a custom dropperless cube.
+    """
+    try:
+        pair = inst.bee2_cube_data  # type: CubePair
+    except AttributeError:
+        LOGGER.warning('Attempting to set cube type on non cube ("{}")', inst['targetname'])
+        return
+
+    try:
+        pair.cube_type = CUBE_TYPES[res.value]
+    except KeyError:
+        raise ValueError('Unknown cube type "{}"!'.format(res.value))
+
+
 @make_result('CubeFilter')
 def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     """Given a set of cube-type IDs, generate a filter for them.
@@ -1034,13 +1052,13 @@ def res_script_cube_predicate(res: Property):
         cube_type.add_models(models)
 
     # Normalise the names to a consistent format.
-    flat_models = {
+    model_names = {
         model.lower().replace('\\', '/')
         for model in models
     }
 
     buffer.write(script_function + ' <- __BEE2_CUBE_FUNC__({\n')
-    for model in flat_models:
+    for model in model_names:
         buffer.write(' ["{}"]=1,\n'.format(model))
     buffer.write('});\n')
 

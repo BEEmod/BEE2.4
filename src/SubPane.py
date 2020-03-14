@@ -55,7 +55,7 @@ class SubPane(Toplevel):
         resize_y: bool=False,
         name: str='',
     ) -> None:
-        self.visible = BooleanVar(self, True)
+        self.visible = BooleanVar(parent, True)
         self.win_name = name
         self.allow_snap = False
         self.can_save = False
