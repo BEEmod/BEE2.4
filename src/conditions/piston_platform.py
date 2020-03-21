@@ -265,7 +265,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
         panel.brush_ent = pistons[max(pistons.keys())]
         panel.offset = st_pos * off
 
-    if not static_ent.solids and panel.brush_ent is not static_ent:
+    if not static_ent.solids and (panel is None or panel.brush_ent is not static_ent):
         static_ent.remove()
 
     if snd_loop:
