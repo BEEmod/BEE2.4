@@ -778,7 +778,7 @@ def main(argv: List[str]) -> None:
                 packlist.pack_file(arcname, data=f.read())
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_ents, fsys, packlist, path, game)
+    run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
