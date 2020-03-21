@@ -209,7 +209,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list:
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         box.state(['disabled'])
-        box['values'] = [_('No Alternate Versions!')]
+        box['values'] = [_('No Alternate Versions')]
         box.current(0)
     else:
         box.state(['!disabled'])
