@@ -634,6 +634,8 @@ class Item:
         if not out_name:
             out_name = ''  # Dump the None.
 
+        out_name = conditions.resolve_value(self.inst, out_name)
+
         if isinstance(target, Entity):
             target = target['targetname']
 
@@ -651,7 +653,7 @@ class Item:
             )
 
         kv_setter.add_out(Output(
-            out_cmd,
+            conditions.resolve_value(self.inst, out_cmd),
             target,
             inp_cmd,
             params,
