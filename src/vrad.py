@@ -796,17 +796,20 @@ def main(argv: List[str]) -> None:
     pack_whitelist = set()  # type: Set[FileSystem]
     pack_blacklist = set()  # type: Set[FileSystem]
     if is_peti:
-        pack_blacklist |= {
-            RawFileSystem(root_folder / 'portal2_dlc2'),
-            RawFileSystem(root_folder / 'portal2_dlc1'),
-            RawFileSystem(root_folder / 'portal2'),
-            RawFileSystem(root_folder / 'platform'),
-            RawFileSystem(root_folder / 'update'),
-        }
         if fsys_mel is not None:
             pack_whitelist.add(fsys_mel)
         if fsys_tag is not None:
             pack_whitelist.add(fsys_tag)
+        # Exclude absolutely everything except our folder.
+        for child_sys, _ in fsys.systems:
+            # Add 'bee2/' and 'bee2_dev/' only.
+            if (
+                isinstance(child_sys, RawFileSystem) and
+                'bee2' in os.path.basename(child_sys.path).casefold()
+            ):
+                pack_whitelist.add(child_sys)
+            else:
+                pack_blacklist.add(child_sys)
 
     if '-no_pack' not in args:
         # Cubemap files packed into the map already.
