@@ -250,23 +250,24 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     else node.inst['angles']
                 ),
             )
-            for key, val in node.inst.fixup.items():
-                # Copy over fixup values
-                logic_inst.fixup[key] = val
 
             # Add the link-values
             for linkVar, link in LINKS.items():
-                logic_inst.fixup[linkVar] = SCAFF_PATTERN.format(
+                node.inst.fixup[linkVar] = SCAFF_PATTERN.format(
                     name=link['name'],
                     group=group_counter,
                     index=index,
                 )
                 if node.next is not None:
-                    logic_inst.fixup[link['next']] = SCAFF_PATTERN.format(
+                    node.inst.fixup[link['next']] = SCAFF_PATTERN.format(
                         name=link['name'],
                         group=group_counter,
                         index=index + 1,
                     )
+
+            for key, val in node.inst.fixup.items():
+                # Copy over fixup values
+                logic_inst.fixup[key] = val
 
             new_file = conf.get('inst_' + orient, '')
             if new_file != '':
