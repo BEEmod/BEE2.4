@@ -1086,7 +1086,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             tile.panels.append(panel)
         else:
             for panel in tile.panels:
-                if panel.inst is inst and panel.points == uvs:
+                if panel.same_item(inst) and panel.points == uvs:
                     break
             else:
                 LOGGER.warning(
@@ -1150,7 +1150,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             [brush_ent] = existing_ents
         except ValueError:
             LOGGER.warning(
-                'Multiple independent panels for "{}" were made, then the'
+                'Multiple independent panels for "{}" were made, then the '
                 'brush entity was edited as a group! Discarding '
                 'individual ents...',
                 inst['targetname']

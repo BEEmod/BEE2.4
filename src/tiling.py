@@ -431,6 +431,18 @@ class Panel:
         self.steals_bullseye = False
         self.offset = Vec()
 
+    def same_item(self, inst: Entity) -> bool:
+        """Check if the two instances come from the same item.
+
+        If they have names, they must match. Otherwise, they must be the same.
+        """
+        if inst is self.inst:
+            return True
+        name = self.inst['targetname']
+        if name and name == inst['targetname']:
+            return True
+        return False
+
     def export(
         self,
         tile: 'TileDef',

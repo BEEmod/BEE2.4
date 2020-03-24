@@ -254,7 +254,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
         pass
     else:
         for panel in tiledef.panels:
-            if panel.inst is inst:
+            if panel.same_item(inst):
                 break
         else:  # Checked all of them.
             panel = None
