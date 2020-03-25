@@ -655,8 +655,8 @@ def main(argv: List[str]) -> None:
     load_config()
 
     for a in fast_args[:]:
-        if a.casefold() in (
-                "-both",
+        folded_a = a.casefold()
+        if folded_a.casefold() in (
                 "-final",
                 "-staticproplighting",
                 "-staticproppolys",
@@ -664,6 +664,11 @@ def main(argv: List[str]) -> None:
                 ):
             # remove final parameters from the modified arguments
             fast_args.remove(a)
+        elif folded_a == '-both':
+            # LDR Portal 2 isn't actually usable, so there's not much
+            # point compiling for it.
+            pos = fast_args.index(a)
+            fast_args[pos] = full_args[pos] = '-hdr'
         elif a in ('-force_peti', '-force_hammer', '-no_pack'):
             # we need to strip these out, otherwise VRAD will get confused
             fast_args.remove(a)
