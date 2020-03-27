@@ -30,6 +30,7 @@ from typing import (
     TypeVar,
     Callable,
     Set,
+    cast,
 )
 
 
@@ -102,7 +103,7 @@ class UnParsedItemVariant(NamedTuple):
     """The desired variant for an item, before we've figured out the dependencies."""
     filesys: FileSystem  # The original filesystem.
     folder: Optional[str]  # If set, use the given folder from our package.
-    style: Optional[str] # Inherit from a specific style (implies folder is None)
+    style: Optional[str]  # Inherit from a specific style (implies folder is None)
     config: Optional[Property]  # Config for editing
 
 
@@ -175,13 +176,20 @@ PakT = TypeVar('PakT', bound='PakObject')
 
 
 class _PakObjectMeta(type):
-    def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
+    def __new__(
+        mcs,
+        name: str,
+        bases: Tuple[type, ...],
+        namespace: Dict[str, Any],
+        allow_mult: bool = False,
+        has_img: bool = True,
+    ) -> 'Type[PakObject]':
         """Adds a PakObject to the list of objects.
 
         Making a metaclass allows us to hook into the creation of all subclasses.
         """
         # Defer to type to create the class..
-        cls = type.__new__(mcs, name, bases, namespace)
+        cls = cast('Type[PakObject]', super().__new__(name, bases, namespace))
 
         # Only register subclasses of PakObject - those with a parent class.
         # PakObject isn't created yet so we can't directly check that.
@@ -193,8 +201,15 @@ class _PakObjectMeta(type):
 
         return cls
 
-    def __init__(cls, name, bases, namespace, **kwargs):
-        # We have to strip kwargs from the type() calls to prevent errors.
+    def __init__(
+        cls,
+        name: str,
+        bases: Tuple[type, ...],
+        namespace: Dict[str, Any],
+        allow_mult: bool = False,
+        has_img: bool = True,
+    ) -> None:
+        """We have to strip kwargs from the type() calls to prevent errors."""
         type.__init__(cls, name, bases, namespace)
 
 
@@ -320,7 +335,7 @@ def get_config(
         raise
 
 
-def set_cond_source(props: Property, source: str):
+def set_cond_source(props: Property, source: str) -> None:
     """Set metadata for Conditions in the given config blocks.
 
     This generates '__src__' keyvalues in Condition blocks with info like
@@ -331,7 +346,7 @@ def set_cond_source(props: Property, source: str):
         cond['__src__'] = source
 
 
-def find_packages(pak_dir):
+def find_packages(pak_dir: str) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
@@ -390,16 +405,7 @@ def find_packages(pak_dir):
         LOGGER.debug('No packages in folder!')
 
 
-def close_filesystems():
-    """Close the package's filesystems.
-
-    This means future access needs to reopen the file handle.
-    """
-    for sys in PACKAGE_SYS.values():
-        sys.close_ref()
-
-
-def no_packages_err(pak_dir, msg):
+def no_packages_err(pak_dir: str, msg: str) -> NoReturn:
     """Show an error message indicating no packages are present."""
     from tkinter import messagebox
     import sys
@@ -493,7 +499,7 @@ def load_packages(
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
-                obj_class = OBJ_TYPES[obj_type].cls  # type: Type[PakObject]
+                obj_class = OBJ_TYPES[obj_type].cls
                 # parse through the object and return the resultant class
                 try:
                     object_ = obj_class.parse(
@@ -528,7 +534,8 @@ def load_packages(
         should_close_filesystems = False
     finally:
         if should_close_filesystems:
-            close_filesystems()
+            for sys in PACKAGE_SYS.values():
+                sys.close_ref()
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
         '{:<15}: {}'.format(name, len(objs))
@@ -625,7 +632,7 @@ def setup_style_tree(
     - First version's style
     - First style of first version
     """
-    all_styles = {}  # type: Dict[str, Style]
+    all_styles: Dict[str, Style] = {}
 
     for style in style_data:
         all_styles[style.id] = style
@@ -651,7 +658,11 @@ def setup_style_tree(
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in item_data:
-        all_ver = list(item.versions.values())  # type: List[Dict[str, Union[Dict[str, Style], str]]]
+        all_ver: List[Dict[str, Union[
+            Dict[str, Union[UnParsedItemVariant, ItemVariant]],
+            str
+        ]]] = list(item.versions.values())
+
         # Move default version to the beginning, so it's read first.
         # that ensures it's got all styles set if we need to fallback.
         all_ver.remove(item.def_ver)
@@ -660,8 +671,8 @@ def setup_style_tree(
         for vers in all_ver:
             # We need to repeatedly loop to handle the chains of
             # dependencies. This is a list of (style_id, UnParsed).
-            to_change = []  # type: List[Tuple[str, UnParsedItemVariant]]
-            styles = vers['styles']  # type:  Dict[str, Union[UnParsedItemVariant, ItemVariant]]
+            to_change: List[Tuple[str, UnParsedItemVariant]] = []
+            styles: Dict[str, Union[UnParsedItemVariant, ItemVariant]] = vers['styles']
             for sty_id, conf in styles.items():
                 to_change.append((sty_id, conf))
                 # Not done yet
@@ -1212,7 +1223,7 @@ class Package:
         self.desc = info['desc', '']
 
     @property
-    def enabled(self):
+    def enabled(self) -> bool:
         """Should this package be loaded?"""
         if self.id == CLEAN_PACKAGE:
             # The clean style package is special!
@@ -1221,13 +1232,13 @@ class Package:
 
         return PACK_CONFIG.get_bool(self.id, 'Enabled', default=True)
 
-    def set_enabled(self, value: bool):
+    @enabled.setter
+    def enabled(self, value: bool) -> None:
         """Enable or disable the package."""
         if self.id == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
-    enabled = enabled.setter(set_enabled)
 
     def is_stale(self, mod_time: int):
         """Check to see if this package has been modified since the last run."""
@@ -1258,16 +1269,16 @@ class Style(PakObject):
     """Represents a style, specifying the era a test was built in."""
     def __init__(
         self,
-        style_id,
+        style_id: str,
         selitem_data: 'SelitemData',
-        editor,
+        editor: Property,
         config=None,
-        base_style=None,
-        suggested=None,
-        has_video=True,
-        vpk_name='',
+        base_style: Optional[str]=None,
+        suggested: Tuple[str, str, str, str]=None,
+        has_video: bool=True,
+        vpk_name: str='',
         corridors: Dict[Tuple[str, int], CorrDesc]=None,
-    ):
+    ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
@@ -1275,7 +1286,7 @@ class Style(PakObject):
         # Set by setup_style_tree() after all objects are read..
         # this is a list of this style, plus parents in order.
         self.bases = []  # type: List[Style]
-        self.suggested = suggested or {}
+        self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
         self.has_video = has_video
         self.vpk_name = vpk_name
         self.corridors = {}
@@ -1405,10 +1416,10 @@ class Style(PakObject):
             zip(self.suggested, override.suggested)
         )
 
-    def __repr__(self):
-        return '<Style:' + self.id + '>'
+    def __repr__(self) -> str:
+        return f'<Style: {self.id}>'
 
-    def export(self):
+    def export(self) -> Tuple[Property, Property]:
         """Export this style, returning the vbsp_config and editoritems.
 
         This is a special case, since styles should go first in the lists.
@@ -1465,7 +1476,7 @@ class Item(PakObject):
         versions = {}
         def_version = None
         # The folders we parse for this - we don't want to parse the same
-        # one twice. First they're set to True if we need to read them,
+        # one twice. First they're set to None if we need to read them,
         # then parse_item_folder() replaces that with the actual values
         folders: Dict[str, Optional[ItemVariant]] = {}
         unstyled = data.info.bool('unstyled')
@@ -1576,7 +1587,7 @@ class Item(PakObject):
             }
         )
 
-    def add_over(self, override: 'Item'):
+    def add_over(self, override: 'Item') -> None:
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
         self.all_conf += override.all_conf
@@ -1748,7 +1759,7 @@ class Item(PakObject):
         comm_block: Property,
         item: Property,
         conv_peti_input: Callable[[Property, str, str], None]=lambda a, b, c: None,
-    ):
+    ) -> Tuple[bool, bool, bool]:
         """Convert editoritems configs with the new BEE2 connections format.
 
         This produces (conf,  has_input, has_output, has_secondary):
@@ -1881,7 +1892,12 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 
     The ID should match an item ID.
     """
-    def __init__(self, it_id, all_conf, version_conf):
+    def __init__(
+        self,
+        it_id,
+        all_conf: Property,
+        version_conf: Dict[str, Dict[str, Property]],
+    ) -> None:
         self.id = it_id
         self.versions = version_conf
         self.all_conf = all_conf
@@ -1923,7 +1939,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             vers,
         )
 
-    def add_over(self, override: 'ItemConfig'):
+    def add_over(self, override: 'ItemConfig') -> None:
         """Add additional style configs to the original config."""
         self.all_conf += override.all_conf.copy()
 
@@ -1936,7 +1952,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
                     our_styles[sty_id] += style.copy()
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """This export is done in Item.export().
 
         Here we don't know the version set for each item.
@@ -1976,7 +1992,7 @@ class QuotePack(PakObject):
         self.turret_hate = turret_hate
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData) -> 'QuotePack':
         """Parse a voice line definition."""
         selitem_data = get_selitem_data(data.info)
         chars = {
