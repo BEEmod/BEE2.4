@@ -10,6 +10,7 @@ context, and the same type of argument will be called with the arg.
 A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
+import itertools
 from abc import abstractmethod
 from collections import defaultdict
 from typing import (
@@ -19,6 +20,8 @@ from typing import (
     Hashable, Iterable,
     MutableSequence, MutableMapping,
     cast,
+    Union,
+    Iterator,
 )
 
 ArgT = TypeVar('ArgT')
@@ -224,3 +227,176 @@ class ObsValue(Generic[ValueT]):
 
     def __repr__(self) -> str:
         return f'ObsValue({self.man!r}, {self._value!r})'
+
+
+class ObsList(Generic[ValueT], MutableSequence[ValueT]):
+    """A sequence class which can be altered, and fires events whenever
+    changed.
+
+    If multiple values are removed at once, each will individually fire an event.
+    If an item is added or removed, None will be substituted as appropriate.
+    """
+    man: EventManager
+    _data: List[ValueT]
+
+    def __init__(
+        self,
+        man: EventManager,
+        initial: Iterable[ValueT] = (),
+    ) -> None:
+        self.man = man
+        self._data = list(initial)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def _fire(self, index: int, orig: ValueT, new: ValueT) -> None:
+        """Internally fire an event. Doesn't fire if it's the same."""
+        # if orig != new and orig != self._data[index]:
+        self.man(self, ValueChange(orig, new, index))
+
+    # First, all read methods delegate unchanged.
+
+    @overload
+    @abstractmethod
+    def __getitem__(self, i: int) -> ValueT: ...
+
+    @overload
+    @abstractmethod
+    def __getitem__(self, s: slice) -> List[ValueT]: ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[List[ValueT], ValueT]:
+        """Indexing a ObsSeq will return the individual item, or a list of items."""
+        return self._data[index]
+
+    def __iter__(self) -> Iterator[ValueT]:
+        return iter(self._data)
+
+    def __contains__(self, value: Any) -> bool:
+        return value in self._data
+
+    def __reversed__(self) -> Iterator[ValueT]:
+        return reversed(self._data)
+
+    def index(self, value: ValueT, start: int = 0, stop: int = None) -> int:
+        """S.index(value, [start, [stop]]) -> integer -- return first index of value.
+           Raises ValueError if the value is not present.
+        """
+        if stop is None:
+            stop = len(self._data)
+        return self._data.index(value, start, stop)
+
+    def count(self, value: Any) -> int:
+        """S.count(value) -> integer -- return number of occurrences of value"""
+        return self._data.count(value)
+
+    @overload
+    @abstractmethod
+    def __setitem__(self, index: int, item: ValueT) -> None: ...
+
+    @overload
+    @abstractmethod
+    def __setitem__(self, index: slice, item: Iterable[ValueT]) -> None: ...
+
+    def __setitem__(self, index: Union[int, slice], item: ValueT) -> None:
+        if isinstance(index, slice):
+            # Complicated. We have to determine if this is going to shrink,
+            # expand or keep the same size.
+            start, stop, step = index.indices(len(self._data))
+            indices = range(start, stop, step)
+            new_vals = list(item)
+            replaced = self._data[index]
+            if len(replaced) != len(new_vals):
+                # We have different counts, so we're resizing.
+                tail_start = max(max(indices), len(self._data)-1)
+                tail = self._data[tail_start:]
+            else:
+                tail_start = 0
+                tail = ()
+
+            self._data[index] = new_vals
+            # First, do the directly changed values.
+            for pos, old, new in zip(indices, replaced, new_vals):
+                self._fire(pos, old, new)
+
+            if not tail:
+                return
+
+            # Now do everything after there which shifts.
+            for pos, orig_pos in enumerate(range(tail_start, len(self._data))):
+                pass
+        else:
+            old = self._data[index]
+            self._data[index] = item
+            self._fire(index, old, item)
+
+    @overload
+    @abstractmethod
+    def __delitem__(self, index: int) -> None: ...
+
+    @overload
+    @abstractmethod
+    def __delitem__(self, index: slice) -> None: ...
+
+    def __delitem__(self, index: Union[int, slice]) -> None:
+        if isinstance(index, slice):
+            start, stop, step  = index.indices(len(self._data))
+            start = min(start, stop)
+        else:
+            start = index
+
+        orig_copy = self._data[start:]
+        del self._data[index]
+        for pos, orig in enumerate(orig_copy, start=start):
+            if pos < len(self._data):
+                new = self._data[pos]
+            else:
+                new = None
+            self._fire(pos, orig, new)
+
+    def insert(self, index: int, object: ValueT) -> None:
+        """Inserting an item changes the index, plus everything after it."""
+        size = len(self._data)
+        self._data.insert(index, object)
+        for pos in range(index, size):
+            self._fire(pos, self._data[pos + 1], self._data[pos])
+        self._fire(size, None, self._data[-1])
+
+    def append(self, item: ValueT) -> None:
+        """Appending adds the item to the end."""
+        pos = len(self._data)
+        self._data.append(item)
+        self.man(self, ValueChange(None, item, pos))
+
+    def clear(self) -> None:
+        """Clearing a list fires the event on every value."""
+        orig = self._data[:]
+        self._data.clear()
+        for index, item in enumerate(orig):
+            self.man(self, ValueChange(item, None, index))
+
+    def extend(self, iterable: Iterable[ValueT]) -> None:
+        """Extend fires the event for each new item."""
+        pos_start = len(self._data)
+        new_values = list(iterable)
+        self._data += new_values
+        for index, item in enumerate(new_values, pos_start):
+            self.man(self, ValueChange(item, None, index))
+
+    def reverse(self) -> None:
+        """Reverse causes the event to fire on every item."""
+        self._data.reverse()
+        size = len(self._data) - 1
+        for new_ind, item in enumerate(reversed(self._data)):
+            old_ind = size - new_ind
+            self._fire(old_ind, self._data[old_ind], item)
+
+    def pop(self, index: int = -1) -> ValueT:
+        """S.pop([index]) -> item -- remove and return item at index (default last).
+           Raise IndexError if list is empty or index is out of range.
+        """
+        if index < 0:
+            index += len(self._data)
+        value = self._data.pop(index)
+        self._fire(index, value, None)
+        return value
