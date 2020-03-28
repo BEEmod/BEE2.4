@@ -72,6 +72,10 @@ reports/
 # Specifies the version for compilation.
 src/bee_version.txt
 
+# Testing:
+.hypothesis/
+.pytest_cache/
+
 # PyInstaller temporary file directory
 /build_tmp/
 
