@@ -10,12 +10,14 @@ context, and the same type of argument will be called with the arg.
 A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
+from abc import abstractmethod
 from collections import defaultdict
 from typing import (
     TypeVar, Callable, overload, Generic,
     Any, Optional, Type,
     Dict, List, Tuple,
-    Hashable,
+    Hashable, Iterable,
+    MutableSequence, MutableMapping,
     cast,
 )
 
@@ -30,12 +32,12 @@ class EventManager:
     """Manages a set of events, and the associated callbacks."""
     _cbacks: Dict[Tuple[Any, Type[Any]], List[Callable]]
     _last_result: Dict[Tuple[Any, Type[Any]], Any]
-    _running: Dict[Tuple[Any, Type[Any]], bool]
+    _running: Dict[Tuple[Any, Type[Any]], int]
 
     def __init__(self) -> None:
         self._cbacks = defaultdict(list)
         self._last_result = {}
-        self._running = {}
+        self._running = defaultdict(int)
 
     @overload
     def register(
@@ -88,16 +90,50 @@ class EventManager:
         run, the second will be ignored.
         """
         key = (ctx, type(arg))
-        self._last_result[key] = arg
 
-        if self._running.get(key):
-            return
-        self._running[key] = True
+        if self._running[key]:
+            try:
+                if self._last_result[key] == arg:
+                    return
+            except KeyError:
+                pass
+
+        self._last_result[key] = arg
+        self._running[key] += 1
         try:
             for func in self._cbacks[key]:
                 func(arg)
         finally:
-            self._running[key] = False
+            self._running[key] -= 1
+
+    @overload
+    def unregister(
+        self, ctx: CtxT,
+        arg_type: None,
+        func: Callable[[None], Any],
+    ) -> None: ...
+    @overload
+    def unregister(
+        self, ctx: CtxT,
+        arg_type: Type[ArgT],
+        func: Callable[[ArgT], Any],
+    ) -> None: ...
+    def unregister(
+        self,
+        ctx: CtxT,
+        arg_type: Optional[Type[ArgT]],
+        func: Callable[[ArgT], Any],
+    ) -> None:
+        """Remove the given callback.
+
+        If it is not registered, raise LookupError.
+        """
+        if arg_type is None:
+            arg_type = cast(Type[ArgT], NoneType)
+        try:
+            self._cbacks[ctx, arg_type].remove(func)
+        except ValueError:
+            raise KeyError(ctx, arg_type, func) from None
 
 # Global manager for general events.
 APP_EVENTS = EventManager()
@@ -151,7 +187,7 @@ class ValueChange(tuple, Generic[KeyT, ValueT]):
     @property
     def new(self) -> ValueT:
         """The new value."""
-        return self[0]
+        return self[1]
 
     @property
     def key(self) -> KeyT:
