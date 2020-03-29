@@ -333,7 +333,7 @@ def test_repr() -> None:
 
     a2.append(a2)
     a2.append(3)
-    assert str(a2) == repr(a2) == f"ObsList({man!r}, [0, 1, 2, [...], 3])"
+    assert str(a2) == repr(a2) == f"ObsList({man!r}, [0, 1, 2, ObsList(...), 3])"
 
     l0 = []
     for i in range(sys.getrecursionlimit() + 100):

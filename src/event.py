@@ -13,6 +13,7 @@ whenever they are modified.
 import itertools
 from abc import abstractmethod
 from collections import defaultdict
+from reprlib import recursive_repr
 from typing import (
     TypeVar, Callable, overload, Generic,
     Any, Optional, Type,
@@ -22,7 +23,14 @@ from typing import (
     cast,
     Union,
     Iterator,
+    Sequence,
 )
+
+__all__ = [
+    'EventManager', 'APP_EVENTS',
+    'ObsValue', 'ObsList',
+    'ArgT', 'CtxT', 'KeyT', 'ValueT',
+]
 
 ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
@@ -268,15 +276,44 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         self.man = man
         self._data = list(initial)
 
-    def __len__(self) -> int:
-        return len(self._data)
+    @recursive_repr('ObsList(...)')
+    def __repr__(self) -> str:
+        return f'ObsList({self.man!r}, {self._data!r})'
 
     def _fire(self, index: int, orig: ValueT, new: ValueT) -> None:
         """Internally fire an event. Doesn't fire if it's the same."""
-        # if orig != new and orig != self._data[index]:
         self.man(self, ValueChange(orig, new, index))
 
+    def _check_tail(self, orig: List[ValueT], start: int) -> None:
+        """Used to fire off events when doing bulk changes.
+
+        When adding/removing values, we change everything after a certain
+        point. orig should be self._data[start:] before the change.
+        This will then check what changed, and fire the events appropriately.
+        """
+        # First, determine how long both of these are.
+        len_old = len(orig)
+        len_new = len(self._data) - start
+        # Regardless of the lengths, first fire off the common components.
+        for pos in range(min(len_old, len_new)):
+            old = orig[pos]
+            new = self._data[start + pos]
+            if old is not new:
+                self._fire(start + pos, old, new)
+
+        if len_new > len_old:
+            # We appended stuff (or shifted them down).
+            for pos in range(len_old, len_new):
+                self._fire(start + pos, None, self._data[start + pos])
+        elif len_new < len_old:
+            # We removed stuff.
+            for pos in range(len_new, len_old):
+                self._fire(start + pos, orig[pos], None)
+
     # First, all read methods delegate unchanged.
+
+    def __len__(self) -> int:
+        return len(self._data)
 
     @overload
     @abstractmethod
@@ -321,31 +358,12 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
 
     def __setitem__(self, index: Union[int, slice], item: ValueT) -> None:
         if isinstance(index, slice):
-            # Complicated. We have to determine if this is going to shrink,
-            # expand or keep the same size.
-            start, stop, step = index.indices(len(self._data))
-            indices = range(start, stop, step)
-            new_vals = list(item)
-            replaced = self._data[index]
-            if len(replaced) != len(new_vals):
-                # We have different counts, so we're resizing.
-                tail_start = max(max(indices), len(self._data)-1)
-                tail = self._data[tail_start:]
-            else:
-                tail_start = 0
-                tail = ()
+            # Find the smallest index we change.
+            start = min(range(*index.indices(len(self._data))), default=0)
+            tail = self._data[start:]
+            self._data[index] = item
 
-            self._data[index] = new_vals
-            # First, do the directly changed values.
-            for pos, old, new in zip(indices, replaced, new_vals):
-                self._fire(pos, old, new)
-
-            if not tail:
-                return
-
-            # Now do everything after there which shifts.
-            for pos, orig_pos in enumerate(range(tail_start, len(self._data))):
-                pass
+            self._check_tail(tail, start)
         else:
             old = self._data[index]
             self._data[index] = item
@@ -361,8 +379,10 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
 
     def __delitem__(self, index: Union[int, slice]) -> None:
         if isinstance(index, slice):
-            start, stop, step  = index.indices(len(self._data))
+            start, stop, step = index.indices(len(self._data))
             start = min(start, stop)
+        elif index < 0:
+            start = index + len(self._data)
         else:
             start = index
 
@@ -399,10 +419,9 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
     def extend(self, iterable: Iterable[ValueT]) -> None:
         """Extend fires the event for each new item."""
         pos_start = len(self._data)
-        new_values = list(iterable)
-        self._data += new_values
-        for index, item in enumerate(new_values, pos_start):
-            self.man(self, ValueChange(item, None, index))
+        self._data.extend(iterable)
+        for index in range(pos_start, len(self._data)):
+            self._fire(index, None, self._data[index])
 
     def reverse(self) -> None:
         """Reverse causes the event to fire on every item."""
@@ -410,7 +429,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         size = len(self._data) - 1
         for new_ind, item in enumerate(reversed(self._data)):
             old_ind = size - new_ind
-            self._fire(old_ind, self._data[old_ind], item)
+            self._fire(new_ind, item, self._data[new_ind])
 
     def pop(self, index: int = -1) -> ValueT:
         """S.pop([index]) -> item -- remove and return item at index (default last).
@@ -421,3 +440,71 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         value = self._data.pop(index)
         self._fire(index, value, None)
         return value
+
+    def sort(
+        self, *,
+        key: Callable[[ValueT], Any] = None,
+        reverse: bool = False,
+    ) -> None:
+        """Sort the list in-place.
+
+        Events will fire on all the locations.
+        """
+        orig = self._data[:]
+        self._data.sort(key=key, reverse=reverse)
+        self._check_tail(orig, 0)
+
+    def __add__(self, other: Sequence[ValueT]) -> List[ValueT]:
+        """Concatenate another sequence with this one.
+
+        This produces a normal list."""
+        if isinstance(other, ObsList):
+            return self._data + other._data
+        copy = self._data[:]
+        copy.extend(other)
+        return copy
+
+    def __radd__(self, other: Sequence[ValueT]) -> List[ValueT]:
+        """Prepend another sequence with this one.
+
+        This produces a normal list."""
+        if isinstance(other, ObsList):
+            return other._data + self._data
+        return list(other) + self._data
+
+    def __iadd__(self, other: Sequence[ValueT]) -> 'ObsList[ValueT]':
+        """Append another sequence to this one."""
+        self.extend(other)
+        return self
+
+    def __mul__(self, count: int) -> List[ValueT]:
+        """Repeat the contents the given number of times."""
+        return self._data * count
+
+    def __rmul__(self, count: int) -> List[ValueT]:
+        """Repeat the contents the given number of times."""
+        return count * self._data
+
+    def __imul__(self, count: int) -> 'ObsList[ValueT]':
+        """Repeat the contents the given number of times."""
+        pos_start = len(self._data)
+        self._data *= count
+        for pos in range(pos_start, len(self._data)):
+            self._fire(pos, None, self._data[pos])
+        return self
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ObsList):
+            return self._data == other._data
+        else:
+            # Use special method so it returns NotImplemented
+            # where required.
+            return self._data.__eq__(other)
+
+    def __ne__(self, other: object) -> bool:
+        if isinstance(other, ObsList):
+            return self._data != other._data
+        else:
+            # Use special method so it returns NotImplemented
+            # where required.
+            return self._data.__ne__(other)
