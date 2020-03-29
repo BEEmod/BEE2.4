@@ -31,16 +31,30 @@ ValueT = TypeVar('ValueT')
 NoneType: Type[None] = type(None)
 
 
+class EventSpec(Generic[ArgT], List[Callable[[ArgT], Any]]):
+    """The data associated with a given event.
+
+    To save a bit of space, combine the list of callbacks with the other
+    args.
+    """
+    __slots__ = ['ctx', 'last_result', 'cur_calls']
+    ctx: Any
+    last_result: ArgT
+    cur_calls: int
+
+    def __init__(self, ctx: Any) -> None:
+        super().__init__()
+        self.ctx = ctx
+        self.cur_calls = 0
+        # Leave last_result unset as a sentinel.
+
+
 class EventManager:
     """Manages a set of events, and the associated callbacks."""
-    _cbacks: Dict[Tuple[Any, Type[Any]], List[Callable]]
-    _last_result: Dict[Tuple[Any, Type[Any]], Any]
-    _running: Dict[Tuple[Any, Type[Any]], int]
+    _events: Dict[Tuple[int, Type[ArgT]], EventSpec[ArgT]]
 
     def __init__(self) -> None:
-        self._cbacks = defaultdict(list)
-        self._last_result = {}
-        self._running = defaultdict(int)
+        self._events = {}
 
     @overload
     def register(
@@ -76,12 +90,16 @@ class EventManager:
         """
         if arg_type is None:
             arg_type = cast(Type[ArgT], NoneType)
-        key = (ctx, arg_type)
-        self._cbacks[key].append(func)
+        key = (id(ctx), arg_type)
+        try:
+            spec = self._events[key]
+        except KeyError:
+            spec = self._events[key] = EventSpec[ArgT](ctx)
+        spec.append(func)
         if prime:
             try:
-                last_val = self._last_result[key]
-            except KeyError:
+                last_val = spec.last_result
+            except AttributeError:
                 pass
             else:
                 func(last_val)
@@ -92,22 +110,25 @@ class EventManager:
         This is re-entrant - if called whilst the same event is already being
         run, the second will be ignored.
         """
-        key = (ctx, type(arg))
+        try:
+            spec = self._events[(id(ctx), type(arg))]
+        except KeyError:
+            return
 
-        if self._running[key]:
+        if spec.cur_calls:
             try:
-                if self._last_result[key] == arg:
+                if spec.last_result == arg:
                     return
-            except KeyError:
+            except AttributeError:
                 pass
 
-        self._last_result[key] = arg
-        self._running[key] += 1
+        spec.last_result = arg
+        spec.cur_calls += 1
         try:
-            for func in self._cbacks[key]:
+            for func in spec:
                 func(arg)
         finally:
-            self._running[key] -= 1
+            spec.cur_calls -= 1
 
     @overload
     def unregister(
@@ -134,9 +155,9 @@ class EventManager:
         if arg_type is None:
             arg_type = cast(Type[ArgT], NoneType)
         try:
-            self._cbacks[ctx, arg_type].remove(func)
-        except ValueError:
-            raise KeyError(ctx, arg_type, func) from None
+            self._events[id(ctx), arg_type].remove(func)
+        except (KeyError, ValueError):
+            raise LookupError(ctx, arg_type, func) from None
 
 # Global manager for general events.
 APP_EVENTS = EventManager()
