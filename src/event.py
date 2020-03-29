@@ -13,15 +13,14 @@ whenever they are modified.
 from abc import abstractmethod
 from reprlib import recursive_repr
 from typing import (
-    TypeVar, Callable, overload, Generic,
-    Any, Optional, Type,
+    overload, cast,
+    TypeVar, Any, Type,
+    Optional, Union, Generic, Callable,
     Dict, List, Tuple,
-    Hashable, Iterable,
+    Hashable, Iterable, Iterator,
     MutableSequence, MutableMapping,
-    cast,
-    Union,
-    Iterator,
-    Sequence,
+    Sequence, Mapping,
+    KeysView, ValuesView, ItemsView,
 )
 
 __all__ = [
@@ -35,6 +34,7 @@ CtxT = TypeVar('CtxT')
 KeyT = TypeVar('KeyT', bound=Hashable)
 ValueT = TypeVar('ValueT')
 NoneType: Type[None] = type(None)
+_UNSET = object()
 
 
 class EventSpec(Generic[ArgT], List[Callable[[ArgT], Any]]):
@@ -116,6 +116,7 @@ class EventManager:
         This is re-entrant - if called whilst the same event is already being
         run, the second will be ignored.
         """
+        spec: EventSpec[ArgT]
         try:
             spec = self._events[id(ctx), type(arg)]
         except KeyError:
@@ -278,7 +279,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
     def __repr__(self) -> str:
         return f'ObsList({self.man!r}, {self._data!r})'
 
-    def _fire(self, index: int, orig: ValueT, new: ValueT) -> None:
+    def _fire(self, index: int, orig: Optional[ValueT], new: Optional[ValueT]) -> None:
         """Internally fire an event. Doesn't fire if it's the same."""
         self.man(self, ValueChange(orig, new, index))
 
@@ -354,7 +355,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
     @abstractmethod
     def __setitem__(self, index: slice, item: Iterable[ValueT]) -> None: ...
 
-    def __setitem__(self, index: Union[int, slice], item: ValueT) -> None:
+    def __setitem__(self, index: Union[int, slice], item: Union[ValueT, Iterable[ValueT]]) -> None:
         if isinstance(index, slice):
             # Find the smallest index we change.
             start = min(range(*index.indices(len(self._data))), default=0)
@@ -386,6 +387,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
 
         orig_copy = self._data[start:]
         del self._data[index]
+        new: Optional[ValueT]
         for pos, orig in enumerate(orig_copy, start=start):
             if pos < len(self._data):
                 new = self._data[pos]
@@ -506,3 +508,106 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
             # Use special method so it returns NotImplemented
             # where required.
             return self._data.__ne__(other)
+
+
+class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
+    """A mapping which can be altered, and fires events whenever changed.
+
+    If multiple values are modified at once, each will individually fire an event.
+    If a key is added or removed, None will be substituted as appropriate.
+    """
+    man: EventManager
+    _data: Dict[KeyT, ValueT]
+
+    def __init__(
+        self,
+        man: EventManager,
+        initial: Union[Mapping[KeyT, ValueT], Iterable[Tuple[KeyT, ValueT]]] = (),
+    ) -> None:
+        self.man = man
+        self._data = dict(initial)
+
+    @recursive_repr('ObsMap(...)')
+    def __repr__(self) -> str:
+        return f'ObsMap({self.man!r}, {self._data!r})'
+
+    def _fire(self, key: KeyT, orig: ValueT, new: ValueT) -> None:
+        """Internally fire an event."""
+        self.man(self, ValueChange(orig, new, key))
+
+    def __getitem__(self, k: KeyT) -> ValueT:
+        return self._data[k]
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __iter__(self) -> Iterator[KeyT]:
+        return iter(self._data)
+
+    def __contains__(self, key: KeyT) -> bool:
+        return key in self._data
+
+    @overload
+    def get(self, k: KeyT) -> Optional[ValueT]: ...
+    @overload
+    def get(self, k: KeyT, default: Union[ValueT, ArgT]) -> Union[ValueT, ArgT]: ...
+
+    def get(self, k: KeyT, default: Union[ValueT, ArgT] = None) -> Optional[ValueT, ArgT]:
+        """Return map[k], or default if key is not present."""
+        return self._data.get(k, default)
+
+    def keys(self) -> KeysView[KeyT]:
+        """Return a view over the mapping's keys."""
+        return self._data.keys()
+
+    def values(self) -> ValuesView[ValueT]:
+        """Return a view over the mapping's values."""
+        return self._data.values()
+
+    def items(self) -> ItemsView[KeyT, ValueT]:
+        """Return a view over the mapping's values."""
+        return self._data.items()
+
+    def __setitem__(self, key: KeyT, value: ValueT) -> None:
+        """Set a value, then fire the event."""
+        old = self._data.get(key, None)
+        self._data[key] = value
+        self._fire(key, old, value)
+
+    def __delitem__(self, key: KeyT) -> None:
+        """Remove the given key."""
+        old = self._data.pop(key)
+        # Raises the KeyError for us.
+        self._fire(key, old, None)
+
+    def clear(self) -> None:
+        """Remove all values."""
+        values = list(self._data.items())
+        self._data.clear()
+        for key, value in values:
+            self._fire(key, value, None)
+
+    @overload
+    def pop(self, k: KeyT) -> ValueT: ...
+    @overload
+    def pop(self, k: KeyT, default: Union[ValueT, ArgT] = ...) -> Union[ValueT, ArgT]: ...
+
+    def pop(self, k: KeyT, default: Union[ValueT, ArgT] = _UNSET) -> Union[ValueT, ArgT]:
+        """Remove the specified key and return the corresponding value.
+
+        If key is not found, the default is returned if given, otherwise KeyError is raised.
+        """
+        try:
+            old = self._data.pop(k)
+        except KeyError:
+            if default is not _UNSET:
+                return default
+            raise  # Already got the KeyError we want.
+        self._fire(k, old, None)
+        return old
+
+    def popitem(self) -> Tuple[KeyT, ValueT]:
+        """Remove and return some (key, value) pair as a 2-tuple; but raise KeyError if D is empty."""
+        keyvalue = key, value = self._data.popitem()
+        self._fire(key, value, None)
+        return keyvalue
