@@ -1,30 +1,11 @@
 """Test the events manager and collections."""
+import sys
 from contextlib import contextmanager
 
 import pytest
 from unittest.mock import Mock, create_autospec, call
 
-from event import EventManager, ValueChange, ObsValue
-
-
-@contextmanager
-def fires(man: EventManager, match_ctx, match_arg, msg=''):
-    """Verify the code fires the given event."""
-    is_fired = False
-
-    def event_func(ctx, arg):
-        nonlocal is_fired
-        assert match_ctx is ctx, f"{match_ctx} is not {ctx}: {msg}"
-        assert match_arg == arg, f"{match_arg} != {arg}: {msg}"
-        is_fired = True
-
-    man.register(match_ctx, type(match_arg), event_func)
-    try:
-        yield
-        if not is_fired:
-            pytest.fail("Not fired: " + msg)
-    finally:
-        man.unregister(match_ctx, type(match_arg), event_func)
+from event import EventManager, ValueChange, ObsValue, ObsList
 
 
 def event_func(arg):
@@ -84,9 +65,9 @@ def test_unregister() -> None:
     func1.reset_mock()
     func2.reset_mock()
 
-    with pytest.raises(KeyError):
+    with pytest.raises(LookupError):
         man.unregister(ctx, int, func1)
-    with pytest.raises(KeyError):
+    with pytest.raises(LookupError):
         man.unregister(45, bool, func1)
     man.unregister(ctx, bool, func1)
 
@@ -151,9 +132,9 @@ def test_unregister_nonearg() -> None:
     func1.reset_mock()
     func2.reset_mock()
 
-    with pytest.raises(KeyError):
+    with pytest.raises(LookupError):
         man.unregister(ctx, int, func1)
-    with pytest.raises(KeyError):
+    with pytest.raises(LookupError):
         man.unregister(45, None, func1)
     man.unregister(ctx, None, func1)
 
@@ -248,4 +229,292 @@ def test_obsvalue_set_during_event() -> None:
         call(ValueChange(1, 2, None)),
         call(ValueChange(2, 3, None)),
         call(ValueChange(3, 3, None)),
+    ])
+
+try:
+    from test.list_tests import CommonTest as CPyListTest
+except ImportError:
+    # No test package installed, can only run the ones here.
+    from unittest import TestCase as CPyListTest
+
+    def test_no_cpython():
+        """Log that the tests aren't importable."""
+        pytest.fail("No test.list_tests to import!")
+
+
+class CPythonObsTests(CPyListTest):
+    """Use CPython's own tests.
+
+    This should comprehensively test that it does the same thing
+    as the original list type.
+    """
+    def test_init(self):
+        man = EventManager()
+        # Iterable arg is optional
+        self.assertEqual(self.type2test([]), self.type2test())
+
+        # Init clears previous values
+        a = self.type2test([1, 2, 3])
+        a.__init__(man)
+        self.assertEqual(a, self.type2test([]))
+
+        # Init overwrites previous values
+        a = self.type2test([1, 2, 3])
+        a.__init__(man, [4, 5, 6])
+        self.assertEqual(a, self.type2test([4, 5, 6]))
+
+        # Mutables always return a new object
+        b = self.type2test(a)
+        self.assertNotEqual(id(a), id(b))
+        self.assertEqual(a, b)
+
+    @staticmethod
+    def type2test(it=()):
+        """Replicate the normal list's parameters, so it can test this."""
+        return ObsList(EventManager(), it)
+
+    # copy() for us isn't useful or well defined.
+    # Context is compared by identity, so it won't fire the events.
+    # But returning a list is odd as well.
+    test_copy = None
+
+    # This is a extension type check, not Python code.
+    test_free_after_iterating = None
+
+    # Our repr() is and should be different.
+    test_repr = None
+
+    def test_addmul(self) -> None:
+        """Eliminate the subclass test, type2test isn't valid."""
+        u1 = self.type2test([0])
+        u2 = self.type2test([0, 1])
+        self.assertEqual(u1, u1 + self.type2test())
+        self.assertEqual(u1, self.type2test() + u1)
+        self.assertEqual(u1 + self.type2test([1]), u2)
+        self.assertEqual(self.type2test([-1]) + u1, self.type2test([-1, 0]))
+        self.assertEqual(self.type2test(), u2 * 0)
+        self.assertEqual(self.type2test(), 0 * u2)
+        self.assertEqual(self.type2test(), u2 * 0)
+        self.assertEqual(self.type2test(), 0 * u2)
+        self.assertEqual(u2, u2 * 1)
+        self.assertEqual(u2, 1 * u2)
+        self.assertEqual(u2, u2 * 1)
+        self.assertEqual(u2, 1 * u2)
+        self.assertEqual(u2 + u2, u2 * 2)
+        self.assertEqual(u2 + u2, 2 * u2)
+        self.assertEqual(u2 + u2, u2 * 2)
+        self.assertEqual(u2 + u2, 2 * u2)
+        self.assertEqual(u2 + u2 + u2, u2 * 3)
+        self.assertEqual(u2 + u2 + u2, 3 * u2)
+
+    def test_getitemoverwriteiter(self):
+        """Needs an override to pass EventManager in."""
+        # Verify that __getitem__ overrides are not recognized by __iter__
+        class T(ObsList):
+            def __getitem__(self, key):
+                return str(key) + '!!!'
+        self.assertEqual(next(iter(T(EventManager(), (1, 2)))), 1)
+
+
+# Don't test this itself.
+del CPyListTest
+
+
+def test_repr() -> None:
+    """Replicate the original list checks."""
+    man = EventManager()
+    l0 = []
+    l2 = [0, 1, 2]
+    a0 = ObsList(man, l0)
+    a2 = ObsList(man, l2)
+
+    assert str(a0) == repr(a0) == f"ObsList({man!r}, [])"
+    assert str(a2) == repr(a2) == f"ObsList({man!r}, [0, 1, 2])"
+
+    a2.append(a2)
+    a2.append(3)
+    assert str(a2) == repr(a2) == f"ObsList({man!r}, [0, 1, 2, [...], 3])"
+
+    l0 = []
+    for i in range(sys.getrecursionlimit() + 100):
+        l0 = [l0]
+    a1 = ObsList(man, l0)
+    with pytest.raises(RecursionError):
+        repr(a1)
+
+
+def test_obslist_reading() -> None:
+    """Test reading functions do what is expected."""
+    man = EventManager()
+    seq = ObsList(man, [1, 2, 3, 3, 4])
+    # If any event fires, we fail.
+    man.register(seq, ValueChange, pytest.fail)
+    assert seq[0] == 1
+    assert seq[1] == 2
+    assert seq[2] == 3
+    assert len(seq) == 5
+    assert seq[:2] == [1, 2]
+    assert seq[1:] == [2, 3, 3, 4]
+    assert seq[2:0:-1] == [3, 2]
+    assert 2 in seq
+    assert 5 not in seq
+    assert FileNotFoundError not in seq  # Random object.
+    assert seq.index(2) == 1
+    assert list(seq) == [1, 2, 3, 3, 4]
+    assert list(reversed(seq)) == [4, 3, 3, 2, 1]
+    assert seq.count(2) == 1
+    assert seq.count(3) == 2
+    assert seq.count(9) == 0
+
+    with pytest.raises(ValueError):
+        seq.index(95)
+
+
+def test_obslist_deletion() -> None:
+    """Test deleting items from the sequence."""
+    man = EventManager()
+    seq = ObsList(man, range(10))
+    event = create_autospec(event_func)
+    man.register(seq, ValueChange, event)
+
+    del seq[7]
+    assert event.call_count == 3
+    event.assert_has_calls([
+        call(ValueChange(7, 8, 7)),
+        call(ValueChange(8, 9, 8)),
+        call(ValueChange(9, None, 9)),
+    ])
+
+
+def test_obslist_slice_assignment_shrink() -> None:
+    """Test deleting items from the list with slice assignment."""
+    man = EventManager()
+    seq = ObsList(man, range(10))
+    event = create_autospec(event_func)
+    man.register(seq, ValueChange, event)
+
+    seq[3:9] = ['a', 'b', 'c']
+    assert event.call_count == 7
+    event.assert_has_calls([
+        call(ValueChange(3, 'a', 3)),
+        call(ValueChange(4, 'b', 4)),
+        call(ValueChange(5, 'c', 5)),
+        call(ValueChange(6, 9, 6)),
+        call(ValueChange(7, None, 7)),
+        call(ValueChange(8, None, 8)),
+        call(ValueChange(9, None, 9)),
+    ])
+
+
+def test_obslist_slice_assignment_grow() -> None:
+    """Test adding items to the list with slice assignment."""
+    man = EventManager()
+    seq = ObsList(man, range(10))
+    event = create_autospec(event_func)
+    man.register(seq, ValueChange, event)
+
+    seq[3:4] = ['a', 'b', 'c', 'd', 'e', 'f']
+    assert event.call_count == 12
+    event.assert_has_calls([
+        call(ValueChange(3, 'a', 3)),
+        call(ValueChange(4, 'b', 4)),
+        call(ValueChange(5, 'c', 5)),
+        call(ValueChange(6, 'd', 6)),
+        call(ValueChange(7, 'e', 7)),
+        call(ValueChange(8, 'f', 8)),
+        call(ValueChange(9, 4, 9)),
+        call(ValueChange(None, 5, 10)),
+        call(ValueChange(None, 6, 11)),
+        call(ValueChange(None, 7, 12)),
+        call(ValueChange(None, 8, 13)),
+        call(ValueChange(None, 9, 14)),
+    ])
+
+
+def test_obslist_slice_assignment_same() -> None:
+    """Test modifying the list with slice assignment, while keeping the length."""
+    man = EventManager()
+    seq = ObsList(man, range(10))
+    event = create_autospec(event_func)
+    man.register(seq, ValueChange, event)
+
+    seq[5:2:-1] = ['a', 'b', 'c']
+    assert event.call_count == 3
+    event.assert_has_calls([
+        call(ValueChange(3, 'c', 3)),
+        call(ValueChange(4, 'b', 4)),
+        call(ValueChange(5, 'a', 5)),
+    ])
+
+
+def test_obslist_reverse() -> None:
+    """Test the inplace reverse fires events."""
+    man = EventManager()
+    seq = ObsList(man, range(10))
+    event = create_autospec(event_func)
+    man.register(seq, ValueChange, event)
+
+    seq.reverse()
+    assert event.call_count == 10
+    event.assert_has_calls([
+        call(ValueChange(0, 9, 0)),
+        call(ValueChange(1, 8, 1)),
+        call(ValueChange(2, 7, 2)),
+        call(ValueChange(3, 6, 3)),
+        call(ValueChange(4, 5, 4)),
+        call(ValueChange(5, 4, 5)),
+        call(ValueChange(6, 3, 6)),
+        call(ValueChange(7, 2, 7)),
+        call(ValueChange(8, 1, 8)),
+        call(ValueChange(9, 0, 9)),
+    ])
+    # Check odd lengths.
+    assert seq.pop() == 0
+    event.reset_mock()
+
+    seq.reverse()
+    assert event.call_count == 9
+    event.assert_has_calls([
+        call(ValueChange(9, 1, 0)),
+        call(ValueChange(8, 2, 1)),
+        call(ValueChange(7, 3, 2)),
+        call(ValueChange(6, 4, 3)),
+        call(ValueChange(5, 5, 4)),
+        call(ValueChange(4, 6, 5)),
+        call(ValueChange(3, 7, 6)),
+        call(ValueChange(2, 8, 7)),
+        call(ValueChange(1, 9, 8)),
+    ])
+
+
+def test_obslist_sort() -> None:
+    """Test the inplace sort fires events."""
+    man = EventManager()
+    seq = ObsList(man, [-3, 4, -2, 8, 3, 5, -9])
+    event = create_autospec(event_func)
+    man.register(seq, ValueChange, event)
+
+    seq.sort()
+    assert event.call_count == 5
+    event.assert_has_calls([
+        call(ValueChange(-3, -9, 0)),
+        call(ValueChange(+4, -3, 1)),
+        # call(ValueChange(-2, -2, 2)),
+        call(ValueChange(+8, +3, 3)),
+        call(ValueChange(+3, +4, 4)),
+        # call(ValueChange(+5, +5, 5)),
+        call(ValueChange(-9, +8, 6)),
+    ])
+    event.reset_mock()
+
+    seq.sort(key=abs, reverse=True)
+    assert event.call_count == 6
+    event.assert_has_calls([
+        # call(ValueChange(-9, -9, 0)),
+        call(ValueChange(-3, +8, 1)),
+        call(ValueChange(-2, +5, 2)),
+        call(ValueChange(+3, +4, 3)),
+        call(ValueChange(+4, -3, 4)),
+        call(ValueChange(+5, +3, 5)),
+        call(ValueChange(+8, -2, 6)),
     ])
