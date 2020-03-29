@@ -147,6 +147,32 @@ def test_unregister_nonearg() -> None:
     func2.assert_called_once_with(None)
 
 
+def test_register_priming() -> None:
+    """Test the 'prime' keyword argument for events."""
+    man = EventManager()
+    func1 = create_autospec(event_func, name='func1')
+    func2 = create_autospec(event_func, name='func2')
+
+    # If not fired, does nothing.
+    man.register(None, int, func1, prime=True)
+    func1.assert_not_called()
+    man(None, 5)
+    func1.assert_called_once_with(5)
+
+    func1.reset_mock()
+    # Now it's been fired already, the late registry can be sent it.
+    man.register(None, int, func2, prime=True)
+    func1.assert_not_called()  # This is unaffected.
+    func2.assert_called_once_with(5)
+
+    func1.reset_mock()
+    func2.reset_mock()
+
+    man(None, 10)
+    func1.assert_called_once_with(10)
+    func2.assert_called_once_with(10)
+
+
 def test_valuechange() -> None:
     """Check ValueChange() produces the right values."""
     with pytest.raises(TypeError):
@@ -230,6 +256,19 @@ def test_obsvalue_set_during_event() -> None:
         call(ValueChange(2, 3, None)),
         call(ValueChange(3, 3, None)),
     ])
+
+
+def test_obsval_repr() -> None:
+    """Test the repr() of ObsValue."""
+    man = EventManager()
+    holder = ObsValue(man, 0)
+
+    assert repr(holder) == f'ObsValue({man!r}, 0)'
+    holder.value = [1, 2, 3]
+    assert repr(holder) == f'ObsValue({man!r}, [1, 2, 3])'
+    holder.value = None
+    assert repr(holder) == f'ObsValue({man!r}, None)'
+
 
 try:
     from test.list_tests import CommonTest as CPyListTest

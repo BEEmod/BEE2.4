@@ -10,9 +10,7 @@ context, and the same type of argument will be called with the arg.
 A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
-import itertools
 from abc import abstractmethod
-from collections import defaultdict
 from reprlib import recursive_repr
 from typing import (
     TypeVar, Callable, overload, Generic,
@@ -119,7 +117,7 @@ class EventManager:
         run, the second will be ignored.
         """
         try:
-            spec = self._events[(id(ctx), type(arg))]
+            spec = self._events[id(ctx), type(arg)]
         except KeyError:
             return
 
