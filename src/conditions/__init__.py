@@ -624,7 +624,7 @@ def build_solid_dict() -> None:
 
     for solid in VMF.brushes:
         for face in solid:
-            if face.mat.casefold in consts.Goo:
+            if face.mat.casefold() in consts.Goo:
                 # Record all locations containing goo.
                 bbox_min, bbox_max = solid.get_bbox()
                 x = bbox_min.x + 64
