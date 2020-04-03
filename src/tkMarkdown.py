@@ -1,13 +1,17 @@
+"""Wrapper around the markdown module, converting it to display in TKinter widgets.
+
+This produces a stream of values, which are fed into richTextBox to display.
+"""
 from enum import Enum
 from itertools import count
 
-from markdown.util import etree
-from markdown.extensions import smart_strong, sane_lists
+from xml.etree.ElementTree import Element as XMLElement
+from markdown.extensions.sane_lists import SaneListExtension
 from markdown.preprocessors import Preprocessor
 import markdown
 import srctools.logger
 
-from typing import Iterable, Iterator, Union, List, Tuple
+from typing import Iterable, Iterator, Union, List, Tuple, Optional, Any, Dict
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -38,6 +42,7 @@ LINK_TAG_START = 'link_callback_'
 
 
 class TAG(Enum):
+    """Marker used to indicate when tags start/end."""
     START = 0
     END = 1
 
@@ -58,11 +63,15 @@ class MarkdownData:
     Blocks are a list of two-tuples - each is a Block type, and data for it.
     Links is a dict mapping urls to callback IDs.
     """
-    def __init__(self, blocks=(), links=None):
+    def __init__(
+        self,
+        blocks: Iterable[Tuple[BlockTags, Any]] = (),
+        links: Dict[str, str] = None,
+    ) -> None:
         self.blocks = list(blocks)
         self.links = links if links is not None else {}
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Empty data is false."""
         return bool(self.blocks)
 
@@ -74,9 +83,9 @@ class MarkdownData:
 
 
 def iter_elemtext(
-    elem: etree.Element,
-    parent_path: Iterable[etree.Element]=(),
-) -> Iterator[Tuple[List[etree.Element], Union[str, TAG]]]:
+    elem: XMLElement,
+    parent_path: Iterable[XMLElement]=(),
+) -> Iterator[Tuple[List[XMLElement], Union[str, TAG]]]:
     """Flatten out an elementTree into the text parts.
 
     Yields path, text tuples. path is a list of the parent elements for the
@@ -103,7 +112,7 @@ def iter_elemtext(
         yield parent_path, elem.tail.replace('\n', '')
 
 
-def parse_html(element: etree.Element):
+def parse_html(element: XMLElement):
     """Translate markdown HTML into TK tags.
 
     This returns lists of alternating text and tags, matching the arguments for
@@ -222,26 +231,28 @@ def parse_html(element: etree.Element):
 class TKConverter(markdown.Extension, Preprocessor):
     """Extension needed to extract our list from the tree.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.result = MarkdownData()
-        self.md = None  # type: markdown.Markdown
+        self.md: Optional[markdown.Markdown] = None
         super().__init__(*args, **kwargs)
 
-    def extendMarkdown(self, md: markdown.Markdown, md_globals):
+    def extendMarkdown(self, md: markdown.Markdown) -> None:
+        """Applies the extension to Markdown."""
         self.md = md
         md.registerExtension(self)
         md.preprocessors.add('TKConverter', self, '_end')
 
-    def reset(self):
+    def reset(self) -> None:
+        """Clear out our data for the next run."""
         self.result = MarkdownData()
 
-    def run(self, lines):
+    def run(self, lines: List[str]) -> List[str]:
         """Set the markdown class to use our serialiser when run."""
         self.md.serializer = self.serialise
 
         return lines  # And don't modify the text..
 
-    def serialise(self, element: etree.Element):
+    def serialise(self, element: XMLElement):
         """Override Markdown's serialising program so it returns our format instead of HTML.
 
         """
@@ -264,8 +275,7 @@ class TKConverter(markdown.Extension, Preprocessor):
 _converter = TKConverter()
 _MD = markdown.Markdown(extensions=[
     _converter,
-    smart_strong.SmartEmphasisExtension(),
-    sane_lists.SaneListExtension(),
+    SaneListExtension(),
 ])
 
 
