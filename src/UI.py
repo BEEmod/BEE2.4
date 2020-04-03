@@ -439,9 +439,6 @@ def quit_application() -> None:
         GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
         GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
-    # Clean up sounds.
-    snd.clean_folder()
-
     BEE2_config.write_settings()
     GEN_OPTS.save_check()
     item_opts.save_check()
@@ -1773,6 +1770,9 @@ def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
+    snd.load_snd()
+    loader.step('UI')
+
     view_menu = init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
