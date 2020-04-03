@@ -198,7 +198,7 @@ SOFTWARE.
     ttk_ver=ttk.__version__,
     pyglet_ver=sound.pyglet_version,
     avbin_ver=sound.avbin_version,
-    md_ver=markdown.version,
+    md_ver=markdown.__version__,
     pil_ver=PIL.__version__,
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
