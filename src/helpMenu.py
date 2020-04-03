@@ -15,7 +15,7 @@ import utils
 import tk_tools
 
 # For version info
-from PIL import PILLOW_VERSION
+import PIL
 import platform
 import sound  # We read pyglet indirectly from here so it can safely fail.
 import markdown
@@ -199,7 +199,7 @@ SOFTWARE.
     pyglet_ver=sound.pyglet_version,
     avbin_ver=sound.avbin_version,
     md_ver=markdown.version,
-    pil_ver=PILLOW_VERSION,
+    pil_ver=PIL.__version__,
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
