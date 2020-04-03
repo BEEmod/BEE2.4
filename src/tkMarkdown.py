@@ -240,7 +240,7 @@ class TKConverter(markdown.Extension, Preprocessor):
         """Applies the extension to Markdown."""
         self.md = md
         md.registerExtension(self)
-        md.preprocessors.add('TKConverter', self, '_end')
+        md.preprocessors.register(self, 'TKConverter', 1000)
 
     def reset(self) -> None:
         """Clear out our data for the next run."""
