@@ -54,7 +54,7 @@ GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
 LOGGER.debug('Starting loading screen...')
-loadScreen.main_loader.set_length('UI', 14)
+loadScreen.main_loader.set_length('UI', 15)
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
 # OS X starts behind other windows, fix that.

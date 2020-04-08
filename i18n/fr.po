@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-01-17 09:55-0800\n"
+"POT-Creation-Date: 2020-03-20 16:59-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.8.0\n"
 
 #: CheckDetails.py:220
 msgid "Toggle all checkboxes."
@@ -296,7 +296,7 @@ msgstr "Coop:"
 msgid "Player Model (SP):"
 msgstr "Modèle de joueur (Solo):"
 
-#: CompilerPane.py:898
+#: CompilerPane.py:897
 msgid "Compile Options"
 msgstr "Options de compilation"
 
@@ -412,7 +412,7 @@ msgid_plural "Styles: {}"
 msgstr[0] "Style: {}"
 msgstr[1] "Styles: {}"
 
-#: StyleVarPane.py:234
+#: StyleVarPane.py:233
 msgid "Style/Item Properties"
 msgstr "Propriétés de style/d'objet"
 
@@ -444,7 +444,7 @@ msgstr "Aucun(e)"
 msgid "Items"
 msgstr "Objets"
 
-#: SubPane.py:77
+#: SubPane.py:84
 msgid "Hide/Show the \"{}\" window."
 msgstr "Cacher/Montrer la fenêtre \"{}\""
 
@@ -588,67 +588,67 @@ msgstr "Lancer le jeu"
 msgid "Delete Palette \"{}\""
 msgstr "Supprimer la palette \"{}\""
 
-#: UI.py:1191
+#: UI.py:1190
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Enregistrer la palette"
 
-#: UI.py:1192
+#: UI.py:1191
 msgid "Enter a name:"
 msgstr "Entrer un nom:"
 
-#: UI.py:1201
+#: UI.py:1200
 msgid "This palette already exists. Overwrite?"
 msgstr "Cette palette existe déjà. Remplacer ?"
 
-#: UI.py:1230 gameMan.py:1510
+#: UI.py:1229 gameMan.py:1510
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
 
-#: UI.py:1257
+#: UI.py:1256
 msgid "Clear Palette"
 msgstr "Vider la palette"
 
-#: UI.py:1293 UI.py:1723
+#: UI.py:1292 UI.py:1728
 msgid "Delete Palette"
 msgstr "Supprimer la palette"
 
-#: UI.py:1313
+#: UI.py:1312
 msgid "Save Palette..."
 msgstr "Enregistrer la palette..."
 
-#: UI.py:1318 UI.py:1746
+#: UI.py:1317 UI.py:1751
 msgid "Save Palette As..."
 msgstr "Enregistrer la palette sous..."
 
-#: UI.py:1329 UI.py:1734
+#: UI.py:1328 UI.py:1739
 msgid "Save Settings in Palettes"
 msgstr ""
 
-#: UI.py:1347 music_conf.py:204
+#: UI.py:1346 music_conf.py:204
 msgid "Music: "
 msgstr "Musique: "
 
-#: UI.py:1373
+#: UI.py:1372
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Utiliser les suggestions {arr}"
 
-#: UI.py:1389
+#: UI.py:1388
 msgid "Style: "
 msgstr "Style: "
 
-#: UI.py:1391
+#: UI.py:1390
 msgid "Voice: "
 msgstr "Voix: "
 
-#: UI.py:1392
+#: UI.py:1391
 msgid "Skybox: "
 msgstr "Skybox: "
 
-#: UI.py:1393
+#: UI.py:1392
 msgid "Elev Vid: "
 msgstr "Vid Asc: "
 
-#: UI.py:1411
+#: UI.py:1410
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
@@ -656,71 +656,75 @@ msgstr ""
 "Activer ou désactiver certaines répliques pour les empêcher d'être "
 "ajoutées."
 
-#: UI.py:1514
+#: UI.py:1513
 msgid "All Items: "
 msgstr "Tous les objets: "
 
-#: UI.py:1648
+#: UI.py:1647
 msgid "Export to \"{}\"..."
 msgstr "Exporter vers \"{}\"..."
 
-#: UI.py:1672 backup.py:872
+#: UI.py:1675 backup.py:872
 msgid "File"
 msgstr "Fichier"
 
-#: UI.py:1677
+#: UI.py:1682
 msgid "Export"
 msgstr "Exporter"
 
-#: UI.py:1684 backup.py:876
+#: UI.py:1689 backup.py:876
 msgid "Add Game"
 msgstr "Ajouter le jeu"
 
-#: UI.py:1688
+#: UI.py:1693
 msgid "Uninstall from Selected Game"
 msgstr "Désinstaller du jeu sélectionné"
 
-#: UI.py:1692
+#: UI.py:1697
 msgid "Backup/Restore Puzzles..."
 msgstr "Sauvegarder/Restaurer les puzzles..."
 
-#: UI.py:1696
+#: UI.py:1701
 msgid "Manage Packages..."
 msgstr "Gérer les paquets..."
 
-#: UI.py:1701
+#: UI.py:1706
 msgid "Options"
 msgstr "Options"
 
-#: UI.py:1706 gameMan.py:1189
+#: UI.py:1711 gameMan.py:1189
 msgid "Quit"
 msgstr "Quitter"
 
-#: UI.py:1716
+#: UI.py:1721
 msgid "Palette"
 msgstr "Palette"
 
-#: UI.py:1718
+#: UI.py:1723
 msgid "Clear"
 msgstr "Vider"
 
-#: UI.py:1727
+#: UI.py:1732
 msgid "Fill Palette"
 msgstr "Remplir la palette"
 
-#: UI.py:1741
+#: UI.py:1746
 msgid "Save Palette"
 msgstr "Enregistrer la palette"
 
-#: UI.py:1868
+#: UI.py:1761
+msgid "View"
+msgstr ""
+
+#: UI.py:1877
 msgid "Palettes"
 msgstr "Palettes"
 
-#: UI.py:1893
+#: UI.py:1902
 msgid "Export Options"
 msgstr "Options d'export"
 
-#: UI.py:1924
+#: UI.py:1934
 msgid "Fill empty spots in the palette with random items."
 msgstr "Remplir les emplacements vides de la palette avec des objets aléatoires."
 
@@ -955,28 +959,29 @@ msgid "This item can be placed in any orientation."
 msgstr "Cet objet peut être placé dans n'importe quel sens."
 
 #: contextWin.py:212
-msgid "No Alternate Versions!"
+#, fuzzy
+msgid "No Alternate Versions"
 msgstr "Pas de versions alternatives !"
 
-#: contextWin.py:302
+#: contextWin.py:304
 msgid "Excursion Funnels accept a on/off input and a directional input."
 msgstr ""
 "Les Halos d'Excursion acceptent une connexion on/off et une connexion de "
 "polarité."
 
-#: contextWin.py:359
+#: contextWin.py:361
 #, fuzzy
 msgid ""
 "This item can be rotated on the floor to face 360 degrees, for Reflection"
 " Cubes only."
 msgstr "Cet objet peut être tourné sur le sol à 360°."
 
-#: contextWin.py:438
+#: contextWin.py:440
 #, fuzzy
 msgid "Properties:"
 msgstr "Propriétés"
 
-#: contextWin.py:460
+#: contextWin.py:462
 msgid ""
 "The number of entities used for this item. The Source engine limits this "
 "to 2048 in total. This provides a guide to how many of these items can be"
@@ -986,11 +991,11 @@ msgstr ""
 "nombre d'entités à 2048 en tout. Ceci fournit un guide pour savoir "
 "combien de ces objets il est possible de placer à la fois sur la carte."
 
-#: contextWin.py:485
+#: contextWin.py:487
 msgid "Description:"
 msgstr "Description:"
 
-#: contextWin.py:528
+#: contextWin.py:530
 msgid ""
 "Failed to open a web browser. Do you wish for the URL to be copied to the"
 " clipboard instead?"
@@ -998,15 +1003,15 @@ msgstr ""
 "Échec de l'ouverture du navigateur. Voulez-vous que l'URL soit copiée "
 "dans le presse-papiers à la place ?"
 
-#: contextWin.py:542
+#: contextWin.py:544
 msgid "More Info>>"
 msgstr "Plus d'infos>>"
 
-#: contextWin.py:559
+#: contextWin.py:561
 msgid "Change Defaults..."
 msgstr "Changer les valeurs par défaut..."
 
-#: contextWin.py:565
+#: contextWin.py:567
 msgid "Change the default settings for this item when placed."
 msgstr "Changer les réglages par défaut pour cet objet lorsqu'il est placé."
 
@@ -1585,13 +1590,13 @@ msgstr "Réinitialiser aux valeurs par défaut"
 msgid "Other"
 msgstr "Autre"
 
-#: selectorWin.py:1083
+#: selectorWin.py:1086
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "Auteur: {}"
 msgstr[1] "Auteurs: {}"
 
-#: selectorWin.py:1139
+#: selectorWin.py:1142
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "Couleur: R={r}, V={g}, B={b}"
 

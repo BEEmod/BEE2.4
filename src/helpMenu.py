@@ -15,7 +15,7 @@ import utils
 import tk_tools
 
 # For version info
-from PIL import PILLOW_VERSION
+import PIL
 import platform
 import sound  # We read pyglet indirectly from here so it can safely fail.
 import markdown
@@ -84,7 +84,7 @@ del Res, steam_url
 CREDITS_TEXT = '''\
 Used software / libraries in the BEE2.4:
 
-* [pyglet {pyglet_ver}][pyglet] and [AVBin {avbin_ver}][avbin] by Alex Holkner
+* [pyglet {pyglet_ver}][pyglet] by Alex Holkner and Contributors
 * [Pillow {pil_ver}][pillow] by Alex Clark and Contributors
 * [noise (2008-12-15)][perlin_noise] by Casey Duncan
 * [markdown {md_ver}][markdown] by the Python Markdown Project
@@ -197,9 +197,8 @@ SOFTWARE.
     tcl_ver=tk.TclVersion,
     ttk_ver=ttk.__version__,
     pyglet_ver=sound.pyglet_version,
-    avbin_ver=sound.avbin_version,
-    md_ver=markdown.version,
-    pil_ver=PILLOW_VERSION,
+    md_ver=markdown.__version__,
+    pil_ver=PIL.__version__,
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
