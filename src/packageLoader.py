@@ -189,7 +189,7 @@ class _PakObjectMeta(type):
         Making a metaclass allows us to hook into the creation of all subclasses.
         """
         # Defer to type to create the class..
-        cls = cast('Type[PakObject]', super().__new__(name, bases, namespace))
+        cls = cast('Type[PakObject]', super().__new__(mcs, name, bases, namespace))
 
         # Only register subclasses of PakObject - those with a parent class.
         # PakObject isn't created yet so we can't directly check that.
@@ -405,7 +405,7 @@ def find_packages(pak_dir: str) -> None:
         LOGGER.debug('No packages in folder!')
 
 
-def no_packages_err(pak_dir: str, msg: str) -> NoReturn:
+def no_packages_err(pak_dir: str, msg: str) -> 'NoReturn':
     """Show an error message indicating no packages are present."""
     from tkinter import messagebox
     import sys
