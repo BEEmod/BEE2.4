@@ -10,7 +10,6 @@ Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from typing import Any, Mapping
-import os
 
 from srctools import AtomicWriter, Property, KeyValError
 
@@ -38,7 +37,7 @@ def get_curr_settings() -> Property:
     return props
 
 
-def apply_settings(props: Property):
+def apply_settings(props: Property) -> None:
     """Given a property tree, apply it to the widgets."""
     for opt_prop in props:
         try:
@@ -76,6 +75,7 @@ def write_settings() -> None:
     with AtomicWriter(
         str(utils.conf_location('config/config.vdf')),
         is_bytes=False,
+        encoding='utf8',
     ) as file:
         for line in props.export():
             file.write(line)
