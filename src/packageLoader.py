@@ -24,13 +24,10 @@ import srctools.logger
 
 from typing import (
     Union, Optional, Any, TYPE_CHECKING,
-    Iterator, Iterable, Type,
-    Dict, List, Tuple, NamedTuple,
-    Match,
-    TypeVar,
-    Callable,
-    Set,
-    cast,
+    Callable, TypeVar, Type, cast,
+    Dict, List, Tuple, Set, Match,
+    NamedTuple, Collection,
+    Iterable, Iterator,
 )
 
 
@@ -266,7 +263,7 @@ class PakObject(metaclass=_PakObjectMeta):
         pass
 
     @classmethod
-    def all(cls: Type[PakT]) -> Iterable[PakT]:
+    def all(cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
         return cls._id_to_obj.values()
 
@@ -430,7 +427,7 @@ def load_packages(
         log_incorrect_packfile=False,
         has_mel_music=False,
         has_tag_music=False,
-        ) -> Tuple[dict, Iterable[FileSystem]]:
+        ) -> Tuple[dict, Collection[FileSystem]]:
     """Scan and read in all packages."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(pak_dir)
