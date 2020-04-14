@@ -415,28 +415,18 @@ def res_import_template_setup(res: Property):
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
-    rem_replace_brush = True
-    additional_ids = set()
-    transfer_overlays = '1'
-    replace_brush_pos: Optional[Vec]
-    try:
-        replace_brush = res.find_key('replaceBrush')
-    except NoKeyError:
-        replace_brush_pos = None
-    else:
-        if replace_brush.has_children():
-            replace_brush_pos_raw = replace_brush['Pos', '0 0 0']
-            additional_ids = set(map(
-                srctools.conv_int,
-                replace_brush['additionalIDs', ''].split(),
-            ))
-            rem_replace_brush = replace_brush.bool('removeBrush', True)
-            transfer_overlays = replace_brush['transferOverlay', '1']
-        else:
-            replace_brush_pos_raw = replace_brush.value
-
-        replace_brush_pos = Vec.from_str(replace_brush_pos_raw)
-        replace_brush_pos.z -= 64  # 0 0 0 defaults to the floor.
+    if 'replaceBrush' in res:
+        LOGGER.warning(
+            'replaceBrush command used for template "{}", which is no '
+            'longer used.',
+            temp_id,
+        )
+    bind_tile_pos = [
+        # So it's the floor block location.
+        Vec.from_str(value) - (0, 0, 128)
+        for value in
+        res.find_key('BindOverlay', []).as_array()
+    ]
 
     key_values = res.find_key("Keys", [])
     if key_values:
@@ -501,10 +491,7 @@ def res_import_template_setup(res: Property):
         force_grid,
         force_type,
         surf_cat,
-        replace_brush_pos,
-        rem_replace_brush,
-        transfer_overlays,
-        additional_ids,
+        bind_tile_pos,
         res['invertVar', ''],
         res['colorVar', ''],
         visgroup_func,
@@ -540,17 +527,10 @@ def res_import_template(inst: Entity, res: Property):
             otherwise. If the material starts with a `#`, it is instead a
             list of face IDs separated by spaces. If the result evaluates
             to "", no change occurs. Both can be $fixups (parsed first).
-    - `replaceBrush`: The position of a brush to replace (`0 0 0`=the surface).
-            This brush will be removed, and overlays will be fixed to use
-            all faces with the same normal. Can alternately be a block:
-
-            - `Pos`: The position to replace.
-            - `additionalIDs`: Space-separated list of face IDs in the template
-              to also fix for overlays. The surface should have close to a
-              vertical normal, to prevent rescaling the overlay.
-            - `removeBrush`: If true, the original brush will not be removed.
-            - `transferOverlay`: Allow disabling transferring overlays to this
-              template. The IDs will be removed instead. (This can be a `$fixup`).
+    - `bindOverlay`: Bind overlays in this template to the given surface, and
+            bind overlays on a surface to surfaces in this template.
+            The value specifies the offset to the surface, where 0 0 0 is the
+            floor position. It can also be a block of multiple positions.
     - `keys`/`localkeys`: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail.
             Specially-handled keys:
@@ -590,10 +570,7 @@ def res_import_template(inst: Entity, res: Property):
         force_grid,
         force_type,
         surf_cat,
-        replace_brush_pos,
-        rem_replace_brush,
-        transfer_overlays,
-        additional_replace_ids,
+        bind_tile_pos,
         invert_var,
         color_var,
         visgroup_func,
@@ -685,6 +662,7 @@ def res_import_template(inst: Entity, res: Property):
         visgroup_choose=visgroup_func,
         add_to_map=True,
         additional_visgroups=visgroups,
+        bind_tile_pos=bind_tile_pos,
     )
 
     if key_block is not None:
@@ -702,13 +680,6 @@ def res_import_template(inst: Entity, res: Property):
             out = out.copy()
             out.target = conditions.local_name(inst, out.target)
             temp_data.detail.add_out(out)
-
-    if replace_brush_pos is not None:
-        LOGGER.warning(
-            '"{}": "Replace" option in templates is no longer available.'
-            'Use tilesetters instead.',
-            template.id,
-        )
 
     template_brush.retexture_template(
         temp_data,

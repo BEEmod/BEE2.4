@@ -85,7 +85,7 @@
 	"The faces must be axis-aligned."
 	vertical_faces(sidelist): "Rotate Faces to Vertical" : : "Rotate these faces in 90 degree increments until they point upwards."
 	skip_faces(sidelist): "Don't Retexture these faces" : : "Do not change textures on these faces."
-	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using ReplaceBrush."
+	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using BindOverlay."
 	
 	temp_type(choices): "Template Type" : "default" : "Convert brushes to this type of entity." =
 		[

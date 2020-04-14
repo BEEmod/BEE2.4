@@ -581,6 +581,7 @@ def import_template(
     add_to_map: bool=True,
     additional_visgroups: Iterable[str]=(),
     visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
+    bind_tile_pos: Iterable[Vec]=(),
 ) -> ExportedTemplate:
     """Import the given template at a location.
 
@@ -596,6 +597,9 @@ def import_template(
     add_to_map sets whether to add the brushes and func_detail to the map.
     visgroup_choose is a callback used to determine if visgroups should be
     added - it's passed a list of names, and should return a list of ones to use.
+
+    If any bound_tile_pos are provided, these are offsets to tiledefs which
+    should have all the overlays in this template bound to them, and vice versa.
     """
     import vbsp
     if isinstance(temp_name, Template):
@@ -679,6 +683,35 @@ def import_template(
         detail_ent.solids = new_detail
         if not add_to_map:
             detail_ent.remove()
+
+    if bind_tile_pos:
+        # Bind all our overlays without IDs to a set of tiles,
+        # and add any marked faces to those tiles to be given overlays.
+        new_overlay_faces = set(map(id_mapping.get, template.overlay_faces))
+        new_overlay_faces.discard(None)
+        bound_overlay_faces = [
+            face
+            for brush in (new_world + new_detail)
+            for face in brush.sides
+            if face.id in new_overlay_faces
+        ]
+
+        tile_norm = Vec(z=1).rotate(*angles)
+        for tile_off in bind_tile_pos:
+            tile_off = tile_off.copy()
+            tile_off.localise(origin, angles)
+            try:
+                tile = tiling.TILES[tile_off.as_tuple(), tile_norm.as_tuple()]
+            except KeyError:
+                LOGGER.warning(
+                    'No tile to bind at {} for "{}"!',
+                    tile_off, template.id,
+                )
+                continue
+            for over in new_over:
+                if over['sides'] == '':
+                    tile.bind_overlay(over)
+            tile.brush_faces.extend(bound_overlay_faces)
 
     return ExportedTemplate(
         world=new_world,
