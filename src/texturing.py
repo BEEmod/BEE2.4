@@ -102,6 +102,7 @@ GEN_CATS = {
 
     'normal': GenCat.NORMAL,
     'surf': GenCat.NORMAL,
+    'tiles': GenCat.NORMAL,
 
     'bullseye': GenCat.BULLSEYE,
     'faithplate': GenCat.BULLSEYE,
@@ -416,27 +417,55 @@ def load_config(conf: Property):
         global_options, global_options,
     ))
 
-    data = {}  # type: Dict[Any, Tuple[Dict[str, Any], Dict[str, List[str]]]]
+    data: Dict[Any, Tuple[Dict[str, Any], Dict[str, List[str]]]] = {}
 
     gen_cat: GenCat
     gen_orient: Optional[Orient]
     gen_portal: Optional[Portalable]
+
+    # Use this to allow alternate names for generators.
+    conf_for_gen: Dict[
+        Tuple[GenCat, Optional[Orient], Optional[Portalable]],
+        Property,
+    ] = {}
+
+    for prop in conf:
+        if prop.name in ('options', 'antlines'):
+            continue
+        if '.' in prop.name:
+            try:
+                gen_cat_name, gen_portal_raw, gen_orient_raw = prop.name.split('.')
+                gen_cat = GEN_CATS[gen_cat_name]
+                gen_orient = ORIENTS[gen_orient_raw]
+                gen_portal = Portalable(gen_portal_raw)
+            except (KeyError, ValueError):
+                LOGGER.warning('Could not parse texture generator type "{}"!', prop.name)
+                continue
+            conf_for_gen[gen_cat, gen_orient, gen_portal] = prop
+        else:
+            try:
+                gen_cat = GEN_CATS[prop.name]
+            except KeyError:
+                LOGGER.warning('Unknown texture generator type "{}"!', prop.name)
+                continue
+            conf_for_gen[gen_cat, None, None] = prop
 
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
         if isinstance(gen_key, GenCat):
             # It's a non-tile generator.
             is_tile = False
             gen_cat = gen_key
-            gen_conf = conf.find_key(gen_cat.value, [])
+            try:
+                gen_conf = conf_for_gen[gen_key, None, None]
+            except KeyError:
+                gen_conf = Property(gen_key.value, [])
         else:
             # Tile-type generator
             is_tile = True
-            gen_cat, gen_orient, gen_portal = gen_key
-            gen_conf = conf.find_key('{}.{}.{}'.format(
-                gen_cat.value,
-                gen_portal.value,
-                gen_orient,
-            ), [])
+            try:
+                gen_conf = conf_for_gen[gen_key]
+            except KeyError:
+                gen_conf = Property('', [])
 
             if not gen_conf.has_children():
                 # Special case - using a single value to indicate that all
