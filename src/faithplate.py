@@ -177,6 +177,7 @@ def associate_faith_plates(vmf: VMF) -> None:
     faith_targ_file = instanceLocs.resolve('<ITEM_CATAPULT_TARGET>')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() in faith_targ_file:
+            inst.remove()  # Don't keep the targets.
             origin = Vec.from_str(inst['origin'])
             norm = Vec(z=1).rotate_by_str(inst['angles'])
             try:
