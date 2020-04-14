@@ -482,7 +482,7 @@ def report_all_obj() -> None:
     from packageLoader import OBJ_TYPES
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(obj_type.cls.all())} {type_name}:\nb')
+            f.write(f'{len(obj_type.cls.all())} {type_name}:\n')
             for obj in obj_type.cls.all():
                 f.write(f'- {obj.id}\n')
 
