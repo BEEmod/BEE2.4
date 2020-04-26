@@ -309,7 +309,7 @@ def init_gen_tab(f: ttk.Frame) -> None:
     add_tooltip(exp_nothing, _('After exports, do nothing and '
                                'keep the BEE2 in focus.'))
     add_tooltip(exp_minimise, _('After exports, minimise to the taskbar/dock.'))
-    add_tooltip(exp_minimise, _('After exports, quit the BEE2.'))
+    add_tooltip(exp_quit, _('After exports, quit the BEE2.'))
 
     UI['launch_game'] = launch_game = make_checkbox(
         after_export_frame,
