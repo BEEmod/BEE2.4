@@ -1,10 +1,12 @@
 """The Operation result allows executing math on instvars."""
 import ast
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Callable, Tuple
 
 from conditions import make_result_setup, make_result
 from srctools import Property, Vec, Entity, conv_bool
 import srctools.logger
+from srctools.vmf import EntityFixup
+
 
 COND_MOD_NAME = 'Python'
 
@@ -106,7 +108,7 @@ class Checker(ast.NodeVisitor):
 
 
 @make_result_setup('Python', 'Operation')
-def res_python_setup(res: Property):
+def res_python_setup(res: Property) -> Tuple[Callable[[EntityFixup], object], str]:
     variables = {}
     variable_order = []
     code = None
@@ -173,12 +175,24 @@ def res_python_setup(res: Property):
     # The last statement returns the target expression.
     statements.append(ast.Return(expression, lineno=len(variable_order)+1, col_offset=0))
 
+    args = ast.arguments(
+        vararg=None, 
+        kwonlyargs=[], 
+        kw_defaults=[], 
+        kwarg=None, 
+        defaults=[],
+    )
+    # Py 3.8+, make it pos-only.
+    if 'posonlyargs' in args._fields:
+        args.posonlyargs = [ast.arg('_fixup', None)]
+        args.args = []
+    else:  # Just make it a regular arg.
+        args.args = [ast.arg('_fixup', None)]
+
     func = ast.Module([
             ast.FunctionDef(
                 name='_bee2_generated_func',
-                args=ast.arguments([
-                    ast.arg('_fixup', None),
-                ], None, [], [], None, []),
+                args=args,
                 body=statements,
                 decorator_list=[],
             ),
@@ -199,6 +213,8 @@ def res_python_setup(res: Property):
 @make_result('Python', 'Operation')
 def res_python(inst: Entity, res: Property):
     """Apply a function to a fixup."""
+    func: Callable[[EntityFixup], object]
+    result_var: str
     func, result_var = res.value
     result = func(inst.fixup)
     if isinstance(result, bool):
