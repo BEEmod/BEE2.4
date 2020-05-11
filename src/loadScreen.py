@@ -43,7 +43,7 @@ def close_all():
         screen.reset()
 
 
-def show_main_loader(is_compact: bool):
+def show_main_loader(is_compact: bool) -> None:
     """Special function, which sets the splash screen compactness."""
     main_loader._send_msg('set_is_compact', is_compact)
     main_loader.show()

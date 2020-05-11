@@ -5,6 +5,8 @@ from pathlib import Path
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
+from typing import Callable, List, Tuple, Dict
+
 from tk_tools import TK_ROOT
 from enum import Enum
 
@@ -41,12 +43,13 @@ AFTER_EXPORT_ACTION = IntVar(
     name='OPT_after_export_action',
 )
 
-refresh_callbacks = []  # functions called to apply settings.
+refresh_callbacks: List[Callable[[], None]] = []  # functions called to apply settings.
 
-VARS = {}
+# All the auto-created checkbox variables
+VARS: Dict[Tuple[str, str], BooleanVar] = {}
 
 
-def reset_all_win():
+def reset_all_win() -> None:
     """Return all windows to their default positions.
 
     This is replaced by `UI.reset_panes`.
@@ -70,13 +73,13 @@ def show() -> None:
 def load() -> None:
     """Load the current settings from config."""
     for var in VARS.values():
-        var.load()
+        var.load()  # type: ignore
 
 
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     for var in VARS.values():
-        var.save()
+        var.save()  # type: ignore
 
     sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
@@ -314,18 +317,17 @@ def init_gen_tab(f: ttk.Frame) -> None:
     add_tooltip(exp_minimise, _('After exports, minimise to the taskbar/dock.'))
     add_tooltip(exp_quit, _('After exports, quit the BEE2.'))
 
-    UI['launch_game'] = launch_game = make_checkbox(
+    make_checkbox(
         after_export_frame,
         section='General',
         item='launch_Game',
         var=LAUNCH_AFTER_EXPORT,
         desc=_('Launch Game'),
         tooltip=_('After exporting, launch the selected game automatically.'),
-    )
-    launch_game.grid(row=3, column=0, sticky='W', pady=(10, 0))
+    ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
     if sound.initiallised:
-        UI['mute'] = mute = make_checkbox(
+        mute = make_checkbox(
             f,
             section='General',
             item='play_sounds',
@@ -333,13 +335,13 @@ def init_gen_tab(f: ttk.Frame) -> None:
             var=PLAY_SOUND,
         )
     else:
-        UI['mute'] = mute = ttk.Checkbutton(
+        mute = ttk.Checkbutton(
             f,
             text=_('Play Sounds'),
             state='disabled',
         )
         add_tooltip(
-            UI['mute'],
+            mute,
             _('Pyglet is either not installed or broken.\n'
               'Sound effects have been disabled.')
         )
@@ -358,7 +360,7 @@ def init_gen_tab(f: ttk.Frame) -> None:
 
 
 def init_win_tab(f: ttk.Frame) -> None:
-    UI['keep_inside'] = keep_inside = make_checkbox(
+    keep_inside = make_checkbox(
         f,
         section='General',
         item='keep_win_inside',
@@ -382,13 +384,12 @@ def init_win_tab(f: ttk.Frame) -> None:
         ),
     ).grid(row=0, column=1, sticky=E)
 
-    UI['reset_win'] = reset_win = ttk.Button(
+    ttk.Button(
         f,
         text=_('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
         command=lambda: reset_all_win(),
-    )
-    reset_win.grid(row=1, column=0, sticky=EW)
+    ).grid(row=1, column=0, sticky=EW)
 
 
 def init_dev_tab(f: ttk.Frame) -> None:
