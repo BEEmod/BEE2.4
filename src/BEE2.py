@@ -26,6 +26,8 @@ DEFAULT_SETTINGS = {
         'allow_any_folder_as_game': '0',
         'play_sounds': '1',
         'palette_save_settings': '0',
+        'splash_stay_ontop': '1',
+        'compact_splash': '0',
 
         # A token used to indicate the time the current cache/ was extracted.
         # This tells us whether to copy it to the game folder.
@@ -55,6 +57,7 @@ GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
 LOGGER.debug('Starting loading screen...')
 loadScreen.main_loader.set_length('UI', 15)
+loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
 # OS X starts behind other windows, fix that.

@@ -17,6 +17,7 @@ import tk_tools
 import srctools.logger
 import contextWin
 import logWindow
+import loadScreen
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -31,6 +32,7 @@ class AfterExport(Enum):
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
+FORCE_LOAD_ONTOP = BooleanVar(value=True, name='OPT_force_load_ontop')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
 PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
@@ -79,6 +81,7 @@ def save() -> None:
     sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
     logWindow.set_visible(SHOW_LOG_WIN.get())
+    loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 
     for func in refresh_callbacks:
         func()
@@ -365,6 +368,19 @@ def init_win_tab(f: ttk.Frame) -> None:
         var=KEEP_WIN_INSIDE,
     )
     keep_inside.grid(row=0, column=0, sticky=W)
+
+    make_checkbox(
+        f,
+        section='General',
+        item='splash_stay_ontop',
+        desc=_('Keep loading screens on top'),
+        var=FORCE_LOAD_ONTOP,
+        tooltip=_(
+            "Force loading screens to be on top of other windows. "
+            "Since they don't appear on the taskbar/dock, they can't be "
+            "brought to the top easily again."
+        ),
+    ).grid(row=0, column=1, sticky=E)
 
     UI['reset_win'] = reset_win = ttk.Button(
         f,

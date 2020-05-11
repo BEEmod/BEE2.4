@@ -49,6 +49,13 @@ def show_main_loader(is_compact: bool):
     main_loader.show()
 
 
+def set_force_ontop(ontop: bool) -> None:
+    """Set whether or not screens will be forced on top."""
+    # The loadscreen ID is ignored for this, it applies to all of them.
+    # But we know this one exists.
+    main_loader._send_msg('set_force_ontop', ontop)
+
+
 @contextlib.contextmanager
 def surpress_screens():
     """A context manager to suppress loadscreens while the body is active."""

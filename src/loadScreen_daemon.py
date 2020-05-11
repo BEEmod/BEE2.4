@@ -29,14 +29,14 @@ TRANSLATION = {
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
-    def __init__(self, master, scr_id, title_text, stages):
+    def __init__(self, master, scr_id, title_text, force_ontop, stages):
         self.scr_id = scr_id
         self.title_text = title_text
 
         self.win = tk.Toplevel(master)
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
-        self.win.attributes('-topmost', 1)
+        self.win.attributes('-topmost', int(force_ontop))
         self.win['cursor'] = utils.CURSORS['wait']
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
@@ -552,9 +552,11 @@ def run_screen(
 
     root = tk.Tk()
     root.withdraw()
+    force_ontop = True
 
     def check_queue():
         """Update stages from the parent process."""
+        nonlocal force_ontop
         had_values = False
         while PIPE_REC.poll():  # Pop off all the values.
             had_values = True
@@ -562,8 +564,12 @@ def run_screen(
             if operation == 'init':
                 # Create a new loadscreen.
                 is_main, title, stages = args
-                screen = (SplashScreen if is_main else LoadScreen)(root, scr_id, title, stages)
+                screen = (SplashScreen if is_main else LoadScreen)(root, scr_id, title, force_ontop, stages)
                 SCREENS[scr_id] = screen
+            elif operation == 'set_force_ontop':
+                [force_ontop] = args
+                for screen in SCREENS.values():
+                    screen.win.attributes('-topmost', force_ontop)
             else:
                 try:
                     func = getattr(SCREENS[scr_id], 'op_' + operation)
