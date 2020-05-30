@@ -1,6 +1,5 @@
 """Adds voicelines dynamically into the map."""
 import itertools
-import os
 import random
 from collections import namedtuple
 from decimal import Decimal
@@ -36,9 +35,6 @@ vmf_file = None  # type: VMF
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/bee2/voice/'
 
-# The location of the responses script.
-RESP_LOC = 'bee2/inject/response_data.nut'
-
 RESP_HAS_NAMES = {
     'death_goo': 'goo',
     'death_turret': 'turret',
@@ -63,40 +59,44 @@ def has_responses():
     return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
 
 
-def generate_resp_script(file, allow_dings):
-    """Write the responses section into a file."""
-    use_dings = allow_dings
-
+def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool) -> None:
+    """Write the coop responses information into the map."""
     config = ConfigFile('bee2/resp_voice.cfg', in_conf_folder=False)
-    file.write("BEE2_RESPONSES <- {\n")
-    for section in QUOTE_DATA.find_key('CoopResponses', []):
-        if not section.has_children() and section.name == 'use_dings':
-            # Allow overriding specifically for the response script
-            use_dings = srctools.conv_bool(section.value, allow_dings)
+    response_block = QUOTE_DATA.find_key('CoopResponses', [])
+
+    # Pass in whether to include dings or not.
+    vmf.create_ent(
+        'comp_scriptvar_setter',
+        origin=pos,
+        target='@glados',
+        variable='BEE2_PLAY_DING',
+        mode='const',
+        # Allow overriding specifically for the response script.
+        const=response_block.bool('use_dings', allow_dings),
+    )
+
+    for section in response_block:
+        if not section.has_children():
             continue
 
         voice_attr = RESP_HAS_NAMES.get(section.name, '')
         if voice_attr and not map_attr[voice_attr]:
+            # This response category isn't present.
             continue
-            # This response catagory isn't present
 
-        section_data = ['\t{} = [\n'.format(section.name)]
+        # Use a custom entity to encode our information.
+        ent = vmf.create_ent(
+            'bee2_coop_response',
+            origin=pos,
+            type=section.name,
+        )
+
+        # section_data = []
         for index, line in enumerate(section):
             if not config.getboolean(section.name, "line_" + str(index), True):
                 # It's disabled!
                 continue
-            section_data.append(
-                '\t\tCreateSceneEntity("{}"),\n'.format(line['choreo'])
-            )
-        if len(section_data) != 1:
-            for line in section_data:
-                file.write(line)
-            file.write('\t],\n')
-    file.write('}\n')
-
-    file.write('BEE2_PLAY_DING = {};\n'.format(
-        'true' if use_dings else 'false'
-    ))
+            ent[f'choreo{index:02}'] = line['choreo']
 
 
 def mode_quotes(prop_block: Property, flag_set: Set[str]):
@@ -507,14 +507,7 @@ def add_voice(
 
     if has_responses():
         LOGGER.info('Generating responses data..')
-        with open(RESP_LOC, 'w') as f:
-            generate_resp_script(f, allow_dings)
-    else:
-        LOGGER.info('No responses data..')
-        try:
-            os.remove(RESP_LOC)
-        except FileNotFoundError:
-            pass
+        encode_coop_responses(vmf_file, quote_loc, allow_dings)
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         if not file:

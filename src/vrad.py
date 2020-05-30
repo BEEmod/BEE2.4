@@ -13,11 +13,11 @@ import sys
 from datetime import datetime
 from io import BytesIO, StringIO
 from zipfile import ZipFile
-from typing import Iterator, List, Tuple, Set
+from typing import Iterator, List, Tuple, Set, Dict, Optional
 
 import srctools.run
 import utils
-from srctools import Property
+from srctools import Property, Entity
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
@@ -25,8 +25,11 @@ from srctools.filesys import (
 )
 from srctools.packlist import PackList, FileType as PackType, load_fgd
 from srctools.game import find_gameinfo
-from srctools.bsp_transform import run_transformations
-
+from srctools.bsp_transform import (
+    run_transformations,
+    Context as TransContext,
+    trans as register_transform,
+)
 
 CONF = Property('Config', [])
 
@@ -51,25 +54,6 @@ SOUND_MAN_FOLDER = {
     utils.STEAM_IDS['DEST_AP']: 'portal2_dlc2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
-}
-
-# Files that VBSP may generate, that we want to insert into the packfile.
-# They are all found in bee2/inject/.
-INJECT_FILES = {
-    # Defines choreo lines used on coop death, taunts, etc.
-    'response_data.nut': 'scripts/vscripts/bee2/coop_response_data.nut',
-
-    # The list of soundscripts that the game loads.
-    'soundscript_manifest.txt': 'scripts/game_sounds_manifest.txt',
-
-    # The list of particles that the game loads.
-    'particles_manifest.txt': 'particles/particles_manifest.txt',
-
-    # A generated soundscript for the current music.
-    'music_script.txt': 'scripts/BEE2_generated_music.txt',
-
-    # Applied to @glados's entity scripts.
-    'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
 }
 
 # Various parts of the soundscript generated for BG music.
@@ -339,6 +323,37 @@ def dump_files(bsp: BSP):
             zipfile.extract(zipinfo, dump_folder)
 
 
+@register_transform('BEE2: Coop Responses')
+def generate_coop_responses(ctx: TransContext) -> None:
+    """If the entities are present, add the coop response script."""
+    responses: Dict[str, List[str]] = {}
+    for response in ctx.vmf.by_class['bee2_coop_response']:
+        responses[response['type']] = [
+            value for key, value in response.keys.items()
+            if key.startswith('choreo')
+        ]
+        response.remove()
+    script = ["BEE2_RESPONSES <- {"]
+    for response_type, lines in sorted(responses.items()):
+        script.append(f'\t{response_type} = [')
+        for line in lines:
+            script.append(f'\t\tCreateSceneEntity("{line}"),')
+        script.append('\t],')
+    script.append('};')
+
+    # We want to write this onto the '@glados' entity.
+    ent: Optional[Entity] = None
+    for ent in ctx.vmf.by_target['@glados']:
+        ctx.add_code(ent, '\n'.join(script))
+        # Also include the actual script.
+        split_script = ent['vscripts'].split()
+        split_script.append('bee2/coop_responses.nut')
+        ent['vscripts'] = ' '.join(split_script)
+
+    if ent is None:
+        LOGGER.warning('Response scripts present, but @glados is not!')
+
+
 def generate_music_script(data: Property, pack_list: PackList) -> bytes:
     """Generate a soundscript file for music."""
     # We also pack the filenames used for the tracks - that way funnel etc
@@ -457,11 +472,6 @@ def write_sound(
 
 def inject_files() -> Iterator[Tuple[str, str]]:
     """Generate the names of files to inject, if they exist.."""
-    for filename, arcname in INJECT_FILES.items():
-        filename = os.path.join('bee2', 'inject', filename)
-        if os.path.exists(filename):
-            yield filename, arcname
-
     # Additionally add files set in the config.
     for prop in CONF.find_children('InjectFiles'):
         filename = os.path.join('bee2', 'inject', prop.real_name)

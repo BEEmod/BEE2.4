@@ -1668,19 +1668,10 @@ def add_extra_ents(game_mode: str) -> None:
             'disable_pti_audio'
             ] = srctools.bool_as_int(not has_cave)
 
-        # The scripts we want to run on the @glados entity.
-        # This gets special functions called (especially in coop) for various
-        # events we might want to track - death, pings, camera taunts, etc.
-        glados_scripts = [
-            'choreo/glados.nut',  # Implements Multiverse Cave..
-        ]
-        if voiceLine.has_responses():
-            glados_scripts.append('bee2/coop_responses.nut')
-
-        global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
+        global_pti_ents.fixup['glados_script'] = 'choreo/glados.nut'  # Implements Multiverse Cave..
 
 
-def change_ents():
+def change_ents() -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
     if vbsp_options.get(bool, "remove_info_lighting"):
@@ -2033,12 +2024,6 @@ def main() -> None:
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
 
-    # Clear the list of files we want to inject into the packfile.
-    # If we're in a Hammer map, we want to ensure no files are injected.
-    LOGGER.info('Clearing inject/ directory..')
-    os.makedirs('bee2/inject/', exist_ok=True)
-    for file in os.listdir('bee2/inject'):
-        os.remove(os.path.join('bee2', 'inject', file))
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
