@@ -68,6 +68,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             continue
         fizz.emitters.clear()  # Remove old positions.
         fizz.up_axis = up_axis
+        fizz.base_inst['origin'] = shape_inst['origin']
+        fizz.base_inst['angles'] = shape_inst['angles']
         break
     else:
         # No fizzler, so generate a default.
@@ -78,6 +80,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             targetname=shape_name,
             classname='func_instance',
             origin=shape_inst['origin'],
+            angles=shape_inst['angles'],
             file=resolve_inst('<ITEM_BARRIER_HAZARD:fizz_base>'),
         )
         base_inst.fixup.update(shape_inst.fixup)
