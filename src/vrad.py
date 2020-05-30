@@ -9,14 +9,13 @@ LOGGER = init_logging('bee2/vrad.log')
 
 import os
 import shutil
-import subprocess
 import sys
 from datetime import datetime
 from io import BytesIO, StringIO
 from zipfile import ZipFile
 from typing import Iterator, List, Tuple, Set
 
-import srctools
+import srctools.run
 import utils
 from srctools import Property
 from srctools.bsp import BSP, BSP_LUMPS
@@ -590,39 +589,11 @@ def mod_screenshots() -> None:
 
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
-
-    suffix = ''
-    if utils.MAC:
-        os_suff = '_osx'
-    elif utils.LINUX:
-        os_suff = '_linux'
-    else:
-        os_suff = ''
-        suffix = '.exe'
-
-    joined_args = (
-        '"' + os.path.normpath(
-            os.path.join(os.getcwd(), "vrad" + os_suff + "_original" + suffix)
-        ) +
-        '" ' +
-        " ".join(
-            # put quotes around args which contain spaces
-            ('"' + x + '"' if " " in x else x)
-            for x in args
-        )
-    )
-    LOGGER.info("Calling original VRAD...")
-    LOGGER.info(joined_args)
-    code = subprocess.call(
-        joined_args,
-        stdout=None,
-        stderr=subprocess.PIPE,
-        shell=True,
-    )
+    code = srctools.run.run_compiler(os.path.join(os.getcwd(), "vrad"), args)
     if code == 0:
         LOGGER.info("Done!")
     else:
-        LOGGER.warning("VRAD failed! (" + str(code) + ")")
+        LOGGER.warning("VRAD failed! ({})", code)
         sys.exit(code)
 
 
