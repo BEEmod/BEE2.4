@@ -490,7 +490,7 @@ def mod_screenshots() -> None:
 
     if mod_type == 'cust':
         LOGGER.info('Using custom screenshot!')
-        scr_loc = CONF['screenshot', '']
+        scr_loc = str(utils.conf_location('screenshot.jpg'))
     elif mod_type == 'auto':
         LOGGER.info('Using automatic screenshot!')
         scr_loc = None

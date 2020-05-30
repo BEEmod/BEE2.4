@@ -1724,9 +1724,6 @@ def make_vrad_config(is_peti: bool) -> None:
         conf['force_full'] = srctools.bool_as_int(
             BEE2_config.get_bool('General', 'vrad_force_full')
         )
-        conf['screenshot'] = BEE2_config.get_val(
-            'Screenshot', 'loc', ''
-        )
         conf['screenshot_type'] = BEE2_config.get_val(
             'Screenshot', 'type', 'PETI'
         ).upper()
