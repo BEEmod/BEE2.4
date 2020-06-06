@@ -1,5 +1,5 @@
 """Various functions shared among the compiler and application."""
-import collections
+from collections import deque
 import functools
 import logging
 import os
@@ -449,9 +449,11 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, FuncLookup):
             return self._registry == other._registry
-        if not isinstance(other, collections.Mapping):
+        try:
+            conv = dict(other.items())
+        except (AttributeError, TypeError):
             return NotImplemented
-        return self._registry == dict(other.items())
+        return self._registry == conv
 
     def __iter__(self) -> Iterator[Callable[..., Any]]:
         """Yield all the functions."""
@@ -592,7 +594,7 @@ def center_win(window, parent=None):
     window.geometry('+' + str(x) + '+' + str(y))
 
 
-def _append_bothsides(deq: collections.deque) -> Generator[None, Any, None]:
+def _append_bothsides(deq: deque) -> Generator[None, Any, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
@@ -611,7 +613,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
         return []
     orig_dist = dist
     smallest = obj[-1]
-    items = collections.deque()
+    items = deque()
 
     # We use this so the small sections appear on both sides of the area.
     adder = _append_bothsides(items)
