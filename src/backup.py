@@ -551,7 +551,7 @@ def refresh_back_details():
     ))
 
 
-def show_window():
+def show_window() -> None:
     window.deiconify()
     window.lift()
     utils.center_win(window, TK_ROOT)
@@ -562,7 +562,7 @@ def show_window():
     UI['back_details'].refresh()
 
 
-def ui_load_backup():
+def ui_load_backup() -> None:
     """Prompt and load in a backup file."""
     file = filedialog.askopenfilename(
         title=_('Load Backup'),
@@ -594,7 +594,7 @@ def ui_load_backup():
         zip_file.close()
 
 
-def ui_new_backup():
+def ui_new_backup() -> None:
     """Create a new backup file."""
     BACKUPS['back'].clear()
     BACKUPS['backup_name'] = None
@@ -608,7 +608,7 @@ def ui_new_backup():
     )
 
 
-def ui_save_backup():
+def ui_save_backup() -> None:
     """Save a backup."""
     if BACKUPS['backup_path'] is None:
         # No backup path, prompt first
@@ -621,7 +621,7 @@ def ui_save_backup():
         pass
 
 
-def ui_save_backup_as():
+def ui_save_backup_as() -> None:
     """Prompt for a name, and then save a backup."""
     path = filedialog.asksaveasfilename(
         title=_('Save Backup As'),
@@ -638,14 +638,14 @@ def ui_save_backup_as():
     ui_save_backup()
 
 
-def ui_refresh_game():
+def ui_refresh_game() -> None:
     """Reload the game maps list."""
     import gameMan
     if gameMan.selected_game is not None:
         load_game(gameMan.selected_game)
 
 
-def ui_backup_sel():
+def ui_backup_sel() -> None:
     """Backup selected maps."""
     backup_maps([
         item.p2c
@@ -655,7 +655,7 @@ def ui_backup_sel():
     ])
 
 
-def ui_backup_all():
+def ui_backup_all() -> None:
     """Backup all maps."""
     backup_maps([
         item.p2c
@@ -664,7 +664,7 @@ def ui_backup_all():
     ])
 
 
-def ui_restore_sel():
+def ui_restore_sel() -> None:
     """Restore selected maps."""
     restore_maps([
         item.p2c
@@ -674,7 +674,7 @@ def ui_restore_sel():
     ])
 
 
-def ui_restore_all():
+def ui_restore_all() -> None:
     """Backup all maps."""
     restore_maps([
         item.p2c
@@ -683,7 +683,7 @@ def ui_restore_all():
     ])
 
 
-def ui_delete_backup():
+def ui_delete_backup() -> None:
     """Delete the selected items in the backup."""
     BACKUPS['back'] = [
         item.p2c
@@ -694,7 +694,8 @@ def ui_delete_backup():
 
     refresh_back_details()
 
-def ui_delete_game():
+
+def ui_delete_game() -> None:
     """Delete selected items in the game list."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:
@@ -755,7 +756,7 @@ def ui_delete_game():
     refresh_game_details()
 
 
-def init():
+def init() -> None:
     """Initialise all widgets in the given window."""
     for cat, btn_text in [
             ('back_', _('Restore:')),
@@ -848,7 +849,7 @@ def init():
     window.columnconfigure(2, weight=1)
 
 
-def init_application():
+def init_application() -> None:
     """Initialise the standalone application."""
     import gameMan
     global window
@@ -901,7 +902,7 @@ def init_application():
     gameMan.add_menu_opts(game_menu)
 
 
-def init_backup_settings():
+def init_backup_settings() -> None:
     """Initialise the auto-backup settings widget."""
     from BEE2_config import GEN_OPTS
     check_var = tk.IntVar(
@@ -970,7 +971,7 @@ def init_backup_settings():
     count.value = count_value
 
 
-def init_toplevel():
+def init_toplevel() -> None:
     """Initialise the window as part of the BEE2."""
     global window
     window = tk.Toplevel(TK_ROOT)
@@ -1028,7 +1029,7 @@ def init_toplevel():
 
 
 @atexit.register
-def deinit():
+def deinit() -> None:
     """When shutting down, we need to close the backup zipfile."""
     for name in ('backup_zip', 'unsaved_file'):
         obj = BACKUPS[name]
