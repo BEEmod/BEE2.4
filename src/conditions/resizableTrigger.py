@@ -157,7 +157,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
         out_ent = trig_ent = vmf.create_ent(
             classname='trigger_multiple',  # Default
             targetname=targ,
-            origin='-2400 0 0',
+            origin=vbsp_options.get(Vec, "global_ents_loc"),
             angles='0 0 0',
         )
         trig_ent.solids = [
