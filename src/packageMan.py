@@ -1,5 +1,6 @@
 """Allows enabling and disabling individual packages.
 """
+from typing import Iterable
 from tkinter import ttk
 from tkinter import messagebox
 import tkinter as tk
@@ -28,10 +29,11 @@ def show():
     window.lift(TK_ROOT)
     window.grab_set()
     utils.center_win(window, TK_ROOT)
-    window.after(100, UI['details'].refresh)
+    window.update()
+    UI['details'].refresh()
 
 
-def make_packitems():
+def make_packitems() -> Iterable[CheckItem]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
     for pack in packageLoader.packages.values():  # type: packageLoader.Package

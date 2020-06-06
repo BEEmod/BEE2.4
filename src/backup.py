@@ -557,6 +557,9 @@ def show_window():
     utils.center_win(window, TK_ROOT)
     # Load our game data!
     ui_refresh_game()
+    window.update()
+    UI['game_details'].refresh()
+    UI['back_details'].refresh()
 
 
 def ui_load_backup():
