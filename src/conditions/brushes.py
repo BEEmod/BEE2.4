@@ -791,13 +791,18 @@ def res_set_tile(inst: Entity, res: Property) -> None:
     and create the tile if necessary.
     Otherwise they will be merged in - white/black tiles will not replace
     tiles set to nodraw or void for example.
+    `chance`, if specified allows producing irregular tiles by randomly not
+    changing the tile.
+
+    If you need less regular placement (other orientation, precise positions)
+    use a bee2_template_tilesetter in a template.
 
     Allowed tile characters:
     - `W`: White tile.
     - `w`: White 4x4 only tile.
     - `B`: Black tile.
     - `b`: Black 4x4 only tile.
-    - `g`: Goo sides (4x4 black, in Clean).
+    - `g`: The side/bottom of goo pits.
     - `n`: Nodraw surface.
     - `i`: Invert the tile surface, if black/white.
     - `1`: Convert to a 1x1 only tile, if a black/white tile.
@@ -819,14 +824,22 @@ def res_set_tile(inst: Entity, res: Property) -> None:
 
     tiles: List[str] = [
         row.value
-        for row in res.find_all('tile')
+        for row in res
+        if row.name in ('tile', 'tiles')
     ]
     if not tiles:
         raise ValueError('No "tile" parameters in SetTile!')
 
+    chance = srctools.conv_float(res['chance', '100'].rstrip('%'), 100.0)
+    if chance < 100.0:
+        conditions.set_random_seed(inst, 'tile' + res['seed', ''])
+
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
             if val in '_ ':
+                continue
+
+            if chance < 100.0 and random.uniform(0, 100) > chance:
                 continue
 
             pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
