@@ -26,6 +26,12 @@ TRANSLATION = {
     'cancel': 'Cancel',
 }
 
+SPLASH_FONTS = [
+    'Univers',
+    'Segoe UI',
+    'San Francisco',
+]
+
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
@@ -233,10 +239,29 @@ class SplashScreen(BaseLoadScreen):
 
         self.is_compact = True
 
+        all_fonts = set(tk.font.families())
+
+        for font_family in all_fonts:
+            # DIN is the font used by Portal 2's logo,
+            # so try and use that.
+            if 'DIN' in font_family:
+                break
+        else:  # Otherwise, use system UI fonts from a list.
+            for font_family in SPLASH_FONTS:
+                if font_family in all_fonts:
+                    break
+            else:
+                font_family = 'Times'  # Generic special case
+
         font = Font(
-            family='Times',  # Generic special case
+            family=font_family,
             size=-18,  # negative = in pixels
             weight='bold',
+        )
+
+        progress_font = Font(
+            family=font_family,
+            size=-12,  # negative = in pixels
         )
 
         # Must be done late, so we know TK is initialised.
@@ -432,6 +457,7 @@ class SplashScreen(BaseLoadScreen):
                     text=stage_name + ': (0/???)',
                     fill='white',
                     tags='text_' + st_id,
+                    font=progress_font,
                 )
 
     def update_stage(self, stage):
