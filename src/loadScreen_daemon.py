@@ -285,14 +285,14 @@ class SplashScreen(BaseLoadScreen):
         )
 
         self.sml_canvas.create_text(
-            sml_width / 2, 40,
+            sml_width / 2, 30,
             anchor='n',
             text=self.title_text,
             fill='white',
             font=font,
         )
         self.sml_canvas.create_text(
-            sml_width / 2, 60,
+            sml_width / 2, 50,
             anchor='n',
             text=TRANSLATION['version'],
             fill='white',
