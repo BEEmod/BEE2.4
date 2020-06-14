@@ -475,7 +475,8 @@ class Game:
                 re.IGNORECASE,
             )
             if match:
-                if match.group(0) == '0':
+                if match.group(1) == b'0':
+                    LOGGER.info('FGD editing disabled by file.')
                     return  # User specifically disabled us.
                 # Delete all data after this line.
                 del data[i:]
@@ -491,7 +492,7 @@ class Game:
                     b'allow editing below text without being overwritten.\n'
                     b'\n\n'
                 )
-                with open(utils.install_path('BEE2.fgd'), 'rb') as bee2_fgd:
+                with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
                 file.write(imp_res_read_binary(srctools, 'srctools.fgd'))
 
@@ -614,7 +615,7 @@ class Game:
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
         try:
-            num_compiler_files = sum(1 for _ in utils.install_path('compiler').rglob('*'))
+            num_compiler_files = sum(1 for file in utils.install_path('compiler').rglob('*'))
         except FileNotFoundError:
             num_compiler_files = 0
 
@@ -842,10 +843,7 @@ class Game:
                             # First try and give ourselves write-permission,
                             # if it's set read-only.
                             utils.unset_readonly(dest)
-                        shutil.copy(
-                            comp_file,
-                            dest,
-                        )
+                        shutil.copy(comp_file, dest)
                     except PermissionError:
                         # We might not have permissions, if the compiler is currently
                         # running.
