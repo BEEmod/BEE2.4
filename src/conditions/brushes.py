@@ -1024,6 +1024,8 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
 def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     """Implements SetPanelOptions and CreatePanel."""
     normal = props.vec('normal', 0, 0, 1).rotate_by_str(inst['angles'])
+    origin = Vec.from_str(inst['origin'])
+    uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
 
     points: Set[Tuple[float, float, float]] = set()
 
@@ -1038,7 +1040,6 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         points.update(map(Vec.as_tuple, Vec.iter_grid(pos1, pos2, 32)))
     else:
         # Default to the full tile.
-        origin = Vec.from_str(inst['origin'])
         points.update({
             (Vec(u, v, -64.0).rotate_by_str(inst['angles']) + origin).as_tuple()
             for u in [-48.0, -16.0, 16.0, 48.0]
@@ -1057,6 +1058,29 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         LOGGER.warning('"{}": No tiles found for panels!', inst['targetname'])
         return
 
+    # If bevels is provided, parse out the overall world positions.
+    bevel_world: Optional[Set[Tuple[int, int]]]
+    try:
+        bevel_prop = props.find_key('bevel')
+    except NoKeyError:
+        bevel_world = None
+    else:
+        bevel_world = set()
+        if bevel_prop.has_children():
+            # Individually specifying offsets.
+            for bevel_str in bevel_prop.as_array():
+                bevel_point = Vec.from_str(bevel_str).rotate_by_str(inst['angles']) + origin
+                bevel_world.add((int(bevel_point[uaxis]), int(bevel_point[vaxis])))
+        elif srctools.conv_bool(bevel_prop.value):
+            # Fill the bounding box.
+            bbox_min, bbox_max = Vec.bbox(map(Vec, points))
+            off = Vec.with_axes(uaxis, 32, vaxis, 32)
+            bbox_min -= off
+            bbox_max += off
+            for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
+                if pos.as_tuple() not in points:
+                    bevel_world.add((pos[uaxis], pos[vaxis]))
+        # else: No bevels.
     panels: List[tiling.Panel] = []
 
     for tile, uvs in tiles_to_uv.items():
@@ -1064,7 +1088,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel = tiling.Panel(
                 None, inst, tiling.PanelType.NORMAL,
                 thickness=4,
-                bevel=True,
+                bevels=(),
             )
             panel.points = uvs
             tile.panels.append(panel)
@@ -1100,10 +1124,22 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                     inst['targetname'],
                     panel.thickness,
                 )
-        if 'bevel' in props:
-            panel.bevel = srctools.conv_bool(
-                conditions.resolve_value(inst, props['bevel'])
+
+        if bevel_world is not None:
+            panel.bevels.clear()
+            for u, v in bevel_world:
+                # Convert from world points to UV positions.
+                u = -(u - tile.pos[uaxis] - 48) / 32
+                v = -(v - tile.pos[vaxis] - 48) / 32
+                # Cull outside here, we don't need to use these.
+                if -1 <= u <= 4 and -1 <= v <= 4:
+                    panel.bevels.add((int(u), int(v)))
+            LOGGER.info(
+                'Panel bevels for {}: {}',
+                panel.inst['targetname'],
+                ', '.join(map(str, sorted(panel.bevels)))
             )
+
         if 'offset' in props:
             panel.offset = conditions.resolve_offset(inst, props['offset'])
             panel.offset -= Vec.from_str(inst['origin'])
