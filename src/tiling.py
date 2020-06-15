@@ -13,6 +13,10 @@ from typing import (
     Optional, Union, cast,
     Tuple, Dict, List,
     Iterator,
+    Set,
+    FrozenSet,
+    AbstractSet,
+    Iterable,
 )
 
 import math
@@ -93,6 +97,20 @@ BEVEL_BACK_SCALE = {
     (True, False): 124/512,  # \__|
     (True, True): 120/512,   # \__/
 }
+
+# U, V offset -> points on that side.
+# This allows computing the set of bevel orientations from the tiles around it.
+BEVEL_SIDES: List[Tuple[int, int, Set[Tuple[int, int]]]] = [
+    (-1, 0, {(-1, y) for y in range(4)}),
+    (+1, 0, {(+4, y) for y in range(4)}),
+    (0, -1, {(x, -1) for x in range(4)}),
+    (0, +1, {(x, +4) for x in range(4)}),
+]
+# Combines all the former.
+BEVEL_AROUND: FrozenSet[Tuple[int, int]] = frozenset({
+    item for u, v, st in BEVEL_SIDES
+    for item in st
+})
 
 
 class TileType(Enum):
@@ -400,7 +418,7 @@ class Panel:
           NORMAL generates a regular slab.
         thickness: 2, 4 or 8 units thick.
         template: If set, generate this template and include it in the brush.
-        bevel: If true, the surface will be bevelled on all sides.
+        bevels: A set of UV points that neighbours will bevel towards.
         nodraw: If true, apply nodraw to the squarebeam and backpanel faces.
         seal: If true, place nodraw tiles behind the panel instead of void.
         offset: Offset the tile by this much (local to the instance).
@@ -412,7 +430,7 @@ class Panel:
         inst: Entity,
         pan_type: PanelType,
         thickness: int,
-        bevel: bool,
+        bevels: Iterable[Tuple[int, int]],
     ) -> None:
         self.brush_ent = brush_ent
         self.inst = inst
@@ -425,7 +443,7 @@ class Panel:
         self.template = ''
         self.pan_type = pan_type
         self.thickness = thickness
-        self.bevel = bevel
+        self.bevels = set(bevels)
         self.nodraw = False
         self.seal = False
         self.steals_bullseye = False
@@ -492,12 +510,12 @@ class Panel:
             vmf,
             sub_tiles,
             is_wall,
-            (self.bevel, ) * 4,
+            self.bevels,
             tile.normal,
             thickness=self.thickness,
             is_panel=True,
             add_bullseye=use_bullseye and not is_static,
-            no_neighbour=True,
+            interior_bevel=False,  # User must request.
         )
         all_brushes += brushes
 
@@ -528,12 +546,12 @@ class Panel:
                 vmf,
                 inv_subtiles,
                 is_wall,
-                (self.bevel, ) * 4,
+                self.bevels,
                 -tile.normal,
                 thickness=self.thickness,
                 offset=64 - 2*self.thickness,
                 add_bullseye=use_bullseye and not is_static,
-                no_neighbour=True,
+            interior_bevel=False,  # User must request.
             )
             all_brushes += brushes
             inset_flip_panel(all_brushes, front_pos, tile.normal)
@@ -1065,12 +1083,10 @@ class TileDef:
         This is only called on special tiles with different patterns,
         or which have items modifying them.
         """
-        bevels: Tuple[bool, bool, bool, bool] = (
-            self.should_bevel(-1, 0),
-            self.should_bevel(+1, 0),
-            self.should_bevel(0, -1),
-            self.should_bevel(0, +1),
-        )
+        bevels: Set[Tuple[int, int]] = set()
+        for u, v, side_bevels in BEVEL_SIDES:
+            if self.should_bevel(u, v):
+                bevels |= side_bevels
 
         front_pos = self.pos + 64 * self.normal
 
@@ -1150,7 +1166,7 @@ class TileDef:
         vmf: VMF,
         pattern: Dict[Tuple[int, int], TileType],
         is_wall: bool,
-        bevels: Tuple[bool, bool, bool, bool],
+        bevels: AbstractSet[Tuple[int, int]],
         normal: Vec,
         offset: int=64,
         thickness: int=4,
@@ -1158,49 +1174,40 @@ class TileDef:
         is_panel: bool=False,
         add_bullseye: bool=False,
         face_output: Optional[Dict[Tuple[int, int], Side]]=None,
-        no_neighbour: bool=False,
+        interior_bevel: bool=True,
     ) -> Tuple[List[Side], List[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
 
         This does the complex job of generating a surface with multiple
         tile types.
+
+        The specified bevels are a set of UV points around the tile. If a tile
+        neighbours one of these points, it will be bevelled. If interior_bevel
+        is true, VOID tiles also are treated as this.
         
         If face_output is set, it will be filled with (u, v) -> top face.
         """
         brushes = []
         faces = []
 
-        def neighbour_empty(u: int, v: int) -> bool:
-            """For bevelling, check if this neighbour is VOID.
-
-            If out of this tile ignore.
-            """
-            if 0 <= u < 4 and 0 <= v < 4:
-                return pattern[u, v] is TileType.VOID
-            return False
+        if interior_bevel:
+            bevels = set(bevels)
+            for uv, tile in pattern.items():
+                if tile is TileType.VOID:
+                    bevels.add(uv)
 
         # NOTE: calc_patterns can produce 0, 1, 1.5, 2, 2.5, 3, 4!
         # Half-values are for nodrawing fizzlers which are center-aligned.
         for umin, umax, vmin, vmax, grid_size, tile_type in self.calc_patterns(pattern, is_wall):
-            # We bevel only the grid-edge tiles, or ones adjacent to VOID.
-            # The first equality check ensures we don't go out of bounds in the
-            # genexp lookups.
             u_range = range(max(int(umin), 0), min(int(umax), 4))
             v_range = range(max(int(vmin), 0), min(int(vmax), 4))
 
-            if no_neighbour:
-                tile_bevels = bevels
-            else:
-                tile_bevels = (
-                    bevels[0] if umin == 0 else
-                    any(neighbour_empty(int(umin)-1, i) for i in v_range),
-                    bevels[1] if umax == 4 else
-                    any(neighbour_empty(int(umax), i) for i in v_range),
-                    bevels[2] if vmin == 0 else
-                    any(neighbour_empty(i, int(vmin)-1) for i in u_range),
-                    bevels[3] if vmax == 4 else
-                    any(neighbour_empty(i, int(vmax)) for i in u_range),
-                )
+            tile_bevels = (
+                any((int(umin)-1, i) in bevels for i in v_range),
+                any((int(umax), i) in bevels for i in v_range),
+                any((i, int(vmin)-1) in bevels for i in u_range),
+                any((i, int(vmax)) in bevels for i in u_range),
+            )
 
             # Check if this tile needs to use a bullseye material.
             tile_is_bullseye = add_bullseye and not (
@@ -1282,7 +1289,7 @@ class TileDef:
                     top_surf=consts.Tools.NODRAW,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
-                    bevels=bevels,
+                    bevels=tile_bevels,
                     back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                     panel_edge=is_panel,
                 )
@@ -1826,7 +1833,7 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         panel_ent,
         PanelType.NORMAL,
         thickness=2,
-        bevel=True,
+        bevels=BEVEL_AROUND,
     ))
 
 
@@ -1850,7 +1857,7 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         panel_ent,
         PanelType.FLIP_BLACK,
         thickness=4,
-        bevel=False,
+        bevels=(),
     ))
 
 
