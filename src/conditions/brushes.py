@@ -1129,16 +1129,11 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.bevels.clear()
             for u, v in bevel_world:
                 # Convert from world points to UV positions.
-                u = -(u - tile.pos[uaxis] - 48) / 32
-                v = -(v - tile.pos[vaxis] - 48) / 32
-                # Cull outside here, we don't need to use these.
+                u = (u - tile.pos[uaxis] + 48) / 32
+                v = (v - tile.pos[vaxis] + 48) / 32
+                # Cull outside here, we wont't use them.
                 if -1 <= u <= 4 and -1 <= v <= 4:
-                    panel.bevels.add((int(u), int(v)))
-            LOGGER.info(
-                'Panel bevels for {}: {}',
-                panel.inst['targetname'],
-                ', '.join(map(str, sorted(panel.bevels)))
-            )
+                    panel.bevels.add((u, v))
 
         if 'offset' in props:
             panel.offset = conditions.resolve_offset(inst, props['offset'])
