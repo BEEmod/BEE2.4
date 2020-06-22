@@ -4,8 +4,6 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
-import sys
-import types
 from tkinter import Event
 from typing import IO, Optional, Callable, Union, Dict
 
@@ -48,11 +46,6 @@ SOUNDS: Dict[str, Union[str, 'Source']] = {
     'move': 'reconfig',
     'swap': 'extrude',
 }
-
-# First, prevent the WMF codec from loading. This seems to mess with thread
-# modes, breaking the debugger. So just replace the module with one that
-# does nothing.
-sys.modules['pyglet.media.codecs.wmf'] = types.SimpleNamespace(get_decoders=lambda: ())
 
 try:
     import pyglet.media
