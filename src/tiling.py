@@ -17,6 +17,7 @@ from typing import (
     FrozenSet,
     AbstractSet,
     Iterable,
+    MutableMapping,
 )
 
 import math
@@ -28,6 +29,7 @@ from srctools import Vec, VMF, Entity, Side, Solid, Output
 import srctools.logger
 from brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from texturing import TileSize, Portalable
+from weakref import WeakKeyDictionary
 import srctools.vmf
 import comp_consts as consts
 import template_brush
@@ -78,15 +80,20 @@ NORM_NAMES = {
     Vec(z=1).as_tuple(): 'up',
     Vec(z=-1).as_tuple(): 'down',
 }
-
 # All the tiledefs in the map.
 # Maps a block center, normal -> the tiledef on the side of that block.
 TILES: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], 'TileDef'] = {}
 
 # Special key for Tile.SubTile - This is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
-# This isn't a U,V tuple, but allow us to store it there anyway.
+# This isn't a U,V tuple, but pretend it is so we can use it as a key.
 SUBTILE_FIZZ_KEY: Tuple[int, int] = cast(Tuple[int, int], object())
+
+# For each overlay, stores any tiledefs that they're affixed to. We then
+# add the front faces of those to the ent at the end.
+# It's weak-key to automatically remove bindings for overlays when removed
+# from the level.
+OVERLAY_BINDS: MutableMapping[Entity, List['TileDef']] = WeakKeyDictionary()
 
 # Given the two bevel options, determine the correct texturing
 # values.
@@ -933,10 +940,7 @@ class TileDef:
         When the tiles are exported the overlay will be
         adjusted to include the face IDs.
         """
-        try:
-            overlays = over.tiledefs  # type: ignore
-        except AttributeError:
-            overlays = over.tiledefs = []  # type: ignore
+        overlays = OVERLAY_BINDS.setdefault(over, [])
         overlays.append(self)
 
     def calc_patterns(
@@ -1717,9 +1721,8 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[int, List[antlines.Segment]
     # Parse face IDs saved in overlays - if they're matching a tiledef,
     # remove them.
     for over in vmf_file.by_class['info_overlay']:
-        faces = over['sides', ''].split(' ')
-        tiles: List[TileDef]
-        tiles = over.tiledefs = []  # type: ignore
+        faces = over['sides', ''].split()
+        tiles = OVERLAY_BINDS[over] = []
         for face in faces[:]:
             try:
                 tiles.append(face_to_tile[int(face)])
@@ -2102,12 +2105,8 @@ def generate_brushes(vmf: VMF) -> None:
                     for v in range(min_v, max_v + 1):
                         tile_pos[u, v].brush_faces.append(front)
 
-    for over in vmf.by_class['info_overlay']:
-        try:
-            over_tiles: List[TileDef] = over.tiledefs  # type: ignore
-        except AttributeError:
-            continue
-        faces = set(over['sides', ''].split(' '))
+    for over, over_tiles in OVERLAY_BINDS.items():
+        faces = set(over['sides', ''].split())
         for tile in over_tiles:
             faces.update(str(f.id) for f in tile.brush_faces)
 
