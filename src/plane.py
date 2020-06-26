@@ -2,9 +2,9 @@
 
 """
 from typing import (
-    TypeVar, Generic,
+    TypeVar, Generic, Union,
     Tuple, Iterable,
-    MutableMapping,
+    Mapping, MutableMapping,
 )
 
 ValT = TypeVar('ValT')
@@ -20,75 +20,95 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     """
     def __init__(
         self, 
-        contents: Iterable[Tuple[Tuple[int, int], ValT]] = (),
+        contents: Union[
+            Mapping[Tuple[int, int], ValT],
+            Iterable[Tuple[Tuple[int, int], ValT]],
+        ] = (),
     ) -> None:
         """Initalises the plane with the provided values."""
         # Track the minimum/maximum position found
-        #self.mins = (0, 0)
-        #self.maxes = (0, 0)
+        self._min_x = self._min_y = self._max_x = self._max_y = 0
         self._yoff = 0
         self._xoffs: List[int] = []
         self._data: List[Optional[List[Optional[ValT]]]] = []
-        #self._used = 0
+        self._used = 0
+        if contents:
+            self.update(contents)
+            
+    @property
+    def mins(self) -> Tuple[int, int]:
+        """Return the minimum bounding point ever set."""
+        return self._min_x, self._min_y
+
+    @property
+    def maxes(self) -> Tuple[int, int]:
+        """Return the maximum bounding point ever set."""
+        return self._max_x, self._max_y
         
     def __len__(self) -> int:
         """The length is the number of used slots."""
         #return self._used
         
     def __repr__(self) -> str:
-        return f'Plane({list(self.items())!r})'
+        return f'Plane({dict(self.items())!r})'
         
     def __getitem__(self, pos: Tuple[int, int]) -> ValT:
         """Return the value at a given position."""
+        attr = vars(self)
         x, y = pos
         y += self._yoff
         try:
             x += self._xoffs[y]
-            out = self._data[x]
+            out = self._data[y][x]
         except IndexError:
             raise KeyError(pos) from None
-        if out is None:  # Empty slot.
-            raise KeyError(pos)
+        #if out is None:  # Empty slot.
+            #raise KeyError(pos)
         return out
             
     def __setitem__(self, pos: Tuple[int, int], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
         x, y = pos
-        y += self._yoff
+        y_ind = y + self._yoff
         y_bound = len(self._xoffs)
         
         # Extend if required. 
-        if y < 0:
-            change = -y
+        if y_ind < 0:
+            change = -y_ind
             self._yoff += change
             self._xoffs[0:0] = [0] * change
             self._data[0:0] = [None] * change
-            y = 0
-        elif y >= y_bound:
-            change = y - y_bound + 1
-            self._yoff -= change
+            y_ind = 0
+        elif y_ind >= y_bound:
+            change = y_ind - y_bound + 1
             self._xoffs.extend([0] * change)
             self._data.extend([None] * change)
-            y = -1
+            y_ind = -1 # y_bound - 1, but list can compute that.
         
         # Now x.
-        data = self._data[y]
-        if data is None:
-            data = self._data[y] = []
+        data = self._data[y_ind]
+        if data is None: # Create the list only when we need it.    
+            data = self._data[y_ind] = []
 
-        x += self._xoffs[y]
+        x_ind = x + self._xoffs[y_ind]
         x_bound = len(data)
-        if x < 0:
-            change = -x
-            self._xoffs[y] += change
+        if x_ind < 0:
+            change = -x_ind
+            self._xoffs[y_ind] += change
             data[0:0] = [None] * change
-            x = 0
+            x_ind = 0
         elif x >= x_bound:
             change = x - x_bound + 1
-            self._xoffs[y] -= change
             data.extend([None] * change)
-            x = -1
-        data[x] = val
+            x_ind = -1
+        
+        if data[x_ind] is None:
+            if val is not None:
+                self._used += 1
+        elif val is None:
+            self.used -= 1
+        
+        data[x_ind] = val
 
     def __iter__(self) -> Tuple[int, int]:
         """Return all used keys."""
@@ -101,12 +121,21 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                     
     def __delitem__(self, pos: Tuple[int, int]) -> None:
         self[x, y] = None
+
+if __name__ == '__main__':
+    print('-'*80)
+    def test(*pos):
+        pl[pos] = pos
+        print(f'{pos[0]} {pos[1]}:')
+        print(' ├', vars(pl))
         
-pl = Plane()
-print(pl)
-pl[0, 1] = (0, 1)
-print('0, 1:', vars(pl))
-pl[1, 0] = (1, 0)
-print('1, 0:', vars(pl))
-pl[-5, 2] = (-5, 2)
-print('-5, 2:', vars(pl))
+        copy = pl[pos]
+        assert copy is pos, copy
+        print(' ├', list(pl))
+        print(' └', pl)
+    pl = Plane()
+
+    test(0, 1)
+    test(1, 0)
+    test(-5, 2)
+    
