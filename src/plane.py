@@ -47,14 +47,13 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         
     def __len__(self) -> int:
         """The length is the number of used slots."""
-        #return self._used
+        return self._used
         
     def __repr__(self) -> str:
         return f'Plane({dict(self.items())!r})'
         
     def __getitem__(self, pos: Tuple[int, int]) -> ValT:
         """Return the value at a given position."""
-        attr = vars(self)
         x, y = pos
         y += self._yoff
         try:
@@ -62,8 +61,8 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             out = self._data[y][x]
         except IndexError:
             raise KeyError(pos) from None
-        #if out is None:  # Empty slot.
-            #raise KeyError(pos)
+        if out is None:  # Empty slot.
+            raise KeyError(pos)
         return out
             
     def __setitem__(self, pos: Tuple[int, int], val: ValT) -> None:
@@ -79,11 +78,15 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             self._xoffs[0:0] = [0] * change
             self._data[0:0] = [None] * change
             y_ind = 0
+            if y < self._min_y:
+                self._min_y = y
         elif y_ind >= y_bound:
             change = y_ind - y_bound + 1
             self._xoffs.extend([0] * change)
             self._data.extend([None] * change)
             y_ind = -1 # y_bound - 1, but list can compute that.
+            if y > self._max_y:
+                self._max_y = y
         
         # Now x.
         data = self._data[y_ind]
@@ -97,16 +100,20 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             self._xoffs[y_ind] += change
             data[0:0] = [None] * change
             x_ind = 0
+            if x < self._min_x:
+                self._min_x = x
         elif x >= x_bound:
             change = x - x_bound + 1
             data.extend([None] * change)
             x_ind = -1
+            if x > self._max_x:
+                self._max_x = x
         
         if data[x_ind] is None:
             if val is not None:
                 self._used += 1
         elif val is None:
-            self.used -= 1
+            self._used -= 1
         
         data[x_ind] = val
 
