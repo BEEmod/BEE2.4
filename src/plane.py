@@ -2,9 +2,10 @@
 
 """
 from typing import (
-    TypeVar, Generic, Union,
+    TypeVar, Generic, Union, Any,
     Tuple, Iterable,
     Mapping, MutableMapping,
+    ValuesView, ItemsView,
 )
 
 ValT = TypeVar('ValT')
@@ -64,7 +65,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         if out is None:  # Empty slot.
             raise KeyError(pos)
         return out
-            
+   
     def __setitem__(self, pos: Tuple[int, int], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
         x, y = pos
@@ -128,6 +129,74 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                     
     def __delitem__(self, pos: Tuple[int, int]) -> None:
         self[x, y] = None
+        
+    def clear(self) -> None:
+        """Remove all data from the plane."""
+        self._min_x = self._min_y = self._max_x = self._max_y = 0
+        self._yoff = self._used = 0
+        self._xoffs.clear()
+        self._data.clear()
+        
+    def values(self) -> ValuesView[ValT]:
+        """D.values() -> a set-like object providing a view on D's values"""
+        return PlaneValues(self)
+        
+    def items(self) -> ItemsView[Tuple[int, int], ValT]:
+        """D.items() -> a set-like object providing a view on D's items"""
+        return PlaneItems(self)
+        
+class PlaneValues(ValuesView[ValT]):
+    """Implementation of Plane.values()."""
+    __slots__ = ()  # _mapping is defined in superclass.
+    def __init__(self, plane: Plane[ValT]) -> None:
+        super().__init__(plane)
+        
+    def __contains__(self, item: Any) -> bool:
+        """Check if the provided item is a value."""
+        if item is None:
+            return false
+        for row in self._mapping._data:
+            if item in row:
+                return True
+        return False
+    
+    def __iter__(self) -> None:
+        """Produce all values in the plane."""
+        for row in self._mapping._data:
+            for value in row:
+                if value is not None:
+                    yield value
+
+
+class PlaneItems(ItemsView[Tuple[int, int], ValT]):
+    """Implementation of Plane.items()."""
+    __slots__ = ()  # _mapping is defined in superclass.
+    def __init__(self, plane: Plane[ValT]) -> None:
+        super().__init__(plane)
+        
+    def __contains__(self, item: Any) -> bool:
+        """Check if the provided pos/value pair is present."""
+        if not isinstance(item, tuple):
+            return False
+        try:
+            xy, value = item
+            return self._mapping[xy] == value
+        except ValueError:  # len(tup) != 3
+            return False
+        except KeyError:  # Not present
+            return False
+    
+    def __iter__(self) -> None:
+        """Produce all coord, value pairs in the plane."""
+        for y, (xoff, row) in enumerate(
+            zip(self._mapping._xoffs, self._mapping._data), 
+            start=-self._mapping._yoff,
+        ):
+            if row is None:
+                continue
+            for x, data in enumerate(row, start=-xoff):
+                if data is not None:
+                    yield (x, y), data
 
 if __name__ == '__main__':
     print('-'*80)
