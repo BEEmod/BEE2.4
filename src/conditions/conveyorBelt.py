@@ -1,51 +1,55 @@
 """Continuously moving belts, like in BTS.
 """
-from srctools import Property, Vec, Entity, Output
+from srctools import Property, Vec, Entity, Output, VMF
 
 import conditions
 import template_brush
 import instanceLocs
-import srctools
+import srctools.logger
+import comp_consts as const
 
 COND_MOD_NAME = None
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.conveyorBelt')
 
 
 @conditions.make_result('ConveyorBelt')
-def res_conveyor_belt(inst: Entity, res: Property):
+def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
     """Create a conveyor belt.
 
     * Options:
-        * `SegmentInst`: Generated at each square. (`track` is the name of the path to attach to.)
+        * `SegmentInst`: Generated at each square. (`track` is the name of the
+          path to attach to.)
         * `TrackTeleport`: Set the track points so they teleport trains to the start.
         * `Speed`: The fixup or number for the train speed.
-        * `MotionTrig`: If set, a trigger_multiple will be spawned that `EnableMotion`s
-          weighted cubes. The value is the name of the relevant filter.
+        * `MotionTrig`: If set, a trigger_multiple will be spawned that
+          `EnableMotion`s weighted cubes. The value is the name of the relevant filter.
         * `EndOutput`: Adds an output to the last track. The value is the same as
           outputs in VMFs.
         `RotateSegments`: If true (default), force segments to face in the
           direction of movement.
         * `BeamKeys`: If set, a list of keyvalues to use to generate an env_beam 
-          travelling from start to end.
-        `RailTemplate`: A template for the track sections. This is made into a non-solid
-          func_brush, combining all sections.
-        * `NoPortalFloor`: If set, add a `func_noportal_volume` on the floor under the track.
+          travelling from start to end. The origin is treated specially - X is
+          the distance from walls, y is the distance to the side, and z is the
+          height.
+        `RailTemplate`: A template for the track sections. This is made into a
+          non-solid func_brush, combining all sections.
+        * `NoPortalFloor`: If set, add a `func_noportal_volume` on the floor
+          under the track.
         * `PaintFizzler`: If set, add a paint fizzler underneath the belt.
     """
-    move_dist = srctools.conv_int(inst.fixup['$travel_distance'])
+    move_dist = inst.fixup.int('$travel_distance')
 
     if move_dist <= 2:
-        # There isn't room for a catwalk, so don't bother.
+        # There isn't room for a conveyor, so don't bother.
         inst.remove()
         return
 
     move_dir = Vec(1, 0, 0).rotate_by_str(inst.fixup['$travel_direction'])
     move_dir.rotate_by_str(inst['angles'])
-    start_offset = srctools.conv_float(inst.fixup['$starting_position'], 0)
+    start_offset = inst.fixup.float('$starting_position')
     teleport_to_start = res.bool('TrackTeleport', True)
     segment_inst_file = instanceLocs.resolve_one(res['SegmentInst', ''])
     rail_template = res['RailTemplate', None]
-
-    vmf = inst.map
 
     track_speed = res['speed', None]
 
@@ -63,21 +67,10 @@ def res_conveyor_belt(inst: Entity, res: Property):
             start_pos, end_pos = end_pos, start_pos
         inst['origin'] = start_pos
 
-    # Find the angle which generates an instance pointing in the direction
-    # of movement, with the same normal.
     norm = Vec(z=1).rotate_by_str(inst['angles'])
-    for roll in range(0, 360, 90):
-        angles = move_dir.to_angle(roll)
-        if Vec(z=1).rotate(*angles) == norm:
-            break
-    else:
-        raise ValueError(
-            "Can't find angles to give a"
-            ' z={} and x={}!'.format(norm, move_dir)
-        )
 
     if res.bool('rotateSegments', True):
-        inst['angles'] = angles
+        inst['angles'] = angles = move_dir.to_angle_roll(norm)
     else:
         angles = Vec.from_str(inst['angles'])
 
@@ -92,10 +85,10 @@ def res_conveyor_belt(inst: Entity, res: Property):
     track_name = conditions.local_name(inst, 'segment_{}')
     rail_temp_solids = []
     last_track = None
-    # Place beams at the top, so they don't appear inside wall sections.
-    beam_start = start_pos + 48 * norm  # type: Vec
-    beam_end = end_pos + 48 * norm  # type: Vec
-    for index, pos in enumerate(beam_start.iter_line(beam_end, stride=128), start=1):
+    # Place tracks at the top, so they don't appear inside wall sections.
+    track_start: Vec = start_pos + 48 * norm
+    track_end: Vec = end_pos + 48 * norm
+    for index, pos in enumerate(track_start.iter_line(track_end, stride=128), start=1):
         track = vmf.create_ent(
             classname='path_track',
             targetname=track_name.format(index) + '-track',
@@ -115,7 +108,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
 
         # Don't place at the last point - it doesn't teleport correctly,
         # and would be one too many.
-        if segment_inst_file and pos != end_pos:
+        if segment_inst_file and pos != track_end:
             seg_inst = vmf.create_ent(
                 classname='func_instance',
                 targetname=track_name.format(index),
@@ -138,7 +131,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
     if rail_temp_solids:
         vmf.create_ent(
             classname='func_brush',
-            origin=beam_start,
+            origin=track_start,
             spawnflags=1,  # Ignore +USE
             solidity=1,  # Not solid
             vrad_brush_cast_shadows=1,
@@ -154,7 +147,6 @@ def res_conveyor_belt(inst: Entity, res: Property):
     if beam_keys.value:
         beam = vmf.create_ent(classname='env_beam')
 
-        # 3 offsets - x = distance from walls, y = side, z = height
         beam_off = beam_keys.vec('origin', 0, 63, 56)
 
         for prop in beam_keys:
@@ -196,26 +188,26 @@ def res_conveyor_belt(inst: Entity, res: Property):
         motion_trig.solids.append(vmf.make_prism(
             start_pos + Vec(72, -56, 58).rotate(*angles),
             end_pos + Vec(-72, 56, 144).rotate(*angles),
-            mat='tools/toolstrigger',
+            mat=const.Tools.TRIGGER,
         ).solid)
 
     if res.bool('NoPortalFloor'):
         # Block portals on the floor..
         floor_noportal = vmf.create_ent(
             classname='func_noportal_volume',
-            origin=beam_start,
+            origin=track_start,
         )
         floor_noportal.solids.append(vmf.make_prism(
             start_pos + Vec(-60, -60, -66).rotate(*angles),
             end_pos + Vec(60, 60, -60).rotate(*angles),
-            mat='tools/toolsinvisible',
+            mat=const.Tools.INVISIBLE,
         ).solid)
 
     # A brush covering under the platform.
     base_trig = vmf.make_prism(
         start_pos + Vec(-64, -64, 48).rotate(*angles),
         end_pos + Vec(64, 64, 56).rotate(*angles),
-        mat='tools/toolsinvisible',
+        mat=const.Tools.INVISIBLE,
     ).solid
 
     vmf.add_brush(base_trig)
@@ -228,4 +220,4 @@ def res_conveyor_belt(inst: Entity, res: Property):
         )
         pfizz.solids.append(base_trig.copy())
         for face in pfizz.sides():
-            face.mat = 'tools/toolstrigger'
+            face.mat = const.Tools.TRIGGER
