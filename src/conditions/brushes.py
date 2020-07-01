@@ -244,17 +244,17 @@ def res_set_texture(inst: Entity, res: Property):
 
     tex = res['tex', '']
 
-    if (
-        tex.startswith('[') and tex.endswith(']') or
-        tex.startswith('<') and tex.endswith('>')
-    ):
+    if tex.startswith('<') and tex.endswith('>'):
         LOGGER.warning(
-            'Special lookups for AlterTexture are '
+            'Special <lookups> for AlterTexture are '
             'no longer usable! ("{}")',
             tex
         )
-    else:
-        tile.override = (tex, temp)
+    elif tex.startswith('[') and tex.endswith(']'):
+        gen, name = texturing.parse_name(tex[1:-1])
+        tex = gen.get(pos - 64 * norm, name)
+
+    tile.override = (tex, temp)
 
 
 @make_result('AddBrush')
