@@ -4,14 +4,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2020-03-20 16:59-0700\n"
+"POT-Creation-Date: 2020-07-03 18:18-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.8.0\n"
+"Generated-By: Babel 2.7.0\n"
 
 #: CheckDetails.py
 msgid "Toggle all checkboxes."
@@ -46,14 +46,16 @@ msgid ""
 "complex moving items will help reduce this. Items have their entity count"
 " listed in the item description window.\n"
 "\n"
-"This isn't totally accurate, some entity types are counted here but don't"
-" affect the ingame limit. "
+"This isn't completely accurate, some entity types are counted here but "
+"don't affect the ingame limit, while others may generate additional "
+"entities at runtime."
 msgstr ""
 
 #: CompilerPane.py
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
-"lights. Hiding long antlines or setting them to signage will reduce this."
+"lights. Hiding complex antlines or setting them to signage will reduce "
+"this."
 msgstr ""
 
 #: CompilerPane.py
@@ -155,8 +157,8 @@ msgstr ""
 #: CompilerPane.py
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
-"to compute. Use if you're arranging lights. When publishing, this is "
-"always used."
+"to compute. Use if you're arranging lights.\n"
+"When publishing, this is always used."
 msgstr ""
 
 #: CompilerPane.py
@@ -220,15 +222,12 @@ msgstr ""
 
 #: CompilerPane.py
 msgid ""
-"When previewing in SP, spawn inside the entry elevator. This also "
-"disables the map restarts when you reach the exit door. Use this to "
+"When previewing in SP, spawn inside the entry elevator. Use this to "
 "examine the entry and exit corridors."
 msgstr ""
 
 #: CompilerPane.py
-msgid ""
-"When previewing in SP, spawn just before the entry door. When you reach "
-"the exit door, the map will restart."
+msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
 
 #: CompilerPane.py
@@ -1299,6 +1298,17 @@ msgstr ""
 msgid ""
 "Prevent sub-windows from moving outside the screen borders. If you have "
 "multiple monitors, disable this."
+msgstr ""
+
+#: optionWindow.py
+msgid "Keep loading screens on top"
+msgstr ""
+
+#: optionWindow.py
+msgid ""
+"Force loading screens to be on top of other windows. Since they don't "
+"appear on the taskbar/dock, they can't be brought to the top easily "
+"again."
 msgstr ""
 
 #: optionWindow.py
