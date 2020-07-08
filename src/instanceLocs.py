@@ -309,7 +309,12 @@ def _resolve(path: str) -> List[str]:
         out = []
         for group in groups:
             if group[0] == '<':
-                item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
+                try:
+                    item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
+                except (ValueError, AttributeError):  # None.groups fail
+                    LOGGER.warning('Could not parse instance lookup "{}"!'.format(group))
+                    return []
+
                 item_id = item_id.casefold()
                 try:
                     item_inst = INSTANCE_FILES[item_id]
