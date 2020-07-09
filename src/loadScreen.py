@@ -5,6 +5,8 @@ the main process is busy loading.
 
 The id() of the main-process object is used to identify loadscreens.
 """
+from types import TracebackType
+from tkinter import commondialog
 from weakref import WeakSet
 from abc import abstractmethod
 import contextlib
@@ -15,15 +17,15 @@ from BEE2_config import GEN_OPTS
 import utils
 import srctools.logger
 
-from typing import Set, Tuple
+from typing import Set, Tuple, cast, Any, Type
 
 
 # Keep a reference to all loading screens, so we can close them globally.
-_ALL_SCREENS = WeakSet()  # type: Set[LoadScreen]
+_ALL_SCREENS = cast(set, WeakSet())  # type: Set[LoadScreen]
 
 # For each loadscreen ID, record if the cancel button was pressed. We then raise
 # Cancelled upon the next interaction with it to stop operation.
-_SCREEN_CANCEL_FLAG = {}
+_SCREEN_CANCEL_FLAG: Set[int] = set()
 
 # Pairs of pipe ends we use to send data to the daemon and vice versa.
 # DAEMON is sent over to the other process.
@@ -37,7 +39,7 @@ class Cancelled(SystemExit):
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-def close_all():
+def close_all() -> None:
     """Hide all loadscreen windows."""
     for screen in _ALL_SCREENS:
         screen.reset()
@@ -45,7 +47,7 @@ def close_all():
 
 def show_main_loader(is_compact: bool) -> None:
     """Special function, which sets the splash screen compactness."""
-    main_loader._send_msg('set_is_compact', is_compact)
+    _PIPE_MAIN_SEND.send(('set_is_compact', id(main_loader), (is_compact, )))
     main_loader.show()
 
 
@@ -57,7 +59,7 @@ def set_force_ontop(ontop: bool) -> None:
 
 
 @contextlib.contextmanager
-def surpress_screens():
+def suppress_screens() -> Any:
     """A context manager to suppress loadscreens while the body is active."""
     active = []
     for screen in _ALL_SCREENS:
@@ -72,19 +74,11 @@ def surpress_screens():
         screen.unsuppress()
 
 
-def patch_tk_dialogs():
-    """Patch various tk windows to hide loading screens while they're are open.
-
-    """
-    from tkinter import commondialog
-
-    # contextlib managers can also be used as decorators.
-    supressor = surpress_screens()  # type: contextlib.ContextDecorator
-    # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
-    # so patching .show() will fix them all.
-    commondialog.Dialog.show = supressor(commondialog.Dialog.show)
-
-patch_tk_dialogs()
+# Patch various tk windows to hide loading screens while they're are open.
+# Messageboxes, file dialogs and colorchooser all inherit from Dialog,
+# so patching .show() will fix them all.
+# contextlib managers can also be used as decorators.
+commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)
 
 
 class LoadScreen:
@@ -108,10 +102,9 @@ class LoadScreen:
         _ALL_SCREENS.add(self)
 
         # Order the daemon to make this screen.
-        _SCREEN_CANCEL_FLAG[id(self)] = False
         self._send_msg('init', is_splash, title_text, stages)
 
-    def __enter__(self):
+    def __enter__(self) -> 'LoadScreen':
         """LoadScreen can be used as a context manager.
 
         Inside the block, the screen will be visible. Cancelling will exit
@@ -120,16 +113,22 @@ class LoadScreen:
         self.show()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Type[BaseException],
+        exc_val: BaseException,
+        exc_tb: TracebackType,
+    ) -> None:
         """Hide the loading screen, and passthrough execptions.
         """
         self.reset()
 
-    def _send_msg(self, command, *args):
+    def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
         _PIPE_MAIN_SEND.send((command, id(self), args))
         # Check the messages coming back as well.
         while _PIPE_MAIN_REC.poll():
+            arg: Any
             command, arg = _PIPE_MAIN_REC.recv()
             if command == 'main_set_compact':
                 # Save the compact state to the config.
@@ -137,35 +136,35 @@ class LoadScreen:
                 GEN_OPTS.save_check()
             elif command == 'cancel':
                 # Mark this loadscreen as cancelled.
-                _SCREEN_CANCEL_FLAG[arg] = True
+                _SCREEN_CANCEL_FLAG.add(arg)
             else:
                 raise ValueError('Bad command from daemon: ' + repr(command))
 
         # If the flag was set for us, raise an exception - the loading thing
         # will then stop.
-        if _SCREEN_CANCEL_FLAG[id(self)]:
-            _SCREEN_CANCEL_FLAG[id(self)] = False
+        if id(self) in _SCREEN_CANCEL_FLAG:
+            _SCREEN_CANCEL_FLAG.discard(id(self))
             LOGGER.info('User cancelled loading screen.')
             raise Cancelled
 
-    def set_length(self, stage: str, num: int):
+    def set_length(self, stage: str, num: int) -> None:
         """Set the maximum value for the specified stage."""
         self._send_msg('set_length', stage, num)
 
-    def step(self, stage: str):
+    def step(self, stage: str) -> None:
         """Increment the specified stage."""
         self._send_msg('step', stage)
 
-    def skip_stage(self, stage: str):
+    def skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         self._send_msg('skip_stage', stage)
 
-    def show(self):
+    def show(self) -> None:
         """Display the loading screen."""
         self.active = True
         self._send_msg('show')
 
-    def reset(self):
+    def reset(self) -> None:
         """Hide the loading screen and reset all the progress bars."""
         self.active = False
         self._send_msg('reset')
@@ -177,13 +176,13 @@ class LoadScreen:
         _ALL_SCREENS.remove(self)
 
     @abstractmethod
-    def suppress(self):
+    def suppress(self) -> None:
         """Temporarily hide the screen."""
         self.active = False
         self._send_msg('hide')
 
     @abstractmethod
-    def unsuppress(self):
+    def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
         self._send_msg('show')

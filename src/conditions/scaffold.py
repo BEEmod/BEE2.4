@@ -7,7 +7,6 @@ from enum import Enum
 import instanceLocs
 import item_chain
 import srctools.logger
-import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
 )
@@ -174,8 +173,24 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             conf = node.conf
             orient, offset = get_config(node)
 
+            new_file = conf.get('inst_' + orient, '')
+            if new_file != '':
+                node.inst['file'] = new_file
+
             if node.prev is None:
                 link_type = LinkType.START
+                if node.next is None:
+                    # No connections in either direction, just skip.
+                    # Generate the piston tip if we would have.
+                    if conf['inst_offset'] is not None:
+                        vmf.create_ent(
+                            classname='func_instance',
+                            targetname=node.inst['targetname'],
+                            file=conf['inst_offset'],
+                            origin=offset,
+                            angles=node.inst['angles'],
+                        )
+                    continue
             elif node.next is None:
                 link_type = LinkType.END
             else:
@@ -187,10 +202,10 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             # model.
             placed_endcap = False
             if (
-                    orient == 'floor' and
-                    link_type is not LinkType.MID and
-                    conf['inst_end'] is not None
-                    ):
+                orient == 'floor' and
+                link_type is not LinkType.MID and
+                conf['inst_end'] is not None
+            ):
                 if link_type is LinkType.START:
                     other_node = node.next
                 else:
@@ -211,7 +226,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     # Round to nearest 90 degrees
                     # Add 45 so the switchover point is at the diagonals
                     link_ang = (link_ang + 45) // 90 * 90
-                    vbsp.VMF.create_ent(
+                    vmf.create_ent(
                         classname='func_instance',
                         targetname=node.inst['targetname'],
                         file=conf['inst_end'],
@@ -224,7 +239,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             if not placed_endcap and conf['inst_offset'] is not None:
                 # Add an additional rotated entity at the offset.
                 # This is useful for the piston item.
-                vbsp.VMF.create_ent(
+                vmf.create_ent(
                     classname='func_instance',
                     targetname=node.inst['targetname'],
                     file=conf['inst_offset'],
@@ -250,27 +265,24 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     else node.inst['angles']
                 ),
             )
-            for key, val in node.inst.fixup.items():
-                # Copy over fixup values
-                logic_inst.fixup[key] = val
 
             # Add the link-values
             for linkVar, link in LINKS.items():
-                logic_inst.fixup[linkVar] = SCAFF_PATTERN.format(
+                node.inst.fixup[linkVar] = SCAFF_PATTERN.format(
                     name=link['name'],
                     group=group_counter,
                     index=index,
                 )
                 if node.next is not None:
-                    logic_inst.fixup[link['next']] = SCAFF_PATTERN.format(
+                    node.inst.fixup[link['next']] = SCAFF_PATTERN.format(
                         name=link['name'],
                         group=group_counter,
                         index=index + 1,
                     )
 
-            new_file = conf.get('inst_' + orient, '')
-            if new_file != '':
-                node.inst['file'] = new_file
+            for key, val in node.inst.fixup.items():
+                # Copy over fixup values
+                logic_inst.fixup[key] = val
 
     LOGGER.info('Finished Scaffold generation!')
     return RES_EXHAUSTED

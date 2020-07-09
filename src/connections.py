@@ -7,16 +7,16 @@ from enum import Enum
 from collections import defaultdict
 
 from srctools import VMF, Entity, Output, Property, conv_bool, Vec
+from antlines import Antline, AntType
 import comp_consts as const
 import instanceLocs
 import conditions
 import instance_traits
 import srctools.logger
 import vbsp_options
-import antlines
 import packing
 
-from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator
+from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator, Union
 
 
 COND_MOD_NAME = "Item Connections"
@@ -385,7 +385,7 @@ class ItemType:
         invert_var = conf['invertVar', '0']
 
         try:
-            spawn_fire = FeatureMode(conf['spawnfire', 'never'])
+            spawn_fire = FeatureMode(conf['spawnfire', 'never'].casefold())
         except ValueError:
             # Older config option - it was a bool for always/never.
             spawn_fire_bool = conf.bool('spawnfire', None)
@@ -470,13 +470,12 @@ class ItemType:
 class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
-        'inst',
+        'inst', 'item_type', '_kv_setters',
         'ind_panels',
         'antlines', 'shape_signs',
         'ant_wall_style', 'ant_floor_style',
         'timer',
         'inputs', 'outputs',
-        'item_type', 'io_outputs',
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
         'ant_toggle_var',
@@ -486,10 +485,10 @@ class Item:
         self,
         inst: Entity,
         item_type: ItemType,
-        ant_floor_style: antlines.AntType,
-        ant_wall_style: antlines.AntType,
+        ant_floor_style: AntType,
+        ant_wall_style: AntType,
         panels: Iterable[Entity]=(),
-        antlines: Iterable[Entity]=(),
+        antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
         ant_toggle_var: str='',
@@ -497,11 +496,9 @@ class Item:
         self.inst = inst
         self.item_type = item_type
 
-        # Associated indicator panels
+        # Associated indicator panels and antlines
         self.ind_panels = set(panels)  # type: Set[Entity]
-
-        # Overlays
-        self.antlines = set(antlines)  # type: Set[Entity]
+        self.antlines = set(antlines)
         self.shape_signs = list(shape_signs)
 
         # And the style to use for the antlines.
@@ -516,15 +513,21 @@ class Item:
         self.timer = timer_count
 
         # From this item
-        self.outputs = set()  # type: Set[Connection]
+        self.outputs: Set[Connection] = set()
         # To this item
-        self.inputs = set()  # type: Set[Connection]
+        self.inputs: Set[Connection] = set()
 
+        # Copy these, allowing them to be altered for a specific item.
         self.enable_cmd = item_type.enable_cmd
         self.disable_cmd = item_type.disable_cmd
 
         self.sec_enable_cmd = item_type.sec_enable_cmd
         self.sec_disable_cmd = item_type.sec_disable_cmd
+
+        # The postcompiler entities to add outputs to the instance.
+        # This eliminates needing io_proxies.
+        # The key is the name of the local ent.
+        self._kv_setters: Dict[str, Entity] = {}
 
         assert self.name, 'Blank name!'
 
@@ -589,8 +592,6 @@ class Item:
 
     def delete_antlines(self) -> None:
         """Delete the antlines and checkmarks outputting from this item."""
-        for ent in self.antlines:
-            ent.remove()
         for ent in self.ind_panels:
             ent.remove()
         for sign in self.shape_signs:
@@ -610,6 +611,56 @@ class Item:
         self.antlines.clear()
         self.ind_panels.clear()
         self.shape_signs.clear()
+
+    def add_io_command(
+        self,
+        output: Optional[Tuple[Optional[str], str]],
+        target: Union[Entity, str],
+        inp_cmd: str,
+        params: str = '',
+        delay: float = 0.0,
+        times: int = -1,
+        inst_in: Optional[str]=None,
+    ) -> None:
+        """Add an output to this item.
+
+        For convenience, if the output is None this does nothing.
+        """
+        if output is None:
+            return
+
+        out_name, out_cmd = output
+
+        if not out_name:
+            out_name = ''  # Dump the None.
+
+        out_name = conditions.resolve_value(self.inst, out_name)
+
+        if isinstance(target, Entity):
+            target = target['targetname']
+
+        try:
+            kv_setter = self._kv_setters[out_name]
+        except KeyError:
+            if out_name:
+                full_name = conditions.local_name(self.inst, out_name)
+            else:
+                full_name = self.name
+            kv_setter = self._kv_setters[out_name] = self.inst.map.create_ent(
+                'comp_kv_setter',
+                origin=self.inst['origin'],
+                target=full_name,
+            )
+
+        kv_setter.add_out(Output(
+            conditions.resolve_value(self.inst, out_cmd),
+            target,
+            inp_cmd,
+            params,
+            delay=delay,
+            times=times,
+            inst_in=inst_in,
+        ))
 
 
 class Connection:
@@ -714,10 +765,11 @@ def read_configs(conf: Property) -> None:
 
 def calc_connections(
     vmf: VMF,
+    antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
-    antline_wall: antlines.AntType,
-    antline_floor: antlines.AntType,
+    antline_wall: AntType,
+    antline_floor: AntType,
 ) -> None:
     """Compute item connections from the map file.
 
@@ -727,8 +779,6 @@ def calc_connections(
     """
     # First we want to match targetnames to item types.
     toggles = {}  # type: Dict[str, Entity]
-    overlays = defaultdict(set)  # type: Dict[str, Set[Entity]]
-
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
     sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
@@ -756,6 +806,10 @@ def calc_connections(
             inst.remove()
         elif 'indicator_panel' in traits:
             panels[inst['targetname']] = inst
+        elif 'fizzler_model' in traits:
+            # Ignore fizzler models - they shouldn't have the connections.
+            # Just the base itself.
+            pass
         else:
             # Normal item.
             try:
@@ -773,15 +827,13 @@ def calc_connections(
                 # invalid.
                 if item_type.input_type is InputType.DUAL:
                     del inst.fixup[const.FixupVars.CONN_COUNT]
+                    del inst.fixup[const.FixupVars.CONN_COUNT_TBEAM]
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
         mat = over['material']
         if mat in SIGN_ORDER_LOOKUP:
             sign_shape_overlays[name, mat.casefold()].append(over)
-        else:
-            # Antlines
-            overlays[name].add(over)
 
     # Name -> signs pairs
     sign_shapes = defaultdict(list)  # type: Dict[str, List[ShapeSignage]]
@@ -830,7 +882,12 @@ def calc_connections(
 
             if out_name in toggles:
                 inst_toggle = toggles[out_name]
-                item.antlines |= overlays[inst_toggle.fixup['indicator_name']]
+                try:
+                    item.antlines.update(
+                        antlines[inst_toggle.fixup['indicator_name']]
+                    )
+                except KeyError:
+                    pass
             elif out_name in panels:
                 pan = panels[out_name]
                 item.ind_panels.add(pan)
@@ -962,8 +1019,8 @@ def do_item_optimisation(vmf: VMF) -> None:
             # We just leave the panel entities, and tie all the antlines
             # to the same toggle.
             needs_global_toggle = True
-            for ent in item.antlines:
-                ent['targetname'] = '_static_ind'
+            for ant in item.antlines:
+                ant.name = '_static_ind'
 
             del ITEMS[item.name]
             item.inst.remove()
@@ -1022,13 +1079,14 @@ def gen_item_outputs(vmf: VMF) -> None:
 
     do_item_optimisation(vmf)
 
-    has_timer_relay = False
-
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
         if item.item_type is None:
             continue
+
+        # Try to add the locking IO.
+        add_locking(item)
 
         # Check we actually have timers, and that we want the relay.
         if item.timer is not None and (
@@ -1037,7 +1095,6 @@ def gen_item_outputs(vmf: VMF) -> None:
         ):
             has_sound = item.item_type.force_timer_sound or len(item.ind_panels) > 0
             add_timer_relay(item, has_sound)
-            has_timer_relay = has_timer_relay or has_sound
 
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
@@ -1114,9 +1171,6 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.item_type.sec_invert_var,
             )
         else:
-            # If we have commands defined, try to add locking.
-            if item.item_type.output_unlock is not None:
-                add_locking(item)
             add_item_inputs(
                 item,
                 item.item_type.input_type,
@@ -1139,15 +1193,6 @@ def gen_item_outputs(vmf: VMF) -> None:
         for pan in item.ind_panels:
             pan['file'] = desired_panel_inst
             pan.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
-
-    if has_timer_relay:
-        # Write this VScript out.
-        timer_sound = vbsp_options.get(str, 'timer_sound')
-        with open('bee2/inject/timer_sound.nut', 'w') as f:
-            f.write(TIMER_SOUND_SCRIPT.format(snd=timer_sound))
-
-        # Make sure this is packed, since parsing the VScript isn't trivial.
-        packing.pack_files(vmf, timer_sound, file_type='sound')
 
     logic_auto = vmf.create_ent(
         'logic_auto',
@@ -1172,6 +1217,16 @@ def add_locking(item: Item) -> None:
 
     This allows items to customise how buttons behave.
     """
+    if item.item_type.output_lock is None and item.item_type.output_unlock is None:
+        return
+    if item.item_type.input_type is InputType.DUAL:
+        LOGGER.warning(
+            'Item type ({}) with locking IO, but dual inputs. '
+            'Locking functionality is ignored!',
+            item.item_type.id
+        )
+        return
+
     # If more than one, it's not logical to lock the button.
     try:
         [lock_conn] = item.inputs
@@ -1192,6 +1247,11 @@ def add_locking(item: Item) -> None:
     instance_traits.get(item.inst).add('locking_targ')
     instance_traits.get(lock_button.inst).add('locking_btn')
 
+    # Force the item to not have a timer.
+    for pan in item.ind_panels:
+        pan.remove()
+    item.ind_panels.clear()
+
     for output, input_cmds in [
         (item.item_type.output_lock, lock_button.item_type.lock_cmd),
         (item.item_type.output_unlock, lock_button.item_type.unlock_cmd)
@@ -1199,22 +1259,18 @@ def add_locking(item: Item) -> None:
         if not output:
             continue
 
-        out_name, out_cmd = output
         for cmd in input_cmds:
             if cmd.target:
                 target = conditions.local_name(lock_button.inst, cmd.target)
             else:
                 target = lock_button.inst
-            item.inst.add_out(
-                Output(
-                    out_cmd,
-                    target,
-                    cmd.input,
-                    cmd.params,
-                    delay=cmd.delay,
-                    times=cmd.times,
-                    inst_out=out_name,
-                )
+            item.add_io_command(
+                output,
+                target,
+                cmd.input,
+                cmd.params,
+                delay=cmd.delay,
+                times=cmd.times,
             )
 
 
@@ -1230,9 +1286,6 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         startDisabled=0,
         spawnflags=0,
     )
-
-    if has_sounds:
-        relay['vscripts'] = 'bee2/timer_sound.nut'
 
     if item.item_type.timer_sound_pos:
         relay_loc = item.item_type.timer_sound_pos.copy()
@@ -1268,6 +1321,20 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         if timer_cc:
             timer_cc = 'cc_emit ' + timer_cc
 
+        # Write out the VScript code to precache the sound, and play it on
+        # demand.
+        relay['vscript_init_code'] = (
+            'function Precache() {'
+            f'self.PrecacheSoundScript(`{timer_sound}`)'
+            '}'
+        )
+        relay['vscript_init_code2'] = (
+            'function snd() {'
+            f'self.EmitSound(`{timer_sound}`)'
+            '}'
+        )
+        packing.pack_files(item.inst.map, timer_sound, file_type='sound')
+
         for delay in range(item.timer):
             relay.add_out(Output(
                 'OnTrigger',
@@ -1289,8 +1356,8 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         (item.timer_output_start(), 'Trigger'),
         (item.timer_output_stop(), 'CancelPending')
     ]:
-        for out_name, out_cmd in outputs:
-            item.inst.add_out(Output(out_cmd, rl_name, cmd, inst_out=out_name))
+        for output in outputs:
+            item.add_io_command(output, rl_name, cmd)
 
 
 def add_item_inputs(
@@ -1309,87 +1376,68 @@ def add_item_inputs(
         return  # The rest of this function requires at least one input.
 
     if logic_type is InputType.DEFAULT:
-        # 'Original' PeTI proxies.
+        # 'Original' PeTI proxy style inputs. We're not actually using the
+        # proxies though.
         for conn in inputs:
             inp_item = conn.from_item
             for output, input_cmds in [
                 (inp_item.output_act(), enable_cmd),
                 (inp_item.output_deact(), disable_cmd)
             ]:
-                if not output or not input_cmds:
-                    continue
-
-                out_name, out_cmd = output
                 for cmd in input_cmds:
-                    inp_item.inst.add_out(
-                        Output(
-                            out_cmd,
-                            item.inst,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            inst_out=out_name,
-                            inst_in=cmd.inst_in,
-                            delay=cmd.delay,
-                        )
+                    inp_item.add_io_command(
+                        output,
+                        item.inst,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        inst_in=cmd.inst_in,
+                        delay=cmd.delay,
                     )
         return
     elif logic_type is InputType.DAISYCHAIN:
         # Another special case, these items AND themselves with their inputs.
-        # We aren't called if we have no inputs, so we don't need to handle that.
+        # Create the counter for that.
 
-        # We transform the instance into a counter, but first duplicate the
-        # instance as a new entity. This way references to the instance add
-        # outputs to the counter instead.
-        orig_inst = item.inst.copy()
-        orig_inst.map.add_ent(orig_inst)
-        orig_inst.outputs.clear()
+        # Note that we use the instance name itself for the counter.
+        # This will break if we've got dual inputs, but we're only
+        # using this for laser catchers...
+        # We have to do this so that the name is something that can be
+        # targeted by other items.
+        # TODO: Do this by generating an AND gate proxy-instance...
+        counter = item.inst.map.create_ent(
+            'math_counter',
+            origin=item.inst['origin'],
+            targetname=item.name,
+            min=0,
+            max=len(inputs) + 1,
+        )
 
-        counter = item.inst
-        counter.clear_keys()
-
-        counter['origin'] = orig_inst['origin']
-        counter['targetname'] = orig_inst['targetname'] + COUNTER_NAME[count_var]
-        counter['classname'] = 'math_counter'
-        counter['min'] = 0
-        counter['max'] = len(inputs) + 1
-
-        for output, input_name in [
-            (item.item_type.output_act, 'Add'),
-            (item.item_type.output_deact, 'Subtract')
-        ]:
-            if not output:
-                continue
-
-            out_name, out_cmd = output
-            orig_inst.add_out(
-                Output(
-                    out_cmd,
-                    counter,
-                    input_name,
-                    '1',
-                    inst_out=out_name,
-                )
+        if (
+            count_var is const.FixupVars.BEE_CONN_COUNT_A or
+            count_var is const.FixupVars.BEE_CONN_COUNT_B
+        ):
+            LOGGER.warning(
+                '{}: Daisychain logic type is '
+                'incompatible with dual inputs in item type {}! '
+                'This will not work well...',
+                item.name,
+                item.item_type.id,
             )
+
+        # Use the item type's output, we've overridden the normal one.
+        item.add_io_command(
+            item.item_type.output_act,
+            counter, 'Add', '1',
+        )
+        item.add_io_command(
+            item.item_type.output_deact,
+            counter, 'Subtract', '1',
+        )
 
         for conn in inputs:
             inp_item = conn.from_item
-            for output, input_name in [
-                (inp_item.output_act(), 'Add'),
-                (inp_item.output_deact(), 'Subtract')
-            ]:
-                if not output:
-                    continue
-
-                out_name, out_cmd = output
-                inp_item.inst.add_out(
-                    Output(
-                        out_cmd,
-                        counter,
-                        input_name,
-                        '1',
-                        inst_out=out_name,
-                    )
-                )
+            inp_item.add_io_command(inp_item.output_act(), counter, 'Add', '1')
+            inp_item.add_io_command(inp_item.output_deact(), counter, 'Subtract', '1')
 
         return
 
@@ -1481,8 +1529,6 @@ def add_item_inputs(
             ('On' + enable_user, enable_cmd),
             ('On' + disable_user, disable_cmd)
         ]:
-            if not input_cmds:
-                continue
             for cmd in input_cmds:
                 spawn_relay.add_out(
                     Output(
@@ -1515,46 +1561,24 @@ def add_item_inputs(
 
     if needs_counter:
         if logic_type.is_logic:
-            # Logic items are the counter. We convert the instance to that
-            # so we keep outputs added by items evaluated earlier.
-            origin = item.inst['origin']
-            name = item.name
-
-            counter = item.inst
-            counter.clear_keys()
-
-            counter['origin'] = origin
-            counter['targetname'] = name
-            counter['classname'] = 'math_counter'
+            # Logic items are the counter.
+            counter_name = item.name
         else:
-            counter = item.inst.map.create_ent(
-                classname='math_counter',
-                targetname=item.name + COUNTER_NAME[count_var],
-                origin=item.inst['origin'],
-            )
+            counter_name = item.name + COUNTER_NAME[count_var]
+
+        counter = item.inst.map.create_ent(
+            classname='math_counter',
+            targetname=counter_name,
+            origin=item.inst['origin'],
+        )
 
         counter['min'] = counter['startvalue'] = counter['StartDisabled'] = 0
         counter['max'] = len(inputs)
 
         for conn in inputs:
             inp_item = conn.from_item
-            for output, input_name in [
-                (inp_item.output_act(), 'Add'),
-                (inp_item.output_deact(), 'Subtract')
-            ]:
-                if not output:
-                    continue
-
-                out_name, out_cmd = output
-                inp_item.inst.add_out(
-                    Output(
-                        out_cmd,
-                        counter,
-                        input_name,
-                        '1',
-                        inst_out=out_name,
-                    )
-                )
+            inp_item.add_io_command(inp_item.output_act(), counter, 'Add', '1')
+            inp_item.add_io_command(inp_item.output_deact(), counter, 'Subtract', '1')
 
         if logic_type is InputType.AND:
             count_on = COUNTER_AND_ON
@@ -1575,8 +1599,6 @@ def add_item_inputs(
             (count_on, enable_cmd),
             (count_off, disable_cmd)
         ]:
-            if not input_cmds:
-                continue
             for cmd in input_cmds:
                 counter.add_out(
                     Output(
@@ -1599,24 +1621,17 @@ def add_item_inputs(
                 (inp_item.output_act(), enable_cmd),
                 (inp_item.output_deact(), disable_cmd)
             ]:
-                if not output or not input_cmds:
-                    continue
-
-                out_name, out_cmd = output
                 for cmd in input_cmds:
-                    inp_item.inst.add_out(
-                        Output(
-                            out_cmd,
-                            conditions.local_name(
-                                item.inst,
-                                conditions.resolve_value(item.inst, cmd.target),
-                            ) or item.inst,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            inst_out=out_name,
-                            delay=cmd.delay,
-                            times=cmd.times,
-                        )
+                    inp_item.add_io_command(
+                        output,
+                        conditions.local_name(
+                            item.inst,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or item.inst,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        delay=cmd.delay,
+                        times=cmd.times,
                     )
 
 
@@ -1625,18 +1640,15 @@ def add_item_indicators(
     inst_type: PanelSwitchingStyle,
     pan_item: ItemType,
 ) -> None:
-    """Generate the commands for antlines, and restyle them."""
+    """Generate the commands for antlines and the overlays themselves."""
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
+    has_ant = len(item.antlines) > 0
 
-    for ind in item.antlines:
-        ind['targetname'] = ant_name
-        antlines.style_antline(ind, item.ant_wall_style, item.ant_floor_style)
+    for ant in item.antlines:
+        ant.name = ant_name
 
-    # If the antline material doesn't toggle, the name is removed by
-    # style_antline(). So check if the overlay actually exists still, to
-    # see if we need to add the toggle.
-    has_ant = len(item.inst.map.by_target[ant_name]) > 0
+        ant.export(item.inst.map, item.ant_wall_style, item.ant_floor_style)
 
     # Special case - the item wants full control over its antlines.
     if has_ant and item.ant_toggle_var:
@@ -1688,23 +1700,18 @@ def add_item_indicators(
             (item.timer_output_start(), pan_item.enable_cmd),
             (item.timer_output_stop(), pan_item.disable_cmd)
         ]:
-            if not input_cmds:
-                continue
-            for out_name, out in outputs:
+            for output in outputs:
                 for cmd in input_cmds:
-                    item.inst.add_out(
-                        Output(
-                            out,
-                            conditions.local_name(
-                                pan,
-                                conditions.resolve_value(item.inst, cmd.target),
-                            ) or pan,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            inst_out=out_name,
-                            inst_in=cmd.inst_in,
-                            times=cmd.times,
-                        )
+                    item.add_io_command(
+                        output,
+                        conditions.local_name(
+                            pan,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or pan,
+                        conditions.resolve_value(item.inst, cmd.input),
+                        conditions.resolve_value(item.inst, cmd.params),
+                        inst_in=cmd.inst_in,
+                        times=cmd.times,
                     )
 
     if needs_toggle:
@@ -1715,19 +1722,15 @@ def add_item_indicators(
             target=ant_name,
         )
         # Don't use the configurable inputs - if they want that, use custAntline.
-        for output, skin in [
-            (item.output_act(), '1'),
-            (item.output_deact(), '0')
-        ]:
-            if not output:
-                continue
-            out_name, out = output
-            item.inst.add_out(
-                Output(
-                    out,
-                    toggle,
-                    'SetTextureIndex',
-                    skin,
-                    inst_out=out_name,
-                )
-            )
+        item.add_io_command(
+            item.output_deact(),
+            toggle,
+            'SetTextureIndex',
+            '0',
+        )
+        item.add_io_command(
+            item.output_act(),
+            toggle,
+            'SetTextureIndex',
+            '1',
+        )

@@ -1,5 +1,5 @@
 """Handles generating Piston Platforms with specific logic."""
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import conditions
 import packing
@@ -10,6 +10,8 @@ from conditions import make_result, make_result_setup, local_name
 from connections import ITEMS
 from instanceLocs import resolve_one as resolve_single
 from srctools import Entity, VMF, Property, Output, Vec
+from texturing import GenCat
+from tiling import TILES, Panel
 
 
 COND_MOD_NAME = 'Piston Platform'
@@ -175,16 +177,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
 
     static_ent = vmf.create_ent('func_brush', origin=origin)
 
-    color_var = conditions.resolve_value(inst, color_var).casefold()
-
-    if color_var == 'white':
-        top_color = template_brush.MAT_TYPES.white
-    elif color_var == 'black':
-        top_color = template_brush.MAT_TYPES.black
-    else:
-        top_color = None
-
-    for pist_ind in range(1, 5):
+    for pist_ind in [1, 2, 3, 4]:
         pist_ent = inst.copy()
         vmf.add_ent(pist_ent)
 
@@ -248,12 +241,31 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
             temp_result,
             origin,
             pist_ent.fixup,
-            force_colour=top_color,
-            force_grid='special',
-            no_clumping=True,
+            generator=GenCat.PANEL,
         )
 
-    if not static_ent.solids:
+    # Associate any set panel with the same entity, if it's present.
+    tile_pos = Vec(z=-128)
+    tile_pos.localise(origin, angles)
+    panel: Optional[Panel] = None
+    try:
+        tiledef = TILES[tile_pos.as_tuple(), off.norm().as_tuple()]
+    except KeyError:
+        pass
+    else:
+        for panel in tiledef.panels:
+            if panel.same_item(inst):
+                break
+        else:  # Checked all of them.
+            panel = None
+
+    if panel is not None:
+        if panel.brush_ent in vmf.entities and not panel.brush_ent.solids:
+            panel.brush_ent.remove()
+        panel.brush_ent = pistons[max(pistons.keys())]
+        panel.offset = st_pos * off
+
+    if not static_ent.solids and (panel is None or panel.brush_ent is not static_ent):
         static_ent.remove()
 
     if snd_loop:

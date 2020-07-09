@@ -8,6 +8,7 @@ import srctools.logger
 import template_brush
 import vbsp_options
 import packing
+import texturing
 from conditions import make_result
 from grid_optim import optimise as grid_optimise
 from instanceLocs import resolve_one
@@ -147,7 +148,7 @@ def res_glass_hole(inst: Entity, res: Property):
         inst.remove()
 
 
-def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
+def make_barriers(vmf: VMF):
     """Make barrier entities. get_tex is vbsp.get_tex."""
     glass_temp = template_brush.get_scaling_template(
         vbsp_options.get(str, "glass_template")
@@ -255,10 +256,8 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
 
         if barr_type is BarrierType.GLASS:
             front_temp = glass_temp
-            front_mat = get_tex('special.glass')
         elif barr_type is BarrierType.GRATING:
             front_temp = grate_temp
-            front_mat = get_tex('special.grating')
         else:
             raise NotImplementedError
 
@@ -311,7 +310,6 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
             normal,
             barr_type,
             front_temp,
-            front_mat,
             solid_pane_func,
         )
 
@@ -322,10 +320,8 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
 
         if barr_type is BarrierType.GLASS:
             front_temp = glass_temp
-            front_mat = get_tex('special.glass')
         elif barr_type is BarrierType.GRATING:
             front_temp = grate_temp
-            front_mat = get_tex('special.grating')
         else:
             raise NotImplementedError
 
@@ -358,7 +354,6 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
                 normal,
                 barr_type,
                 front_temp,
-                front_mat,
                 solid_pane_func,
             )
 
@@ -374,7 +369,6 @@ def make_glass_grating(
     normal: Vec,
     barr_type: BarrierType,
     front_temp: template_brush.ScalingTemplate,
-    front_mat: str,
     solid_func: Callable[[float, float, str], List[Solid]],
 ):
     """Make all the brushes needed for glass/grating.
@@ -382,11 +376,13 @@ def make_glass_grating(
     solid_func() is called with two offsets from the voxel edge, and returns a
     matching list of solids. This allows doing holes and normal panes with the
     same function.
+    barrier_type is either 'glass' or 'grating'.
     """
 
     if barr_type is BarrierType.GLASS:
         main_ent = vmf.create_ent('func_detail')
         player_clip_mat = consts.Tools.PLAYER_CLIP_GLASS
+        tex_cat = 'glass'
     else:
         player_clip_mat = consts.Tools.PLAYER_CLIP_GRATE
         main_ent = vmf.create_ent(
@@ -394,6 +390,7 @@ def make_glass_grating(
             renderfx=14,  # Constant Glow
             solidity=1,  # Never solid
         )
+        tex_cat = 'grating'
     # The actual glass/grating brush - 0.5-1 units back from the surface.
     main_ent.solids = solid_func(0.5, 1, consts.Tools.NODRAW)
 
@@ -401,7 +398,7 @@ def make_glass_grating(
     for face in main_ent.sides():
         f_normal = face.normal()
         if abs(f_normal) == abs_norm:
-            face.mat = front_mat
+            texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
             front_temp.apply(face, change_mat=False)
 
     if normal.z == 0:

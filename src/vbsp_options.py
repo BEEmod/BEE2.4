@@ -14,8 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 SETTINGS = {}
 
-# Overwritten by VBSP to get the actual values.
-ITEM_CONFIG = ConfigFile(None)
+ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
 
 
 class TYPE(Enum):
@@ -293,11 +292,15 @@ DEFAULTS = [
         """Remove the glass/grating info_lighting entities.
         This should be used when the border is made of brushes.
         """),
-    Opt('remove_pedestal_plat', False,
-        """Remove the PeTI-generated pedestal button platforms.
-        """),
     Opt('remove_exit_signs', False,
         """Remove the exit sign overlays for singleplayer.
+        """),
+
+    Opt('_tiling_template_', '__TILING_TEMPLATE__',
+        """Change the template used for generating brushwork. 
+        
+        If changing this use caution and only modify texture orientations.
+        DO NOT change brush shapes or positions!
         """),
 
     Opt('rotate_edge', False,
@@ -348,24 +351,12 @@ DEFAULTS = [
         """Set the stopping sound for Flip Panel brushes.
         """),
 
-    Opt('staticPan', TYPE.STR,
-        """Folder for static panels.
-
-        Instances follow the pattern `ang_type.vmf`,
-        where ang = (`00`, `30`, `45`, `60`, `90`) and type=(`glass`, `surf`).
+    Opt('static_pan_thickness', 2,
+        """Thickness of static angled panel brushes. 
+        
+        Must be either 2, 4 or 8.
         """),
-    Opt('static_pan_temp_flat', "BEE2_STATIC_PAN_FLAT",
-        """Template used for 0-degree static panels.
-
-        This should be a panel sticking slightly out of the surface.
-        """),
-    Opt('static_pan_temp_white', "BEE2_STATIC_PAN_ANGLED",
-        """Template used for angled portalable static panels.
-        """),
-    Opt('static_pan_temp_black', "BEE2_STATIC_PAN_ANGLED",
-        """Template used for angled non-portalable static panels.
-        """),
-    # If set,
+    # If set this is used.
     Opt('dynamic_pan_temp', TYPE.STR,
         """If set, replace panel func_brushes with this.
 
@@ -375,6 +366,15 @@ DEFAULTS = [
         """The local name that the panel func_brush should parent to.
         Adding the attachment name to the parent after a comma
         automatically sets the attachment point for the brush.
+        """),
+    Opt('dynamic_pan_thickness', 2,
+        """Thickness of moveable angled panel brushes. 
+        
+        Must be either 2, 4 or 8.
+        """),
+    Opt('dynamic_pan_nodraw', False,
+        """If set, apply nodraw to the side and bottom of dynamic 
+        angled panels.
         """),
 
     Opt('ind_pan_check_switching', 'custom',
@@ -547,9 +547,6 @@ DEFAULTS = [
     ######
     # The following are set by the BEE2.4 app automatically:
 
-    Opt('bee2_loc', TYPE.STR,
-        """(Automatic) The location of the BEE2 application.
-        """),
     Opt('game_id', "620",
         """(Automatic) The game's steam ID.
         """),

@@ -45,11 +45,13 @@ import template_brush
 import utils
 import comp_consts as const
 import instanceLocs
+from texturing import Portalable
 from srctools import (
     Property,
     Vec_tuple, Vec,
     Entity, Output, Solid, Side
 )
+
 
 COND_MOD_NAME = 'Main Conditions'
 
@@ -70,9 +72,6 @@ ALL_FLAGS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, E
 ALL_RESULTS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
 ALL_META = []  # type: List[Tuple[str, Decimal, Callable[[srctools.VMF], None]]]
 
-GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
-GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
-
 # A template shaped like embeddedVoxel blocks
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
@@ -86,12 +85,12 @@ class SWITCH_TYPE(Enum):
 
 
 # A dictionary mapping origins to their brushes
-solidGroup = NamedTuple('solidGroup', [
-    ('face', Side),
-    ('solid', Solid),
-    ('normal', Vec),  # The normal of the face.
-    ('color', template_brush.MAT_TYPES),
-])
+class solidGroup(NamedTuple):
+    face: Side
+    solid: Solid
+    normal: Vec  # The normal of the face.
+    color: Portalable
+
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
 
@@ -99,6 +98,8 @@ SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
 # For each item Id, the item class for it.
 CLASS_FOR_ITEM = {}  # type: Dict[str, consts.ItemClass]
+# For each item ID, the positions they embed.
+EMBED_OFFSETS: Dict[str, List[Vec]] = {}
 
 
 xp = Vec_tuple(1, 0, 0)
@@ -159,6 +160,8 @@ INST_ANGLE = {
 PETI_INST_ANGLE = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
+    zp: "0 0 0",
+    zn: "180 0 0",
 
     yn: "0 0 90",
     xp: "0 90 90",
@@ -383,13 +386,26 @@ def annotation_caller(
     # Double function to make a closure, to allow reference to the function
     # more directly.
     # Lambdas are expressions, so we can return the result directly.
-    return eval(
+    reorder_func = eval(
         '(lambda func: lambda {}: func({}))(func)'.format(
             ', '.join(inputs),
             ', '.join(outputs),
         ),
         {'func': func},
     )
+    # Add some introspection attributes to this generated function.
+    try:
+        reorder_func.__name__ = func.__name__
+        reorder_func.__qualname__ = func.__qualname__
+        reorder_func.__wrapped__ = func
+        reorder_func.__doc__ = '{0}({1}) -> {0}({2})'.format(
+            func.__name__,
+            ', '.join(inputs),
+            ', '.join(outputs),
+        )
+    except AttributeError:
+        pass
+    return reorder_func
 
 
 def add_meta(func, priority: Union[Decimal, int], only_once=True):
@@ -455,6 +471,13 @@ def make_flag(orig_name: str, *aliases: str):
 
 def make_result(orig_name: str, *aliases: str):
     """Decorator to add results to the lookup."""
+    folded_name = orig_name.casefold()
+    # Discard the original name from aliases, if it's also there.
+    aliases = tuple([
+        name for name in aliases
+        if name.casefold() != folded_name
+    ])
+
     def x(func):
         try:
             func.group = func.__globals__['COND_MOD_NAME']
@@ -466,7 +489,7 @@ def make_result(orig_name: str, *aliases: str):
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
-        RESULT_LOOKUP[orig_name.casefold()] = wrapper
+        RESULT_LOOKUP[folded_name] = wrapper
         for name in aliases:
             RESULT_LOOKUP[name.casefold()] = wrapper
         return func
@@ -617,29 +640,13 @@ def build_solid_dict() -> None:
     import vbsp
     mat_types = {}
     for mat in vbsp.BLACK_PAN:
-        mat_types[mat] = template_brush.MAT_TYPES.black
+        mat_types[mat] = Portalable.black
 
     for mat in vbsp.WHITE_PAN:
-        mat_types[mat] = template_brush.MAT_TYPES.white
+        mat_types[mat] = Portalable.white
 
     for solid in VMF.brushes:
         for face in solid:
-            if face.mat.casefold() in consts.Goo:
-                # Record all locations containing goo.
-                bbox_min, bbox_max = solid.get_bbox()
-                x = bbox_min.x + 64
-                y = bbox_min.y + 64
-                # If goo is multi-level, we want to record all pos!
-                for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
-                    GOO_LOCS[Vec_tuple(x, y, z)] = face
-
-                # Add the location of the top face
-                GOO_FACE_LOC[Vec_tuple(x, y, bbox_max.z)] = face
-
-                # Indicate that this map contains goo...
-                vbsp.settings['has_attr']['goo'] = True
-                continue
-
             try:
                 mat_type = mat_types[face.mat]
             except KeyError:
@@ -663,7 +670,10 @@ def build_solid_dict() -> None:
 
 
 def build_itemclass_dict(prop_block: Property):
-    """Load in the dictionary mapping item classes to item ids"""
+    """Load in the item ID database.
+
+    This maps item IDs to their item class, and their embed locations.
+    """
     for prop in prop_block.find_children('ItemClasses'):
         try:
             it_class = consts.ItemClass(prop.value)
@@ -673,6 +683,25 @@ def build_itemclass_dict(prop_block: Property):
 
         ITEMS_WITH_CLASS[it_class].append(prop.name)
         CLASS_FOR_ITEM[prop.name] = it_class
+
+    # Now load in the embed data.
+    for prop in prop_block.find_children('ItemEmbeds'):
+        if prop.name not in CLASS_FOR_ITEM:
+            LOGGER.warning('Unknown item ID with embeds "{}"!', prop.real_name)
+
+        vecs = EMBED_OFFSETS.setdefault(prop.name, [])
+        if ':' in prop.value:
+            first, last = prop.value.split(':')
+            bbox_min, bbox_max = Vec.bbox(Vec.from_str(first), Vec.from_str(last))
+            vecs.extend(Vec.iter_grid(bbox_min, bbox_max))
+        else:
+            vecs.append(Vec.from_str(prop.value))
+
+    LOGGER.info(
+        'Read {} item IDs, with {} embeds!',
+        len(ITEMS_WITH_CLASS),
+        len(EMBED_OFFSETS),
+    )
 
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
@@ -973,7 +1002,7 @@ def steal_from_brush(
         for face_id in
         additional
     }
-    new_ids = []  # type: List[str]
+    new_ids: Optional[List[str]] = []
 
     for brush in temp_brushes:
         for face in brush.sides:
@@ -1105,86 +1134,25 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     return offset
 
 
-def hollow_block(solid_group: solidGroup, remove_orig_face=False):
-    """Convert a solid into a embeddedVoxel-style block.
+def set_random_seed(inst: Entity, seed: str) -> None:
+    """Compute and set a random seed for a specific entity."""
+    import instance_traits   # Import loop...
 
-    The original brushes must be in the SOLIDS dict. They will be replaced.
-    This returns a dict mapping normals to the new solidGroups.
-    If remove_orig_face is true, the starting face will not be kept.
-    """
-    import vbsp
-    orig_solid = solid_group.solid  # type: Solid
-
-    bbox_min, bbox_max = orig_solid.get_bbox()
-    if (bbox_max - bbox_min) != (128, 128, 128):
-        # If it's not a full block, it's a embed block and we want to skip
-        # modifying this.
-        if remove_orig_face:
-            VMF.remove_brush(orig_solid)
-            del SOLIDS[solid_group.face.get_origin().as_tuple()]
-        return
-
-    VMF.remove_brush(orig_solid)
-
-    for face in orig_solid.sides:
-        if remove_orig_face and face is solid_group.face:
-            # Skip readding the original face, which removes it.
-            continue
-
-        solid_key = face.get_origin().as_tuple()
-
-        if face.mat.casefold() == 'tools/toolsnodraw' and face not in vbsp.IGNORED_FACES:
-            # If it's nodraw, we can skip it. If it's also in IGNORED_FACES
-            # though a condition has set it, so recreate it (it might be sealing
-            # the void behind a func_detail or model).
-            continue
-
-        # Remove this face from the solids list, and get the group.
-        face_group = SOLIDS.pop(solid_key, None)
-
-        normal = face.normal()
-
-        # Generate our new brush.
-        new_brushes = template_brush.import_template(
-            TEMP_EMBEDDED_VOXEL,
-            face.get_origin(),
-            # The normal Z is swapped...
-            normal.to_angle(),
-            force_type=template_brush.TEMP_TYPES.world,
-        ).world
-
-        # Texture the new brush..
-        for brush in new_brushes:  # type: Solid
-            for new_face in brush.sides:
-                # The SKIP brush is the surface, all the others are nodraw.
-                if new_face.mat.casefold() != 'tools/toolsskip':
-                    continue
-
-                # Overwrite all the properties, to make the new brush
-                # the same as the original.
-                new_face.mat = face.mat
-                new_face.uaxis = face.uaxis
-                new_face.vaxis = face.vaxis
-                new_face.planes = face.planes
-                new_face.ham_rot = 0
-
-                # Swap the two IDs - that way when the original face gets
-                # deleted the auto-set ID will vanish, leaving the original
-                # ID.
-                new_face.id, face.id = face.id, new_face.id
-
-                # Remove the new face, if the original wasn't in IGNORED_FACES.
-                if face not in vbsp.IGNORED_FACES:
-                    vbsp.IGNORED_FACES.remove(new_face)
-
-                # Make a new SolidGroup to match the face.
-                if face_group is not None:
-                    SOLIDS[solid_key] = solidGroup(
-                        new_face,
-                        brush,
-                        face_group.normal,
-                        face_group.color,
-                    )
+    name = inst['targetname']
+    # The global instances like elevators always get the same name, or
+    # none at all so we cannot use those for the seed. Instead use the global
+    # seed.
+    if name == '' or 'preplaced' in instance_traits.get(inst):
+        import vbsp
+        random.seed('{}{}{}{}'.format(
+            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
+        ))
+    else:
+        # We still need to use angles and origin, since things like
+        # fizzlers might not get unique names.
+        random.seed('{}{}{}{}'.format(
+            inst['targetname'], seed, inst['origin'], inst['angles']
+        ))
 
 
 @make_flag('debug')
@@ -1338,9 +1306,14 @@ def res_switch_setup(res: Property):
     flag = None
     method = SWITCH_TYPE.FIRST
     cases = []
+    default = []
+    rand_seed = ''
     for prop in res:
         if prop.has_children():
-            cases.append(prop)
+            if prop.name == '<default>':
+                default.append(prop)
+            else:
+                cases.append(prop)
         else:
             if prop.name == 'flag':
                 flag = prop.value
@@ -1350,8 +1323,10 @@ def res_switch_setup(res: Property):
                     method = SWITCH_TYPE(prop.value.casefold())
                 except ValueError:
                     pass
+            elif prop.name == 'seed':
+                rand_seed = prop.value
 
-    for prop in cases:
+    for prop in itertools.chain(cases, default):
         for result in prop.value:
             Condition.setup_result(
                 prop.value,
@@ -1365,7 +1340,9 @@ def res_switch_setup(res: Property):
     return (
         flag,
         cases,
+        default,
         method,
+        rand_seed,
     )
 
 
@@ -1375,16 +1352,21 @@ def res_switch(inst: Entity, res: Property):
 
     'method' is the way the search is done - first, last, random, or all.
     'flag' is the name of the flag.
+    'seed' sets the randomisation seed for this block, for the random mode.
     Each property group is a case to check - the property name is the flag
     argument, and the contents are the results to execute in that case.
+    The special group "<default>" is only run if no other flag is valid.
     For 'random' mode, you can omit the flag to choose from all objects. In
     this case the flag arguments are ignored.
     """
-    flag_name, cases, method = res.value
+    flag_name, cases, default, method, rand_seed = res.value
 
     if method is SWITCH_TYPE.RANDOM:
         cases = cases[:]
+        set_random_seed(inst, rand_seed)
         random.shuffle(cases)
+
+    run_case = False
 
     for case in cases:
         if flag_name is not None:
@@ -1393,9 +1375,13 @@ def res_switch(inst: Entity, res: Property):
                 continue
         for res in case:
             Condition.test_result(inst, res)
+        run_case = True
         if method is not SWITCH_TYPE.ALL:
             # All does them all, otherwise we quit now.
             break
+    if not run_case:
+        for res in default:
+            Condition.test_result(inst, res)
 
 
 @make_result_setup('staticPiston')

@@ -1,15 +1,22 @@
 import math
+from typing import Tuple, Dict, Callable, Set
 
 from conditions import (
     make_flag, make_result, resolve_offset,
-    DIRECTIONS, SOLIDS,
+    DIRECTIONS,
 )
+import tiling
 import brushLoc
-from srctools import Vec, Entity, Property, VMF
-import srctools
+from srctools import Vec, Entity, Property
+from srctools.logger import get_logger
+
 
 COND_MOD_NAME = 'Positioning'
+LOGGER = get_logger(__name__, alias='cond.positioning')
 
+# Predicates for tiles.
+# We optimise to a lookup table.
+TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
 
 @make_flag(
     'rotation',
@@ -26,7 +33,7 @@ def flag_angles(inst: Entity, flag: Property):
     The value should be either just the angle to check, or a block of
     options:
 
-    - `Angle`: A unit vector (XYZ value) pointing in a direction, or some
+    - `direction`: A unit vector (XYZ value) pointing in a direction, or some
         keywords: `+z`, `-y`, `N`/`S`/`E`/`W`, `up`/`down`, `floor`/`ceiling`, or `walls` for any wall side.
     - `From_dir`: The direction the unrotated instance is pointed in.
         This lets the flag check multiple directions.
@@ -42,7 +49,7 @@ def flag_angles(inst: Entity, flag: Property):
             from_dir = Vec(DIRECTIONS[from_dir.casefold()])
         else:
             from_dir = Vec.from_str(from_dir, 0, 0, 1)
-        allow_inverse = srctools.conv_bool(flag['allow_inverse', '0'])
+        allow_inverse = flag.bool('allow_inverse')
     else:
         targ_angle = flag.value
         from_dir = Vec(0, 0, 1)
@@ -64,68 +71,243 @@ def flag_angles(inst: Entity, flag: Property):
         )
 
 
-@make_flag('posIsSolid')
-def flag_brush_at_loc(vmf: VMF, inst: Entity, flag: Property):
-    """Checks to see if a wall is present at the given location.
+def brush_at_loc(
+    inst: Entity,
+    props: Property,
+) -> Tuple[tiling.TileType, bool, Set[tiling.TileType]]:
+    """Common code for posIsSolid and ReadSurfType.
 
-    - `Pos` is the position of the brush, where `0 0 0` is the floor-position
-       of the brush.
-    - `Dir` is the normal the face is pointing. `(0 0 -1)` is up.
-    - `Type` defines the type the brush must be:
-      - `Any` requires either a black or white brush.
-      - `None` means that no brush must be present.
-      - `White` requires a portalable surface.
-      - `Black` requires a non-portalable surface.
-    - `SetVar` defines an instvar which will be given a value of `black`,
-      `white` or `none` to allow the result to be reused.
-    - If `gridPos` is true, the position will be snapped so it aligns with
-      the 128 grid (Useful with fizzler/light strip items).
-    - `RemoveBrush`: If set to `1`, the brush will be removed if found.
-      Only do this to `EmbedFace` brushes, since it will remove the other
-      sides as well.
+    This returns the average tiletype, if both colors were found,
+    and a set of all types found.
     """
-    pos = Vec.from_str(flag['pos', '0 0 0'])
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+
+    # Allow using pos1 instead, to match pos2.
+    pos = props.vec('pos1' if 'pos1' in props else 'pos')
     pos.z -= 64  # Subtract so origin is the floor-position
-    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
 
-    # Relative to the instance origin
-    pos += Vec.from_str(inst['origin', '0 0 0'])
+    pos.localise(origin, angles)
 
-    norm = flag['dir', None]
-    if norm is not None:
-        norm = Vec.from_str(norm).rotate_by_str(
-            inst['angles', '0 0 0'],
-        )
+    norm = props.vec('dir', 0, 0, 1).rotate(*angles)
 
-    if srctools.conv_bool(flag['gridpos', '0']) and norm is not None:
+    if props.bool('gridpos') and norm is not None:
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
             # those are already fine.
             if norm[axis] == 0:
                 pos[axis] = pos[axis] // 128 * 128 + 64
 
-    result_var = flag['setVar', '']
-    should_remove = srctools.conv_bool(flag['RemoveBrush', False], False)
-    des_type = flag['type', 'any'].casefold()
+    result_var = props['setVar', '']
+    # RemoveBrush is the pre-tiling name.
+    should_remove = props.bool('RemoveTile', props.bool('RemoveBrush', False))
 
-    brush = SOLIDS.get(pos.as_tuple(), None)
+    tile_types: Set[tiling.TileType] = set()
+    both_colors = False
 
-    if brush is None or (norm is not None and abs(brush.normal) != abs(norm)):
-        br_type = 'none'
+    if 'pos2' in props:
+        pos2 = props.vec('pos2')
+        pos2.z -= 64  # Subtract so origin is the floor-position
+        pos2.localise(origin, angles)
+
+        bbox_min, bbox_max = Vec.bbox(pos, pos2)
+
+        white_count = black_count = 0
+
+        for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
+            try:
+                tiledef, u, v = tiling.find_tile(pos, norm)
+            except KeyError:
+                continue
+
+            tile_type = tiledef[u, v]
+            tile_types.add(tile_type)
+            if should_remove:
+                tiledef[u, v] = tiling.TileType.VOID
+            if tile_type.is_tile:
+                if tile_type.color is tiling.Portalable.WHITE:
+                    white_count += 1
+                else:
+                    black_count += 1
+
+        both_colors = white_count > 0 and black_count > 0
+
+        if white_count == black_count == 0:
+            tile_type = tiling.TileType.VOID
+            tile_types.add(tiling.TileType.VOID)
+        elif white_count > black_count:
+            tile_type = tiling.TileType.WHITE
+        else:
+            tile_type = tiling.TileType.BLACK
     else:
-        br_type = str(brush.color)
-        if should_remove:
-            vmf.remove_brush(
-                brush.solid,
-            )
+        # Single tile.
+        try:
+            tiledef, u, v = tiling.find_tile(pos, norm)
+        except KeyError:
+            tile_type = tiling.TileType.VOID
+        else:
+            tile_type = tiledef[u, v]
+            if should_remove:
+                tiledef[u, v] = tiling.TileType.VOID
+        tile_types.add(tile_type)
 
     if result_var:
-        inst.fixup[result_var] = br_type
+        if tile_type.is_tile:
+            # Don't distinguish between 4x4, goo sides
+            inst.fixup[result_var] = tile_type.color.value
+        elif tile_type is tiling.TileType.VOID:
+            inst.fixup[result_var] = 'none'
+        else:
+            inst.fixup[result_var] = tile_type.name.casefold()
 
-    if des_type == 'any' and br_type != 'none':
-        return True
+    return tile_type, both_colors, tile_types
 
-    return des_type == br_type
+
+@make_flag('posIsSolid')
+def flag_brush_at_loc(inst: Entity, flag: Property):
+    """Checks to see if a tile is present at the given location.
+
+    - `Pos` is the position of the tile, where `0 0 0` is the floor-position
+       of the brush.
+    - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
+    - `Pos2`: If set, checks all the tiles in a bounding box.
+    - `Type` defines the type the brush must be:
+        - `Any` requires some sort of surface.
+        - `Tile` allows a black/white tile of some kind.
+        - `None` means that no surface must be present.
+        - `White` requires a portalable surface.
+        - `Black` requires a non-portalable surface.
+        - `4x4` requires a tile that forces the 4x4 size.
+        - `1x1` requires a tile that does not force a size.
+    - `Mode` specifies how the check is done, if `Pos2` is provided:
+        - `avg`/`average` (default): The tiles will be averaged together.
+        if there is an equal number of white/black tiles, black wins.
+        - `and`: The check must pass on all tiles.
+        - `or`: The check must pass on any tile.
+        - `same`: Checks to see if all tiles are the same. `Type` is ignored.
+        - `diff`/`different`: Checks to see if there are multiple tile types.
+          `Type` is ignored.
+    - `SetVar` defines an instvar which will be given a value of `black`,
+      `white` or `none` depending on the average colour of tiles.
+    - If `gridPos` is true, the position will be snapped so it aligns with
+      the 128 grid (Useful with fizzler/light strip items).
+    - `RemoveTile`: If set to `1`, the tile will be removed if found.
+    """
+    avg_type, both_colors, tile_types = brush_at_loc(inst, flag)
+
+    if 'pos2' not in flag:  # Others are useless.
+        mode = 'avg'
+    else:
+        mode = flag['mode', 'avg'].casefold()
+
+    if mode in ('same', 'diff', 'different'):
+        # These don't need 'type', force the value so it can't error out.
+        des_type = 'any'
+    else:
+        des_type = flag['type', 'any'].casefold()
+
+    if des_type in ('same', 'diff', 'different'):
+        LOGGER.warning(
+            'Using type={} in posIsSolid is deprecated, put this in mode!',
+            des_type,
+        )
+        # Modify the properties, so it doesn't happen again.
+        mode = flag['mode'] = des_type
+        des_type = 'any'
+        del flag['type']
+
+    try:
+        tile_pred = TILE_PREDICATES[des_type]
+    except KeyError:
+        LOGGER.warning(
+            'Unknown tile type "{}" for posIsSolid command!',
+            des_type
+        )
+        return False
+
+    if mode in ('diff', 'different'):
+        return both_colors
+    elif mode == 'same':
+        return not both_colors and all(tile.is_tile for tile in tile_types)
+    elif mode == 'and':
+        return all(tile in tile_pred for tile in tile_types)
+    elif mode == 'or':
+        return any(tile in tile_pred for tile in tile_types)
+    elif mode == 'avg':
+        return avg_type in tile_pred
+
+    LOGGER.warning(
+        'Unknown check mode "{}" for posIsSolid command!'
+    )
+    return False
+
+
+def _fill_predicates() -> None:
+    """Set TILE_PREDICATES."""
+    WHITE = tiling.Portalable.WHITE
+    BLACK = tiling.Portalable.BLACK
+    TILE_4x4 = tiling.TileSize.TILE_4x4
+    TILE_1x1 = tiling.TileSize.TILE_1x1
+
+    def pred_any(tile: tiling.TileType) -> bool:
+        """Any kind of surface."""
+        return tile is not tiling.TileType.VOID
+
+    def pred_none(tile: tiling.TileType) -> bool:
+        """No surface present."""
+        return tile is tiling.TileType.VOID
+
+    def pred_tile(tile: tiling.TileType) -> bool:
+        """A solid black/white tile."""
+        return tile.is_tile
+
+    def pred_white(tile: tiling.TileType) -> bool:
+        """A portal surface."""
+        return tile.is_tile and tile.color is WHITE
+
+    def pred_black(tile: tiling.TileType) -> bool:
+        """A non-portal surface."""
+        return tile.is_tile and tile.color is BLACK
+
+    def pred_1x1(tile: tiling.TileType) -> bool:
+        """A tile which produces an unrestricted surface."""
+        return tile.is_tile and tile.tile_size is TILE_1x1
+
+    def pred_4x4(tile: tiling.TileType) -> bool:
+        """A tile that forces a 4x4 size."""
+        return tile.is_tile and tile.tile_size is TILE_4x4
+
+    for name, func in list(locals().items()):
+        if name.startswith('pred_'):
+            # Collapse it down into a lookup table.
+            TILE_PREDICATES[name[5:]] = set(filter(
+                func, tiling.TileType.__members__.values()
+            ))
+
+
+_fill_predicates()
+del _fill_predicates
+
+
+@make_result('ReadSurfType')
+def res_brush_at_loc(inst: Entity, res: Property):
+    """Read the type of surface at a particular location.
+
+    - `Pos` is the position of the tile, where `0 0 0` is the floor-position
+       of the brush.
+    - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
+    - `Pos2`: If set, causes the check to average the tiles in a bounding box.
+      If no tiles are present they're treated as a lack of them.
+      Otherwise the dominant colour wins, with ties treated as black.
+    - `ResultVar` is the variable which is set. This will be set to
+      `black`, `white` or `none` depending on the average colour of tiles.
+    - If `gridPos` is true, the position will be snapped so it aligns with
+      the 128 grid (Useful with fizzler/light strip items).
+    - `RemoveTile`: If set to `1`, the tile will be removed if found.
+    """
+    # Alias PosIsSolid to also be a result, for using the variable mode by itself.
+    res['setVar'] = res['resultVar']
+    brush_at_loc(inst, res)
 
 
 @make_flag('PosIsGoo')
@@ -145,7 +327,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
 
     If the value is single value, that should be the type.
     Otherwise, the value should be a block with 'offset' and 'type' values.
-    The offset is in block increments, with 0 0 0 equal to the mounting surface.
+    The offset is in block increments, with 0 0 0 equal to the mounting voxel.
     If 'offset2' is also provided, all positions in the bounding box will
     be checked.
 
@@ -173,7 +355,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
         pos1 = resolve_offset(inst, flag['offset', '0 0 0'], scale=128, zoff=-128)
         types = flag['type'].split()
         if 'offset2' in flag:
-            pos2 = resolve_offset(inst, flag.value, scale=128, zoff=-128)
+            pos2 = resolve_offset(inst, flag['offset2', '0 0 0'], scale=128, zoff=-128)
     else:
         types = flag.value.split()
         pos1 = Vec()

@@ -653,6 +653,8 @@ def load_packages(data):
         readonly_desc=_('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
+        none_icon='BEE2/random.png',
+        none_name=_('Random'),
         none_desc=_('Choose a random video.'),
         callback=win_callback,
         callback_params=['Elevator'],

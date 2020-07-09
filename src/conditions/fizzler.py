@@ -47,8 +47,11 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     that represent the ends of the fizzler.
     * `up_axis` should be set to a normal vector pointing in the new 'upward'
     direction.
-    * `default` is the ID of a fizzler type which should be used if no outputs
-    are present.
+    * If none are connected, a regular fizzler will be synthesized.
+
+    The following fixup vars will be set to allow the shape to match the fizzler:
+
+    * `$uses_nodraw` will be 1 if the fizzler nodraws surfaces behind it.
     """
     shape_name = shape_inst['targetname']
     shape_item = connections.ITEMS.pop(shape_name)
@@ -65,6 +68,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             continue
         fizz.emitters.clear()  # Remove old positions.
         fizz.up_axis = up_axis
+        fizz.base_inst['origin'] = shape_inst['origin']
+        fizz.base_inst['angles'] = shape_inst['angles']
         break
     else:
         # No fizzler, so generate a default.
@@ -75,6 +80,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             targetname=shape_name,
             classname='func_instance',
             origin=shape_inst['origin'],
+            angles=shape_inst['angles'],
             file=resolve_inst('<ITEM_BARRIER_HAZARD:fizz_base>'),
         )
         base_inst.fixup.update(shape_inst.fixup)
@@ -95,19 +101,23 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     # Detach this connection and remove traces of it.
     for conn in list(shape_item.outputs):
         conn.remove()
-    for coll in [shape_item.antlines, shape_item.ind_panels, shape_item.shape_signs]:
-        for ent in coll:
-            ent.remove()
-        coll.clear()
 
+    # Transfer the inputs from us to the fizzler.
     for inp in list(shape_item.inputs):
         inp.to_item = fizz_item
+
+    shape_item.delete_antlines()
 
     fizz_base = fizz.base_inst
     fizz_base['origin'] = shape_inst['origin']
     origin = Vec.from_str(shape_inst['origin'])
 
     fizz.has_cust_position = True
+    # Since the fizzler is moved elsewhere, it's the responsibility of
+    # the new item to have holes.
+    fizz.embedded = False
+    # So tell it whether or not it needs to do so.
+    shape_inst.fixup['$uses_nodraw'] = fizz.fizz_type.nodraw_behind
 
     for seg_prop in res.find_all('Segment'):
         vec1, vec2 = seg_prop.value.split(';')

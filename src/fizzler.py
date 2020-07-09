@@ -9,14 +9,17 @@ from enum import Enum
 import conditions
 import connections
 import packing
+import texturing
 import utils
 import vbsp_options
 import srctools.logger
+import srctools.vmf
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
 import comp_consts as const
 import instance_traits
 import instanceLocs
 import template_brush
+import tiling
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -167,6 +170,7 @@ class FizzlerType:
         pack_lists_static: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
+        nodraw_behind: bool,
         brushes: List['FizzlerBrush'],
         beams: List['FizzBeam'],
         inst: Dict[Tuple[FizzInst, bool], List[str]],
@@ -201,6 +205,10 @@ class FizzlerType:
         # Instances to use - FizzInst, is_static -> list of instances.
         self.inst = inst
 
+        # If set, nodraw the 128x32 area behind the fizzler - to allow
+        # the Clean model to stick through.
+        self.nodraw_behind = nodraw_behind
+
         # If set, add a brush ent using templates.
         self.temp_single = temp_single
         self.temp_max = temp_max
@@ -228,7 +236,7 @@ class FizzlerType:
             # We can't rename without a local name.
             model_name_type = ModelName.SAME
 
-        inst = {}
+        inst: Dict[Tuple[FizzInst, bool], List[str]] = {}
         for inst_type, is_static in itertools.product(FizzInst, (False, True)):
             inst_type_name = inst_type.value + ('_static' if is_static else '')
             inst[inst_type, is_static] = instances = [
@@ -249,9 +257,6 @@ class FizzlerType:
             # We do False, True so it's already been calculated.
             if not instances and is_static:
                 inst[inst_type, True] = inst[inst_type, False]
-
-        if not inst[FizzInst.BASE, False]:
-            LOGGER.warning('No base instance set! for "{}"!', fizz_id)
 
         voice_attrs = []
         for prop in conf.find_all('Has'):
@@ -319,6 +324,7 @@ class FizzlerType:
             pack_lists_static,
             model_local_name,
             model_name_type,
+            conf.bool('nodraw_behind'),
             brushes,
             beams,
             inst,
@@ -343,7 +349,10 @@ class Fizzler:
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
         self.emitters = emitters  # Pairs of left, right positions.
 
-        self.has_cust_position = False  # If the emitters are a custom layout.
+        self.has_cust_position = False  # If the emitters are a custom layout
+        # True if the fizzler is in the original position, and so we need
+        # to adjust tiles for the sides.
+        self.embedded = True
 
         # Special case - for TAG fizzlers, if that side is enabled.
         # We generate the triggers elsewhere.
@@ -423,6 +432,154 @@ class Fizzler:
                 mat=const.Tools.TRIGGER,
             ).solid)
 
+    def set_tiles_behind_models(self, origin: Vec, normal: Vec, to_nodraw: bool):
+        """Set the tile surface behind a model to specific values.
+
+        position is the center-point on the wall.
+        normal is the direction out of the model.
+        If to_nodraw is true, set to nodraw. Otherwise, set to 4x4 if grid aligned.
+        """
+        up_axis = self.up_axis.axis()
+        u_axis, v_axis = Vec.INV_AXIS[normal.axis()]
+
+        if origin % 64 == (0, 0, 0):
+            # Aligned with the 64-grid - it's centered in the tile.
+            # That means we need to set special values.
+
+            # Don't bother if not nodrawing.
+            if not to_nodraw:
+                return
+
+            tile = tiling.TILES[
+                (origin - 64 * normal).as_tuple(),
+                normal.as_tuple()
+            ]  # type: tiling.TileDef
+
+            # Reversed?
+            if up_axis == u_axis:
+                tile.set_fizz_orient('v')
+            elif up_axis == v_axis:
+                tile.set_fizz_orient('u')  # type: ignore
+            else:
+                LOGGER.error(
+                    'Not U or V?: {} @ {} ("{}")',
+                    origin,
+                    normal,
+                    self.base_inst['targetname'],
+                )
+        elif to_nodraw:
+            # Side-aligned, we just edit quarter-tiles.
+            for off in [-48, -16, 16, 48]:
+                tiling.edit_quarter_tile(
+                    origin + Vec.with_axes(up_axis, off),
+                    normal,
+                    tiling.TileType.NODRAW,
+                )
+        else:
+            # Swap surfaces to 4x4 sizes.
+            for off in [-48, -16, 16, 48]:
+                try:
+                    tile, u, v = tiling.find_tile(
+                        origin + Vec.with_axes(up_axis, off),
+                        normal,
+                    )
+                except KeyError:
+                    continue
+                orig = tile[u, v]
+                if orig.is_tile and not orig.is_4x4:
+                    tile[u, v] = tiling.TileType.with_color_and_size(
+                        tiling.TileSize.TILE_4x4,
+                        orig.color,
+                    )
+
+    def _gen_fizz_border(self, vmf: VMF, seg_min: Vec, seg_max: Vec):
+        """Generate borders above/below fizzlers."""
+        up = abs(self.up_axis)
+        forward = (seg_max - seg_min).norm()
+        norm_dir = self.normal().axis()
+
+        tiledefs_up: List[tiling.TileDef] = []
+        tiledefs_dn: List[tiling.TileDef] = []
+
+        overlay_len = int((seg_max - seg_min).mag())
+
+        # We need to snap the axis normal_axis to the grid, since it could
+        # be forward or back.
+        min_pos = seg_min.copy()
+        min_pos[norm_dir] = min_pos[norm_dir] // 128 * 128 + 64
+
+        for offset in range(64, overlay_len, 128):
+            # Each position on top or bottom, inset 64 from each end
+            pos = min_pos + offset * forward
+            try:
+                top_tile = tiling.TILES[
+                    (pos + 128 * up).as_tuple(),
+                    (-up).as_tuple()
+                ]
+            except KeyError:
+                pass
+            else:
+                if any(tile.is_tile for u, v, tile in top_tile):
+                    tiledefs_up.append(top_tile)
+            try:
+                btm_tile = tiling.TILES[
+                    (pos - 128 * up).as_tuple(),
+                    up.as_tuple()
+                ]
+            except KeyError:
+                pass
+            else:
+                if any(tile.is_tile for u, v, tile in btm_tile):
+                    tiledefs_dn.append(btm_tile)
+
+        if not tiledefs_up and not tiledefs_dn:
+            return
+
+        overlay_thickness = vbsp_options.get(int, 'fizz_border_thickness')
+        overlay_repeat = vbsp_options.get(int, 'fizz_border_repeat')
+        flip_uv = vbsp_options.get(bool, 'fizz_border_vertical')
+
+        if flip_uv:
+            u_rep = 1.0
+            v_rep = overlay_len / overlay_repeat
+        else:
+            u_rep = overlay_len / overlay_repeat
+            v_rep = 1.0
+
+        cent_pos = (seg_min + seg_max) / 2
+
+        if tiledefs_up:
+            over = srctools.vmf.make_overlay(
+                vmf,
+                normal=-up,
+                origin=cent_pos,
+                uax=forward * overlay_len,
+                vax=Vec.cross(up, forward) * overlay_thickness,
+                material=texturing.SPECIAL.get(cent_pos + up, 'fizz_border'),
+                surfaces=[],
+                u_repeat=u_rep,
+                v_repeat=v_rep,
+                swap=flip_uv,
+            )
+            for tile in tiledefs_up:
+                tile.bind_overlay(over)
+
+        if tiledefs_dn:
+            over = srctools.vmf.make_overlay(
+                vmf,
+                normal=up,
+                origin=cent_pos,
+                uax=forward * overlay_len,
+                vax=Vec.cross(-up, forward) * overlay_thickness,
+                material=texturing.SPECIAL.get(cent_pos + up, 'fizz_border'),
+                surfaces=[],
+                u_repeat=u_rep,
+                v_repeat=v_rep,
+                swap=flip_uv,
+            )
+            for tile in tiledefs_dn:
+                tile.bind_overlay(over)
+
 
 class FizzlerBrush:
     """A brush-set used in a fizzler."""
@@ -471,7 +628,7 @@ class FizzlerBrush:
         self.mat_mod_var = mat_mod_var
         self.mat_mod_name = mat_mod_name
 
-        self.textures = {}
+        self.textures = {}  # type: Dict[TexGroup, Optional[str]]
         for group in TexGroup:
             self.textures[group] = textures.get(group, None)
 
@@ -565,7 +722,7 @@ class FizzlerBrush:
         neg: Vec,
         pos: Vec,
         used_tex_func: Callable[[str], None],
-    ) -> List[Solid]:
+    ) -> Iterator[Solid]:
         """Generate the actual brush.
 
         used_tex will be filled with the textures used.
@@ -593,7 +750,8 @@ class FizzlerBrush:
             # Fizzlers are larger resolution..
             tex_size = FIZZLER_TEX_SIZE
 
-        if (field_length == 128 and not short_tex) or trigger_tex or fitted_tex:
+        # Treat 127.9999 as 128, etc.
+        if (round(field_length) == 128 and short_tex) or trigger_tex or fitted_tex:
             # We need only one brush.
             brush = vmf.make_prism(
                 p1=(origin
@@ -645,7 +803,7 @@ class FizzlerBrush:
                         side.uaxis.scale = 0.25
         else:
             # Generate the three brushes for fizzlers.
-            if field_length <= 128:
+            if round(field_length) <= 128:
                 side_len = field_length / 2
                 center_len = 0
             else:
@@ -711,7 +869,7 @@ class FizzlerBrush:
                 ]
 
             for brush, model_normal, brush_length in brushes:
-                for side in brush.sides:  # type: Side
+                for side in brush.sides:
                     side_norm = side.normal()
                     if abs(side_norm) == abs(fizz.up_axis):
                         self._side_color(side, normal, neg, used_tex_func)
@@ -760,6 +918,7 @@ class FizzlerBrush:
                                 TexGroup.LEFT
                             ]
                     used_tex_func(side.mat)
+
 
     def _texture_fit(
         self,
@@ -975,6 +1134,8 @@ def generate_fizzlers(vmf: VMF):
     """
     from vbsp import MAP_RAND_SEED
 
+    has_fizz_border = 'fizz_border' in texturing.SPECIAL
+
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
             continue   # The fizzler was removed from the map.
@@ -985,6 +1146,7 @@ def generate_fizzlers(vmf: VMF):
         # Static versions are only used for fizzlers which start on.
         # Permanently-off fizzlers are kinda useless, so we don't need
         # to bother optimising for it.
+        # TODO: This needs to use connections to correctly check this.
         is_static = bool(
             fizz.base_inst.fixup.int('$connectioncount', 0) == 0
             and fizz.base_inst.fixup.bool('$start_enabled', 1)
@@ -1157,6 +1319,13 @@ def generate_fizzlers(vmf: VMF):
             min_inst.fixup.update(fizz.base_inst.fixup)
             instance_traits.get(min_inst).update(fizz_traits)
 
+            if has_fizz_border:
+                fizz._gen_fizz_border(vmf, seg_min, seg_max)
+
+            if fizz.embedded:
+                fizz.set_tiles_behind_models(seg_min, forward, fizz_type.nodraw_behind)
+                fizz.set_tiles_behind_models(seg_max, -forward, fizz_type.nodraw_behind)
+
             if fizz_type.inst[FizzInst.GRID, is_static]:
                 # Generate one instance for each position.
 
@@ -1282,6 +1451,8 @@ def generate_fizzlers(vmf: VMF):
                     )
                 )
 
+        # We have a trigger_hurt in this fizzler, potentially generate
+        # the flinching logic.
         if trigger_hurt_name:
             fizz.gen_flinch_trigs(
                 vmf,
@@ -1289,10 +1460,13 @@ def generate_fizzlers(vmf: VMF):
                 trigger_hurt_start_disabled,
             )
 
-        # If we have the config, but no templates used anywhere...
+        # If we have the config, but no templates used anywhere in this brush,
+        # remove the empty brush entity.
         if template_brush_ent is not None and not template_brush_ent.solids:
             template_brush_ent.remove()
 
+        # Generate the material modify controls.
+        # One is needed for each texture used on the brush, unfortunately.
         for brush_type, used_tex in mat_mod_tex.items():
             brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
             mat_mod_name = conditions.local_name(fizz.base_inst, brush_type.mat_mod_name)
