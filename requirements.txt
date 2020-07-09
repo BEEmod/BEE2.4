@@ -1,0 +1,9 @@
+srctools==1.2.0
+aenum==2.1.2
+importlib-resources==1.0.1
+Markdown==3.2.1
+Pillow==6.0.0
+pyglet==1.5.7
+PyInstaller==3.5
+typing==3.7.4.1
+typing-extensions==3.7.4
