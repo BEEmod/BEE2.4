@@ -4,13 +4,14 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
+import os
 from tkinter import Event
 from typing import IO, Optional, Callable, Union, Dict
 
 import utils
 
 from tk_tools import TK_ROOT
-from srctools.filesys import FileSystemChain, FileSystem
+from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
 import srctools.logger
 
 __all__ = [
@@ -83,7 +84,9 @@ except ImportError:
 else:
     # Was able to load Pyglet.
     from pyglet.media.codecs import Source
-    from pyglet.media.exceptions import MediaDecodeException, CannotSeekException
+    from pyglet.media.exceptions import (
+        MediaDecodeException, MediaFormatException, CannotSeekException,
+    )
     from pyglet.clock import tick
     initiallised = True
     _play_repeat_sfx = True
@@ -204,12 +207,23 @@ else:
                     LOGGER.error('Sound sample not found: "{}"', self.cur_file)
                     return  # Abort if music isn't found..
 
-                self._cur_sys = self.system.get_system(file)
-                self._cur_sys.open_ref()
-                self._handle = file.open_bin()
+                child_sys = self.system.get_system(file)
+                # Special case raw filesystems - Pyglet is more efficient
+                # if it can just open the file itself.
+                if isinstance(child_sys, RawFileSystem):
+                    load_path = os.path.join(child_sys.path, file.path)
+                    self._cur_sys = self._handle = None
+                    LOGGER.debug('Loading music directly from {!r}', load_path)
+                else:
+                    # Use the file objects directly.
+                    load_path = self.cur_file
+                    self._cur_sys = child_sys
+                    self._cur_sys.open_ref()
+                    self._handle = file.open_bin()
+                    LOGGER.debug('Loading music via {!r}', self._handle)
                 try:
-                    sound = pyglet.media.load(self.cur_file, self._handle)
-                except MediaDecodeException:
+                    sound = pyglet.media.load(load_path, self._handle)
+                except (MediaDecodeException, MediaFormatException):
                     self.stop_callback()
                     LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
                     return  # Abort if music isn't found..
