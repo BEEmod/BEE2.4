@@ -129,14 +129,15 @@ COUNT_CATEGORIES = [
         _("Entities are the things in the map that have functionality. Removing "
           "complex moving items will help reduce this. Items have their entity "
           "count listed in the item description window.\n\n"
-          "This isn't totally accurate, some entity types are counted here "
-          "but don't affect the ingame limit. "),
+          "This isn't completely accurate, some entity types are counted here "
+          "but don't affect the ingame limit, while others may generate additional "
+          "entities at runtime."),
     ),
     (
         count_overlay, 'overlay', 512,
         # i18n: Progress bar description
         _("Overlays are smaller images affixed to surfaces, like signs or "
-          "indicator lights. Hiding long antlines or setting them to signage "
+          "indicator lights. Hiding complex antlines or setting them to signage "
           "will reduce this.")
     ),
 ]
@@ -654,7 +655,7 @@ def make_comp_widgets(frame: ttk.Frame):
     add_tooltip(
         UI['light_full'],
         _("Compile with high-quality lighting. This looks correct, "
-          "but takes longer to compute. Use if you're arranging lights. "
+          "but takes longer to compute. Use if you're arranging lights.\n"
           "When publishing, this is always used.")
     )
 
@@ -823,13 +824,11 @@ def make_map_widgets(frame: ttk.Frame):
     add_tooltip(
         UI['elev_elevator'],
         _("When previewing in SP, spawn inside the entry elevator. "
-          "This also disables the map restarts when you reach the "
-          "exit door. Use this to examine the entry and exit corridors.")
+          "Use this to examine the entry and exit corridors.")
     )
     add_tooltip(
         UI['elev_preview'],
-        _("When previewing in SP, spawn just before the entry door. "
-          "When you reach the exit door, the map will restart.")
+        _("When previewing in SP, spawn just before the entry door.")
     )
 
     corr_frame = ttk.LabelFrame(

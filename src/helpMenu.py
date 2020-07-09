@@ -40,7 +40,7 @@ SEPERATOR = object()
 
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
-DISCORD_SERVER = 'https://discord.gg/hnGFJrz'
+DISCORD_SERVER = 'https://discord.gg/EvC8Fku'
 MUSIC_CHANGER = 'https://beemmc.boards.net/'
 
 
