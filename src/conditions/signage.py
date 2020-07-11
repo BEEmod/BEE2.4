@@ -177,8 +177,10 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
                 brush_faces.append(face)
     else:
         # Direct on the surface.
+        # Find the grid pos first.
+        grid_pos = (origin // 128) * 128 + 64
         try:
-            tiledef, u, v = tiling.find_tile(origin + 64*normal, -normal)
+            tiledef = tiling.TILES[(grid_pos + 128*normal).as_tuple(), (-normal).as_tuple()]
         except KeyError:
             LOGGER.warning(
                 "Can't place signage at ({}) in ({}) direction!",
@@ -186,7 +188,6 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
                 normal,
                 exc_info=True,
             )
-            vmf.create_ent('info_particle_system', origin=origin, angles=normal.to_angle())
             return
 
     if sign_prim is not None:
