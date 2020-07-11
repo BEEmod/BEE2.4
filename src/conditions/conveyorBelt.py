@@ -143,8 +143,11 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         last_track['target'] = track_name.format(1) + '-track'
 
     # Generate an env_beam pointing from the start to the end of the track.
-    beam_keys = res.find_key('BeamKeys', [])
-    if beam_keys.value:
+    try:
+        beam_keys = res.find_key('BeamKeys')
+    except LookupError:
+        pass
+    else:
         beam = vmf.create_ent(classname='env_beam')
 
         beam_off = beam_keys.vec('origin', 0, 63, 56)
