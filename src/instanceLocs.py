@@ -269,10 +269,12 @@ def resolve(path: str, silent: bool=False) -> List[str]:
     """
     if silent:
         # Ignore messages < ERROR (warning and info)
+        log_level = LOGGER.level
         LOGGER.setLevel(logging.ERROR)
-        val = _resolve(path)
-        LOGGER.setLevel(logging.NOTSET)
-        return val
+        try:
+            return _resolve(path)
+        finally:
+            LOGGER.setLevel(log_level)
     else:
         return _resolve(path)
 
