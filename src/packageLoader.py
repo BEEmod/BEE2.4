@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-all_obj = {}
+all_obj: Dict[str, Dict[str, 'ObjData']] = {}
 packages: Dict[str, 'Package'] = {}
 OBJ_TYPES: Dict[str, 'ObjType'] = {}
 
@@ -3321,7 +3321,7 @@ class BrushTemplate(PakObject, has_img=False, allow_mult=True):
             conf_auto_visgroup = is_scaling = False
             if not temp_id:
                 raise ValueError('No template ID passed in!')
-            LOGGER.warning('Template "{}" has no config!', temp_id)
+            LOGGER.warning('Template "{}" has no config entity! In a future version this will be required.', temp_id)
 
         if is_scaling:
             # Make a scaling template config.
