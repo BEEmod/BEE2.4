@@ -111,6 +111,8 @@ def res_unst_scaffold_setup(res: Property):
             'inst_offset': resolve_optional(block, 'offsetInst'),
             # Specially rotated to face the next track!
             'inst_end': resolve_optional(block, 'endInst'),
+            # If it's allowed to point any direction, not just 90 degrees.
+            'free_rotation': block.bool('free_rotate_end'),
         }
         for logic_type in ('logic_start', 'logic_mid', 'logic_end'):
             if conf[logic_type + '_rev'] is None:
@@ -227,15 +229,15 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                 # Compute the horizontal gradient (z / xy dist).
                 # Don't use endcap if rising more than ~45 degrees, or lowering
                 # more than ~12 degrees.
-                # If
                 horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
                 if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
                     link_ang = math.degrees(
                         math.atan2(link_dir.y, link_dir.x)
                     )
-                    # Round to nearest 90 degrees
-                    # Add 45 so the switchover point is at the diagonals
-                    link_ang = (link_ang + 45) // 90 * 90
+                    if not conf['free_rotation']:
+                        # Round to nearest 90 degrees
+                        # Add 45 so the switchover point is at the diagonals
+                        link_ang = (link_ang + 45) // 90 * 90
                     vmf.create_ent(
                         classname='func_instance',
                         targetname=node.inst['targetname'],
