@@ -1165,16 +1165,12 @@ def debug_flag(inst: Entity, props: Property):
     """
     # Mark as a warning so it's more easily seen.
     if props.has_children():
-        LOGGER.warning('Debug:')
-        LOGGER.warning(str(props))
-        LOGGER.warning(str(inst))
-    elif props.value.strip().endswith('='):
+        LOGGER.warning('Debug:\n{!s}\n{!s}', props, inst)
+    else:
         LOGGER.warning('Debug: {props}{inst!s}'.format(
             inst=inst,
             props=props.value,
         ))
-    else:
-        LOGGER.warning('Debug: ' + props.value)
     return True  # The flag is always true
 
 
