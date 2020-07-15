@@ -1,6 +1,6 @@
 """The result used to generate unstationary scaffolds."""
 import math
-from typing import Tuple
+from typing import Tuple, Optional
 
 from enum import Enum
 
@@ -61,6 +61,16 @@ def get_config(
     offset += Vec.from_str(node.inst['origin'])
     return orient, offset
 
+
+def resolve_optional(prop: Property, key: str) -> Optional[str]:
+    """Resolve the given instance, or return None if not defined."""
+    try:
+        file = prop[key]
+    except LookupError:
+        return None
+    return instanceLocs.resolve_one(file)
+
+
 # The name we give to instances and other parts.
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
@@ -88,19 +98,19 @@ def res_unst_scaffold_setup(res: Property):
             'off_floor': Vec.from_str(block['FloorOff', '0 0 0']),
             'off_wall': Vec.from_str(block['WallOff', '0 0 0']),
 
-            'logic_start': block['startlogic', ''],
-            'logic_end': block['endLogic', ''],
-            'logic_mid': block['midLogic', ''],
+            'logic_start': resolve_optional(block, 'startlogic'),
+            'logic_end': resolve_optional(block, 'endLogic'),
+            'logic_mid': resolve_optional(block, 'midLogic'),
 
-            'logic_start_rev': block['StartLogicRev', None],
-            'logic_end_rev': block['EndLogicRev', None],
-            'logic_mid_rev': block['EndLogicRev', None],
+            'logic_start_rev': resolve_optional(block, 'StartLogicRev'),
+            'logic_end_rev': resolve_optional(block, 'EndLogicRev'),
+            'logic_mid_rev': resolve_optional(block, 'EndLogicRev'),
 
-            'inst_wall': block['wallInst', ''],
-            'inst_floor': block['floorInst', ''],
-            'inst_offset': block['offsetInst', None],
+            'inst_wall': resolve_optional(block, 'wallInst'),
+            'inst_floor': resolve_optional(block, 'floorInst'),
+            'inst_offset': resolve_optional(block, 'offsetInst'),
             # Specially rotated to face the next track!
-            'inst_end': block['endInst', None],
+            'inst_end': resolve_optional(block, 'endInst'),
         }
         for logic_type in ('logic_start', 'logic_mid', 'logic_end'):
             if conf[logic_type + '_rev'] is None:
@@ -174,7 +184,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             orient, offset = get_config(node)
 
             new_file = conf.get('inst_' + orient, '')
-            if new_file != '':
+            if new_file:
                 node.inst['file'] = new_file
 
             if node.prev is None:
