@@ -399,7 +399,7 @@ def find_packages(pak_dir: str) -> None:
         found_pak = True
 
     if not found_pak:
-        LOGGER.debug('No packages in folder!')
+        LOGGER.info('No packages in folder {}!', pak_dir)
 
 
 def no_packages_err(pak_dir: str, msg: str) -> 'NoReturn':
