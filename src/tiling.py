@@ -2132,7 +2132,7 @@ def generate_goo(vmf: VMF) -> None:
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
     # Valve just does it semi-randomly.
-    goo_heights: Dict[Tuple[float, float, float], int] = Counter()
+    goo_heights: Dict[float, int] = Counter()
 
     pos = None
 
@@ -2141,9 +2141,9 @@ def generate_goo(vmf: VMF) -> None:
             goo_pos[pos.z, pos.z][pos.x, pos.y] = True
             trig_pos[pos.z][pos.x, pos.y] = True
 
-            goo_heights[pos.as_tuple()] += 1
+            goo_heights[pos.z] += 1
         elif block_type is Block.GOO_TOP:
-            goo_heights[pos.as_tuple()] += 1
+            goo_heights[pos.z] += 1
             # Multi-layer..
             lower_pos = BLOCK_POS.raycast(pos, Vec(0, 0, -1))
 
@@ -2176,7 +2176,7 @@ def generate_goo(vmf: VMF) -> None:
     goo_scale = vbsp_options.get(float, 'goo_scale')
 
     # Find key with the highest value - that gives the largest z-level.
-    best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+    [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])
 
     for ((min_z, max_z), grid) in goo_pos.items():
         for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
@@ -2194,7 +2194,7 @@ def generate_goo(vmf: VMF) -> None:
             prism.top.mat = texturing.SPECIAL.get(
                 bbox_max + (0, 0, 96), (
                     'goo' if
-                    bbox_max.z == best_goo
+                    max_z == best_goo
                     else 'goo_cheap'
                 ),
             )
