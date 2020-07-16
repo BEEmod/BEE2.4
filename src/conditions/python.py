@@ -104,8 +104,7 @@ class Checker(ast.NodeVisitor):
     visit_Num = safe_visit
     visit_Str = safe_visit
     visit_NameConstant = safe_visit  # True, False, None
-    # Constant is never generated, but could be these.
-
+    visit_Constant = safe_visit
 
 @make_result_setup('Python', 'Operation')
 def res_python_setup(res: Property) -> Tuple[Callable[[EntityFixup], object], str]:
@@ -200,6 +199,10 @@ def res_python_setup(res: Property) -> Tuple[Callable[[EntityFixup], object], st
         lineno=1,
         col_offset=0,
     )
+    # Python 3.8 also
+    if 'type_ignores' in func._fields:
+        func.type_ignores = []
+
     # Fill in lineno and col_offset
     ast.fix_missing_locations(func)
 
