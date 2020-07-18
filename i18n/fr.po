@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-07-03 18:18-0700\n"
+"POT-Creation-Date: 2020-07-18 11:58+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.6.0\n"
 
 #: CheckDetails.py:220
 msgid "Toggle all checkboxes."
@@ -83,7 +83,7 @@ msgid ""
 " change."
 msgstr ""
 
-#: CompilerPane.py:322
+#: CompilerPane.py:322 UI.py:657
 msgid "Random"
 msgstr "Aléatoire"
 
@@ -556,19 +556,19 @@ msgstr ""
 msgid "This style does not have a elevator video screen."
 msgstr "Ce style n'a aucune vidéo d'ascenseur."
 
-#: UI.py:656
+#: UI.py:658
 msgid "Choose a random video."
 msgstr "Choisit une vidéo aléatoire."
 
-#: UI.py:660
+#: UI.py:662
 msgid "Multiple Orientations"
 msgstr "Orientations multiples"
 
-#: UI.py:881
+#: UI.py:883
 msgid "Selected Items and Style successfully exported!"
 msgstr "Le style et les objets sélectionnés ont été exportés avec succès !"
 
-#: UI.py:883
+#: UI.py:885
 msgid ""
 "\n"
 "\n"
@@ -581,78 +581,78 @@ msgstr ""
 "Hammer pour assurer le rafraîchissement des apparences des murs en "
 "prévisualisation."
 
-#: UI.py:896
+#: UI.py:898
 #, fuzzy
 msgid ""
 "\n"
 " Launch Game?"
 msgstr "Lancer le jeu"
 
-#: UI.py:1111
+#: UI.py:1113
 msgid "Delete Palette \"{}\""
 msgstr "Supprimer la palette \"{}\""
 
-#: UI.py:1187
+#: UI.py:1189
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Enregistrer la palette"
 
-#: UI.py:1188
+#: UI.py:1190
 msgid "Enter a name:"
 msgstr "Entrer un nom:"
 
-#: UI.py:1197
+#: UI.py:1199
 msgid "This palette already exists. Overwrite?"
 msgstr "Cette palette existe déjà. Remplacer ?"
 
-#: UI.py:1226 gameMan.py:1510
+#: UI.py:1228 gameMan.py:1529
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
 
-#: UI.py:1253
+#: UI.py:1255
 msgid "Clear Palette"
 msgstr "Vider la palette"
 
-#: UI.py:1289 UI.py:1725
+#: UI.py:1291 UI.py:1727
 msgid "Delete Palette"
 msgstr "Supprimer la palette"
 
-#: UI.py:1309
+#: UI.py:1311
 msgid "Save Palette..."
 msgstr "Enregistrer la palette..."
 
-#: UI.py:1314 UI.py:1748
+#: UI.py:1316 UI.py:1750
 msgid "Save Palette As..."
 msgstr "Enregistrer la palette sous..."
 
-#: UI.py:1325 UI.py:1736
+#: UI.py:1327 UI.py:1738
 msgid "Save Settings in Palettes"
 msgstr ""
 
-#: UI.py:1343 music_conf.py:204
+#: UI.py:1345 music_conf.py:204
 msgid "Music: "
 msgstr "Musique: "
 
-#: UI.py:1369
+#: UI.py:1371
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Utiliser les suggestions {arr}"
 
-#: UI.py:1385
+#: UI.py:1387
 msgid "Style: "
 msgstr "Style: "
 
-#: UI.py:1387
+#: UI.py:1389
 msgid "Voice: "
 msgstr "Voix: "
 
-#: UI.py:1388
+#: UI.py:1390
 msgid "Skybox: "
 msgstr "Skybox: "
 
-#: UI.py:1389
+#: UI.py:1391
 msgid "Elev Vid: "
 msgstr "Vid Asc: "
 
-#: UI.py:1407
+#: UI.py:1409
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
@@ -660,75 +660,75 @@ msgstr ""
 "Activer ou désactiver certaines répliques pour les empêcher d'être "
 "ajoutées."
 
-#: UI.py:1510
+#: UI.py:1512
 msgid "All Items: "
 msgstr "Tous les objets: "
 
-#: UI.py:1644
+#: UI.py:1646
 msgid "Export to \"{}\"..."
 msgstr "Exporter vers \"{}\"..."
 
-#: UI.py:1672 backup.py:872
+#: UI.py:1674 backup.py:876
 msgid "File"
 msgstr "Fichier"
 
-#: UI.py:1679
+#: UI.py:1681
 msgid "Export"
 msgstr "Exporter"
 
-#: UI.py:1686 backup.py:876
+#: UI.py:1688 backup.py:880
 msgid "Add Game"
 msgstr "Ajouter le jeu"
 
-#: UI.py:1690
+#: UI.py:1692
 msgid "Uninstall from Selected Game"
 msgstr "Désinstaller du jeu sélectionné"
 
-#: UI.py:1694
+#: UI.py:1696
 msgid "Backup/Restore Puzzles..."
 msgstr "Sauvegarder/Restaurer les puzzles..."
 
-#: UI.py:1698
+#: UI.py:1700
 msgid "Manage Packages..."
 msgstr "Gérer les paquets..."
 
-#: UI.py:1703
+#: UI.py:1705
 msgid "Options"
 msgstr "Options"
 
-#: UI.py:1708 gameMan.py:1189
+#: UI.py:1710 gameMan.py:1208
 msgid "Quit"
 msgstr "Quitter"
 
-#: UI.py:1718
+#: UI.py:1720
 msgid "Palette"
 msgstr "Palette"
 
-#: UI.py:1720
+#: UI.py:1722
 msgid "Clear"
 msgstr "Vider"
 
-#: UI.py:1729
+#: UI.py:1731
 msgid "Fill Palette"
 msgstr "Remplir la palette"
 
-#: UI.py:1743
+#: UI.py:1745
 msgid "Save Palette"
 msgstr "Enregistrer la palette"
 
-#: UI.py:1758
+#: UI.py:1760
 msgid "View"
 msgstr ""
 
-#: UI.py:1877
+#: UI.py:1879
 msgid "Palettes"
 msgstr "Palettes"
 
-#: UI.py:1902
+#: UI.py:1904
 msgid "Export Options"
 msgstr "Options d'export"
 
-#: UI.py:1934
+#: UI.py:1936
 msgid "Fill empty spots in the palette with random items."
 msgstr "Remplir les emplacements vides de la palette avec des objets aléatoires."
 
@@ -784,27 +784,27 @@ msgstr ""
 "Cette carte est déjà dans les fichiers du jeu. Voulez-vous la remplacer ?"
 " ({})"
 
-#: backup.py:565
+#: backup.py:568
 msgid "Load Backup"
 msgstr "Charger la sauvegarde"
 
-#: backup.py:566 backup.py:625
+#: backup.py:569 backup.py:628
 msgid "Backup zip"
 msgstr "Compresser la sauvegarde"
 
-#: backup.py:599
+#: backup.py:602
 msgid "Unsaved Backup"
 msgstr "Sauvegarde non enregistrée"
 
-#: backup.py:624 backup.py:870
+#: backup.py:627 backup.py:874
 msgid "Save Backup As"
 msgstr "Enregistrer la sauvegarde sous"
 
-#: backup.py:720
+#: backup.py:724
 msgid "Confirm Deletion"
 msgstr "Confirmer la suppression"
 
-#: backup.py:721
+#: backup.py:725
 msgid "Do you wish to delete {} map?\n"
 msgid_plural "Do you wish to delete {} maps?\n"
 msgstr[0] ""
@@ -814,55 +814,55 @@ msgstr[1] ""
 "Voulez-vous supprimer {} cartes ?\n"
 "\n"
 
-#: backup.py:758
+#: backup.py:762
 msgid "Restore:"
 msgstr "Restaurer:"
 
-#: backup.py:759
+#: backup.py:763
 msgid "Backup:"
 msgstr "Sauvegarder:"
 
-#: backup.py:796
+#: backup.py:800
 msgid "Checked"
 msgstr "Celles cochées"
 
-#: backup.py:804
+#: backup.py:808
 msgid "Delete Checked"
 msgstr "Supprimer celles cochées"
 
-#: backup.py:854
+#: backup.py:858
 msgid "BEEMOD {} - Backup / Restore Puzzles"
 msgstr "BEEMOD {} - Sauvegarder / Restaurer les puzzles"
 
-#: backup.py:867 backup.py:995
+#: backup.py:871 backup.py:999
 msgid "New Backup"
 msgstr "Nouvelle sauvegarde"
 
-#: backup.py:868 backup.py:1002
+#: backup.py:872 backup.py:1006
 msgid "Open Backup"
 msgstr "Ouvrir la sauvegarde"
 
-#: backup.py:869 backup.py:1009
+#: backup.py:873 backup.py:1013
 msgid "Save Backup"
 msgstr "Sauvegarder"
 
-#: backup.py:877
+#: backup.py:881
 msgid "Remove Game"
 msgstr "Retirer le jeu"
 
-#: backup.py:880
+#: backup.py:884
 msgid "Game"
 msgstr "Jeu"
 
-#: backup.py:926
+#: backup.py:930
 msgid "Automatic Backup After Export"
 msgstr "Sauvegarde automatique après export"
 
-#: backup.py:958
+#: backup.py:962
 msgid "Keep (Per Game):"
 msgstr "Nombre (par jeu):"
 
-#: backup.py:976
+#: backup.py:980
 msgid "Backup/Restore Puzzles"
 msgstr "Sauvegarder/Restaurer des puzzles"
 
@@ -1019,71 +1019,71 @@ msgstr "Changer les valeurs par défaut..."
 msgid "Change the default settings for this item when placed."
 msgstr "Changer les réglages par défaut pour cet objet lorsqu'il est placé."
 
-#: gameMan.py:753 gameMan.py:858
+#: gameMan.py:750 gameMan.py:852
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - Export échoué !"
 
-#: gameMan.py:754
+#: gameMan.py:751
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr ""
 
-#: gameMan.py:859
+#: gameMan.py:853
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
 "Copie du fichier {file} échouée. Veuillez vous assurer que {game} n'est "
 "pas en cours d'exécution."
 
-#: gameMan.py:1246
+#: gameMan.py:1265
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
 msgstr ""
 
-#: gameMan.py:1250
+#: gameMan.py:1269
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
-#: gameMan.py:1433
+#: gameMan.py:1452
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "Sélectionnez le dossier où l'exécutable du jeu est localisé ({appname})..."
 
-#: gameMan.py:1436 gameMan.py:1451 gameMan.py:1461 gameMan.py:1468
-#: gameMan.py:1477 gameMan.py:1486
+#: gameMan.py:1455 gameMan.py:1470 gameMan.py:1480 gameMan.py:1487
+#: gameMan.py:1496 gameMan.py:1505
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - Ajouter un jeu"
 
-#: gameMan.py:1439
+#: gameMan.py:1458
 msgid "Find Game Exe"
 msgstr "Trouvez l'exécutable du jeu"
 
-#: gameMan.py:1440
+#: gameMan.py:1459
 msgid "Executable"
 msgstr "Exécutable"
 
-#: gameMan.py:1448
+#: gameMan.py:1467
 msgid "This does not appear to be a valid game folder!"
 msgstr "Cela ne semble pas être un dossier de jeu valide."
 
-#: gameMan.py:1458
+#: gameMan.py:1477
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "Portal Stories: Mel n'a pas d'éditeur."
 
-#: gameMan.py:1469
+#: gameMan.py:1488
 msgid "Enter the name of this game:"
 msgstr "Entrez le nom de ce jeu:"
 
-#: gameMan.py:1476
+#: gameMan.py:1495
 msgid "This name is already taken!"
 msgstr "Ce nom est déjà pris !"
 
-#: gameMan.py:1485
+#: gameMan.py:1504
 msgid "Please enter a name for this game!"
 msgstr "Veuillez entrer un nom pour ce jeu."
 
-#: gameMan.py:1504
+#: gameMan.py:1523
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1179,35 +1179,35 @@ msgstr "Aucune propriété disponible !"
 msgid "Choose a Color"
 msgstr "Choisissez une couleur"
 
-#: loadScreen.py:200
+#: loadScreen.py:199
 msgid "Skipped!"
 msgstr "Sauté !"
 
-#: loadScreen.py:201
+#: loadScreen.py:200
 msgid "Version: "
 msgstr "Version: "
 
-#: loadScreen.py:202 optionWindow.py:252 packageMan.py:114 selectorWin.py:723
+#: loadScreen.py:201 optionWindow.py:252 packageMan.py:116 selectorWin.py:723
 msgid "Cancel"
 msgstr "Annuler"
 
-#: loadScreen.py:212 tagsPane.py:53
+#: loadScreen.py:211 tagsPane.py:53
 msgid "Packages"
 msgstr "Paquets"
 
-#: loadScreen.py:213
+#: loadScreen.py:212
 msgid "Loading Objects"
 msgstr "Chargement des objets"
 
-#: loadScreen.py:214
+#: loadScreen.py:213
 msgid "Loading Images"
 msgstr "Chargement des images"
 
-#: loadScreen.py:215
+#: loadScreen.py:214
 msgid "Initialising UI"
 msgstr "Initialisation de l'interface"
 
-#: loadScreen.py:216
+#: loadScreen.py:215
 msgid "Better Extended Editor for Portal 2"
 msgstr "Better Extended Editor pour Portal 2"
 
@@ -1359,7 +1359,7 @@ msgstr "Windows"
 msgid "Development"
 msgstr "Développement"
 
-#: optionWindow.py:247 packageMan.py:108 selectorWin.py:701
+#: optionWindow.py:247 packageMan.py:110 selectorWin.py:701
 msgid "OK"
 msgstr "OK"
 
@@ -1546,11 +1546,11 @@ msgstr ""
 msgid "Dump Items list"
 msgstr ""
 
-#: packageMan.py:62
+#: packageMan.py:64
 msgid "BEE2 - Restart Required!"
 msgstr "BEE2 - Redémarrage requis !"
 
-#: packageMan.py:63
+#: packageMan.py:65
 msgid ""
 "Changing enabled packages requires a restart.\n"
 "Continue?"
@@ -1558,7 +1558,7 @@ msgstr ""
 "Changer les paquets activés demande un redémarrage.\n"
 "Continuer ?"
 
-#: packageMan.py:86
+#: packageMan.py:88
 msgid "BEE2 - Manage Packages"
 msgstr "BEE2 - Gérer les paquets"
 
@@ -1649,7 +1649,7 @@ msgstr "Tout"
 msgid "Available Tags (click):"
 msgstr "Tags disponibles (cliquez):"
 
-#: utils.py:814
+#: utils.py:841
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 

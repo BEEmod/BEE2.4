@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2020-07-03 18:18-0700\n"
+"POT-Creation-Date: 2020-07-18 11:58+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.6.0\n"
 
 #: CheckDetails.py:220
 msgid "Toggle all checkboxes."
@@ -79,7 +79,7 @@ msgid ""
 " change."
 msgstr "随机选择一个走廊，被随机选中的走廊将保存在地图编辑器中且不会再次变更。"
 
-#: CompilerPane.py:322
+#: CompilerPane.py:322 UI.py:657
 msgid "Random"
 msgstr "随机"
 
@@ -524,19 +524,19 @@ msgstr ""
 msgid "This style does not have a elevator video screen."
 msgstr "这种风格的电梯间没有影像屏幕。"
 
-#: UI.py:656
+#: UI.py:658
 msgid "Choose a random video."
 msgstr "随机选择一个影像。"
 
-#: UI.py:660
+#: UI.py:662
 msgid "Multiple Orientations"
 msgstr "多种方向"
 
-#: UI.py:881
+#: UI.py:883
 msgid "Selected Items and Style successfully exported!"
 msgstr "所选物品和风格已成功导出！"
 
-#: UI.py:883
+#: UI.py:885
 msgid ""
 "\n"
 "\n"
@@ -547,7 +547,7 @@ msgstr ""
 "\n"
 "警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
 
-#: UI.py:896
+#: UI.py:898
 msgid ""
 "\n"
 " Launch Game?"
@@ -555,145 +555,145 @@ msgstr ""
 "\n"
 "启动游戏？"
 
-#: UI.py:1111
+#: UI.py:1113
 msgid "Delete Palette \"{}\""
 msgstr "删除模板 \"{}\""
 
-#: UI.py:1187
+#: UI.py:1189
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - 保存模板"
 
-#: UI.py:1188
+#: UI.py:1190
 msgid "Enter a name:"
 msgstr "键入模板名称："
 
-#: UI.py:1197
+#: UI.py:1199
 msgid "This palette already exists. Overwrite?"
 msgstr "已经存在同名模板，是否覆盖？"
 
-#: UI.py:1226 gameMan.py:1510
+#: UI.py:1228 gameMan.py:1529
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
-#: UI.py:1253
+#: UI.py:1255
 msgid "Clear Palette"
 msgstr "清空模板内容"
 
-#: UI.py:1289 UI.py:1725
+#: UI.py:1291 UI.py:1727
 msgid "Delete Palette"
 msgstr "删除选中模板"
 
-#: UI.py:1309
+#: UI.py:1311
 msgid "Save Palette..."
 msgstr "保存模板..."
 
-#: UI.py:1314 UI.py:1748
+#: UI.py:1316 UI.py:1750
 msgid "Save Palette As..."
 msgstr "另存为模板..."
 
-#: UI.py:1325 UI.py:1736
+#: UI.py:1327 UI.py:1738
 msgid "Save Settings in Palettes"
 msgstr "在模板中保存配置"
 
-#: UI.py:1343 music_conf.py:204
+#: UI.py:1345 music_conf.py:204
 msgid "Music: "
 msgstr "音乐选择："
 
-#: UI.py:1369
+#: UI.py:1371
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} 使用推荐配置 {arr}"
 
-#: UI.py:1385
+#: UI.py:1387
 msgid "Style: "
 msgstr "物品风格"
 
-#: UI.py:1387
+#: UI.py:1389
 msgid "Voice: "
 msgstr "旁白语音"
 
-#: UI.py:1388
+#: UI.py:1390
 msgid "Skybox: "
 msgstr "天空布景"
 
-#: UI.py:1389
+#: UI.py:1391
 msgid "Elev Vid: "
 msgstr "电梯视频"
 
-#: UI.py:1407
+#: UI.py:1409
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "启用或禁用特定的台词，以防止添加它们。"
 
-#: UI.py:1510
+#: UI.py:1512
 msgid "All Items: "
 msgstr "所有物品："
 
-#: UI.py:1644
+#: UI.py:1646
 msgid "Export to \"{}\"..."
 msgstr "导出到 \"{}\"..."
 
-#: UI.py:1672 backup.py:872
+#: UI.py:1674 backup.py:876
 msgid "File"
 msgstr "文件"
 
-#: UI.py:1679
+#: UI.py:1681
 msgid "Export"
 msgstr "导出"
 
-#: UI.py:1686 backup.py:876
+#: UI.py:1688 backup.py:880
 msgid "Add Game"
 msgstr "添加游戏"
 
-#: UI.py:1690
+#: UI.py:1692
 msgid "Uninstall from Selected Game"
 msgstr "删除选中的游戏"
 
-#: UI.py:1694
+#: UI.py:1696
 msgid "Backup/Restore Puzzles..."
 msgstr "备份/恢复 谜题..."
 
-#: UI.py:1698
+#: UI.py:1700
 msgid "Manage Packages..."
 msgstr "管理资源包..."
 
-#: UI.py:1703
+#: UI.py:1705
 msgid "Options"
 msgstr "设置"
 
-#: UI.py:1708 gameMan.py:1189
+#: UI.py:1710 gameMan.py:1208
 msgid "Quit"
 msgstr "退出"
 
-#: UI.py:1718
+#: UI.py:1720
 msgid "Palette"
 msgstr "模板"
 
-#: UI.py:1720
+#: UI.py:1722
 msgid "Clear"
 msgstr "清空模板"
 
-#: UI.py:1729
+#: UI.py:1731
 msgid "Fill Palette"
 msgstr "重置模板"
 
-#: UI.py:1743
+#: UI.py:1745
 msgid "Save Palette"
 msgstr "保存模板"
 
-#: UI.py:1758
+#: UI.py:1760
 msgid "View"
 msgstr ""
 
-#: UI.py:1877
+#: UI.py:1879
 msgid "Palettes"
 msgstr "模板列表"
 
-#: UI.py:1902
+#: UI.py:1904
 msgid "Export Options"
 msgstr "导出设置"
 
-#: UI.py:1934
+#: UI.py:1936
 msgid "Fill empty spots in the palette with random items."
 msgstr "随机选择物品填充物品栏中的空位。"
 
@@ -747,80 +747,80 @@ msgstr ""
 "游戏目录中已存在同名的地图文件，是否要覆盖它？\n"
 "({})"
 
-#: backup.py:565
+#: backup.py:568
 msgid "Load Backup"
 msgstr "载入备份"
 
-#: backup.py:566 backup.py:625
+#: backup.py:569 backup.py:628
 msgid "Backup zip"
 msgstr "备份为zip文件"
 
-#: backup.py:599
+#: backup.py:602
 msgid "Unsaved Backup"
 msgstr "未保持的备份"
 
-#: backup.py:624 backup.py:870
+#: backup.py:627 backup.py:874
 msgid "Save Backup As"
 msgstr "将备份另存为"
 
-#: backup.py:720
+#: backup.py:724
 msgid "Confirm Deletion"
 msgstr "确认删除"
 
-#: backup.py:721
+#: backup.py:725
 msgid "Do you wish to delete {} map?\n"
 msgid_plural "Do you wish to delete {} maps?\n"
 msgstr[0] "确定要删除 {} 张地图？\n"
 
-#: backup.py:758
+#: backup.py:762
 msgid "Restore:"
 msgstr "还原："
 
-#: backup.py:759
+#: backup.py:763
 msgid "Backup:"
 msgstr "备份："
 
-#: backup.py:796
+#: backup.py:800
 msgid "Checked"
 msgstr "已选"
 
-#: backup.py:804
+#: backup.py:808
 msgid "Delete Checked"
 msgstr "删除已选"
 
-#: backup.py:854
+#: backup.py:858
 msgid "BEEMOD {} - Backup / Restore Puzzles"
 msgstr "BEEMOD {} - 备份/恢复 谜题"
 
-#: backup.py:867 backup.py:995
+#: backup.py:871 backup.py:999
 msgid "New Backup"
 msgstr "新建备份"
 
-#: backup.py:868 backup.py:1002
+#: backup.py:872 backup.py:1006
 msgid "Open Backup"
 msgstr "打开备份"
 
-#: backup.py:869 backup.py:1009
+#: backup.py:873 backup.py:1013
 msgid "Save Backup"
 msgstr "保存备份"
 
-#: backup.py:877
+#: backup.py:881
 msgid "Remove Game"
 msgstr "删除游戏"
 
-#: backup.py:880
+#: backup.py:884
 msgid "Game"
 msgstr "游戏"
 
-#: backup.py:926
+#: backup.py:930
 msgid "Automatic Backup After Export"
 msgstr "导出后自动备份"
 
-#: backup.py:958
+#: backup.py:962
 msgid "Keep (Per Game):"
 msgstr "保持（每N场游戏）"
 
-#: backup.py:976
+#: backup.py:980
 msgid "Backup/Restore Puzzles"
 msgstr "备份/恢复 谜题"
 
@@ -968,22 +968,22 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: gameMan.py:753 gameMan.py:858
+#: gameMan.py:750 gameMan.py:852
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
-#: gameMan.py:754
+#: gameMan.py:751
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
 
-#: gameMan.py:859
+#: gameMan.py:853
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
-#: gameMan.py:1246
+#: gameMan.py:1265
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -991,48 +991,48 @@ msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
 
-#: gameMan.py:1250
+#: gameMan.py:1269
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: gameMan.py:1433
+#: gameMan.py:1452
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件的路径 {appname}"
 
-#: gameMan.py:1436 gameMan.py:1451 gameMan.py:1461 gameMan.py:1468
-#: gameMan.py:1477 gameMan.py:1486
+#: gameMan.py:1455 gameMan.py:1470 gameMan.py:1480 gameMan.py:1487
+#: gameMan.py:1496 gameMan.py:1505
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: gameMan.py:1439
+#: gameMan.py:1458
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: gameMan.py:1440
+#: gameMan.py:1459
 msgid "Executable"
 msgstr "可执行文件"
 
-#: gameMan.py:1448
+#: gameMan.py:1467
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: gameMan.py:1458
+#: gameMan.py:1477
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: gameMan.py:1469
+#: gameMan.py:1488
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: gameMan.py:1476
+#: gameMan.py:1495
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: gameMan.py:1485
+#: gameMan.py:1504
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: gameMan.py:1504
+#: gameMan.py:1523
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1128,35 +1128,35 @@ msgstr "没有可用的属性！"
 msgid "Choose a Color"
 msgstr "选择一种颜色"
 
-#: loadScreen.py:200
+#: loadScreen.py:199
 msgid "Skipped!"
 msgstr "跳过！"
 
-#: loadScreen.py:201
+#: loadScreen.py:200
 msgid "Version: "
 msgstr "版本："
 
-#: loadScreen.py:202 optionWindow.py:252 packageMan.py:114 selectorWin.py:723
+#: loadScreen.py:201 optionWindow.py:252 packageMan.py:116 selectorWin.py:723
 msgid "Cancel"
 msgstr "取消"
 
-#: loadScreen.py:212 tagsPane.py:53
+#: loadScreen.py:211 tagsPane.py:53
 msgid "Packages"
 msgstr "资源包"
 
-#: loadScreen.py:213
+#: loadScreen.py:212
 msgid "Loading Objects"
 msgstr "正在载入对象"
 
-#: loadScreen.py:214
+#: loadScreen.py:213
 msgid "Loading Images"
 msgstr "正在载入图像"
 
-#: loadScreen.py:215
+#: loadScreen.py:214
 msgid "Initialising UI"
 msgstr "初始化界面"
 
-#: loadScreen.py:216
+#: loadScreen.py:215
 msgid "Better Extended Editor for Portal 2"
 msgstr "更棒的传送门2扩展编辑器"
 
@@ -1302,7 +1302,7 @@ msgstr "窗口"
 msgid "Development"
 msgstr "开发者选项"
 
-#: optionWindow.py:247 packageMan.py:108 selectorWin.py:701
+#: optionWindow.py:247 packageMan.py:110 selectorWin.py:701
 msgid "OK"
 msgstr "确定"
 
@@ -1473,11 +1473,11 @@ msgstr "反选所有复选框"
 msgid "Dump Items list"
 msgstr ""
 
-#: packageMan.py:62
+#: packageMan.py:64
 msgid "BEE2 - Restart Required!"
 msgstr "BEE2 - 需要重新启动!"
 
-#: packageMan.py:63
+#: packageMan.py:65
 msgid ""
 "Changing enabled packages requires a restart.\n"
 "Continue?"
@@ -1485,7 +1485,7 @@ msgstr ""
 "更改已启用的数据包需要重新启动程序。\n"
 "继续吗？"
 
-#: packageMan.py:86
+#: packageMan.py:88
 msgid "BEE2 - Manage Packages"
 msgstr "BEE2 - 管理数据包"
 
@@ -1574,7 +1574,7 @@ msgstr "所有"
 msgid "Available Tags (click):"
 msgstr "可用标签（点击）"
 
-#: utils.py:814
+#: utils.py:841
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
