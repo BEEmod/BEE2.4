@@ -18,24 +18,23 @@ import utils
 import srctools.vmf as VLib
 import srctools.run
 import srctools.logger
-import antlines
-import voiceLine
-import vbsp_options
-import instanceLocs
-import brushLoc
-import bottomlessPit
-import packing
-import conditions
-import tiling
-import texturing
-import connections
-import instance_traits
-import template_brush
-import fizzler
-import faithplate
-import comp_consts as consts
-import cubes
-import barriers
+from precomp import (
+    instance_traits, tiling, brushLoc, bottomlessPit,
+    instanceLocs,
+    cubes,
+    texturing,
+    barriers,
+    connections,
+    options,
+    faithplate,
+    antlines,
+    packing,
+    template_brush,
+    conditions,
+    fizzler,
+    voice_line,
+)
+import consts
 
 from typing import Any, Dict, Tuple, List, Set
 
@@ -124,11 +123,11 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
         ant_floor = ant_wall
 
     # Load in our main configs..
-    vbsp_options.load(conf.find_all('Options'))
+    options.load(conf.find_all('Options'))
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        voiceLine.QUOTE_DATA += quote_block.value
+        voice_line.QUOTE_DATA += quote_block.value
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -169,7 +168,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     fizzler.read_configs(conf)
 
     # Signage items
-    from conditions.signage import load_signs
+    from precomp.conditions.signage import load_signs
     load_signs(conf)
 
     # Get configuration for the elevator, defaulting to ''.
@@ -233,7 +232,7 @@ def load_map(map_path):
 @conditions.meta_cond(priority=100)
 def add_voice():
     """Add voice lines to the map."""
-    voiceLine.add_voice(
+    voice_line.add_voice(
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file_=VMF,
@@ -348,7 +347,7 @@ def set_player_model():
     if GAME_MODE == 'COOP':  # Not in coop..
         return
 
-    loc = vbsp_options.get(Vec, 'global_ents_loc')
+    loc = options.get(Vec, 'global_ents_loc')
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -389,7 +388,7 @@ def set_player_model():
         delay=0.1,
     ))
 
-    if pgun_skin and vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
+    if pgun_skin and options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
         auto.add_out(VLib.Output(
@@ -431,7 +430,7 @@ def set_player_portalgun() -> None:
       `NeedsPortalMan` still works to add this in Coop.
     """
 
-    if vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
+    if options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
     LOGGER.info('Setting Portalgun:')
@@ -462,7 +461,7 @@ def set_player_portalgun() -> None:
         has['spawn_single'] = False
         has['spawn_nogun'] = True
 
-    ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    ent_pos = options.get(Vec, 'global_pti_ents_loc')
     
     logic_auto = VMF.create_ent('logic_auto', origin=ent_pos, flags='1')
 
@@ -599,8 +598,8 @@ def set_player_portalgun() -> None:
             ))
 
         # Shuts down various parts when you've reached the exit.
-        import conditions.instances
-        conditions.instances.global_input(VMF, ent_pos, VLib.Output(
+        import precomp.conditions.instances
+        precomp.conditions.instances.global_input(VMF, ent_pos, VLib.Output(
             'OnTrigger',
             '@portalgun',
             'RunScriptCode',
@@ -634,7 +633,7 @@ def add_screenshot_logic() -> None:
         VMF.create_ent(
             classname='func_instance',
             file='instances/bee2/logic/screenshot_logic.vmf',
-            origin=vbsp_options.get(Vec, 'global_ents_loc'),
+            origin=options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
         LOGGER.info('Added Screenshot Logic')
@@ -643,7 +642,7 @@ def add_screenshot_logic() -> None:
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = vbsp_options.get(Vec, 'global_ents_loc')
+    pos = options.get(Vec, 'global_ents_loc')
     VMF.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -1298,10 +1297,10 @@ def change_brush() -> None:
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
 
-    goo_scale = vbsp_options.get(float, 'goo_scale')
+    goo_scale = options.get(float, 'goo_scale')
 
     # Goo mist must be enabled by both the style and the user.
-    make_goo_mist = vbsp_options.get(bool, 'goo_mist') and srctools.conv_bool(
+    make_goo_mist = options.get(bool, 'goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
     mist_solids = set()
@@ -1435,13 +1434,13 @@ def change_overlays() -> None:
     LOGGER.info("Editing Overlays...")
 
     # A frame instance to add around all the 32x32 signs
-    sign_inst = vbsp_options.get(str, 'signInst')
+    sign_inst = options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size = vbsp_options.get(int, 'signSize') / 2
+    sign_size = options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack = vbsp_options.get(str, 'signPack')
+    sign_inst_pack = options.get(str, 'signPack')
 
     # Grab all the textures we're using...
     for over in VMF.by_class['info_overlay']:
@@ -1452,7 +1451,7 @@ def change_overlays() -> None:
 
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
-            if vbsp_options.get(bool, "remove_exit_signs"):
+            if options.get(bool, "remove_exit_signs"):
                 # Some styles have instance-based ones, remove the
                 # originals if needed to ensure it looks nice.
                 VMF.remove_ent(over)
@@ -1501,12 +1500,12 @@ def add_extra_ents(game_mode: str) -> None:
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
-    loc = vbsp_options.get(Vec, 'global_ents_loc')
+    loc = options.get(Vec, 'global_ents_loc')
 
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
-    inst = vbsp_options.get(str, 'music_instance')
-    snd_length = vbsp_options.get(int, 'music_looplen')
+    inst = options.get(str, 'music_instance')
+    snd_length = options.get(int, 'music_looplen')
 
     # Don't add our logic if an instance was provided.
     # If this settings is set, we have a music config.
@@ -1614,9 +1613,9 @@ def add_extra_ents(game_mode: str) -> None:
 
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.
-    global_ents_pos = vbsp_options.get(Vec, 'global_ents_loc')
-    pti_file = vbsp_options.get(str, 'global_pti_ents')
-    pti_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    global_ents_pos = options.get(Vec, 'global_ents_loc')
+    pti_file = options.get(str, 'global_pti_ents')
+    pti_loc = options.get(Vec, 'global_pti_ents_loc')
 
     # Add a nodraw box around the global entity location, to seal it.
     VMF.add_brushes(VMF.make_hollow(
@@ -1674,7 +1673,7 @@ def add_extra_ents(game_mode: str) -> None:
 def change_ents() -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
-    if vbsp_options.get(bool, "remove_info_lighting"):
+    if options.get(bool, "remove_info_lighting"):
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
         for ent in VMF.by_class['info_lighting']:
@@ -1696,9 +1695,9 @@ def fix_worldspawn() -> None:
         # If the game is Aperture Tag, it's always forced on
         VMF.spawn['paintinmap'] = srctools.bool_as_int(
             settings['has_attr']['gel'] or
-            vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
+            options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
-    VMF.spawn['skyname'] = vbsp_options.get(str, 'skybox')
+    VMF.spawn['skyname'] = options.get(str, 'skybox')
 
 
 def make_vrad_config(is_peti: bool) -> None:
@@ -1724,7 +1723,7 @@ def make_vrad_config(is_peti: bool) -> None:
         conf['is_preview'] = srctools.bool_as_int(
             IS_PREVIEW
         )
-        conf['game_id'] = vbsp_options.get(str, 'game_id')
+        conf['game_id'] = options.get(str, 'game_id')
 
         if BEE2_config.get_bool('General', 'packfile_dump_enable'):
             conf['packfile_dump'] = BEE2_config.get_val(
@@ -1747,8 +1746,7 @@ def make_vrad_config(is_peti: bool) -> None:
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
-        import cubes
-        import conditions.piston_platform
+        import precomp.conditions.piston_platform
 
         # This generates scripts and might need to tell VRAD.
         cubes.write_vscripts(conf)
@@ -1951,7 +1949,7 @@ def main() -> None:
         # Special override - generate docs for the BEE2 wiki.
         LOGGER.info('Writing Wiki text...')
         with open(os.environ['BEE2_WIKI_OPT_LOC'], 'w') as f:
-            vbsp_options.dump_info(f)
+            options.dump_info(f)
         with open(os.environ['BEE2_WIKI_COND_LOC'], 'a+') as f:
             conditions.dump_conditions(f)
         LOGGER.info('Done. Exiting now!')
