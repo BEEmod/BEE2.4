@@ -5,6 +5,8 @@ from pathlib import Path
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
+from typing import Callable, List, Tuple, Dict
+
 from tk_tools import TK_ROOT
 from enum import Enum
 
@@ -17,6 +19,7 @@ import tk_tools
 import srctools.logger
 import contextWin
 import logWindow
+import loadScreen
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -31,6 +34,7 @@ class AfterExport(Enum):
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
+FORCE_LOAD_ONTOP = BooleanVar(value=True, name='OPT_force_load_ontop')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
 PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
@@ -39,12 +43,13 @@ AFTER_EXPORT_ACTION = IntVar(
     name='OPT_after_export_action',
 )
 
-refresh_callbacks = []  # functions called to apply settings.
+refresh_callbacks: List[Callable[[], None]] = []  # functions called to apply settings.
 
-VARS = {}
+# All the auto-created checkbox variables
+VARS: Dict[Tuple[str, str], BooleanVar] = {}
 
 
-def reset_all_win():
+def reset_all_win() -> None:
     """Return all windows to their default positions.
 
     This is replaced by `UI.reset_panes`.
@@ -68,17 +73,18 @@ def show() -> None:
 def load() -> None:
     """Load the current settings from config."""
     for var in VARS.values():
-        var.load()
+        var.load()  # type: ignore
 
 
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     for var in VARS.values():
-        var.save()
+        var.save()  # type: ignore
 
     sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
     logWindow.set_visible(SHOW_LOG_WIN.get())
+    loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 
     for func in refresh_callbacks:
         func()
@@ -309,20 +315,19 @@ def init_gen_tab(f: ttk.Frame) -> None:
     add_tooltip(exp_nothing, _('After exports, do nothing and '
                                'keep the BEE2 in focus.'))
     add_tooltip(exp_minimise, _('After exports, minimise to the taskbar/dock.'))
-    add_tooltip(exp_minimise, _('After exports, quit the BEE2.'))
+    add_tooltip(exp_quit, _('After exports, quit the BEE2.'))
 
-    UI['launch_game'] = launch_game = make_checkbox(
+    make_checkbox(
         after_export_frame,
         section='General',
         item='launch_Game',
         var=LAUNCH_AFTER_EXPORT,
         desc=_('Launch Game'),
         tooltip=_('After exporting, launch the selected game automatically.'),
-    )
-    launch_game.grid(row=3, column=0, sticky='W', pady=(10, 0))
+    ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
     if sound.initiallised:
-        UI['mute'] = mute = make_checkbox(
+        mute = make_checkbox(
             f,
             section='General',
             item='play_sounds',
@@ -330,13 +335,13 @@ def init_gen_tab(f: ttk.Frame) -> None:
             var=PLAY_SOUND,
         )
     else:
-        UI['mute'] = mute = ttk.Checkbutton(
+        mute = ttk.Checkbutton(
             f,
             text=_('Play Sounds'),
             state='disabled',
         )
         add_tooltip(
-            UI['mute'],
+            mute,
             _('Pyglet is either not installed or broken.\n'
               'Sound effects have been disabled.')
         )
@@ -355,7 +360,7 @@ def init_gen_tab(f: ttk.Frame) -> None:
 
 
 def init_win_tab(f: ttk.Frame) -> None:
-    UI['keep_inside'] = keep_inside = make_checkbox(
+    keep_inside = make_checkbox(
         f,
         section='General',
         item='keep_win_inside',
@@ -366,13 +371,25 @@ def init_win_tab(f: ttk.Frame) -> None:
     )
     keep_inside.grid(row=0, column=0, sticky=W)
 
-    UI['reset_win'] = reset_win = ttk.Button(
+    make_checkbox(
+        f,
+        section='General',
+        item='splash_stay_ontop',
+        desc=_('Keep loading screens on top'),
+        var=FORCE_LOAD_ONTOP,
+        tooltip=_(
+            "Force loading screens to be on top of other windows. "
+            "Since they don't appear on the taskbar/dock, they can't be "
+            "brought to the top easily again."
+        ),
+    ).grid(row=0, column=1, sticky=E)
+
+    ttk.Button(
         f,
         text=_('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
         command=lambda: reset_all_win(),
-    )
-    reset_win.grid(row=1, column=0, sticky=EW)
+    ).grid(row=1, column=0, sticky=EW)
 
 
 def init_dev_tab(f: ttk.Frame) -> None:
@@ -482,7 +499,7 @@ def report_all_obj() -> None:
     from packageLoader import OBJ_TYPES
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(obj_type.cls.all())} {type_name}:\nb')
+            f.write(f'{len(obj_type.cls.all())} {type_name}:\n')
             for obj in obj_type.cls.all():
                 f.write(f'- {obj.id}\n')
 

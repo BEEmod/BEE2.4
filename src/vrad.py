@@ -9,16 +9,15 @@ LOGGER = init_logging('bee2/vrad.log')
 
 import os
 import shutil
-import subprocess
 import sys
 from datetime import datetime
 from io import BytesIO, StringIO
 from zipfile import ZipFile
-from typing import Iterator, List, Tuple, Set
+from typing import Iterator, List, Tuple, Set, Dict, Optional
 
-import srctools
+import srctools.run
 import utils
-from srctools import Property, Vec
+from srctools import Property, Entity
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
@@ -26,8 +25,11 @@ from srctools.filesys import (
 )
 from srctools.packlist import PackList, FileType as PackType, load_fgd
 from srctools.game import find_gameinfo
-from srctools.bsp_transform import run_transformations
-
+from srctools.bsp_transform import (
+    run_transformations,
+    Context as TransContext,
+    trans as register_transform,
+)
 
 CONF = Property('Config', [])
 
@@ -52,34 +54,6 @@ SOUND_MAN_FOLDER = {
     utils.STEAM_IDS['DEST_AP']: 'portal2_dlc2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
-}
-
-# Files that VBSP may generate, that we want to insert into the packfile.
-# They are all found in bee2/inject/.
-INJECT_FILES = {
-    # Defines choreo lines used on coop death, taunts, etc.
-    'response_data.nut': 'scripts/vscripts/bee2/coop_response_data.nut',
-
-    # The list of soundscripts that the game loads.
-    'soundscript_manifest.txt': 'scripts/game_sounds_manifest.txt',
-
-    # The list of particles that the game loads.
-    'particles_manifest.txt': 'particles/particles_manifest.txt',
-
-    # A generated soundscript for the current music.
-    'music_script.txt': 'scripts/BEE2_generated_music.txt',
-
-    # Applied to @glados's entity scripts.
-    'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
-
-    # Commands for monitor items.
-    'monitor_args.nut': 'scripts/vscripts/bee2/mon_camera_args.nut',
-
-    # Script for setting model types on cubes.
-    'cube_setmodel.nut': 'scripts/vscripts/bee2/cube_setmodel.nut',
-
-    # Plays the tick-tock timer sound.
-    'timer_sound.nut': 'scripts/vscripts/bee2/timer_sound.nut',
 }
 
 # Various parts of the soundscript generated for BG music.
@@ -315,7 +289,7 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def dump_files(zipfile: ZipFile):
+def dump_files(bsp: BSP):
     """Dump packed files to a location.
     """
     dump_folder = CONF['packfile_dump', '']
@@ -323,6 +297,8 @@ def dump_files(zipfile: ZipFile):
         return
 
     dump_folder = os.path.abspath(dump_folder)
+    
+    LOGGER.info('Dumping packed files to "{}"...', dump_folder)
 
     # Delete files in the folder, but don't delete the folder itself.
     try:
@@ -342,8 +318,40 @@ def dump_files(zipfile: ZipFile):
         else:
             os.remove(name)
 
-    for zipinfo in zipfile.infolist():
-        zipfile.extract(zipinfo, dump_folder)
+    with bsp.packfile() as zipfile:
+        for zipinfo in zipfile.infolist():
+            zipfile.extract(zipinfo, dump_folder)
+
+
+@register_transform('BEE2: Coop Responses')
+def generate_coop_responses(ctx: TransContext) -> None:
+    """If the entities are present, add the coop response script."""
+    responses: Dict[str, List[str]] = {}
+    for response in ctx.vmf.by_class['bee2_coop_response']:
+        responses[response['type']] = [
+            value for key, value in response.keys.items()
+            if key.startswith('choreo')
+        ]
+        response.remove()
+    script = ["BEE2_RESPONSES <- {"]
+    for response_type, lines in sorted(responses.items()):
+        script.append(f'\t{response_type} = [')
+        for line in lines:
+            script.append(f'\t\tCreateSceneEntity("{line}"),')
+        script.append('\t],')
+    script.append('};')
+
+    # We want to write this onto the '@glados' entity.
+    ent: Optional[Entity] = None
+    for ent in ctx.vmf.by_target['@glados']:
+        ctx.add_code(ent, '\n'.join(script))
+        # Also include the actual script.
+        split_script = ent['vscripts'].split()
+        split_script.append('bee2/coop_responses.nut')
+        ent['vscripts'] = ' '.join(split_script)
+
+    if ent is None:
+        LOGGER.warning('Response scripts present, but @glados is not!')
 
 
 def generate_music_script(data: Property, pack_list: PackList) -> bytes:
@@ -464,11 +472,6 @@ def write_sound(
 
 def inject_files() -> Iterator[Tuple[str, str]]:
     """Generate the names of files to inject, if they exist.."""
-    for filename, arcname in INJECT_FILES.items():
-        filename = os.path.join('bee2', 'inject', filename)
-        if os.path.exists(filename):
-            yield filename, arcname
-
     # Additionally add files set in the config.
     for prop in CONF.find_children('InjectFiles'):
         filename = os.path.join('bee2', 'inject', prop.real_name)
@@ -497,7 +500,7 @@ def mod_screenshots() -> None:
 
     if mod_type == 'cust':
         LOGGER.info('Using custom screenshot!')
-        scr_loc = CONF['screenshot', '']
+        scr_loc = str(utils.conf_location('screenshot.jpg'))
     elif mod_type == 'auto':
         LOGGER.info('Using automatic screenshot!')
         scr_loc = None
@@ -596,39 +599,11 @@ def mod_screenshots() -> None:
 
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
-
-    suffix = ''
-    if utils.MAC:
-        os_suff = '_osx'
-    elif utils.LINUX:
-        os_suff = '_linux'
-    else:
-        os_suff = ''
-        suffix = '.exe'
-
-    joined_args = (
-        '"' + os.path.normpath(
-            os.path.join(os.getcwd(), "vrad" + os_suff + "_original" + suffix)
-        ) +
-        '" ' +
-        " ".join(
-            # put quotes around args which contain spaces
-            ('"' + x + '"' if " " in x else x)
-            for x in args
-        )
-    )
-    LOGGER.info("Calling original VRAD...")
-    LOGGER.info(joined_args)
-    code = subprocess.call(
-        joined_args,
-        stdout=None,
-        stderr=subprocess.PIPE,
-        shell=True,
-    )
+    code = srctools.run.run_compiler(os.path.join(os.getcwd(), "vrad"), args)
     if code == 0:
         LOGGER.info("Done!")
     else:
-        LOGGER.warning("VRAD failed! (" + str(code) + ")")
+        LOGGER.warning("VRAD failed! ({})", code)
         sys.exit(code)
 
 
@@ -661,8 +636,8 @@ def main(argv: List[str]) -> None:
     load_config()
 
     for a in fast_args[:]:
-        if a.casefold() in (
-                "-both",
+        folded_a = a.casefold()
+        if folded_a.casefold() in (
                 "-final",
                 "-staticproplighting",
                 "-staticproppolys",
@@ -670,6 +645,11 @@ def main(argv: List[str]) -> None:
                 ):
             # remove final parameters from the modified arguments
             fast_args.remove(a)
+        elif folded_a == '-both':
+            # LDR Portal 2 isn't actually usable, so there's not much
+            # point compiling for it.
+            pos = fast_args.index(a)
+            fast_args[pos] = full_args[pos] = '-hdr'
         elif a in ('-force_peti', '-force_hammer', '-no_pack'):
             # we need to strip these out, otherwise VRAD will get confused
             fast_args.remove(a)
@@ -784,7 +764,7 @@ def main(argv: List[str]) -> None:
                 packlist.pack_file(arcname, data=f.read())
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_ents, fsys, packlist)
+    run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
@@ -802,42 +782,41 @@ def main(argv: List[str]) -> None:
     pack_whitelist = set()  # type: Set[FileSystem]
     pack_blacklist = set()  # type: Set[FileSystem]
     if is_peti:
-        pack_blacklist |= {
-            RawFileSystem(root_folder / 'portal2_dlc2'),
-            RawFileSystem(root_folder / 'portal2_dlc1'),
-            RawFileSystem(root_folder / 'portal2'),
-            RawFileSystem(root_folder / 'platform'),
-            RawFileSystem(root_folder / 'update'),
-        }
         if fsys_mel is not None:
             pack_whitelist.add(fsys_mel)
         if fsys_tag is not None:
             pack_whitelist.add(fsys_tag)
+        # Exclude absolutely everything except our folder.
+        for child_sys, _ in fsys.systems:
+            # Add 'bee2/' and 'bee2_dev/' only.
+            if (
+                isinstance(child_sys, RawFileSystem) and
+                'bee2' in os.path.basename(child_sys.path).casefold()
+            ):
+                pack_whitelist.add(child_sys)
+            else:
+                pack_blacklist.add(child_sys)
 
     if '-no_pack' not in args:
         # Cubemap files packed into the map already.
-        existing = set(zipfile.infolist())
+        with bsp_file.packfile() as zipfile:
+            existing = set(zipfile.namelist())
 
         LOGGER.info('Writing to BSP...')
         packlist.pack_into_zip(
-            zipfile,
+            bsp_file,
             ignore_vpk=True,
             whitelist=pack_whitelist,
             blacklist=pack_blacklist,
         )
 
-        LOGGER.info('Packed files:\n{}', '\n'.join([
-            zipinfo.filename
-            for zipinfo in zipfile.infolist()
-            if zipinfo.filename not in existing
-        ]))
+        with bsp_file.packfile() as zipfile:
+            LOGGER.info('Packed files:\n{}', '\n'.join(
+                set(zipfile.namelist()) - existing
+            ))
 
-    dump_files(zipfile)
+    dump_files(bsp_file)
 
-    zipfile.close()  # Finalise the zip modification
-
-    # Copy the zipfile into the BSP file, and adjust the headers.
-    bsp_file.lumps[BSP_LUMPS.PAKFILE].data = zip_data.getvalue()
     # Copy new entity data.
     bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
 

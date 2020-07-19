@@ -1,14 +1,15 @@
 """Conditions related to specific kinds of entities."""
 import random
 from collections import defaultdict
+from typing import List, Dict, Tuple
 
 import conditions
 import srctools.logger
 import template_brush
-from conditions import (
-    make_result, make_result_setup,
-    SOLIDS
-)
+import texturing
+import tiling
+from brushLoc import POS as BLOCK_POS
+from conditions import make_result, make_result_setup
 from template_brush import TEMP_TYPES
 from srctools import Property, Vec, VMF, Entity
 
@@ -18,15 +19,17 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
 @make_result_setup('TemplateOverlay')
-def res_import_template_setup(res: Property):
+def res_import_template_setup(
+    res: Property,
+) -> Tuple[str, Dict[str, List[str]], Vec, Vec, Vec]:
     temp_id = res['id'].casefold()
 
     face = Vec.from_str(res['face_pos', '0 0 -64'])
     norm = Vec.from_str(res['normal', '0 0 1'])
 
-    replace_tex = defaultdict(list)
+    replace_tex = defaultdict(list)  # type: Dict[str, List[str]]
     for prop in res.find_key('replace', []):
-        replace_tex[prop.name].append(prop.value)
+        replace_tex[prop.name.replace('\\', '/')].append(prop.value)
 
     offset = Vec.from_str(res['offset', '0 0 0'])
 
@@ -40,7 +43,7 @@ def res_import_template_setup(res: Property):
 
 
 @make_result('TemplateOverlay')
-def res_insert_overlay(inst: Entity, res: Property):
+def res_insert_overlay(inst: Entity, res: Property) -> None:
     """Use a template to insert one or more overlays on a surface.
 
     Options:
@@ -74,14 +77,12 @@ def res_insert_overlay(inst: Entity, res: Property):
         inst['angles', '0 0 0']
     )
 
-    for axis, norm in enumerate(normal):
-        # Align to the center of the block grid. The normal direction is
-        # already correct.
-        if norm == 0:
-            face_pos[axis] = face_pos[axis] // 128 * 128 + 64
+    # Shift so that the user perceives the position as the pos of the face
+    # itself.
+    face_pos -= 64 * normal
 
     try:
-        face_id = SOLIDS[face_pos.as_tuple()].face.id
+        tiledef = tiling.TILES[face_pos.as_tuple(), normal.as_tuple()]
     except KeyError:
         LOGGER.warning(
             'Overlay brush position is not valid: {}',
@@ -99,19 +100,20 @@ def res_insert_overlay(inst: Entity, res: Property):
 
     for over in temp.overlay:  # type: Entity
         random.seed('TEMP_OVERLAY_' + over['basisorigin'])
-        mat = random.choice(replace.get(
-            over['material'],
-            (over['material'], ),
-        ))
+        mat = over['material']
+        try:
+            mat = random.choice(replace[over['material'].casefold().replace('\\', '/')])
+        except KeyError:
+            pass
+
         if mat[:1] == '$':
             mat = inst.fixup[mat]
         if mat.startswith('<') or mat.endswith('>'):
-            # Lookup in the style data.
-            import vbsp
-            LOGGER.info('Tex: {}', vbsp.settings['textures'].keys())
-            mat = vbsp.get_tex(mat[1:-1])
+            # Lookup in the texture data.
+            gen, mat = texturing.parse_name(mat[1:-1])
+            mat = gen.get(Vec.from_str(over['basisorigin']), mat)
         over['material'] = mat
-        over['sides'] = str(face_id)
+        tiledef.bind_overlay(over)
 
     # Wipe the brushes from the map.
     if temp.detail is not None:
@@ -159,7 +161,7 @@ def res_water_splash_setup(res: Property):
 
 
 @make_result('WaterSplash')
-def res_water_splash(vmf: VMF, inst: Entity, res: Property):
+def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
     """Creates splashes when something goes in and out of water.
 
     Arguments:
@@ -183,10 +185,10 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
         pos2,
         calc_type,
         fast_check,
-    ) = res.value  # type: str, str, float, Vec, str, str
+    ) = res.value  # type: str, str, float, Vec, Vec, str, str
 
-    pos1 = pos1.copy()  # type: Vec
-    splash_pos = pos1.copy()  # type: Vec
+    pos1 = pos1.copy()
+    splash_pos = pos1.copy()
 
     if calc_type == 'track_platform':
         lin_off = srctools.conv_int(inst.fixup['$travel_distance'])
@@ -229,26 +231,24 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
         # actual surface. In that case check the origin too.
         check_pos.append(Vec(pos1.x, pos1.y, origin.z))
 
-    for pos in check_pos:
-        grid_pos = pos // 128 * 128  # type: Vec
-        grid_pos += (64, 64, 64)
-        try:
-            surf = conditions.GOO_LOCS[grid_pos.as_tuple()]
-        except KeyError:
-            continue
-        break
-    else:
-        return  # Not in goo at all
-
     if pos1.z == pos2.z:
         # Flat - this won't do anything...
         return
 
-    water_pos = surf.get_origin()
+    for pos in check_pos:
+        grid_pos = pos // 128 * 128
+        grid_pos += (64, 64, 64)
+
+        block = BLOCK_POS['world': pos]
+        if block.is_goo:
+            break
+    else:
+        return  # Not in goo at all
+
+    water_pos = grid_pos + (0, 0, 32)
 
     # Check if both positions are above or below the water..
     # that means it won't ever trigger.
-    LOGGER.info('pos1: {}, pos2: {}, water_pos: {}', pos1.z, pos2.z, water_pos.z)
     if max(pos1.z, pos2.z) < water_pos.z - 8:
         return
     if min(pos1.z, pos2.z) > water_pos.z + 8:
@@ -275,7 +275,7 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property):
 
 
 @make_result('FunnelLight')
-def res_make_funnel_light(inst: Entity):
+def res_make_funnel_light(inst: Entity) -> None:
     """Place a light for Funnel items."""
     oran_on = inst.fixup.bool('$start_reversed')
     need_blue = need_oran = False

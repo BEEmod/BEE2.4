@@ -1,5 +1,5 @@
 """Various functions shared among the compiler and application."""
-import collections
+from collections import deque
 import functools
 import logging
 import os
@@ -449,9 +449,11 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, FuncLookup):
             return self._registry == other._registry
-        if not isinstance(other, collections.Mapping):
+        try:
+            conv = dict(other.items())
+        except (AttributeError, TypeError):
             return NotImplemented
-        return self._registry == dict(other.items())
+        return self._registry == conv
 
     def __iter__(self) -> Iterator[Callable[..., Any]]:
         """Yield all the functions."""
@@ -592,7 +594,7 @@ def center_win(window, parent=None):
     window.geometry('+' + str(x) + '+' + str(y))
 
 
-def _append_bothsides(deq: collections.deque) -> Generator[None, Any, None]:
+def _append_bothsides(deq: deque) -> Generator[None, Any, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
@@ -611,7 +613,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
         return []
     orig_dist = dist
     smallest = obj[-1]
-    items = collections.deque()
+    items = deque()
 
     # We use this so the small sections appear on both sides of the area.
     adder = _append_bothsides(items)
@@ -629,6 +631,31 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
 
     assert sum(items) == orig_dist
     return list(items)  # Dump the deque
+
+
+ValueT = TypeVar('ValueT')
+
+
+def group_runs(iterable: Iterable[ValueT]) -> Iterator[Tuple[ValueT, int, int]]:
+    """Group runs of equal values.
+
+    Yields (value, min_ind, max_ind) tuples, where all of iterable[min:max+1]
+    is equal to value.
+    """
+    it = iter(iterable)
+    min_ind = max_ind = 0
+    try:
+        obj = next(it)
+    except StopIteration:
+        return
+    for next_obj in it:
+        if next_obj == obj:
+            max_ind += 1
+        else:
+            yield obj, min_ind, max_ind
+            obj = next_obj
+            min_ind = max_ind = max_ind + 1
+    yield obj, min_ind, max_ind
 
 
 def restart_app() -> NoReturn:

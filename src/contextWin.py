@@ -209,7 +209,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list:
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         box.state(['disabled'])
-        box['values'] = [_('No Alternate Versions!')]
+        box['values'] = [_('No Alternate Versions')]
         box.current(0)
     else:
         box.state(['!disabled'])
@@ -274,6 +274,8 @@ def load_item_data():
 
     editor_data = item_data.editor.copy()
 
+    # Reuse the exporting logic to parse out whether an item has I/O.
+    # This takes into account a bunch of special cases.
     comm_block = Property(selected_item.id, [])
     (
         has_inputs,
@@ -299,10 +301,10 @@ def load_item_data():
             set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
-                wid['sprite', SPR.INPUT].tooltip_text = _(
+                tooltip.set_tooltip(wid['sprite', SPR.INPUT], _(
                     'Excursion Funnels accept a on/off '
                     'input and a directional input.'
-                )
+                ))
         else:
             set_sprite(SPR.INPUT, 'in_norm')
     else:

@@ -4,7 +4,6 @@ import random
 from srctools import Vec, Property, VMF, Solid, Side, Output
 import srctools.logger
 import utils
-import vbsp
 import brushLoc
 import vbsp_options
 
@@ -67,6 +66,7 @@ def load_settings(pit: Property):
 
 def make_bottomless_pit(vmf: VMF, max_height):
     """Generate bottomless pits."""
+    import vbsp
 
     tele_ref = SETTINGS['tele_ref']
     tele_dest = SETTINGS['tele_dest']
@@ -239,10 +239,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             side_dirs
         ])
 
-    if tele_trig is not None:
-        vbsp.IGNORED_BRUSH_ENTS.add(tele_trig)
     if hurt_trig is not None:
-        vbsp.IGNORED_BRUSH_ENTS.add(hurt_trig)
         hurt_trig.outputs.append(
             Output(
                 'OnHurtPlayer',
@@ -318,7 +315,6 @@ def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
     """Retexture the brush forming the bottom of a pit."""
     if SETTINGS['skybox'] != '':
         face.mat = 'tools/toolsskybox'
-        vbsp.IGNORED_FACES.add(face)
     else:
         # We have a pit shell, we don't want a bottom.
         vmf.remove_brush(solid)
@@ -344,7 +340,7 @@ def make_pit_shell(vmf: VMF):
 
             if lowest is None:
                 continue
-                # TODO: For opened areas (wheatley), generate a floor...
+                # TODO: For opened areas (Wheatley), generate a floor...
                 real_pos = brushLoc.grid_to_world(Vec(x, y, 0))
                 prism = vmf.make_prism(
                     real_pos + (64, 64, BOTTOMLESS_PIT_MIN + 8),

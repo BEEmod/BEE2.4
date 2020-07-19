@@ -1,7 +1,7 @@
 """Generate random quarter tiles, like in Destroyed or Retro maps."""
 import random
 from collections import defaultdict, namedtuple
-from typing import Tuple, Set
+from typing import Tuple, Set, Dict, List
 
 import conditions
 import connections
@@ -12,7 +12,7 @@ import vbsp
 import comp_consts as consts
 import instanceLocs
 from perlin import SimplexNoise
-from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis, VMF
+from srctools import Property, Vec_tuple, Vec, Side, UVAxis, VMF
 
 
 COND_MOD_NAME = None
@@ -28,15 +28,10 @@ TEX_DEFAULT = [
 ]
 
 # Materials set for the cutout tile
-MATS = defaultdict(list)
+MATS: Dict[str, List[str]] = defaultdict(list)
 
 # We want to force tiles with these overlay materials to appear!
-FORCE_TILE_MATS = {
-    mat
-    for mat, key in
-    vbsp.TEX_VALVE.items()
-    if key.startswith('overlay.')
-}
+FORCE_TILE_MATS = list(consts.Signage)
 
 # The template used to seal sides open to the void.
 FLOOR_TEMP_SIDE_WORLD = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_WORLD'
@@ -85,6 +80,11 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
 
     """
     marker_filenames = instanceLocs.resolve(res['markeritem'])
+
+    x: float
+    y: float
+    max_x: float
+    max_y: float
 
     INST_LOCS = {}  # Map targetnames -> surface loc
     CEIL_IO = []  # Pairs of ceil inst corners to cut out.
@@ -142,7 +142,8 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
 
     # We want to know the number of neighbouring tile cutouts before
     # placing tiles - blocks away from the sides generate fewer tiles.
-    floor_neighbours = defaultdict(dict)  # all_floors[z][x,y] = count
+    # all_floors[z][x,y] = count
+    floor_neighbours = defaultdict(dict)  # type: Dict[float, Dict[Tuple[float, float], int]]
 
     for mat_prop in res.find_key('Materials', []):
         MATS[mat_prop.name].append(mat_prop.value)
@@ -196,6 +197,8 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
         # Remove all traces of this item (other than in connections lists).
         inst.remove()
         del connections.ITEMS[targ]
+
+    return  # TODO: Reimplement cutout tiles.
 
     for start_floor, end_floor in FLOOR_IO:
         box_min = Vec(INST_LOCS[start_floor])
@@ -303,8 +306,8 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
     # Now count boundaries near tiles, then generate them.
 
     # Do it separately for each z-level:
-    for z, xy_dict in floor_neighbours.items():  # type: float, dict
-        for x, y in xy_dict:  # type: float, float
+    for z, xy_dict in floor_neighbours.items():
+        for x, y in xy_dict:
             # We want to count where there aren't any tiles
             xy_dict[x, y] = (
                 ((x - 128, y - 128) not in xy_dict) +
@@ -367,8 +370,6 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
             )
 
     add_floor_sides(vmf, floor_edges)
-
-    conditions.reallocate_overlays(overlay_ids)
 
     return conditions.RES_EXHAUSTED
 
@@ -534,9 +535,6 @@ def make_tile(vmf: VMF, p1: Vec, p2: Vec, top_mat, bottom_mat, beam_mat):
         0, 1, 0, offset=0)
     w.uaxis = e.uaxis.copy()
     w.vaxis = e.vaxis.copy()
-
-    # Ensure the squarebeams textures aren't replaced, as well as floor tex
-    vbsp.IGNORED_FACES.update(brush.sides)
 
     return prism
 
@@ -794,8 +792,6 @@ def add_floor_sides(vmf: VMF, locs):
             # Swap these to flip the texture diagonally, so the beam is at top
             face.uaxis, face.vaxis = face.vaxis, face.uaxis
             face.uaxis.offset = 48
-
-            vbsp.IGNORED_FACES.add(face)
 
     # Look for the ones without a texture - these are open to the void and
     # need to be sealed. The template chamfers the edges

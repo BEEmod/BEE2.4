@@ -18,7 +18,6 @@ from srctools import (
 )
 import srctools.logger
 import conditions.globals
-import vbsp
 from srctools.vmf import EntityFixup
 
 
@@ -430,7 +429,7 @@ class CubeType:
             raise ValueError('Bad cube type "{}" for {}'.format(
                 conf['cubetype'], cube_id)
             ) from None
-        except NoKeyError:
+        except LookupError:
             raise ValueError('No cube type for "{}"!'.format(cube_id)) from None
 
         try:
@@ -526,6 +525,12 @@ class CubePair:
 
         self.tint = tint  # If set, Colorizer color to use.
 
+        # Copy from the dropper, allowing specific droppers to update this.
+        if drop_type is not None:
+            self.spawn_offset = drop_type.cube_pos
+        else:
+            self.spawn_offset = Vec()
+
         # Addons to attach to the cubes.
         # Use a set to ensure it doesn't have two copies.
         self.addons = set()  # type: Set[CubeAddon]
@@ -551,7 +556,10 @@ class CubePair:
             cube.bee2_cube_data = self
             CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
-    def __repr__(self):
+        # Cache of comp_kv_setters adding outputs to dropper ents.
+        self._kv_setters: Dict[str, Entity] = {}
+
+    def __repr__(self) -> str:
         drop_id = drop = cube = ''
         if self.dropper:
             drop = self.dropper['targetname']
@@ -562,6 +570,19 @@ class CubePair:
         return '<CubePair {} -> "{}": {!r} -> {!r}, {!s}>'.format(
             drop_id, self.cube_type.id, drop, cube, self.tint,
         )
+
+    def get_kv_setter(self, name: str) -> Entity:
+        """Get a KV setter setting this dropper-local name, creating if required."""
+        name = conditions.local_name(self.dropper, name)
+        try:
+            return self._kv_setters[name]
+        except KeyError:
+            kv_setter = self._kv_setters[name] = self.dropper.map.create_ent(
+                'comp_kv_setter',
+                origin=self.dropper['origin'],
+                target=name,
+            )
+            return kv_setter
 
 
 def parse_conf(conf: Property):
@@ -705,6 +726,7 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
                 # Parent class which is True for everything.
                 classname='filter_base',
                 targetname='@filter_nothing',
+                origin=pos,
                 negated=True,
             )['targetname']
             return filter_name
@@ -927,6 +949,36 @@ def res_dropper_addon(inst: Entity, res: Property):
     pair.addons.add(addon)
 
 
+@make_result('SetDropperOffset')
+def res_set_dropper_off(inst: Entity, res: Property) -> None:
+    """Update the position cubes will be spawned at for a dropper."""
+    try:
+        pair = inst.bee2_cube_data  # type: CubePair
+    except AttributeError:
+        LOGGER.warning('SetDropperOffset applied to non cube ("{}")', res.value)
+    else:
+        pair.spawn_offset = Vec.from_str(conditions.resolve_value(inst, res.value))
+
+
+@make_result('ChangeCubeType', 'SetCubeType')
+def flag_cube_type(inst: Entity, res: Property):
+    """Change the cube type of a cube item
+
+    This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and instances
+    marked as a custom dropperless cube.
+    """
+    try:
+        pair = inst.bee2_cube_data  # type: CubePair
+    except AttributeError:
+        LOGGER.warning('Attempting to set cube type on non cube ("{}")', inst['targetname'])
+        return
+
+    try:
+        pair.cube_type = CUBE_TYPES[res.value]
+    except KeyError:
+        raise ValueError('Unknown cube type "{}"!'.format(res.value))
+
+
 @make_result('CubeFilter')
 def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     """Given a set of cube-type IDs, generate a filter for them.
@@ -1000,13 +1052,13 @@ def res_script_cube_predicate(res: Property):
         cube_type.add_models(models)
 
     # Normalise the names to a consistent format.
-    models = {
+    model_names = {
         model.lower().replace('\\', '/')
         for model in models
     }
 
     buffer.write(script_function + ' <- __BEE2_CUBE_FUNC__({\n')
-    for model in models:
+    for model in model_names:
         buffer.write(' ["{}"]=1,\n'.format(model))
     buffer.write('});\n')
 
@@ -1416,14 +1468,13 @@ def make_cube(
                 # Manually add the dropper outputs here, so they only add to the
                 # actual dropper (not the other cube if present).
                 drop_name, drop_cmd = drop_type.out_finish_drop
-                pair.dropper.add_out(
+                pair.get_kv_setter(drop_name).add_out(
                     # Paint the cube, so it now has the functionality.
                     Output(
                         drop_cmd,
                         '!activator',
                         'SetPaint',
                         pair.paint_type.value,
-                        inst_out=drop_name,
                     )
                 )
             else:
@@ -1441,13 +1492,12 @@ def make_cube(
                 # Manually add the dropper outputs here, so they only add to the
                 # actual dropper.
                 drop_name, drop_cmd = drop_type.out_finish_drop
-                pair.dropper.add_out(
+                pair.get_kv_setter(drop_name).add_out(
                     # Fire an input to activate the effects.
                     Output(
                         drop_cmd,
                         conditions.local_name(pair.dropper, 'painter_blue'),
                         'FireUser1',
-                        inst_out=drop_name,
                     ),
                     # And also paint the cube itself.
                     Output(
@@ -1455,7 +1505,6 @@ def make_cube(
                         '!activator',
                         'SetPaint',
                         pair.paint_type.value,
-                        inst_out=drop_name,
                     )
                 )
                 # Don't paint it on spawn.
@@ -1579,12 +1628,22 @@ def generate_cubes(vmf: VMF):
             if cust_model:
                 # Fire an on-spawn output that swaps the model,
                 # then resets the skin.
+
+                # If we have a bounce cube painter, it needs to be the normal skin.
+                if (
+                    pair.paint_type is CubePaintType.BOUNCE and
+                    pair.drop_type.bounce_paint_file.casefold() != '<prepaint>'
+                ):
+                    spawn_paint = None
+                else:
+                    spawn_paint = pair.paint_type
+
                 pair.outputs[CubeOutputs.SPAWN].append(Output(
                     '', '!self', 'RunScriptCode',
                     'self.SetModel(`{}`); '
                     'self.__KeyValueFromInt(`skin`, {});'.format(
                         cust_model,
-                        CUBE_SKINS[pair.paint_type, pair.cube_type.type],
+                        CUBE_SKINS[spawn_paint, pair.cube_type.type],
                     ),
                 ))
                 conditions.globals.precache_model(vmf, cust_model)
@@ -1619,7 +1678,7 @@ def generate_cubes(vmf: VMF):
         if pair.dropper:
             assert pair.drop_type is not None
             pos = Vec.from_str(pair.dropper['origin'])
-            pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
+            pos += pair.spawn_offset.copy().rotate_by_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True)
             cubes.append(drop_cube)
 
@@ -1636,22 +1695,19 @@ def generate_cubes(vmf: VMF):
 
             drop_done_name, drop_done_command = pair.drop_type.out_finish_drop
             for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
-                out = setup_output(
+                pair.get_kv_setter(drop_done_name).add_out(setup_output(
                     temp_out,
                     pair.dropper,
                     drop_done_command,
                     self_name='!activator',
-                )
-                out.inst_out = drop_done_name
-                pair.dropper.add_out(out)
+                ))
 
             # We always enable portal funnelling after dropping,
             # since we turn it off inside.
-            pair.dropper.add_out(Output(
+            pair.get_kv_setter(drop_done_name).add_out(Output(
                 drop_done_command,
                 '!activator',
                 'EnablePortalFunnel',
-                inst_out=drop_done_name,
             ))
 
             # We FireUser4 after the template ForceSpawns.
@@ -1695,11 +1751,10 @@ def generate_cubes(vmf: VMF):
 
                 # For FrankenTurrets, we also pop it out after finishing
                 # spawning.
-                pair.dropper.add_out(Output(
+                pair.get_kv_setter(drop_done_name).add_out(Output(
                     drop_done_command,
                     '!activator',
                     'BecomeMonster',
-                    inst_out=drop_done_name,
                     delay=0.2,
                 ))
 
@@ -1831,12 +1886,11 @@ def generate_cubes(vmf: VMF):
 
             # Fizzle the cube when triggering the dropper.
             drop_fizzle_name, drop_fizzle_command = pair.drop_type.out_start_drop
-            pair.dropper.add_out(Output(
+            pair.get_kv_setter(drop_fizzle_name).add_out(Output(
                 drop_fizzle_command,
                 cube['targetname'],
                 'Dissolve',
                 only_once=True,
-                inst_out=drop_fizzle_name
             ))
 
         # Voice events to add to all cubes.

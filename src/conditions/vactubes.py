@@ -1,20 +1,20 @@
 """Implements the cutomisable vactube items.
 """
 from collections import namedtuple
+from typing import Dict, Tuple, List, Iterator, Optional
 
 import connections
 import srctools.logger
 import template_brush
+import tiling
 import vbsp
+from brushLoc import POS as BLOCK_POS
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    GOO_LOCS, SOLIDS
+    meta_cond
 )
 import instanceLocs
-from srctools import (
-    Vec, Vec_tuple,
-    Property, Entity,
-)
+from srctools import Vec, Vec_tuple, Property, Entity, VMF
 
 COND_MOD_NAME = None
 
@@ -25,6 +25,7 @@ UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
 PUSH_TRIGS = {}
+VAC_TRACKS: List[Tuple['Marker', Dict[str, 'Marker']]] = []  # Tuples of (start, group)
 
 CornerAng = namedtuple('CornerAng', 'ang, axis')
 
@@ -68,10 +69,10 @@ CORNER_ANG = {
     (yn, xp): CornerAng('0 0 90', 'z'),
 }
 
-SUPPORT_POS = {}
+SUPPORT_POS: Dict[Tuple[float, float, float], List[Tuple[Vec, Vec]]] = {}
 
 
-def _make_support_table():
+def _make_support_table() -> None:
     """Make a table of angle/offset values for each direction."""
     for norm in (xp, xn, yp, yn, zp, zn):
         table = SUPPORT_POS[norm] = []
@@ -79,26 +80,38 @@ def _make_support_table():
             ang = Vec(norm).to_angle(roll=x)
             table.append((
                 ang,
-                Vec(0, 0, -64).rotate(*ang)
+                Vec(0, 0, -128).rotate(*ang)
             ))
 _make_support_table()  # Ensure local vars are destroyed
 
 del xp, xn, yp, yn, zp, zn
 
 
-def follow_vac_path(inst_list, start_ent):
-    """Given the start item and instance list, follow the programmed path."""
-    cur_ent = start_ent
-    while True:
-        next_ent = inst_list.get(cur_ent['next'], None)
-        if next_ent is None:
-            return
-        yield cur_ent, next_ent
-        cur_ent = next_ent
+class Marker:
+    """A single node point."""
+    next: Optional[str]
+
+    def __init__(self, inst: Entity, conf: dict, size: int) -> None:
+        self.ent = inst
+        self.conf = conf
+        self.next = None
+        self.no_prev = True
+        self.size = size
+
+    def follow_path(self, vac_list: Dict[str, 'Marker']) -> Iterator[Tuple['Marker', 'Marker']]:
+        """Follow the provided vactube path, yielding each pair of nodes."""
+        vac_node = self
+        while True:
+            try:
+                next_ent = vac_list[vac_node.next]
+            except KeyError:
+                return
+            yield vac_node, next_ent
+            vac_node = next_ent
 
 # Store the configs for vactube items so we can
 # join them together - multiple item types can participate in the same
-# vatube track.
+# vactube track.
 VAC_CONFIGS = {}
 
 
@@ -156,22 +169,19 @@ def res_vactube_setup(res: Property):
 
 @make_result('CustVactube')
 def res_make_vactubes(res: Property):
-    """Specialised result to generate vactubes from markers.
+    """Specialised result to parse vactubes from markers.
 
-    Only runs once, and then quits the condition list.
+    Only runs once, and then quits the condition list. After priority 400,
+    the ents will actually be placed.
     """
     if res.value not in VAC_CONFIGS:
         # We've already executed this config group
         return RES_EXHAUSTED
 
-    LOGGER.info(
-        'Running Generator ({})...',
-        res.value
-    )
     CONFIG, INST_CONFIGS = VAC_CONFIGS[res.value]
     del VAC_CONFIGS[res.value]  # Don't let this run twice
 
-    markers = {}
+    markers: Dict[str, Marker] = {}
 
     # Find all our markers, so we can look them up by targetname.
     for inst in vbsp.VMF.by_class['func_instance']:  # type: Entity
@@ -184,13 +194,7 @@ def res_make_vactubes(res: Property):
         # ones.
         inst.remove()
 
-        markers[inst['targetname']] = {
-            'ent': inst,
-            'conf': config,
-            'next': None,
-            'no_prev': True,
-            'size': inst_size,
-        }
+        markers[inst['targetname']] = Marker(inst, config, inst_size)
 
     for mark_name, marker in markers.items():
         marker_item = connections.ITEMS[mark_name]
@@ -210,64 +214,66 @@ def res_make_vactubes(res: Property):
 
             conn.remove()
                 
-            if marker['next'] is not None:
+            if marker.next is not None:
                 raise ValueError('Vactube connected to two targets!')
-            marker['next'] = conn.to_item.name
-            next_marker['no_prev'] = False
+            marker.next = conn.to_item.name
+            next_marker.no_prev = False
 
         if next_marker is None:
             # No next-instances were found..
             # Mark as no-connections
-            marker['next'] = None
+            marker.next = None
 
     # We do generation only from the start of chains.
     for marker in markers.values():
-        if marker['no_prev']:
-            make_vac_track(marker, markers)
+        if marker.no_prev:
+            VAC_TRACKS.append((marker, markers))
 
     return RES_EXHAUSTED
 
 
-def make_vac_track(start, all_markers):
-    """Create a vactube path section.
+@meta_cond(400)
+def vactube_gen(vmf: VMF) -> None:
+    """Generate the vactubes, after most conditions have run."""
+    if not VAC_TRACKS:
+        return
+    LOGGER.info('Generating vactubes...')
+    for start, all_markers in VAC_TRACKS:
+        start_normal = Vec(-1, 0, 0).rotate_by_str(start.ent['angles'])
 
-    """
+        # First create the start section..
+        start_logic = start.ent.copy()
+        vbsp.VMF.add_ent(start_logic)
 
-    start_normal = Vec(-1, 0, 0).rotate_by_str(start['ent']['angles'])
+        start_logic['file'] = start.conf['entry', (
+            'ceiling' if (start_normal.z > 0) else
+            'floor' if (start_normal.z < 0) else
+            'wall'
+        )]
 
-    # First create the start section..
-    start_logic = start['ent'].copy()
-    vbsp.VMF.add_ent(start_logic)
+        end = start
 
-    start_logic['file'] = start['conf']['entry', (
-        'ceiling' if (start_normal.z > 0) else
-        'floor' if (start_normal.z < 0) else
-        'wall'
-    )]
+        for inst, end in start.follow_path(all_markers):
+            join_markers(inst, end, inst is start)
 
-    end = start
+        end_loc = Vec.from_str(end.ent['origin'])
+        end_norm = Vec(-1, 0, 0).rotate_by_str(end.ent['angles'])
 
-    for inst, end in follow_vac_path(all_markers, start):
-        join_markers(inst, end, inst is start)
+        # join_markers creates straight parts up-to the marker, but not at it's
+        # location - create the last one.
+        make_straight(
+            end_loc,
+            end_norm,
+            128,
+            end.conf,
+        )
 
-    end_loc = Vec.from_str(end['ent']['origin'])
-    end_norm = Vec(-1, 0, 0).rotate_by_str(end['ent']['angles'])
-
-    # join_markers creates straight parts up-to the marker, but not at it's
-    # location - create the last one.
-    make_straight(
-        end_loc,
-        end_norm,
-        128,
-        end['conf'],
-    )
-
-    # If the end is placed in goo, don't add logic - it isn't visible, and
-    # the object is on a one-way trip anyway.
-    if end_loc.as_tuple() not in GOO_LOCS:
-        end_logic = end['ent'].copy()
-        vbsp.VMF.add_ent(end_logic)
-        end_logic['file'] = end['conf']['exit']
+        # If the end is placed in goo, don't add logic - it isn't visible, and
+        # the object is on a one-way trip anyway.
+        if BLOCK_POS['world': end_loc].is_goo and end_norm == (0, 0, -1):
+            end_logic = end.ent.copy()
+            vbsp.VMF.add_ent(end_logic)
+            end_logic['file'] = end.conf['exit']
 
 
 def push_trigger(loc, normal, solids):
@@ -310,12 +316,12 @@ def motion_trigger(*solids):
 
 
 def make_straight(
-        origin: Vec,
-        normal: Vec,
-        dist: int,
-        config: dict,
-        is_start=False,
-    ):
+    origin: Vec,
+    normal: Vec,
+    dist: int,
+    config: dict,
+    is_start=False,
+) -> None:
     """Make a straight line of instances from one point to another."""
 
     # 32 added to the other directions, plus extended dist in the direction
@@ -359,7 +365,15 @@ def make_straight(
         )
 
         for supp_ang, supp_off in support_positions:
-            if (position + supp_off).as_tuple() in SOLIDS:
+            try:
+                tile = tiling.TILES[
+                    (position + supp_off).as_tuple(),
+                    (-supp_off).norm().as_tuple()
+                ]
+            except KeyError:
+                continue
+            # Check all 4 center tiles are present.
+            if all(tile[u, v].is_tile for u in (1,2) for v in (1, 2)):
                 vbsp.VMF.create_ent(
                     classname='func_instance',
                     origin=position,
@@ -585,18 +599,15 @@ def make_ubend(
         )
 
 
-def join_markers(inst_a, inst_b, is_start=False):
-    """Join two marker ents together with corners.
+def join_markers(mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
+    """Join two marker ents together with corners."""
+    origin_a = Vec.from_str(mark_a.ent['origin'])
+    origin_b = Vec.from_str(mark_b.ent['origin'])
 
-    This returns a list of solids used for the vphysics_motion trigger.
-    """
-    origin_a = Vec.from_str(inst_a['ent']['origin'])
-    origin_b = Vec.from_str(inst_b['ent']['origin'])
+    norm_a = Vec(-1, 0, 0).rotate_by_str(mark_a.ent['angles'])
+    norm_b = Vec(-1, 0, 0).rotate_by_str(mark_b.ent['angles'])
 
-    norm_a = Vec(-1, 0, 0).rotate_by_str(inst_a['ent']['angles'])
-    norm_b = Vec(-1, 0, 0).rotate_by_str(inst_b['ent']['angles'])
-
-    config = inst_a['conf']
+    config = mark_a.conf
 
     if norm_a == norm_b:
         # Either straight-line, or s-bend.
@@ -620,7 +631,7 @@ def join_markers(inst_a, inst_b, is_start=False):
             origin_b,
             norm_a,
             config,
-            max_size=inst_a['size'],
+            max_size=mark_a.size,
         )
         return
 
@@ -641,5 +652,5 @@ def join_markers(inst_a, inst_b, is_start=False):
             norm_b,
             corner_ang,
             config,
-            max_size=inst_a['size'],
+            max_size=mark_a.size,
         )

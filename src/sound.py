@@ -4,18 +4,20 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
-import shutil
 import os
+from tkinter import Event
+from typing import IO, Optional, Callable, Union, Dict
+
 import utils
 
 from tk_tools import TK_ROOT
-from srctools.filesys import RawFileSystem, FileSystemChain
+from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
 import srctools.logger
 
 __all__ = [
     'SOUNDS', 'SamplePlayer',
 
-    'avbin_version', 'pyglet_version', 'initiallised',
+    'pyglet_version', 'initiallised',
     'load_snd', 'play_sound', 'fx',
     'fx_blockable', 'block_fx',
 ]
@@ -24,10 +26,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 play_sound = True
 
-SAMPLE_WRITE_PATH = utils.conf_location('config/music_sample/temp')
-
 # This starts holding the filenames, but then caches the actual sound object.
-SOUNDS = {
+SOUNDS: Dict[str, Union[str, 'Source']] = {
     'select': 'rollover',
     'add': 'increment',
     'config': 'reconfig',
@@ -50,14 +50,14 @@ SOUNDS = {
 
 try:
     import pyglet.media
-    from pyglet.media import avbin  # We need this extension, so error early.
 
     pyglet_version = pyglet.version
-    avbin_version = avbin.get_version()
+    if not pyglet.media.have_ffmpeg():
+        raise ImportError('No ffmpeg available!')
 except ImportError:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!', exc_info=True)
 
-    pyglet_version = avbin_version = '(Not installed)'
+    pyglet_version = '(Not installed)'
 
     def fx(*args, **kwargs):
         """Pyglet has failed to initialise!
@@ -65,30 +65,40 @@ except ImportError:
         No sounds will be played.
         """
 
-    def load_snd():
+    def load_snd() -> None:
         """Load in sound FX."""
 
-    def fx_blockable(sound):
+    def fx_blockable(sound: str) -> None:
         """Play a sound effect.
 
         This waits for a certain amount of time between retriggering sounds
         so they don't overlap.
         """
 
-    def block_fx():
+    def block_fx() -> None:
         """Block fx_blockable() for a short time."""
-
-    def clean_folder():
-        pass
 
     initiallised = False
     pyglet = avbin = None  # type: ignore
     SamplePlayer = None  # type: ignore
 else:
-    # Succeeded in loading PyGame
-    from pyglet.media import Source, MediaFormatException, CannotSeekException
+    # Was able to load Pyglet.
+    from pyglet.media.codecs import Source
+    from pyglet.media.exceptions import (
+        MediaDecodeException, MediaFormatException, CannotSeekException,
+    )
+    from pyglet.clock import tick
     initiallised = True
     _play_repeat_sfx = True
+
+    def load_snd() -> None:
+        """Load all the sounds."""
+        for name, fname in SOUNDS.items():
+            LOGGER.info('Loading sound "{}" -> sounds/{}.ogg', name, fname)
+            SOUNDS[name] = pyglet.media.load(
+                str(utils.install_path('sounds/{}.ogg'.format(fname))),
+                streaming=False,
+            )
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
@@ -101,12 +111,9 @@ else:
         except KeyError:
             raise ValueError(f'Not a valid sound? "{name}"')
         if type(sound) is str:
-            LOGGER.info('Loading sound "{}" -> sounds/{}.ogg', name, sound)
-            sound = SOUNDS[name] = pyglet.media.load(
-                str(utils.install_path('sounds/{}.ogg'.format(sound))),
-                streaming=False,
-            )
-        sound.play()
+            LOGGER.warning('load_snd() not called when playing "{}"?', name)
+        else:
+            sound.play()
 
 
     def _reset_fx_blockable() -> None:
@@ -132,34 +139,52 @@ else:
         _play_repeat_sfx = False
         TK_ROOT.after(50, _reset_fx_blockable)
 
-    def clean_folder():
-        """Delete files used by the sample player."""
-        for file in SAMPLE_WRITE_PATH.parent.iterdir():
-            LOGGER.info('Cleaning up "{}"...', file)
-            try:
-                file.unlink()
-            except (PermissionError, FileNotFoundError):
-                pass
+    def ticker() -> None:
+        """We need to constantly trigger pyglet.clock.tick().
+
+        Instead of re-registering this, cache off the command name.
+        """
+        tick()
+        TK_ROOT.tk.call(ticker_cmd)
+
+    ticker_cmd = ('after', 150, TK_ROOT.register(ticker))
+    TK_ROOT.tk.call(ticker_cmd)
 
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""
-        def __init__(self, start_callback, stop_callback, system: FileSystemChain):
+        def __init__(
+            self,
+            start_callback:  Callable[[], None],
+            stop_callback:  Callable[[], None],
+            system: FileSystemChain,
+        ) -> None:
             """Initialise the sample-playing manager.
             """
-            self.sample = None
-            self.start_time = 0   # If set, the time to start the track at.
-            self.after = None
-            self.start_callback = start_callback
-            self.stop_callback = stop_callback
-            self.cur_file = None
-            self.system = system
+            self.sample: Optional[Source] = None
+            self.start_time: float = 0   # If set, the time to start the track at.
+            self.after: Optional[str] = None
+            self.start_callback: Callable[[], None] = start_callback
+            self.stop_callback: Callable[[], None] = stop_callback
+            self.cur_file: Optional[str] = None
+            # The system we need to cleanup.
+            self._handle: Optional[IO[bytes]] = None
+            self._cur_sys: Optional[FileSystem] = None
+            self.system: FileSystemChain = system
 
         @property
         def is_playing(self):
             """Is the player currently playing sounds?"""
             return self.sample is not None
 
-        def play_sample(self, e=None):
+        def _close_handles(self) -> None:
+            """Close down previous sounds."""
+            if self._handle is not None:
+                self._handle.close()
+            if self._cur_sys is not None:
+                self._cur_sys.close_ref()
+            self._handle = self._cur_sys = None
+
+        def play_sample(self, e: Event=None) -> None:
             pass
             """Play a sample of music.
 
@@ -172,6 +197,8 @@ else:
                 self.stop()
                 return
 
+            self._close_handles()
+
             with self.system:
                 try:
                     file = self.system[self.cur_file]
@@ -180,30 +207,26 @@ else:
                     LOGGER.error('Sound sample not found: "{}"', self.cur_file)
                     return  # Abort if music isn't found..
 
-            # TODO: Pyglet doesn't support direct streams, so we have to
-            # TODO: extract sounds to disk first.
-
-            fsystem = self.system.get_system(file)
-            if isinstance(fsystem, RawFileSystem):
-                # Special case, it's directly lying on the disk -
-                # We can just pass that along.
-                disk_filename = os.path.join(fsystem.path, file.path)
-                LOGGER.info('Directly playing sample "{}"...', disk_filename)
-            else:
-                # In a filesystem, we need to extract it.
-                # SAMPLE_WRITE_PATH + the appropriate extension.
-                disk_filename = str(SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1]))
-                LOGGER.info('Extracting music sample to "{}"...', disk_filename)
-                with self.system.get_system(file), file.open_bin() as fsrc:
-                    with open(disk_filename, 'wb') as fdest:
-                        shutil.copyfileobj(fsrc, fdest)
-
-            try:
-                sound = pyglet.media.load(disk_filename, streaming=False)  # type: Source
-            except MediaFormatException:
-                self.stop_callback()
-                LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
-                return  # Abort if music isn't found..
+                child_sys = self.system.get_system(file)
+                # Special case raw filesystems - Pyglet is more efficient
+                # if it can just open the file itself.
+                if isinstance(child_sys, RawFileSystem):
+                    load_path = os.path.join(child_sys.path, file.path)
+                    self._cur_sys = self._handle = None
+                    LOGGER.debug('Loading music directly from {!r}', load_path)
+                else:
+                    # Use the file objects directly.
+                    load_path = self.cur_file
+                    self._cur_sys = child_sys
+                    self._cur_sys.open_ref()
+                    self._handle = file.open_bin()
+                    LOGGER.debug('Loading music via {!r}', self._handle)
+                try:
+                    sound = pyglet.media.load(load_path, self._handle)
+                except (MediaDecodeException, MediaFormatException):
+                    self.stop_callback()
+                    LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
+                    return  # Abort if music isn't found..
 
             if self.start_time:
                 try:
@@ -218,21 +241,23 @@ else:
             )
             self.start_callback()
 
-        def stop(self):
+        def stop(self) -> None:
             """Cancel the music, if it's playing."""
             if self.sample is None:
                 return
 
             self.sample.pause()
             self.sample = None
+            self._close_handles()
             self.stop_callback()
 
             if self.after is not None:
                 TK_ROOT.after_cancel(self.after)
                 self.after = None
 
-        def _finished(self):
+        def _finished(self) -> None:
             """Reset values after the sound has finished."""
             self.sample = None
             self.after = None
+            self._close_handles()
             self.stop_callback()

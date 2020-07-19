@@ -1060,6 +1060,9 @@ class selWin:
             return True
 
         if it_id == '<NONE>':
+            # No none item, pretend it doesn't exist...
+            if self.noneItem not in self.item_list:
+                return False
             self.sel_item(self.noneItem)
             self.set_disp()
             self.do_callback()

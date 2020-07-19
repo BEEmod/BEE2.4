@@ -4,20 +4,20 @@ During package loading, we are busy performing tasks in the main thread.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-from typing import Optional
+from typing import Optional, Dict, Tuple, List
 
 from tkinter import ttk
 from tkinter.font import Font
 import tkinter as tk
-import multiprocessing
+import multiprocessing.connection
 
 import utils
 
 # ID -> screen.
-SCREENS = {}
+SCREENS: Dict[int, 'BaseLoadScreen'] = {}
 
-PIPE_REC = ...  # type: multiprocessing.Connection
-PIPE_SEND = ...  # type: multiprocessing.Connection
+PIPE_REC: multiprocessing.connection.Connection
+PIPE_SEND: multiprocessing.connection.Connection
 
 # Stores translated strings, which are done in the main process.
 TRANSLATION = {
@@ -26,17 +26,30 @@ TRANSLATION = {
     'cancel': 'Cancel',
 }
 
+SPLASH_FONTS = [
+    'Univers',
+    'Segoe UI',
+    'San Francisco',
+]
+
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
-    def __init__(self, master, scr_id, title_text, stages):
+    def __init__(
+        self,
+        master: tk.Tk,
+        scr_id: int,
+        title_text: str,
+        force_ontop: bool,
+        stages: List[Tuple[str, str]],
+    ) -> None:
         self.scr_id = scr_id
         self.title_text = title_text
 
         self.win = tk.Toplevel(master)
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
-        self.win.attributes('-topmost', 1)
+        self.win.attributes('-topmost', int(force_ontop))
         self.win['cursor'] = utils.CURSORS['wait']
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
@@ -85,7 +98,7 @@ class BaseLoadScreen:
             y=self.win.winfo_y() + (event.y - self.drag_y),
         ))
 
-    def op_show(self):
+    def op_show(self) -> None:
         """Show the window."""
         self.is_shown = True
         self.win.deiconify()
@@ -96,11 +109,11 @@ class BaseLoadScreen:
             y=(self.win.winfo_screenheight() - self.win.winfo_reqheight()) // 2,
         ))
 
-    def op_hide(self):
+    def op_hide(self) -> None:
         self.is_shown = False
         self.win.withdraw()
 
-    def op_reset(self):
+    def op_reset(self) -> None:
         """Hide and reset values in all bars."""
         self.op_hide()
         for stage in self.values.keys():
@@ -108,29 +121,29 @@ class BaseLoadScreen:
             self.values[stage] = 0
         self.reset_stages()
 
-    def op_step(self, stage):
+    def op_step(self, stage: str) -> None:
         """Increment the specified value."""
         self.values[stage] += 1
         self.update_stage(stage)
 
-    def op_set_length(self, stage, num):
+    def op_set_length(self, stage: str, num: int) -> None:
         """Set the number of items in a stage."""
         self.maxes[stage] = num
         self.update_stage(stage)
 
-    def op_skip_stage(self, stage):
+    def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         raise NotImplementedError
 
-    def update_stage(self, stage):
+    def update_stage(self, stage: str) -> None:
         """Update the UI for the given stage."""
         raise NotImplementedError
 
-    def reset_stages(self):
+    def reset_stages(self) -> None:
         """Return the UI to the initial state with unknown max."""
         raise NotImplementedError
 
-    def op_destroy(self):
+    def op_destroy(self) -> None:
         """Remove this screen."""
         self.win.withdraw()
         self.win.destroy()
@@ -233,10 +246,29 @@ class SplashScreen(BaseLoadScreen):
 
         self.is_compact = True
 
+        all_fonts = set(tk.font.families())
+
+        for font_family in all_fonts:
+            # DIN is the font used by Portal 2's logo,
+            # so try and use that.
+            if 'DIN' in font_family:
+                break
+        else:  # Otherwise, use system UI fonts from a list.
+            for font_family in SPLASH_FONTS:
+                if font_family in all_fonts:
+                    break
+            else:
+                font_family = 'Times'  # Generic special case
+
         font = Font(
-            family='Times',  # Generic special case
+            family=font_family,
             size=-18,  # negative = in pixels
             weight='bold',
+        )
+
+        progress_font = Font(
+            family=font_family,
+            size=-12,  # negative = in pixels
         )
 
         # Must be done late, so we know TK is initialised.
@@ -260,14 +292,14 @@ class SplashScreen(BaseLoadScreen):
         )
 
         self.sml_canvas.create_text(
-            sml_width / 2, 40,
+            sml_width / 2, 30,
             anchor='n',
             text=self.title_text,
             fill='white',
             font=font,
         )
         self.sml_canvas.create_text(
-            sml_width / 2, 60,
+            sml_width / 2, 50,
             anchor='n',
             text=TRANSLATION['version'],
             fill='white',
@@ -432,6 +464,7 @@ class SplashScreen(BaseLoadScreen):
                     text=stage_name + ': (0/???)',
                     fill='white',
                     tags='text_' + st_id,
+                    font=progress_font,
                 )
 
     def update_stage(self, stage):
@@ -500,7 +533,7 @@ class SplashScreen(BaseLoadScreen):
         self.set_bar(stage, 1.0)  # Force stage to be max filled.
 
     # Operations:
-    def op_set_is_compact(self, is_compact):
+    def op_set_is_compact(self, is_compact: bool) -> None:
         """Set the display mode."""
         self.is_compact = is_compact
         if is_compact:
@@ -511,7 +544,7 @@ class SplashScreen(BaseLoadScreen):
             self.lrg_canvas.grid(row=0, column=0)
         PIPE_SEND.send(('main_set_compact', is_compact))
 
-    def toggle_compact(self, event: tk.Event):
+    def toggle_compact(self, event: tk.Event) -> None:
         """Toggle when the splash screen is double-clicked."""
         self.op_set_is_compact(not self.is_compact)
 
@@ -538,8 +571,8 @@ class SplashScreen(BaseLoadScreen):
 
 
 def run_screen(
-    pipe_send,
-    pipe_rec,
+    pipe_send: multiprocessing.connection.Connection,
+    pipe_rec: multiprocessing.connection.Connection,
     # Pass in various bits of translated text
     # so we don't need to do it here.
     translations,
@@ -552,9 +585,11 @@ def run_screen(
 
     root = tk.Tk()
     root.withdraw()
+    force_ontop = True
 
     def check_queue():
         """Update stages from the parent process."""
+        nonlocal force_ontop
         had_values = False
         while PIPE_REC.poll():  # Pop off all the values.
             had_values = True
@@ -562,8 +597,12 @@ def run_screen(
             if operation == 'init':
                 # Create a new loadscreen.
                 is_main, title, stages = args
-                screen = (SplashScreen if is_main else LoadScreen)(root, scr_id, title, stages)
+                screen = (SplashScreen if is_main else LoadScreen)(root, scr_id, title, force_ontop, stages)
                 SCREENS[scr_id] = screen
+            elif operation == 'set_force_ontop':
+                [force_ontop] = args
+                for screen in SCREENS.values():
+                    screen.win.attributes('-topmost', force_ontop)
             else:
                 try:
                     func = getattr(SCREENS[scr_id], 'op_' + operation)

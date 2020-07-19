@@ -36,7 +36,7 @@ import backup as backup_win
 import tooltip
 import signage_ui
 
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -439,9 +439,6 @@ def quit_application() -> None:
         GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
         GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
-    # Clean up sounds.
-    snd.clean_folder()
-
     BEE2_config.write_settings()
     GEN_OPTS.save_check()
     item_opts.save_check()
@@ -656,6 +653,8 @@ def load_packages(data):
         readonly_desc=_('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
+        none_icon='BEE2/random.png',
+        none_name=_('Random'),
         none_desc=_('Choose a random video.'),
         callback=win_callback,
         callback_params=['Elevator'],
@@ -924,15 +923,15 @@ def export_editoritems(e=None):
     refresh_pal_ui()
 
 
-def set_disp_name(item, e=None):
+def set_disp_name(item, e=None) -> None:
     UI['pre_disp_name'].configure(text=item.name)
 
 
-def clear_disp_name(e=None):
+def clear_disp_name(e=None) -> None:
     UI['pre_disp_name'].configure(text='')
 
 
-def conv_screen_to_grid(x, y):
+def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
     """Returns the location of the item hovered over on the preview pane."""
     return (
         (x-UI['pre_bg_img'].winfo_rootx()-8) // 65,
@@ -940,7 +939,7 @@ def conv_screen_to_grid(x, y):
     )
 
 
-def drag_start(e):
+def drag_start(e: Event) -> None:
     """Start dragging a palette item."""
     drag_win = windows['drag_win']
     drag_win.drag_item = e.widget
@@ -983,7 +982,7 @@ def drag_start(e):
     UI['pre_sel_line'].lift()
 
 
-def drag_stop(e):
+def drag_stop(e) -> None:
     """User released the mouse button, complete the drag."""
     drag_win = windows['drag_win']
 
@@ -1147,14 +1146,14 @@ def set_palette(e=None):
     flow_preview()
 
 
-def pal_clear():
+def pal_clear() -> None:
     """Empty the palette."""
     for item in pal_picked[:]:
         item.kill()
     flow_preview()
 
 
-def pal_shuffle():
+def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
     if len(pal_picked) == 32:
         return
@@ -1184,8 +1183,7 @@ def pal_shuffle():
     flow_preview()
 
 
-def pal_save_as(e: Event=None):
-    name = ""
+def pal_save_as(e: Event=None) -> None:
     while True:
         name = tk_tools.prompt(
             _("BEE2 - Save Palette"),
@@ -1193,7 +1191,7 @@ def pal_save_as(e: Event=None):
         )
         if name is None:
             # Cancelled...
-            return False
+            return
         elif paletteLoader.check_exists(name):
             if messagebox.askyesno(
                 icon=messagebox.QUESTION,
@@ -1211,7 +1209,7 @@ def pal_save_as(e: Event=None):
     refresh_pal_ui()
 
 
-def pal_save(e=None):
+def pal_save(e=None) -> None:
     pal = paletteLoader.pal_list[selectedPalette]
     paletteLoader.save_pal(
         [(it.id, it.subKey) for it in pal_picked],
@@ -1221,7 +1219,7 @@ def pal_save(e=None):
     refresh_pal_ui()
 
 
-def pal_remove():
+def pal_remove() -> None:
     global selectedPalette
     if len(paletteLoader.pal_list) >= 2:
         pal = paletteLoader.pal_list[selectedPalette]
@@ -1244,7 +1242,7 @@ def pal_remove():
 # make it easy to move them around if needed
 
 
-def init_palette(f):
+def init_palette(f) -> None:
     """Initialises the palette pane.
 
     This lists all saved palettes and lets users choose from the list.
@@ -1299,7 +1297,7 @@ def init_palette(f):
         ttk.Sizegrip(f).grid(row=2, column=1)
 
 
-def init_option(pane: SubPane):
+def init_option(pane: SubPane) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1658,7 +1656,11 @@ def set_game(game: gameMan.Game):
     EXPORT_CMD_VAR.set(text)
 
 
-def init_menu_bar(win):
+def init_menu_bar(win: Toplevel) -> Menu:
+    """Create the top menu bar.
+
+    This returns the View menu, for later population.
+    """
     bar = Menu(win)
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
@@ -1671,7 +1673,9 @@ def init_menu_bar(win):
 
     bar.add_cascade(menu=file_menu, label=_('File'))
 
-    win['menu'] = bar  # Must be done after creating the apple menu
+    # Assign the bar as the main window's menu.
+    # Must be done after creating the apple menu.
+    win['menu'] = bar
 
     file_menu.add_command(
         label=_("Export"),
@@ -1752,18 +1756,26 @@ def init_menu_bar(win):
 
     # refresh_pal_ui() adds the palette menu options here.
 
+    view_menu = Menu(bar)
+    bar.add_cascade(menu=view_menu, label=_('View'))
+
     win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
     win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
     win.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
 
     helpMenu.make_help_menu(bar)
 
+    return view_menu
 
-def init_windows():
+
+def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    init_menu_bar(TK_ROOT)
+    snd.load_snd()
+    loader.step('UI')
+
+    view_menu = init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
@@ -1864,9 +1876,9 @@ def init_windows():
 
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
-        options=GEN_OPTS,
         title=_('Palettes'),
         name='pal',
+        menu_bar=view_menu,
         resize_x=True,
         resize_y=True,
         tool_frame=frames['toolMenu'],
@@ -1889,9 +1901,9 @@ def init_windows():
 
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
-        options=GEN_OPTS,
         title=_('Export Options'),
         name='opt',
+        menu_bar=view_menu,
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img=img.png('icons/win_options'),
@@ -1901,11 +1913,11 @@ def init_windows():
 
     loader.step('UI')
 
-    StyleVarPane.make_pane(frames['toolMenu'])
+    StyleVarPane.make_pane(frames['toolMenu'], view_menu)
 
     loader.step('UI')
 
-    CompilerPane.make_pane(frames['toolMenu'])
+    CompilerPane.make_pane(frames['toolMenu'], view_menu)
 
     loader.step('UI')
 

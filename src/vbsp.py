@@ -8,9 +8,7 @@ import os
 import sys
 import shutil
 import random
-import itertools
 import logging
-from enum import Enum
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
@@ -28,18 +26,18 @@ import brushLoc
 import bottomlessPit
 import packing
 import conditions
+import tiling
+import texturing
 import connections
 import instance_traits
 import template_brush
 import fizzler
+import faithplate
 import comp_consts as consts
 import cubes
 import barriers
 
-from typing import (
-    Dict, Tuple, List,
-    Set,
-)
+from typing import Any, Dict, Tuple, List, Set
 
 COND_MOD_NAME = 'VBSP'
 
@@ -48,103 +46,14 @@ settings = {
     "textures":       {},
     "options":        {},
     "fog":            {},
-    "elev_opt":       {},
+    "elevator":       {},
     'music_conf':     None,
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
     "packtrigger":    defaultdict(list),
-}
+}  # type: Dict[str, Dict[str, Any]]
 
-
-TEX_VALVE = {
-    # all the non-wall textures produced by the Puzzlemaker, and their
-    # replacement keys:
-    consts.Signage.EXIT: "overlay.exit",
-    consts.Signage.ARROW: "overlay.arrow",
-    consts.Signage.SHAPE_DOT: "overlay.dot",
-    consts.Signage.SHAPE_MOON: "overlay.moon",
-    consts.Signage.SHAPE_TRIANGLE: "overlay.triangle",
-    consts.Signage.SHAPE_CROSS: "overlay.cross",
-    consts.Signage.SHAPE_SQUARE: "overlay.square",
-    consts.Signage.SHAPE_CIRCLE: "overlay.circle",
-    consts.Signage.SHAPE_SINE: "overlay.sine",
-    consts.Signage.SHAPE_SLASH: "overlay.slash",
-    consts.Signage.SHAPE_STAR: "overlay.star",
-    consts.Signage.SHAPE_WAVY: "overlay.wavy",
-    consts.Special.BACKPANELS_CHEAP: "special.behind",
-    consts.Special.PED_SIDE: "special.pedestalside",
-    consts.Special.SQUAREBEAMS: "special.edge",
-    consts.Special.GLASS: "special.glass",
-    consts.Special.GRATING: "special.grating",
-}
-
-
-TEX_DEFAULTS = [
-    # Extra default replacements we need to specially handle.
-
-    # These have the same item so we can't store this in the regular
-    # dictionary.
-    (consts.BlackPan.BLACK_FLOOR,    'black.floor'),
-    (consts.WhitePan.WHITE_FLOOR,    'white.floor'),
-    (consts.BlackPan.BLACK_FLOOR,    'black.ceiling'),
-    (consts.WhitePan.WHITE_FLOOR,    'white.ceiling'),
-    (consts.WhitePan.WHITE_1x1,     'white.wall'),
-    (consts.WhitePan.WHITE_2x1,     'white.wall'),
-    (consts.WhitePan.WHITE_2x2,     'white.2x2'),
-    (consts.WhitePan.WHITE_4x4,     'white.4x4'),
-    (consts.BlackPan.BLACK_1,  'black.wall'),
-    (consts.BlackPan.BLACK_2,  'black.wall'),
-    (consts.BlackPan.BLACK_2x2,  'black.2x2'),
-    (consts.BlackPan.BLACK_4x4,  'black.4x4'),
-
-    # This must be specially handled, switching between these.
-    (consts.Goo.REFLECTIVE, 'special.goo'),
-    (consts.Goo.CHEAP, 'special.goo_cheap'),
-
-    # These replacements are deactivated when unset
-    ('', 'special.white'),
-    ('', 'special.black'),
-    ('', 'special.white_wall'),
-    ('', 'special.black_wall'),
-    ('', 'special.white_gap'),
-    ('', 'special.black_gap'),
-    ('', 'special.goo_wall'),
-    ('', 'special.goo_floor'),
-    ('', 'special.edge_special'),
-    ('', 'special.fizz_border'),
-
-    # If set and enabled, adds frames for >10 sign pairs
-    # to distinguish repeats.
-    ('', 'overlay.shapeframe'),
-
-    # Only used if set - replace the decals with textures
-    ('', 'special.bullseye_white_wall'),
-    ('', 'special.bullseye_white_floor'),
-    ('', 'special.bullseye_white_ceiling'),
-    ('', 'special.bullseye_black_wall'),
-    ('', 'special.bullseye_black_floor'),
-    ('', 'special.bullseye_black_ceiling'),
-]
-
-
-class ORIENT(Enum):
-    """The different orientations a surface can have.
-
-    This mainly affects which textures are added.
-    """
-    floor = 1
-    wall = 2
-    ceiling = 3
-    ceil = 3
-
-    def __str__(self):
-        if self is ORIENT.floor:
-            return 'floor'
-        elif self is ORIENT.wall:
-            return 'wall'
-        elif self is ORIENT.ceiling:
-            return 'ceiling'
 
 # The textures used for white surfaces.
 WHITE_PAN = [
@@ -165,7 +74,7 @@ BLACK_PAN = [
     "metal/black_wall_metal_002b",  # 4x4
     ]
 
-BEE2_config = None  # type: ConfigFile
+BEE2_config = ConfigFile('compile.cfg')
 
 GAME_MODE = 'ERR'  # SP or COOP?
 # Are we in preview mode? (Spawn in entry door instead of elevator)
@@ -179,91 +88,15 @@ MAP_RAND_SEED = ''
 # The actual map.
 VMF = None  # type: VLib.VMF
 
-# These are faces, overlays and brush entitites which have been modified by
+# These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
-IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
-IGNORED_BRUSH_ENTS = set()
-
-GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
-
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
-##################
-# UTIL functions #
-##################
 
-
-def get_tex(name: str) -> str:
-    if name in settings['textures']:
-        return random.choice(settings['textures'][name])
-    else:
-        raise Exception('No texture "' + name + '"!')
-
-
-def alter_mat(
-    face: VLib.Side,
-    seed: str=None,
-    texture_lock: bool=True,
-) -> bool:
-    """Randomise the texture used for a face, based on configured textures.
-
-    This uses the TEX_VALVE dict to identify the kind of texture, but
-    uses the face orientation to determine the wall direction - the
-    PeTI often uses textures on the wrong sides for various reasons.
-
-    If texture_lock is false, the offset of the texture will be reset to 0,0.
-    That ensures embedface will have aligned textures.
-    """
-    mat = face.mat.casefold()
-    if seed:
-        random.seed(seed)
-
-    if mat in TEX_VALVE:  # should we convert it?
-        face.mat = get_tex(TEX_VALVE[mat])
-        return True
-    elif mat in consts.BlackPan or mat in consts.WhitePan:
-        orient = get_face_orient(face)
-        face.mat = get_tex(get_tile_type(mat, orient))
-
-        if not texture_lock:
-            face.offset = 0
-
-        return True
-    else:
-        return False
-
-
-def get_tile_type(mat: str, orient: ORIENT) -> str:
-    """Get the texture command for a texture."""
-    surf_type = 'white' if mat in consts.WhitePan else 'black'
-    # We need to handle specially the 4x4 and 2x4 variants.
-    # These are used in the embedface brushes, so they should
-    # remain having small tile size. Wall textures have 4x4 and 2x2,
-    # but floor/ceilings only have 4x4 sizes (since they usually
-    # just stay the same).
-    if orient == ORIENT.wall:
-        if mat == consts.BlackPan.BLACK_4x4 or mat == consts.WhitePan.WHITE_4x4:
-            orient = '4x4'
-        elif mat == consts.BlackPan.BLACK_2x2 or mat == consts.WhitePan.WHITE_2x2:
-            orient = '2x2'
-        else:
-            orient = 'wall'
-    elif orient == ORIENT.floor:
-        orient = 'floor'
-    elif orient == ORIENT.ceiling:
-        orient = 'ceiling'
-    return surf_type + '.' + orient
-
-##################
-# MAIN functions #
-##################
-
-
-def load_settings():
+def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     """Load in all our settings from vbsp_config."""
-    global BEE2_config
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
@@ -272,23 +105,7 @@ def load_settings():
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
-    tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
-
-    # Collect texture values from the config.
-    # They are collected in a list for each option, allowing
-    # multiple random textures for each slot.
-    for item, key in tex_defaults:
-        cat, name = key.split(".")
-        value = [
-            prop.value
-            for prop in
-            conf.find_all('textures', cat, name)
-        ]
-        if len(value) == 0:
-            # If there are no values, just use the original value
-            settings['textures'][key] = [str(item)]
-        else:
-            settings['textures'][key] = value
+    texturing.load_config(conf.find_key('textures', []))
 
     # Antline texturing settings.
     # We optionally allow different ones for floors.
@@ -398,15 +215,6 @@ def load_settings():
         'tonemap_exp_max': fog_config['tonemap_exposure_max', '3'],
     })
 
-    # Find the location of the BEE2 app, and load the options
-    # set in the 'Compiler Pane'.
-    bee2_loc = vbsp_options.get(str, 'BEE2_loc')
-    if bee2_loc:
-        BEE2_config = ConfigFile('compile.cfg')
-        vbsp_options.ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
-    else:
-        BEE2_config = ConfigFile(None)
-
     LOGGER.info("Settings Loaded!")
     return ant_floor, ant_wall
 
@@ -433,305 +241,6 @@ def add_voice():
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )
 
-
-def add_fizz_borders():
-    """Generate overlays at the top and bottom of fizzlers.
-
-    This is used in 50s and BTS styles.
-    """
-    tex = settings['textures']['special.fizz_border']
-    if tex == ['']:
-        # No textures were defined!
-        return
-
-    flip_uv = vbsp_options.get(bool, 'fizz_border_vertical')
-    overlay_thickness = vbsp_options.get(int, 'fizz_border_thickness')
-    overlay_repeat = vbsp_options.get(int, 'fizz_border_repeat')
-
-    # First, figure out the orientation of every fizzler via their model.
-    fizz_directions = {}  # type: Dict[str, Tuple[Vec, Vec, Vec]]
-    for inst in VMF.by_class['func_instance']:
-        if '_modelStart' not in inst['targetname', '']:
-            continue
-        name = inst['targetname'].rsplit('_modelStart', 1)[0] + '_brush'
-        # Once per fizzler only!
-        if name not in fizz_directions:
-            fizz_directions[name] = (
-                # Normal direction of surface
-                Vec(1, 0, 0).rotate_by_str(inst['angles']),
-                # 'Horizontal' direction (for vertical fizz attached to walls)
-                Vec(0, 0, 1).rotate_by_str(inst['angles']),
-                # 'Vertical' direction (for vertical fizz attached to walls)
-                Vec(0, 1, 0).rotate_by_str(inst['angles']),
-            )
-
-    for brush_ent in (VMF.by_class['trigger_portal_cleanser'] |
-                      VMF.by_class['func_brush']):
-        try:
-            norm, horiz, vert = fizz_directions[brush_ent['targetname']]
-        except KeyError:
-            continue
-        norm_dir = norm.axis()
-        horiz_dir = horiz.axis()
-        vert_dir = vert.axis()
-
-        bbox_min, bbox_max = brush_ent.get_bbox()
-        dimensions = bbox_max - bbox_min
-
-        # We need to snap the axis normal_axis to the grid, since it could
-        # be forward or back.
-        min_pos = bbox_min.copy()
-        min_pos[norm_dir] = min_pos[norm_dir] // 128 * 128 + 64
-
-        max_pos = min_pos.copy()
-        max_pos[vert_dir] += 128
-
-        min_faces = []
-        max_faces = []
-
-        overlay_len = int(dimensions[horiz_dir])
-
-        for offset in range(64, overlay_len, 128):
-            # Each position on top or bottom, inset 64 from each end
-            min_pos[horiz_dir] = bbox_min[horiz_dir] + offset
-            max_pos[horiz_dir] = min_pos[horiz_dir]
-
-            solid = conditions.SOLIDS.get(min_pos.as_tuple())
-            if solid is not None:
-                min_faces.append(solid.face)
-            solid = conditions.SOLIDS.get(max_pos.as_tuple())
-            if solid is not None:
-                max_faces.append(solid.face)
-
-        if flip_uv:
-            u_rep = 1
-            v_rep = overlay_len / overlay_repeat
-        else:
-            u_rep = overlay_len / overlay_repeat
-            v_rep = 1
-
-        if min_faces:
-            min_origin = bbox_min.copy()
-            min_origin[norm_dir] += 1
-            min_origin[horiz_dir] += overlay_len/2
-            min_origin[vert_dir] += 16
-            VLib.make_overlay(
-                VMF,
-                normal=abs(vert),
-                origin=min_origin,
-                uax=horiz * overlay_len,
-                vax=norm * overlay_thickness,
-                material=random.choice(tex),
-                surfaces=min_faces,
-                u_repeat=u_rep,
-                v_repeat=v_rep,
-                swap=flip_uv,
-            )
-        if max_faces:
-            max_origin = bbox_max.copy()
-            max_origin[norm_dir] -= 1
-            max_origin[horiz_dir] -= overlay_len/2
-            max_origin[vert_dir] -= 16
-            VLib.make_overlay(
-                VMF,
-                normal=-abs(vert),
-                origin=max_origin,
-                uax=horiz * overlay_len,
-                vax=norm * overlay_thickness,
-                material=random.choice(tex),
-                surfaces=max_faces,
-                u_repeat=u_rep,
-                v_repeat=v_rep,
-                swap=flip_uv,
-            )
-
-
-@conditions.meta_cond(priority=-100, only_once=False)
-def static_pan(inst: Entity):
-    """Switches glass angled panels to static instances, if needed."""
-    if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
-        # white/black are found via the func_brush
-        make_static_pan(inst, "glass")
-
-# Dict mapping locations -> func_brush face, name
-ANGLED_PAN_BRUSH = {}   # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, str]]
-# locations -> white, black faces
-FLIP_PAN_BRUSH = {}  # type: Dict[Tuple[float, float, float], Tuple[VLib.Side, VLib.Side]]
-# Record info_targets at the angled panel positions, so we can correct
-# their locations for static panels
-PANEL_FAITH_TARGETS = defaultdict(list) # type: Dict[Tuple[float, float, float], List[VLib.Entity]]
-
-
-@conditions.meta_cond(-1000)
-def find_panel_locs() -> None:
-    """Find the locations of panels, used for FaithBullseye."""
-
-    non_panel_mats = {
-        consts.Special.SQUAREBEAMS,
-        consts.Special.BACKPANELS,
-        consts.Special.BACKPANELS_CHEAP
-    }
-
-    # Angled Panels
-    for brush in VMF.by_class['func_brush']:
-        if "-model_arms" not in brush['parentname', '']:
-            continue
-        for face in brush.sides():
-            # Find the face which isn't backpanel/squarebeams
-            if face.mat.casefold() not in non_panel_mats:
-                ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = (
-                    face,
-                    # Repeat the change done later in change_func_brush()
-                    brush['targetname'].replace(
-                        '_panel_top',
-                        '-brush',
-                    ),
-                )
-                break
-
-    # Flip panels
-    for brush in VMF.by_class['func_door_rotating']:
-        white_face = None
-        black_face = None
-        for face in brush.sides():
-            if face.mat in consts.WhitePan:
-                white_face = face
-            if face.mat in consts.BlackPan:
-                black_face = face
-        if white_face and black_face:
-            # The white face is positioned facing outward, so its origin is
-            # centered nicely.
-            FLIP_PAN_BRUSH[white_face.get_origin().as_tuple()] = (
-                white_face,
-                black_face,
-            )
-
-
-@conditions.meta_cond(100)
-def set_flip_panel_keyvalues() -> None:
-    """Set keyvalues on flip panels."""
-    flip_panel_start = vbsp_options.get(str, 'flip_sound_start') or ''
-    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop') or ''
-
-    for flip_pan in VMF.by_class['func_door_rotating']:
-        # Don't edit non flip panels!
-        pan_name = flip_pan['targetname']
-        if not pan_name.endswith('-flipping_panel'):
-            continue
-        try:
-            item = connections.ITEMS[flip_pan['targetname'][:-15]]
-        except KeyError:
-            continue
-
-        flip_pan['spawnpos'] = int(not item.inst.fixup.bool('$start_deployed'))
-        flip_pan['noise1'] = flip_panel_start
-        flip_pan['noise2'] = flip_panel_stop
-
-
-@conditions.make_result_setup('FaithBullseye')
-def res_faith_bullseye_check(res: Property) -> None:
-    """Do a check to ensure there are actually textures availble."""
-    for col in ('white', 'black'):
-        for orient in ('wall', 'floor', 'ceiling'):
-            if settings['textures'][
-                    'special.bullseye_{}_{}'.format(col, orient)
-                                        ] != ['']:
-                return res.value
-    return None  # No textures!
-
-
-@conditions.make_result('FaithBullseye')
-def res_faith_bullseye(inst: Entity, res: Property):
-    """Replace the bullseye instances with textures instead."""
-
-    pos = Vec(0, 0, -64).rotate_by_str(inst['angles'])
-    pos = (pos + Vec.from_str(inst['origin'])).as_tuple()
-
-    norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
-
-    face = None
-    color = None
-
-    # Look for a world brush
-    if pos in conditions.SOLIDS:
-        solid = conditions.SOLIDS[pos]
-        if solid.normal == norm:
-            face = solid.face
-            color = solid.color
-            if make_bullseye_face(face, color):
-                # Use an alternate instance, without the decal ent.
-                inst['file'] = res.value
-
-    # Look for angled panels
-    if face is None and pos in ANGLED_PAN_BRUSH:
-        face, br_name = ANGLED_PAN_BRUSH[pos]
-        if face.mat in consts.WhitePan:
-            color = 'white'
-        elif face.mat in consts.BlackPan:
-            color = 'black'
-        else:
-            # Should never happen - no angled panel should be textured
-            # yet. Act as if the panel wasn't there.
-            face = None
-
-        if face is not None and make_bullseye_face(face, color):
-            # The instance won't be used -
-            # there's already a helper
-            inst['file'] = ''
-            # We want to find the info_target, and parent it to the panel.
-
-            # The target is located at the center of the brush, which
-            # we already calculated.
-
-            for targ in VMF.by_class['info_target']:
-                if Vec.from_str(targ['origin']) == pos:
-                    targ['parentname'] = br_name
-                    PANEL_FAITH_TARGETS[pos].append(targ)
-
-    # Look for flip panels
-    if face is None and pos in FLIP_PAN_BRUSH:
-        white_face, black_face = FLIP_PAN_BRUSH[pos]
-        flip_orient = get_face_orient(white_face)
-        if make_bullseye_face(white_face, 'white', flip_orient):
-            # Use the white panel orient for both sides since the
-            # black panel spawns facing backward.
-            if make_bullseye_face(black_face, 'black', flip_orient):
-                # Flip panels also have their own helper..
-                inst['file'] = ''
-
-    # There isn't a surface - blank the instance, it's in goo or similar
-    if face is None:
-        inst['file'] = ''
-        return
-
-
-def make_bullseye_face(
-    face: VLib.Side,
-    color,
-    orient: ORIENT=None,
-    ) -> bool:
-    """Switch the given face to use a bullseye texture.
-
-    Returns whether it was successful or not.
-    """
-    if orient is None:
-        orient = get_face_orient(face)
-
-    if orient is ORIENT.ceil:  # We use the full 'ceiling' here, instead of 'ceil'.
-        orient = 'ceiling'
-
-    mat = get_tex('special.bullseye_{!s}_{!s}'.format(color, orient))
-
-    # Fallback to floor texture if using ceiling or wall
-    if orient is not ORIENT.floor and mat == '':
-        mat = get_tex('special.bullseye_{}_floor'.format(color))
-
-    if mat == '':
-        return False
-    else:
-        face.mat = mat
-        IGNORED_FACES.add(face)
-        return True
 
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
@@ -839,7 +348,7 @@ def set_player_model():
     if GAME_MODE == 'COOP':  # Not in coop..
         return
 
-    loc = vbsp_options.get(Vec, 'model_changer_loc')
+    loc = vbsp_options.get(Vec, 'global_ents_loc')
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -848,31 +357,17 @@ def set_player_model():
 
     model_path, pgun_skin = PLAYER_MODELS[chosen_model]
 
-    # Plug leaks
-    VMF.add_brushes(VMF.make_hollow(
-        loc - (32, 32, 64),
-        loc + (32, 32, 64),
-    ))
-
     # Precache the model, so we can switch to it.
     VMF.create_ent(
-        classname='prop_dynamic_override',
-        origin=loc + (0, 0, -60),
+        classname='comp_precache_model',
+        origin=loc,
         model='models/' + model_path + '.mdl',
-
-        rendermode=10,
-        startDisabled=1,
-        holdAnimation=1,
-        disableshadows=1,
-        disableshadowdepth=1,
-        disableflashlight=1,
-        disablereceiveshadows=1,
     )
 
     auto = VMF.create_ent(
         classname='logic_auto',
         spawnflags=0,  # Don't remove on fire.
-        origin=loc + (0, 0, 32),
+        origin=loc,
     )
 
     # The delay is required to ensure the portalgun parents properly
@@ -968,6 +463,8 @@ def set_player_portalgun() -> None:
         has['spawn_nogun'] = True
 
     ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    
+    logic_auto = VMF.create_ent('logic_auto', origin=ent_pos, flags='1')
 
     if not blue_portal or not oran_portal or force_portal_man:
         pgun_script = VMF.create_ent(
@@ -1088,7 +585,7 @@ def set_player_portalgun() -> None:
             ))
 
         if GAME_MODE == 'SP':
-            GLOBAL_OUTPUTS.append(VLib.Output(
+            logic_auto.add_out(VLib.Output(
                 'OnMapSpawn',
                 '@portalgun',
                 'RunScriptCode',
@@ -1111,14 +608,14 @@ def set_player_portalgun() -> None:
         ), relay_name='@map_won')
 
     if blue_portal:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '@player_has_blue',
             'Trigger',
             only_once=True,
         ))
     if oran_portal:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '@player_has_oran',
             'Trigger',
@@ -1193,7 +690,9 @@ def add_fog_ents():
         fog_controller['fogcolor2'] = fog_opt['secondary']
         fog_controller['use_angles'] = '1'
 
-    GLOBAL_OUTPUTS.extend([
+    logic_auto = VMF.create_ent(classname='logic_auto', origin=pos, flags='1')
+
+    logic_auto.add_out(
         VLib.Output(
             'OnMapSpawn',
             '@clientcommand',
@@ -1229,10 +728,10 @@ def add_fog_ents():
             fog_opt['tonemap_exp_max'],
             only_once=True,
         ),
-    ])
+    )
 
     if fog_opt['tonemap_bloom_scale']:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetBloomScale',
@@ -1241,7 +740,7 @@ def add_fog_ents():
         ))
 
     if GAME_MODE == 'SP':
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '!player',
             'SetFogController',
@@ -1249,14 +748,13 @@ def add_fog_ents():
             only_once=True,
         ))
     else:
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        logic_auto.add_out(VLib.Output(
             'OnMapSpawn',
             '!player_blue',
             'SetFogController',
             '@fog_controller',
             only_once=True,
-        ))
-        GLOBAL_OUTPUTS.append(VLib.Output(
+        ), VLib.Output(
             'OnMapSpawn',
             '!player_orange',
             'SetFogController',
@@ -1716,102 +1214,6 @@ def fit_goo_mist(
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 
-def fixup_goo_sides() -> None:
-    """Replace the textures on the sides of goo and bottomless pits.
-
-    For goo these can use special textures, or black 4x4 walls.
-    For pits sides use normal black walls.
-    """
-
-    if vbsp_options.get(str, 'goo_wall_scale_temp'):
-        scale = template_brush.get_scaling_template(
-            vbsp_options.get(str, 'goo_wall_scale_temp')
-        )
-    else:
-        scale = None
-
-    LOGGER.info("Changing goo sides...")
-    for solid in VMF.brushes[:]:
-        for face in solid:
-            if face in IGNORED_FACES:
-                continue
-            if face.mat.casefold() != 'tools/toolsnodraw':
-                origin = face.get_origin()
-                norm = face.normal()
-                if len(norm) != 1:
-                    continue  # Not aligned to grid...
-
-                block_type = brushLoc.POS['world': origin - 64 * norm]
-
-                # We only want to alter black panel surfaces..
-                if block_type.is_goo and face.mat.casefold() in BLACK_PAN:
-                    face.mat = ''
-                    if norm.z != 0:
-                        face.mat = get_tex('special.goo_floor')
-
-                    if face.mat == '':  # goo_floor is invalid, or not used
-                        face.mat = get_tex('special.goo_wall')
-
-                    if face.mat == '':  # No overrides, use normal textures.
-                        face.mat = get_tex('black.4x4')
-
-                    if scale is not None:
-                        # Allow altering the orientation of the texture.
-                        scale.apply(face, change_mat=False)
-
-                    IGNORED_FACES.add(face)
-
-                if block_type.is_pit:
-                    if block_type.is_bottom and norm.z != 0:
-                        bottomlessPit.fix_base_brush(VMF, solid, face)
-                    else:
-                        # Use the black textures, this should be textured normally.
-                        face.mat = BLACK_PAN[1]
-
-    LOGGER.info("Done!")
-
-
-def collapse_goo_trig() -> None:
-    """Collapse the goo triggers to only use 2 entities for all pits."""
-    LOGGER.info('Collapsing goo triggers...')
-
-    hurt_trig = None
-    cube_trig = None
-    for trig in VMF.by_class['trigger_multiple']:
-        if trig in IGNORED_BRUSH_ENTS:
-            continue
-
-        if trig['wait'] == '0.1' and trig['targetname', ''] == '':
-            if cube_trig is None:
-                cube_trig = trig
-            else:
-                cube_trig.solids.extend(trig.solids)
-                trig.remove()
-
-    for trig in VMF.by_class['trigger_hurt']:
-        if trig in IGNORED_BRUSH_ENTS:
-            continue
-
-        if trig['targetname', ''] == '':
-            if hurt_trig is None:
-                hurt_trig = trig
-            else:
-                hurt_trig.solids.extend(trig.solids)
-                trig.remove()
-
-    if hurt_trig is not None:
-        hurt_trig['damage'] = '99999'
-        hurt_trig.outputs.append(
-            VLib.Output(
-                'OnHurtPlayer',
-                '@goo_fade',
-                'Fade',
-            ),
-        )
-
-    LOGGER.info('Done!')
-
-
 @conditions.meta_cond(priority=-50)
 def set_barrier_frame_type() -> None:
     """Set a $type instvar on glass frame.
@@ -1904,17 +1306,6 @@ def change_brush() -> None:
     )
     mist_solids = set()
 
-    if vbsp_options.get(bool, 'remove_pedestal_plat'):
-        # Remove the pedestal platforms
-        for ent in VMF.by_class['func_detail']:
-            if ent in IGNORED_BRUSH_ENTS:
-                continue
-
-            for side in ent.sides():
-                if side.mat.casefold() == 'plastic/plasticwall004a':
-                    VMF.remove_ent(ent)
-                    break  # Skip to next entity
-
     make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
 
@@ -1956,10 +1347,12 @@ def change_brush() -> None:
                 # Use fancy goo on the level with the
                 # highest number of blocks.
                 # All plane z are the same.
-                face.mat = get_tex(
-                    'special.goo' if
-                    face.planes[0].z == best_goo
-                    else 'special.goo_cheap'
+                face.mat = texturing.SPECIAL.get(
+                    face.get_origin(), (
+                        'goo' if
+                        face.planes[0].z == best_goo
+                        else 'goo_cheap'
+                    ),
                 )
 
     if make_bottomless:
@@ -1971,59 +1364,6 @@ def change_brush() -> None:
         LOGGER.info('Adding Goo Mist...')
         add_goo_mist(mist_solids)
         LOGGER.info('Done!')
-
-    if can_clump():
-        clump_walls()
-    else:
-        random_walls()
-
-
-def can_clump() -> bool:
-    """Check the clump algorithm is enabled."""
-    return vbsp_options.get(bool, "clump_wall_tex")
-
-
-def face_seed(face: VLib.Side) -> str:
-    """Create a seed unique to this brush face.
-
-    This is the same regardless of side direction.
-    """
-    origin = face.get_origin()
-    for axis in "xyz":
-        if origin[axis] % 128 < 2:
-            origin[axis] = (origin[axis] // 64) * 64
-        else:
-            origin[axis] = (origin[axis] // 128) * 128 + 64
-    return origin.join(' ')
-
-
-def random_walls() -> None:
-    """The original wall style, with completely randomised walls."""
-    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
-    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
-    edge_off = vbsp_options.get(bool, 'reset_edge_off')
-    edge_scale = vbsp_options.get(float, 'edge_scale')
-
-    for solid in VMF.iter_wbrushes(world=True, detail=True):
-        for face in solid:
-            if face in IGNORED_FACES:
-                continue
-
-            if face.mat == consts.Special.SQUAREBEAMS:
-                fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
-
-            # Conditions can define special clumps for items, we want to
-            # do those if needed.
-            origin = face.get_origin()
-            for clump in PRESET_CLUMPS:
-                if clump.min_pos <= origin <= clump.max_pos:
-                    face.mat = clump.tex[get_tile_type(
-                        face.mat.casefold(),
-                        get_face_orient(face),
-                    )]
-                    break
-            else:  # No clump..
-                alter_mat(face, face_seed(face), texture_lock)
 
 
 Clump = namedtuple('Clump', [
@@ -2090,163 +1430,6 @@ def cond_force_clump(inst: Entity, res: Property):
     ))
 
 
-def clump_walls():
-    """A wall style where textures are used in small groups near each other.
-
-    This replicates the Old Aperture maps, which are cobbled together
-    from many different materials.
-    """
-    # For this, we ignore all of Valve's wall textures.
-    # We then start making clumps.
-    # These are 2x2x4 maximum rectangular areas (configurable), which all get
-    #  the same texture. We don't overwrite previously-set ones though.
-    # After that, we fill in any unset textures with the white/black_gap ones.
-    # This makes it look like those areas were patched up.
-
-    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
-    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
-    edge_off = vbsp_options.get(bool, 'reset_edge_off')
-    edge_scale = vbsp_options.get(float, 'edge_scale')
-
-    # Possible locations for clumps - every face origin, not including
-    # ignored faces or nodraw
-    panel_mats = set(consts.WhitePan).union(consts.BlackPan)
-    possible_locs = [
-        face.get_origin()
-        for face in
-        VMF.iter_wfaces(world=True, detail=True)
-        if face not in IGNORED_FACES
-        if face.mat.casefold() in panel_mats
-    ]
-
-    clump_size = vbsp_options.get(int, "clump_size")
-    clump_wid = vbsp_options.get(int, "clump_width")
-
-    clump_numb = len(possible_locs) // (clump_size * clump_wid * clump_wid)
-    clump_numb *= vbsp_options.get(int, "clump_number")
-
-    # Also clump ceilings or floors?
-    clump_ceil = vbsp_options.get(bool, 'clump_ceil')
-    clump_floor = vbsp_options.get(bool, 'clump_floor')
-
-    LOGGER.info(
-        'Clumping: {} clumps (+ {} special)',
-        clump_numb,
-        len(PRESET_CLUMPS),
-    )
-
-    random.seed(MAP_RAND_SEED)
-
-    clumps = []
-
-    for _ in range(clump_numb):
-        # Picking out of the map origins helps ensure at least 1 texture is
-        # modded by a clump
-        pos = random.choice(possible_locs) // 128 * 128  # type: Vec
-
-        pos_min = Vec()
-        pos_max = Vec()
-        # Clumps are long strips mainly extended in one direction
-        # In the other directions extend by 'width'. It can point any axis.
-        direction = random.choice('xyz')
-        for axis in 'xyz':
-            if axis == direction:
-                dist = clump_size
-            else:
-                dist = clump_wid
-            pos_min[axis] = pos[axis] - random.randint(0, dist) * 128
-            pos_max[axis] = pos[axis] + random.randint(0, dist) * 128
-        cur_state = random.getstate()
-        random.seed('CLUMP_TEX_' + pos_min.join() + '_' + pos_max.join(' '))
-        clumps.append(Clump(
-            pos_min,
-            pos_max,
-            # For each clump, every tile gets the same texture!
-            {
-                (color + '.' + size): get_tex(color + '.' + size)
-                for color in ('white', 'black')
-                for size in ('wall', 'floor', 'ceiling', '2x2', '4x4')
-            }
-        ))
-        random.setstate(cur_state)
-
-    # Now modify each texture!
-    for face in VMF.iter_wfaces(world=True, detail=True):
-        if face in IGNORED_FACES:
-            continue
-
-        mat = face.mat.casefold()
-
-        if mat == consts.Special.SQUAREBEAMS:
-            # Handle squarebeam transformations
-            alter_mat(face, face_seed(face), texture_lock)
-            fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
-            continue
-
-        if mat not in panel_mats:
-            # Don't clump non-wall textures
-            alter_mat(face, face_seed(face), texture_lock)
-            continue
-
-        orient = get_face_orient(face)
-
-        origin = face.get_origin()
-        # Conditions can define special clumps for items, do those first
-        # so they override the normal surfaces.
-        # We want to do that regardless of the clump_floor and clump_ceil
-        # settings
-        clump_changed = False
-        for clump in PRESET_CLUMPS:
-            if clump.min_pos <= origin <= clump.max_pos:
-                face.mat = clump.tex[get_tile_type(mat, orient)]
-                clump_changed = True
-                break
-        if clump_changed:
-            continue
-
-        if (
-                (orient is ORIENT.floor and not clump_floor) or
-                (orient is ORIENT.ceiling and not clump_ceil)):
-            # Don't clump if configured not to for this orientation
-            alter_mat(face, face_seed(face), texture_lock)
-            continue
-
-        # Clump the texture!
-        for clump in clumps:
-            if clump.min_pos <= origin <= clump.max_pos:
-                face.mat = clump.tex[get_tile_type(mat, orient)]
-                break
-        else:
-            # Not in a clump!
-            # Allow using special textures for these, to fill in gaps.
-            orig_mat = mat
-            if mat in consts.WhitePan:
-                face.mat = get_tex("special.white_gap")
-                if not face.mat:
-                    face.mat = orig_mat
-                    alter_mat(face, texture_lock=texture_lock)
-            elif mat in consts.BlackPan:
-                face.mat = get_tex("special.black_gap")
-                if not face.mat:
-                    face.mat = orig_mat
-                    alter_mat(face, texture_lock=texture_lock)
-            else:
-                alter_mat(face, texture_lock=texture_lock)
-
-
-def get_face_orient(face: VLib.Side) -> ORIENT:
-    """Determine the orientation of an on-grid face."""
-    norm = face.normal()
-    # Even if not axis-aligned, make mostly-flat surfaces
-    # floor/ceiling (+-40 degrees)
-    # sin(40) = ~0.707
-    if norm.z < -0.8:
-        return ORIENT.floor
-    if norm.z > 0.8:
-        return ORIENT.ceiling
-    return ORIENT.wall
-
-
 def change_overlays() -> None:
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
@@ -2260,7 +1443,7 @@ def change_overlays() -> None:
     # A packlist associated with the sign_inst.
     sign_inst_pack = vbsp_options.get(str, 'signPack')
 
-
+    # Grab all the textures we're using...
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
             # Overlays added by us, or conditions. These are styled aleady,
@@ -2281,36 +1464,40 @@ def change_overlays() -> None:
 
         case_mat = over['material'].casefold()
 
-        if case_mat in consts.Signage:
-            sign_type = TEX_VALVE[case_mat]
-            if sign_inst is not None:
-                new_inst = VMF.create_ent(
-                    classname='func_instance',
-                    origin=over['origin'],
-                    angles=over['angles', '0 0 0'],
-                    file=sign_inst,
-                )
-                if sign_inst_pack:
-                    packing.pack_list(VMF, sign_inst_pack)
-                new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
-            # Delete the overlay's targetname - signs aren't ever dynamic
-            # This also means items set to signage only won't get toggle
-            # instances.
-            del over['targetname']
+        try:
+            sign_type = consts.Signage(case_mat)
+        except ValueError:
+            continue
 
-            over['material'] = get_tex(sign_type)
-            if sign_size != 16:
-                # Resize the signage overlays
-                # These are the 4 vertex locations
-                # Each axis is set to -16, 16 or 0 by default
-                for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
-                    val = Vec.from_str(over[prop])
-                    val /= 16
-                    val *= sign_size
-                    over[prop] = val.join(' ')
+        if sign_inst is not None:
+            new_inst = VMF.create_ent(
+                classname='func_instance',
+                origin=over['origin'],
+                angles=over['angles', '0 0 0'],
+                file=sign_inst,
+            )
+            if sign_inst_pack:
+                packing.pack_list(VMF, sign_inst_pack)
+            new_inst.fixup['mat'] = sign_type.name.lower()
+
+        # Delete the overlay's targetname - signs aren't ever dynamic.
+        # This also means items set to signage only won't get toggle
+        # instances.
+        del over['targetname']
+
+        over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        if sign_size != 16:
+            # Resize the signage overlays
+            # These are the 4 vertex locations
+            # Each axis is set to -16, 16 or 0 by default
+            for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
+                val = Vec.from_str(over[prop])
+                val /= 16
+                val *= sign_size
+                over[prop] = val.join(' ')
 
 
-def add_extra_ents(mode):
+def add_extra_ents(game_mode: str) -> None:
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
@@ -2358,7 +1545,7 @@ def add_extra_ents(mode):
         # looping.
 
         # In either case, we need @music_restart to do that safely.
-        if GAME_MODE == 'SP' or snd_length > 0:
+        if game_mode == 'SP' or snd_length > 0:
 
             music_restart = VMF.create_ent(
                 classname='logic_relay',
@@ -2385,7 +1572,7 @@ def add_extra_ents(mode):
                 VLib.Output('OnTrigger', music, 'PlaySound', delay=0.1),
             )
 
-            if GAME_MODE == 'SP':
+            if game_mode == 'SP':
                 # Trigger on level loads.
                 VMF.create_ent(
                     classname='logic_auto',
@@ -2481,300 +1668,7 @@ def add_extra_ents(mode):
             'disable_pti_audio'
             ] = srctools.bool_as_int(not has_cave)
 
-        # The scripts we want to run on the @glados entity.
-        # This gets special functions called (especially in coop) for various
-        # events we might want to track - death, pings, camera taunts, etc.
-        glados_scripts = [
-            'choreo/glados.nut',  # Implements Multiverse Cave..
-        ]
-        if voiceLine.has_responses():
-            glados_scripts.append('bee2/coop_responses.nut')
-
-        global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
-
-    # Add a logic_auto with the set of global outputs.
-    logic_auto = VMF.create_ent(
-        classname='logic_auto',
-        spawnflags='0',  # Don't remove on fire
-        origin=global_ents_pos + (0, 0, 16),
-    )
-    logic_auto.outputs = GLOBAL_OUTPUTS
-
-
-def change_func_brush():
-    """Edit func_brushes."""
-    LOGGER.info("Editing Brush Entities...")
-
-    dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
-    dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
-
-    # All the textures used for faith plate bullseyes
-    bullseye_white = set(itertools.chain.from_iterable(
-        settings['textures']['special.bullseye_white_' + orient]
-        for orient in ('floor', 'wall', 'ceiling')
-    ))
-    bullseye_black = set(itertools.chain.from_iterable(
-        settings['textures']['special.bullseye_black_' + orient]
-        for orient in ('floor', 'wall', 'ceiling')
-    ))
-
-    if get_tex('special.edge_special') == '':
-        edge_tex = 'special.edge'
-        rotate_edge = vbsp_options.get(bool, 'rotate_edge')
-        edge_off = vbsp_options.get(bool, 'reset_edge_off')
-        edge_scale = vbsp_options.get(float, 'edge_scale')
-    else:
-        edge_tex = 'special.edge_special'
-        rotate_edge = vbsp_options.get(bool, 'rotate_edge_special')
-        edge_off = vbsp_options.get(bool, 'reset_edge_off_special')
-        edge_scale = vbsp_options.get(float, 'edge_scale_special')
-
-    for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
-        if brush in IGNORED_BRUSH_ENTS:
-            continue
-
-        brush['drawInFastReflection'] = vbsp_options.get(bool, "force_brush_reflect")
-        parent = brush['parentname', '']
-        # Used when creating static panels
-        brush_type = ""
-        is_bullseye = False
-
-        target = brush['targetname', '']
-        # Fizzlers need their custom outputs.
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            brush['targetname'] = target[:-6] + '-br_brush'
-
-        # Func_brush/func_rotating (for angled panels and flip panels)
-        # often use different textures, so let the style do that.
-
-        surf_face = None  # The angled-panel top face..
-
-        is_grating = False
-        delete_brush = False
-        for side in brush.sides():
-            # If it's set to a bullseye texture, it's in the ignored_faces
-            # set!
-            if side.mat in bullseye_white:
-                brush_type = 'white'
-                is_bullseye = True
-            elif side.mat in bullseye_black:
-                brush_type = 'black'
-                is_bullseye = True
-
-            if side in IGNORED_FACES:
-                continue
-
-            if side.mat == consts.Special.SQUAREBEAMS:
-                side.mat = get_tex(edge_tex)
-                fix_squarebeams(
-                    side,
-                    rotate_edge,
-                    edge_off,
-                    edge_scale,
-                )
-                continue
-
-            if side.mat in consts.WhitePan:
-                brush_type = "white"
-                set_special_mat(side, 'white')
-                surf_face = side
-
-            elif side.mat in consts.BlackPan:
-                brush_type = "black"
-                set_special_mat(side, 'black')
-                surf_face = side
-            else:
-
-                alter_mat(side)  # for gratings, laserfields and some others
-
-            # The style blanked the material, so delete the brush
-            if side.mat == '':
-                delete_brush = True
-                break
-
-        if delete_brush:
-            VMF.remove_ent(brush)
-            continue
-
-        if "-model_arms" in parent:  # is this an angled panel?:
-            # strip only the model_arms off the end
-            targ = '-'.join(parent.split("-")[:-1])
-            # Now find the associated instance
-            for ins in (
-                VMF.by_class['func_instance'] &
-                VMF.by_target[targ]
-            ):
-
-                if 'connectioncount' not in ins.fixup:
-                    continue  # It's a static-style overlay instance, ignore.
-
-                if make_static_pan(ins, brush_type, is_bullseye):
-                    # delete the brush, we don't want it if we made a
-                    # static one
-                    VMF.remove_ent(brush)
-                else:
-                    # Oherwise, rename the brush to -brush, so the panel
-                    # can be sent inputs.
-                    brush['targetname'] = brush['targetname'].replace(
-                        '_panel_top',
-                        '-brush',
-                        )
-                    brush['parentname'] = conditions.local_name(
-                        ins,
-                        dynamic_pan_parent,
-                    )
-
-                    if dynamic_pan_temp:
-                        # Allow replacing the brush used for the surface.
-                        new_brush = template_brush.import_template(
-                            dynamic_pan_temp,
-                            Vec.from_str(brush['origin']),
-                            Vec.from_str(ins['angles']),
-                            targetname=targ,
-                            force_type=template_brush.TEMP_TYPES.detail,
-                        )
-                        brush.solids = new_brush.detail.solids
-                        new_brush.detail.remove()
-                        for side in brush.sides():
-                            if side.mat.casefold() == 'metal/black_wall_metal_002c':
-                                # Copy data from the original face...
-                                side.mat = surf_face.mat
-                                side.uaxis = surf_face.uaxis
-                                side.vaxis = surf_face.vaxis
-                                side.ham_rot = surf_face.ham_rot
-                                side.smooth = surf_face.smooth
-                                side.lightmap = surf_face.lightmap
-
-                break  # Don't run twice - there might be a second matching
-                # overlay instance!
-
-    if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
-        packing.pack_list(VMF, vbsp_options.get(str, 'grating_pack'))
-
-
-def set_special_mat(face, side_type):
-    """Set a face to a special texture.
-
-    Those include checkers or portal-here tiles, used on flip
-    and angled panels.
-    side_type should be either 'white' or 'black'.
-    """
-    # We use a wall-specific texture, or the floor texture,
-    # or fallback to regular textures
-    rep_texture = 'special.' + side_type
-    orient = get_face_orient(face)
-    if orient is ORIENT.wall and get_tex(rep_texture + '_wall'):
-        face.mat = get_tex(rep_texture + '_wall')
-    elif get_tex(rep_texture):
-        face.mat = get_tex(rep_texture)
-    elif not alter_mat(face):
-        face.mat = get_tex(side_type + '.' + str(orient))
-
-
-def make_static_pan(
-    ent: VLib.Entity,
-    pan_type: str,
-    is_bullseye: bool=False
-) -> bool:
-    """Convert a regular panel into a static version.
-
-    This is done to save entities and improve lighting."""
-    static_pan_folder = vbsp_options.get(str, 'staticPan')
-    if not static_pan_folder:
-        return False  # no conversion allowed!
-
-    angle = "00"
-    if ent.fixup['animation']:
-        # the 5:7 is the number in "ramp_45_deg_open"
-        angle = ent.fixup['animation'][5:7]
-    if ent.fixup['start_deployed'] == "0":
-        angle = "00"  # different instance flat with the wall
-    if ent.fixup['connectioncount', '0'] != "0":
-        return False
-    # Handle glass panels
-    if pan_type == 'glass':
-        ent["file"] = static_pan_folder + angle + '_glass.vmf'
-        return True
-
-    # Handle white/black panels:
-    ent['file'] = static_pan_folder + angle + '_surf.vmf'
-
-    # We use a template for the surface, so it can use correct textures.
-    if angle == '00':
-        # Special case: flat panels use different templates
-        temp_data = template_brush.import_template(
-            vbsp_options.get(str, 'static_pan_temp_flat'),
-            origin=Vec.from_str(ent['origin']),
-            angles=Vec.from_str(ent['angles']),
-            targetname=ent['targetname'],
-            force_type=template_brush.TEMP_TYPES.detail,
-        )
-        template_brush.retexture_template(
-            temp_data,
-            origin=Vec.from_str(ent['origin']),
-            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
-            fixup=ent.fixup,
-            use_bullseye=is_bullseye,
-        )
-
-        # Some styles have 8-unit thick flat panels, others use 4-units.
-        # Put the target halfway.
-        faith_targ_pos = Vec(0, 0, -64 + 6).rotate_by_str(ent['angles'])
-        faith_targ_pos += Vec.from_str(ent['origin'])
-    else:
-        # For normal surfaces, we need an  origin and angles
-        #  rotated around the hinge point!
-        temp_origin = Vec(-64, 0, -64).rotate_by_str(ent['angles'])
-        temp_origin += Vec.from_str(ent['origin'])
-
-        temp_angles = Vec.from_str(ent['angles'])
-
-        # figure out the right axis to rotate for the face
-        facing_dir = Vec(0, 1, 0).rotate_by_str(ent['angles'])
-        # Rotating counterclockwise
-        if facing_dir.z == 1:
-            temp_angles.y = (temp_angles.y - int(angle)) % 360
-        # Rotating clockwise
-        elif facing_dir.z == -1:
-            temp_angles.y = (temp_angles.y + int(angle)) % 360
-        else:
-            normal = Vec(0, 0, 1).rotate_by_str(ent['angles'])
-            if normal.z == -1:
-                # On ceiling
-                temp_angles.x = (temp_angles.x + int(angle)) % 360
-            else:
-                # Floor or rotating upright on walls
-                temp_angles.x = (temp_angles.x - int(angle)) % 360
-        # The target should be centered on the rotated panel!
-        faith_targ_pos = Vec(64, 0, 0)
-        faith_targ_pos.localise(temp_origin, temp_angles)
-
-        temp_data = template_brush.import_template(
-            vbsp_options.get(str, 'static_pan_temp_' + pan_type),
-            temp_origin,
-            temp_angles,
-            force_type=template_brush.TEMP_TYPES.detail,
-        )
-        template_brush.retexture_template(
-            temp_data,
-            origin=Vec.from_str(ent['origin']),
-            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
-            fixup=ent.fixup,
-            use_bullseye=is_bullseye,
-        )
-
-    # Search for the info_targets of catapults aimed at the panel,
-    # and adjust them so they're placed precicely on the surface.
-    base_pos = Vec(0, 0, -64).rotate_by_str(ent['angles'])
-    base_pos += Vec.from_str(ent['origin'])
-    # Since it's a defaultdict, misses will give an empty list.
-    for target in PANEL_FAITH_TARGETS[base_pos.as_tuple()]:
-        target['origin'] = faith_targ_pos.join(' ')
-        # Clear the parentname, since the brush is now gone!
-        del target['parentname']
-
-    return True
+        global_pti_ents.fixup['glados_script'] = 'choreo/glados.nut'  # Implements Multiverse Cave..
 
 
 def change_ents() -> None:
@@ -2820,9 +1714,6 @@ def make_vrad_config(is_peti: bool) -> None:
     if is_peti:
         conf['force_full'] = srctools.bool_as_int(
             BEE2_config.get_bool('General', 'vrad_force_full')
-        )
-        conf['screenshot'] = BEE2_config.get_val(
-            'Screenshot', 'loc', ''
         )
         conf['screenshot_type'] = BEE2_config.get_val(
             'Screenshot', 'type', 'PETI'
@@ -3050,7 +1941,7 @@ def main() -> None:
     """Main program code.
 
     """
-    global MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
+    global MAP_RAND_SEED
     LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
     conditions.import_conditions()  # Import all the conditions and
@@ -3133,12 +2024,6 @@ def main() -> None:
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
 
-    # Clear the list of files we want to inject into the packfile.
-    # If we're in a Hammer map, we want to ensure no files are injected.
-    LOGGER.info('Clearing inject/ directory..')
-    os.makedirs('bee2/inject/', exist_ok=True)
-    for file in os.listdir('bee2/inject'):
-        os.remove(os.path.join('bee2', 'inject', file))
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
@@ -3155,10 +2040,13 @@ def main() -> None:
         load_map(path)
         instance_traits.set_traits(VMF)
 
+        ant, side_to_antline = antlines.parse_antlines(VMF)
+
         # Requires instance traits!
         connections.calc_connections(
             VMF,
-            settings['textures']['overlay.shapeframe'],
+            ant,
+            texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
             ant_floor,
             ant_wall,
@@ -3179,20 +2067,24 @@ def main() -> None:
             vmf_file=VMF,
         )
 
+        tiling.gen_tile_temp()
+        tiling.analyse_map(VMF, side_to_antline)
+
+        del side_to_antline
+
+        texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
+
         conditions.check_all()
-        add_extra_ents(mode=GAME_MODE)
+        add_extra_ents(GAME_MODE)
 
         change_ents()
-        fixup_goo_sides()  # Must be done before change_brush()!
-        change_brush()
+        tiling.generate_brushes(VMF)
+        faithplate.gen_faithplates(VMF)
         change_overlays()
-        collapse_goo_trig()
-        change_func_brush()
-        barriers.make_barriers(VMF, get_tex)
+        barriers.make_barriers(VMF)
         fix_worldspawn()
 
-        
-        # Ensure all VMF outputs use the correct seperator.
+        # Ensure all VMF outputs use the correct separator.
         for ent in VMF.entities:
             for out in ent.outputs:
                 out.comma_sep = False

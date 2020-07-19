@@ -1,9 +1,11 @@
+"""Implements the customisable Signage item."""
 from typing import Tuple, Dict, Optional, Iterable, List
 from enum import Enum
 
 import conditions
 import srctools.logger
-import vbsp
+import tiling
+import texturing
 import template_brush
 from srctools import Property, Entity, VMF, Vec, NoKeyError
 from srctools.vmf import make_overlay, Side
@@ -11,7 +13,7 @@ import comp_consts as const
 
 COND_MOD_NAME = None
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.signage')
 
 
 class SignType(Enum):
@@ -135,8 +137,6 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
     template_id = res['template_id', '']
 
-    face: Side
-
     if inst.fixup.bool(const.FixupVars.ST_REVERSED):
         # Flip around.
         forward = -forward
@@ -147,8 +147,17 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         prim_visgroup = 'primary'
         sec_visgroup = 'secondary'
 
+    if sign_prim and sign_sec:
+        inst['file'] = res['large_clip', '']
+        inst['origin'] = (prim_pos + sec_pos) / 2
+    else:
+        inst['file'] = res['small_clip', '']
+        inst['origin'] = prim_pos if sign_prim else sec_pos
+
+    brush_faces: List[Side] = []
+    tiledef: Optional[tiling.TileDef] = None
+
     if template_id:
-        brush_faces: List[Side] = []
         if sign_prim and sign_sec:
             visgroup = [prim_visgroup, sec_visgroup]
         elif sign_prim:
@@ -168,22 +177,21 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
                 brush_faces.append(face)
     else:
         # Direct on the surface.
-        block_center = origin // 128 * 128 + (64, 64, 64)
+        # Find the grid pos first.
+        grid_pos = (origin // 128) * 128 + 64
         try:
-            face = conditions.SOLIDS[
-                (block_center + 64*normal).as_tuple()
-            ].face
+            tiledef = tiling.TILES[(grid_pos + 128*normal).as_tuple(), (-normal).as_tuple()]
         except KeyError:
             LOGGER.warning(
                 "Can't place signage at ({}) in ({}) direction!",
-                block_center,
+                origin,
                 normal,
+                exc_info=True,
             )
             return
-        brush_faces = [face]
 
     if sign_prim is not None:
-        place_sign(
+        over = place_sign(
             vmf,
             brush_faces,
             sign_prim,
@@ -193,11 +201,15 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
             rotate=True,
         )
 
+        if tiledef is not None:
+            tiledef.bind_overlay(over)
+
     if sign_sec is not None:
         if has_arrow and res.bool('arrowDown'):
             # Arrow texture points down, need to flip it.
             forward = -forward
-        place_sign(
+
+        over = place_sign(
             vmf,
             brush_faces,
             sign_sec,
@@ -206,6 +218,9 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
             forward,
             rotate=not has_arrow,
         )
+
+        if tiledef is not None:
+            tiledef.bind_overlay(over)
 
 
 def place_sign(
@@ -216,7 +231,7 @@ def place_sign(
     normal: Vec,
     forward: Vec,
     rotate: bool=True,
-) -> None:
+) -> Entity:
     """Place the sign into the map."""
 
     if rotate and normal.z == 0:
@@ -225,7 +240,8 @@ def place_sign(
 
     texture = sign.overlay
     if texture.startswith('<') and texture.endswith('>'):
-        texture = vbsp.get_tex(texture[1:-1])
+        gen, tex_name = texturing.parse_name(texture[1:-1])
+        texture = gen.get(pos, tex_name)
 
     width, height = SIZES[sign.type]
     over = make_overlay(
@@ -241,4 +257,4 @@ def place_sign(
     over['startu'] = '1'
     over['endu'] = '0'
 
-    vbsp.IGNORED_OVERLAYS.add(over)
+    return over

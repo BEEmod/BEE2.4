@@ -1,9 +1,12 @@
 """The Operation result allows executing math on instvars."""
 import ast
+from typing import List, Dict, Any, Callable, Tuple
 
 from conditions import make_result_setup, make_result
 from srctools import Property, Vec, Entity, conv_bool
 import srctools.logger
+from srctools.vmf import EntityFixup
+
 
 COND_MOD_NAME = 'Python'
 
@@ -30,7 +33,7 @@ FUNC_GLOBALS = {
     '__builtins__': None,
 }
 
-AST_PRETTY = {
+BANNED_COMPS = {
     ast.Is: 'is',
     ast.IsNot: 'is not',
     ast.In: 'in',
@@ -75,10 +78,20 @@ class Checker(ast.NodeVisitor):
 
     def visit_Compare(self, node):
         """ < comps etc."""
-        if isinstance(node.op, (ast.Is, ast.IsNot, ast.In, ast.NotIn)):
-            raise Exception("The {} operator is not allowed!".format(
-                [type(node.op)]
-            ))
+        try:
+            ops = node.ops
+        except AttributeError:
+            if isinstance(node.op, tuple(BANNED_COMPS)):
+                raise Exception("The {} operator is not allowed!".format(
+                    BANNED_COMPS[type(node.op)]
+                ))
+        else:
+            for op in ops:
+                if isinstance(op, tuple(BANNED_COMPS)):
+                    raise Exception("The {} operator is not allowed!".format(
+                        BANNED_COMPS[type(op)]
+                    ))
+
         self.visit(node.left)
         for right in node.comparators:
             self.visit(right)
@@ -91,11 +104,10 @@ class Checker(ast.NodeVisitor):
     visit_Num = safe_visit
     visit_Str = safe_visit
     visit_NameConstant = safe_visit  # True, False, None
-    # Constant is never generated, but could be these.
-
+    visit_Constant = safe_visit
 
 @make_result_setup('Python', 'Operation')
-def res_python_setup(res: Property):
+def res_python_setup(res: Property) -> Tuple[Callable[[EntityFixup], object], str]:
     variables = {}
     variable_order = []
     code = None
@@ -117,8 +129,8 @@ def res_python_setup(res: Property):
     if not result_var:
         raise Exception('No destination specified!')
 
-    for name in ('_bee2_generated_func', '_fixup'):
-        if name in variables:
+    for name in variables:
+        if name.startswith('_'):
             raise Exception('"{}" is not permitted as a variable name!'.format(name))
 
     # Allow $ in the variable names..
@@ -138,7 +150,7 @@ def res_python_setup(res: Property):
 
     # For each variable, do
     # var = func(_fixup['var'])
-    statements = [
+    statements: List[ast.AST] = [
         ast.Assign(
             targets=[ast.Name(id=var_name, ctx=ast.Store())],
             value=ast.Call(
@@ -162,12 +174,24 @@ def res_python_setup(res: Property):
     # The last statement returns the target expression.
     statements.append(ast.Return(expression, lineno=len(variable_order)+1, col_offset=0))
 
+    args = ast.arguments(
+        vararg=None, 
+        kwonlyargs=[], 
+        kw_defaults=[], 
+        kwarg=None, 
+        defaults=[],
+    )
+    # Py 3.8+, make it pos-only.
+    if 'posonlyargs' in args._fields:
+        args.posonlyargs = [ast.arg('_fixup', None)]
+        args.args = []
+    else:  # Just make it a regular arg.
+        args.args = [ast.arg('_fixup', None)]
+
     func = ast.Module([
             ast.FunctionDef(
                 name='_bee2_generated_func',
-                args=ast.arguments([
-                    ast.arg('_fixup', None),
-                ], None, [], [], None, []),
+                args=args,
                 body=statements,
                 decorator_list=[],
             ),
@@ -175,10 +199,14 @@ def res_python_setup(res: Property):
         lineno=1,
         col_offset=0,
     )
+    # Python 3.8 also
+    if 'type_ignores' in func._fields:
+        func.type_ignores = []
+
     # Fill in lineno and col_offset
     ast.fix_missing_locations(func)
 
-    ns = {}
+    ns: Dict[str, Any] = {}
     eval(compile(func, '<bee2_op>', mode='exec'), FUNC_GLOBALS, ns)
     compiled_func = ns['_bee2_generated_func']
     compiled_func.__name__ = '<bee2_func>'
@@ -188,6 +216,8 @@ def res_python_setup(res: Property):
 @make_result('Python', 'Operation')
 def res_python(inst: Entity, res: Property):
     """Apply a function to a fixup."""
+    func: Callable[[EntityFixup], object]
+    result_var: str
     func, result_var = res.value
     result = func(inst.fixup)
     if isinstance(result, bool):

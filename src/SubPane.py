@@ -1,5 +1,8 @@
+from typing import Callable, Any
+
 from tkinter import *
 from tkinter import ttk
+from BEE2_config import GEN_OPTS
 
 import tooltip
 import tk_tools
@@ -18,7 +21,11 @@ style.configure(
 )
 
 
-def make_tool_button(frame, img, command):
+def make_tool_button(
+    frame: Misc,
+    img: PhotoImage,
+    command: Callable[[], Any]
+) -> ttk.Button:
     """Make a toolbar icon."""
     button = ttk.Button(
         frame,
@@ -36,18 +43,19 @@ class SubPane(Toplevel):
      This follows the main window when moved.
     """
     def __init__(
-            self,
-            parent,
-            tool_frame,
-            tool_img,
-            options,
-            tool_col=0,
-            title='',
-            resize_x=False,
-            resize_y=False,
-            name='',
-            ):
-        self.visible = True
+        self,
+        parent: Misc,
+        *,
+        tool_frame: Frame,
+        tool_img: PhotoImage,
+        menu_bar: Menu,
+        tool_col: int=0,
+        title: str='',
+        resize_x: bool=False,
+        resize_y: bool=False,
+        name: str='',
+    ) -> None:
+        self.visible = BooleanVar(parent, True)
         self.win_name = name
         self.allow_snap = False
         self.can_save = False
@@ -56,7 +64,6 @@ class SubPane(Toplevel):
         self.relY = 0
         self.can_resize_x = resize_x
         self.can_resize_y = resize_y
-        self.config_file = options
         super().__init__(parent, name='pane_' + name)
         self.withdraw()  # Hide by default
 
@@ -75,7 +82,7 @@ class SubPane(Toplevel):
         tooltip.add_tooltip(
             self.tool_button,
             text=_('Hide/Show the "{}" window.').format(title))
-
+        menu_bar.add_checkbutton(label=title, variable=self.visible, command=self.toggle_win)
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
         self.title(title)
@@ -86,32 +93,33 @@ class SubPane(Toplevel):
         self.bind('<Configure>', self.snap_win)
         self.bind('<FocusIn>', self.enable_snap)
 
-    def hide_win(self, play_snd=True):
+    def hide_win(self, play_snd: bool=True) -> None:
         """Hide the window."""
         if play_snd:
             snd.fx('config')
         self.withdraw()
-        self.visible = False
+        self.visible.set(False)
         self.save_conf()
         self.tool_button.state(('!pressed',))
 
-    def show_win(self, play_snd=True):
+    def show_win(self, play_snd: bool=True) -> None:
         """Show the window."""
         if play_snd:
             snd.fx('config')
         self.deiconify()
-        self.visible = True
+        self.visible.set(True)
         self.save_conf()
         self.tool_button.state(('pressed',))
         self.follow_main()
 
-    def toggle_win(self):
-        if self.visible:
+    def toggle_win(self) -> None:
+        """Toggle the window between shown and hidden."""
+        if self.visible.get():
             self.hide_win()
         else:
             self.show_win()
 
-    def move(self, x=None, y=None, width=None, height=None):
+    def move(self, x: int=None, y: int=None, width: int=None, height: int=None) -> None:
         """Move the window to the specified position.
 
         Effectively an easier-to-use form of Toplevel.geometry(), that
@@ -140,10 +148,10 @@ class SubPane(Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, e=None):
+    def enable_snap(self, e=None) -> None:
         self.allow_snap = True
 
-    def snap_win(self, e=None):
+    def snap_win(self, e=None) -> None:
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.
@@ -154,7 +162,7 @@ class SubPane(Toplevel):
             self.relY = self.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
-    def follow_main(self, e=None):
+    def follow_main(self, e=None) -> None:
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         x, y = utils.adjust_inside_screen(
@@ -165,31 +173,28 @@ class SubPane(Toplevel):
         self.geometry('+'+str(x)+'+'+str(y))
         self.parent.focus()
 
-    def save_conf(self):
-        if self.can_save:
-            self.config_file['win_state'][
-                self.win_name + '_visible'] = srctools.bool_as_int(self.visible)
-            self.config_file['win_state'][self.win_name + '_x'] = str(self.relX)
-            self.config_file['win_state'][self.win_name + '_y'] = str(self.relY)
-            if self.can_resize_x:
-                self.config_file['win_state'][
-                    self.win_name + '_width'] = str(self.winfo_width())
-            if self.can_resize_y:
-                self.config_file['win_state'][
-                    self.win_name + '_height'] = str(self.winfo_height())
+    def save_conf(self) -> None:
+        """Write configuration to the config file."""
+        if not self.can_save:
+            return
+        opt_block = GEN_OPTS['win_state']
+        opt_block[self.win_name + '_visible'] = srctools.bool_as_int(self.visible.get())
+        opt_block[self.win_name + '_x'] = str(self.relX)
+        opt_block[self.win_name + '_y'] = str(self.relY)
+        if self.can_resize_x:
+            opt_block[self.win_name + '_width'] = str(self.winfo_width())
+        if self.can_resize_y:
+            opt_block[self.win_name + '_height'] = str(self.winfo_height())
 
-    def load_conf(self):
+    def load_conf(self) -> None:
+        """Load configuration from our config file."""
         try:
             if self.can_resize_x:
-                width = int(
-                    self.config_file['win_state'][self.win_name + '_width']
-                )
+                width = int(GEN_OPTS['win_state'][self.win_name + '_width'])
             else:
                 width = self.winfo_reqwidth()
             if self.can_resize_y:
-                height = int(
-                    self.config_file['win_state'][self.win_name + '_height']
-                )
+                height = int(GEN_OPTS['win_state'][self.win_name + '_height'])
             else:
                 height = self.winfo_reqheight()
             self.deiconify()
@@ -197,22 +202,14 @@ class SubPane(Toplevel):
             self.geometry('{!s}x{!s}'.format(width, height))
             self.sizefrom('user')
 
-            self.relX = int(
-                self.config_file['win_state'][self.win_name + '_x']
-            )
-            self.relY = int(
-                self.config_file['win_state'][self.win_name + '_y']
-            )
+            self.relX = int(GEN_OPTS['win_state'][self.win_name + '_x'])
+            self.relY = int(GEN_OPTS['win_state'][self.win_name + '_y'])
 
             self.follow_main()
             self.positionfrom('user')
         except (ValueError, KeyError):
             pass
-        if not self.config_file.get_bool(
-                'win_state',
-                self.win_name + '_visible',
-                True
-                ):
+        if not GEN_OPTS.get_bool('win_state', self.win_name + '_visible', True):
             self.after(150, self.hide_win)
 
         # Prevent this until here, so the <config> event won't erase our

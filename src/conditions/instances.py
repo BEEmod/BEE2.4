@@ -70,18 +70,21 @@ def flag_has_trait(inst: Entity, flag: Property):
         * `cube_ball`: Edgeless Safety Cube.
         * `cube_reflect`: Discouragment Redirection Cube.
         * `cube_franken`: FrankenTurret.
-    * `coop_corridor`: A Coop exit Corridor.
-    * `sp_corridor`: SP entry or exit corridor.
-    * `corridor_frame`: White/black door frame.
-    * `corridor_1`-`7`: The specified entry/exit corridor.
-    * `elevator`: An elevator instance.
-    * `entry_elevator`: Entry Elevator.
-    * `exit_elevator`: Exit Elevator.
-    * `entry_corridor`: Entry SP Corridor.
-    * `exit_corridor`: Exit SP/Coop Corridor.
+    * `preplaced`: The various pre-existing instances:
+        * `coop_corridor`: A Coop exit Corridor.
+        * `sp_corridor`: SP entry or exit corridor.
+        * `corridor_frame`: White/black door frame.
+        * `corridor_1`-`7`: The specified entry/exit corridor.
+        * `elevator`: An elevator instance.
+        * `entry_elevator`: Entry Elevator.
+        * `exit_elevator`: Exit Elevator.
+        * `entry_corridor`: Entry SP Corridor.
+        * `exit_corridor`: Exit SP/Coop Corridor.
     * `fizzler`: A fizzler item:
         * `fizzler_base`: Logic instance.
         * `fizzler_model`: Model instance.
+        * `cust_shape`: Set if the fizzler has been moved to a custom position
+          by ReshapeFizzler.
     * `locking_targ`: Target of a locking pedestal button.
     * `locking_btn`: Locking pedestal button.
     * `paint_dropper`: Gel Dropper:
@@ -148,6 +151,33 @@ def flag_instvar(inst: Entity, flag: Property):
     else:
         # For just a name.
         return inst.fixup.bool(flag.value)
+
+
+@make_flag('offsetDist')
+def flag_offset_distance(inst: Entity, flag: Property) -> bool:
+    """Check if the given instance is in an offset position.
+
+    This computes the distance between the instance location and the center
+    of the voxel.
+    The value can be the distance for an exact check, '< x', '> $var', etc.
+    """
+    origin = Vec.from_str(inst['origin'])
+    grid_pos = origin // 128 * 128 + 64
+    offset = (origin - grid_pos).mag()
+
+    try:
+        op, comp_val = flag.value.split()
+    except ValueError:
+        # A single value.
+        op = '='
+        comp_val = flag.value
+
+    try:
+        value = float(conditions.resolve_value(inst, comp_val))
+    except ValueError:
+        return False
+
+    return INSTVAR_COMP.get(op, operator.eq)(offset, value)
 
 
 @make_result('rename', 'changeInstance')

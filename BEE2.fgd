@@ -85,7 +85,7 @@
 	"The faces must be axis-aligned."
 	vertical_faces(sidelist): "Rotate Faces to Vertical" : : "Rotate these faces in 90 degree increments until they point upwards."
 	skip_faces(sidelist): "Don't Retexture these faces" : : "Do not change textures on these faces."
-	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using ReplaceBrush."
+	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using BindOverlay."
 	
 	temp_type(choices): "Template Type" : "default" : "Convert brushes to this type of entity." =
 		[
@@ -108,11 +108,60 @@
 	= bee2_template_colorpicker:
 	"Applies the color of a surface at a position to template faces. The arrow should point out of the surface."
 	[
+	targetname(target_source): "Name" : "": "Set the name for reference from other entities."
 	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
+
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
+
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
+
 	grid_snap(boolean): "Snap To Grid" : 0 : "For items like fizzlers, snap to the closest grid position in side directions."
-	remove_brush(boolean): "Remove Brush" : 0 : "After grabbing the surface, remove the brush. Should only be done when you know the brush isn't shared with other faces."
+	
+	use_pattern(boolean): "Use Tile Pattern": 0 : "Force this surface to use the texture of the tile that would be here. " +
+		"Should be used ONLY on brushes pointing straight up, and that are split on the 32x32 lines to replace the normal surface entirely."
+
+	tex_white(material) : "White Material" : : "If set, the sides will be switched to this specific material if the surface is WHITE."
+	tex_black(material) : "Black Material" : : "If set, the sides will be switched to this specific material if the surface is BLACK."
+
+	remove_brush(choices): "Remove Tile" : 0 : "After grabbing the surface, should the tile be removed?" = 
+		[
+		0: "Do not change"
+		1: "Remove Tile (Set to VOID)"
+		2: "Set to Nodraw"
+		]
+	]
+
+@PointClass
+	base(Angles)
+	studioprop("models/BEE2/editor/tile_setter.mdl")
+	line(64 64 64, targetname, color_picker)
+	= bee2_template_tilesetter:
+	"Applies a tile type to a surface."
+	[
+	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
+	color_picker(target_destination): "Color Picker": "" : "If set, use this colorpicker to reuse existing textures."
+
+	force(boolean) : "Force Place" : 0 : "If enabled, place the tile regardless of what's already in this position."
+	
+	color(choices): "Color" : "tile" : "The color to use for tiles (if applicable). If set to Match Var or Invert Var, the template must provide a color." = 
+		[
+		"tile": "Use tile colour"
+		"match": "Match var"
+		"invert": "Invert var"
+		"copy": "Copy type, not color"
+		]
+	
+	skin(choices): "Tile Type" : "4": "The tile type to apply." = 
+		[
+		0: "Black"
+		1: "4x4 Black"
+		2: "White"
+		3: "4x4 White"
+		4: "Nodraw"
+		5: "Void (remove tile)"
+		6: "Cutout Tile (Broken)"
+		7: "Cutout Tile (Partial)"
+		]
 	]
 
 // --------
@@ -142,7 +191,7 @@
 	min(vecline) : "Maximum Position" : "64 64 0" : "The maximum position of the hollowed area."
 	]
 
-@PointClass wirebox(min, max)= bee2_editor_embedface: "Defines a EmbedFace section for an item."
+@PointClass wirebox(min, max) = bee2_editor_embedface: "Defines a EmbedFace section for an item."
 	[
 	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the brush section. Vertical position is ignored."
 	min(vecline) : "Maximum Position" : "64 64 0" : "The minimum position of the brush section. Vertical position is ignored."
@@ -156,6 +205,37 @@
 		"Grid_Default"  : "Normal Wall"
 		]
 	]
+
+// Entities added to the finished map to pass information to VRAD.
+
+@PointClass
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+	= bee2_coop_response :
+	"Stores the choreo scenes for responses to players in Coop."
+	[
+	type(string) : "Type" : : "The type of response this is."
+	choreo01(scene) : "Scene" : : "Random line to use."
+	choreo02(scene) : "Scene" : : "Random line to use."
+	choreo03(scene) : "Scene" : : "Random line to use."
+	choreo04(scene) : "Scene" : : "Random line to use."
+	choreo05(scene) : "Scene" : : "Random line to use."
+	choreo06(scene) : "Scene" : : "Random line to use."
+	choreo07(scene) : "Scene" : : "Random line to use."
+	choreo08(scene) : "Scene" : : "Random line to use."
+	choreo09(scene) : "Scene" : : "Random line to use."
+	choreo10(scene) : "Scene" : : "Random line to use."
+	choreo11(scene) : "Scene" : : "Random line to use."
+	choreo12(scene) : "Scene" : : "Random line to use."
+	choreo13(scene) : "Scene" : : "Random line to use."
+	choreo14(scene) : "Scene" : : "Random line to use."
+	choreo15(scene) : "Scene" : : "Random line to use."
+	choreo16(scene) : "Scene" : : "Random line to use."
+	choreo17(scene) : "Scene" : : "Random line to use."
+	choreo18(scene) : "Scene" : : "Random line to use."
+	choreo19(scene) : "Scene" : : "Random line to use."
+	choreo20(scene) : "Scene" : : "Random line to use."
+	]
+
 
 @AutoVisGroup = "BEE2"
 	[
@@ -196,6 +276,13 @@
 	"Configuration"
 		[
 		"bee2_template_conf"
+		]
+	"Color Picker"
+		[
 		"bee2_template_colorpicker"
+		]
+	"Tile Setter"
+		[
+		"bee2_template_tilesetter"
 		]
 	]

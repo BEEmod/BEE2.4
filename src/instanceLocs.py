@@ -18,12 +18,12 @@ from typing import (
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# The list of instance each item uses.
-INSTANCE_FILES = {}
+# The list of instances each item uses.
+INSTANCE_FILES: Dict[str, List[str]] = {}
 
 # Item ID and index/special name for instances set in editoritems.
 # Note this is imperfect - two items could reuse the same instance.
-ITEM_FOR_FILE = {}  # type: Dict[str, Tuple[str, Union[int, str]]]
+ITEM_FOR_FILE: Dict[str, Tuple[str, Union[int, str]]] = {}
 
 _RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
@@ -38,12 +38,12 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES = defaultdict(dict)  # type: Dict[str, Dict[str, str]]
+CUST_INST_FILES: Dict[str, Dict[str, str]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
 # or indicator panels.
-SPECIAL_INST = {
+SPECIAL_INST: Dict[str, str] = {
     # Glass only generates borders for genuine ITEM_BARRIER items,
     # so it's possible to define special names.
     'glass_128':                 '<ITEM_BARRIER:0>',
@@ -132,11 +132,11 @@ SPECIAL_INST = {
 }
 
 # The resolved versions of SPECIAL_INST
-INST_SPECIAL = None  # type: dict
+INST_SPECIAL: Dict[str, List[str]] = {}
 
 # Gives names to reusable instance fields, so you don't need to remember
 # indexes
-SUBITEMS = {
+SUBITEMS: Dict[str, Union[int, Tuple[int, ...]]] = {
     # Cube
     'standard': 0,
     'companion': 1,
@@ -171,7 +171,7 @@ SUBITEMS = {
     'edgeless_white': 4,
     'edgeless_black': 5,
 
-    # Combined buttom parts
+    # Combined button parts
     'btn_weighted': (0, 1),
     'btn_floor': (0, 1),
     'btn_cube': (2, 3),
@@ -218,8 +218,6 @@ SPECIAL_INST_FOLDED = {
 
 def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
-    global INST_SPECIAL
-
     # Extra definitions: key -> filename.
     # Make sure to do this first, so numbered instances are set in
     # ITEM_FOR_FILE.
@@ -238,11 +236,12 @@ def load_conf(prop_block: Property):
             inst_list.append(file)
             ITEM_FOR_FILE[file] = (prop.name, ind)
 
-    INST_SPECIAL = {
+    INST_SPECIAL.clear()
+    INST_SPECIAL.update({
         key.casefold(): resolve(val_string, silent=True)
         for key, val_string in
         SPECIAL_INST.items()
-    }
+    })
 
 
 def resolve(path: str, silent: bool=False) -> List[str]:
@@ -270,10 +269,12 @@ def resolve(path: str, silent: bool=False) -> List[str]:
     """
     if silent:
         # Ignore messages < ERROR (warning and info)
+        log_level = LOGGER.level
         LOGGER.setLevel(logging.ERROR)
-        val = _resolve(path)
-        LOGGER.setLevel(logging.NOTSET)
-        return val
+        try:
+            return _resolve(path)
+        finally:
+            LOGGER.setLevel(log_level)
     else:
         return _resolve(path)
 
@@ -310,7 +311,12 @@ def _resolve(path: str) -> List[str]:
         out = []
         for group in groups:
             if group[0] == '<':
-                item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
+                try:
+                    item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
+                except (ValueError, AttributeError):  # None.groups fail
+                    LOGGER.warning('Could not parse instance lookup "{}"!'.format(group))
+                    return []
+
                 item_id = item_id.casefold()
                 try:
                     item_inst = INSTANCE_FILES[item_id]
@@ -379,7 +385,7 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
                     '"' + val + '" is not a valid instance'
                                 ' subtype or index!'
                 )
-        # SUBITEMS has tuple values, which represent multiple subitems.
+        # SUBITEMS has tuple values, which represent multiple sub-items.
         if isinstance(ind, tuple):
             output.extend(ind)
         else:

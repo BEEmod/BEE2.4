@@ -128,13 +128,17 @@ class Manager(Generic[ItemT]):
             - label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        slot = Slot(self, parent, source, label)  # type: Slot[ItemT]
+        slot: Slot[ItemT] = Slot(self, parent, source, label)
         if source:
             self._sources.append(slot)
         else:
             self._targets.append(slot)
 
         return slot
+
+    def remove(self, slot: 'Slot[ItemT]') -> None:
+        """Remove the specified slot."""
+        (self._sources if slot.is_source else self._targets).remove(slot)
 
     def refresh_icons(self) -> None:
         """Update all items to set new icons."""

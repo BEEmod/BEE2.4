@@ -9,8 +9,8 @@ It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
-from typing import Any, Mapping
-import os
+from pathlib import Path
+from typing import Any, Mapping, Optional
 
 from srctools import AtomicWriter, Property, KeyValError
 
@@ -38,7 +38,7 @@ def get_curr_settings() -> Property:
     return props
 
 
-def apply_settings(props: Property):
+def apply_settings(props: Property) -> None:
     """Given a property tree, apply it to the widgets."""
     for opt_prop in props:
         try:
@@ -53,7 +53,7 @@ def read_settings() -> None:
     """Read and apply the settings from disk."""
     path = utils.conf_location('config/config.vdf')
     try:
-        file = open(path, encoding='utf8')
+        file = path.open(encoding='utf8')
     except FileNotFoundError:
         return
     try:
@@ -76,6 +76,7 @@ def write_settings() -> None:
     with AtomicWriter(
         str(utils.conf_location('config/config.vdf')),
         is_bytes=False,
+        encoding='utf8',
     ) as file:
         for line in props.export():
             file.write(line)
@@ -89,9 +90,13 @@ class ConfigFile(ConfigParser):
     get_val, get_bool, and get_int are modified to return defaults instead
     of erroring.
     """
+    has_changed: bool
+    filename: Optional[Path]
+    _writer: Optional[AtomicWriter]
+
     def __init__(
         self,
-        filename: str,
+        filename: Optional[str],
         *,
         in_conf_folder: bool=True,
         auto_load: bool=True,
@@ -109,17 +114,17 @@ class ConfigFile(ConfigParser):
 
         if filename is not None:
             if in_conf_folder:
-                self.filename = utils.conf_location('config/' + filename)
+                self.filename = utils.conf_location('config') / filename
             else:
-                self.filename = filename
+                self.filename = Path(filename)
 
-            self.writer = AtomicWriter(self.filename)
+            self._writer = AtomicWriter(self.filename)
             self.has_changed = False
 
             if auto_load:
                 self.load()
         else:
-            self.filename = self.writer = None
+            self.filename = self._writer = None
 
     def load(self) -> None:
         """Load config options from disk."""
@@ -152,10 +157,10 @@ class ConfigFile(ConfigParser):
     def save(self) -> None:
         """Write our values out to disk."""
         LOGGER.info('Saving changes in config "{}"!', self.filename)
-        if self.filename is None:
+        if self.filename is None or self._writer is None:
             raise ValueError('No filename provided!')
 
-        with self.writer as conf:
+        with self._writer as conf:
             self.write(conf)
         self.has_changed = False
 
@@ -233,9 +238,9 @@ class ConfigFile(ConfigParser):
         self.has_changed = True
         super().add_section(section)
 
-    def remove_section(self, section: str) -> None:
+    def remove_section(self, section: str) -> bool:
         self.has_changed = True
-        super().remove_section(section)
+        return super().remove_section(section)
 
     def set(self, section: str, option: str, value: str) -> None:
         orig_val = self.get(section, option, fallback=None)
