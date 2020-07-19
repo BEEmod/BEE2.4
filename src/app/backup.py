@@ -11,22 +11,21 @@ from io import BytesIO, TextIOWrapper
 from typing import List, TYPE_CHECKING, Dict, Any
 from zipfile import ZipFile, ZIP_LZMA
 
-import img
 import loadScreen
 import srctools.logger
-import tk_tools
+from app import tk_tools, img
 import tkinter as tk
 import utils
-from CheckDetails import CheckDetails, Item as CheckItem
+from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
-from tooltip import add_tooltip
+from app.tooltip import add_tooltip
 if TYPE_CHECKING:
-    import gameMan
+    from app import gameMan
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -640,7 +639,6 @@ def ui_save_backup_as() -> None:
 
 def ui_refresh_game() -> None:
     """Reload the game maps list."""
-    import gameMan
     if gameMan.selected_game is not None:
         load_game(gameMan.selected_game)
 
@@ -851,7 +849,6 @@ def init() -> None:
 
 def init_application() -> None:
     """Initialise the standalone application."""
-    import gameMan
     global window
     window = TK_ROOT
     TK_ROOT.title(
@@ -884,7 +881,7 @@ def init_application() -> None:
     bar.add_cascade(menu=game_menu, label=_('Game'))
     gameMan.game_menu = game_menu
 
-    import helpMenu
+    from app import helpMenu
     # Add the 'Help' menu here too.
     helpMenu.make_help_menu(bar)
 

@@ -272,7 +272,7 @@ class SplashScreen(BaseLoadScreen):
         )
 
         # Must be done late, so we know TK is initialised.
-        import img
+        from app import img
 
         logo_img = img.png('BEE2/splash_logo')
 

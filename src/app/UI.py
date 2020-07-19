@@ -7,34 +7,36 @@ import operator
 import random
 
 from srctools import Property
-import music_conf
-from tk_tools import TK_ROOT
-from itemPropWin import PROP_TYPES
+from app import music_conf
+from app.tk_tools import TK_ROOT
+from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
+from app.selector_win import selWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 import srctools.logger
-import sound as snd
+from app import sound as snd
 import BEE2_config
-import paletteLoader
+from app import paletteLoader
 import packageLoader
-import img
-import itemconfig
+from app import img
+from app import itemconfig
 import utils
-import tk_tools
-import SubPane
-import voiceEditor
-import contextWin
-import gameMan
-import packageMan
-import StyleVarPane
-import CompilerPane
-import tagsPane
-import optionWindow
-import helpMenu
-import backup as backup_win
-import tooltip
-import signage_ui
+from app import (
+    tk_tools,
+    SubPane,
+    voiceEditor,
+    contextWin,
+    gameMan,
+    packageMan,
+    StyleVarPane,
+    CompilerPane,
+    tagsPane,
+    optionWindow,
+    helpMenu,
+    backup as backup_win,
+    tooltip,
+    signage_ui,
+)
 
 from typing import List, Dict, Tuple
 
@@ -137,7 +139,7 @@ class Item:
 
     def load_data(self):
         """Load data from the item."""
-        from tagsPane import Section
+        from app.tagsPane import Section
 
         version = self.item.versions[self.selected_ver]
         self.data = version['styles'].get(

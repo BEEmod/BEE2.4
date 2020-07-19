@@ -85,7 +85,7 @@ elif utils.MAC:
     LISTBOX_BG_COLOR = 'white'
 else:  # Linux
     # Get the tk image object.
-    import img
+    from app import img
     app_icon = img.get_app_icon(ICO_PATH)
 
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
@@ -319,7 +319,7 @@ class FileField(ttk.Frame):
         - callback is a function to be called with the new path whenever it
           changes.
         """
-        from tooltip import add_tooltip
+        from app.tooltip import add_tooltip
 
         super(FileField, self).__init__(master)
 
@@ -385,7 +385,7 @@ class FileField(ttk.Frame):
     @value.setter
     def value(self, path: str) -> None:
         """Set the current path. This calls the callback function."""
-        import tooltip
+        from app import tooltip
         self.callback(path)
         self._location = path
         tooltip.set_tooltip(self, path)

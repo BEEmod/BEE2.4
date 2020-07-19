@@ -6,8 +6,7 @@ from tkinter.messagebox import askokcancel
 import webbrowser
 from typing import Union
 
-import img
-import tkMarkdown
+from app import tkMarkdown, img
 import utils
 import srctools.logger
 

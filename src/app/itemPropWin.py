@@ -1,18 +1,14 @@
 from tkinter import *  # ui library
 
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
 from enum import Enum
-import math
 import random
 
-import sound
 import utils
 import srctools
-import contextWin
-import gameMan
-import tk_tools
+from app import contextWin, gameMan, tk_tools, sound
 import srctools.logger
 
 from typing import Dict, List, Union, Any

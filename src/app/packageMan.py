@@ -4,9 +4,9 @@ from typing import Iterable
 from tkinter import ttk
 from tkinter import messagebox
 import tkinter as tk
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 
-from CheckDetails import CheckDetails, Item as CheckItem
+from app.CheckDetails import CheckDetails, Item as CheckItem
 from BEE2_config import ConfigFile
 import packageLoader
 import utils

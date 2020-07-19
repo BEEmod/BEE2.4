@@ -1,6 +1,6 @@
 from tkinter import ttk
 from tkinter import font
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 import tkinter as tk
 
 from functools import partial
@@ -9,12 +9,8 @@ from collections import defaultdict
 from enum import Enum
 import string
 
-import sound as snd
-import optionWindow
-import StyleVarPane
-import UI
+from app import optionWindow, StyleVarPane, UI, tk_tools, sound
 import utils
-import tk_tools
 
 from typing import Dict, List
 
@@ -107,7 +103,7 @@ def expand(_):
     )
     wid['tag_list']['height'] = TK_ROOT.winfo_height() / 48
 
-    snd.fx('expand')
+    sound.fx('expand')
     UI.flow_picker()
 
 
@@ -116,7 +112,7 @@ def contract(_):
     global is_expanded
     is_expanded = False
     wid['expand_frame'].grid_remove()
-    snd.fx('contract')
+    sound.fx('contract')
     UI.flow_picker()
 
 

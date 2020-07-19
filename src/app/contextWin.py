@@ -10,7 +10,7 @@ various item properties.
 from tkinter import *
 
 from srctools import Property
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
 
@@ -19,18 +19,15 @@ import functools
 import webbrowser
 import srctools.logger
 
-from richTextBox import tkRichText
-import img
-import itemconfig
-import sound as snd
-import itemPropWin
-import tkMarkdown
-import tooltip
-import tk_tools
+from app.richTextBox import tkRichText
+from app import (
+    itemPropWin, itemconfig, tkMarkdown, tooltip, tk_tools,
+    sound,
+    img,
+    UI,
+)
 import utils
 import packageLoader
-
-import UI
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -126,7 +123,7 @@ def pos_for_item():
 
 
 def hide_item_props(vals):
-    snd.fx('contract')
+    sound.fx('contract')
     selected_item.set_properties(vals)
 
 
@@ -136,7 +133,7 @@ def sub_sel(ind, e=None):
     if selected_sub_item.is_pre:
         pos = SUBITEM_POS[selected_item.num_sub][ind]
         if pos != -1 and pos != selected_sub_item.subKey:
-            snd.fx('config')
+            sound.fx('config')
             selected_sub_item.change_subtype(pos)
             # Redisplay the window to refresh data and move it to match
             show_prop(selected_sub_item, warp_cursor=True)
@@ -146,14 +143,14 @@ def sub_open(ind, e=None):
     """Move the context window to apply to the given item."""
     pos = SUBITEM_POS[selected_item.num_sub][ind]
     if pos != -1 and pos != selected_sub_item.subKey:
-        snd.fx('expand')
+        sound.fx('expand')
         selected_sub_item.open_menu_at_sub(pos)
 
 
 def open_event(item):
     """Show the window for a particular PalItem."""
     def func(e):
-        snd.fx('expand')
+        sound.fx('expand')
         show_prop(item)
     return func
 
@@ -418,7 +415,7 @@ def hide_context(e=None):
     if is_open:
         is_open = False
         prop_window.withdraw()
-        snd.fx('contract')
+        sound.fx('contract')
         selected_item = selected_sub_item = None
 
 
@@ -549,7 +546,7 @@ def init_widgets():
     menu_info.add_command(label='', state='disabled')
 
     def show_item_props():
-        snd.fx('expand')
+        sound.fx('expand')
         itemPropWin.show_window(
             selected_item.get_properties(),
             wid['changedefaults'],

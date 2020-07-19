@@ -9,16 +9,16 @@ from tkinter import (
 
 from enum import Enum
 
-from richTextBox import tkRichText
-from sound import SamplePlayer
+from app.richTextBox import tkRichText
+from app.sound import SamplePlayer
 from srctools import Vec, FileSystemChain
 from typing import (
-    NamedTuple, Optional, Union, Tuple, List, Dict, Any,
+    Optional, Union, Tuple, List, Dict, Any,
     Callable, Iterable,
 )
 
-from tkMarkdown import MarkdownData
-from tk_tools import HidingScroll
+from app.tkMarkdown import MarkdownData
+from app.tk_tools import HidingScroll
 
 __all__ = [
     'ICON_SIZE', 'ICON_SIZE_LRG',

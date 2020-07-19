@@ -4,7 +4,7 @@
 Call add_tooltip with a widget to add all the events automatically.
 """
 import tkinter as tk
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 
 PADDING = 0  # Space around the target widget
 CENT_DIST = 50  # Distance around center where we align centered.

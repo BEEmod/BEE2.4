@@ -1,21 +1,19 @@
 from tkinter import *
 from tkinter import filedialog
 from tkinter import ttk
-from tooltip import add_tooltip, set_tooltip
+from app.tooltip import add_tooltip, set_tooltip
 import base64
 
 from PIL import Image, ImageTk
 
-import SubPane
-import img
-import selectorWin
-import tkMarkdown
+from app import selector_win
+from app import tkMarkdown, SubPane, img
 import utils
-from BEE2_config import ConfigFile, GEN_OPTS, option_handler
+from BEE2_config import ConfigFile, option_handler
 from packageLoader import CORRIDOR_COUNTS, CorrDesc
 from srctools import Property, AtomicWriter
 from srctools.logger import get_logger
-from tk_tools import TK_ROOT, FileField
+from app.tk_tools import TK_ROOT, FileField
 
 from typing import Dict, Tuple, Optional
 
@@ -26,8 +24,8 @@ LOGGER = get_logger(__name__)
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR = {}  # type: Dict[str, selectorWin.selWin]
-CORRIDOR_DATA = {}  # type: Dict[Tuple[str, int], CorrDesc]
+CORRIDOR: Dict[str, selector_win.selWin] = {}
+CORRIDOR_DATA: Dict[Tuple[str, int], CorrDesc] = {}
 
 CORRIDOR_DESC = tkMarkdown.convert('')
 
@@ -278,12 +276,12 @@ def set_corridors(config: Dict[Tuple[str, int], CorrDesc]):
             if data.icon:
                 item.large_icon = img.png(
                     'corr/' + data.icon,
-                    resize_to=selectorWin.ICON_SIZE_LRG,
+                    resize_to=selector_win.ICON_SIZE_LRG,
                     error=default_icon,
                 )
                 item.icon = img.png(
                     'corr/' + data.icon,
-                    resize_to=selectorWin.ICON_SIZE,
+                    resize_to=selector_win.ICON_SIZE,
                     error=default_icon,
                 )
             else:
@@ -303,10 +301,10 @@ def make_corr_wid(corr_name: str):
     """Create the corridor widget and items."""
     length = CORRIDOR_COUNTS[corr_name]
 
-    CORRIDOR[corr_name] = sel = selectorWin.selWin(
+    CORRIDOR[corr_name] = sel = selector_win.selWin(
         TK_ROOT,
         [
-            selectorWin.Item(
+            selector_win.Item(
                 str(i),
                 'INVALID: ' + str(i),
             )

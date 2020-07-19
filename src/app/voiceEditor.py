@@ -1,7 +1,6 @@
 """Allows enabling and disabling specific voicelines."""
 import functools
 import itertools
-import os
 from decimal import Decimal
 from enum import Enum
 from typing import Iterator, List, Tuple, Dict
@@ -10,14 +9,14 @@ from tkinter import *
 from tkinter import font
 from tkinter import ttk
 
-import img
+from app import img
 import srctools.logger
-import tk_tools
+from app import tk_tools
 import utils
 from BEE2_config import ConfigFile
-from tooltip import add_tooltip
+from app.tooltip import add_tooltip
 from srctools import Property
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 
 
 LOGGER = srctools.logger.get_logger(__name__)

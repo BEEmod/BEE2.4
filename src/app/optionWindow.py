@@ -7,18 +7,15 @@ from tkinter import ttk
 from tkinter import messagebox
 from typing import Callable, List, Tuple, Dict
 
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 from enum import Enum
 
 from BEE2_config import GEN_OPTS
-from tooltip import add_tooltip
+from app.tooltip import add_tooltip
 
-import sound
 import utils
-import tk_tools
 import srctools.logger
-import contextWin
-import logWindow
+from app import contextWin, gameMan, tk_tools, sound, logWindow
 import loadScreen
 
 
@@ -95,7 +92,6 @@ def clear_caches() -> None:
 
      This will force package resources to be extracted again.
      """
-    import gameMan
     import packageLoader
 
     message = _(

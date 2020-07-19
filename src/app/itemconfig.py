@@ -8,14 +8,10 @@ import math
 from srctools import Property, Vec, conv_int, conv_bool
 from packageLoader import PakObject, ExportData, ParseData, desc_parse
 import BEE2_config
-from tooltip import add_tooltip
-from tk_tools import ttk_Spinbox
-import tkMarkdown
+from app.tooltip import add_tooltip
 import utils
 import srctools.logger
-import img
-import sound
-import signage_ui
+from app import signage_ui, UI, tkMarkdown, sound, img
 
 from typing import Union, Callable, List, Tuple, Optional
 
@@ -426,8 +422,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
     This replicates the box on the right-click menu for items.
     It's special-cased in the above code.
     """
-    import UI
-    import contextWin
+    from app import contextWin
     # We don't use the variable passed to us.
 
     try:

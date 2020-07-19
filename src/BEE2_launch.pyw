@@ -23,7 +23,7 @@ freeze_support()
 
 if __name__ == '__main__':
     import srctools.logger
-    import tk_tools
+    from app import tk_tools
     import utils
 
     if len(sys.argv) > 1:
@@ -47,12 +47,12 @@ if __name__ == '__main__':
     LOGGER.info('Running "{}":', app_name)
 
     if app_name == 'bee2':
-        import BEE2
+        from app import BEE2
     elif app_name == 'backup':
-        import backup
+        from app import backup
         backup.init_application()
     elif app_name == 'compilepane':
-        import CompilerPane
+        from app import CompilerPane
         CompilerPane.init_application()
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')

@@ -2,13 +2,13 @@
 from typing import Dict, Iterable, Optional, List
 
 from BEE2_config import GEN_OPTS
-from SubPane import SubPane
+from app.SubPane import SubPane
 from loadScreen import LoadScreen
 from packageLoader import Music, MusicChannel
 from tkinter import ttk
-from selectorWin import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr
+from app.selector_win import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr
 from srctools import FileSystemChain, FileSystem
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 import tkinter
 import srctools.logger
 

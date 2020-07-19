@@ -1,19 +1,18 @@
 from tkinter import *
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 from tkinter import ttk
 
 from collections import namedtuple
 import operator
 
-from SubPane import SubPane
+from app.SubPane import SubPane
 from srctools import Property
 from srctools.logger import get_logger
 import packageLoader
-import tooltip
+from app import tooltip
 import utils
-import itemconfig
+from app import itemconfig, img
 import BEE2_config
-import img
 
 from typing import Union, List, Dict
 

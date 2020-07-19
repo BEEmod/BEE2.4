@@ -7,17 +7,14 @@ import tkinter as tk
 import webbrowser
 import functools
 
-from richTextBox import tkRichText
-from tk_tools import TK_ROOT, HidingScroll
-import tkMarkdown
-import img
+from app.richTextBox import tkRichText
+from app.tk_tools import TK_ROOT, HidingScroll
+from app import tkMarkdown, tk_tools, sound, img
 import utils
-import tk_tools
 
 # For version info
 import PIL
 import platform
-import sound  # We read pyglet indirectly from here so it can safely fail.
 import markdown
 
 

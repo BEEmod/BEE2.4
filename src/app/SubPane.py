@@ -4,11 +4,12 @@ from tkinter import *
 from tkinter import ttk
 from BEE2_config import GEN_OPTS
 
-import tooltip
-import tk_tools
+from app import tooltip
+from app import tk_tools
 import utils
 import srctools
-import sound as snd
+from app import sound
+
 
 # This is a bit of an ugly hack. On OSX the buttons are set to have
 # default padding on the left and right, spreading out the toolbar
@@ -96,7 +97,7 @@ class SubPane(Toplevel):
     def hide_win(self, play_snd: bool=True) -> None:
         """Hide the window."""
         if play_snd:
-            snd.fx('config')
+            sound.fx('config')
         self.withdraw()
         self.visible.set(False)
         self.save_conf()
@@ -105,7 +106,7 @@ class SubPane(Toplevel):
     def show_win(self, play_snd: bool=True) -> None:
         """Show the window."""
         if play_snd:
-            snd.fx('config')
+            sound.fx('config')
         self.deiconify()
         self.visible.set(True)
         self.save_conf()

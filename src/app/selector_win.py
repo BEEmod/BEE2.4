@@ -8,7 +8,7 @@ from tkinter import *  # ui library
 from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
 
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 
 from collections import namedtuple, defaultdict
 from operator import itemgetter
@@ -16,16 +16,13 @@ from enum import Enum
 import functools
 import math
 
-import img  # png library for TKinter
-from richTextBox import tkRichText
-from tooltip import add_tooltip, set_tooltip
+from app.richTextBox import tkRichText
+from app.tooltip import add_tooltip, set_tooltip
 from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
-import tkMarkdown
-import sound
+from app import tkMarkdown, tk_tools, sound, img
 import utils
-import tk_tools
 
 
 LOGGER = srctools.logger.get_logger(__name__)

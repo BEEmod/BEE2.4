@@ -10,9 +10,9 @@ from collections import defaultdict
 from enum import Enum
 
 import srctools
-import tkMarkdown
+from app import tkMarkdown
 import utils
-from packageMan import PACK_CONFIG
+from app.packageMan import PACK_CONFIG
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
@@ -33,8 +33,8 @@ from typing import (
 
 # noinspection PyUnresolvedReferences
 if TYPE_CHECKING:
-    from gameMan import Game
-    from selectorWin import SelitemData
+    from app.gameMan import Game
+    from app.selector_win import SelitemData
     from loadScreen import LoadScreen
     from typing import NoReturn
 
@@ -3533,7 +3533,7 @@ def desc_parse(
 def get_selitem_data(info: Property) -> 'SelitemData':
     """Return the common data for all item types - name, author, description.
     """
-    from selectorWin import SelitemData
+    from app.selector_win import SelitemData
 
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
@@ -3569,7 +3569,7 @@ def join_selitem_data(
     This uses the over_data values if defined, using our_data if not.
     Authors and descriptions will be joined to each other.
     """
-    from selectorWin import SelitemData
+    from app.selector_win import SelitemData
     (
         our_name,
         our_short_name,

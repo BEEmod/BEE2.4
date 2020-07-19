@@ -11,9 +11,9 @@ import tkinter as tk
 
 import functools
 
-from tooltip import add_tooltip, set_tooltip
+from app.tooltip import add_tooltip, set_tooltip
+from app import tk_tools
 import utils
-import tk_tools
 
 from typing import List, Iterator
 

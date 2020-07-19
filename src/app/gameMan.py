@@ -7,11 +7,10 @@ Does stuff related to the actual games.
 """
 from pathlib import Path
 
-import tk_tools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
-from tk_tools import TK_ROOT
+from app.tk_tools import TK_ROOT
 
 import os
 import shutil
@@ -27,7 +26,7 @@ from srctools import (
     FileSystem, FileSystemChain,
 )
 import srctools.logger
-import backup
+from app import backup, tk_tools
 import loadScreen
 import packageLoader
 import utils
