@@ -10,7 +10,7 @@ from typing import IO, Optional, Callable, Union, Dict
 
 import utils
 
-from app.tk_tools import TK_ROOT
+from app import TK_ROOT
 from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
 import srctools.logger
 

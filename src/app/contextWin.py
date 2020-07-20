@@ -10,7 +10,6 @@ various item properties.
 from tkinter import *
 
 from srctools import Property
-from app.tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
 
@@ -25,6 +24,7 @@ from app import (
     sound,
     img,
     UI,
+    TK_ROOT,
 )
 import utils
 import packageLoader

@@ -1,5 +1,4 @@
 from tkinter import *
-from app.tk_tools import TK_ROOT
 from tkinter import ttk
 
 from collections import namedtuple
@@ -9,7 +8,7 @@ from app.SubPane import SubPane
 from srctools import Property
 from srctools.logger import get_logger
 import packageLoader
-from app import tooltip
+from app import tooltip, TK_ROOT
 import utils
 from app import itemconfig, img
 import BEE2_config

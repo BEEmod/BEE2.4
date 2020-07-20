@@ -2,8 +2,7 @@
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
 
-from app import gameMan, paletteLoader, UI, music_conf, logWindow, img
-from app.tk_tools import TK_ROOT
+from app import gameMan, paletteLoader, UI, music_conf, logWindow, img, TK_ROOT
 import loadScreen
 import packageLoader
 import utils

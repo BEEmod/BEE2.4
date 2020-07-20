@@ -12,10 +12,9 @@ import tkinter as tk
 import functools
 
 from app.tooltip import add_tooltip, set_tooltip
-from app import tk_tools
 import utils
 
-from typing import List, Iterator
+from typing import List, Iterator, Optional
 
 
 UP_ARROW = '\u25B3'
@@ -73,8 +72,8 @@ class Item:
         """
         self.values = values
         self.state_var = tk.IntVar(value=bool(state))
-        self.master = None  # type: CheckDetails
-        self.check = None  # type: ttk.Checkbutton
+        self.master = None  # type: Optional[CheckDetails]
+        self.check = None  # type: Optional[ttk.Checkbutton]
         self.locked = lock_check
         self.hover_text = hover_text
         self.val_widgets = []
@@ -502,9 +501,9 @@ class CheckDetails(ttk.Frame):
 
 
 if __name__ == '__main__':
-    root = tk_tools.TK_ROOT
+    from app import TK_ROOT
     test_inst = CheckDetails(
-        parent=root,
+        parent=TK_ROOT,
         headers=['Name', 'Author', 'Description'],
         items=[
             Item('Item1', 'Auth1', 'Blah blah blah'),
@@ -516,9 +515,9 @@ if __name__ == '__main__':
         ]
     )
     test_inst.grid(sticky='NSEW')
-    utils.add_mousewheel(test_inst.wid_canvas, root)
+    utils.add_mousewheel(test_inst.wid_canvas, TK_ROOT)
 
-    root.columnconfigure(0, weight=1)
-    root.rowconfigure(0, weight=1)
-    root.deiconify()
-    root.mainloop()
+    TK_ROOT.columnconfigure(0, weight=1)
+    TK_ROOT.rowconfigure(0, weight=1)
+    TK_ROOT.deiconify()
+    TK_ROOT.mainloop()

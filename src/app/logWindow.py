@@ -6,9 +6,8 @@ import tkinter as tk
 import logging
 
 import srctools.logger
-from app.tk_tools import TK_ROOT
 from BEE2_config import GEN_OPTS
-from app import tk_tools
+from app import tk_tools, TK_ROOT
 import utils
 
 # Colours to use for each log level

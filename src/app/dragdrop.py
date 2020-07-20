@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import tkinter
 import utils
-from app import sound, img
+from app import sound, img, TK_ROOT
 from enum import Enum
 from tkinter import ttk, messagebox
 from srctools.logger import get_logger
@@ -554,7 +554,6 @@ class Slot(Generic[ItemT]):
 def _test() -> None:
     """Test the GUI."""
     from srctools.logger import init_logging
-    from app.tk_tools import TK_ROOT
     from BEE2_config import GEN_OPTS
     from packageLoader import find_packages, PACKAGE_SYS
 

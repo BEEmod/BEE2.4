@@ -8,6 +8,7 @@ from typing import Optional, Dict, Tuple, List
 
 from tkinter import ttk
 from tkinter.font import Font
+from app import img, TK_ROOT
 import tkinter as tk
 import multiprocessing.connection
 
@@ -37,7 +38,6 @@ class BaseLoadScreen:
     """Code common to both loading screen types."""
     def __init__(
         self,
-        master: tk.Tk,
         scr_id: int,
         title_text: str,
         force_ontop: bool,
@@ -46,7 +46,7 @@ class BaseLoadScreen:
         self.scr_id = scr_id
         self.title_text = title_text
 
-        self.win = tk.Toplevel(master)
+        self.win = tk.Toplevel(TK_ROOT)
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
         self.win.attributes('-topmost', int(force_ontop))
@@ -270,9 +270,6 @@ class SplashScreen(BaseLoadScreen):
             family=font_family,
             size=-12,  # negative = in pixels
         )
-
-        # Must be done late, so we know TK is initialised.
-        from app import img
 
         logo_img = img.png('BEE2/splash_logo')
 
@@ -583,8 +580,6 @@ def run_screen(
     PIPE_REC = pipe_rec
     TRANSLATION.update(translations)
 
-    root = tk.Tk()
-    root.withdraw()
     force_ontop = True
 
     def check_queue():
@@ -597,7 +592,7 @@ def run_screen(
             if operation == 'init':
                 # Create a new loadscreen.
                 is_main, title, stages = args
-                screen = (SplashScreen if is_main else LoadScreen)(root, scr_id, title, force_ontop, stages)
+                screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
                 SCREENS[scr_id] = screen
             elif operation == 'set_force_ontop':
                 [force_ontop] = args
@@ -616,7 +611,7 @@ def run_screen(
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
         # Otherwise we hog the CPU.
-        root.after(1 if had_values else 200, check_queue)
+        TK_ROOT.after(1 if had_values else 200, check_queue)
     
-    root.after(10, check_queue)
-    root.mainloop()  # Infinite loop, until the entire process tree quits.
+    TK_ROOT.after(10, check_queue)
+    TK_ROOT.mainloop()  # Infinite loop, until the entire process tree quits.

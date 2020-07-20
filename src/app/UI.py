@@ -7,8 +7,7 @@ import operator
 import random
 
 from srctools import Property
-from app import music_conf
-from app.tk_tools import TK_ROOT
+from app import music_conf, TK_ROOT
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import selWin, Item as selWinItem, AttrDef as SelAttr

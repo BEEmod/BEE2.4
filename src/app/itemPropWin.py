@@ -1,6 +1,5 @@
 from tkinter import *  # ui library
 
-from app.tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
 from enum import Enum
@@ -8,7 +7,7 @@ import random
 
 import utils
 import srctools
-from app import contextWin, gameMan, tk_tools, sound
+from app import contextWin, gameMan, tk_tools, sound, TK_ROOT
 import srctools.logger
 
 from typing import Dict, List, Union, Any

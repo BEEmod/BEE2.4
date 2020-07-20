@@ -13,13 +13,12 @@ from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
 import srctools.logger
-from app import tk_tools, img
+from app import tk_tools, img, TK_ROOT
 import tkinter as tk
 import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
-from app.tk_tools import TK_ROOT
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk

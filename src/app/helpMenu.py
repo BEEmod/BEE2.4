@@ -8,8 +8,7 @@ import webbrowser
 import functools
 
 from app.richTextBox import tkRichText
-from app.tk_tools import TK_ROOT, HidingScroll
-from app import tkMarkdown, tk_tools, sound, img
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 import utils
 
 # For version info
@@ -226,7 +225,7 @@ class Dialog(tk.Toplevel):
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(0, weight=1)
 
-        scrollbox = HidingScroll(
+        scrollbox = tk_tools.HidingScroll(
             frame,
             orient='vertical',
             command=self.textbox.yview,

@@ -1,6 +1,5 @@
 from tkinter import ttk
 from tkinter import font
-from app.tk_tools import TK_ROOT
 import tkinter as tk
 
 from functools import partial
@@ -9,7 +8,7 @@ from collections import defaultdict
 from enum import Enum
 import string
 
-from app import optionWindow, StyleVarPane, UI, tk_tools, sound
+from app import optionWindow, StyleVarPane, UI, tk_tools, sound, TK_ROOT
 import utils
 
 from typing import Dict, List

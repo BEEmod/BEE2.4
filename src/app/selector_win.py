@@ -8,8 +8,6 @@ from tkinter import *  # ui library
 from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
 
-from app.tk_tools import TK_ROOT
-
 from collections import namedtuple, defaultdict
 from operator import itemgetter
 from enum import Enum
@@ -21,7 +19,7 @@ from app.tooltip import add_tooltip, set_tooltip
 from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
-from app import tkMarkdown, tk_tools, sound, img
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 import utils
 
 

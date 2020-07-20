@@ -9,14 +9,13 @@ from tkinter import *
 from tkinter import font
 from tkinter import ttk
 
-from app import img
+from app import img, TK_ROOT
 import srctools.logger
 from app import tk_tools
 import utils
 from BEE2_config import ConfigFile
 from app.tooltip import add_tooltip
 from srctools import Property
-from app.tk_tools import TK_ROOT
 
 
 LOGGER = srctools.logger.get_logger(__name__)

@@ -10,7 +10,6 @@ from pathlib import Path
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
-from app.tk_tools import TK_ROOT
 
 import os
 import shutil
@@ -26,7 +25,7 @@ from srctools import (
     FileSystem, FileSystemChain,
 )
 import srctools.logger
-from app import backup, tk_tools
+from app import backup, tk_tools, TK_ROOT
 import loadScreen
 import packageLoader
 import utils

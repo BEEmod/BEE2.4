@@ -12,7 +12,6 @@ from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
 import logging
 import utils
-from app.tk_tools import TK_ROOT  # Make sure this is initialised!
 
 from typing import Iterable, Union, Dict, Tuple
 

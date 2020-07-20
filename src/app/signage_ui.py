@@ -1,7 +1,7 @@
 """Configures which signs are defined for the Signage item."""
 from typing import Optional, Tuple, List, Dict, overload
 
-from app import dragdrop, img
+from app import dragdrop, img, TK_ROOT
 import srctools.logger
 import utils
 import BEE2_config
@@ -9,7 +9,7 @@ from packageLoader import Signage, Style
 import tkinter as tk
 from srctools import Property
 from tkinter import ttk
-from app.tk_tools import TK_ROOT, HidingScroll
+from app.tk_tools import HidingScroll
 
 LOGGER = srctools.logger.get_logger(__name__)
 

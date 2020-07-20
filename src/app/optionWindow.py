@@ -7,7 +7,6 @@ from tkinter import ttk
 from tkinter import messagebox
 from typing import Callable, List, Tuple, Dict
 
-from app.tk_tools import TK_ROOT
 from enum import Enum
 
 from BEE2_config import GEN_OPTS
@@ -15,7 +14,7 @@ from app.tooltip import add_tooltip
 
 import utils
 import srctools.logger
-from app import contextWin, gameMan, tk_tools, sound, logWindow
+from app import contextWin, gameMan, tk_tools, sound, logWindow, TK_ROOT
 import loadScreen
 
 
