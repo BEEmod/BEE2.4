@@ -2003,20 +2003,20 @@ class QuotePack(PakObject):
         # portrait.
         port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
-        monitor_data = data.info.find_key('monitor', None)
-
-        if monitor_data.value is not None:
+        try:
+            monitor_data = data.info.find_key('monitor')
+        except NoKeyError:
+            mon_studio = mon_cam_loc = None
+            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_studio_actor = ''
+            turret_hate = False
+        else:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
             mon_interrupt = monitor_data.float('interrupt_chance', 0)
             mon_cam_loc = monitor_data.vec('Cam_loc')
             mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
             turret_hate = monitor_data.bool('TurretShoot')
-        else:
-            mon_studio = mon_cam_loc = None
-            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
-            mon_studio_actor = ''
-            turret_hate = False
 
         config = get_config(
             data.info,

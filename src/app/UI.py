@@ -518,7 +518,7 @@ def load_packages(data):
     # the object.
     obj_types = [
         (sky_list, 'Skybox', {
-            '3D': 'config.value',  # Check if it has a config
+            '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
         (voice_list, 'QuotePack', {
