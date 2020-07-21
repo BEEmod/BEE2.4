@@ -44,6 +44,7 @@ from precomp import (
     music,
     rand,
 )
+from precomp.errors import UserError
 import consts
 import editoritems
 
@@ -1546,7 +1547,9 @@ def main() -> None:
             vbsp_args=old_args,
             path=path,
         )
-    else:
+        return
+
+    try:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
@@ -1613,6 +1616,25 @@ def main() -> None:
         vmf.spawn['BEE2_is_preview'] = info.is_preview
 
         save(vmf, new_path)
+        if not skip_vbsp:
+            run_vbsp(
+                vbsp_args=new_args,
+                path=path,
+                new_path=new_path,
+            )
+    except UserError as error:
+        # The user did something wrong, so the map is invalid.
+        # Compile a special map which displays the message.
+        LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
+        vmf = error.make_map()
+
+        # Flag as PeTI, preview, errored
+        vmf.spawn['BEE2_is_peti'] = True
+        vmf.spawn['BEE2_is_preview'] = True
+        vmf.spawn['BEE2_is_error'] = True
+
+        # Act like this was made normally, running VBSP.
+        save(vmf, path)
         if not skip_vbsp:
             run_vbsp(
                 vbsp_args=new_args,
