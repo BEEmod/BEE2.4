@@ -51,7 +51,7 @@ class UserError(BaseException):
         This map is as simple as possible to make compile time quick.
         """
         with ERROR_PAGE.open('w') as f:
-            f.write(ERROR_TEMPLATE.replace('%MSG', self.message))
+            f.write(ERROR_TEMPLATE.replace('%MSG%', self.message))
         vmf = VMF()
         vmf.map_ver = 1
         vmf.spawn['skyname'] = 'sky_black_nofog'
@@ -67,24 +67,33 @@ class UserError(BaseException):
             mat=consts.Tools.NODRAW,
             inner_mat=consts.Tools.BLACK,
         ))
-        # Drop lightmap size, might make it a teeny bit faster.
-        for side in vmf.iter_wfaces():
-            side.lightmap = 128
+        # Ensure we have at least one lightmapped surface,
+        # so VRAD computes lights.
+        roof_detail = vmf.make_prism(
+            Vec(48, 48, 120),
+            Vec(80, 80, 124)
+        )
+        roof_detail.top.mat = consts.BlackPan.BLACK_FLOOR
+        roof_detail.top.scale = 64
+        vmf.create_ent('func_detail').solids.append(roof_detail.solid)
 
         # VScript displays the webpage, then kicks you back to the editor
         # if the map is swapped back to.
         vmf.create_ent(
             'info_player_start',
             origin="64 64 1",
+            angles="0 0 0",
             vscripts='BEE2/compile_error.nut',
             thinkfunction='Think',
         )
+        # We need a light, so the map compiles lights and doesn't turn on
+        # mat_fullbright.
         vmf.create_ent(
             'light',
             origin="64 64 64",
             angles="0 0 0",
             spawnflags="0",
-            _light="255 255 255 20",
+            _light="255 255 255 200",
             _lightHDR="-1 -1 -1 -1",
             _lightscaleHDR="1",
             _constant_attn="0",
