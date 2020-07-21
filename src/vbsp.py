@@ -218,7 +218,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     return ant_floor, ant_wall
 
 
-def load_map(map_path):
+def load_map(map_path) -> VLib.VMF:
     """Load in the VMF file."""
     global VMF
     with open(map_path) as file:
@@ -227,6 +227,7 @@ def load_map(map_path):
     LOGGER.info('Reading Map...')
     VMF = VLib.VMF.parse(props)
     LOGGER.info("Loading complete!")
+    return VMF
 
 
 @conditions.meta_cond(priority=100)
@@ -1777,13 +1778,13 @@ def instance_symlink():
     os.symlink(inst, link_loc, target_is_directory=True)
 
 
-def save(path: str) -> None:
+def save(vmf: VLib.VMF, path: str) -> None:
     """Save the modified map back to the correct location.
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with AtomicWriter(path) as f:
-        VMF.export(dest_file=f, inc_version=True)
+        vmf.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 
 
@@ -2035,14 +2036,14 @@ def main() -> None:
         LOGGER.info("Loading settings...")
         ant_floor, ant_wall = load_settings()
 
-        load_map(path)
-        instance_traits.set_traits(VMF)
+        vmf = load_map(path)
+        instance_traits.set_traits(vmf)
 
-        ant, side_to_antline = antlines.parse_antlines(VMF)
+        ant, side_to_antline = antlines.parse_antlines(vmf)
 
         # Requires instance traits!
         connections.calc_connections(
-            VMF,
+            vmf,
             ant,
             texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
@@ -2054,19 +2055,19 @@ def main() -> None:
 
         all_inst = get_map_info()
 
-        brushLoc.POS.read_from_map(VMF, settings['has_attr'])
+        brushLoc.POS.read_from_map(vmf, settings['has_attr'])
 
-        fizzler.parse_map(VMF, settings['has_attr'])
-        barriers.parse_map(VMF, settings['has_attr'])
+        fizzler.parse_map(vmf, settings['has_attr'])
+        barriers.parse_map(vmf, settings['has_attr'])
 
         conditions.init(
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
-            vmf_file=VMF,
+            vmf_file=vmf,
         )
 
         tiling.gen_tile_temp()
-        tiling.analyse_map(VMF, side_to_antline)
+        tiling.analyse_map(vmf, side_to_antline)
 
         del side_to_antline
 
@@ -2076,18 +2077,18 @@ def main() -> None:
         add_extra_ents(GAME_MODE)
 
         change_ents()
-        tiling.generate_brushes(VMF)
-        faithplate.gen_faithplates(VMF)
+        tiling.generate_brushes(vmf)
+        faithplate.gen_faithplates(vmf)
         change_overlays()
-        barriers.make_barriers(VMF)
+        barriers.make_barriers(vmf)
         fix_worldspawn()
 
         # Ensure all VMF outputs use the correct separator.
-        for ent in VMF.entities:
+        for ent in vmf.entities:
             for out in ent.outputs:
                 out.comma_sep = False
 
-        save(new_path)
+        save(vmf, new_path)
         run_vbsp(
             vbsp_args=new_args,
             path=path,
