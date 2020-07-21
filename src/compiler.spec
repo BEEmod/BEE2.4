@@ -88,14 +88,15 @@ if MAC or LINUX:
 
 # Include the condition sub-modules that are dynamically imported.
 INCLUDES = [
-    'conditions.' + module
+    'precomp.conditions.' + module
     for loader, module, is_package in
-    pkgutil.iter_modules(['conditions'])
+    pkgutil.iter_modules(['precomp/conditions'])
 ]
+print(INCLUDES)
 
 bee_version = input('BEE2 Version ("x.y.z" or blank for dev): ')
 if bee_version:
-    bee_version = '2 v'
+    bee_version = '2 v' + bee_version
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
