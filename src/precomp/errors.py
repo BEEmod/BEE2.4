@@ -14,8 +14,8 @@ ERROR_TEMPLATE = '''\
   <title>BEEmod Compilation Error</title>
   <style>
   body {
-    background: #000;
-    color: #fff;
+    background: #fff;
+    color: #000;
   }
   </style>
 </head>
