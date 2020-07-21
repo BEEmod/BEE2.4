@@ -1634,7 +1634,7 @@ def main() -> None:
         vmf.spawn['BEE2_is_error'] = True
 
         # Act like this was made normally, running VBSP.
-        save(vmf, path)
+        save(vmf, new_path)
         if not skip_vbsp:
             run_vbsp(
                 vbsp_args=new_args,
