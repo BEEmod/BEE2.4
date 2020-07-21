@@ -10,6 +10,7 @@ from typing import NamedTuple, MutableMapping
 
 from precomp import brushLoc, options, packing, conditions
 from precomp.conditions.globals import precache_model
+from precomp.errors import UserError
 from precomp.instanceLocs import resolve as resolve_inst
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, Property, Vec, Matrix, Angle
@@ -1147,12 +1148,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         # Infinite and 3 (default) are treated as off.
         if 3 < timer <= 30:
             if timer in dropper_timer:
-                LOGGER.warning(
-                    'Two droppers with the same timer value: {}',
+                other_inst, _ = dropper_timer[timer]
+                raise UserError(
+                    'Two droppers with the same '
+                    'timer value: <code>{}</code>',
                     timer,
+                    points=[
+                        Vec.from_str(inst['origin']),
+                        Vec.from_str(other_inst['origin']),
+                    ]
                 )
-                # Disable this.
-                dropper_timer[timer] = None, None
             else:
                 dropper_timer[timer] = inst, drop_type
         # For setup later.
@@ -1172,21 +1177,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             try:
                 dropper, drop_type = dropper_timer[timer]
             except KeyError:
-                LOGGER.warning(
+                raise UserError(
                     'Unknown cube "linkage" value ({}) in cube!\n'
-                    "A cube has a timer set which doesn\'t match any droppers.",
-                    timer,
-                )
-                continue
-            if dropper is None or drop_type is None:
-                # Two of these, it's ambiguous. Already logged above.
-                continue
+                    'A cube has a timer set which doesn\'t match '
+                    'any droppers.', timer
+                ) from None
             if used_droppers[dropper]:
-                LOGGER.warning(
+                raise UserError(
                     'Dropper tried to link to two cubes! (timer={})',
                     timer,
-                )
-                continue
+                ) from None
             used_droppers[dropper] = True
 
             # Autodrop on the dropper shouldn't be on - that makes
@@ -1216,10 +1216,11 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 pass  # Drop out of if
             else:
                 if used_droppers[dropper]:
-                    raise ValueError(
+                    raise UserError(
                         'Dropper above custom cube is already'
                         ' linked!\n'
-                        'Cube type: {}'.format(cube_type.id)
+                        'Cube type: {}',
+                        cube_type.id
                     ) from None
                 used_droppers[dropper] = True
                 cube.remove()
