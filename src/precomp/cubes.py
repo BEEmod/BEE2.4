@@ -9,6 +9,7 @@ from typing import Dict, Optional, List, Union, Tuple, Set, FrozenSet, Iterable
 
 from precomp import brushLoc, options, packing, conditions
 from precomp.conditions import meta_cond, make_result, make_flag, RES_EXHAUSTED
+from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst
 from srctools import (
     Property, VMF, Entity, Vec, Output,
@@ -1644,7 +1645,7 @@ def generate_cubes(vmf: VMF):
                         CUBE_SKINS[spawn_paint, pair.cube_type.type],
                     ),
                 ))
-                precomp.conditions.globals.precache_model(vmf, cust_model)
+                precache_model(vmf, cust_model)
 
         drop_cube = cube = should_respawn = None
 
