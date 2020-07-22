@@ -12,7 +12,7 @@ import logging
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
-from srctools import Property, Vec, AtomicWriter
+from srctools import Property, Vec, AtomicWriter, Vec_tuple
 from srctools.vmf import VMF, Entity, Output
 from BEE2_config import ConfigFile
 import utils
@@ -39,7 +39,8 @@ from precomp import (
 )
 import consts
 
-from typing import Any, Dict, Tuple, List, Set
+from typing import Any, Dict, Tuple, List, Set, Iterable
+
 
 COND_MOD_NAME = 'VBSP'
 
@@ -218,16 +219,15 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     return ant_floor, ant_wall
 
 
-def load_map(map_path) -> VMF:
+def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
-    global VMF
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
         props = Property.parse(file, map_path)
     LOGGER.info('Reading Map...')
-    VMF = VMF.parse(props)
+    vmf = VMF.parse(props)
     LOGGER.info("Loading complete!")
-    return VMF
+    return vmf
 
 
 @conditions.meta_cond(priority=100)
@@ -1072,7 +1072,7 @@ def mod_entryexit(
             pretty_name,
             index + 1,
         )
-        return index
+        return str(index)
     else:
         LOGGER.info(
             'Setting {} to {}',
@@ -1131,23 +1131,22 @@ def calc_rand_seed(vmf: VMF) -> str:
         return '|'.join(lst)
 
 
-def add_goo_mist(sides):
+def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
     """
     needs_mist = set(sides)  # Locations that still need mist
-    sides = sorted(sides)
+    ordered_sides = sorted(sides)
     fit_goo_mist(
-        sides, needs_mist,
+        vmf, ordered_sides, needs_mist,
         grid_x=1024,
         grid_y=512,
         particle='water_mist_1024_512',
-        angles='0 0 0',
     )
 
     fit_goo_mist(
-        sides, needs_mist,
+        vmf, ordered_sides, needs_mist,
         grid_x=512,
         grid_y=1024,
         particle='water_mist_1024_512',
@@ -1155,14 +1154,14 @@ def add_goo_mist(sides):
     )
 
     fit_goo_mist(
-        sides, needs_mist,
+        vmf, ordered_sides, needs_mist,
         grid_x=512,
         grid_y=512,
         particle='water_mist_512',
     )
 
     fit_goo_mist(
-        sides, needs_mist,
+        vmf, sides, needs_mist,
         grid_x=256,
         grid_y=256,
         particle='water_mist_256',
@@ -1170,7 +1169,7 @@ def add_goo_mist(sides):
 
     # There isn't a 128 particle so use 256 centered
     fit_goo_mist(
-        sides, needs_mist,
+        vmf, ordered_sides, needs_mist,
         grid_x=128,
         grid_y=128,
         particle='water_mist_256',
@@ -1178,13 +1177,14 @@ def add_goo_mist(sides):
 
 
 def fit_goo_mist(
-        sides,
-        needs_mist,
-        grid_x: int,
-        grid_y: int,
-        particle,
-        angles='0 0 0',
-        ):
+    vmf: VMF,
+    sides: Iterable[Vec_tuple],
+    needs_mist: Set[Vec_tuple],
+    grid_x: int,
+    grid_y: int,
+    particle: str,
+    angles: str = '0 0 0',
+) -> None:
     """Try to add particles of the given size.
 
     needs_mist is a set of all added sides, so we don't double-up on a space.
@@ -1198,7 +1198,7 @@ def fit_goo_mist(
             if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
                 break  # Doesn't match
         else:
-            VMF.create_ent(
+            vmf.create_ent(
                 classname='info_particle_system',
                 targetname='@goo_mist',
                 start_active='1',
@@ -1221,8 +1221,7 @@ def set_barrier_frame_type(vmf: VMF) -> None:
     This allows using different instances on glass and grating.
     """
     barrier_types = {}  # origin, normal -> 'glass' / 'grating'
-
-    barrier_pos = [] # type: List[Tuple[Vec, str]]
+    barrier_pos: List[Tuple[Vec, str]] = []
 
     # Find glass and grating brushes..
     for brush in vmf.iter_wbrushes(world=False, detail=True):
@@ -1268,7 +1267,7 @@ def set_barrier_frame_type(vmf: VMF) -> None:
             pass
 
 
-def change_brush() -> None:
+def change_brush(vmf: VMF) -> None:
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
 
@@ -1303,7 +1302,7 @@ def change_brush() -> None:
 
     LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
 
-    for solid in VMF.iter_wbrushes(world=True, detail=True):
+    for solid in vmf.iter_wbrushes(world=True, detail=True):
         for face in solid:
             highest_brush = max(
                 highest_brush,
@@ -1331,12 +1330,12 @@ def change_brush() -> None:
 
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
-        bottomlessPit.make_bottomless_pit(VMF, highest_brush)
+        bottomlessPit.make_bottomless_pit(vmf, highest_brush)
         LOGGER.info('Done!')
 
     if make_goo_mist:
         LOGGER.info('Adding Goo Mist...')
-        add_goo_mist(mist_solids)
+        add_goo_mist(vmf, mist_solids)
         LOGGER.info('Done!')
 
 
@@ -2045,7 +2044,7 @@ def main() -> None:
 
         del side_to_antline
 
-        texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
+        texturing.setup(vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
 
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)

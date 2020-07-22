@@ -238,9 +238,10 @@ def gen_faithplates(vmf: VMF) -> None:
             trig_origin = trig.get_origin()
             if plate.template is not None:
                 trig.solids = template_brush.import_template(
-                    temp_name=plate.template,
-                    origin=trig_origin + plate.trig_offset,
-                    angles=Vec.from_str(plate.inst['angles']),
+                    vmf,
+                    plate.template,
+                    trig_origin + plate.trig_offset,
+                    Vec.from_str(plate.inst['angles']),
                     force_type=template_brush.TEMP_TYPES.world,
                     add_to_map=False,
                 ).world

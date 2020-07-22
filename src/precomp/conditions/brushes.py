@@ -157,7 +157,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
             ))
 
         # Generate brush
-        door_ent.solids = [vbsp.VMF.make_prism(pos - 1, pos + 1).solid]
+        door_ent.solids = [vmf.make_prism(pos - 1, pos + 1).solid]
 
     # Add or remove flags as needed by creating KV setters.
 
@@ -256,7 +256,7 @@ def res_set_texture(inst: Entity, res: Property):
 
 
 @make_result('AddBrush')
-def res_add_brush(inst: Entity, res: Property) -> None:
+def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
     """Spawn in a brush at the indicated points.
 
     - `point1` and `point2` are locations local to the instance, with `0 0 0`
@@ -268,8 +268,6 @@ def res_add_brush(inst: Entity, res: Property) -> None:
     The sides will be textured with 1x1, 2x2 or 4x4 wall, ceiling and floor
     textures as needed.
     """
-    import vbsp
-
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
@@ -323,7 +321,7 @@ def res_add_brush(inst: Entity, res: Property) -> None:
     # All brushes in each grid have the same textures for each side.
     random.seed(grid_offset.join(' ') + '-partial_block')
 
-    solids = vbsp.VMF.make_prism(point1, point2)
+    solids = vmf.make_prism(point1, point2)
 
     solids.north.mat = texturing.gen(
         texturing.GenCat.NORMAL,
@@ -356,16 +354,14 @@ def res_add_brush(inst: Entity, res: Property) -> None:
         tex_type,
     ).get(solids.north.get_origin(), tile_grids['z'])
 
-    if srctools.conv_bool(res['detail', False], False):
+    if res.bool('detail'):
         # Add the brush to a func_detail entity
-        vbsp.VMF.create_ent(
+        vmf.create_ent(
             classname='func_detail'
-        ).solids = [
-            solids.solid
-        ]
+        ).solids = [solids.solid]
     else:
         # Add to the world
-        vbsp.VMF.add_brush(solids.solid)
+        vmf.add_brush(solids.solid)
 
 
 @make_result_setup('TemplateBrush')
@@ -652,6 +648,7 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
     temp_data = template_brush.import_template(
+        vmf,
         template,
         origin,
         angles,

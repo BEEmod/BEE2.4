@@ -163,6 +163,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         else:
             visgroup = [sec_visgroup]
         template = template_brush.import_template(
+            vmf,
             template_id,
             origin,
             angles,

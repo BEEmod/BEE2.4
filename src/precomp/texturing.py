@@ -7,8 +7,8 @@ import random
 import abc
 
 import srctools.logger
-from srctools import Property, Side, Solid, Vec
-from srctools.vmf import VisGroup
+from srctools import Property, Vec
+from srctools.vmf import VisGroup, VMF, Side, Solid
 
 import consts
 
@@ -600,7 +600,7 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def setup(global_seed, tiles: List['TileDef']):
+def setup(vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
     """Set randomisation seed on all the generators, and build clumps."""
     gen_key_str: Union[GenCat, str]
     for gen_key, generator in GENERATORS.items():
@@ -615,7 +615,7 @@ def setup(global_seed, tiles: List['TileDef']):
             gen_key_str = gen_key
 
         generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key_str)
-        generator.setup(global_seed, tiles)
+        generator.setup(vmf, global_seed, tiles)
 
 
 class Generator(abc.ABC):
@@ -661,7 +661,7 @@ class Generator(abc.ABC):
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0]))
 
-    def setup(self, global_seed: str, tiles: List['TileDef']):
+    def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and setup the generator."""
 
     def _missing_error(self, tex_name: str):
@@ -736,7 +736,7 @@ class GenClump(Generator):
         self.gen_seed = 0
         self._clump_locs = []  # type: List[Clump]
 
-    def setup(self, global_seed: str, tiles: List['TileDef']):
+    def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
         """Build the list of clump locations."""
         assert self.portal is not None
         assert self.orient is not None
@@ -772,8 +772,7 @@ class GenClump(Generator):
         # For debugging, generate skip brushes with the shape of the clumps.
         debug_visgroup: Optional[VisGroup]
         if self.options['clump_debug']:
-            import vbsp
-            debug_visgroup = vbsp.VMF.create_visgroup(
+            debug_visgroup = vmf.create_visgroup(
                 f'{self.category.name}_{self.orient.name}_{self.portal.name}'
             )
         else:
@@ -815,14 +814,14 @@ class GenClump(Generator):
             ))
             if debug_visgroup is not None:
                 # noinspection PyUnboundLocalVariable
-                debug_brush: Solid = vbsp.VMF.make_prism(
+                debug_brush: Solid = vmf.make_prism(
                     pos_min - 64,
                     pos_max + 64,
                     'tools/toolsskip',
                 ).solid
                 debug_brush.visgroup_ids.add(debug_visgroup.id)
                 debug_brush.vis_shown = False
-                vbsp.VMF.add_brush(debug_brush)
+                vmf.add_brush(debug_brush)
 
         LOGGER.info(
             '{}.{}.{}: {} Clumps for {} tiles',

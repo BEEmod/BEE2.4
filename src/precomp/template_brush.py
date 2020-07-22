@@ -571,6 +571,7 @@ def get_template(temp_name) -> Template:
 
 
 def import_template(
+    vmf: VMF,
     temp_name: Union[str, Template],
     origin: Vec,
     angles: Optional[Vec]=None,
@@ -626,7 +627,7 @@ def import_template(
         ]:
         for old_brush in orig_list:
             brush = old_brush.copy(
-                vmf_file=vbsp.VMF,
+                vmf_file=vmf,
                 side_mapping=id_mapping,
                 keep_vis=False,
             )
@@ -635,7 +636,7 @@ def import_template(
 
     for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(
-            vmf_file=vbsp.VMF,
+            vmf_file=vmf,
             keep_vis=False,
         )
         del new_overlay['template_id']  # Remove this, it's not part of overlays
@@ -656,7 +657,7 @@ def import_template(
         if targetname and orig_target and orig_target[0] != '@':
             new_overlay['targetname'] = targetname + '-' + orig_target
 
-        vbsp.VMF.add_ent(new_overlay)
+        vmf.add_ent(new_overlay)
         new_over.append(new_overlay)
 
         # Don't let the overlays get retextured too!
@@ -670,14 +671,12 @@ def import_template(
         new_detail.clear()
 
     if add_to_map:
-        vbsp.VMF.add_brushes(new_world)
+        vmf.add_brushes(new_world)
 
     detail_ent: Optional[Entity] = None
 
     if new_detail:
-        detail_ent = vbsp.VMF.create_ent(
-            classname='func_detail'
-        )
+        detail_ent = vmf.create_ent(classname='func_detail')
         detail_ent.solids = new_detail
         if not add_to_map:
             detail_ent.remove()
@@ -910,7 +909,7 @@ def retexture_template(
                         for v in (0, 1, 2, 3)
                     },
                     is_wall=tiledef.normal.z != 0,
-                    bevels=(False, False, False, False),
+                    bevels=frozenset(),
                     normal=tiledef.normal,
                     face_output=pattern,
                 )

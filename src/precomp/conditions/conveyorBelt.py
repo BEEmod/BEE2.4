@@ -119,6 +119,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
 
         if rail_template:
             temp = template_brush.import_template(
+                vmf,
                 rail_template,
                 pos,
                 angles,

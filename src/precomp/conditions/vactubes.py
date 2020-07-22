@@ -3,7 +3,7 @@
 from collections import namedtuple
 from typing import Dict, Tuple, List, Iterator, Optional
 
-from srctools import Vec, Vec_tuple, Property, Entity, VMF
+from srctools import Vec, Vec_tuple, Property, Entity, VMF, Solid
 import srctools.logger
 
 from precomp import tiling, instanceLocs, connections, template_brush
@@ -166,7 +166,7 @@ def res_vactube_setup(res: Property):
 
 
 @make_result('CustVactube')
-def res_make_vactubes(res: Property):
+def res_make_vactubes(vmf: VMF, res: Property):
     """Specialised result to parse vactubes from markers.
 
     Only runs once, and then quits the condition list. After priority 400,
@@ -182,7 +182,7 @@ def res_make_vactubes(res: Property):
     markers: Dict[str, Marker] = {}
 
     # Find all our markers, so we can look them up by targetname.
-    for inst in vbsp.VMF.by_class['func_instance']:  # type: Entity
+    for inst in vmf.by_class['func_instance']:  # type: Entity
         try:
             config, inst_size = INST_CONFIGS[inst['file'].casefold()]
         except KeyError:
@@ -241,7 +241,7 @@ def vactube_gen(vmf: VMF) -> None:
 
         # First create the start section..
         start_logic = start.ent.copy()
-        vbsp.VMF.add_ent(start_logic)
+        vmf.add_ent(start_logic)
 
         start_logic['file'] = start.conf['entry', (
             'ceiling' if (start_normal.z > 0) else
@@ -252,7 +252,7 @@ def vactube_gen(vmf: VMF) -> None:
         end = start
 
         for inst, end in start.follow_path(all_markers):
-            join_markers(inst, end, inst is start)
+            join_markers(vmf, inst, end, inst is start)
 
         end_loc = Vec.from_str(end.ent['origin'])
         end_norm = Vec(-1, 0, 0).rotate_by_str(end.ent['angles'])
@@ -260,6 +260,7 @@ def vactube_gen(vmf: VMF) -> None:
         # join_markers creates straight parts up-to the marker, but not at it's
         # location - create the last one.
         make_straight(
+            vmf,
             end_loc,
             end_norm,
             128,
@@ -270,16 +271,16 @@ def vactube_gen(vmf: VMF) -> None:
         # the object is on a one-way trip anyway.
         if BLOCK_POS['world': end_loc].is_goo and end_norm == (0, 0, -1):
             end_logic = end.ent.copy()
-            vbsp.VMF.add_ent(end_logic)
+            vmf.add_ent(end_logic)
             end_logic['file'] = end.conf['exit']
 
 
-def push_trigger(loc, normal, solids):
+def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
     # We only need one trigger per direction, for now.
     try:
         ent = PUSH_TRIGS[normal.as_tuple()]
     except KeyError:
-        ent = PUSH_TRIGS[normal.as_tuple()] = vbsp.VMF.create_ent(
+        ent = PUSH_TRIGS[normal.as_tuple()] = vmf.create_ent(
             classname='trigger_push',
             origin=loc,
             # The z-direction is reversed..
@@ -295,15 +296,15 @@ def push_trigger(loc, normal, solids):
     ent.solids.extend(solids)
 
 
-def motion_trigger(*solids):
+def motion_trigger(vmf: VMF, *solids: Solid) -> None:
     """Create the anti-gravity trigger, and force crouching."""
-    motion_trig = vbsp.VMF.create_ent(
+    motion_trig = vmf.create_ent(
         classname='trigger_vphysics_motion',
         SetGravityScale='0.0',
         origin=solids[0].get_origin(),
         spawnflags='1103',  # Clients, Physics, Everything
     )
-    duck_trig = vbsp.VMF.create_ent(
+    duck_trig = vmf.create_ent(
         classname='trigger_playermovement',
         origin=motion_trig['origin'],
         spawnflags=1 + 2048,  # Clients, Auto-duck while in trigger.
@@ -314,6 +315,7 @@ def motion_trigger(*solids):
 
 
 def make_straight(
+    vmf: VMF,
     origin: Vec,
     normal: Vec,
     dist: int,
@@ -333,15 +335,15 @@ def make_straight(
     # bbox before +- 32 to ensure the above doesn't wipe it out
     p1, p2 = Vec.bbox(p1, p2)
 
-    solid = vbsp.VMF.make_prism(
+    solid = vmf.make_prism(
         # Expand to 64x64 in the other two directions
         p1 - 32, p2 + 32,
         mat='tools/toolstrigger',
     ).solid
 
-    motion_trigger(solid.copy())
+    motion_trigger(vmf, solid.copy())
 
-    push_trigger(origin, normal, [solid])
+    push_trigger(vmf, origin, normal, [solid])
 
     angles = normal.to_angle()
 
@@ -355,7 +357,7 @@ def make_straight(
 
     for off in range(0, int(dist), 128):
         position = origin + off * normal
-        vbsp.VMF.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             origin=position,
             angles=angles,
@@ -372,7 +374,7 @@ def make_straight(
                 continue
             # Check all 4 center tiles are present.
             if all(tile[u, v].is_tile for u in (1,2) for v in (1, 2)):
-                vbsp.VMF.create_ent(
+                vmf.create_ent(
                     classname='func_instance',
                     origin=position,
                     angles=supp_ang,
@@ -380,8 +382,8 @@ def make_straight(
                 )
 
 
-def make_corner(origin, angle, size, config):
-    vbsp.VMF.create_ent(
+def make_corner(vmf: VMF, origin: Vec, angle: str, size: int, config: dict) -> None:
+    vmf.create_ent(
         classname='func_instance',
         origin=origin,
         angles=angle,
@@ -391,26 +393,27 @@ def make_corner(origin, angle, size, config):
     temp = config['corner_temp', size]
     if temp:
         temp_solids = template_brush.import_template(
+            vmf,
             temp,
             origin=origin,
             angles=Vec.from_str(angle),
             force_type=template_brush.TEMP_TYPES.world,
+            add_to_map=False,
         ).world
-        for solid in temp_solids:
-            vbsp.VMF.remove_brush(solid)
         motion_trigger(*temp_solids)
 
 
 def make_bend(
-        origin_a: Vec,
-        origin_b: Vec,
-        norm_a: Vec,
-        norm_b: Vec,
-        corner_ang: str,
-        config,
-        max_size: int,
-        is_start=False,
-):
+    vmf: VMF,
+    origin_a: Vec,
+    origin_b: Vec,
+    norm_a: Vec,
+    norm_b: Vec,
+    corner_ang: str,
+    config,
+    max_size: int,
+    is_start=False,
+) -> None:
     """Make a corner and the straight sections leading into it."""
     off = origin_b - origin_a
     # The distance to move first, then second.
@@ -428,10 +431,11 @@ def make_bend(
     straight_b = sec_movement.mag() - (corner_size * 128)
 
     if corner_size < 1:
-        return []  # No room!
+        return  # No room!
 
     if straight_a > 0:
         make_straight(
+            vmf,
             origin_a,
             norm_a,
             straight_a,
@@ -441,6 +445,7 @@ def make_bend(
 
     corner_origin = origin_a + norm_a * straight_a
     make_corner(
+        vmf,
         corner_origin,
         corner_ang,
         corner_size,
@@ -449,6 +454,7 @@ def make_bend(
 
     if straight_b > 0:
         make_straight(
+            vmf,
             origin_b - (straight_b * norm_b),
             norm_b,
             straight_b,
@@ -457,12 +463,13 @@ def make_bend(
 
 
 def make_ubend(
-        origin_a: Vec,
-        origin_b: Vec,
-        normal: Vec,
-        config,
-        max_size: int,
-        is_start=False,
+    vmf: VMF,
+    origin_a: Vec,
+    origin_b: Vec,
+    normal: Vec,
+    config,
+    max_size: int,
+    is_start=False,
 ):
     """Create u-shaped bends."""
     offset = origin_b - origin_a
@@ -552,6 +559,7 @@ def make_ubend(
     )
 
     make_straight(
+        vmf,
         origin_a,
         normal,
         first_straight,
@@ -562,6 +570,7 @@ def make_ubend(
     first_corner_loc = origin_a + (normal * first_straight)
 
     make_corner(
+        vmf,
         first_corner_loc,
         CORNER_ANG[normal.as_tuple(), side_norm.as_tuple()].ang,
         first_size,
@@ -573,6 +582,7 @@ def make_ubend(
 
     if side_straight > 0:
         make_straight(
+            vmf,
             off_straight_loc,
             side_norm,
             side_straight,
@@ -582,6 +592,7 @@ def make_ubend(
     sec_corner_loc = off_straight_loc + side_norm * side_straight
 
     make_corner(
+        vmf,
         sec_corner_loc,
         CORNER_ANG[side_norm.as_tuple(), (-normal).as_tuple()].ang,
         second_size,
@@ -590,6 +601,7 @@ def make_ubend(
 
     if second_straight > 0:
         make_straight(
+            vmf,
             sec_corner_loc - normal * (128 * second_size),
             -normal,
             second_straight,
@@ -597,7 +609,7 @@ def make_ubend(
         )
 
 
-def join_markers(mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
+def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
     """Join two marker ents together with corners."""
     origin_a = Vec.from_str(mark_a.ent['origin'])
     origin_b = Vec.from_str(mark_b.ent['origin'])
@@ -613,6 +625,7 @@ def join_markers(mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
 
         if origin_a + (norm_a * dist) == origin_b:
             make_straight(
+                vmf,
                 origin_a,
                 norm_a,
                 dist,
@@ -625,6 +638,7 @@ def join_markers(mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
     if norm_a == -norm_b:
         # U-shape bend..
         make_ubend(
+            vmf,
             origin_a,
             origin_b,
             norm_a,
@@ -644,6 +658,7 @@ def join_markers(mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
         return
     else:
         make_bend(
+            vmf,
             origin_a,
             origin_b,
             norm_a,

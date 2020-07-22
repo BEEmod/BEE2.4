@@ -603,6 +603,7 @@ class Panel:
 
         if self.template:
             template = template_brush.import_template(
+                vmf,
                 self.template,
                 # Don't offset these at all. Assume the user knows
                 # where it should go.

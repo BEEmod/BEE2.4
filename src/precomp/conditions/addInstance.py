@@ -1,14 +1,12 @@
 """Results for generating additional instances.
 
 """
-from precomp import instanceLocs, options, conditions
+from typing import Optional
+from srctools import Vec, Entity, Property, VMF
 import srctools.logger
-import vbsp
-from precomp.conditions import (
-    make_result, RES_EXHAUSTED,
-    GLOBAL_INSTANCES,
-)
-from srctools import Vec, Entity, Property
+
+from precomp import instanceLocs, options, conditions
+from precomp.conditions import make_result, RES_EXHAUSTED, GLOBAL_INSTANCES
 
 
 COND_MOD_NAME = 'Instance Generation'
@@ -17,7 +15,7 @@ LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
 @make_result('addGlobal')
-def res_add_global_inst(res: Property):
+def res_add_global_inst(vmf: VMF, res: Property):
     """Add one instance in a specific location.
 
     Options:
@@ -42,7 +40,7 @@ def res_add_global_inst(res: Property):
         # if was already added - this is helpful for
         # items that add to original items, or to avoid
         # bugs.
-        new_inst = vbsp.VMF.create_ent(
+        new_inst = vmf.create_ent(
             classname="func_instance",
             targetname=res['name', ''],
             file=instanceLocs.resolve_one(res['file'], error=True),
@@ -61,7 +59,7 @@ def res_add_global_inst(res: Property):
 
 
 @make_result('addOverlay', 'overlayinst')
-def res_add_overlay_inst(inst: Entity, res: Property):
+def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Entity]:
     """Add another instance on top of this one.
 
     If a single value, this sets only the filename.
@@ -102,9 +100,9 @@ def res_add_overlay_inst(inst: Entity, res: Property):
         if not res.bool('silentLookup'):
             LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
         # Don't bother making a overlay which will be deleted.
-        return
+        return None
 
-    overlay_inst = vbsp.VMF.create_ent(
+    overlay_inst = vmf.create_ent(
         classname='func_instance',
         targetname=inst['targetname', ''],
         file=filename,
@@ -142,5 +140,5 @@ def res_cave_portrait(inst: Entity, res: Property):
     skin = options.get(int, 'cave_port_skin')
     if skin is not None:
         new_inst = res_add_overlay_inst(inst, res)
-        if new_inst:
+        if new_inst is not None:
             new_inst.fixup['$skin'] = skin

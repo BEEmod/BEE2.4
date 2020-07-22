@@ -414,6 +414,7 @@ def convert_floor(
 
         brush.face.mat = 'tools/toolsnodraw'  # It won't be visible
         temp_data = template_brush.import_template(
+            vmf,
             temp_name=FLOOR_TEMP_PILLAR,
             origin=loc,
         )
@@ -804,6 +805,7 @@ def add_floor_sides(vmf: VMF, locs):
         diag_loc = (wall_loc.x, wall_loc.y, wall_loc.z + 128)
 
         temp_data = template_brush.import_template(
+            vmf,
             # If there's a wall surface directly above this point
             # or a ceiling brush in the next block over
             # we want to use a world brush to seal the leak.

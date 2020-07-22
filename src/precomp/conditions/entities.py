@@ -41,7 +41,7 @@ def res_import_template_setup(
 
 
 @make_result('TemplateOverlay')
-def res_insert_overlay(inst: Entity, res: Property) -> None:
+def res_insert_overlay(vmf: VMF, inst: Entity, res: Property) -> None:
     """Use a template to insert one or more overlays on a surface.
 
     Options:
@@ -89,6 +89,7 @@ def res_insert_overlay(inst: Entity, res: Property) -> None:
         return
 
     temp = template_brush.import_template(
+        vmf,
         temp_id,
         origin,
         angles,

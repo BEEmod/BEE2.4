@@ -226,6 +226,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
             pist_ent.remove()
 
         temp_result = template_brush.import_template(
+            vmf,
             template,
             brush_pos,
             angles,

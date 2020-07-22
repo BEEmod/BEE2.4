@@ -1348,6 +1348,7 @@ def generate_fizzlers(vmf: VMF):
             if template_brush_ent is not None:
                 if length == 128 and fizz_type.temp_single:
                     temp = template_brush.import_template(
+                        vmf,
                         fizz_type.temp_single,
                         (seg_min + seg_max) / 2,
                         min_angles,
@@ -1358,6 +1359,7 @@ def generate_fizzlers(vmf: VMF):
                 else:
                     if fizz_type.temp_min:
                         temp = template_brush.import_template(
+                            vmf,
                             fizz_type.temp_min,
                             seg_min,
                             min_angles,
@@ -1367,6 +1369,7 @@ def generate_fizzlers(vmf: VMF):
                         template_brush_ent.solids.extend(temp.world)
                     if fizz_type.temp_max:
                         temp = template_brush.import_template(
+                            vmf,
                             fizz_type.temp_max,
                             seg_max,
                             max_angles,
