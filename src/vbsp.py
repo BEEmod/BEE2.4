@@ -12,10 +12,10 @@ import logging
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
-from srctools import Property, Vec, AtomicWriter, Entity
+from srctools import Property, Vec, AtomicWriter
+from srctools.vmf import VMF, Entity, Output
 from BEE2_config import ConfigFile
 import utils
-import srctools.vmf as VLib
 import srctools.run
 import srctools.logger
 from precomp import (
@@ -86,9 +86,6 @@ IS_PREVIEW = 'ERR'  # type: bool
 # This stops patterns from repeating in different maps, but keeps it the same
 # when recompiling.
 MAP_RAND_SEED = ''
-
-# The actual map.
-VMF = None  # type: VLib.VMF
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
@@ -221,20 +218,20 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     return ant_floor, ant_wall
 
 
-def load_map(map_path) -> VLib.VMF:
+def load_map(map_path) -> VMF:
     """Load in the VMF file."""
     global VMF
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
         props = Property.parse(file, map_path)
     LOGGER.info('Reading Map...')
-    VMF = VLib.VMF.parse(props)
+    VMF = VMF.parse(props)
     LOGGER.info("Loading complete!")
     return VMF
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VLib.VMF):
+def add_voice(vmf: VMF):
     """Add voice lines to the map."""
     voice_line.add_voice(
         has_items=settings['has_attr'],
@@ -250,7 +247,7 @@ FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def anti_fizz_bump(vmf: VLib.VMF) -> None:
+def anti_fizz_bump(vmf: VMF) -> None:
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
@@ -342,7 +339,7 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(vmf: VLib.VMF) -> None:
+def set_player_model(vmf: VMF) -> None:
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
@@ -375,7 +372,7 @@ def set_player_model(vmf: VLib.VMF) -> None:
 
     # The delay is required to ensure the portalgun parents properly
     # to the player's hand.
-    auto.add_out(VLib.Output(
+    auto.add_out(Output(
         'OnMapSpawn',
         '@command',
         'Command',
@@ -384,7 +381,7 @@ def set_player_model(vmf: VLib.VMF) -> None:
     ))
 
     # We need to redo this whenever a saved game is loaded..
-    auto.add_out(VLib.Output(
+    auto.add_out(Output(
         'OnLoadGame',
         '@command',
         'Command',
@@ -395,14 +392,14 @@ def set_player_model(vmf: VLib.VMF) -> None:
     if pgun_skin and options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
-        auto.add_out(VLib.Output(
+        auto.add_out(Output(
             'OnMapSpawn',
             'viewmodel',  # Classname of the viewmodel.
             'Skin',
             str(pgun_skin),
             delay=0.1,
         ))
-        auto.add_out(VLib.Output(
+        auto.add_out(Output(
             'OnMapSpawn',
             # Classname of the portalgun.
             # This will also change pedestals and the like,
@@ -415,7 +412,7 @@ def set_player_model(vmf: VLib.VMF) -> None:
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(vmf: VLib.VMF) -> None:
+def set_player_portalgun(vmf: VMF) -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -544,7 +541,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
             )
             trigger_portal.solids = [whole_map.copy()]
             trigger_portal.add_out(
-                VLib.Output(
+                Output(
                     'OnStartTouchPortal1',
                     '!activator',
                     'RunScriptCode',
@@ -552,7 +549,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
                     '__pgun_port_id <- {}; '
                     '__pgun_active <- 1'.format(port_id),
                 ),
-                VLib.Output(
+                Output(
                     'OnStartTouchPortal2',
                     '!activator',
                     'RunScriptCode',
@@ -560,7 +557,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
                     '__pgun_port_id <- {}; '
                     '__pgun_active <- 1'.format(port_id),
                 ),
-                VLib.Output(
+                Output(
                     'OnEndTouchPortal',
                     '!activator',
                     'RunScriptCode',
@@ -580,7 +577,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
                 wait=0.01,
             )
             trig_cube.solids = [whole_map.copy()]
-            trig_cube.add_out(VLib.Output(
+            trig_cube.add_out(Output(
                 'OnStartTouch',
                 '@portalgun',
                 'RunScriptCode',
@@ -588,7 +585,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
             ))
 
         if GAME_MODE == 'SP':
-            logic_auto.add_out(VLib.Output(
+            logic_auto.add_out(Output(
                 'OnMapSpawn',
                 '@portalgun',
                 'RunScriptCode',
@@ -603,7 +600,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
 
         # Shuts down various parts when you've reached the exit.
         import precomp.conditions.instances
-        precomp.conditions.instances.global_input(vmf, ent_pos, VLib.Output(
+        precomp.conditions.instances.global_input(vmf, ent_pos, Output(
             'OnTrigger',
             '@portalgun',
             'RunScriptCode',
@@ -611,14 +608,14 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
         ), relay_name='@map_won')
 
     if blue_portal:
-        logic_auto.add_out(VLib.Output(
+        logic_auto.add_out(Output(
             'OnMapSpawn',
             '@player_has_blue',
             'Trigger',
             only_once=True,
         ))
     if oran_portal:
-        logic_auto.add_out(VLib.Output(
+        logic_auto.add_out(Output(
             'OnMapSpawn',
             '@player_has_oran',
             'Trigger',
@@ -629,7 +626,7 @@ def set_player_portalgun(vmf: VLib.VMF) -> None:
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(vmf: VLib.VMF) -> None:
+def add_screenshot_logic(vmf: VMF) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
@@ -644,7 +641,7 @@ def add_screenshot_logic(vmf: VLib.VMF) -> None:
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(vmf: VLib.VMF) -> None:
+def add_fog_ents(vmf: VMF) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.get(Vec, 'global_ents_loc')
     vmf.create_ent(
@@ -696,35 +693,35 @@ def add_fog_ents(vmf: VLib.VMF) -> None:
     logic_auto = vmf.create_ent(classname='logic_auto', origin=pos, flags='1')
 
     logic_auto.add_out(
-        VLib.Output(
+        Output(
             'OnMapSpawn',
             '@clientcommand',
             'Command',
             'r_flashlightbrightness 1',
         ),
 
-        VLib.Output(
+        Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetTonemapPercentBrightPixels',
             fog_opt['tonemap_brightpixels'],
             only_once=True,
         ),
-        VLib.Output(
+        Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetTonemapRate',
             fog_opt['tonemap_rate'],
             only_once=True,
         ),
-        VLib.Output(
+        Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetAutoExposureMin',
             fog_opt['tonemap_exp_min'],
             only_once=True,
         ),
-        VLib.Output(
+        Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetAutoExposureMax',
@@ -734,7 +731,7 @@ def add_fog_ents(vmf: VLib.VMF) -> None:
     )
 
     if fog_opt['tonemap_bloom_scale']:
-        logic_auto.add_out(VLib.Output(
+        logic_auto.add_out(Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetBloomScale',
@@ -743,7 +740,7 @@ def add_fog_ents(vmf: VLib.VMF) -> None:
         ))
 
     if GAME_MODE == 'SP':
-        logic_auto.add_out(VLib.Output(
+        logic_auto.add_out(Output(
             'OnMapSpawn',
             '!player',
             'SetFogController',
@@ -751,13 +748,13 @@ def add_fog_ents(vmf: VLib.VMF) -> None:
             only_once=True,
         ))
     else:
-        logic_auto.add_out(VLib.Output(
+        logic_auto.add_out(Output(
             'OnMapSpawn',
             '!player_blue',
             'SetFogController',
             '@fog_controller',
             only_once=True,
-        ), VLib.Output(
+        ), Output(
             'OnMapSpawn',
             '!player_orange',
             'SetFogController',
@@ -767,7 +764,7 @@ def add_fog_ents(vmf: VLib.VMF) -> None:
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(vmf: VLib.VMF) -> None:
+def set_elev_videos(vmf: VMF) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -812,7 +809,7 @@ def set_elev_videos(vmf: VLib.VMF) -> None:
         )
 
 
-def get_map_info(vmf: VLib.VMF) -> Set[str]:
+def get_map_info(vmf: VMF) -> Set[str]:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -1015,7 +1012,7 @@ def get_map_info(vmf: VLib.VMF) -> Set[str]:
 
 
 def mod_entryexit(
-    inst: VLib.Entity,
+    inst: Entity,
     resolve_name: str,
     pretty_name: str,
     elev_override: bool = False,
@@ -1087,7 +1084,7 @@ def mod_entryexit(
         return str(override_corr - 1)
 
 
-def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
+def mod_doorframe(inst: Entity, corr_id, corr_type, corr_name):
     """Change the instance used by door frames, if desired.
 
     corr_id is the item ID of the dooor, and corr_type is the
@@ -1115,7 +1112,7 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
         inst['file'] = replace
 
 
-def calc_rand_seed(vmf: VLib.VMF) -> str:
+def calc_rand_seed(vmf: VMF) -> str:
     """Use the ambient light entities to create a map seed.
 
      This ensures textures remain the same when the map is recompiled.
@@ -1218,7 +1215,7 @@ def fit_goo_mist(
 
 
 @conditions.meta_cond(priority=-50)
-def set_barrier_frame_type(vmf: VLib.VMF) -> None:
+def set_barrier_frame_type(vmf: VMF) -> None:
     """Set a $type instvar on glass frame.
 
     This allows using different instances on glass and grating.
@@ -1407,7 +1404,7 @@ def cond_force_clump(inst: Entity, res: Property):
     ))
 
 
-def change_overlays(vmf: VLib.VMF) -> None:
+def change_overlays(vmf: VMF) -> None:
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
 
@@ -1474,7 +1471,7 @@ def change_overlays(vmf: VLib.VMF) -> None:
                 over[prop] = val.join(' ')
 
 
-def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
+def add_extra_ents(vmf: VMF, game_mode: str) -> None:
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
@@ -1510,8 +1507,8 @@ def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
             origin=loc + (16, 0, -16),
         )
         music_stop.add_out(
-            VLib.Output('OnTrigger', music, 'StopSound'),
-            VLib.Output('OnTrigger', music, 'Volume', '0'),
+            Output('OnTrigger', music, 'StopSound'),
+            Output('OnTrigger', music, 'Volume', '0'),
         )
 
         # In SinglePlayer, music gets killed during reload,
@@ -1533,20 +1530,20 @@ def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
             )
 
             music_start.add_out(
-                VLib.Output('OnTrigger', music_restart, 'Enable'),
-                VLib.Output('OnTrigger', music_restart, 'Trigger', delay=0.01),
+                Output('OnTrigger', music_restart, 'Enable'),
+                Output('OnTrigger', music_restart, 'Trigger', delay=0.01),
             )
 
             music_stop.add_out(
-                VLib.Output('OnTrigger', music_restart, 'Disable'),
-                VLib.Output('OnTrigger', music_restart, 'CancelPending'),
+                Output('OnTrigger', music_restart, 'Disable'),
+                Output('OnTrigger', music_restart, 'CancelPending'),
             )
 
             music_restart.add_out(
-                VLib.Output('OnTrigger', music, 'StopSound'),
-                VLib.Output('OnTrigger', music, 'Volume', '0'),
-                VLib.Output('OnTrigger', music, 'Volume', '10', delay=0.1),
-                VLib.Output('OnTrigger', music, 'PlaySound', delay=0.1),
+                Output('OnTrigger', music, 'StopSound'),
+                Output('OnTrigger', music, 'Volume', '0'),
+                Output('OnTrigger', music, 'Volume', '10', delay=0.1),
+                Output('OnTrigger', music, 'PlaySound', delay=0.1),
             )
 
             if game_mode == 'SP':
@@ -1557,14 +1554,14 @@ def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
                     spawnflags='0',  # Don't remove after fire
                     globalstate='',
                 ).add_out(
-                    VLib.Output('OnLoadGame', music_restart, 'CancelPending'),
-                    VLib.Output('OnLoadGame', music_restart, 'Trigger', delay=0.01),
+                    Output('OnLoadGame', music_restart, 'CancelPending'),
+                    Output('OnLoadGame', music_restart, 'Trigger', delay=0.01),
                 )
 
             if snd_length > 0:
                 # Re-trigger after the music duration.
                 music_restart.add_out(
-                    VLib.Output('OnTrigger', '!self', 'Trigger', delay=snd_length)
+                    Output('OnTrigger', '!self', 'Trigger', delay=snd_length)
                 )
                 # Set to non-looping, so re-playing will restart it correctly.
                 music['spawnflags'] = '49'
@@ -1572,8 +1569,8 @@ def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
             # The music track never needs to have repeating managed,
             # just directly trigger.
             music_start.add_out(
-                VLib.Output('OnTrigger', music, 'PlaySound'),
-                VLib.Output('OnTrigger', music, 'Volume', '10'),
+                Output('OnTrigger', music, 'PlaySound'),
+                Output('OnTrigger', music, 'Volume', '10'),
             )
 
     if inst:
@@ -1648,7 +1645,7 @@ def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
         global_pti_ents.fixup['glados_script'] = 'choreo/glados.nut'  # Implements Multiverse Cave..
 
 
-def change_ents(vmf: VLib.VMF) -> None:
+def change_ents(vmf: VMF) -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
     if options.get(bool, "remove_info_lighting"):
@@ -1664,7 +1661,7 @@ def change_ents(vmf: VLib.VMF) -> None:
                 vmf.remove_ent(auto)
 
 
-def fix_worldspawn(vmf: VLib.VMF) -> None:
+def fix_worldspawn(vmf: VMF) -> None:
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
     if vmf.spawn['paintinmap'] != '1':
@@ -1755,7 +1752,7 @@ def instance_symlink() -> None:
     os.symlink(inst, link_loc, target_is_directory=True)
 
 
-def save(vmf: VLib.VMF, path: str) -> None:
+def save(vmf: VMF, path: str) -> None:
     """Save the modified map back to the correct location.
     """
     LOGGER.info("Saving New Map...")
