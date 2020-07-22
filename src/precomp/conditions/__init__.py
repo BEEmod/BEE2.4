@@ -81,16 +81,6 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-# A dictionary mapping origins to their brushes
-class solidGroup(NamedTuple):
-    face: Side
-    solid: Solid
-    normal: Vec  # The normal of the face.
-    color: Portalable
-
-SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
-
-
 # For each class, a list of item IDs of that type.
 ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
 # For each item Id, the item class for it.
@@ -280,7 +270,7 @@ class Condition:
                     source or 'condition',
                 )
                 if utils.DEV_MODE:
-                    # Crash so this is immediately noticable..
+                    # Crash so this is immediately noticeable..
                     utils.quit_app(1)
                 else:
                     # In release, just skip this one - that way it's
@@ -413,7 +403,7 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
     dec_priority = Decimal(priority)
     # This adds a condition result like "func" (with quotes), which cannot
     # be entered into property files.
-    # The qualname will be unique across modules.
+    # The qualified name will be unique across modules.
     name = '"' + func.__qualname__ + '"'
     LOGGER.debug(
         "Adding metacondition ({}) with priority {!s}!",
@@ -519,8 +509,6 @@ def init(seed: str, inst_list: Set[str], vmf_file: VMF) -> None:
     # Sort by priority, where higher = done later
     zero = Decimal(0)
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
-
-    build_solid_dict(vmf_file)
 
 
 def check_all(vmf: VMF) -> None:
@@ -629,43 +617,6 @@ def import_conditions() -> None:
         LOGGER.debug('Importing {} ...', module)
         importlib.import_module(module)
     LOGGER.info('Imported all conditions modules!')
-
-
-def build_solid_dict(vmf: VMF) -> None:
-    """Build a dictionary mapping origins to brush faces.
-
-    This allows easily finding brushes that are at certain locations.
-    """
-    import vbsp
-    mat_types = {}
-    for mat in vbsp.BLACK_PAN:
-        mat_types[mat] = Portalable.black
-
-    for mat in vbsp.WHITE_PAN:
-        mat_types[mat] = Portalable.white
-
-    for solid in vmf.brushes:
-        for face in solid:
-            try:
-                mat_type = mat_types[face.mat]
-            except KeyError:
-                continue
-            else:
-                origin = face.get_origin().as_tuple()
-                if origin in SOLIDS:
-                    # The only time two textures will be in the same
-                    # place is if they are covering each other -
-                    # nodraw them both and ignore them
-                    SOLIDS.pop(origin).face.mat = consts.Tools.NODRAW
-                    face.mat = consts.Tools.NODRAW
-                    continue
-
-                SOLIDS[origin] = solidGroup(
-                    color=mat_type,
-                    face=face,
-                    solid=solid,
-                    normal=face.normal(),
-                )
 
 
 def build_itemclass_dict(prop_block: Property) -> None:
