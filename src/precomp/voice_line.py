@@ -119,7 +119,7 @@ def res_quote_event(res: Property):
     return conditions.RES_EXHAUSTED
 
 
-def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name, player_flag_set):
+def find_group_quotes(vmf, group, mid_quotes, use_dings, conf, mid_name, player_flag_set):
     """Scan through a group, looking for applicable quote options."""
     is_mid = (group.name == 'midchamber')
 
@@ -138,7 +138,7 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name, player_flag_
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_flag(flag, fake_inst):
+            if not conditions.check_flag(vmf, flag, fake_inst):
                 valid_quote = False
                 break
 
@@ -553,6 +553,7 @@ def add_voice(
 
         possible_quotes = sorted(
             find_group_quotes(
+                vmf_file,
                 group,
                 mid_quotes,
                 use_dings,

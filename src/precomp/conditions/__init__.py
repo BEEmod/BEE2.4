@@ -39,10 +39,7 @@ from typing import (
     TextIO,
 )
 
-from precomp import (
-    instanceLocs,
-    template_brush,
-)
+from precomp import instanceLocs
 import consts
 import srctools.logger
 import utils
@@ -50,7 +47,7 @@ from precomp.texturing import Portalable
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    Entity, Output, Solid, Side
+    VMF, Entity, Output, Solid, Side
 )
 
 
@@ -61,9 +58,8 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()  # type: Set[str]
 ALL_INST = set()  # type: Set[str]
-VMF = None  # type: srctools.VMF
 
-conditions = []
+conditions: List['Condition'] = []
 FLAG_LOOKUP = {}  # type: Dict[str, Callable[[srctools.VMF, Entity, Property], bool]]
 RESULT_LOOKUP = {}  # type: Dict[str, Callable[[srctools.VMF, Entity, Property], object]]
 RESULT_SETUP = {}  # type: Dict[str, Callable[[srctools.VMF, Property], object]]
@@ -203,7 +199,6 @@ class Condition:
         self.else_results = else_results or []
         self.priority = priority
         self.source = source
-        self.setup()
 
     def __repr__(self):
         return (
@@ -260,25 +255,25 @@ class Condition:
             source,
         )
 
-    def setup(self) -> None:
+    def setup(self, vmf: VMF) -> None:
         """Some results need some pre-processing before they can be used.
 
         """
         for res in self.results[:]:
-            self.setup_result(self.results, res, self.source)
+            self.setup_result(vmf, self.results, res, self.source)
 
         for res in self.else_results[:]:
-            self.setup_result(self.else_results, res, self.source)
+            self.setup_result(vmf, self.else_results, res, self.source)
 
     @staticmethod
-    def setup_result(res_list: List[Property], result: Property, source: Optional[str]='') -> None:
+    def setup_result(vmf: VMF, res_list: List[Property], result: Property, source: Optional[str]='') -> None:
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
             # noinspection PyBroadException
             try:
-                result.value = func(VMF, result)
-            except:
+                result.value = func(vmf, result)
+            except Exception:
                 # Print the source of the condition if if fails...
                 LOGGER.exception(
                     'Error in {} setup:',
@@ -312,13 +307,13 @@ class Condition:
                 # Delete this so it doesn't re-fire..
                 return RES_EXHAUSTED
         else:
-            return func(VMF, inst, res)
+            return func(inst.map, inst, res)
 
     def test(self, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance."""
         success = True
         for flag in self.flags:
-            if not check_flag(flag, inst):
+            if not check_flag(inst.map, flag, inst):
                 success = False
                 break
         results = self.results if success else self.else_results
@@ -514,11 +509,10 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: Set[str], vmf_file: srctools.vmf.VMF) -> None:
+def init(seed: str, inst_list: Set[str], vmf_file: VMF) -> None:
     """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
-    global MAP_RAND_SEED, ALL_INST, VMF
-    VMF = vmf_file
+    global MAP_RAND_SEED
     MAP_RAND_SEED = seed
     ALL_INST.update(inst_list)
 
@@ -526,14 +520,16 @@ def init(seed: str, inst_list: Set[str], vmf_file: srctools.vmf.VMF) -> None:
     zero = Decimal(0)
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
 
-    build_solid_dict()
+    build_solid_dict(vmf_file)
 
 
-def check_all() -> None:
+def check_all(vmf: VMF) -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
+    LOGGER.info('-----------------------')
     for condition in conditions:
-        for inst in VMF.by_class['func_instance']:
+        condition.setup(vmf)
+        for inst in vmf.by_class['func_instance']:
             try:
                 condition.test(inst)
             except NextInstance:
@@ -556,6 +552,8 @@ def check_all() -> None:
             if not condition.results and not condition.else_results:
                 break  # Condition has run out of results, quit early
 
+    LOGGER.info('---------------------')
+    LOGGER.info('Conditions executed!')
     import vbsp
     LOGGER.info('Map has attributes: {}', [
         key
@@ -570,7 +568,7 @@ def check_all() -> None:
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(flag: Property, inst: Entity):
+def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
     """Determine the result for a condition flag."""
     name = flag.name
     # If starting with '!', invert the result.
@@ -591,7 +589,7 @@ def check_flag(flag: Property, inst: Entity):
             # Skip these conditions..
             return False
 
-    res = func(VMF, inst, flag)
+    res = func(vmf, inst, flag)
     return res == desired_result
 
 
@@ -633,7 +631,7 @@ def import_conditions() -> None:
     LOGGER.info('Imported all conditions modules!')
 
 
-def build_solid_dict() -> None:
+def build_solid_dict(vmf: VMF) -> None:
     """Build a dictionary mapping origins to brush faces.
 
     This allows easily finding brushes that are at certain locations.
@@ -646,7 +644,7 @@ def build_solid_dict() -> None:
     for mat in vbsp.WHITE_PAN:
         mat_types[mat] = Portalable.white
 
-    for solid in VMF.brushes:
+    for solid in vmf.brushes:
         for face in solid:
             try:
                 mat_type = mat_types[face.mat]
@@ -670,7 +668,7 @@ def build_solid_dict() -> None:
                 )
 
 
-def build_itemclass_dict(prop_block: Property):
+def build_itemclass_dict(prop_block: Property) -> None:
     """Load in the item ID database.
 
     This maps item IDs to their item class, and their embed locations.
@@ -940,92 +938,6 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=Non
                     v[axis] = bound_min[axis]
 
 
-def remove_ant_toggle(toggle_ent: Entity):
-    """Remove a texture_toggle instance , plus the associated antline.
-
-    For non-toggle instances, they will just be removed.
-    """
-    toggle_ent.remove()
-
-    # Assume anything with '$indicator_name' is a toggle instance
-    # This will likely be called on the signs too, if present.
-    overlay_name = toggle_ent.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
-    if overlay_name != '':
-        for ent in VMF.by_target[overlay_name]:
-            ent.remove()
-
-
-def reallocate_overlays(mapping: Dict[str, Optional[List[str]]]):
-    """Replace one side ID with others in all overlays.
-
-    The IDs should be strings.
-    """
-    for overlay in VMF.by_class['info_overlay']:
-        sides = overlay['sides', ''].split(' ')
-        for side in sides[:]:
-            try:
-                new_ids = mapping[side]
-            except KeyError:
-                continue
-            sides.remove(side)
-            if new_ids is not None:
-                sides.extend(new_ids)
-        if not sides:
-            # The overlay doesn't have any sides at all!
-            VMF.remove_ent(overlay)
-        else:
-            overlay['sides'] = ' '.join(sides)
-
-
-def steal_from_brush(
-    temp_data: template_brush.ExportedTemplate,
-    brush_group: 'solidGroup',
-    rem_brush=True,
-    additional: Iterable[int]=(),
-    transfer_overlays=True,
-):
-    """Copy IDs from a brush to a template."""
-    temp_brushes = temp_data.world.copy()
-    # Overlays can't be applied to entities (other than func_detail).
-    if temp_data.detail is not None and temp_data.detail['classname'] == 'func_detail':
-        temp_brushes.extend(temp_data.detail.solids)
-
-    if rem_brush:
-        VMF.remove_brush(brush_group.solid)
-    else:
-        # Switch it to nodraw if still in the map, since it must be
-        # covered.
-        brush_group.face.mat = 'tools/toolsnodraw'
-
-    # Additional is a list of IDs in the template VMF, not the final one.
-    additional = {
-        temp_data.orig_ids.get(int(face_id), -1)
-        for face_id in
-        additional
-    }
-    new_ids: Optional[List[str]] = []
-
-    for brush in temp_brushes:
-        for face in brush.sides:
-            # Only faces pointing the same way!
-            if face.normal() == brush_group.normal:
-                # Skip tool brushes in the template (nodraw, player clips..)
-                if face.mat.casefold().startswith('tools/'):
-                    continue
-                new_ids.append(str(face.id))
-            # If the original ID is present in the 'additional' values
-            # use it. This allows specifying specific faces.
-            elif face.id in additional:
-                new_ids.append(str(face.id))
-
-    if new_ids:
-        if not transfer_overlays:
-            new_ids = None
-        reallocate_overlays({
-            str(brush_group.face.id): new_ids,
-        })
-
-
 def set_ent_keys(
     ent: Entity,
     inst: Entity,
@@ -1182,7 +1094,7 @@ def dummy_result(inst: Entity, props: Property):
 
 
 @meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst: Entity):
+def remove_blank_inst(inst: Entity) -> None:
     """Remove instances with a blank file keyvalue.
 
     This allows conditions to strip the instances when requested.
@@ -1190,18 +1102,7 @@ def remove_blank_inst(inst: Entity):
     # If editoritems instances are set to "", PeTI will autocorrect it to
     # ".vmf" - we need to handle that too.
     if inst['file', ''] in ('', '.vmf'):
-        VMF.remove_ent(inst)
-
-
-@meta_cond(priority=0, only_once=True)
-def fix_catapult_targets(inst: Entity):
-    """Set faith plate targets to transmit to clients.
-
-    This fixes some console spam in coop, and might improve trajectories
-    for faith plates.
-    """
-    for targ in VMF.by_class['info_target']:
-        targ['spawnflags'] = '3'  # Transmit to client, ignoring PVS
+        inst.remove()
 
 
 @make_result_setup('timedRelay')
@@ -1231,14 +1132,14 @@ def res_timed_relay_setup(res: Property):
 
 
 @make_result('timedRelay')
-def res_timed_relay(inst: Entity, res: Property):
+def res_timed_relay(vmf: VMF, inst: Entity, res: Property) -> None:
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
     """
     var, name, disabled, flags, final_outs, rep_outs = res.value
 
-    relay = VMF.create_ent(
+    relay = vmf.create_ent(
         classname='logic_relay',
         spawnflags=flags,
         origin=inst['origin'],
@@ -1273,11 +1174,18 @@ def res_timed_relay(inst: Entity, res: Property):
         relay.add_out(new_out)
 
 
+@make_result_setup('condition')
+def res_sub_condition_setup(vmf: VMF, res: Property):
+    """Setup the sub-condition."""
+    cond = Condition.parse(res)
+    cond.setup(vmf)
+    return cond
+
+
 @make_result('condition')
 def res_sub_condition(base_inst: Entity, res: Property):
     """Check a different condition if the outer block is true."""
     res.value.test(base_inst)
-make_result_setup('condition')(Condition.parse)
 
 
 @make_result('nextInstance')
@@ -1299,7 +1207,7 @@ def res_end_condition():
 
 
 @make_result_setup('switch')
-def res_switch_setup(res: Property):
+def res_switch_setup(vmf: VMF, res: Property):
     flag = None
     method = SWITCH_TYPE.FIRST
     cases = []
@@ -1326,6 +1234,7 @@ def res_switch_setup(res: Property):
     for prop in itertools.chain(cases, default):
         for result in prop.value:
             Condition.setup_result(
+                vmf,
                 prop.value,
                 result,
                 'switch: {} -> {}'.format(flag, prop.real_name),
@@ -1344,7 +1253,7 @@ def res_switch_setup(res: Property):
 
 
 @make_result('switch')
-def res_switch(inst: Entity, res: Property):
+def res_switch(vmf: VMF, inst: Entity, res: Property):
     """Run the same flag multiple times with different arguments.
 
     'method' is the way the search is done - first, last, random, or all.
@@ -1368,7 +1277,7 @@ def res_switch(inst: Entity, res: Property):
     for case in cases:
         if flag_name is not None:
             flag = Property(flag_name, case.real_name)
-            if not check_flag(flag, inst):
+            if not check_flag(vmf, flag, inst):
                 continue
         for res in case:
             Condition.test_result(inst, res)
@@ -1479,7 +1388,7 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
 
 
 @make_result('GooDebris')
-def res_goo_debris(res: Property):
+def res_goo_debris(vmf: VMF, res: Property) -> object:
     """Add random instances to goo squares.
 
     Options:
@@ -1558,7 +1467,7 @@ def res_goo_debris(res: Property):
             loc.x += random.randint(-offset, offset)
             loc.y += random.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
-        VMF.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             file=file + suff + '.vmf',
             origin=loc.join(' '),

@@ -2047,7 +2047,7 @@ def main() -> None:
 
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
-        conditions.check_all()
+        conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)
 
         change_ents(vmf)

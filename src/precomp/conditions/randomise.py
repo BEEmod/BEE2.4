@@ -2,7 +2,7 @@
 import random
 from typing import List
 
-from srctools import Property, Vec, Entity
+from srctools import Property, Vec, Entity, VMF
 from precomp import conditions
 import srctools
 
@@ -32,7 +32,7 @@ def flag_random(inst: Entity, res: Property) -> bool:
 
 
 @make_result_setup('random')
-def res_random_setup(res: Property) -> object:
+def res_random_setup(vmf: VMF, res: Property) -> object:
     weight = ''
     results = []
     chance = 100
@@ -60,9 +60,9 @@ def res_random_setup(res: Property) -> object:
     for prop in results[:]:
         if prop.name == 'group':
             for sub_prop in list(prop):
-                Condition.setup_result(prop.value, sub_prop)
+                Condition.setup_result(vmf, prop.value, sub_prop)
         else:
-            Condition.setup_result(results, prop)
+            Condition.setup_result(vmf, results, prop)
 
     return seed, chance, weight, results
 

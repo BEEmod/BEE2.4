@@ -504,7 +504,7 @@ def res_import_template_setup(res: Property):
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst: Entity, res: Property):
+def res_import_template(vmf: VMF, inst: Entity, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only
@@ -619,7 +619,7 @@ def res_import_template(inst: Entity, res: Property):
         return
 
     for vis_flag_block in visgroup_instvars:
-        if all(conditions.check_flag(flag, inst) for flag in vis_flag_block):
+        if all(conditions.check_flag(vmf, flag, inst) for flag in vis_flag_block):
             visgroups.add(vis_flag_block.real_name)
 
     if color_var.casefold() == '<editor>':
