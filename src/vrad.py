@@ -12,7 +12,7 @@ import shutil
 import sys
 from io import BytesIO
 from zipfile import ZipFile
-from typing import Iterator, List, Tuple, Set, Dict, Optional
+from typing import List, Set, Dict, Optional
 
 import srctools.run
 from srctools import Property, Entity
@@ -31,26 +31,10 @@ from srctools.bsp_transform import (
 
 from postcomp import music, screenshot
 
-CONF = Property('Config', [])
 
-
-def load_config() -> None:
-    global CONF
-    LOGGER.info('Loading Settings...')
-    try:
-        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
-            CONF.append(Property.parse(config, 'bee2/vrad_config.cfg').find_key(
-                'Config', []
-            ))
-    except FileNotFoundError:
-        pass
-    LOGGER.info('Config Loaded!')
-
-
-def dump_files(bsp: BSP) -> None:
+def dump_files(bsp: BSP, dump_folder: str) -> None:
     """Dump packed files to a location.
     """
-    dump_folder = CONF['packfile_dump', '']
     if not dump_folder:
         return
 
@@ -111,14 +95,6 @@ def generate_coop_responses(ctx: TransContext) -> None:
     if ent is None:
         LOGGER.warning('Response scripts present, but @glados is not!')
 
-def inject_files() -> Iterator[Tuple[str, str]]:
-    """Generate the names of files to inject, if they exist.."""
-    # Additionally add files set in the config.
-    for prop in CONF.find_children('InjectFiles'):
-        filename = os.path.join('bee2', 'inject', prop.real_name)
-        if os.path.exists(filename):
-            yield filename, prop.value
-
 
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
@@ -131,6 +107,7 @@ def run_vrad(args: List[str]) -> None:
 
 
 def main(argv: List[str]) -> None:
+    """Main VRAD script."""
     LOGGER.info('BEE2 VRAD hook started!')
         
     args = " ".join(argv)
@@ -156,7 +133,17 @@ def main(argv: List[str]) -> None:
 
     LOGGER.info("Map path is " + path)
 
-    load_config()
+    LOGGER.info('Loading Settings...')
+    try:
+        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
+            conf = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
+                'Config', []
+            )
+    except FileNotFoundError:
+        conf = Property('Config', [])
+    else:
+        LOGGER.info('Config Loaded!')
+
 
     for a in fast_args[:]:
         folded_a = a.casefold()
@@ -193,14 +180,14 @@ def main(argv: List[str]) -> None:
         raise ValueError('"{}" is not a file!'.format(path))
 
     # If VBSP thinks it's hammer, trust it.
-    if CONF.bool('is_hammer', False):
+    if conf.bool('is_hammer', False):
         is_peti = edit_args = False
     else:
         is_peti = True
         # Detect preview via knowing the bsp name. If we are in preview,
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
-            edit_args = not CONF.bool('force_full', False)
+            edit_args = not conf.bool('force_full', False)
         else:
             # publishing - always force full lighting.
             edit_args = False
@@ -223,11 +210,11 @@ def main(argv: List[str]) -> None:
 
     # Put the Mel and Tag filesystems in so we can pack from there.
     fsys_tag = fsys_mel = None
-    if is_peti and 'mel_vpk' in CONF:
-        fsys_mel = VPKFileSystem(CONF['mel_vpk'])
+    if is_peti and 'mel_vpk' in conf:
+        fsys_mel = VPKFileSystem(conf['mel_vpk'])
         fsys.add_sys(fsys_mel)
-    if is_peti and 'tag_dir' in CONF:
-        fsys_tag = RawFileSystem(CONF['tag_dir'])
+    if is_peti and 'tag_dir' in conf:
+        fsys_tag = RawFileSystem(conf['tag_dir'])
         fsys.add_sys(fsys_tag)
 
     # Special case - move the BEE2 fsys FIRST, so we always pack files found
@@ -265,7 +252,7 @@ def main(argv: List[str]) -> None:
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
 
-    # We nee to add all soundscripts in scripts/bee2_snd/
+    # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
     for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
         if soundscript.path.endswith('.txt'):
@@ -273,9 +260,9 @@ def main(argv: List[str]) -> None:
 
     if is_peti:
         LOGGER.info('Adding special packed files:')
-        voice_attr = set(CONF['VoiceAttr', ''].casefold().split(';'))
+        voice_attr = set(conf['VoiceAttr', ''].casefold().split(';'))
 
-        music_data = CONF.find_key('MusicScript', [])
+        music_data = conf.find_key('MusicScript', [])
         if music_data:
             packlist.pack_file(
                 'scripts/BEE2_generated_music.txt',
@@ -283,10 +270,14 @@ def main(argv: List[str]) -> None:
                 data=music.generate(music_data, voice_attr, packlist)
             )
 
-        for filename, arcname in inject_files():
-            LOGGER.info('Injecting "{}" into packfile.', arcname)
-            with open(filename, 'rb') as f:
-                packlist.pack_file(arcname, data=f.read())
+        for prop in conf.find_children('InjectFiles'):
+            filename = os.path.join('bee2', 'inject', prop.real_name)
+            try:
+                with open(filename, 'rb') as f:
+                    LOGGER.info('Injecting "{}" into packfile.', prop.value)
+                    packlist.pack_file(prop.value, data=f.read())
+            except FileNotFoundError:
+                pass
 
     LOGGER.info('Run transformations...')
     run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
@@ -340,7 +331,7 @@ def main(argv: List[str]) -> None:
                 set(zipfile.namelist()) - existing
             ))
 
-    dump_files(bsp_file)
+    dump_files(bsp_file, conf['packfile_dump', ''])
 
     # Copy new entity data.
     bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
@@ -349,7 +340,7 @@ def main(argv: List[str]) -> None:
     LOGGER.info(' - BSP written!')
 
     if is_peti:
-        screenshot.modify(CONF)
+        screenshot.modify(conf)
 
     if edit_args:
         LOGGER.info("Forcing Cheap Lighting!")
