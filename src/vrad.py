@@ -12,10 +12,10 @@ import shutil
 import sys
 from io import BytesIO
 from zipfile import ZipFile
-from typing import List, Set, Dict, Optional
+from typing import List, Set
 
 import srctools.run
-from srctools import Property, Entity
+from srctools import Property
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
@@ -23,13 +23,13 @@ from srctools.filesys import (
 )
 from srctools.packlist import PackList, FileType as PackType, load_fgd
 from srctools.game import find_gameinfo
-from srctools.bsp_transform import (
-    run_transformations,
-    Context as TransContext,
-    trans as register_transform,
-)
+from srctools.bsp_transform import run_transformations
 
-from postcomp import music, screenshot
+from postcomp import (
+    music,
+    screenshot,
+    coop_responses,
+)
 
 
 def dump_files(bsp: BSP, dump_folder: str) -> None:
@@ -63,37 +63,6 @@ def dump_files(bsp: BSP, dump_folder: str) -> None:
     with bsp.packfile() as zipfile:
         for zipinfo in zipfile.infolist():
             zipfile.extract(zipinfo, dump_folder)
-
-
-@register_transform('BEE2: Coop Responses')
-def generate_coop_responses(ctx: TransContext) -> None:
-    """If the entities are present, add the coop response script."""
-    responses: Dict[str, List[str]] = {}
-    for response in ctx.vmf.by_class['bee2_coop_response']:
-        responses[response['type']] = [
-            value for key, value in response.keys.items()
-            if key.startswith('choreo')
-        ]
-        response.remove()
-    script = ["BEE2_RESPONSES <- {"]
-    for response_type, lines in sorted(responses.items()):
-        script.append(f'\t{response_type} = [')
-        for line in lines:
-            script.append(f'\t\tCreateSceneEntity("{line}"),')
-        script.append('\t],')
-    script.append('};')
-
-    # We want to write this onto the '@glados' entity.
-    ent: Optional[Entity] = None
-    for ent in ctx.vmf.by_target['@glados']:
-        ctx.add_code(ent, '\n'.join(script))
-        # Also include the actual script.
-        split_script = ent['vscripts'].split()
-        split_script.append('bee2/coop_responses.nut')
-        ent['vscripts'] = ' '.join(split_script)
-
-    if ent is None:
-        LOGGER.warning('Response scripts present, but @glados is not!')
 
 
 def run_vrad(args: List[str]) -> None:
