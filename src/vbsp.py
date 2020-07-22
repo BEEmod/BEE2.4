@@ -231,12 +231,12 @@ def load_map(map_path) -> VLib.VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice():
+def add_voice(vmf: VLib.VMF):
     """Add voice lines to the map."""
     voice_line.add_voice(
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
-        vmf_file_=VMF,
+        vmf_file_=vmf,
         map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )
@@ -247,7 +247,7 @@ FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def anti_fizz_bump():
+def anti_fizz_bump(vmf: VLib.VMF) -> None:
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
@@ -258,13 +258,13 @@ def anti_fizz_bump():
     # to get the difference for each face.
 
     if not srctools.conv_bool(settings['style_vars']['fixfizzlerbump']):
-        return True
+        return
 
     # Only use 1 bumper entity for each fizzler, since we can.
     bumpers = {}
 
     LOGGER.info('Adding Portal Bumpers to fizzlers...')
-    for cleanser in VMF.by_class['trigger_portal_cleanser']:
+    for cleanser in vmf.by_class['trigger_portal_cleanser']:
         # Client bit flag = 1, triggers without it won't destroy portals
         # - so don't add a bumper.
         if int(cleanser['spawnflags']) & 1 != 1:
@@ -277,7 +277,7 @@ def anti_fizz_bump():
 
         # Only have 1 bumper per brush
         if fizz_name not in bumpers:
-            bumper = bumpers[fizz_name] = VMF.create_ent(
+            bumper = bumpers[fizz_name] = vmf.create_ent(
                 classname='func_portal_bumper',
                 targetname=fizz_name,
                 origin=cleanser['origin'],
@@ -290,7 +290,7 @@ def anti_fizz_bump():
 
         # Noportal_volumes need separate parts, since they can't be
         # concave.
-        noportal = VMF.create_ent(
+        noportal = vmf.create_ent(
             classname='func_noportal_volume',
             targetname=fizz_name,
             origin=cleanser['origin'],
@@ -339,7 +339,7 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model():
+def set_player_model(vmf: VLib.VMF) -> None:
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
@@ -358,13 +358,13 @@ def set_player_model():
     model_path, pgun_skin = PLAYER_MODELS[chosen_model]
 
     # Precache the model, so we can switch to it.
-    VMF.create_ent(
+    vmf.create_ent(
         classname='comp_precache_model',
         origin=loc,
         model='models/' + model_path + '.mdl',
     )
 
-    auto = VMF.create_ent(
+    auto = vmf.create_ent(
         classname='logic_auto',
         spawnflags=0,  # Don't remove on fire.
         origin=loc,
@@ -412,7 +412,7 @@ def set_player_model():
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun() -> None:
+def set_player_portalgun(vmf: VLib.VMF) -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -464,10 +464,10 @@ def set_player_portalgun() -> None:
 
     ent_pos = options.get(Vec, 'global_pti_ents_loc')
     
-    logic_auto = VMF.create_ent('logic_auto', origin=ent_pos, flags='1')
+    logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
 
     if not blue_portal or not oran_portal or force_portal_man:
-        pgun_script = VMF.create_ent(
+        pgun_script = vmf.create_ent(
             classname='point_template',
             targetname='@portalgun',
             vscripts='bee2/portal_man.nut',
@@ -475,7 +475,7 @@ def set_player_portalgun() -> None:
         )
 
         if GAME_MODE == 'SP':
-            VMF.create_ent(
+            vmf.create_ent(
                 classname='weapon_portalgun',
                 targetname='__pgun_template',
                 CanFirePortal1=0,
@@ -491,7 +491,7 @@ def set_player_portalgun() -> None:
 
             # For Absolute Fizzler or otherwise, this fizzles portals on a
             # player remotely.
-            cleanser = VMF.create_ent(
+            cleanser = vmf.create_ent(
                 classname='trigger_portal_cleanser',
                 targetname='__pgun_cleanser',
                 parentname=pgun_script['targetname'],
@@ -500,13 +500,13 @@ def set_player_portalgun() -> None:
                 visible=0,
                 spawnflags=1,  # Clients only.
             )
-            cleanser.solids.append(VMF.make_prism(
+            cleanser.solids.append(vmf.make_prism(
                 ent_pos - 4, ent_pos + 4,
                 mat=consts.Tools.TRIGGER,
             ).solid)
 
         # For removing portalguns from players.
-        trig_stripper = VMF.create_ent(
+        trig_stripper = vmf.create_ent(
             targetname='__pgun_weapon_strip',
             classname='trigger_weapon_strip',
             origin=ent_pos,
@@ -516,7 +516,7 @@ def set_player_portalgun() -> None:
         )
         # Max map size is +-16384, for some reason we can't have a brush bigger than
         # that in any dimension?
-        whole_map = VMF.make_prism(
+        whole_map = vmf.make_prism(
             Vec(-8192, -8192, -8192),
             Vec(8192, 8192, 8192),
             mat=consts.Tools.TRIGGER,
@@ -532,7 +532,7 @@ def set_player_portalgun() -> None:
             port_ids = (0, )
 
         for port_id in port_ids:
-            trigger_portal = VMF.create_ent(
+            trigger_portal = vmf.create_ent(
                 targetname='__pgun_port_detect_{}'.format(port_id),
                 classname='func_portal_detector',
                 origin=ent_pos,
@@ -567,7 +567,7 @@ def set_player_portalgun() -> None:
 
         # Checking for held cubes, for pgun buttons.
         if has_btn_onoff:
-            trig_cube = VMF.create_ent(
+            trig_cube = vmf.create_ent(
                 targetname='__pgun_held_trig',
                 classname='trigger_multiple',
                 origin=ent_pos,
@@ -600,7 +600,7 @@ def set_player_portalgun() -> None:
 
         # Shuts down various parts when you've reached the exit.
         import precomp.conditions.instances
-        precomp.conditions.instances.global_input(VMF, ent_pos, VLib.Output(
+        precomp.conditions.instances.global_input(vmf, ent_pos, VLib.Output(
             'OnTrigger',
             '@portalgun',
             'RunScriptCode',
@@ -626,12 +626,12 @@ def set_player_portalgun() -> None:
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic() -> None:
+def add_screenshot_logic(vmf: VLib.VMF) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
     ).upper() == 'AUTO' and IS_PREVIEW:
-        VMF.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             file='instances/bee2/logic/screenshot_logic.vmf',
             origin=options.get(Vec, 'global_ents_loc'),
@@ -641,10 +641,10 @@ def add_screenshot_logic() -> None:
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents():
+def add_fog_ents(vmf: VLib.VMF) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.get(Vec, 'global_ents_loc')
-    VMF.create_ent(
+    vmf.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
         origin=pos + (-16, 0, 0),
@@ -653,7 +653,7 @@ def add_fog_ents():
     fog_opt = settings['fog']
 
     random.seed(MAP_RAND_SEED + '_shadow_angle')
-    VMF.create_ent(
+    vmf.create_ent(
         classname='shadow_control',
         # Slight variations around downward direction.
         angles=Vec(random.randrange(85, 90), random.randrange(0, 360), 0),
@@ -664,7 +664,7 @@ def add_fog_ents():
         enableshadowsfromlocallights=1,
     )
 
-    fog_controller = VMF.create_ent(
+    fog_controller = vmf.create_ent(
         classname='env_fog_controller',
         targetname='@fog_controller',
         origin=pos + (16, 0, 0),
@@ -690,7 +690,7 @@ def add_fog_ents():
         fog_controller['fogcolor2'] = fog_opt['secondary']
         fog_controller['use_angles'] = '1'
 
-    logic_auto = VMF.create_ent(classname='logic_auto', origin=pos, flags='1')
+    logic_auto = vmf.create_ent(classname='logic_auto', origin=pos, flags='1')
 
     logic_auto.add_out(
         VLib.Output(
@@ -764,7 +764,7 @@ def add_fog_ents():
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos() -> None:
+def set_elev_videos(vmf: VLib.VMF) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -792,7 +792,7 @@ def set_elev_videos() -> None:
         return
 
     transition_ents = instanceLocs.resolve('[transitionents]')
-    for inst in VMF.by_class['func_instance']:
+    for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
             continue
         if vert_vid:
@@ -801,7 +801,7 @@ def set_elev_videos() -> None:
             inst.fixup[consts.FixupVars.BEE_ELEV_HORIZ] = 'media/' + horiz_vid + '.bik'
 
         # Create the video script
-        VMF.create_ent(
+        vmf.create_ent(
             classname='logic_script',
             targetname='@video_splitter',
             vscripts=script,
@@ -809,7 +809,7 @@ def set_elev_videos() -> None:
         )
 
 
-def get_map_info() -> Set[str]:
+def get_map_info(vmf: VLib.VMF) -> Set[str]:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -863,7 +863,7 @@ def get_map_info() -> Set[str]:
     # The door frame instances
     entry_door_frame = exit_door_frame = None
 
-    for item in VMF.by_class['func_instance']:
+    for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
         # doors.
         # - Read the $no_player_start var to see if we're in preview mode,
@@ -1012,13 +1012,13 @@ def get_map_info() -> Set[str]:
 
 
 def mod_entryexit(
-        inst: VLib.Entity,
-        resolve_name,
-        pretty_name,
-        elev_override=False,
-        override_corr=-1,
-        is_exit=False,
-    ):
+    inst: VLib.Entity,
+    resolve_name: str,
+    pretty_name: str,
+    elev_override: bool = False,
+    override_corr: int = -1,
+    is_exit: bool = False,
+) -> str:
     """Modify this entrance or exit.
 
     This sets IS_PREVIEW, switches to vertical variants, and chooses a
@@ -1062,7 +1062,7 @@ def mod_entryexit(
         return 'vert_down'
 
     if override_corr == -1:
-        return None  # There aren't any variants (coop spawn room)
+        return '0'  # There aren't any variants (coop spawn room)
 
     if override_corr == 0:
         index = files.index(inst['file'].casefold())
@@ -1081,7 +1081,7 @@ def mod_entryexit(
         )
         inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = override_corr
         inst['file'] = files[override_corr - 1]
-        return override_corr - 1
+        return str(override_corr - 1)
 
 
 def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
@@ -1112,7 +1112,7 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
         inst['file'] = replace
 
 
-def calc_rand_seed() -> str:
+def calc_rand_seed(vmf: VLib.VMF) -> str:
     """Use the ambient light entities to create a map seed.
 
      This ensures textures remain the same when the map is recompiled.
@@ -1121,7 +1121,7 @@ def calc_rand_seed() -> str:
     lst = [
         inst['targetname'] or '-'  # If no targ
         for inst in
-        VMF.by_class['func_instance']
+        vmf.by_class['func_instance']
         if inst['file'].casefold() in amb_light
         ]
     if len(lst) == 0:
@@ -1215,7 +1215,7 @@ def fit_goo_mist(
 
 
 @conditions.meta_cond(priority=-50)
-def set_barrier_frame_type() -> None:
+def set_barrier_frame_type(vmf: VLib.VMF) -> None:
     """Set a $type instvar on glass frame.
 
     This allows using different instances on glass and grating.
@@ -1225,7 +1225,7 @@ def set_barrier_frame_type() -> None:
     barrier_pos = [] # type: List[Tuple[Vec, str]]
 
     # Find glass and grating brushes..
-    for brush in VMF.iter_wbrushes(world=False, detail=True):
+    for brush in vmf.iter_wbrushes(world=False, detail=True):
         for side in brush:
             if side.mat == consts.Special.GLASS:
                 break
@@ -1234,7 +1234,7 @@ def set_barrier_frame_type() -> None:
             continue
         barrier_pos.append((brush.get_origin(), 'glass'))
 
-    for brush_ent in VMF.by_class['func_brush']:
+    for brush_ent in vmf.by_class['func_brush']:
         for side in brush_ent.sides():
             if side.mat == consts.Special.GRATING:
                 break
@@ -1253,7 +1253,7 @@ def set_barrier_frame_type() -> None:
 
     barrier_files = instanceLocs.resolve('<ITEM_BARRIER>')
     glass_file = instanceLocs.resolve('[glass_128]')
-    for inst in VMF.by_class['func_instance']:
+    for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in barrier_files:
             continue
         if inst['file'].casefold() in glass_file:
@@ -1266,32 +1266,6 @@ def set_barrier_frame_type() -> None:
             inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), norm.as_tuple()]
         except KeyError:
             pass
-
-
-def fix_squarebeams(
-    face: VLib.Side,
-    rotate: bool,
-    reset_offset: bool,
-    scale: float,
-) -> None:
-    """Fix a squarebeams brush for use in other styles.
-
-    If rotate is True, rotate the texture 90 degrees.
-    offset is the offset for the texture.
-    """
-    if rotate:
-        # To rotate, swap the two values
-        face.uaxis, face.vaxis = face.vaxis, face.uaxis
-
-    # We want to modify the value with an offset
-    if face.uaxis.offset != 0:
-        targ = face.uaxis
-    else:
-        targ = face.vaxis
-
-    if reset_offset:
-        targ.offset = 0
-    targ.scale = scale
 
 
 def change_brush() -> None:
@@ -1430,7 +1404,7 @@ def cond_force_clump(inst: Entity, res: Property):
     ))
 
 
-def change_overlays() -> None:
+def change_overlays(vmf: VLib.VMF) -> None:
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
 
@@ -1444,9 +1418,9 @@ def change_overlays() -> None:
     sign_inst_pack = options.get(str, 'signPack')
 
     # Grab all the textures we're using...
-    for over in VMF.by_class['info_overlay']:
+    for over in vmf.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
-            # Overlays added by us, or conditions. These are styled aleady,
+            # Overlays added by us, or conditions. These are styled already,
             # don't touch them.
             continue
 
@@ -1455,7 +1429,7 @@ def change_overlays() -> None:
             if options.get(bool, "remove_exit_signs"):
                 # Some styles have instance-based ones, remove the
                 # originals if needed to ensure it looks nice.
-                VMF.remove_ent(over)
+                over.remove()
                 continue  # Break out, to make sure the instance isn't added
             else:
                 # blank the targetname, so we don't get the
@@ -1470,14 +1444,14 @@ def change_overlays() -> None:
             continue
 
         if sign_inst is not None:
-            new_inst = VMF.create_ent(
+            new_inst = vmf.create_ent(
                 classname='func_instance',
                 origin=over['origin'],
                 angles=over['angles', '0 0 0'],
                 file=sign_inst,
             )
             if sign_inst_pack:
-                packing.pack_list(VMF, sign_inst_pack)
+                packing.pack_list(vmf, sign_inst_pack)
             new_inst.fixup['mat'] = sign_type.name.lower()
 
         # Delete the overlay's targetname - signs aren't ever dynamic.
@@ -1497,7 +1471,7 @@ def change_overlays() -> None:
                 over[prop] = val.join(' ')
 
 
-def add_extra_ents(game_mode: str) -> None:
+def add_extra_ents(vmf: VLib.VMF, game_mode: str) -> None:
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
@@ -1511,7 +1485,7 @@ def add_extra_ents(game_mode: str) -> None:
     # Don't add our logic if an instance was provided.
     # If this settings is set, we have a music config.
     if settings['music_conf'] and not inst:
-        music = VMF.create_ent(
+        music = vmf.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
             targetname='@music',
@@ -1520,13 +1494,13 @@ def add_extra_ents(game_mode: str) -> None:
             health='10',  # Volume
         )
 
-        music_start = VMF.create_ent(
+        music_start = vmf.create_ent(
             classname='logic_relay',
             spawnflags='0',
             targetname='@music_start',
             origin=loc + (-16, 0, -16),
         )
-        music_stop = VMF.create_ent(
+        music_stop = vmf.create_ent(
             classname='logic_relay',
             spawnflags='0',
             targetname='@music_stop',
@@ -1547,7 +1521,7 @@ def add_extra_ents(game_mode: str) -> None:
         # In either case, we need @music_restart to do that safely.
         if game_mode == 'SP' or snd_length > 0:
 
-            music_restart = VMF.create_ent(
+            music_restart = vmf.create_ent(
                 classname='logic_relay',
                 spawnflags='2',  # Allow fast retrigger.
                 targetname='@music_restart',
@@ -1574,7 +1548,7 @@ def add_extra_ents(game_mode: str) -> None:
 
             if game_mode == 'SP':
                 # Trigger on level loads.
-                VMF.create_ent(
+                vmf.create_ent(
                     classname='logic_auto',
                     origin=loc + (0, 0, 16),
                     spawnflags='0',  # Don't remove after fire
@@ -1601,7 +1575,7 @@ def add_extra_ents(game_mode: str) -> None:
 
     if inst:
         # We assume the instance is setup correct.
-        VMF.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             targetname='music',
             angles='0 0 0',
@@ -1619,21 +1593,21 @@ def add_extra_ents(game_mode: str) -> None:
     pti_loc = options.get(Vec, 'global_pti_ents_loc')
 
     # Add a nodraw box around the global entity location, to seal it.
-    VMF.add_brushes(VMF.make_hollow(
+    vmf.add_brushes(vmf.make_hollow(
         global_ents_pos + (128, 128, 128),
         global_ents_pos - (128, 128, 64),
     ))
 
     # Add a cubemap into the map, so materials get a blank one generated.
     # If none are present this doesn't happen...
-    VMF.create_ent(
+    vmf.create_ent(
         classname='env_cubemap',
         cubemapsize=1,  # Make as small as possible..
         origin=global_ents_pos,
     )
 
     # So we have one in the map.
-    VMF.create_ent(
+    vmf.create_ent(
         classname='info_node',
         origin=global_ents_pos - (0, 0, 64),
         nodeid=1,
@@ -1643,7 +1617,7 @@ def add_extra_ents(game_mode: str) -> None:
 
     if settings['has_attr']['bridge'] or settings['has_attr']['lightbridge']:
         # If we have light bridges, make sure we precache the particle.
-        VMF.create_ent(
+        vmf.create_ent(
             classname='info_particle_system',
             origin=global_ents_pos,
             effect_name='projected_wall_impact',
@@ -1652,7 +1626,7 @@ def add_extra_ents(game_mode: str) -> None:
 
     if pti_file:
         LOGGER.info('Adding Global PTI Ents')
-        global_pti_ents = VMF.create_ent(
+        global_pti_ents = vmf.create_ent(
             classname='func_instance',
             targetname='global_pti_ents',
             angles='0 0 0',
@@ -1671,34 +1645,34 @@ def add_extra_ents(game_mode: str) -> None:
         global_pti_ents.fixup['glados_script'] = 'choreo/glados.nut'  # Implements Multiverse Cave..
 
 
-def change_ents() -> None:
+def change_ents(vmf: VLib.VMF) -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
     if options.get(bool, "remove_info_lighting"):
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
-        for ent in VMF.by_class['info_lighting']:
+        for ent in vmf.by_class['info_lighting']:
             ent.remove()
-    for auto in VMF.by_class['logic_auto']:
+    for auto in vmf.by_class['logic_auto']:
         # Remove all the logic_autos that set attachments, we can
         # replicate this in the instance
         for out in auto.outputs:
             if 'panel_top' in out.target:
-                VMF.remove_ent(auto)
+                vmf.remove_ent(auto)
 
 
-def fix_worldspawn() -> None:
+def fix_worldspawn(vmf: VLib.VMF) -> None:
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
-    if VMF.spawn['paintinmap'] != '1':
+    if vmf.spawn['paintinmap'] != '1':
         # If PeTI thinks there should be paint, don't touch it
         # Otherwise set it based on the 'gel' voice attribute
         # If the game is Aperture Tag, it's always forced on
-        VMF.spawn['paintinmap'] = srctools.bool_as_int(
+        vmf.spawn['paintinmap'] = srctools.bool_as_int(
             settings['has_attr']['gel'] or
             options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
-    VMF.spawn['skyname'] = options.get(str, 'skybox')
+    vmf.spawn['skyname'] = options.get(str, 'skybox')
 
 
 def make_vrad_config(is_peti: bool) -> None:
@@ -1757,7 +1731,7 @@ def make_vrad_config(is_peti: bool) -> None:
             f.write(line)
 
 
-def instance_symlink():
+def instance_symlink() -> None:
     """On OS X and Linux, Valve broke VBSP's instances/ finding code.
 
     We need to symlink maps/styled/instances/ -> maps/instances/ to allow
@@ -2051,9 +2025,9 @@ def main() -> None:
             ant_wall,
         )
 
-        MAP_RAND_SEED = calc_rand_seed()
+        MAP_RAND_SEED = calc_rand_seed(vmf)
 
-        all_inst = get_map_info()
+        all_inst = get_map_info(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'])
 
@@ -2074,14 +2048,14 @@ def main() -> None:
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
         conditions.check_all()
-        add_extra_ents(GAME_MODE)
+        add_extra_ents(vmf, GAME_MODE)
 
-        change_ents()
+        change_ents(vmf)
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
-        change_overlays()
+        change_overlays(vmf)
         barriers.make_barriers(vmf)
-        fix_worldspawn()
+        fix_worldspawn(vmf)
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:
