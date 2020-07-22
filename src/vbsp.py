@@ -19,17 +19,20 @@ import srctools.vmf as VLib
 import srctools.run
 import srctools.logger
 from precomp import (
-    instance_traits, tiling, brushLoc, bottomlessPit,
+    instance_traits,
+    brushLoc,
+    bottomlessPit,
     instanceLocs,
     cubes,
+    template_brush,
     texturing,
+    tiling,
     barriers,
     connections,
     options,
     faithplate,
     antlines,
     packing,
-    template_brush,
     conditions,
     fizzler,
     voice_line,
