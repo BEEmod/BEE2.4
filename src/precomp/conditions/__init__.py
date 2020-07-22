@@ -168,12 +168,13 @@ class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
-# Flag to indicate a result doesn't need to be exectuted anymore,
+# Flag to indicate a result doesn't need to be executed anymore,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
 
 
 class Condition:
+    """A single condition which may be evaluated."""
     __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
 
     def __init__(
@@ -190,7 +191,7 @@ class Condition:
         self.priority = priority
         self.source = source
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             'Condition(flags={!r}, '
             'results={!r}, else_results={!r}, '
@@ -938,11 +939,10 @@ def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
             value = inst.fixup[value]
         else:
             LOGGER.warning(
-                'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
+                'Invalid fixup ({}) in the "{}" instance:\n{}',
                 value,
                 inst['targetname'],
                 inst,
-                inst.fixup._fixup
             )
             value = ''
 
@@ -1140,7 +1140,7 @@ def res_sub_condition(base_inst: Entity, res: Property):
 
 
 @make_result('nextInstance')
-def res_break():
+def res_break() -> None:
     """Skip to the next instance.
 
     The value will be ignored.
@@ -1149,7 +1149,7 @@ def res_break():
 
 
 @make_result('endCondition', 'nextCondition')
-def res_end_condition():
+def res_end_condition() -> None:
     """Skip to the next condition.
 
     The value will be ignored.
