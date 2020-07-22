@@ -517,6 +517,48 @@ class Panel:
 
         all_brushes: List[Solid] = []
 
+        if self.pan_type.is_flip:
+            # Two surfaces, forward and backward - each is 4 thick.
+            invert_black = self.pan_type is PanelType.FLIP_INVERT
+            back_subtiles = {
+                uv: (
+                    tile_type.inverted
+                    if invert_black or tile_type.color is Portalable.WHITE else
+                    tile_type
+                ) for uv, tile_type in sub_tiles.items()
+            }
+            # If facing black first, use that side.
+            if not self.inst.fixup.bool(consts.FixupVars.ST_DEPLOYED):
+                back_subtiles, sub_tiles = sub_tiles, back_subtiles
+
+            # Now, we need to flip this across the appropriate axis to
+            # replicate rotation.
+            u_ax, v_ax = Vec.INV_AXIS[tile.normal.axis()]
+            rot_flag = srctools.conv_int(self.brush_ent['spawnflags'])
+            if rot_flag & 64:
+                rot_axis = 'x'
+            elif rot_flag & 128:
+                rot_axis = 'y'
+            else:
+                rot_axis = 'z'
+            if rot_axis == v_ax:
+                back_subtiles = {
+                    (3-u, v): tile_type
+                    for (u, v), tile_type in back_subtiles.items()
+                }
+            elif rot_axis == u_ax:
+                back_subtiles = {
+                    (u, 3-v): tile_type
+                    for (u, v), tile_type in back_subtiles.items()
+                }
+            else:
+                LOGGER.warning(
+                    'Flip panel "{}" rotates on normal axis??',
+                    self.brush_ent['targetname'],
+                )
+        else:  # Should never be needed, but makes typecheck happy.
+            back_subtiles = sub_tiles
+
         faces, brushes = tile.gen_multitile_pattern(
             vmf,
             sub_tiles,
@@ -544,23 +586,15 @@ class Panel:
                         side.scale = 0.25
 
         if self.pan_type.is_flip:
-            # Two surfaces, forward and backward - each is 4 thick.
-            invert_black = self.pan_type is PanelType.FLIP_INVERT
-            inv_subtiles = {
-                uv: (
-                    tile_type.inverted
-                    if invert_black or tile_type.color is Portalable.WHITE else
-                    tile_type
-                ) for uv, tile_type in sub_tiles.items()
-            }
             back_faces, brushes = tile.gen_multitile_pattern(
                 vmf,
-                inv_subtiles,
+                back_subtiles,
                 is_wall,
                 self.bevels,
                 -tile.normal,
                 thickness=self.thickness,
                 offset=64 - 2*self.thickness,
+                is_panel=True,
                 add_bullseye=use_bullseye and not is_static,
                 interior_bevel=False,  # User must specify this themselves.
             )
