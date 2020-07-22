@@ -27,7 +27,7 @@ from typing import (
 LOGGER = srctools.logger.get_logger(__name__, alias='template')
 
 # A lookup for templates.
-TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]
+_TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]
 
 # The location of the template data.
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
@@ -35,7 +35,7 @@ TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 class InvalidTemplateName(LookupError):
     """Raised if a template ID is invalid."""
-    def __init__(self, temp_name):
+    def __init__(self, temp_name: str) -> None:
         self.temp_name = temp_name
 
     def __str__(self):
@@ -45,7 +45,7 @@ class InvalidTemplateName(LookupError):
             '\n'.join(
                 (' * "' + temp.upper() + '"')
                 for temp in
-                sorted(TEMPLATES.keys())
+                sorted(_TEMPLATES.keys())
             ),
         )
 
@@ -452,7 +452,7 @@ def load_templates() -> None:
 
     for ent in vmf.by_class['bee2_template_scaling']:
         temp = ScalingTemplate.parse(ent)
-        TEMPLATES[temp.id.casefold()] = temp
+        _TEMPLATES[temp.id.casefold()] = temp
 
     for ent in vmf.by_class['bee2_template_colorpicker']:
         # Parse the colorpicker data.
@@ -540,7 +540,7 @@ def load_templates() -> None:
             overlay_faces = conf['overlay_faces'].split()
             skip_faces = conf['skip_faces'].split()
 
-        TEMPLATES[temp_id.casefold()] = Template(
+        _TEMPLATES[temp_id.casefold()] = Template(
             temp_id,
             world_ents[temp_id],
             detail_ents[temp_id],
@@ -554,10 +554,10 @@ def load_templates() -> None:
         )
 
 
-def get_template(temp_name) -> Template:
+def get_template(temp_name: str) -> Template:
     """Get the data associated with a given template."""
     try:
-        temp = TEMPLATES[temp_name.casefold()]
+        temp = _TEMPLATES[temp_name.casefold()]
     except KeyError:
         raise InvalidTemplateName(temp_name) from None
 
@@ -732,7 +732,7 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
     temp_name, over_names = parse_temp_name(temp_id)
 
     try:
-        temp = TEMPLATES[temp_name.casefold()]
+        temp = _TEMPLATES[temp_name.casefold()]
     except KeyError:
         raise InvalidTemplateName(temp_name) from None
 
