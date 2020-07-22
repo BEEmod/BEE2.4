@@ -7,12 +7,12 @@ import shutil
 import math
 import re
 from collections import defaultdict
-from enum import Enum
 
 import srctools
 from app import tkMarkdown
 import utils
 from app.packageMan import PACK_CONFIG
+from consts import MusicChannel
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
@@ -147,14 +147,6 @@ VPK_FOLDER = {
     # This doesn't have VPK files, and is higher priority.
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
-
-
-class MusicChannel(Enum):
-    """Categories that can have music."""
-    BASE = 'base'  # Main track
-    TBEAM = 'tbeam'  # Funnel audio
-    BOUNCE = 'BounceGel'  # Jumping on repulsion gel.
-    SPEED = 'SpeedGel'  # Moving fast horizontally
 
 
 class SignStyle(NamedTuple):

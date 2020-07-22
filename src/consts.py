@@ -6,13 +6,13 @@ from srctools import Side
 __all__ = [
     'MaterialGroup',
 
-    'ItemClass',
+    'ItemClass', 'MusicChannel',
 
     'WhitePan', 'BlackPan',
     'Signage', 'Antlines',
     'Goo', 'Fizzler',
     'Special', 'Tools',
-    'FixupVars'
+    'FixupVars',
 ]
 
 
@@ -253,3 +253,11 @@ class Fizzler(MaterialGroup):
     LEFT = "effects/fizzler_l"
     RIGHT = "effects/fizzler_r"
     SHORT = "effects/fizzler"
+
+
+class MusicChannel(Enum):
+    """Categories of music."""
+    BASE = 'base'  # Main track
+    TBEAM = 'tbeam'  # Funnel audio
+    BOUNCE = 'BounceGel'  # Jumping on repulsion gel.
+    SPEED = 'SpeedGel'  # Moving fast horizontally

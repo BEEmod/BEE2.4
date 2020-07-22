@@ -20,6 +20,7 @@ import packageLoader
 from app import img
 from app import itemconfig
 import utils
+import consts
 from app import (
     tk_tools,
     SubPane,
@@ -2044,7 +2045,7 @@ def init_windows() -> None:
         sugg = style_obj.suggested
         win_types = (
             voice_win,
-            music_conf.WINDOWS[music_conf.MusicChannel.BASE],
+            music_conf.WINDOWS[consts.MusicChannel.BASE],
             skybox_win,
             elev_win,
         )
