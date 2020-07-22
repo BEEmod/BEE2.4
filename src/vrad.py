@@ -144,7 +144,6 @@ def main(argv: List[str]) -> None:
     else:
         LOGGER.info('Config Loaded!')
 
-
     for a in fast_args[:]:
         folded_a = a.casefold()
         if folded_a.casefold() in (
@@ -178,6 +177,11 @@ def main(argv: List[str]) -> None:
         raise ValueError('"{}" does not exist!'.format(path))
     if not os.path.isfile(path):
         raise ValueError('"{}" is not a file!'.format(path))
+
+    LOGGER.info('Reading BSP')
+    bsp_file = BSP(path)
+
+    bsp_ents = bsp_file.read_ent_data()
 
     # If VBSP thinks it's hammer, trust it.
     if conf.bool('is_hammer', False):
@@ -223,11 +227,6 @@ def main(argv: List[str]) -> None:
         if 'bee2' in child_sys[0].path.casefold():
             fsys.systems.remove(child_sys)
             fsys.systems.insert(0, child_sys)
-
-    LOGGER.info('Reading BSP')
-    bsp_file = BSP(path)
-
-    bsp_ents = bsp_file.read_ent_data()
 
     zip_data = BytesIO()
     zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
