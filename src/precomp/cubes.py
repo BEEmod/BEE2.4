@@ -1074,8 +1074,6 @@ def link_cubes(vmf: VMF):
     inst_to_type = {}  # type: Dict[str, Union[CubeType, DropperType]]
 
     for obj_type in itertools.chain(CUBE_TYPES.values(), DROPPER_TYPES.values()):
-        if not obj_type.instances:
-            continue
         for inst in obj_type.instances:
             inst_to_type[inst] = obj_type
 
