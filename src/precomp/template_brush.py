@@ -1083,7 +1083,7 @@ def retexture_template(
                 texturing.apply(gen_type, face, tex_name)
 
                 if tex_name in ('goo', 'goo_cheap'):
-                    if norm != (0, 0, 1):
+                    if norm != (0, 0, -1):
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
                         # all faces goo to work in multiple orientations.
