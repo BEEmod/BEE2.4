@@ -259,5 +259,5 @@ class MusicChannel(Enum):
     """Categories of music."""
     BASE = 'base'  # Main track
     TBEAM = 'tbeam'  # Funnel audio
-    BOUNCE = 'BounceGel'  # Jumping on repulsion gel.
-    SPEED = 'SpeedGel'  # Moving fast horizontally
+    BOUNCE = 'bouncegel'  # Jumping on repulsion gel.
+    SPEED = 'speedgel'  # Moving fast horizontally

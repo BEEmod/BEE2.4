@@ -1,14 +1,21 @@
 """Handles adding music to the level."""
-from typing import Set, Dict, Iterable
+from typing import Dict, List
 
 from srctools import VMF, Vec, Property, Output
 from precomp import options
+from consts import MusicChannel as Channel
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-def add(vmf: VMF, loc: Vec, conf: Property, voice_attr: Dict[str, str], is_sp: bool) -> None:
+def add(
+    vmf: VMF,
+    loc: Vec,
+    conf: Property,
+    voice_attr: Dict[str, str],
+    is_sp: bool,
+) -> None:
     """Add music to the map."""
     LOGGER.info("Adding Music...")
     # These values are exported by the BEE2 app, indicating the
@@ -54,7 +61,6 @@ def add(vmf: VMF, loc: Vec, conf: Property, voice_attr: Dict[str, str], is_sp: b
 
         # In either case, we need @music_restart to do that safely.
         if is_sp or snd_length > 0:
-
             music_restart = vmf.create_ent(
                 classname='logic_relay',
                 spawnflags='2',  # Allow fast retrigger.
@@ -107,6 +113,38 @@ def add(vmf: VMF, loc: Vec, conf: Property, voice_attr: Dict[str, str], is_sp: b
                 Output('OnTrigger', music, 'Volume', '10'),
             )
 
+        # Add the ents for the config itself.
+        # If the items aren't in the map, we can skip adding them.
+        # Speed-gel sounds also play when flinging, so keep it always.
+
+        funnel = conf.find_key('tbeam', [])
+        bounce = conf.find_key('bouncegel', [])
+
+        make_channel_conf(
+            vmf, loc,
+            Channel.BASE,
+            conf.find_key('base', []).as_array(),
+        )
+        make_channel_conf(
+            vmf, loc,
+            Channel.SPEED,
+            conf.find_key('speedgel', []).as_array(),
+        )
+        if 'funnel' in voice_attr or 'excursionfunnel' in voice_attr:
+            make_channel_conf(
+                vmf, loc,
+                Channel.TBEAM,
+                funnel.as_array(),
+                conf.bool('sync_funnel'),
+            )
+
+        if 'bouncegel' in voice_attr or 'bluegel' in voice_attr:
+            make_channel_conf(
+                vmf, loc,
+                Channel.BOUNCE,
+                bounce.as_array(),
+            )
+
     if inst:
         # We assume the instance is setup correct.
         vmf.create_ent(
@@ -117,3 +155,22 @@ def add(vmf: VMF, loc: Vec, conf: Property, voice_attr: Dict[str, str], is_sp: b
             file=inst,
             fixup_style='0',
         )
+
+
+def make_channel_conf(
+    vmf: VMF,
+    pos: Vec,
+    channel: Channel,
+    tracks: List[str],
+    sync: bool = False,
+) -> None:
+    """Embed the specified channel's data into the map via a custom ent."""
+    if tracks:
+        ent = vmf.create_ent(
+            'bee2_music_channel',
+            origin=pos,
+            channel=channel.value,
+            sync=sync,
+        )
+        for i, track in enumerate(tracks, 1):
+            ent[f'track{i:02}'] = track

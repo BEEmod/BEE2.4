@@ -1,11 +1,16 @@
 """Generates the soundscript for background music."""
-from typing import Set
+import itertools
+from typing import Dict, List
 from io import StringIO
 
-from srctools.sndscript import SND_CHARS
-from srctools.packlist import PackList
-from srctools import Property
 
+from srctools.sndscript import SND_CHARS
+from srctools.packlist import PackList, FileType
+from srctools.vmf import VMF
+from consts import MusicChannel as Channel
+import srctools.logger
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 # The starting section defining the name and volume.
 # SNDLVL_NONE means it's infinite range.
@@ -221,60 +226,62 @@ MUSIC_FUNNEL_UPDATE_STACK = """\
 }
 """
 
-def generate(data: Property, voice_attr: Set[str], pack_list: PackList) -> bytes:
+
+def generate(bsp: VMF, pack_list: PackList):
     """Generate a soundscript file for music."""
     # We also pack the filenames used for the tracks - that way funnel etc
     # only get packed when needed. Stock sounds are in VPKS or in aperturetag/,
     # we don't check there.
+    tracks: Dict[Channel, List[str]] = {}
+    sync_funnel = False
 
-    funnel = data.find_key('tbeam', '')
-    bounce = data.find_key('bouncegel', '')
-    speed = data.find_key('speedgel', '')
+    for conf_ent in bsp.by_class['bee2_music_channel']:
+        conf_ent.remove()
+        channel = Channel(conf_ent['channel'].casefold())
+        if channel is Channel.TBEAM:
+            sync_funnel = srctools.conv_bool(conf_ent['sync'])
 
-    sync_funnel = data.bool('sync_funnel')
+        track = []
+        for i in itertools.count(1):
+            snd = conf_ent[f'track{i:02}']
+            if not snd:
+                break
+            track.append(snd)
+        if track:
+            tracks[channel] = track
 
-    if 'base' not in data:
-        base = Property('base', 'bee2/silent_lp.wav')
+    if not tracks:
+        return None  # No music.
+
+    if Channel.BASE not in tracks:
+        tracks[Channel.BASE] = ['bee2/silent_lp.wav']
         # Don't sync to a 2-second sound.
         sync_funnel = False
-    else:
-        base = data.find_key('base')
-
-    # The sounds must be present, and the items should be in the map.
-    has_funnel = funnel.value and (
-        'funnel' in voice_attr or
-        'excursionfunnel' in voice_attr
-    )
-    has_bounce = bounce.value and (
-        'bouncegel' in voice_attr or
-        'bluegel' in voice_attr
-    )
-    # Speed-gel sounds also play when flinging, so keep it always.
 
     file = StringIO()
 
     # Write the base music track
     file.write(MUSIC_START.format(name='', vol='1'))
-    write_sound(file, base, pack_list, snd_prefix='#*')
+    write_sound(file, tracks[Channel.BASE], pack_list, snd_prefix='#*')
     file.write(MUSIC_BASE)
     # The 'soundoperators' section is still open now.
 
-    # Add the operators to play the auxilluary sounds..
-    if has_funnel:
+    # Add the operators to play the auxiliary sounds..
+    if Channel.TBEAM in tracks:
         file.write(MUSIC_FUNNEL_MAIN)
-    if has_bounce:
+    if Channel.BOUNCE in tracks:
         file.write(MUSIC_GEL_BOUNCE_MAIN)
-    if speed.value:
+    if Channel.SPEED in tracks:
         file.write(MUSIC_GEL_SPEED_MAIN)
 
     # End the main sound block
     file.write(MUSIC_END)
 
-    if has_funnel:
+    if Channel.TBEAM in tracks:
         # Write the 'music.BEE2_funnel' sound entry
         file.write('\n')
         file.write(MUSIC_START.format(name='_funnel', vol='1'))
-        write_sound(file, funnel, pack_list, snd_prefix='*')
+        write_sound(file, tracks[Channel.TBEAM], pack_list)
         # Some tracks want the funnel music to sync with the normal
         # track, others randomly choose a start.
         file.write(
@@ -284,29 +291,33 @@ def generate(data: Property, voice_attr: Set[str], pack_list: PackList) -> bytes
         )
         file.write(MUSIC_FUNNEL_UPDATE_STACK)
 
-    if has_bounce:
+    if Channel.BOUNCE in tracks:
         file.write('\n')
         file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
-        write_sound(file, bounce, pack_list, snd_prefix='*')
+        write_sound(file, tracks[Channel.BOUNCE], pack_list)
         # Fade in fast (we never get false positives, but fade out slow
         # since this disables when falling back..
         file.write(MUSIC_GEL_STACK.format(fadein=0.25, fadeout=1.5))
 
-    if speed.value:
+    if Channel.SPEED in tracks:
         file.write('\n')
         file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
-        write_sound(file, speed, pack_list, snd_prefix='*')
+        write_sound(file, tracks[Channel.SPEED], pack_list)
         # We need to shut off the sound fast, so portals don't confuse it.
         # Fade in slow so it doesn't make much sound (and also as we get
         # up to speed). We stop almost immediately on gel too.
         file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
 
-    return file.getvalue().encode()
+    pack_list.pack_file(
+        'scripts/BEE2_generated_music.txt',
+        FileType.SOUNDSCRIPT,
+        data=file.getvalue().encode()
+    )
 
 
 def write_sound(
     file: StringIO,
-    snds: Property,
+    snds: List[str],
     pack_list: PackList,
     snd_prefix: str='*',
 ) -> None:
@@ -314,22 +325,22 @@ def write_sound(
 
     snd_prefix is the prefix for each filename - *, #, @, etc.
     """
-    if snds.has_children():
+    if len(snds) > 1:
         file.write('"rndwave"\n\t{\n')
         for snd in snds:
             file.write(
                 '\t"wave" "{sndchar}{file}"\n'.format(
-                    file=snd.value.lstrip(SND_CHARS),
+                    file=snd.lstrip(SND_CHARS),
                     sndchar=snd_prefix,
                 )
             )
-            pack_list.pack_file('sound/' + snd.value.casefold())
+            pack_list.pack_file('sound/' + snd.casefold())
         file.write('\t}\n')
     else:
         file.write(
             '"wave" "{sndchar}{file}"\n'.format(
-                file=snds.value.lstrip(SND_CHARS),
+                file=snds[0].lstrip(SND_CHARS),
                 sndchar=snd_prefix,
             )
         )
-        pack_list.pack_file('sound/' + snds.value.casefold())
+        pack_list.pack_file('sound/' + snds[0].casefold())

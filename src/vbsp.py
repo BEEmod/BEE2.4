@@ -183,7 +183,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
         )
     }
 
-    settings['music_conf'] = conf['MusicScript', []]
+    settings['music_conf'] = conf.find_key('MusicScript', [])
 
     # Bottomless pit configuration
     pit = conf.find_key("bottomless_pit", [])
@@ -1604,16 +1604,6 @@ def make_vrad_config(is_peti: bool) -> None:
                 'packfile_dump_dir',
                 ''
             )
-
-        # Copy over the voice attributes
-        conf['VoiceAttr'] = ';'.join(
-            key
-            for key, value in
-            settings['has_attr'].items()
-            if value
-        )
-
-        import precomp.conditions.piston_platform
 
         # This generates scripts and might need to tell VRAD.
         cubes.write_vscripts(conf)

@@ -227,16 +227,8 @@ def main(argv: List[str]) -> None:
             packlist.load_soundscript(soundscript, always_include=False)
 
     if is_peti:
-        LOGGER.info('Adding special packed files:')
-        voice_attr = set(conf['VoiceAttr', ''].casefold().split(';'))
-
-        music_data = conf.find_key('MusicScript', [])
-        if music_data:
-            packlist.pack_file(
-                'scripts/BEE2_generated_music.txt',
-                PackType.SOUNDSCRIPT,
-                data=music.generate(music_data, voice_attr, packlist)
-            )
+        LOGGER.info('Checking for music:')
+        music.generate(bsp_ents, packlist)
 
         for prop in conf.find_children('InjectFiles'):
             filename = os.path.join('bee2', 'inject', prop.real_name)
