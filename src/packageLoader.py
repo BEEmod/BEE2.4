@@ -28,6 +28,7 @@ from typing import (
     Dict, List, Tuple, Set, Match,
     NamedTuple, Collection,
     Iterable, Iterator,
+    FrozenSet,
 )
 
 
@@ -2521,12 +2522,13 @@ class Music(PakObject):
             )
 
     @classmethod
-    def post_parse(cls):
+    def post_parse(cls) -> None:
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
         """
-        sounds = {}  # type: Dict[str, str]
+        sounds: Dict[FrozenSet[str], str] = {}
+
         for music in cls.all():
             for channel in MusicChannel:
                 # Base isn't present in this.
@@ -2544,20 +2546,22 @@ class Music(PakObject):
                         )
                 # Look for tracks used in two items, indicates
                 # they should be children of one...
-                for sound in music.sound[channel]:
-                    sound = sound.casefold()
-                    try:
-                        other_id = sounds[sound]
-                    except KeyError:
-                        sounds[sound] = music.id
-                    else:
-                        if music.id != other_id:
-                            LOGGER.warning(
-                                'Sound "{}" was reused in "{}" <> "{}".',
-                                sound,
-                                music.id,
-                                other_id
-                            )
+                soundset = frozenset(map(str.casefold, music.sound[channel]))
+                if not soundset:
+                    continue # Blank shouldn't match blanks...
+
+                try:
+                    other_id = sounds[soundset]
+                except KeyError:
+                    sounds[soundset] = music.id
+                else:
+                    if music.id != other_id:
+                        LOGGER.warning(
+                            'Music tracks were reused in "{}" <> "{}": \n{}',
+                            music.id,
+                            other_id,
+                            sorted(soundset)
+                        )
 
 
 class Signage(PakObject, allow_mult=True, has_img=False):
