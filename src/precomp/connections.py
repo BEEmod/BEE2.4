@@ -1563,8 +1563,10 @@ def add_item_inputs(
 
     if needs_counter:
         if logic_type.is_logic:
-            # Logic items are the counter.
+            # Logic items are just the counter. The instance is useless, so
+            # remove that from the map.
             counter_name = item.name
+            item.inst.remove()
         else:
             counter_name = item.name + COUNTER_NAME[count_var]
 
@@ -1591,7 +1593,6 @@ def add_item_inputs(
         elif logic_type.is_logic:
             # We don't add outputs here, the outputted items do that.
             # counter is item.inst, so those are added to that.
-            LOGGER.info('LOGIC counter: {}', counter['targetname'])
             return
         else:
             # Should never happen, not other types.
