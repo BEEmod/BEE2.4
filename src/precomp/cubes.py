@@ -634,6 +634,7 @@ def parse_filter_types(
     * <any> to detect all cube types (including franken)
     * <companion> to detect 'companion' items.
     * <sphere> to detect sphere-type items.
+    * <reflect> to detect reflection-type items.
 
     This returns 3 sets of CubeTypes - all cubes, ones to include, and ones
     to exclude.
@@ -672,6 +673,13 @@ def parse_filter_types(
                 for cube in all_cubes:
                     if cube.type is CubeEntType.sphere:
                         targ_set.add(cube)
+            elif cube_id in ('reflect', 'reflection'):
+                for cube in all_cubes:
+                    if cube.type is CubeEntType.reflect:
+                        targ_set.add(cube)
+            # The other entity types don't have special behaviour really.
+            else:
+                raise KeyError('Unknown special cube type "<{}>"', cube_id)
         else:
             try:
                 cube = CUBE_TYPES[cube_id]
