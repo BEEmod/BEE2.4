@@ -273,6 +273,35 @@
 	choreo20(scene) : "Scene" : : "Random line to use."
 	]
 
+@PointClass
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+= bee2_cube_filter_script:
+	"Stores models used for VScript cube filters."
+	[
+	filename(string) : "Filename" : : "The filename to produce."
+	function(string) : "Function" : : "The name of the function generated."
+	mdl01(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl02(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl03(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl04(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl05(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl06(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl07(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl08(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl09(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl10(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl11(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl12(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl13(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl14(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl15(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl16(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl17(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl18(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl19(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl20(studio) : "Model" : : "A model that satisfies the predicate."
+	]
+
 
 @AutoVisGroup = "BEE2"
 	[
@@ -294,6 +323,7 @@
 		[
 		"bee2_music_channel"
 		"bee2_coop_response"
+		"bee2_cube_filter_script"
 		]
 	]
 

@@ -79,21 +79,6 @@ CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
 ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
 
-# For filtering, we use this class. It stores the table of values, and then
-# provides a __call__()-style method to check if an ent matches the models.
-
-VSCRIPT_CLOSURE = '''\
-class __BEE2_CUBE_FUNC__{
-\ttable = null;
-\tconstructor(table) {
-\t\tthis.table = table;
-\t}
-\tfunction _call(this2, ent) {
-\t\treturn ent.GetModelName().tolower() in this.table;
-\t}
-}
-'''
-
 
 class CubeEntType(Enum):
     """Cube types, as set on prop_weighted_cube.
@@ -1002,7 +987,7 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
 
 
 @make_result('VScriptCubePredicate')
-def res_script_cube_predicate(res: Property):
+def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> None:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
     This produces a script to include, which will define the specified function
@@ -1033,13 +1018,6 @@ def res_script_cube_predicate(res: Property):
     if script_filename[-4:] != '.nut':
         script_filename += '.nut'
 
-    try:
-        buffer = CUBE_SCRIPT_FILTERS[script_filename]
-    except KeyError:
-        CUBE_SCRIPT_FILTERS[script_filename] = buffer = io.StringIO()
-        # Write our starting code.
-        buffer.write(VSCRIPT_CLOSURE)
-
     all_cubes, inclusions, exclusions = parse_filter_types([
         prop.value for prop in res.find_all('Cube')
     ])
@@ -1051,15 +1029,19 @@ def res_script_cube_predicate(res: Property):
         cube_type.add_models(models)
 
     # Normalise the names to a consistent format.
-    model_names = {
+    model_names = list({
         model.lower().replace('\\', '/')
         for model in models
-    }
+    })
 
-    buffer.write(script_function + ' <- __BEE2_CUBE_FUNC__({\n')
-    for model in model_names:
-        buffer.write(' ["{}"]=1,\n'.format(model))
-    buffer.write('});\n')
+    conf_ent = vmf.create_ent(
+        'bee2_cube_filter_script',
+        origin=ent['origin'],
+        filename=script_filename,
+        function=script_function,
+    )
+    for i, model in enumerate(model_names, 1):
+        conf_ent[f'mdl{i:02}'] = model
 
     return RES_EXHAUSTED
 

@@ -21,7 +21,7 @@ from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
     FileSystem,
 )
-from srctools.packlist import PackList, FileType as PackType, load_fgd
+from srctools.packlist import PackList, load_fgd
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
 
@@ -29,6 +29,7 @@ from postcomp import (
     music,
     screenshot,
     coop_responses,
+    filter,
 )
 
 
