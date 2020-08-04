@@ -1713,6 +1713,7 @@ def add_item_indicators(
                         ) or pan,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
+                        delay=cmd.delay,
                         inst_in=cmd.inst_in,
                         times=cmd.times,
                     )
