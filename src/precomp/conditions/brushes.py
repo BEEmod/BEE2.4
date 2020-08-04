@@ -275,8 +275,8 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
     point2.z -= 64
 
     # Rotate to match the instance
-    point1.rotate_by_str(inst['angles'])
-    point2.rotate_by_str(inst['angles'])
+    point1 = point1.rotate_by_str(inst['angles'])
+    point2 = point2.rotate_by_str(inst['angles'])
 
     origin = Vec.from_str(inst['origin'])
     point1 += origin  # Then offset to the location of the instance

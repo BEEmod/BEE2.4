@@ -44,7 +44,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         return
 
     move_dir = Vec(1, 0, 0).rotate_by_str(inst.fixup['$travel_direction'])
-    move_dir.rotate_by_str(inst['angles'])
+    move_dir = move_dir.rotate_by_str(inst['angles'])
     start_offset = inst.fixup.float('$starting_position')
     teleport_to_start = res.bool('TrackTeleport', True)
     segment_inst_file = instanceLocs.resolve_one(res['SegmentInst', ''])

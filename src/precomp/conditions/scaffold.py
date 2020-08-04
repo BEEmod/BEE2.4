@@ -54,7 +54,7 @@ def get_config(
                 else '$bottom_level'
             ]
         )
-    offset.rotate_by_str(node.inst['angles'])
+    offset = offset.rotate_by_str(node.inst['angles'])
     offset += Vec.from_str(node.inst['origin'])
     return orient, offset
 

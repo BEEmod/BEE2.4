@@ -244,9 +244,8 @@ def res_rand_inst_shift(inst: Entity, res: Property) -> None:
         random.uniform(min_x, max_x),
         random.uniform(min_y, max_y),
         random.uniform(min_z, max_z),
-    )
+    ).rotate_by_str(inst['angles'])
 
-    offset.rotate_by_str(inst['angles'])
     origin = Vec.from_str(inst['origin'])
     origin += offset
     inst['origin'] = origin
