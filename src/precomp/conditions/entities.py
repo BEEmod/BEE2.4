@@ -74,6 +74,12 @@ def res_insert_overlay(vmf: VMF, inst: Entity, res: Property) -> None:
     origin += offset.copy().rotate_by_str(
         inst['angles', '0 0 0']
     )
+    
+    for axis, norm in enumerate(normal):
+        # Align to the center of the block grid. The normal direction is
+        # already correct.
+        if norm == 0:
+            face_pos[axis] = face_pos[axis] // 128 * 128 + 64
 
     # Shift so that the user perceives the position as the pos of the face
     # itself.
