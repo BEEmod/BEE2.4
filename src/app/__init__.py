@@ -1,12 +1,12 @@
 """The package containg all UI code."""
 import tkinter as tk
 from types import TracebackType
+from typing import Type
+from utils import BEE_VERSION
+
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
-from typing import Type
-
-
 TK_ROOT = tk.Tk()
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
@@ -91,7 +91,7 @@ def on_error(
     try:
         from tkinter import messagebox
         messagebox.showinfo(
-            title='BEE2 Error!',
+            title='BEEMOD {} Error!'.format(BEE_VERSION),
             message='An error occurred: \n{}\n\nThis has '
                     'been copied to the clipboard.'.format(err),
             icon=messagebox.ERROR,
