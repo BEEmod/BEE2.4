@@ -5,6 +5,7 @@ from tkinter import messagebox  # simple, standard modal dialogs
 import itertools
 import operator
 import random
+import math
 
 from srctools import Property
 from app import music_conf, TK_ROOT
@@ -1601,30 +1602,28 @@ def flow_picker(e=None):
 
     for item in (it for it in pal_items if not it.visible):
         item.place_forget()
-    height = (num_items // width + 1) * 65 + 2
-    pal_canvas['scrollregion'] = (
-        0,
-        0,
-        width * 65,
-        height,
-    )
+
+    height = int(math.ceil(num_items / width)) * 65 + 2
+    pal_canvas['scrollregion'] = (0, 0, width * 65, height)
     frmScroll['height'] = height
 
-    # This adds extra blank items on the end to finish the grid nicely.
-    for i in range(width):
+    # Now, add extra blank items on the end to finish the grid nicely.
+    # pal_items_fake allows us to recycle existing icons.
+    last_row = num_items % width
+    # Special case, don't add a full row if it's exactly the right count.
+    extra_items = (width - last_row) if last_row != 0 else 0
+
+    y = (num_items // width)*65 + offset + 1
+    for i in range(extra_items):
         if i not in pal_items_fake:
             pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
-        if (num_items % width) <= i < width:  # if this space is empty
-            pal_items_fake[i].place(
-                x=((i % width)*65 + 1),
-                y=(num_items // width)*65 + offset + 1,
-            )
+        pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
-    for item in pal_items_fake[width:]:
+    for item in pal_items_fake[extra_items:]:
         item.place_forget()
 
 
-def init_drag_icon():
+def init_drag_icon() -> None:
     drag_win = Toplevel(TK_ROOT)
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
