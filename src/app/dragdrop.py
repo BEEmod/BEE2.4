@@ -368,8 +368,24 @@ class Manager(Generic[ItemT]):
 # noinspection PyProtectedMember
 class Slot(Generic[ItemT]):
     """Represents a single slot."""
+    # The two widgets shown at the bottom when moused over.
     _text_lbl: Optional[tkinter.Label]
     _info_btn: Optional[tkinter.Label]
+    # Our main widget.
+    _lbl: tkinter.Label
+
+    # The current thing in the slot.
+    _contents: Optional[ItemT]
+
+    # The geometry manager used to position this.
+    # Either 'pack', 'place', 'grid', or '_canvas_XX' to indicate
+    # we're on the canvas with ID XX.
+    _pos_type: Optional[str]
+
+    # If true, this can't be changed, and dragging out of it produces a second
+    # reference to the contents.
+    is_source: bool
+    man: Manager  # Our drag/drop controller.
 
     def __init__(
         self,
@@ -382,8 +398,8 @@ class Slot(Generic[ItemT]):
 
         self.man = man
         self.is_source = is_source
-        self._contents: Optional[ItemT] = None
-        self._pos_type: Optional[str] = None
+        self._contents = None
+        self._pos_type = None
         self._lbl = tkinter.Label(
             parent,
             image=man._img_blank,
