@@ -434,7 +434,10 @@ class PalItem(Label):
 
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
-    import sys
+    import sys, logging
+
+    LOGGER.info('Shutting down application.')
+
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
     if TK_ROOT.winfo_viewable():
@@ -447,7 +450,8 @@ def quit_application() -> None:
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
 
-    # Destroy the TK windows
+    # Destroy the TK windows, finalise logging, then quit.
+    logging.shutdown()
     TK_ROOT.quit()
     sys.exit(0)
 
