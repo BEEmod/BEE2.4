@@ -750,7 +750,7 @@ def suggested_refresh():
             UI['suggested_style'].state(['!disabled'])
 
 
-def refresh_pal_ui():
+def refresh_pal_ui() -> None:
     """Update the UI to show the correct palettes."""
     global selectedPalette
     cur_palette = paletteLoader.pal_list[selectedPalette]
@@ -780,6 +780,13 @@ def refresh_pal_ui():
                 background=tk_tools.LISTBOX_BG_COLOR,
                 selectbackground=tk_tools.LISTBOX_BG_SEL_COLOR,
             )
+
+    if len(paletteLoader.pal_list) < 2 or cur_palette.prevent_overwrite:
+        UI['pal_remove'].state(('disabled',))
+        menus['pal'].entryconfigure(1, state=DISABLED)
+    else:
+        UI['pal_remove'].state(('!disabled',))
+        menus['pal'].entryconfigure(1, state=NORMAL)
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -1232,20 +1239,24 @@ def pal_save(e=None) -> None:
 
 def pal_remove() -> None:
     global selectedPalette
-    if len(paletteLoader.pal_list) >= 2:
-        pal = paletteLoader.pal_list[selectedPalette]
-        if messagebox.askyesno(
-                title='BEE2',
-                message=_('Are you sure you want to delete "{}"?').format(
-                    pal.name,
-                ),
-                parent=TK_ROOT,
-                ):
-            pal.delete_from_disk()
-            del paletteLoader.pal_list[selectedPalette]
-            selectedPalette -= 1
-            selectedPalette_radio.set(selectedPalette)
-            refresh_pal_ui()
+    pal = paletteLoader.pal_list[selectedPalette]
+    # Don't delete if there's only 1, or it's readonly.
+    if len(paletteLoader.pal_list) < 2 or pal.prevent_overwrite:
+        return
+
+    if messagebox.askyesno(
+        title='BEE2',
+        message=_('Are you sure you want to delete "{}"?').format(
+            pal.name,
+        ),
+        parent=TK_ROOT,
+    ):
+        pal.delete_from_disk()
+        del paletteLoader.pal_list[selectedPalette]
+        selectedPalette -= 1
+        selectedPalette_radio.set(selectedPalette)
+        refresh_pal_ui()
+        set_palette()
 
 
 # UI functions, each accepts the parent frame to place everything in.
