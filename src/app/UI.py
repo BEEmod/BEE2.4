@@ -889,30 +889,34 @@ def export_editoritems(e=None):
             'Hammer to ensure editor wall previews are changed.'
         )
 
-    chosen_action = optionWindow.AfterExport(
-        optionWindow.AFTER_EXPORT_ACTION.get()
-    )
+    chosen_action = optionWindow.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
+    want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
 
-    # Launch first so quitting doesn't affect this.
-    if optionWindow.LAUNCH_AFTER_EXPORT.get():
-        if messagebox.askyesno(
+    if want_launch or chosen_action is not optionWindow.AfterExport.NORMAL:
+        do_action = messagebox.askyesno(
             'BEEMOD2',
-            message + _('\n Launch Game?'),
+            message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
             parent=TK_ROOT,
-        ):
-            gameMan.selected_game.launch()
-    else:
+        )
+    else:  # No action to do, so just show an OK.
         messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
+        do_action = False
 
     # Do the desired action - if quit, we don't bother to update UI.
-    if chosen_action is optionWindow.AfterExport.NORMAL:
-        pass
-    elif chosen_action is optionWindow.AfterExport.MINIMISE:
-        TK_ROOT.iconify()
-    elif chosen_action is optionWindow.AfterExport.QUIT:
-        utils.quit_app()
-    else:
-        raise ValueError('Unknown action "{}"'.format(chosen_action))
+    if do_action:
+        # Launch first so quitting doesn't affect this.
+        if want_launch:
+            gameMan.selected_game.launch()
+
+        if chosen_action is optionWindow.AfterExport.NORMAL:
+            pass
+        elif chosen_action is optionWindow.AfterExport.MINIMISE:
+            TK_ROOT.iconify()
+        elif chosen_action is optionWindow.AfterExport.QUIT:
+            quit_application()
+            # We never return from this.
+        else:
+            raise ValueError('Unknown action "{}"'.format(chosen_action))
 
     # Select the last_export palette, so reloading loads this item selection.
     paletteLoader.pal_list.sort(key=str)
