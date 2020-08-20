@@ -1,4 +1,4 @@
-# coding=utf-8
+"""Window for configuring BEE2's options, as well as the home of some options."""
 from collections import defaultdict
 from pathlib import Path
 
@@ -38,6 +38,18 @@ AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
 )
+
+# action, launching_game -> suffix on the message box.
+AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], str] = {
+    (AfterExport.NORMAL, False): '',
+    (AfterExport.NORMAL, True): _('\nLaunch Game?'),
+
+    (AfterExport.MINIMISE, False): _('\nMinimise BEE2?'),
+    (AfterExport.MINIMISE, True): _('\nLaunch Game and minimise BEE2?'),
+
+    (AfterExport.QUIT, False): _('\nQuit BEE2?'),
+    (AfterExport.QUIT, True): _('\nLaunch Game and quit BEE2?'),
+}
 
 refresh_callbacks: List[Callable[[], None]] = []  # functions called to apply settings.
 

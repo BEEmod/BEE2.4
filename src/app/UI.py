@@ -5,6 +5,7 @@ from tkinter import messagebox  # simple, standard modal dialogs
 import itertools
 import operator
 import random
+import math
 
 from srctools import Property
 from app import music_conf, TK_ROOT
@@ -434,7 +435,10 @@ class PalItem(Label):
 
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
-    import sys
+    import sys, logging
+
+    LOGGER.info('Shutting down application.')
+
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
     if TK_ROOT.winfo_viewable():
@@ -447,7 +451,8 @@ def quit_application() -> None:
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
 
-    # Destroy the TK windows
+    # Destroy the TK windows, finalise logging, then quit.
+    logging.shutdown()
     TK_ROOT.quit()
     sys.exit(0)
 
@@ -745,7 +750,7 @@ def suggested_refresh():
             UI['suggested_style'].state(['!disabled'])
 
 
-def refresh_pal_ui():
+def refresh_pal_ui() -> None:
     """Update the UI to show the correct palettes."""
     global selectedPalette
     cur_palette = paletteLoader.pal_list[selectedPalette]
@@ -775,6 +780,13 @@ def refresh_pal_ui():
                 background=tk_tools.LISTBOX_BG_COLOR,
                 selectbackground=tk_tools.LISTBOX_BG_SEL_COLOR,
             )
+
+    if len(paletteLoader.pal_list) < 2 or cur_palette.prevent_overwrite:
+        UI['pal_remove'].state(('disabled',))
+        menus['pal'].entryconfigure(1, state=DISABLED)
+    else:
+        UI['pal_remove'].state(('!disabled',))
+        menus['pal'].entryconfigure(1, state=NORMAL)
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -889,30 +901,34 @@ def export_editoritems(e=None):
             'Hammer to ensure editor wall previews are changed.'
         )
 
-    chosen_action = optionWindow.AfterExport(
-        optionWindow.AFTER_EXPORT_ACTION.get()
-    )
+    chosen_action = optionWindow.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
+    want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
 
-    # Launch first so quitting doesn't affect this.
-    if optionWindow.LAUNCH_AFTER_EXPORT.get():
-        if messagebox.askyesno(
+    if want_launch or chosen_action is not optionWindow.AfterExport.NORMAL:
+        do_action = messagebox.askyesno(
             'BEEMOD2',
-            message + _('\n Launch Game?'),
+            message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
             parent=TK_ROOT,
-        ):
-            gameMan.selected_game.launch()
-    else:
+        )
+    else:  # No action to do, so just show an OK.
         messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
+        do_action = False
 
     # Do the desired action - if quit, we don't bother to update UI.
-    if chosen_action is optionWindow.AfterExport.NORMAL:
-        pass
-    elif chosen_action is optionWindow.AfterExport.MINIMISE:
-        TK_ROOT.iconify()
-    elif chosen_action is optionWindow.AfterExport.QUIT:
-        utils.quit_app()
-    else:
-        raise ValueError('Unknown action "{}"'.format(chosen_action))
+    if do_action:
+        # Launch first so quitting doesn't affect this.
+        if want_launch:
+            gameMan.selected_game.launch()
+
+        if chosen_action is optionWindow.AfterExport.NORMAL:
+            pass
+        elif chosen_action is optionWindow.AfterExport.MINIMISE:
+            TK_ROOT.iconify()
+        elif chosen_action is optionWindow.AfterExport.QUIT:
+            quit_application()
+            # We never return from this.
+        else:
+            raise ValueError('Unknown action "{}"'.format(chosen_action))
 
     # Select the last_export palette, so reloading loads this item selection.
     paletteLoader.pal_list.sort(key=str)
@@ -1223,20 +1239,24 @@ def pal_save(e=None) -> None:
 
 def pal_remove() -> None:
     global selectedPalette
-    if len(paletteLoader.pal_list) >= 2:
-        pal = paletteLoader.pal_list[selectedPalette]
-        if messagebox.askyesno(
-                title='BEE2',
-                message=_('Are you sure you want to delete "{}"?').format(
-                    pal.name,
-                ),
-                parent=TK_ROOT,
-                ):
-            pal.delete_from_disk()
-            del paletteLoader.pal_list[selectedPalette]
-            selectedPalette -= 1
-            selectedPalette_radio.set(selectedPalette)
-            refresh_pal_ui()
+    pal = paletteLoader.pal_list[selectedPalette]
+    # Don't delete if there's only 1, or it's readonly.
+    if len(paletteLoader.pal_list) < 2 or pal.prevent_overwrite:
+        return
+
+    if messagebox.askyesno(
+        title='BEE2',
+        message=_('Are you sure you want to delete "{}"?').format(
+            pal.name,
+        ),
+        parent=TK_ROOT,
+    ):
+        pal.delete_from_disk()
+        del paletteLoader.pal_list[selectedPalette]
+        selectedPalette -= 1
+        selectedPalette_radio.set(selectedPalette)
+        refresh_pal_ui()
+        set_palette()
 
 
 # UI functions, each accepts the parent frame to place everything in.
@@ -1593,30 +1613,28 @@ def flow_picker(e=None):
 
     for item in (it for it in pal_items if not it.visible):
         item.place_forget()
-    height = (num_items // width + 1) * 65 + 2
-    pal_canvas['scrollregion'] = (
-        0,
-        0,
-        width * 65,
-        height,
-    )
+
+    height = int(math.ceil(num_items / width)) * 65 + 2
+    pal_canvas['scrollregion'] = (0, 0, width * 65, height)
     frmScroll['height'] = height
 
-    # This adds extra blank items on the end to finish the grid nicely.
-    for i in range(width):
+    # Now, add extra blank items on the end to finish the grid nicely.
+    # pal_items_fake allows us to recycle existing icons.
+    last_row = num_items % width
+    # Special case, don't add a full row if it's exactly the right count.
+    extra_items = (width - last_row) if last_row != 0 else 0
+
+    y = (num_items // width)*65 + offset + 1
+    for i in range(extra_items):
         if i not in pal_items_fake:
             pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
-        if (num_items % width) <= i < width:  # if this space is empty
-            pal_items_fake[i].place(
-                x=((i % width)*65 + 1),
-                y=(num_items // width)*65 + offset + 1,
-            )
+        pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
-    for item in pal_items_fake[width:]:
+    for item in pal_items_fake[extra_items:]:
         item.place_forget()
 
 
-def init_drag_icon():
+def init_drag_icon() -> None:
     drag_win = Toplevel(TK_ROOT)
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
