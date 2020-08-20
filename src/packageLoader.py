@@ -370,7 +370,7 @@ def find_packages(pak_dir: str) -> None:
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
                 find_packages(name)
             else:
-                LOGGER.warning('ERROR: Bad package "{}"!', name)
+                LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
             continue
         try:
