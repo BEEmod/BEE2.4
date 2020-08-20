@@ -130,7 +130,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
 
 
 @make_result('addCavePortrait')
-def res_cave_portrait(inst: Entity, res: Property):
+def res_cave_portrait(vmf: VMF, inst: Entity, res: Property) -> None:
     """A variant of AddOverlay for adding Cave Portraits.
 
     If the set quote pack is not Cave Johnson, this does nothing.
@@ -139,6 +139,6 @@ def res_cave_portrait(inst: Entity, res: Property):
     """
     skin = options.get(int, 'cave_port_skin')
     if skin is not None:
-        new_inst = res_add_overlay_inst(inst, res)
+        new_inst = res_add_overlay_inst(vmf, inst, res)
         if new_inst is not None:
             new_inst.fixup['$skin'] = skin
