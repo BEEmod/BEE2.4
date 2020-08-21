@@ -58,9 +58,9 @@ Switch to the srctools repo, and install the package:
 
 Finally, switch to the BEE2.4 repo and build the compiler, then the application:
 
-    cd BEE2.4/src/
-	pyinstaller --distpath ../dist/ --workpath ../build_tmp compiler.spec
+	cd BEE2.4/src/
 	pyinstaller --distpath ../dist/ --workpath ../build_tmp BEE2.spec
+	pyinstaller --distpath ../dist/BEE2/ --workpath ../build_tmp compiler.spec
 	
 The built application is found in `BEE2.4/dist/BEE2/`.
 Copy `BEE2.4/dist/BEE2/` into this folder as well.
