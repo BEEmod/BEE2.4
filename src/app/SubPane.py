@@ -1,6 +1,6 @@
 from typing import Callable, Any
 
-from tkinter import *
+import tkinter as tk
 from tkinter import ttk
 from BEE2_config import GEN_OPTS
 
@@ -23,8 +23,8 @@ style.configure(
 
 
 def make_tool_button(
-    frame: Misc,
-    img: PhotoImage,
+    frame: tk.Misc,
+    img: tk.PhotoImage,
     command: Callable[[], Any]
 ) -> ttk.Button:
     """Make a toolbar icon."""
@@ -38,25 +38,25 @@ def make_tool_button(
     return button
 
 
-class SubPane(Toplevel):
+class SubPane(tk.Toplevel):
     """A Toplevel window that can be shown/hidden.
 
      This follows the main window when moved.
     """
     def __init__(
         self,
-        parent: Misc,
+        parent: tk.Misc,
         *,
-        tool_frame: Frame,
-        tool_img: PhotoImage,
-        menu_bar: Menu,
+        tool_frame: tk.Frame,
+        tool_img: tk.PhotoImage,
+        menu_bar: tk.Menu,
         tool_col: int=0,
         title: str='',
         resize_x: bool=False,
         resize_y: bool=False,
         name: str='',
     ) -> None:
-        self.visible = BooleanVar(parent, True)
+        self.visible = tk.BooleanVar(parent, True)
         self.win_name = name
         self.allow_snap = False
         self.can_save = False
