@@ -71,7 +71,7 @@ class SubPane(Toplevel):
         self.tool_button = make_tool_button(
             frame=tool_frame,
             img=tool_img,
-            command=self.toggle_win,
+            command=self._toggle_win,
         )
         self.tool_button.state(('pressed',))
         self.tool_button.grid(
@@ -83,7 +83,12 @@ class SubPane(Toplevel):
         tooltip.add_tooltip(
             self.tool_button,
             text=_('Hide/Show the "{}" window.').format(title))
-        menu_bar.add_checkbutton(label=title, variable=self.visible, command=self.toggle_win)
+        menu_bar.add_checkbutton(
+            label=title,
+            variable=self.visible,
+            command=self._set_state_from_menu,
+        )
+
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
         self.title(title)
@@ -113,12 +118,23 @@ class SubPane(Toplevel):
         self.tool_button.state(('pressed',))
         self.follow_main()
 
-    def toggle_win(self) -> None:
+    def _toggle_win(self) -> None:
         """Toggle the window between shown and hidden."""
         if self.visible.get():
             self.hide_win()
         else:
             self.show_win()
+
+    def _set_state_from_menu(self) -> None:
+        """Called when the menu bar button is pressed.
+
+        This has already toggled the variable, so we just need to read
+        from it.
+        """
+        if self.visible.get():
+            self.show_win()
+        else:
+            self.hide_win()
 
     def move(self, x: int=None, y: int=None, width: int=None, height: int=None) -> None:
         """Move the window to the specified position.
