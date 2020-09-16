@@ -1042,6 +1042,26 @@ def retexture_template(
                 else:
                     face.uaxis = uaxis.copy()
                     face.vaxis = vaxis.copy()
+            elif orig_id in template.vertical_faces:
+                # Rotate the face in increments of 90 degress, so it is as
+                # upright as possible.
+                pos_u = face.uaxis
+                pos_v = face.vaxis
+                # If both are zero, we're on the floor/ceiling and this is
+                # pointless.
+                if pos_u.z != 0 or pos_v.z != 0:
+                    neg_u = UVAxis(-pos_u.x, -pos_u.y, -pos_u.z, pos_u.offset,
+                                   pos_u.scale)
+                    neg_v = UVAxis(-pos_v.x, -pos_v.y, -pos_v.z, pos_v.offset,
+                                   pos_v.scale)
+                    # Each row does u, v = v, -u to rotate 90 degrees.
+                    # We want whichever makes V point vertically.
+                    face.uaxis, face.vaxis = max([
+                        (pos_u, pos_v),
+                        (pos_v, neg_u),
+                        (neg_u, neg_v),
+                        (neg_v, pos_u),
+                    ], key=lambda uv: -uv[1].z)
 
             override_mat: Optional[List[str]]
             try:
