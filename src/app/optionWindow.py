@@ -447,9 +447,9 @@ def init_dev_tab(f: ttk.Frame) -> None:
         item='preserve_bee2_resource_dir',
         desc=_('Preserve Game Directories'),
         var=PRESERVE_RESOURCES,
-        tooltip=_('When exporting, do not overwrite \n"bee2/" and'
-                  '\n"sdk_content/maps/bee2/".\n'
-                  "Enable if you're"
+        tooltip=_('When exporting, do not copy resources to \n"bee2/" and'
+                  ' "sdk_content/maps/bee2/".\n'
+                  "Only enable if you're"
                   ' developing new content, to ensure it is not '
                   'overwritten.'),
     ).grid(row=0, column=1, sticky=W)
