@@ -15,13 +15,13 @@ from zipfile import ZipFile
 from typing import List, Set
 
 import srctools.run
-from srctools import Property
+from srctools import Property, FGD
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
     FileSystem,
 )
-from srctools.packlist import PackList, load_fgd
+from srctools.packlist import PackList
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
 
@@ -214,7 +214,7 @@ def main(argv: List[str]) -> None:
         LOGGER.debug('- {}: {!r}', child_sys[1], child_sys[0])
 
     LOGGER.info('Reading our FGD files...')
-    fgd = load_fgd()
+    fgd = FGD.engine_dbase()
 
     packlist = PackList(fsys)
     packlist.load_soundscript_manifest(
