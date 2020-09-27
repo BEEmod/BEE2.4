@@ -19,7 +19,7 @@ from app.tooltip import add_tooltip, set_tooltip
 from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, optionWindow
 import utils
 
 
@@ -1092,7 +1092,15 @@ class selWin:
             width, height = img.tuple_size(ICON_SIZE)
         self.prop_icon_frm.configure(width=width, height=height)
 
-        self.prop_desc.set_text(item.desc)
+        if optionWindow.DEV_MODE.get():
+            # Show the ID of the item in the description
+            text = tkMarkdown.convert(f'**ID:** {item.name or "NONE"}\n\n')
+            self.prop_desc.set_text(tkMarkdown.join(
+                text,
+                item.desc,
+            ))
+        else:
+            self.prop_desc.set_text(item.desc)
 
         self.selected.button.state(('!alternate',))
         self.selected = item
@@ -1148,7 +1156,7 @@ class selWin:
                         'Invalid attribute type: "{}"'.format(label.type)
                     )
 
-    def key_navigate(self, event):
+    def key_navigate(self, event: Event):
         """Navigate using arrow keys.
 
         Allowed keys are set in NAV_KEYS
