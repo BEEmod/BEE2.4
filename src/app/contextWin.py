@@ -21,6 +21,7 @@ import srctools.logger
 from app.richTextBox import tkRichText
 from app import (
     itemPropWin, itemconfig, tkMarkdown, tooltip, tk_tools,
+    optionWindow,
     sound,
     img,
     UI,
@@ -35,8 +36,8 @@ OPEN_IN_TAB = 2
 
 wid = {}
 
-selected_item = None  # type: UI.Item
-selected_sub_item = None  # type: UI.PalItem
+selected_item: 'UI.Item'
+selected_sub_item: 'UI.PalItem'
 is_open = False
 
 version_lookup = []
@@ -256,6 +257,12 @@ def load_item_data():
         )
     )
 
+    if optionWindow.DEV_MODE.get():
+        wid['item_id']['text'] = f'{selected_item.data.source} -> {selected_item.id}:{selected_sub_item.subKey}'
+        wid['item_id'].grid()
+    else:
+        wid['item_id'].grid_remove()
+
     if itemPropWin.can_edit(selected_item.properties()):
         wid['changedefaults'].state(['!disabled'])
     else:
@@ -446,6 +453,10 @@ def init_widgets():
     wid['name'] = ttk.Label(f, text="", anchor="center")
     wid['name'].grid(row=1, column=0, columnspan=3, sticky="EW")
 
+    wid['item_id'] = ttk.Label(f, text="", anchor="center")
+    wid['item_id'].grid(row=2, column=0, columnspan=3, sticky="EW")
+    tooltip.add_tooltip(wid['item_id'])
+
     wid['ent_count'] = ttk.Label(
         f,
         text="",
@@ -462,10 +473,10 @@ def init_widgets():
     )
 
     wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
-    wid['author'].grid(row=2, column=0, columnspan=3, sticky="EW")
+    wid['author'].grid(row=3, column=0, columnspan=3, sticky="EW")
 
     sub_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
-    sub_frame.grid(column=0, columnspan=3, row=3)
+    sub_frame.grid(column=0, columnspan=3, row=4)
     for i in range(5):
         wid['subitem', i] = ttk.Label(
             sub_frame,
@@ -488,7 +499,7 @@ def init_widgets():
     )
 
     spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
-    spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
+    spr_frame.grid(column=1, columnspan=2, row=5, sticky=W)
     # sprites: inputs, outputs, rotation handle, occupied/embed state,
     # desiredFacing
     for spr_id in SPR:
@@ -501,7 +512,7 @@ def init_widgets():
         tooltip.add_tooltip(sprite)
 
     desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
-    desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
+    desc_frame.grid(row=6, column=0, columnspan=3, sticky="EW")
     desc_frame.columnconfigure(0, weight=1)
 
     wid['desc'] = tkRichText(desc_frame, width=40, height=16)
@@ -539,7 +550,7 @@ def init_widgets():
             hide_context(None)
 
     wid['moreinfo'] = ttk.Button(f, text=_("More Info>>"), command=show_more_info)
-    wid['moreinfo'].grid(row=6, column=2, sticky=E)
+    wid['moreinfo'].grid(row=7, column=2, sticky=E)
     tooltip.add_tooltip(wid['moreinfo'])
 
     menu_info = Menu(wid['moreinfo'])
@@ -558,7 +569,7 @@ def init_widgets():
         text=_("Change Defaults..."),
         command=show_item_props,
         )
-    wid['changedefaults'].grid(row=6, column=1)
+    wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],
         _('Change the default settings for this item when placed.')
@@ -574,6 +585,6 @@ def init_widgets():
     wid['variant'].state(['readonly'])  # Prevent directly typing in values
     wid['variant'].bind('<<ComboboxSelected>>', set_item_version)
     wid['variant'].current(0)
-    wid['variant'].grid(row=6, column=0, sticky=W)
+    wid['variant'].grid(row=7, column=0, sticky=W)
 
     itemPropWin.init(hide_item_props)
