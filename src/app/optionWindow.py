@@ -34,6 +34,7 @@ FORCE_LOAD_ONTOP = BooleanVar(value=True, name='OPT_force_load_ontop')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
 PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
+DEV_MODE = BooleanVar(value=False, name='OPT_development_mode')
 AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
@@ -443,6 +444,16 @@ def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         f,
+        section='Debug',
+        item='development_mode',
+        var=DEV_MODE,
+        desc=_("Development Mode"),
+        tooltip=_('Enables displaying additional UI specific for '
+                  'development purposes.'),
+    ).grid(row=0, column=1, sticky=W)
+
+    make_checkbox(
+        f,
         section='General',
         item='preserve_bee2_resource_dir',
         desc=_('Preserve Game Directories'),
@@ -452,7 +463,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
                   "Only enable if you're"
                   ' developing new content, to ensure it is not '
                   'overwritten.'),
-    ).grid(row=0, column=1, sticky=W)
+    ).grid(row=1, column=1, sticky=W)
 
     make_checkbox(
         f,
@@ -461,7 +472,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         desc=_('Show Log Window'),
         var=SHOW_LOG_WIN,
         tooltip=_('Show the log file in real-time.'),
-    ).grid(row=1, column=1, sticky=W)
+    ).grid(row=2, column=1, sticky=W)
 
     make_checkbox(
         f,
@@ -471,7 +482,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         tooltip=_('Make all props_map_editor models available for use. '
                   'Portal 2 has a limit of 1024 models loaded in memory at '
                   'once, so we need to disable unused ones to free this up.'),
-    ).grid(row=2, column=1, sticky='w')
+    ).grid(row=3, column=1, sticky='w')
 
     ttk.Separator(orient='horizontal').grid(
         row=9, column=0, columnspan=2, sticky='ew'
