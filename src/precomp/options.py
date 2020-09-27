@@ -547,6 +547,11 @@ DEFAULTS = [
     ######
     # The following are set by the BEE2.4 app automatically:
 
+    Opt('dev_mode', False,
+        """Whether 'development mode' is enabled in the app.
+        
+        This enables extra outputs for assisting with package development.
+        """),
     Opt('game_id', "620",
         """(Automatic) The game's steam ID.
         """),

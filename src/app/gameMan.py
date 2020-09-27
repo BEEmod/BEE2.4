@@ -25,7 +25,7 @@ from srctools import (
     FileSystem, FileSystemChain,
 )
 import srctools.logger
-from app import backup, tk_tools, TK_ROOT
+from app import backup, optionWindow, tk_tools, TK_ROOT
 import loadScreen
 import packageLoader
 import utils
@@ -691,10 +691,8 @@ class Game:
 
                 export_screen.step('EXP')
 
-            vbsp_config.set_key(
-                ('Options', 'Game_ID'),
-                self.steamID,
-            )
+            vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
+            vbsp_config.set_key(('Options', 'dev_mode'), optionWindow.DEV_MODE.get())
 
             # If there are multiple of these blocks, merge them together.
             # They will end up in this order.
