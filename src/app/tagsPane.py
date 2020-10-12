@@ -86,9 +86,6 @@ def filter_items():
             )
     UI.flow_picker()
 
-# When exiting settings, we need to hide/show WIP items.
-optionWindow.refresh_callbacks.append(filter_items)
-
 
 def expand(_):
     """Expand the filter view."""
@@ -148,6 +145,8 @@ def add_tag(section: Section, tag: str, pretty: str=None):
 
 def init(frm):
     """Initialise the UI objects."""
+    # When exiting settings, we need to hide/show WIP items.
+    optionWindow.refresh_callbacks.append(filter_items)
 
     frm.bind('<Enter>', expand)
     frm.bind('<Leave>', contract)

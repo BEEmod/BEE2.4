@@ -1656,7 +1656,7 @@ def init_drag_icon() -> None:
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game: gameMan.Game):
+def set_game(game: 'gameMan.Game'):
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
