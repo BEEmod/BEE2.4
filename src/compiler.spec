@@ -19,17 +19,6 @@ else:
     suffix = ''
 
 
-# src -> build subfolder.
-data_files = [
-    # Add the FGD data for us.
-    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools'),
-    (os.path.join(srctools.__path__[0], 'srctools.fgd'), 'srctools'),
-
-]
-
-block_cipher = None
-
-
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
     'argparse',  # Used in __main__ of some modules
@@ -111,43 +100,21 @@ if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
-# We need to include this version data.
-try:
-    import importlib_resources
-    data_files.append(
-        (
-            os.path.join(importlib_resources.__path__[0], 'version.txt'),
-            'importlib_resources',
-         )
-    )
-except ImportError:
-    pass
-
-print('Data files: ')
-print(data_files)
-
 # Finally, run the PyInstaller analysis process.
-# from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
+from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 vbsp_vrad_an = Analysis(
     ['compiler_launch.py'],
     pathex=[workpath, os.path.dirname(srctools.__path__[0])],
     binaries=[],
-    datas=data_files,
     hiddenimports=INCLUDES,
-    hookspath=[],
-    runtime_hooks=[],
     excludes=EXCLUDES,
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False
 )
 
 pyz = PYZ(
     vbsp_vrad_an.pure,
     vbsp_vrad_an.zipped_data,
-    cipher=block_cipher
 )
 
 vbsp_exe = EXE(
