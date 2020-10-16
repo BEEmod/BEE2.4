@@ -6,7 +6,10 @@ from collections import namedtuple
 from weakref import WeakKeyDictionary
 
 from enum import Enum
-from typing import Dict, Optional, List, Union, Tuple, Set, FrozenSet, Iterable
+from typing import (
+    Optional, Union, Tuple, NamedTuple,
+    Dict, List, Set, FrozenSet, Iterable,
+)
 
 from precomp import brushLoc, options, packing, conditions
 from precomp.conditions import meta_cond, make_result, make_flag, RES_EXHAUSTED
@@ -164,25 +167,64 @@ class CubePaintType(Enum):
     BOUNCE = 0
     SPEED = 2
 
-# The skin used for a cube type and gel.
-CUBE_SKINS = {
-    (None, CubeEntType.norm): '0',
-    (None, CubeEntType.comp): '1',
-    (None, CubeEntType.reflect): '0',
-    (None, CubeEntType.sphere): '0',
-    (None, CubeEntType.antique): '0',
 
-    (CubePaintType.BOUNCE, CubeEntType.norm): '6',
-    (CubePaintType.BOUNCE, CubeEntType.comp): '8',
-    (CubePaintType.BOUNCE, CubeEntType.reflect): '2',
-    (CubePaintType.BOUNCE, CubeEntType.sphere): '2',
-    (CubePaintType.BOUNCE, CubeEntType.antique): '1',
+class CubeSkins(NamedTuple):
+    """Specifies the various skins present for cubes.
 
-    (CubePaintType.SPEED, CubeEntType.norm): '7',
-    (CubePaintType.SPEED, CubeEntType.comp): '9',
-    (CubePaintType.SPEED, CubeEntType.reflect): '3',
-    (CubePaintType.SPEED, CubeEntType.sphere): '3',
-    (CubePaintType.SPEED, CubeEntType.antique): '2',
+    For each, the first is the off skin, the second is the on skin.
+    """
+    clean: Tuple[int, int]
+    rusty: Optional[Tuple[int, int]]
+    bounce: Tuple[int, int]
+    speed: Tuple[int, int]
+
+    def spawn_skin(self, paint: Optional[CubePaintType]) -> int:
+        """Return the skin this paint would spawn with."""
+        if paint is None:
+            return self.clean[0]
+        elif paint is CubePaintType.BOUNCE:
+            return self.bounce[0]
+        elif paint is CubePaintType.SPEED:
+            return self.speed[0]
+        raise AssertionError(f"Unknown value: {paint}")
+
+
+# (paint, type and rusty) -> off, on skins.
+CUBE_SKINS: Dict[CubeEntType, CubeSkins] = {
+    CubeEntType.norm: CubeSkins(
+        clean=(0, 2),
+        rusty=(3, 5),
+        bounce=(6, 10),
+        speed=(7, 11),
+    ),
+    CubeEntType.comp: CubeSkins(
+        clean=(1, 4),
+        rusty=None,
+        # On-painted skins are actually normal!
+        # Not really noticeable though, so don't bother
+        # fixing.
+        bounce=(8, 10),
+        speed=(9, 11),
+    ),
+    CubeEntType.reflect: CubeSkins(
+        clean=(0, 0),
+        rusty=(1, 1),
+        bounce=(2, 2),
+        speed=(3, 3),
+        # 4-6 are for Schrodinger...
+    ),
+    CubeEntType.sphere: CubeSkins(
+        clean=(0, 1),
+        rusty=None,
+        bounce=(2, 2),
+        speed=(3, 3),
+    ),
+    CubeEntType.antique: CubeSkins(
+        clean=(0, 0),
+        rusty=None,
+        bounce=(1, 1),
+        speed=(2, 2),
+    ),
 }
 
 
