@@ -3,6 +3,7 @@ import io
 import itertools
 from contextlib import suppress
 from collections import namedtuple
+from weakref import WeakKeyDictionary
 
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple, Set, FrozenSet, Iterable
@@ -29,7 +30,8 @@ DROPPER_TYPES = {}  # type: Dict[str, DropperType]
 ADDON_TYPES = {}  # type: Dict[str, CubeAddon]
 
 # All the cubes/droppers
-PAIRS = []  # type: List[CubePair]
+PAIRS: List['CubePair'] = []
+INST_TO_PAIR: Dict[Entity, 'CubePair'] = WeakKeyDictionary()
 
 # Distance from the floor to the bottom of dropperless cubes.
 # That's needed for light bridges and things like that.
@@ -530,13 +532,12 @@ class CubePair:
                 for out in cube_type.base_outputs[out_type]
             ]
 
-        # Write ourselves into the entities to allow retrieving this
-        # from them, and also via origin.
+        # Ensure we can look up the pair by origin and instance.
         if dropper is not None:
-            dropper.bee2_cube_data = self
+            INST_TO_PAIR[dropper] = self
             CUBE_POS[Vec.from_str(dropper['origin']).as_tuple()] = self
         if cube is not None:
-            cube.bee2_cube_data = self
+            INST_TO_PAIR[cube] = self
             CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
         # Cache of comp_kv_setters adding outputs to dropper ents.
@@ -873,8 +874,8 @@ def flag_cube_type(inst: Entity, res: Property):
     * `<cube>`: The cube half of a pair.
     """
     try:
-        pair = inst.bee2_cube_data  # type: CubePair
-    except AttributeError:
+        pair = INST_TO_PAIR[inst]
+    except KeyError:
         # None checks for if the instance *isn't* a cube.
         return res.value.casefold() == '<none>'
 
@@ -913,8 +914,8 @@ def flag_dropper_color(inst: Entity, res: Property):
     which will have the tint copied into it.
     """
     try:
-        data = inst.bee2_cube_data  # type: CubePair
-    except AttributeError:
+        data = INST_TO_PAIR[inst]
+    except KeyError:
         return False
 
     if res.value:
@@ -932,8 +933,8 @@ def res_dropper_addon(inst: Entity, res: Property):
         raise ValueError('Invalid Cube Addon: {}'.format(res.value))
 
     try:
-        pair = inst.bee2_cube_data  # type: CubePair
-    except AttributeError:
+        pair = INST_TO_PAIR[inst]
+    except KeyError:
         LOGGER.warning('Cube Addon applied to non cube ("{}")', res.value)
         return
 
@@ -944,8 +945,8 @@ def res_dropper_addon(inst: Entity, res: Property):
 def res_set_dropper_off(inst: Entity, res: Property) -> None:
     """Update the position cubes will be spawned at for a dropper."""
     try:
-        pair = inst.bee2_cube_data  # type: CubePair
-    except AttributeError:
+        pair = INST_TO_PAIR[inst]
+    except KeyError:
         LOGGER.warning('SetDropperOffset applied to non cube ("{}")', res.value)
     else:
         pair.spawn_offset = Vec.from_str(
@@ -960,8 +961,8 @@ def flag_cube_type(inst: Entity, res: Property):
     marked as a custom dropperless cube.
     """
     try:
-        pair = inst.bee2_cube_data  # type: CubePair
-    except AttributeError:
+        pair = INST_TO_PAIR[inst]
+    except KeyError:
         LOGGER.warning('Attempting to set cube type on non cube ("{}")', inst['targetname'])
         return
 
