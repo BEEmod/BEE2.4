@@ -171,6 +171,9 @@ class CubePaintType(Enum):
 class CubeSkins(NamedTuple):
     """Specifies the various skins present for cubes.
 
+    Rusty skins are only applicable if the map doesn't contain gels, since
+    all of the cube types have one or more bad gel skins. If None, there's
+    no rusty version.
     For each, the first is the off skin, the second is the on skin.
     """
     clean: Tuple[int, int]
@@ -369,6 +372,7 @@ class CubeType:
         has_name: str,
         cube_item_id: str,
         is_companion: bool,
+        try_rusty: bool,
         model: Optional[str],
         model_color: Optional[str],
         model_swap_meth: ModelSwapMeth,
@@ -408,6 +412,9 @@ class CubeType:
 
         # Conceptually - is it 'companion'-like -> voiceline
         self.is_companion = is_companion
+        # If true, use the original model and rusty skin type if no gels are
+        # present.
+        self.try_rusty = try_rusty
 
         # Distance from model origin to the 'floor'.
         self.base_offset = base_offset
@@ -486,6 +493,7 @@ class CubeType:
             conf['hasName'],
             cube_item_id,
             cube_type is CubeEntType.comp or conf.bool('isCompanion'),
+            conf.bool('tryRusty'),
             cust_model,
             cust_model_color,
             model_swap_meth,
@@ -595,6 +603,20 @@ class CubePair:
             drop_id = '"{}"'.format(self.drop_type.id)
         return '<CubePair {} -> "{}": {!r} -> {!r}, {!s}>'.format(
             drop_id, self.cube_type.id, drop, cube, self.tint,
+        )
+
+    def use_rusty_version(self, has_gel: bool):
+        """Check if we can can use the rusty version.
+
+        This is only allowed if it's one of Valve's cubes,
+        no color is used, and no gels are present.
+        In this case, we ignore the custom model.
+        """
+        return (
+            self.cube_type.try_rusty and
+            self.paint_type is None and
+            self.tint is None and
+            CUBE_SKINS[self.cube_type].rusty is not None
         )
 
     def get_kv_setter(self, name: str) -> Entity:
@@ -1404,6 +1426,8 @@ def make_cube(
     pair: CubePair,
     floor_pos: Vec,
     in_dropper: bool,
+    bounce_in_map: bool,
+    speed_in_map: bool,
 ) -> Tuple[bool, Entity]:
     """Place a cube on the specified floor location.
 
@@ -1589,10 +1613,26 @@ def make_cube(
         ent['AllowSilentDissolve'] = 1
     else:
         # A prop_weighted_cube
-
         ent['NewSkins'] = '1'
-        ent['SkinType'] = '0'
-        ent['Skin'] = CUBE_SKINS[spawn_paint, pair.cube_type.type]
+
+        skin = CUBE_SKINS[pair.cube_type.type]
+        skinset: Set[int] = set()
+
+        if pair.use_rusty_version(bounce_in_map or speed_in_map):
+            ent['SkinType'] = '1'
+            ent['Skin'] = skin.rusty[0]
+            skinset.update(skin.rusty)
+            cust_model = None
+        else:
+            ent['SkinType'] = '0'
+            ent['Skin'] = skin.spawn_skin(spawn_paint)
+            skinset.update(skin.clean)
+            if bounce_in_map or spawn_paint is CubePaintType.BOUNCE:
+                skinset.update(skin.bounce)
+            if speed_in_map or spawn_paint is CubePaintType.BOUNCE:
+                skinset.update(skin.speed)
+
+        ent['skinset'] = ' '.join(map(str, sorted(skinset)))
         ent['angles'] = Vec(0, yaw, 0)
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
@@ -1636,6 +1676,10 @@ def make_cube(
 @meta_cond(priority=750, only_once=True)
 def generate_cubes(vmf: VMF):
     """After other conditions are run, generate cubes."""
+    from vbsp import settings
+    voice_attr = settings['has_attr']  # type: Dict[str, bool]
+    bounce_in_map = voice_attr['BounceGel']
+    speed_in_map = voice_attr['SpeedGel']
 
     # point_template for spawning dropperless cubes.
     # We can fit 16 in each, start with the count = 16 so
@@ -1644,12 +1688,15 @@ def generate_cubes(vmf: VMF):
     dropperless_temp_count = 16
 
     for pair in PAIRS:
-        # Don't include the cube entity.
+        # Don't include the original cube instance.
         if pair.cube:
             pair.cube.remove()
 
-        if pair.cube_type.model_swap_meth is ModelSwapMeth.SETMODEL:
-            # Add the custom model logic.
+        # Add the custom model logic. But skip if we use the rusty version.
+        # That overrides it to be using the normal model.
+        if (pair.cube_type.model_swap_meth is ModelSwapMeth.SETMODEL
+            and not pair.use_rusty_version(bounce_in_map or speed_in_map)
+        ):
             cust_model = (
                 pair.cube_type.model_color
                 if pair.tint is not None else
@@ -1657,8 +1704,7 @@ def generate_cubes(vmf: VMF):
             )
             if cust_model:
                 # Fire an on-spawn output that swaps the model,
-                # then resets the skin.
-
+                # then resets the skin to the right one.
                 # If we have a bounce cube painter, it needs to be the normal skin.
                 if (
                     pair.paint_type is CubePaintType.BOUNCE and
@@ -1673,7 +1719,7 @@ def generate_cubes(vmf: VMF):
                     'self.SetModel(`{}`); '
                     'self.__KeyValueFromInt(`skin`, {});'.format(
                         cust_model,
-                        CUBE_SKINS[spawn_paint, pair.cube_type.type],
+                        CUBE_SKINS[pair.cube_type.type].spawn_skin(spawn_paint),
                     ),
                 ))
                 precache_model(vmf, cust_model)
@@ -1709,7 +1755,7 @@ def generate_cubes(vmf: VMF):
             assert pair.drop_type is not None
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.spawn_offset.copy().rotate_by_str(pair.dropper['angles'])
-            has_addon, drop_cube = make_cube(vmf, pair, pos, True)
+            has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map)
             cubes.append(drop_cube)
 
             # We can't refer to the dropped cube directly because of the template name
@@ -1813,7 +1859,7 @@ def generate_cubes(vmf: VMF):
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
             pos += Vec(z=DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
-            has_addon, cube = make_cube(vmf, pair, pos, False)
+            has_addon, cube = make_cube(vmf, pair, pos, False, bounce_in_map, speed_in_map)
             cubes.append(cube)
             cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'box')
 
