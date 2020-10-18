@@ -356,7 +356,7 @@ msgid ""
 msgstr ""
 "Permite colocar y borrar las puertas de Entrada / Salida obligatorias así"
 " como la gran sala de observación. Solo recomendable con la gran sala de "
-"observación."
+"observación. Usar con precaución, ¡esto puede dar resultados extraños!"
 
 #: StyleVarPane.py:65
 msgid "Allow Adding Goo Mist"
@@ -447,11 +447,11 @@ msgstr "Otros Estilos:"
 
 #: StyleVarPane.py:287
 msgid "No Options!"
-msgstr "Sin Opciones!"
+msgstr "¡Sin Opciones!"
 
 #: StyleVarPane.py:293
 msgid "None!"
-msgstr "Ninguno!"
+msgstr "¡Ninguno!"
 
 #: StyleVarPane.py:364
 msgid "Items"
@@ -1269,63 +1269,67 @@ msgstr ""
 msgid ""
 "Add no music to the map at all. Testing Element-specific music may still "
 "be added."
-msgstr "No añadir ninguna música de fondo al mapa en absoluto."
+msgstr "No añadir ninguna música de fondo al mapa. La música de ciertos "
+"elementos de prueba específicos puede que sea añadida."
 
 #: music_conf.py:142
 msgid "Propulsion Gel SFX"
-msgstr "SFX del gel de propulsión"
+msgstr "SFX del Gel de Propulsión"
 
 #: music_conf.py:143
 msgid "Repulsion Gel SFX"
-msgstr "SFX del gel de repulsion"
+msgstr "SFX del Gel de Repulsion"
 
 #: music_conf.py:144
 msgid "Excursion Funnel Music"
-msgstr "La música de fondo"
+msgstr "Música del embudo de translación"
 
 #: music_conf.py:145 music_conf.py:160
 msgid "Synced Funnel Music"
-msgstr ""
+msgstr "Música del Embudo de Translación sincronizada"
 
 #: music_conf.py:152
 #, fuzzy
 msgid "Select Excursion Funnel Music"
-msgstr "Selecciona la música de fondo"
+msgstr "Selecciona la música del Embudo de Translación"
 
 #: music_conf.py:153
 msgid "Set the music used while inside Excursion Funnels."
-msgstr ""
+msgstr "Selecciona la música usada al estar dentro de los"
+" Embudos de Translación."
 
 #: music_conf.py:156
 msgid "Have no music playing when inside funnels."
-msgstr ""
+msgstr "No hay música al estar dentro de los Embudos de"
+" translación."
 
 #: music_conf.py:167
 msgid "Select Repulsion Gel Music"
-msgstr ""
+msgstr "Seleccionar Música del Gel de Repulsión."
 
 #: music_conf.py:168
 msgid "Select the music played when players jump on Repulsion Gel."
-msgstr ""
+msgstr "Selecciona la música que se reproduce al saltar en el Gel de Repulsión."
 
 #: music_conf.py:171
 msgid "Add no music when jumping on Repulsion Gel."
-msgstr ""
+msgstr "No añadir música al saltar en el Gel de Repulsión."
 
 #: music_conf.py:179
 #, fuzzy
 msgid "Select Propulsion Gel Music"
-msgstr "Selecciona la música de fondo"
+msgstr "Seleccionar la música del Gel de Repulsión"
 
 #: music_conf.py:180
 msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
-msgstr ""
+msgstr "Selecciona la música que se reproduce cuando los jugadores "
+" tienen una alta velocidad horizontal."
 
 #: music_conf.py:183
 msgid "Add no music while running fast."
-msgstr ""
+msgstr "No añadir música al moverse rápido."
 
 #: music_conf.py:218
 msgid "Base: "
@@ -1333,34 +1337,35 @@ msgstr ""
 
 #: music_conf.py:251
 msgid "Funnel:"
-msgstr ""
+msgstr "Embudo de Translación:"
 
 #: music_conf.py:252
 msgid "Bounce:"
-msgstr ""
+msgstr "Rebotar:"
 
 #: music_conf.py:253
 msgid "Speed:"
-msgstr ""
+msgstr "Velocidad:"
 
 #: optionWindow.py:62
 msgid "BEE2 Options"
-msgstr "BEE2 Opciones"
+msgstr "Opciones de BEE2"
 
 #: optionWindow.py:101
 msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
-msgstr ""
+msgstr "La fecha de los archivos cache de los paquetes se ha reseteado. Estos"
+" serán extraídos durante la siguiente exportación."
 
 #: optionWindow.py:118
 msgid "\"Preserve Game Resources\" has been disabled."
-msgstr ""
+msgstr "\"Preservar Recursos del Juego\" se ha desabilitado."
 
 #: optionWindow.py:130
 #, fuzzy
 msgid "Packages Reset"
-msgstr "Paquetes"
+msgstr "Resetear Paquetes"
 
 #: optionWindow.py:211
 msgid "General"
@@ -1368,7 +1373,7 @@ msgstr "General"
 
 #: optionWindow.py:217
 msgid "Windows"
-msgstr "Ventana"
+msgstr "Ventanas"
 
 #: optionWindow.py:223
 msgid "Development"
@@ -1376,128 +1381,136 @@ msgstr "Desarollo"
 
 #: optionWindow.py:247 packageMan.py:110 selectorWin.py:701
 msgid "OK"
-msgstr "SI"
+msgstr "Vale"
 
 #: optionWindow.py:278
 msgid "After Export:"
-msgstr ""
+msgstr "Después de la Exportación:"
 
 #: optionWindow.py:295
 msgid "Do Nothing"
-msgstr ""
+msgstr "No hacer nada"
 
 #: optionWindow.py:301
 msgid "Minimise BEE2"
-msgstr ""
+msgstr "Minimizar BEE2"
 
 #: optionWindow.py:307
 msgid "Quit BEE2"
-msgstr ""
+msgstr "Cerrar BEE2"
 
 #: optionWindow.py:315
 msgid "After exports, do nothing and keep the BEE2 in focus."
-msgstr ""
+msgstr "Después de exportar, no hacer nada y mantener BEE2 abierto."
 
 #: optionWindow.py:317
 msgid "After exports, minimise to the taskbar/dock."
-msgstr ""
+msgstr "Después de exportar, minimizar a la barra de tareas/bandeja."
 
 #: optionWindow.py:318
 msgid "After exports, quit the BEE2."
-msgstr ""
+msgstr "Después de exportar, salir de BEE2."
 
 #: optionWindow.py:325
 msgid "Launch Game"
-msgstr ""
+msgstr "Ejecutar Juego"
 
 #: optionWindow.py:326
 msgid "After exporting, launch the selected game automatically."
-msgstr ""
+msgstr "Después de exportar, ejecutar el juego seleccionado automáticamente."
 
 #: optionWindow.py:334 optionWindow.py:340
 msgid "Play Sounds"
-msgstr ""
+msgstr "Reproducir Sonidos"
 
 #: optionWindow.py:345
 msgid ""
 "Pyglet is either not installed or broken.\n"
 "Sound effects have been disabled."
-msgstr ""
+msgstr "Pyglet no está instalado, o está roto.\n"
+"Los efectos de sonido se han desabilitado."
 
 #: optionWindow.py:352
 msgid "Reset Package Caches"
-msgstr ""
+msgstr "Resetear la caché de los Paquetes"
 
 #: optionWindow.py:358
 msgid "Force re-extracting all package resources."
-msgstr ""
+msgstr "Forzar la re-extracción de todos los recursos de los paquetes."
 
 #: optionWindow.py:367
 msgid "Keep windows inside screen"
-msgstr ""
+msgstr "Mantener ventanas dentro de la pantalla"
 
 #: optionWindow.py:368
 msgid ""
 "Prevent sub-windows from moving outside the screen borders. If you have "
 "multiple monitors, disable this."
-msgstr ""
+msgstr "Prevenir el movimiento de las sub-ventanas fuera de los bordes de pantalla."
+" Si tienes varios monitores, deshabilita esta opción."
 
 #: optionWindow.py:378
 #, fuzzy
 msgid "Keep loading screens on top"
-msgstr "Limpiar viejas capturas de pantalla"
+msgstr "Mantener pantallas de carga encima"
 
 #: optionWindow.py:380
 msgid ""
 "Force loading screens to be on top of other windows. Since they don't "
 "appear on the taskbar/dock, they can't be brought to the top easily "
 "again."
-msgstr ""
+msgstr "Forzar que las pantallas de carga aparezcan encima de otras ventanas."
+" Como no aparecen en la barra de tareas/bandeja, no es posible moverlas encima"
+" facilmente."
 
 #: optionWindow.py:389
 msgid "Reset All Window Positions"
-msgstr ""
+msgstr "Resetear la posición de todas las ventanas"
 
 #: optionWindow.py:403
 msgid "Log missing entity counts"
-msgstr ""
+msgstr "Registrar cuenta de entidades que faltan"
 
 #: optionWindow.py:404
 msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
-msgstr ""
+msgstr "Cuando se cargan ítems, registrar ítems que faltan de entidades"
+" en el archivo properties.txt."
 
 #: optionWindow.py:412
 msgid "Log when item doesn't have a style"
-msgstr ""
+msgstr "Registrar cuando un ítem no tiene un estilo"
 
 #: optionWindow.py:413
 msgid ""
 "Log items have no applicable version for a particular style.This usually "
 "means it will look very bad."
-msgstr ""
+msgstr "Registrar ítems que no tienen una versión aplicable para un estilo en"
+" particular. Esto usualmente significa que lucirá muy mal."
 
 #: optionWindow.py:421
 msgid "Log when item uses parent's style"
-msgstr ""
+msgstr "Registrar cuando un ítem usa el estilo del padre"
 
 #: optionWindow.py:422
 msgid ""
 "Log when an item reuses a variant from a parent style (1970s using 1950s "
 "items, for example). This is usually fine, but may need to be fixed."
-msgstr ""
+msgstr "Registrar cuando un ítem usa una variante de un estilo padre (1970s"
+" usando ítems de 1950s, por ejemplo). Esto normalmente está bien, pero"
+" puede que tenga que ser reparado."
 
 #: optionWindow.py:431
 msgid "Log missing packfile resources"
-msgstr "Mostrar recursos packfile que faltan"
+msgstr "Registrar recursos packfile que faltan"
 
 #: optionWindow.py:432
 msgid ""
 "Log when the resources a \"PackList\" refers to are not present in the "
 "zip. This may be fine (in a prerequisite zip), but it often indicates an "
 "error."
-msgstr "Mostrar cuando los recursos que \"PackList\" refiere no se encuentran"
+msgstr "Registrar cuando los recursos a los que \"PackList\" se refiere no se encuentran"
 " presentes en el zip. Esto puede estar bien (en un zip requerido), pero "
 "normalmente indica un error."
 
