@@ -81,7 +81,7 @@ msgstr "Couloir"
 msgid ""
 "Randomly choose a corridor. This is saved in the puzzle data and will not"
 " change."
-msgstr ""
+msgstr "Choisit un couloir aléatoire. Ceci est sauvegardé dans le data du puzzle et ne va pas changer."
 
 #: CompilerPane.py:322 UI.py:657
 msgid "Random"
@@ -192,7 +192,7 @@ msgid ""
 "When publishing, this is always used."
 msgstr ""
 "Compilation de haute qualité. Cela prend plus de temps à compiler mais "
-"rend mieux. À utiliser si vous arrangez les lumières.\n"
+"c'est plus beau. À utiliser si vous arrangez les lumières.\n"
 "À la publication, ceci est toujours utilisé."
 
 #: CompilerPane.py:664
@@ -908,7 +908,7 @@ msgstr "Cet objet accepte des connexions entrantes."
 
 #: contextWin.py:90
 msgid "This item has two input types (A and B), using the Input A and B items."
-msgstr ""
+msgstr "Cet objet a deux types d'entrée (A et B), utilisant les items Input A et B."
 
 #: contextWin.py:92
 msgid "This item does not output."
@@ -1105,7 +1105,7 @@ msgstr "Serveur Discord..."
 
 #: helpMenu.py:68
 msgid "aerond's Music Changer..."
-msgstr ""
+msgstr "Le changeur de musique d'aerond..."
 
 #: helpMenu.py:70
 msgid "Application Repository..."
@@ -1149,7 +1149,7 @@ msgstr "Aide"
 
 #: helpMenu.py:277
 msgid "BEE2 Credits"
-msgstr "Crédits du BEE2"
+msgstr "Crédits de BEE2"
 
 #: helpMenu.py:294
 msgid "Credits..."
@@ -1193,7 +1193,7 @@ msgstr "Annuler"
 
 #: loadScreen.py:211 tagsPane.py:53
 msgid "Packages"
-msgstr "Paquets"
+msgstr "Packages"
 
 #: loadScreen.py:212
 msgid "Loading Objects"
@@ -1238,7 +1238,7 @@ msgstr "Montrer:"
 #: music_conf.py:132
 #, fuzzy
 msgid "Select Background Music - Base"
-msgstr "Sélectionnez la musique de fond"
+msgstr "Sélectionnez la musique de fond - Base"
 
 #: music_conf.py:133
 #, fuzzy
@@ -1275,77 +1275,78 @@ msgstr "Musique du Halo synchronisée"
 #: music_conf.py:152
 #, fuzzy
 msgid "Select Excursion Funnel Music"
-msgstr "Musique du Halo d'Excursion"
+msgstr "Sélectionnez la musique du Halo d'Excursion."
 
 #: music_conf.py:153
 msgid "Set the music used while inside Excursion Funnels."
-msgstr ""
+msgstr "Sélectionne la musique utilisée à l'intérieur d'un Halo d'Excursion"
 
 #: music_conf.py:156
 msgid "Have no music playing when inside funnels."
-msgstr ""
+msgstr "N'a pas de musique pour les Halos d'Excursion.
 
 #: music_conf.py:167
 msgid "Select Repulsion Gel Music"
-msgstr ""
+msgstr "Sélectionnez la musique du Gel Répulsif.
 
 #: music_conf.py:168
 msgid "Select the music played when players jump on Repulsion Gel."
-msgstr ""
+msgstr "Sélectionne la musique utilisée pour le Gel Répulsif.
 
 #: music_conf.py:171
 msgid "Add no music when jumping on Repulsion Gel."
-msgstr ""
+msgstr "N'ajoute pas de musique pour le Gel Répulsif."
 
 #: music_conf.py:179
 #, fuzzy
 msgid "Select Propulsion Gel Music"
-msgstr "Sélectionnez la musique de fond"
+msgstr "Sélectionnez la musique du Gel Propulsif."
 
 #: music_conf.py:180
 msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
-msgstr ""
+msgstr "Sélectionne la musique quand les joueurs sont très véloces horizontalement."
 
 #: music_conf.py:183
 msgid "Add no music while running fast."
-msgstr ""
+msgstr "N'ajoute pas de musique en temps de course rapide."
 
 #: music_conf.py:218
 msgid "Base: "
-msgstr ""
+msgstr "Base"
 
 #: music_conf.py:251
 msgid "Funnel:"
-msgstr ""
+msgstr "Halo d'Excursion"
 
 #: music_conf.py:252
 msgid "Bounce:"
-msgstr ""
+msgstr "Rebondissement"
 
 #: music_conf.py:253
 msgid "Speed:"
-msgstr ""
+msgstr "Vitesse"
 
 #: optionWindow.py:62
 msgid "BEE2 Options"
-msgstr "Options BEE2"
+msgstr "Options de BEE2"
 
 #: optionWindow.py:101
 msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
-msgstr ""
+msgstr "Les caches temporelles des Packages ont été réinitialisées."
+"Elles vont être extraites durant le prochain export."
 
 #: optionWindow.py:118
 msgid "\"Preserve Game Resources\" has been disabled."
-msgstr ""
+msgstr "\"Preserve Game Resources\" a été désactivé."
 
 #: optionWindow.py:130
 #, fuzzy
 msgid "Packages Reset"
-msgstr "Paquets"
+msgstr "réinitialisation des packages"
 
 #: optionWindow.py:211
 msgid "General"
@@ -1373,19 +1374,19 @@ msgstr "Ne rien faire"
 
 #: optionWindow.py:301
 msgid "Minimise BEE2"
-msgstr "Minimiser le BEE2"
+msgstr "Minimiser BEE2"
 
 #: optionWindow.py:307
 msgid "Quit BEE2"
-msgstr "Quitter le BEE2"
+msgstr "Quitter BEE2"
 
 #: optionWindow.py:315
 msgid "After exports, do nothing and keep the BEE2 in focus."
-msgstr "Après l'export, ne rien faire et garder le BEE2 au premier plan."
+msgstr "Après l'export, ne rien faire et garder BEE2 au premier plan."
 
 #: optionWindow.py:317
 msgid "After exports, minimise to the taskbar/dock."
-msgstr "Après l'export, minimiser le BEE2 dans la barre des tâches."
+msgstr "Après l'export, minimiser BEE2 dans la barre des tâches."
 
 #: optionWindow.py:318
 msgid "After exports, quit the BEE2."
@@ -1413,13 +1414,12 @@ msgstr ""
 
 #: optionWindow.py:352
 msgid "Reset Package Caches"
-msgstr "Réinitialiser le cache des paquets"
+msgstr "Réinitialiser le cache des packages"
 
 #: optionWindow.py:358
 #, fuzzy
 msgid "Force re-extracting all package resources."
-msgstr ""
-"Forcer la ré-extraction de tous les paquets de ressources. Cela requiert "
+msgstr "Forcer la ré-extraction de tous les packages de ressources. Cela requiert "
 "un redémarrage."
 
 #: optionWindow.py:367
@@ -1432,35 +1432,37 @@ msgid ""
 "multiple monitors, disable this."
 msgstr ""
 "Empêcher les sous-fenêtres de sortir des limites de l'écran. Si vous avez"
-" plusieurs écrans, désactivez cela."
+"plusieurs écrans, désactivez cela."
 
 #: optionWindow.py:378
 #, fuzzy
 msgid "Keep loading screens on top"
-msgstr "Supprimer les anciens screenshots"
+msgstr "Garder les écrans de chargement au-dessus."
 
 #: optionWindow.py:380
 msgid ""
 "Force loading screens to be on top of other windows. Since they don't "
 "appear on the taskbar/dock, they can't be brought to the top easily "
 "again."
-msgstr ""
+msgstr "Forcer les écrans de téléchargement à être au-dessus des autres fenêtres."
+"Si elles n'apparaissent pas dans la barre des tâches/dock, elles ne peuvent pas aller au-dessus"
+"facilement."
 
 #: optionWindow.py:389
 msgid "Reset All Window Positions"
-msgstr "Réinitialiser les positions des sous-fenêtres"
+msgstr "Réinitialiser les positions des fenêtres"
 
 #: optionWindow.py:403
 msgid "Log missing entity counts"
-msgstr "Enregistrer dans un fichier les nombres d'entités manquants"
+msgstr "Enregistrer dans un fichier les nombres d'entités manquantes"
 
 #: optionWindow.py:404
 msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
 msgstr ""
-"Lors du chargement des objets, enregistrer les objets n'ayant pas de "
-"nombre d'entités dans leur fichier properties.txt."
+"Lors du chargement des objets, enregistrer les objets ayant un"
+"nombre d'entités manquantes dans leur fichier properties.txt."
 
 #: optionWindow.py:412
 msgid "Log when item doesn't have a style"
@@ -1472,7 +1474,7 @@ msgid ""
 "means it will look very bad."
 msgstr ""
 "Enregistrer dans un fichier les objets n'ayant pas de version applicable "
-"pour un style donné. Cela signifie qu'il rendra très moche."
+"pour un style donné. Cela signifie qu'il ne sera pas très beau."
 
 #: optionWindow.py:421
 msgid "Log when item uses parent's style"
@@ -1484,7 +1486,7 @@ msgid ""
 "items, for example). This is usually fine, but may need to be fixed."
 msgstr ""
 "Enregistrer dans un fichier quand un objet réutilise une variante d'un "
-"style parent (le style 1970s utilisant des objets style 1950s par ex.). "
+"style parent (le style 1970s utilisant des objets du style 1950s par ex.). "
 "Ce n'est généralement pas un problème mais nécessite parfois des "
 "ajustements."
 
@@ -1529,22 +1531,23 @@ msgstr "Montrer le log en temps réel."
 
 #: optionWindow.py:463
 msgid "Force Editor Models"
-msgstr ""
+msgstr "Forcer les modèles de l'éditeur"
 
 #: optionWindow.py:464
 msgid ""
 "Make all props_map_editor models available for use. Portal 2 has a limit "
 "of 1024 models loaded in memory at once, so we need to disable unused "
 "ones to free this up."
-msgstr ""
+msgstr "Rendre tous les modèes props_map_editor utlilsables. Portal 2 a une limite "
+"de 1024 modèles chargés en mémoire en une fois, alors nous devons désactiver les autres."
 
 #: optionWindow.py:475
 msgid "Dump All objects"
-msgstr ""
+msgstr "Supprimer tous les objets"
 
 #: optionWindow.py:481
 msgid "Dump Items list"
-msgstr ""
+msgstr "Supprimer la liste d'objets"
 
 #: packageMan.py:64
 msgid "BEE2 - Restart Required!"
@@ -1555,12 +1558,12 @@ msgid ""
 "Changing enabled packages requires a restart.\n"
 "Continue?"
 msgstr ""
-"Changer les paquets activés demande un redémarrage.\n"
+"Changer les packages activés demande un redémarrage.\n"
 "Continuer ?"
 
 #: packageMan.py:88
 msgid "BEE2 - Manage Packages"
-msgstr "BEE2 - Gérer les paquets"
+msgstr "BEE2 - Gérer les packages"
 
 #: paletteLoader.py:25
 msgid "<Last Export>"
@@ -1618,7 +1621,7 @@ msgstr "Couleur: R={r}, V={g}, B={b}"
 
 #: signage_ui.py:140 signage_ui.py:213
 msgid "Configure Signage"
-msgstr ""
+msgstr "Configurer la signalisation"
 
 #: signage_ui.py:144
 #, fuzzy
@@ -1627,7 +1630,7 @@ msgstr "Style choisi:"
 
 #: signage_ui.py:167
 msgid "Signage: {}"
-msgstr ""
+msgstr "Signalisation: {}"
 
 #: tagsPane.py:51
 msgid "Tags"
@@ -1639,7 +1642,7 @@ msgstr "Auteurs"
 
 #: tagsPane.py:162
 msgid "Any"
-msgstr "N'importe"
+msgstr "N'importe quel"
 
 #: tagsPane.py:171
 msgid "All"
@@ -1651,36 +1654,36 @@ msgstr "Tags disponibles (cliquez):"
 
 #: utils.py:841
 msgid "__LANG_USE_SANS_SERIF__"
-msgstr ""
+msgstr "__LANG_USE_SANS_SERIF__"
 
 #: voiceEditor.py:35
 msgid "Singleplayer"
-msgstr ""
+msgstr "Solo"
 
 #: voiceEditor.py:36
 #, fuzzy
 msgid "Cooperative"
-msgstr "Propriétés"
+msgstr "Coop"
 
 #: voiceEditor.py:37
 msgid "ATLAS (SP/Coop)"
-msgstr ""
+msgstr "ATLAS (Solo/Coop)"
 
 #: voiceEditor.py:38
 msgid "P-Body (SP/Coop)"
-msgstr ""
+msgstr "P-Body (Solo/Coop)"
 
 #: voiceEditor.py:41
 msgid "Human characters (Bendy and Chell)"
-msgstr ""
+msgstr "Personnages humains (Bendy et Chell)"
 
 #: voiceEditor.py:42
 msgid "AI characters (ATLAS, P-Body, or Coop)"
-msgstr ""
+msgstr "Personnages IA (ATLAS, P-Body, ou Coop"
 
 #: voiceEditor.py:53
 msgid "Death - Toxic Goo"
-msgstr "Mort - Acide mortel"
+msgstr "Mort - Vase mortelle"
 
 #: voiceEditor.py:54
 msgid "Death - Turrets"
