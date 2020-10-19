@@ -3,7 +3,7 @@
 
 ### Please read the [Contributing Guidelines](https://github.com/BEEmod/BEE2-items/blob/master/.github/contributing.md) and [FAQ](https://github.com/BEEmod/BEE2-items/wiki/FAQ) before opening an issue.
 
-![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/bee2.ico)
+![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/BEE2.ico)
 # Better Extended Editor 2 version 4 #
 ## Portal 2  Mod Tool
 The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for
