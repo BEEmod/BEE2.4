@@ -19,11 +19,6 @@ data_files = [
     ('../images/BEE2/*.png', 'images/BEE2/'),
     ('../images/icons/*.png', 'images/icons/'),
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
-
-    # Add the FGD data for us.
-    (os.path.join(srctools.__path__[0], 'fgd.lzma'), 'srctools'),
-    (os.path.join(srctools.__path__[0], 'srctools.fgd'), 'srctools'),
-
 ]
 
 
@@ -148,8 +143,6 @@ EXCLUDES = [
     'argparse',
 ]
 
-block_cipher = None
-
 
 # AVbin is needed to read OGG files.
 INCLUDE_PATHS = [
@@ -186,18 +179,6 @@ for snd in os.listdir('../sounds/'):
     data_files.append(('../sounds/' + snd, 'sounds'))
 
 
-# We need to include this version data.
-try:
-    import importlib_resources
-    data_files.append(
-        (
-            os.path.join(importlib_resources.__path__[0], 'version.txt'),
-            'importlib_resources',
-         )
-    )
-except ImportError:
-    pass
-
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
@@ -213,7 +194,6 @@ bee2_a = Analysis(
     excludes=EXCLUDES,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False
 )
 
@@ -227,7 +207,6 @@ bee2_a.datas.append((
 pyz = PYZ(
     bee2_a.pure,
     bee2_a.zipped_data,
-    cipher=block_cipher
 )
 
 exe = EXE(

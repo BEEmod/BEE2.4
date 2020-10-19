@@ -207,10 +207,47 @@
 	]
 
 // Entities added to the finished map to pass information to VRAD.
+	
+@PointClass
+	base(Angles)
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+= bee2_music_channel:
+	"Stores the configuration for the music soundscript."
+	[
+	channel(choices) : "Channel" : "BASE" : "The type of music this contains." = 
+		[	
+    	"base"      : "Main track"
+		"tbeam"     : "Excursion Funnel"
+    	"BounceGel" : "Repulsion Gel"
+    	"SpeedGel"  : "Propulsion Gel"
+		]
+	sync(boolean) : "Sync" : 0 : "For funnels only, synchronise to the base track."
+
+	track01(sound) : "Track" : : "A track which may be potentially selected."
+	track02(sound) : "Track" : : "A track which may be potentially selected."
+	track03(sound) : "Track" : : "A track which may be potentially selected."
+	track04(sound) : "Track" : : "A track which may be potentially selected."
+	track05(sound) : "Track" : : "A track which may be potentially selected."
+	track06(sound) : "Track" : : "A track which may be potentially selected."
+	track07(sound) : "Track" : : "A track which may be potentially selected."
+	track08(sound) : "Track" : : "A track which may be potentially selected."
+	track09(sound) : "Track" : : "A track which may be potentially selected."
+	track10(sound) : "Track" : : "A track which may be potentially selected."
+	track11(sound) : "Track" : : "A track which may be potentially selected."
+	track12(sound) : "Track" : : "A track which may be potentially selected."
+	track13(sound) : "Track" : : "A track which may be potentially selected."
+	track14(sound) : "Track" : : "A track which may be potentially selected."
+	track15(sound) : "Track" : : "A track which may be potentially selected."
+	track16(sound) : "Track" : : "A track which may be potentially selected."
+	track17(sound) : "Track" : : "A track which may be potentially selected."
+	track18(sound) : "Track" : : "A track which may be potentially selected."
+	track19(sound) : "Track" : : "A track which may be potentially selected."
+	track20(sound) : "Track" : : "A track which may be potentially selected."
+	]
 
 @PointClass
 	iconsprite("BEE2/editor/bee2_icon.vmt")
-	= bee2_coop_response :
+= bee2_coop_response :
 	"Stores the choreo scenes for responses to players in Coop."
 	[
 	type(string) : "Type" : : "The type of response this is."
@@ -236,6 +273,35 @@
 	choreo20(scene) : "Scene" : : "Random line to use."
 	]
 
+@PointClass
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+= bee2_cube_filter_script:
+	"Stores models used for VScript cube filters."
+	[
+	filename(string) : "Filename" : : "The filename to produce."
+	function(string) : "Function" : : "The name of the function generated."
+	mdl01(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl02(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl03(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl04(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl05(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl06(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl07(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl08(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl09(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl10(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl11(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl12(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl13(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl14(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl15(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl16(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl17(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl18(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl19(studio) : "Model" : : "A model that satisfies the predicate."
+	mdl20(studio) : "Model" : : "A model that satisfies the predicate."
+	]
+
 
 @AutoVisGroup = "BEE2"
 	[
@@ -252,6 +318,12 @@
 		"bee2_editor_connectionpoint"
 		"bee2_editor_embeddedvoxel"
 		"bee2_editor_embedface"
+		]
+	"Map Data"
+		[
+		"bee2_music_channel"
+		"bee2_coop_response"
+		"bee2_cube_filter_script"
 		]
 	]
 
