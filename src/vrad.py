@@ -200,10 +200,10 @@ def main(argv: List[str]) -> None:
 
     zip_data = BytesIO()
     zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
-    zipfile = ZipFile(zip_data, mode='a')
+    zipfile = ZipFile(zip_data)
 
     # Mount the existing packfile, so the cubemap files are recognised.
-    fsys.systems.append((ZipFileSystem('', zipfile), ''))
+    fsys.add_sys(ZipFileSystem('<BSP pakfile>', zipfile))
 
     fsys.open_ref()
 
