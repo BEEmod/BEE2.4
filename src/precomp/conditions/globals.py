@@ -1,4 +1,7 @@
 """Conditions related to global properties - stylevars, music, which game, etc."""
+
+from typing import AbstractSet, Collection, Set, Dict, Optional, Tuple
+
 from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
 
@@ -167,7 +170,7 @@ def res_set_style_var(res: Property) -> bool:
 
 
 @make_result('has')
-def res_set_voice_attr(res: Property):
+def res_set_voice_attr(res: Property) -> object:
     """Sets a number of Voice Attributes.
 
     Each child property will be set. The value is ignored, but must
@@ -181,42 +184,62 @@ def res_set_voice_attr(res: Property):
     return RES_EXHAUSTED
 
 
-CACHED_MODELS = set()
+# The set is the set of skins to use. If empty, all are used.
+CACHED_MODELS: Dict[str, Tuple[Set[int], Entity]] = {}
 
 
 @make_result('PreCacheModel')
-def res_pre_cache_model(vmf: VMF, res: Property):
+def res_pre_cache_model(vmf: VMF, res: Property) -> None:
     """Precache the given model for switching.
 
     This places it as a `prop_dynamic_override`.
     """
-    precache_model(vmf, res.value.casefold())
+    if res.has_children():
+        model = res['model']
+        skins = [int(skin) for skin in res['skinset', ''].split()]
+    else:
+        model = res.value
+        skins = ()
+    precache_model(vmf, model, skins)
 
 
-def precache_model(vmf: VMF, mdl_name: str):
+def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None:
     """Precache the given model for switching.
 
-    This places it as a `prop_dynamic_override`.
+    This places it as a `comp_precache_model`.
     """
-
+    mdl_name = mdl_name.casefold().replace('\\', '/')
     if not mdl_name.startswith('models/'):
         mdl_name = 'models/' + mdl_name
     if not mdl_name.endswith('.mdl'):
         mdl_name += '.mdl'
-
     if mdl_name in CACHED_MODELS:
         return
 
-    CACHED_MODELS.add(mdl_name)
-    vmf.create_ent(
-        classname='comp_precache_model',
-        origin=options.get(Vec, 'global_ents_loc'),
-        model=mdl_name,
-    )
+    try:
+        skins, ent = CACHED_MODELS[mdl_name]
+    except KeyError:
+        ent = vmf.create_ent(
+            classname='comp_precache_model',
+            origin=options.get(Vec, 'global_ents_loc'),
+            model=mdl_name,
+        )
+        skins = set(skinset)
+        CACHED_MODELS[mdl_name] = skins, ent
+    else:
+        if skins:  # If empty, it's wildcard so ignore specifics.
+            if len(skinset) == 0:
+                skins.clear()
+            else:
+                skins.update(skinset)
+    if skins:
+        ent['skinset'] = ' '.join(map(str, sorted(skinset)))
+    else:
+        ent['skinset'] = ''
 
 
 @make_result('GetItemConfig')
-def res_item_config_to_fixup(inst: Entity, res: Property):
+def res_item_config_to_fixup(inst: Entity, res: Property) -> None:
     """Load a config from the item config panel onto a fixup.
 
     * `ID` is the ID of the group.
