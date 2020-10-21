@@ -692,7 +692,7 @@ class Game:
                 export_screen.step('EXP')
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
-            vbsp_config.set_key(('Options', 'dev_mode'), optionWindow.DEV_MODE.get())
+            vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(optionWindow.DEV_MODE.get()))
 
             # If there are multiple of these blocks, merge them together.
             # They will end up in this order.
