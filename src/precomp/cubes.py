@@ -1343,11 +1343,11 @@ def link_cubes(vmf: VMF):
             pair.cube_type.in_map = True
 
         if pair.paint_type is CubePaintType.BOUNCE:
-            voice_attr['BounceGel'] = voice_attr['BlueGel'] = True
-            voice_attr['Gel'] = True
+            voice_attr['bouncegel'] = voice_attr['BlueGel'] = True
+            voice_attr['gel'] = True
         elif pair.paint_type is CubePaintType.SPEED:
-            voice_attr['SpeedGel'] = voice_attr['OrangeGel'] = True
-            voice_attr['Gel'] = True
+            voice_attr['speedgel'] = voice_attr['OrangeGel'] = True
+            voice_attr['gel'] = True
 
         has_name = pair.cube_type.has_name
         voice_attr['cube' + has_name] = True
@@ -1678,8 +1678,8 @@ def generate_cubes(vmf: VMF):
     """After other conditions are run, generate cubes."""
     from vbsp import settings
     voice_attr = settings['has_attr']  # type: Dict[str, bool]
-    bounce_in_map = voice_attr['BounceGel']
-    speed_in_map = voice_attr['SpeedGel']
+    bounce_in_map = voice_attr['bouncegel']
+    speed_in_map = voice_attr['speedgel']
 
     # point_template for spawning dropperless cubes.
     # We can fit 16 in each, start with the count = 16 so
