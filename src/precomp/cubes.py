@@ -605,7 +605,7 @@ class CubePair:
             drop_id, self.cube_type.id, drop, cube, self.tint,
         )
 
-    def use_rusty_version(self, has_gel: bool):
+    def use_rusty_version(self, has_gel: bool) -> bool:
         """Check if we can can use the rusty version.
 
         This is only allowed if it's one of Valve's cubes,
@@ -1644,6 +1644,8 @@ def make_cube(
             
             if cube_type.model_swap_meth is ModelSwapMeth.CUBE_TYPE:
                 ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
+            elif cube_type.model_swap_meth is ModelSwapMeth.SETMODEL:
+                precache_model(vmf, cust_model, skinset)
 
             if isinstance(pack, list):
                 packing.pack_files(vmf, *pack)
@@ -1722,7 +1724,6 @@ def generate_cubes(vmf: VMF):
                         CUBE_SKINS[pair.cube_type.type].spawn_skin(spawn_paint),
                     ),
                 ))
-                precache_model(vmf, cust_model)
 
         drop_cube = cube = should_respawn = None
 
