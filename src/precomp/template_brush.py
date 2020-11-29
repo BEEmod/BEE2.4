@@ -7,8 +7,9 @@ from enum import Enum
 from operator import attrgetter
 
 import srctools
-from srctools import Entity, Solid, Side, Property, UVAxis, Vec, VMF
-from srctools.vmf import EntityFixup
+from srctools import Property
+from srctools.vec import Vec, Angle, Matrix, to_matrix
+from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
 import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
@@ -38,7 +39,7 @@ class InvalidTemplateName(LookupError):
     def __init__(self, temp_name: str) -> None:
         self.temp_name = temp_name
 
-    def __str__(self):
+    def __str__(self) -> str:
         # List all the templates that are available.
         return 'Template not found: "{}"\nValid templates:\n{}'.format(
             self.temp_name,
@@ -149,7 +150,7 @@ del B, W
 
 TEMP_TILE_PIX_SIZE = {
     # The width in texture pixels of each tile size.
-    # We decrease offset to this much +- at maximum (so adjacient template
+    # We decrease offset to this much +- at maximum (so adjacent template
     # brushes merge with each other). This still allows creating brushes
     # with half-grid offsets.
     '4x4': 128,
@@ -187,14 +188,14 @@ class ExportedTemplate(NamedTuple):
     orig_ids: Dict[int, int]
     template: 'Template'
     origin: Vec
-    angles: Vec
+    orient: Matrix
     visgroups: Set[str]
     picker_results: Dict[str, Optional[Portalable]]
     picker_type_results: Dict[str, Optional[TileType]]
 
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
-realign_solid = VMF().make_prism(Vec(-16,-16,-16), Vec(16,16,16)).solid  # type: Solid
+realign_solid = VMF().make_prism(Vec(-16, -16, -16), Vec(16, 16, 16)).solid  # type: Solid
 REALIGN_UVS = {
     face.normal().as_tuple(): (face.uaxis, face.vaxis)
     for face in realign_solid
@@ -373,7 +374,7 @@ class ScalingTemplate(Mapping[
         mat, axis_u, axis_v, rotation = self._axes[normal]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Vec, origin: Optional[Vec]=None) -> 'ScalingTemplate':
+    def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> 'ScalingTemplate':
         """Rotate this template, and return a new template with those angles."""
         new_axis = {}
         if origin is None:
@@ -382,7 +383,7 @@ class ScalingTemplate(Mapping[
         for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
             axis_u = axis_u.localise(origin, angles)
             axis_v = axis_v.localise(origin, angles)
-            v_norm = Vec(norm).rotate(*angles)
+            v_norm = Vec(norm) @ angles
             new_axis[v_norm.as_tuple()] = mat, axis_u, axis_v, rot
 
         return ScalingTemplate(self.id, new_axis)
@@ -480,7 +481,7 @@ def load_templates() -> None:
             name=ent['targetname'],
             visgroups=set(ent['visgroups'].split(' ')) - {''},
             offset=Vec.from_str(ent['origin']),
-            normal=Vec(x=1).rotate_by_str(ent['angles']),
+            normal=Vec(x=1) @ Angle.from_str(ent['angles']),
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
             after=remove_after,
@@ -510,7 +511,7 @@ def load_templates() -> None:
 
         tile_setters[temp_id].append(TileSetter(
             offset=Vec.from_str(ent['origin']),
-            normal=Vec(z=1).rotate_by_str(ent['angles']),
+            normal=Vec(z=1) @ Angle.from_str(ent['angles']),
             visgroups=set(ent['visgroups'].split(' ')) - {''},
             color=color,
             tile_type=tile_type,
@@ -574,7 +575,7 @@ def import_template(
     vmf: VMF,
     temp_name: Union[str, Template],
     origin: Vec,
-    angles: Optional[Vec]=None,
+    angles: Optional[Union[Angle, Matrix]]=None,
     targetname: str='',
     force_type: TEMP_TYPES=TEMP_TYPES.default,
     add_to_map: bool=True,
@@ -620,18 +621,19 @@ def import_template(
 
     # A map of the original -> new face IDs.
     id_mapping = {}  # type: Dict[int, int]
+    orient = to_matrix(angles)
 
     for orig_list, new_list in [
-            (orig_world, new_world),
-            (orig_detail, new_detail)
-        ]:
+        (orig_world, new_world),
+        (orig_detail, new_detail)
+    ]:
         for old_brush in orig_list:
             brush = old_brush.copy(
                 vmf_file=vmf,
                 side_mapping=id_mapping,
                 keep_vis=False,
             )
-            brush.localise(origin, angles)
+            brush.localise(origin, orient)
             new_list.append(brush)
 
     for overlay in orig_over:  # type: Entity
@@ -649,7 +651,7 @@ def import_template(
             if int(side) in id_mapping
         )
 
-        srctools.vmf.localise_overlay(new_overlay, origin, angles)
+        srctools.vmf.localise_overlay(new_overlay, origin, orient)
         orig_target = new_overlay['targetname']
 
         # Only change the targetname if the overlay is not global, and we have
@@ -693,10 +695,10 @@ def import_template(
             if face.id in new_overlay_faces
         ]
 
-        tile_norm = Vec(z=1).rotate(*angles)
+        tile_norm = orient.up()
         for tile_off in bind_tile_pos:
             tile_off = tile_off.copy()
-            tile_off.localise(origin, angles)
+            tile_off.localise(origin, orient)
             try:
                 tile = tiling.TILES[tile_off.as_tuple(), tile_norm.as_tuple()]
             except KeyError:
@@ -717,7 +719,7 @@ def import_template(
         orig_ids=id_mapping,
         template=template,
         origin=origin,
-        angles=angles or Vec(0, 0, 0),
+        orient=orient,
         visgroups=chosen_groups,
         picker_results={},  # Filled by retexture_template.
         picker_type_results={},
@@ -842,7 +844,7 @@ def retexture_template(
     if sense_offset is None:
         sense_offset = Vec()
     else:
-        sense_offset = sense_offset.copy().rotate(*template_data.angles)
+        sense_offset = sense_offset @ template_data.orient
 
     # For each face, if it needs to be forced to a colour, or None if not.
     # If a string it's forced to that string specifically.
@@ -861,9 +863,9 @@ def retexture_template(
         if not color_picker.visgroups.issubset(template_data.visgroups):
             continue
 
-        picker_pos = color_picker.offset.copy().rotate(*template_data.angles)
+        picker_pos = color_picker.offset @ template_data.orient
         picker_pos += template_data.origin + sense_offset
-        picker_norm = Vec(color_picker.normal).rotate(*template_data.angles)
+        picker_norm = Vec(color_picker.normal) @ template_data.orient
 
         if color_picker.grid_snap:
             for axis in 'xyz':
@@ -935,9 +937,9 @@ def retexture_template(
         if not tile_setter.visgroups.issubset(template_data.visgroups):
             continue
 
-        setter_pos = Vec(tile_setter.offset).rotate(*template_data.angles)
+        setter_pos = Vec(tile_setter.offset) @ template_data.orient
         setter_pos += template_data.origin + sense_offset
-        setter_norm = Vec(tile_setter.normal).rotate(*template_data.angles)
+        setter_norm = Vec(tile_setter.normal) @ template_data.orient
         setter_type = tile_setter.tile_type  # type: TileType
 
         if tile_setter.color == 'copy':
@@ -1043,7 +1045,7 @@ def retexture_template(
                     face.uaxis = uaxis.copy()
                     face.vaxis = vaxis.copy()
             elif orig_id in template.vertical_faces:
-                # Rotate the face in increments of 90 degress, so it is as
+                # Rotate the face in increments of 90 degrees, so it is as
                 # upright as possible.
                 pos_u = face.uaxis
                 pos_v = face.vaxis
