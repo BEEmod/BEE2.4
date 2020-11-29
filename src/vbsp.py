@@ -1903,8 +1903,8 @@ def main() -> None:
             ant,
             texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
-            ant_floor,
-            ant_wall,
+            antline_wall=ant_wall,
+            antline_floor=ant_floor,
         )
 
         MAP_RAND_SEED = calc_rand_seed(vmf)

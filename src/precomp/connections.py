@@ -823,7 +823,11 @@ def calc_connections(
                 pass
             else:
                 # Pass in the defaults for antline styles.
-                ITEMS[inst_name] = Item(inst, item_type, antline_floor, antline_wall)
+                ITEMS[inst_name] = Item(
+                    inst, item_type,
+                    ant_floor_style=antline_floor,
+                    ant_wall_style=antline_wall,
+                )
 
                 # Strip off the original connection count variables, these are
                 # invalid.
@@ -1651,7 +1655,7 @@ def add_item_indicators(
     for ant in item.antlines:
         ant.name = ant_name
 
-        ant.export(item.inst.map, item.ant_wall_style, item.ant_floor_style)
+        ant.export(item.inst.map, wall_conf=item.ant_wall_style, floor_conf=item.ant_floor_style)
 
     # Special case - the item wants full control over its antlines.
     if has_ant and item.ant_toggle_var:
