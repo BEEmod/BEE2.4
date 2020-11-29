@@ -9,7 +9,8 @@ from enum import Enum
 import utils
 import srctools.logger
 import srctools.vmf
-from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
+from srctools.vmf import VMF, Solid, Entity, Side, Output
+from srctools import Property, NoKeyError, Vec, Matrix, Angle
 from precomp import (
     instance_traits, tiling, instanceLocs,
     texturing,
@@ -31,9 +32,6 @@ FIZZLERS = {}  # type: Dict[str, Fizzler]
 # Fizzler textures are higher-res than laserfields.
 FIZZLER_TEX_SIZE = 1024
 LASER_TEX_SIZE = 512
-
-# Given a normal and the up-axis, the angle used for the instance.
-FIZZ_ANGLES  = {}  # type: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], Vec]
 
 # A few positions for material_modify_control,
 # so they aren't on top of each other.
@@ -139,25 +137,6 @@ def read_configs(conf: Property) -> None:
             outputs=[],
             singular=True,
         ))
-
-
-def _calc_fizz_angles() -> None:
-    """Generate FIZZ_ANGLES."""
-    it = itertools.product('xyz', (-1, 1), 'xyz', (-1, 1))
-    for norm_axis, norm_mag, roll_axis, roll_mag in it:
-        if norm_axis == roll_axis:
-            # They can't both be the same...
-            continue
-        norm = Vec.with_axes(norm_axis, norm_mag)
-        roll = Vec.with_axes(roll_axis, roll_mag)
-
-        # Norm is Z, roll is X,  we want y.
-        angle = roll.to_angle_roll(norm)
-        up_dir = norm.cross(roll)
-        FIZZ_ANGLES[norm.as_tuple(), up_dir.as_tuple()] = angle
-
-_calc_fizz_angles()
-del _calc_fizz_angles
 
 
 class FizzlerType:
@@ -920,7 +899,6 @@ class FizzlerBrush:
                             ]
                     used_tex_func(side.mat)
 
-
     def _texture_fit(
         self,
         side: Side,
@@ -1017,7 +995,8 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
 
     for name, base_inst in fizz_bases.items():
         models = fizz_models[name]
-        up_axis = Vec(y=1).rotate_by_str(base_inst['angles'])
+        orient = Matrix.from_angle(Angle.from_str(base_inst['angles']))
+        up_axis = orient.left()
 
         # If upside-down, make it face upright.
         if up_axis == (0, 0, -1):
@@ -1028,7 +1007,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         # Now match the pairs of models to each other.
         # The length axis is the line between them.
         # We don't care about the instances after this, so don't keep track.
-        length_axis = Vec(z=1).rotate_by_str(base_inst['angles']).axis()
+        length_axis = orient.up().axis()
 
         emitters = []  # type: List[Tuple[Vec, Vec]]
 
@@ -1189,8 +1168,8 @@ def generate_fizzlers(vmf: VMF):
         up_dir = fizz.up_axis
         forward = (fizz.emitters[0][1] - fizz.emitters[0][0]).norm()
 
-        min_angles = FIZZ_ANGLES[forward.as_tuple(), up_dir.as_tuple()]
-        max_angles = FIZZ_ANGLES[(-forward).as_tuple(), up_dir.as_tuple()]
+        min_orient = Matrix.from_basis(z=forward, y=up_dir)
+        max_orient = Matrix.from_basis(z=-forward, y=up_dir)
 
         model_min = (
             fizz_type.inst[FizzInst.PAIR_MIN, is_static]
@@ -1251,8 +1230,8 @@ def generate_fizzlers(vmf: VMF):
                 for offset in beam.offset:  # type: Vec
                     min_off = offset.copy()
                     max_off = offset.copy()
-                    min_off.localise(seg_min, min_angles)
-                    max_off.localise(seg_max, max_angles)
+                    min_off.localise(seg_min, min_orient)
+                    max_off.localise(seg_max, max_orient)
                     beam_ent = beam_template.copy()
                     vmf.add_ent(beam_ent)
 
@@ -1296,7 +1275,7 @@ def generate_fizzlers(vmf: VMF):
                     classname='func_instance',
                     file=random.choice(fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]),
                     origin=(seg_min + seg_max)/2,
-                    angles=min_angles,
+                    angles=min_orient.to_angle(),
                 )
             else:
                 # Both side models.
@@ -1305,7 +1284,7 @@ def generate_fizzlers(vmf: VMF):
                     classname='func_instance',
                     file=random.choice(model_min),
                     origin=seg_min,
-                    angles=min_angles,
+                    angles=min_orient.to_angle(),
                 )
                 random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_max))
                 max_inst = vmf.create_ent(
@@ -1313,7 +1292,7 @@ def generate_fizzlers(vmf: VMF):
                     classname='func_instance',
                     file=random.choice(model_max),
                     origin=seg_max,
-                    angles=max_angles,
+                    angles=max_orient.to_angle(),
                 )
                 max_inst.fixup.update(fizz.base_inst.fixup)
                 instance_traits.get(max_inst).update(fizz_traits)
@@ -1338,7 +1317,7 @@ def generate_fizzlers(vmf: VMF):
                     mid_inst = vmf.create_ent(
                         classname='func_instance',
                         targetname=fizz_name,
-                        angles=min_angles,
+                        angles=min_orient.to_angle(),
                         file=random.choice(fizz_type.inst[FizzInst.GRID, is_static]),
                         origin=mid_pos,
                     )
@@ -1351,7 +1330,7 @@ def generate_fizzlers(vmf: VMF):
                         vmf,
                         fizz_type.temp_single,
                         (seg_min + seg_max) / 2,
-                        min_angles,
+                        min_orient,
                         force_type=template_brush.TEMP_TYPES.world,
                         add_to_map=False,
                     )
@@ -1362,7 +1341,7 @@ def generate_fizzlers(vmf: VMF):
                             vmf,
                             fizz_type.temp_min,
                             seg_min,
-                            min_angles,
+                            min_orient,
                             force_type=template_brush.TEMP_TYPES.world,
                             add_to_map=False,
                         )
@@ -1372,7 +1351,7 @@ def generate_fizzlers(vmf: VMF):
                             vmf,
                             fizz_type.temp_max,
                             seg_max,
-                            max_angles,
+                            max_orient,
                             force_type=template_brush.TEMP_TYPES.world,
                             add_to_map=False,
                         )
@@ -1475,7 +1454,7 @@ def generate_fizzlers(vmf: VMF):
             brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
             mat_mod_name = conditions.local_name(fizz.base_inst, brush_type.mat_mod_name)
             for off, tex in zip(MATMOD_OFFSETS, sorted(used_tex)):
-                pos = off.copy().rotate(*min_angles)
+                pos = off @ min_orient
                 pos += Vec.from_str(fizz.base_inst['origin'])
                 vmf.create_ent(
                     classname='material_modify_control',
