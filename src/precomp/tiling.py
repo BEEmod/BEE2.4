@@ -1424,7 +1424,7 @@ def find_tile(origin: Vec, normal: Vec, force: bool=False) -> Tuple[TileDef, int
     )
     # grid_pos = round_grid(origin - normal)
 
-    uv_pos = (origin - grid_pos + 64 - 16)
+    uv_pos = round(origin - grid_pos + 64 - 16, 6)
     u = uv_pos[u_axis] / 32 % 4
     v = uv_pos[v_axis] / 32 % 4
 
