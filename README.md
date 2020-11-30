@@ -22,6 +22,10 @@ The packages (item, style, etc definitions) are in the [BEE2-Items](https://gith
 - Place extracted package folder in the root BEE2 folder. _e.g. `C:\BEE2.4\packages`_
 - To run, locate the BEE2 application in the app folder and execute it. _e.g. `C:\BEE2.4\BEE2.exe`_
 
+### BEE2.4 on Mac
+
+As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki article](https://github.com/BEEmod/BEE2-items/wiki/BEE2.4-on-Mac) for more details and how you can still use the mod.
+
 ### Used Libraries ###
 - [Python](https://www.python.org/)
 - [TKinter/TTK](https://tcl.tk/)
