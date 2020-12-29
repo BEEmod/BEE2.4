@@ -249,11 +249,7 @@ def main(argv: List[str]) -> None:
     packlist.eval_dependencies()
     LOGGER.info('Done!')
 
-    if is_peti:
-        packlist.write_manifest()
-    else:
-        # Write with the map name, so it loads directly.
-        packlist.write_manifest(os.path.basename(path)[:-4])
+    packlist.write_manifest()
 
     # We need to disallow Valve folders.
     pack_whitelist = set()  # type: Set[FileSystem]
