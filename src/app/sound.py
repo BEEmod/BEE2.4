@@ -54,7 +54,7 @@ try:
     pyglet_version = pyglet.version
     if not pyglet.media.have_ffmpeg():
         raise ImportError('No ffmpeg available!')
-except ImportError:
+except Exception:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!', exc_info=True)
 
     pyglet_version = '(Not installed)'
