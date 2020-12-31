@@ -1,4 +1,5 @@
 """Manages reading general options from vbsp_config."""
+import math
 from enum import Enum, EnumMeta
 
 import inspect
@@ -97,9 +98,9 @@ def load(opt_blocks: Iterator[Property]) -> None:
                 SETTINGS[opt.id] = opt.default
             continue
         if opt.type is TYPE.VEC:
-            # Pass nones so we can check if it failed.. 
-            parsed_vals = parse_vec_str(val, x=None)
-            if parsed_vals[0] is None:
+            # Pass NaN so we can check if it failed..
+            parsed_vals = parse_vec_str(val, math.nan)
+            if math.isnan(parsed_vals[0]):
                 SETTINGS[opt.id] = opt.default
             else:
                 SETTINGS[opt.id] = Vec(*parsed_vals)
