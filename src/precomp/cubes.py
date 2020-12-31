@@ -1564,7 +1564,7 @@ def make_cube(
                 # Don't paint it on spawn.
                 spawn_paint = None
 
-    yaw = norm.to_angle().y
+    yaw = norm.to_angle().yaw
 
     cust_model = cube_type.model
     pack = cube_type.pack  # type: Optional[Union[str, List[str]]]
