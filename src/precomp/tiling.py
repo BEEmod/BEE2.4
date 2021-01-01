@@ -23,7 +23,7 @@ from typing import (
 import math
 from weakref import WeakKeyDictionary
 
-from srctools import Vec, VMF, Entity, Side, Solid, Output
+from srctools import Vec, VMF, Entity, Side, Solid, Output, Angle, Matrix
 import srctools.logger
 import srctools.vmf
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
@@ -499,17 +499,14 @@ class Panel:
         )
         use_bullseye = tile.use_bullseye()
 
-        angles = Vec.from_str(self.inst['angles'])
-        inst_normal = Vec(z=1).rotate(*angles)
-        if inst_normal != tile.normal:
+        angles = Angle.from_str(self.inst['angles'])
+        orient = Matrix.from_angle(angles)
+        if orient.up() != tile.normal:
             # It's not aligned to ourselves, so dump the rotation.
-            angles = Vec.from_str(
+            angles = Angle.from_str(
                 conditions.PETI_INST_ANGLE[tile.normal.as_tuple()])
-        # Points towards the open end on angled panels.
-        front_normal = Vec(x=1).rotate(*angles)
-        # Point along the hinge axis on angled panels.
-        side_normal = Vec(y=1).rotate(*angles)
-        front_pos = tile.pos + 64 * tile.normal
+            orient = Matrix.from_angle(angles)
+        front_pos = Vec(0, 0, 64) @ orient + tile.pos
 
         offset = self.offset.copy()
 
@@ -608,7 +605,7 @@ class Panel:
                 # Don't offset these at all. Assume the user knows
                 # where it should go.
                 Vec.from_str(self.inst['origin']),
-                Vec.from_str(self.inst['angles']),
+                orient,
                 self.inst['targetname'],
                 force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
@@ -621,24 +618,13 @@ class Panel:
             all_brushes += template.world
 
         if self.pan_type.is_angled:
-            # Rotate the panel to match the panel shape:
-            # Figure out if we want to rotate +ve or -ve.
-            # We know rotating the surface 90 degrees will point
-            # the end straight up, so check if it points at the normal.
-            rotate_forward = Vec(x=1).rotate(*side_normal.rotation_around()) == tile.normal
-
-            # This direction is inverted...
-            if front_normal == (-1, 0, 0):
-                rotate_forward = not rotate_forward
-
-            if rotate_forward:
-                rotation = side_normal.rotation_around(self.pan_type.angle)
-            else:
-                rotation = side_normal.rotation_around(-self.pan_type.angle)
+            # Rotate the panel to match the panel shape, by rotating around
+            # its Y axis.
+            rotation = Matrix.axis_angle(-orient.left(), self.pan_type.angle)
 
             # Shift so the rotation axis is 0 0 0, then shift back
             # to rotate correctly.
-            panel_offset = front_pos - 64 * front_normal
+            panel_offset = front_pos - Vec(64, 0, 0) @ orient
 
             # Rotating like this though will make the brush clip into the
             # surface it's attached on. We need to clip the hinge edge
@@ -652,15 +638,17 @@ class Panel:
                 tile.pos - 64 + 128 * tile.normal,
             )[PRISM_NORMALS[(-tile.normal).as_tuple()]]
 
-            front_axis = front_normal.axis()
+            front_normal: Vec = round(orient.forward(), 6)
 
             for brush in all_brushes:
                 clip_face = None
                 for face in brush:
                     if (
                         face.normal() == front_normal
-                        and face.get_origin()[front_axis]
-                        == panel_offset[front_axis]
+                        and math.isclose(
+                            face.get_origin().dot(front_normal),
+                            panel_offset.dot(front_normal)
+                        )
                     ):
                         clip_face = face
                         break
@@ -675,9 +663,9 @@ class Panel:
             # Helpfully the angled surfaces are always going to be forced
             # upright, so we don't need to compute the orientation matching
             # the item axis.
-            angled_normal = tile.normal.copy().rotate(*rotation)
+            angled_normal = tile.normal @ rotation
             top_center = (
-                (64 * front_normal).rotate(*rotation) -
+                64 * front_normal @ rotation -
                 64 * front_normal +
                 front_pos
             )
@@ -700,8 +688,8 @@ class Panel:
                     vmf,
                     angled_normal,
                     top_center,
-                    (64 * front_normal).rotate(*rotation),
-                    (64 * side_normal),
+                    64 * front_normal @ rotation,
+                    64 * orient.left(),
                     texturing.OVERLAYS.get(front_pos, 'bullseye'),
                     faces,
                 )
@@ -714,8 +702,8 @@ class Panel:
                     vmf,
                     tile.normal,
                     front_pos + offset,
-                    Vec(y=64).rotate(*angles),
-                    Vec(z=64).rotate(*angles),
+                    64 * orient.left(),
+                    64 * orient.forward(),
                     texturing.OVERLAYS.get(front_pos, 'bullseye'),
                     faces,
                 )
@@ -725,8 +713,7 @@ class Panel:
                 # We need to make a placement helper.
                 helper = vmf.create_ent(
                     'info_placement_helper',
-                    angles=tile.normal.to_angle_roll(
-                        tile.portal_helper_orient),
+                    angles=Angle.from_basis(z=tile.portal_helper_orient, x=tile.normal),
                     origin=front_pos + offset,
                     force_placement=int(force_helper),
                     snap_to_helper_angles=int(force_helper),
@@ -743,7 +730,7 @@ class Panel:
 
         if offset:
             for brush in all_brushes:
-                brush.localise(offset, Vec())
+                brush.localise(offset)
 
         if self.brush_ent is None:
             vmf.add_brushes(all_brushes)
@@ -760,7 +747,7 @@ class Panel:
             )
             panel_top.localise(
                 Vec.from_str(self.inst['origin']),
-                Vec.from_str(self.inst['angles']),
+                Angle.from_str(self.inst['angles']),
             )
         else:
             panel_top = tile.pos + 64 * tile.normal
