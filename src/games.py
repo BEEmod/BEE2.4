@@ -76,7 +76,7 @@ class Game:
         )
 
 
-def conf_read(cls, fname: Path) -> Iterator[Game]:
+def conf_read(fname: Path) -> Iterator[Game]:
     """Parse games from config files."""
     with open(fname, 'r') as f:
         props = Property.parse(f)
@@ -91,7 +91,7 @@ def conf_read(cls, fname: Path) -> Iterator[Game]:
 
 def conf_write(fname: Path, games: Iterable[Game]) -> None:
     """Write games into a config file."""
-    with AtomicWriter(str(fname), is_bytes=False) as f:
+    with AtomicWriter(fname, is_bytes=False) as f:
         for game in games:
             prop = Property('Game', [
                 Property('steam', game.steam_id.value),
