@@ -111,7 +111,7 @@ class tkRichText(tkinter.Text):
         """
 
         # Remove all previous link commands
-        for tag, (command_id, func) in self.link_commands.items():
+        for tag, command_id in self.link_commands.items():
             self.tag_unbind(tag, '<Button-1>', funcid=command_id)
         self.link_commands.clear()
 
@@ -134,12 +134,11 @@ class tkRichText(tkinter.Text):
                 raise ValueError('Unknown block {!r}?'.format(block_type))
 
         for url, link_id in text_data.links.items():
-            func = self.make_link_callback(url)
             self.link_commands[link_id] = self.tag_bind(
                 link_id,
                 '<Button-1>',
                 self.make_link_callback(url),
-            ), func
+            )
 
         self['state'] = "disabled"
 
