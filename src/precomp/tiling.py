@@ -124,6 +124,7 @@ BEVEL_AROUND: FrozenSet[Tuple[int, int]] = frozenset({
 })
 
 
+@utils.freeze_enum_props
 class TileType(Enum):
     """Physical types of geometry for each 1/4 tile."""
     WHITE = 0
@@ -149,17 +150,17 @@ class TileType(Enum):
     @property
     def is_recess(self) -> bool:
         """Should this recess the surface?"""
-        return self.value in (22, 23)
+        return self.name.startswith('CUTOUT_TILE')
      
     @property   
     def is_nodraw(self) -> bool:
         """Should this swap to nodraw?"""
-        return self.value == 10
+        return self is self.NODRAW
         
     @property
     def blocks_pattern(self) -> bool:
         """Does this affect patterns?"""
-        return self.value != 22
+        return self is not self.CUTOUT_TILE_BROKEN
         
     @property
     def is_tile(self) -> bool:
@@ -169,31 +170,37 @@ class TileType(Enum):
     @property
     def is_white(self) -> bool:
         """Is this portalable?"""
-        return self.value in (0, 1)
+        return self.name.startswith('WHITE')
 
     @property
     def is_4x4(self) -> bool:
         """Is this forced to be 4x4 in size?"""
-        return self.value in (1, 3)
+        return '4x4' in self.name
 
     @property
     def color(self) -> texturing.Portalable:
         """The portalability of the tile."""
-        if self.value in (0, 1):
+        if 'WHITE' in self.name:
             return texturing.Portalable.WHITE
-        elif self.value in (2, 3, 4):
+        elif 'BLACK' in self.name or self is self.GOO_SIDE:
             return texturing.Portalable.BLACK
         raise ValueError('No colour for ' + self.name + '!')
 
     @property
     def inverted(self) -> 'TileType':
         """Swap the color of a type."""
-        return _tiletype_inverted.get(self, self)
+        if self is self.GOO_SIDE:
+            return self.WHITE_4x4
+        if self.name.startswith('WHITE'):
+            return getattr(self, f'BLACK{self.name[5:]}')
+        if self.name.startswith('BLACK'):
+            return getattr(self, f'WHITE{self.name[5:]}')
+        return self
 
     @property
     def tile_size(self) -> TileSize:
         """The size of the tile this should force."""
-        if self.value in (1, 3):
+        if '4x4' in self.name:
             return TileSize.TILE_4x4
         else:
             return TileSize.TILE_1x1
@@ -211,13 +218,6 @@ _tiletype_tiles = {
     (TileSize.TILE_1x1, texturing.Portalable.WHITE): TileType.WHITE,
     (TileSize.TILE_4x4, texturing.Portalable.BLACK): TileType.BLACK_4x4,
     (TileSize.TILE_4x4, texturing.Portalable.WHITE): TileType.WHITE_4x4,
-}
-_tiletype_inverted = {
-    TileType.BLACK: TileType.WHITE,
-    TileType.WHITE: TileType.BLACK,
-    TileType.BLACK_4x4: TileType.WHITE_4x4,
-    TileType.WHITE_4x4: TileType.BLACK_4x4,
-    TileType.GOO_SIDE: TileType.WHITE_4x4,
 }
 
 # Symbols that represent TileSize values.
@@ -239,6 +239,7 @@ TILETYPE_FROM_CHAR: Dict[str, TileType] = {
 }
 
 
+@utils.freeze_enum_props
 class PanelType(Enum):
     """Special functionality for tiling panels."""
     NORMAL = 'normal'

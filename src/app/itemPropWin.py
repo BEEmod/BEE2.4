@@ -15,6 +15,7 @@ from typing import Dict, List, Union, Any
 LOGGER = srctools.logger.get_logger(__name__)
 
 
+@utils.freeze_enum_props
 class PropTypes(Enum):
     """Type of property to display."""
     NONE = 'none'

@@ -123,6 +123,7 @@ ORIENTS = {
 }
 
 
+@utils.freeze_enum_props
 class TileSize(str, Enum):
     """Types of textures that can exist, for tile-type generators."""
     TILE_1x1 = '1x1'  # Full block
