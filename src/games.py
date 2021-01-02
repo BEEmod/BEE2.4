@@ -58,6 +58,7 @@ DEFAULT_STEAM = [
 
 
 class Game:
+    """Represents a specific game we know about."""
     def __init__(
         self,
         steam_id: GameID,
@@ -68,12 +69,25 @@ class Game:
         self.state = state
         self.path = path.resolve()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<{} Game {} "{!s}">'.format(
             self.state.name.title(),
             self.steam_id.name,
             self.path,
         )
+
+    def __eq__(self, other: object) -> object:
+        if isinstance(other, Game):
+            return self.path == other.path
+        return NotImplemented
+
+    def __ne__(self, other: object) -> object:
+        if isinstance(other, Game):
+            return self.path != other.path
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.path)
 
 
 def conf_read(fname: Path) -> Iterator[Game]:
