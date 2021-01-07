@@ -437,7 +437,6 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
             func = _exc_freeze(data, data_exc)
         else: # If we don't raise, we can use the C-func
             func = data.get
-        print(f'{cls}.{name} = {data}, {data_exc}')
         setattr(cls, name, property(fget=func, doc=value.__doc__))
     return cls
 
