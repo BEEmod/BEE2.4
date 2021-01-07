@@ -8,7 +8,7 @@ from operator import attrgetter
 
 import srctools
 from srctools import Property
-from srctools.vec import Vec, Angle, Matrix, to_matrix
+from srctools.math import Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
 import srctools.logger
 
