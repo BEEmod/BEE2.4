@@ -18,14 +18,13 @@ from typing import (
     Optional, Union, Generic, Callable,
     Dict, List, Tuple,
     Hashable, Iterable, Iterator,
-    MutableSequence, MutableMapping,
-    Sequence, Mapping,
+    MutableSequence, MutableMapping, Mapping,
     KeysView, ValuesView, ItemsView,
 )
 
 __all__ = [
-    'EventManager', 'APP_EVENTS',
-    'ObsValue', 'ObsList',
+    'EventManager', 'APP_EVENTS', 'ValueChange',
+    'ObsValue', 'ObsList', 'ObsMap',
     'ArgT', 'CtxT', 'KeyT', 'ValueT',
 ]
 
@@ -33,7 +32,7 @@ ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
 KeyT = TypeVar('KeyT', bound=Hashable)
 ValueT = TypeVar('ValueT')
-NoneType: Type[None] = type(None)
+NoneType = Type[None]
 _UNSET: Any = object()
 
 
@@ -95,7 +94,7 @@ class EventManager:
         instead of type(None).
         """
         if arg_type is None:
-            arg_type = cast(Type[ArgT], NoneType)
+            arg_type = cast(Type[ArgT], type(None))
         key = (id(ctx), arg_type)
         try:
             spec = self._events[key]
@@ -160,7 +159,7 @@ class EventManager:
         If it is not registered, raise LookupError.
         """
         if arg_type is None:
-            arg_type = cast(Type[ArgT], NoneType)
+            arg_type = cast(Type[ArgT], type(None))
         try:
             self._events[id(ctx), arg_type].remove(func)
         except (KeyError, ValueError):
@@ -492,7 +491,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         self._data.sort(key=key, reverse=reverse)
         self._check_tail(orig, 0)
 
-    def __add__(self, other: Sequence[ValueT]) -> List[ValueT]:
+    def __add__(self, other: Iterable[ValueT]) -> List[ValueT]:
         """Concatenate another sequence with this one.
 
         This produces a normal list."""
@@ -502,7 +501,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         copy.extend(other)
         return copy
 
-    def __radd__(self, other: Sequence[ValueT]) -> List[ValueT]:
+    def __radd__(self, other: Iterable[ValueT]) -> List[ValueT]:
         """Prepend another sequence with this one.
 
         This produces a normal list."""
@@ -510,7 +509,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
             return other._data + self._data
         return list(other) + self._data
 
-    def __iadd__(self, other: Sequence[ValueT]) -> 'ObsList[ValueT]':
+    def __iadd__(self, other: Iterable[ValueT]) -> 'ObsList[ValueT]':
         """Append another sequence to this one."""
         self.extend(other)
         return self
@@ -569,7 +568,7 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
     def __repr__(self) -> str:
         return f'ObsMap({self.man!r}, {self._data!r})'
 
-    def _fire(self, key: KeyT, orig: ValueT, new: ValueT) -> None:
+    def _fire(self, key: KeyT, orig: Optional[ValueT], new: Optional[ValueT]) -> None:
         """Internally fire an event."""
         self.man(self, ValueChange(orig, new, key))
 
@@ -582,15 +581,19 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
     def __iter__(self) -> Iterator[KeyT]:
         return iter(self._data)
 
-    def __contains__(self, key: KeyT) -> bool:
+    def __contains__(self, key: object) -> bool:
         return key in self._data
+
+    def copy(self) -> 'ObsMap[KeyT, ValueT]':
+        """Return a duplicate of this map, with the same manager."""
+        return ObsMap(self.man, self._data)
 
     @overload
     def get(self, k: KeyT) -> Optional[ValueT]: ...
     @overload
     def get(self, k: KeyT, default: Union[ValueT, ArgT]) -> Union[ValueT, ArgT]: ...
 
-    def get(self, k: KeyT, default: Union[ValueT, ArgT] = None) -> Optional[ValueT, ArgT]:
+    def get(self, k: KeyT, default: Union[ValueT, ArgT] = None) -> Union[ValueT, ArgT, None]:
         """Return map[k], or default if key is not present."""
         return self._data.get(k, default)
 
@@ -649,3 +652,15 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
         keyvalue = key, value = self._data.popitem()
         self._fire(key, value, None)
         return keyvalue
+
+    def setdefault(self, key: KeyT, default: Union[ValueT, ArgT] = None) -> Union[ValueT, ArgT]:
+        """If the key is present, return the value.
+
+        Otherwise, set the key to the default, return the default, and fire an event.
+        """
+        try:
+            return self._data[key]
+        except KeyError:
+            self._data[key] = default
+            self._fire(key, None, default)
+            return default

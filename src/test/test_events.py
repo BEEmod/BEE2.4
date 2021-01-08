@@ -1,11 +1,10 @@
 """Test the events manager and collections."""
 import sys
-from contextlib import contextmanager
 
 import pytest
 from unittest.mock import Mock, create_autospec, call
 
-from event import EventManager, ValueChange, ObsValue, ObsList
+from event import EventManager, ValueChange, ObsValue, ObsList, ObsMap
 
 
 def event_func(arg):
@@ -280,16 +279,16 @@ def test_obsval_repr() -> None:
 
 try:
     from test.list_tests import CommonTest as CPyListTest
+    from test.mapping_tests import TestHashMappingProtocol as CPyMapTest
 except ImportError:
     # No test package installed, can only run the ones here.
-    from unittest import TestCase as CPyListTest
+    from unittest import TestCase as CPyListTest, TestCase as CPyMapTest
 
     def test_no_cpython():
         """Log that the tests aren't importable."""
-        pytest.fail("No test.list_tests to import!")
+        pytest.fail("No test.list_tests and test.mapping_tests to import!")
 
-
-class CPythonObsTests(CPyListTest):
+class CPythonObsListTests(CPyListTest):
     """Use CPython's own tests.
 
     This should comprehensively test that it does the same thing
@@ -363,11 +362,58 @@ class CPythonObsTests(CPyListTest):
         self.assertEqual(next(iter(T(EventManager(), (1, 2)))), 1)
 
 
-# Don't test this itself.
-del CPyListTest
+class CPythonObsMapTests(CPyMapTest):
+    """Use CPython's own tests.
+
+    This should comprehensively test that it does the same thing
+    as the original dict type.
+    """
+    type2test = ObsMap
+    man = EventManager()
+    event_fail = False
+
+    def _reference(self):
+        """Return a dictionary of values which are invariant by storage
+        in the object under test."""
+        return self._full_mapping({"1": "2", "key1": "value1", "key2": (1, 2, 3)})
+
+    def _empty_mapping(self):
+        """Return an empty mapping object"""
+        return self._full_mapping({})
+
+    def _full_mapping(self, data):
+        """Return a mapping object with the value contained in data
+        dictionary"""
+        dct = ObsMap(self.man, data)
+        if self.event_fail:
+            dct.man.register(dct, ValueChange, pytest.fail)
+        return dct
+
+    # fromkeys() for us isn't useful.
+    test_fromkeys = None
+
+    # Our constructor is different.
+    test_constructor = None
+
+    # Our repr() is and should be different.
+    test_repr = None
+
+    def test_read(self):
+        """Fail if any event is fired."""
+        self.man = EventManager()
+        try:
+            self.event_fail = True
+            super().test_read()
+        finally:
+            self.event_fail = False
+            self.man = EventManager()
 
 
-def test_repr() -> None:
+# Don't test these themselves.
+del CPyListTest, CPyMapTest
+
+
+def test_obslist_repr() -> None:
     """Replicate the original list checks."""
     man = EventManager()
     l0 = []
@@ -497,23 +543,24 @@ def test_obslist_slice_assignment_same() -> None:
 def test_obslist_reverse() -> None:
     """Test the inplace reverse fires events."""
     man = EventManager()
-    seq = ObsList(man, range(10))
+    # x10 to distinguish ind/keys.
+    seq = ObsList(man, (x * 10 for x in range(10)))
     event = create_autospec(event_func)
     man.register(seq, ValueChange, event)
 
     seq.reverse()
     assert event.call_count == 10
     event.assert_has_calls([
-        call(ValueChange(0, 9, 0)),
-        call(ValueChange(1, 8, 1)),
-        call(ValueChange(2, 7, 2)),
-        call(ValueChange(3, 6, 3)),
-        call(ValueChange(4, 5, 4)),
-        call(ValueChange(5, 4, 5)),
-        call(ValueChange(6, 3, 6)),
-        call(ValueChange(7, 2, 7)),
-        call(ValueChange(8, 1, 8)),
-        call(ValueChange(9, 0, 9)),
+        call(ValueChange( 0, 90, 0)),
+        call(ValueChange(10, 80, 1)),
+        call(ValueChange(20, 70, 2)),
+        call(ValueChange(30, 60, 3)),
+        call(ValueChange(40, 50, 4)),
+        call(ValueChange(50, 40, 5)),
+        call(ValueChange(60, 30, 6)),
+        call(ValueChange(70, 20, 7)),
+        call(ValueChange(80, 10, 8)),
+        call(ValueChange(90,  0, 9)),
     ])
     # Check odd lengths.
     assert seq.pop() == 0
@@ -522,15 +569,15 @@ def test_obslist_reverse() -> None:
     seq.reverse()
     assert event.call_count == 9
     event.assert_has_calls([
-        call(ValueChange(9, 1, 0)),
-        call(ValueChange(8, 2, 1)),
-        call(ValueChange(7, 3, 2)),
-        call(ValueChange(6, 4, 3)),
-        call(ValueChange(5, 5, 4)),
-        call(ValueChange(4, 6, 5)),
-        call(ValueChange(3, 7, 6)),
-        call(ValueChange(2, 8, 7)),
-        call(ValueChange(1, 9, 8)),
+        call(ValueChange(90, 10, 0)),
+        call(ValueChange(80, 20, 1)),
+        call(ValueChange(70, 30, 2)),
+        call(ValueChange(60, 40, 3)),
+        call(ValueChange(50, 50, 4)),
+        call(ValueChange(40, 60, 5)),
+        call(ValueChange(30, 70, 6)),
+        call(ValueChange(20, 80, 7)),
+        call(ValueChange(10, 90, 8)),
     ])
 
 
@@ -565,3 +612,87 @@ def test_obslist_sort() -> None:
         call(ValueChange(+5, +3, 5)),
         call(ValueChange(+8, -2, 6)),
     ])
+
+
+def test_obsmap_repr():
+    """Same as test.test_mapping.TestHashMappingProtocol, but with our repr."""
+    man = EventManager()
+    man_repr = repr(man)  # Contains the memory address.
+    d = ObsMap(man)
+    assert repr(d) == 'ObsMap(%, {})'.replace('%', man_repr)
+    d[1] = 2
+    assert repr(d) == 'ObsMap(%, {1: 2})'.replace('%', man_repr)
+
+    d = ObsMap(man)
+    d[1] = d
+    assert repr(d) == 'ObsMap(%, {1: ObsMap(...)})'.replace('%', man_repr)
+
+    class Exc(Exception): pass
+
+    class BadRepr(object):
+        def __repr__(self):
+            raise Exc()
+
+    d = ObsMap(man, {1: BadRepr()})
+    with pytest.raises(Exc):
+        repr(d)
+
+
+def test_obsmap_setting():
+    man = EventManager()
+    dct: ObsMap = ObsMap(man, {1: False})
+    event = create_autospec(event_func)
+    man.register(dct, ValueChange, event)
+    assert event.call_count == 0
+
+    dct[1] = True
+    event.assert_has_calls([
+        call(ValueChange(False, True, key=1))
+    ])
+    event.reset_mock()
+
+    o = object()
+    dct[78] = o
+    dct['hello'] = 'bye'
+    dct[78] = 'blah'
+    dct['hello'] = dct[78]
+    event.assert_has_calls([
+        call(ValueChange(None, o, key=78)),
+        call(ValueChange(None, 'bye', key='hello')),
+        call(ValueChange(o, 'blah', key=78)),
+        call(ValueChange('bye', 'blah', key='hello')),
+    ])
+    event.reset_mock()
+
+    del dct[78]
+    event.assert_has_calls([
+        call(ValueChange('blah', None, key=78)),
+    ])
+    event.reset_mock()
+
+    dct[78] = 'test'
+    event.assert_has_calls([
+        call(ValueChange(None, 'test', key=78)),
+    ])
+    event.reset_mock()
+
+
+def test_obsmap_setdefault():
+    """An event should only fire if the key isn't present."""
+    man = EventManager()
+    dct: ObsMap = ObsMap(man, {'present': True})
+    event = create_autospec(event_func)
+    man.register(dct, ValueChange, event)
+
+    assert dct.setdefault('present', 45) == True
+    assert event.call_count == 0
+    event.reset_mock()
+
+    assert dct.setdefault('missing', 70) == 70
+    event.assert_has_calls([
+        call(ValueChange(None, 70, 'missing'))
+    ])
+    event.reset_mock()
+    assert dct['missing'] == 70
+    assert dct.setdefault('missing', 30) == 70
+    assert event.call_count == 0
