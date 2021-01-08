@@ -181,8 +181,16 @@ def test_valuechange() -> None:
         ValueChange(1)
     with pytest.raises(TypeError):
         ValueChange(1, 2)
+    with pytest.raises(TypeError):
+        ValueChange(1, 2, key=4, ind=6)
+    with pytest.raises(TypeError):
+        ValueChange(1, 2, 3, 4)
     assert ValueChange(1, 2, 3) == (1, 2, 3)
+    assert ValueChange(2, 5, key=10) == (2, 5, 10)
+    assert ValueChange(2, 5, ind=10) == (2, 5, 10)
+    assert ValueChange(ind=5, old=2, new=3) == (2, 3, 5)
     assert ValueChange(key=5, old=2, new=3) == (2, 3, 5)
+    assert ValueChange(ind=5, old=2, new=3) == (2, 3, 5)
     examp = ValueChange(0, 1, 'hi')
     assert list(examp) == [0, 1, 'hi']
     assert examp.ind is examp.key is examp[2] == 'hi'

@@ -34,7 +34,7 @@ CtxT = TypeVar('CtxT')
 KeyT = TypeVar('KeyT', bound=Hashable)
 ValueT = TypeVar('ValueT')
 NoneType: Type[None] = type(None)
-_UNSET = object()
+_UNSET: Any = object()
 
 
 class EventSpec(Generic[ArgT], List[Callable[[ArgT], Any]]):
@@ -182,31 +182,70 @@ class ValueChange(tuple, Generic[KeyT, ValueT]):
 
     _fields = ('old', 'new', 'key')
 
-    def __new__(cls, old: ValueT, new: ValueT, key: KeyT) -> 'ValueChange':
+    @overload
+    def __new__(cls, old: ValueT, new: ValueT, key: KeyT) -> 'ValueChange': ...
+
+    @overload
+    def __new__(cls, old: ValueT, new: ValueT, ind: KeyT) -> 'ValueChange': ...
+
+    def __new__(cls, old: ValueT, new: ValueT, key: KeyT=_UNSET, *, ind: KeyT=_UNSET) -> 'ValueChange':
         """Create new instance of ValueChange(old, new, key)"""
+        if key is _UNSET:
+            if ind is _UNSET:
+                raise TypeError('Either key or ind must be provided.')
+            key = ind
+        elif ind is not _UNSET:
+            raise TypeError('Both key and ind cannot be provided!')
         return tuple.__new__(cls, (old, new, key))
 
     @classmethod
-    def _make(cls, iterable) -> 'ValueChange':
+    def _make(cls, iterable: Iterable[Union[KeyT, ValueT]]) -> 'ValueChange':
         """Make a new ValueChange object from a sequence or iterable."""
         result = tuple.__new__(cls, iterable)
         if len(result) != 3:
             raise TypeError('Expected 3 arguments, got %d' % len(result))
         return result
 
+    @overload
+    def _replace(
+        self,
+        old: ValueT=...,
+        new: ValueT=...,
+        ind: KeyT=...,
+    ) -> 'ValueChange':
+        pass
+
+    @overload
+    def _replace(
+        self,
+        old: ValueT=...,
+        new: ValueT=...,
+        key: KeyT=...,
+    ) -> 'ValueChange':
+        pass
+
     def _replace(self, **kwds) -> 'ValueChange':
         """Return a new ValueChange object replacing specified fields with
         new values"""
-        result = self._make(map(kwds.pop, ('old', 'new', 'key'), self))
+        old = kwds.pop('old', self[0])
+        new = kwds.pop('new', self[1])
+        if 'key' in kwds:
+            key = kwds.pop('key')
+        elif 'ind' in kwds:
+            key = kwds.pop('ind')
+        else:
+            key = self[2]
+
+        result = tuple.__new__(ValueChange, (old, new, key))
         if kwds:
-            raise ValueError('Got unexpected field names: %r' % list(kwds))
+            raise ValueError(f'Got unexpected field names: {list(kwds)!r}')
         return result
 
     def __repr__(self) -> str:
         """Return a nicely formatted representation string"""
         return 'ValueChange(old={!r}, new={!r}, key={!r})'.format(*self)
 
-    def __getnewargs__(self):
+    def __getnewargs__(self) -> object:
         """Return self as a plain tuple.  Used by copy and pickle."""
         return tuple(self)
 
@@ -428,7 +467,6 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         self._data.reverse()
         size = len(self._data) - 1
         for new_ind, item in enumerate(reversed(self._data)):
-            old_ind = size - new_ind
             self._fire(new_ind, item, self._data[new_ind])
 
     def pop(self, index: int = -1) -> ValueT:
