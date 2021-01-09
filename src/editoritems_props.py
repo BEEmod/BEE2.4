@@ -1,19 +1,22 @@
 """The different properties defineable for items."""
 from typing import Type, TypeVar, Generic, ClassVar, Sequence, Dict
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from srctools import Property as KeyValues  # Prevent confusion
-from srctools import conv_bool, conv_int, conv_float, bool_as_int, Vec
+from srctools import conv_bool, conv_int, conv_float, bool_as_int, Angle
 
 
 ValueT = TypeVar('ValueT')
 
 
-class ItemProps(Generic[ValueT]):
+class ItemProp(Generic[ValueT]):
     """A property for an item."""
     id: ClassVar[str]  # Property name for this.
     trans_name: ClassVar[str]  # The translation keyword for this, if it exists.
     instvar: ClassVar[str]  # The instance variable this sets, if any.
+    # All the possible values this can have, if used as a subtype.
+    # If not useable, produce a zero-length sequence.
+    subtype_values: ClassVar[Sequence[ValueT]] = ()
 
     def __init__(self, default: ValueT) -> None:
         self.default = default
@@ -35,7 +38,7 @@ class ItemProps(Generic[ValueT]):
         return NotImplemented
 
     @staticmethod
-    def parse(props: KeyValues) -> 'ItemProps':
+    def parse(props: KeyValues) -> 'ItemProp':
         """Parse a property block, picking the appropriate class."""
         cls = PROP_TYPES[props.name]
 
@@ -68,21 +71,14 @@ class ItemProps(Generic[ValueT]):
     def _export_value(value: ValueT) -> str:
         return str(value)
 
-    def subtype_values(self) -> Sequence[ValueT]:
-        """Produce all the possible values this can have,
-
-        if used as a subtype.
-        If not useable, produce a zero-length sequence.
-        """
-        return ()
-
 
 # ID -> class
-PROP_TYPES: Dict[str, Type[ItemProps]] = {}
+PROP_TYPES: Dict[str, Type[ItemProp]] = {}
 
 
-class _BoolProp(ItemProps[bool]):
+class _BoolProp(ItemProp[bool]):
     """Implements boolean-type properties."""
+    subtype_values = (False, True)
 
     @staticmethod
     def _parse_value(value: str) -> bool:
@@ -92,16 +88,8 @@ class _BoolProp(ItemProps[bool]):
     def _export_value(value: bool) -> str:
         return bool_as_int(value)
 
-    def subtype_values(self) -> Sequence[bool]:
-        """Produce all the possible values this can have,
 
-        if used as a subtype.
-        If not useable, produce a zero-length sequence.
-        """
-        return (False, True)
-
-
-class _FloatProp(ItemProps[bool]):
+class _FloatProp(ItemProp[float]):
     """Implements float-type properties. These are all internal."""
     trans_name = ''  # Hidden prop
 
@@ -110,7 +98,24 @@ class _FloatProp(ItemProps[bool]):
         return conv_float(value)
 
 
+class _EnumProp(ItemProp[ValueT], Generic[ValueT]):
+    """*Type props, with an enum."""
+    _enum: ClassVar[Type[ValueT]]
+
+    @classmethod
+    def _parse_value(cls, value: str) -> ValueT:
+        try:
+            return cls._enum[value.upper()]
+        except ValueError:
+            pass
+        return cls._enum(int(value))
+
+    @staticmethod
+    def _export_value(typ: ValueT) -> str:
+        return str(typ.value)
+
 # Enumerations for various types.
+
 
 class PanelAnimation(Enum):
     """Available angles for angled panels."""
@@ -118,6 +123,12 @@ class PanelAnimation(Enum):
     ANGLE_45 = 45
     ANGLE_60 = 60
     AMGLE_90 = 90
+
+
+class PanelType(Enum):
+    """The type of angled panel that is used."""
+    ANGLED = '0'
+    GLASS = '1'
 
 
 class PaintTypes(Enum):
@@ -129,15 +140,6 @@ class PaintTypes(Enum):
     GREY = GRAY = REFLECT = "reflect"  # Extra/hacked in.
 
 
-ALL_PAINTS = [
-    PaintTypes.BOUNCE,
-    PaintTypes.SPEED,
-    PaintTypes.PORTAL,
-    PaintTypes.ERASE,
-    PaintTypes.REFLECT
-]
-
-
 class PaintFlows(Enum):
     """The different flow amounts paint can have."""
     LIGHT = 'light'
@@ -147,16 +149,32 @@ class PaintFlows(Enum):
     BOMB = 'bomb'
 
 
-FLOW_ORDER = list(PaintFlows)
-
-
 class CubeTypes(Enum):
     """The different types of cubes."""
     STANDARD = 0
     COMPANION = 1
     REFLECT = 2
     SPHERE = 3
-    FRANKEN = 6
+    FRANKEN = 4
+
+
+class ButtonTypes(Enum):
+    """The different types of floor buttons."""
+    FLOOR = WEIGHTED = 0
+    BOX = CUBE = 1
+    BALL = SPHERE = 2
+
+
+class FizzlerTypes(Enum):
+    """The different types of fizzlers."""
+    FIZZLER = 0
+    LASERFIELD = 1
+
+
+class GlassTypes(Enum):
+    """The different types of glass."""
+    GLASS = 0
+    GRATE = GRATING = 1
 
 
 # Actual properties begin here.
@@ -292,14 +310,14 @@ class TrackSpeed(_FloatProp):
     instvar = '$speed'
 
 
-class TrackMoveDirection(ItemProps[Vec]):  # TODO: Angle
+class TrackMoveDirection(ItemProp[Angle]):
     id = 'TravelDirection'
     instvar = '$travel_direction'
     trans_name = ''  # Hidden prop
 
     @staticmethod
-    def _parse_value(value: str) -> Vec:
-        return Vec.from_str(value)
+    def _parse_value(value: str) -> Angle:
+        return Angle.from_str(value)
 
 
 # Piston Platform:
@@ -310,11 +328,13 @@ class TrackMoveDirection(ItemProps[Vec]):  # TODO: Angle
 # 0
 
 
-class PistonLowerExtent(ItemProps[int]):
+class PistonLowerExtent(ItemProp[int]):
     id = 'BottomLevel'
     instvar = '$bottom_level'
     trans_name = ''  # Controlled by the widgets.
+    subtype_values = [0, 1, 2, 3]
 
+    @staticmethod
     def _parse_value(value: str) -> int:
         try:
             pos = int(value)
@@ -324,15 +344,14 @@ class PistonLowerExtent(ItemProps[int]):
             raise ValueError(f'Invalid position {value}!') from None
         raise ValueError(f'Position {value} not in 0, 1, 2, 3!')
 
-    def subtype_values(self):
-        return (0, 1, 2, 3)
 
-
-class PistonUpperExtent(ItemProps[int]):
+class PistonUpperExtent(ItemProp[int]):
     id = 'TopLevel'
     instvar = '$top_level'
     trans_name = ''  # Controlled by the widgets.
+    subtype_values = [1, 2, 3, 4]
 
+    @staticmethod
     def _parse_value(value: str) -> int:
         try:
             pos = int(value)
@@ -341,9 +360,6 @@ class PistonUpperExtent(ItemProps[int]):
         except ValueError:
             raise ValueError(f'Invalid position {value}!') from None
         raise ValueError(f'Position {value} not in 1, 2, 3, 4!')
-
-    def subtype_values(self):
-        return (1, 2, 3, 4)
 
 
 class PistonStartUp(_BoolProp):
@@ -362,13 +378,12 @@ class PistonAutoTrigger(_BoolProp):
 
 # Paint stuff.
 
-class PaintTypeProp(ItemProps[PaintTypes]):
+class PaintTypeProp(ItemProp[PaintTypes]):
     """The main paint type property, directly specifying each paint type."""
     id = 'PaintType'
     instvar = ''  # Done through the other props.
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_paint_type'
-
-    _paint_order = [
+    subtype_values = [
         PaintTypes.BOUNCE,
         PaintTypes.SPEED,
         PaintTypes.PORTAL,
@@ -376,6 +391,7 @@ class PaintTypeProp(ItemProps[PaintTypes]):
         # This is not actually valid, but it works to get a single custom type.
         PaintTypes.REFLECT,
     ]
+    _export_order = subtype_values
 
     @classmethod
     def _parse_value(cls, value: str) -> PaintTypes:
@@ -388,15 +404,12 @@ class PaintTypeProp(ItemProps[PaintTypes]):
 
         index = int(value)
         if 0 <= index < 5:
-            return cls._paint_order[index]
+            return cls.subtype_values[index]
         raise ValueError(f'{value} is not a valid paint type!') from None
 
     @classmethod
     def _export_value(cls, value: PaintTypes) -> str:
-        return cls._paint_order.index(value)
-
-    def subtype_values(self) -> Sequence[PaintTypes]:
-        return ALL_PAINTS
+        return str(cls._export_order.index(value))
 
 
 class PaintExportType(PaintTypeProp):
@@ -417,8 +430,9 @@ class PaintExportType(PaintTypeProp):
     ]
 
 
-class PaintFlowRype(ItemProps[PaintFlows]):
+class PaintFlowType(ItemProp[PaintFlows]):
     """The amount of gel that drops."""
+
     id = 'PaintFlowType'
     # This actually sets multiple variables:
     # - $blobs_per_second
@@ -429,6 +443,15 @@ class PaintFlowRype(ItemProps[PaintFlows]):
     # The first is the most "important".
     instvar = '$blobs_per_second'
     trans_name = '$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'
+    subtype_values = list(PaintFlows)
+
+    @staticmethod
+    def _parse_value(value: str) -> PaintFlows:
+        return PaintFlows(value)
+
+    @staticmethod
+    def _export_value(value: PaintFlows) -> str:
+        return value.value
 
 
 class PaintAllowStreaks(_BoolProp):
@@ -441,7 +464,7 @@ class PaintAllowStreaks(_BoolProp):
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'
 
 
-class ConnectionCount(ItemProps[int]):
+class ConnectionCount(ItemProp[int]):
     """Tracks the number of input items."""
     id = 'ConnectionCount'
     instvar = "$connectioncount"
@@ -462,7 +485,7 @@ class ConnectionCountPolarity(ConnectionCount):
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_tbeam_polarity'
 
 
-class TimerDelay(ItemProps[int]):
+class TimerDelay(ItemProp[int]):
     """The Timer Delay property, providing 0-30 second delays."""
     id = "TimerDelay"
     instvar = "$timer_delay"
@@ -478,44 +501,100 @@ class TimerDelay(ItemProps[int]):
         return range(0, 31)
 
 
-# 'angledpanelanimation':     (PropTypes.PANEL,
-# 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
-
-# 'angledpaneltype': (PropTypes.NONE, 'Angled Panel Type'),
-# 'targetname': (PropTypes.NONE, 'Faith Target Name'),
-
-# 'cubetype': (PropTypes.SUB_TYPE, 'Cube Type'),
-# 'hazardtype': (PropTypes.SUB_TYPE, 'Fizzler Type'),
-# 'barriertype': (PropTypes.SUB_TYPE, 'Barrier Type'),
-# 'buttontype': (PropTypes.SUB_TYPE, 'Button Type'),
-
-
 class FaithVerticalAlignment(_BoolProp):
     """Specifies if a Faith Plate is in straight-up or angled mode."""
-    id = 'verticalalignment'
+    id = 'VerticalAlignment'
     instvar = ''  # None!
     trans_name = ''  # Not visible.
 
 
 class FaithSpeed(_FloatProp):
     """Stores the Faith Plate's speed, defining the arc height."""
-    id = 'catapultspeed'
+    id = 'CatapultSpeed'
     instvar = '$catapult_speed'
     trans_name = ''  # Not visible.
 
 
-class FaithTargetName(ItemProps[str]):
+class FaithTargetName(ItemProp[str]):
     """Logically would store or produce the name of the target.
 
     However, this never does anything.
     """
-    id = 'targetname'
+    id = 'Targetname'
     instvar = ''
     trans_name = ''
 
     @staticmethod
     def _parse_value(value: str) -> str:
         return value
+
+
+class AngledPanelType(_EnumProp[PanelType]):
+    """Differentiates between the two angled panel items."""
+    id = 'AngledPanelType'
+    instvar = ''  # None!
+    trans_name = ''  # Not visible.
+    subtype_values = list(PanelType)
+    _enum = PanelType
+
+
+class AngledPanelAnimation(ItemProp[PanelAnimation]):
+    """The angle the panel rises to."""
+    id = 'AngledPanelAnimation'
+    instvar = 'animation'
+    trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'
+    subtype_values = list(PanelAnimation)
+
+    @classmethod
+    def _parse_value(cls, value: str) -> PanelAnimation:
+        value = value.casefold()
+        if value.startswith('ramp_') and value.endswith('_deg_open'):
+            value = value[5:-10]
+        ind = int(value)
+        if ind < 30:
+            return cls.subtype_values[ind]
+        else:
+            return PanelAnimation(int(value))
+
+    @staticmethod
+    def _export_value(ang: PanelAnimation) -> str:
+        return f'ramp_{ang.value}_deg_open'
+
+
+class CubeTypeProp(_EnumProp[CubeTypes]):
+    """Type of cubes."""
+    id = 'CubeType'
+    instvar = 'cubetype'
+    trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_cube_type'
+    subtype_values = list(CubeTypes)
+    _enum = CubeTypes
+
+
+class ButtonTypeProp(_EnumProp[ButtonTypes]):
+    """Type of floor buttons."""
+    id = 'ButtonType'
+    instvar = ''  # Sets instance index.
+    trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_button_type'
+    subtype_values = list(ButtonTypes)
+    _enum = ButtonTypes
+
+
+class FizzlerTypeProp(_EnumProp[FizzlerTypes]):
+    """Type of fizzlers."""
+    id = 'hazardtype'
+    instvar = '$skin'
+    trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_barrier_hazard_type'
+    subtype_values = list(FizzlerTypes)
+    _enum = FizzlerTypes
+
+
+class GlassTypeProp(_EnumProp[GlassTypes]):
+    """Type of fizzlers."""
+    id = 'BarrierType'
+    instvar = ''  # Brushes placed only
+    trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_barrier_type'
+    subtype_values = list(GlassTypes)
+    _enum = GlassTypes
 
 
 # Finally add to the dict.
