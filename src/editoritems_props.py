@@ -1,5 +1,5 @@
 """The different properties defineable for items."""
-from typing import Type, TypeVar, Generic, ClassVar, Sequence, Dict
+from typing import Type, TypeVar, Generic, ClassVar, Sequence, Dict, Tuple
 from abc import abstractmethod
 from enum import Enum
 from srctools import Property as KeyValues  # Prevent confusion
@@ -18,8 +18,11 @@ class ItemProp(Generic[ValueT]):
     # If not useable, produce a zero-length sequence.
     subtype_values: ClassVar[Sequence[ValueT]] = ()
 
-    def __init__(self, default: ValueT) -> None:
-        self.default = default
+    def __init__(self, default: str, index: int, user_default: bool = True) -> None:
+        self.default = self._parse_value(default)
+        self.index = index
+        # If false, don't show on the default selection window.
+        self.allow_user_default = user_default
 
     def __repr__(self) -> str:
         """Generic repr() for properties."""
@@ -37,14 +40,10 @@ class ItemProp(Generic[ValueT]):
             return self.default != other.default
         return NotImplemented
 
-    @staticmethod
-    def parse(props: KeyValues) -> 'ItemProp':
-        """Parse a property block, picking the appropriate class."""
-        cls = PROP_TYPES[props.name]
+    def __hash__(self) -> int:
+        return hash((self.id, self.default))
 
-        return cls(cls._parse_value(props['DefaultValue', '']))
-
-    def export(self, index: int = 0) -> KeyValues:
+    def export(self, index: int = 0) -> Tuple[str, int]:
         """Generate the property block to write this back to the file.
 
         A unique index must be provided if the variable produces an instvar.
@@ -55,10 +54,10 @@ class ItemProp(Generic[ValueT]):
                     type(self).__qualname__ + '() requires an index!')
         else:
             index = 0
-        return KeyValues(self.id, [
-            KeyValues('DefaultValue', self._export_value(self.default)),
-            KeyValues('Index', str(index)),
-        ])
+        return self._export_value(self.default), index
+
+    def parse_value(self, value: str) -> ValueT:
+        return self._parse_value(value)
 
     # Subclasses should implement the following:
 
@@ -106,7 +105,7 @@ class _EnumProp(ItemProp[ValueT], Generic[ValueT]):
     def _parse_value(cls, value: str) -> ValueT:
         try:
             return cls._enum[value.upper()]
-        except ValueError:
+        except KeyError:
             pass
         return cls._enum(int(value))
 
@@ -125,12 +124,6 @@ class PanelAnimation(Enum):
     AMGLE_90 = 90
 
 
-class PanelType(Enum):
-    """The type of angled panel that is used."""
-    ANGLED = '0'
-    GLASS = '1'
-
-
 class PaintTypes(Enum):
     """The 5 types of gel that exist."""
     BLUE = BOUNCE = "bounce"
@@ -142,11 +135,11 @@ class PaintTypes(Enum):
 
 class PaintFlows(Enum):
     """The different flow amounts paint can have."""
-    LIGHT = 'light'
-    MEDIUM = 'medium'
-    HEAVY = 'heavy'
-    DRIP = 'drip'
-    BOMB = 'bomb'
+    LIGHT = 0
+    MEDIUM = 1
+    HEAVY = 2
+    DRIP = 3
+    BOMB = 4
 
 
 class CubeTypes(Enum):
@@ -216,7 +209,7 @@ class StartLocked(_BoolProp):
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'
 
 
-class FlipPanelPortalability(_BoolProp):
+class Portalability(_BoolProp):
     """Specifies if the flip panel starts portalable."""
     id = 'portalable'
     instvar = '$start_deployed'
@@ -430,7 +423,7 @@ class PaintExportType(PaintTypeProp):
     ]
 
 
-class PaintFlowType(ItemProp[PaintFlows]):
+class PaintFlowType(_EnumProp[PaintFlows]):
     """The amount of gel that drops."""
 
     id = 'PaintFlowType'
@@ -444,14 +437,7 @@ class PaintFlowType(ItemProp[PaintFlows]):
     instvar = '$blobs_per_second'
     trans_name = '$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'
     subtype_values = list(PaintFlows)
-
-    @staticmethod
-    def _parse_value(value: str) -> PaintFlows:
-        return PaintFlows(value)
-
-    @staticmethod
-    def _export_value(value: PaintFlows) -> str:
-        return value.value
+    _enum = PaintFlows
 
 
 class PaintAllowStreaks(_BoolProp):
@@ -490,15 +476,21 @@ class TimerDelay(ItemProp[int]):
     id = "TimerDelay"
     instvar = "$timer_delay"
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_timer_delay'
+    subtype_values = range(0, 31)
 
     @staticmethod
     def _parse_value(value: str) -> int:
         time = conv_int(value, 3)
         return max(0, min(30, time))
 
-    def subtype_values(self) -> Sequence[int]:
-        """Timers have a value from 0-30."""
-        return range(0, 31)
+
+class TimerSound(_BoolProp):
+    """Specifies if a pedestal button should play timer sounds.
+
+    """
+    id = 'TimerSound'
+    instvar = '$timer_sound'
+    trans_name = ''  # Not visible.
 
 
 class FaithVerticalAlignment(_BoolProp):
@@ -529,30 +521,39 @@ class FaithTargetName(ItemProp[str]):
         return value
 
 
-class AngledPanelType(_EnumProp[PanelType]):
-    """Differentiates between the two angled panel items."""
+class AngledPanelType(ItemProp[str]):
+    """Differentiates between the two angled panel items, presumably.
+
+    Defaults to 2 always, so the value isn't important.
+    """
     id = 'AngledPanelType'
     instvar = ''  # None!
     trans_name = ''  # Not visible.
-    subtype_values = list(PanelType)
-    _enum = PanelType
+
+    @staticmethod
+    def _parse_value(value: str) -> str:
+        return value
 
 
 class AngledPanelAnimation(ItemProp[PanelAnimation]):
     """The angle the panel rises to."""
     id = 'AngledPanelAnimation'
-    instvar = 'animation'
+    instvar = '$animation'
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'
     subtype_values = list(PanelAnimation)
 
     @classmethod
     def _parse_value(cls, value: str) -> PanelAnimation:
+        orig_value = value
         value = value.casefold()
         if value.startswith('ramp_') and value.endswith('_deg_open'):
-            value = value[5:-10]
+            value = value[5:-9]
         ind = int(value)
         if ind < 30:
-            return cls.subtype_values[ind]
+            try:
+                return cls.subtype_values[ind]
+            except IndexError:
+                raise ValueError(f'Unknown animation {orig_value}')
         else:
             return PanelAnimation(int(value))
 
@@ -564,7 +565,7 @@ class AngledPanelAnimation(ItemProp[PanelAnimation]):
 class CubeTypeProp(_EnumProp[CubeTypes]):
     """Type of cubes."""
     id = 'CubeType'
-    instvar = 'cubetype'
+    instvar = '$cubetype'
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_cube_type'
     subtype_values = list(CubeTypes)
     _enum = CubeTypes
@@ -606,4 +607,3 @@ PROP_TYPES.update({
     if isinstance(prop_type, type)
        and hasattr(prop_type, 'id')
 })
-

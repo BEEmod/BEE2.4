@@ -3,7 +3,7 @@ from enum import Enum, Flag, auto
 from typing import List, Dict, Optional, Tuple, Set, Container, Iterable, Union
 from pathlib import PurePosixPath as FSPath
 
-from srctools import Vec, logger
+from srctools import Vec, logger, conv_int, conv_bool
 from srctools.tokenizer import Tokenizer, Token
 from editoritems_props import ItemProp, PROP_TYPES
 
@@ -299,9 +299,9 @@ class Item:
                 if tok_value.casefold() == 'item':
                     it = cls.parse_one(tok, False)
                     if it.id == RENDERABLE_ERROR:
-                        raise ValueError('Error icon must be in the renderables section!')
+                        raise tok.error('Error icon must be in the renderables section!')
                     if it.id == RENDERABLE_CONN:
-                        raise ValueError('Connections icon must be in the renderables section!')
+                        raise tok.error('Connections icon must be in the renderables section!')
                     if it.id in items:
                         LOGGER.warning('Item {} redeclared!', it.id)
                     items[it.id] = it
@@ -311,7 +311,7 @@ class Item:
                         if token is Token.STRING and tok_value.casefold() == 'item':
                             it = cls.parse_one(tok, True)
                             if it.id != RENDERABLE_ERROR and it.id != RENDERABLE_CONN:
-                                raise ValueError(f'Item ID {it.id} is not a known renderable!')
+                                raise tok.error(f'Item ID {it.id} is not a known renderable!')
                             items[it.id] = it
                         elif token is Token.BRACE_CLOSE:
                             break
@@ -365,7 +365,6 @@ class Item:
                 tok.expect(Token.BRACE_OPEN)
                 item._parse_editor_block(tok)
             elif tok_value == 'properties':
-                tok.expect(Token.BRACE_OPEN)
                 item._parse_properties_block(tok)
             elif tok_value == 'exporting':
                 tok.expect(Token.BRACE_OPEN)
@@ -380,6 +379,29 @@ class Item:
 
     def _parse_properties_block(self, tok: Tokenizer) -> None:
         """Parse the properties block of the item definitions."""
+        for prop_str in tok.block('Properties'):
+            try:
+                prop_type = PROP_TYPES[prop_str.casefold()]
+            except KeyError:
+                raise tok.error(f'Unknown property "{prop_str}"!')
+
+            default = ''
+            index = 0
+            user_default = True
+            for prop_value in tok.block(prop_str + ' options'):
+                prop_value = prop_value.casefold()
+                if prop_value == 'defaultvalue':
+                    default = tok.expect(Token.STRING)
+                elif prop_value == 'index':
+                    index = conv_int(tok.expect(Token.STRING))
+                elif prop_value == 'bee2_ignore':
+                    user_default = conv_bool(tok.expect(Token.STRING), user_default)
+                else:
+                    raise tok.error('Unknown property option "{}"!', prop_value)
+            try:
+                self.properties[prop_type.id] = prop_type(default, index, user_default)
+            except ValueError:
+                raise tok.error('Default value {} is not valid for {} properties!', default, prop_type.id)
 
     def _parse_export_block(self, tok: Tokenizer) -> None:
         """Parse the export block of the item definitions."""
