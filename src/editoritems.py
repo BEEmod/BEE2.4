@@ -85,10 +85,11 @@ CLASS_BY_NAME = {
     for itemclass in ItemClass
 }
 
-# The special item IDs for the two "renderables", which show up in their own
-# block.
-RENDERABLE_ERROR = 'ErrorState'
-RENDERABLE_CONN = 'ConnectionHeartSolid'
+
+class RenderableType(Enum):
+    """The two "renderables", which show up in their own block."""
+    ERROR = 'ErrorState'
+    CONN = 'ConnectionHeartSolid'
 
 
 class Handle(Enum):
@@ -186,6 +187,16 @@ class Anim(Enum):
     BAD_PLACE_SHOW = 'ANIM_ICON_SHOW'
     BAD_PLACE_HIDE = 'ANIM_ICON_HIDE'
 
+    @classmethod
+    def parse_block(cls, anims: Dict['Anim', int], tok: Tokenizer) -> None:
+        """Parse a block of animation definitions."""
+        for anim_name in tok.block('Animations'):
+            try:
+                anim = Anim(anim_name)
+            except ValueError:
+                raise tok.error('Unknown animation {}', anim_name) from None
+            anims[anim] = conv_int(tok.expect(Token.STRING))
+
 
 class ConnTypes(Enum):
     """Input/output types. Many of these are used to link item pairs."""
@@ -222,6 +233,44 @@ DEFAULT_SOUNDS = {
     Sound.CREATE: 'P2Editor.PlaceOther',
     Sound.DELETE: 'P2Editor.RemoveOther',
 }
+
+
+class Renderable:
+    """Simpler definition used for the heart and error icons."""
+    _types = {r.value.casefold(): r for r in RenderableType}
+    def __init__(
+        self,
+        typ: RenderableType,
+        model: str,
+        animations: Dict[Anim, int],
+    ):
+        self.type = typ
+        self.model = model
+        self.animations = animations
+
+    @classmethod
+    def parse(cls, tok: Tokenizer) -> 'Renderable':
+        """Parse a renderable."""
+        kind: Optional[RenderableType] = None
+        model = ''
+        anims = {}
+
+        for key in tok.block("Renderable Item"):
+            if key.casefold() == "type":
+                render_id = tok.expect(Token.STRING)
+                try:
+                    kind = cls._types[render_id.casefold()]
+                except KeyError:
+                    raise tok.error('Unknown Renderable "{}"!', render_id)
+            elif key.casefold() == "animations":
+                Anim.parse_block(anims, tok)
+            elif key.casefold() == "model":
+                model = tok.expect(Token.STRING)
+            else:
+                raise tok.error('Unknown renderable option "{}"!', key)
+        if kind is None:
+            raise tok.error('No type specified for Renderable!')
+        return Renderable(kind, model, anims)
 
 
 class SubType:
@@ -297,52 +346,34 @@ class Item:
         self.offset = Vec()
 
     @classmethod
-    def parse(cls, file: Iterable[str]) -> Dict[str, 'Item']:
+    def parse(cls, file: Iterable[str]) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file."""
         items: Dict[str, Item] = {}
+        icons: Dict[RenderableType, Renderable] = {}
         tok = Tokenizer(file)
 
         if tok.expect(Token.STRING).casefold() != 'itemdata':
             raise tok.error('No "ItemData" block present!')
-        tok.expect(Token.BRACE_OPEN)
 
-        for token, tok_value in tok:
-            if token is Token.STRING:
-                if tok_value.casefold() == 'item':
-                    it = cls.parse_one(tok, False)
-                    if it.id == RENDERABLE_ERROR:
-                        raise tok.error('Error icon must be in the renderables section!')
-                    if it.id == RENDERABLE_CONN:
-                        raise tok.error('Connections icon must be in the renderables section!')
-                    if it.id in items:
-                        LOGGER.warning('Item {} redeclared!', it.id)
-                    items[it.id] = it
-                elif tok_value.casefold() == 'renderables':
-                    tok.expect(Token.BRACE_OPEN)
-                    for token, tok_value in tok:
-                        if token is Token.STRING and tok_value.casefold() == 'item':
-                            it = cls.parse_one(tok, True)
-                            if it.id != RENDERABLE_ERROR and it.id != RENDERABLE_CONN:
-                                raise tok.error(f'Item ID {it.id} is not a known renderable!')
-                            items[it.id] = it
-                        elif token is Token.BRACE_CLOSE:
-                            break
-                        elif token is not Token.NEWLINE:
-                            raise tok.error(token)
-                    else:
-                        raise tok.error('Unclosed Renderables block!')
-                else:
-                    raise tok.error('Unknown block "{}"!', tok_value)
-            elif token is Token.BRACE_CLOSE:
-                break
-            elif token is not Token.NEWLINE:
-                raise tok.error(token)
-        else:
-            raise tok.error('Unclosed ItemData block!')
-        return items
+        for key in tok.block('ItemData'):
+            if key.casefold() == 'item':
+                it = cls.parse_one(tok)
+                if it.id in items:
+                    LOGGER.warning('Item {} redeclared!', it.id)
+                items[it.id] = it
+            elif key.casefold() == 'renderables':
+                for render_block in tok.block('Renderables'):
+                    if render_block.casefold() != 'item':
+                        raise tok.error('Unknown block "{}"!', render_block)
+                    ico = Renderable.parse(tok)
+                    icons[ico.type] = ico
+            else:
+                raise tok.error('Unknown block "{}"!', key)
+
+        return items, icons
 
     @classmethod
-    def parse_one(cls, tok: Tokenizer, renderable: bool) -> 'Item':
+    def parse_one(cls, tok: Tokenizer) -> 'Item':
         """Parse an item.
 
         This expects the "Item" token to have been read already.
@@ -411,12 +442,7 @@ class Item:
                         if level <= 0:
                             break
             elif folded_key == 'animations':
-                for anim_name in tok.block('Animations'):
-                    try:
-                        anim = Anim(anim_name)
-                    except ValueError:
-                        raise tok.error('Unknown animation {}', anim_name) from None
-                    self.animations[anim] = conv_int(tok.expect(Token.STRING))
+                Anim.parse_block(self.animations, tok)
             elif folded_key == 'movementhandle':
                 handle_str = tok.expect(Token.STRING)
                 try:
