@@ -113,6 +113,15 @@ class _EnumProp(ItemProp[ValueT], Generic[ValueT]):
     def _export_value(typ: ValueT) -> str:
         return str(typ.value)
 
+
+class _InternalStrProp(ItemProp[str]):
+    """Several internal properties that are implementation internals."""
+    trans_name = ''
+
+    @staticmethod
+    def _parse_value(value: str) -> str:
+        return value
+
 # Enumerations for various types.
 
 
@@ -507,32 +516,63 @@ class FaithSpeed(_FloatProp):
     trans_name = ''  # Not visible.
 
 
-class FaithTargetName(ItemProp[str]):
+class DoorInCoop(_BoolProp):
+    """Set on the entry/exit doors, to indicate their type."""
+    id = 'CoopDoor'
+    instvar = 'PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle'
+    trans_name = ''  # Not visible.
+
+
+class AntlineIndicator(_InternalStrProp):
+    """Set to the name of the overlay the env_texturetoggle should control."""
+    id = 'IndicatorName'
+    instvar = '$indicator_name'
+
+
+class AntlineIsTimer(_BoolProp):
+    """Set on the antline sign items to determine their type."""
+    id = 'IsTimer'
+    instvar = '$is_timer'
+    trans_name = ''  # Not visible.
+
+
+class HelperRadius(_FloatProp):
+    """Set on the placement helper instance, always 64."""
+    id = 'HelperRadius'
+    instvar = '#helper_radius'
+    trans_name = ''  # Not visible.
+
+
+class HelperUseAngles(_BoolProp):
+    """Set on the placement helper instance, always false."""
+    id = 'UseHelperAngles'
+    instvar = '$use_helper_angles'
+    trans_name = ''  # Not visible.
+
+
+class HelperForcePlacement(_BoolProp):
+    """Set on the placement helper instance, always false."""
+    id = 'ForcePlacement'
+    instvar = '$force_placement'
+    trans_name = ''  # Not visible.
+
+
+class FaithTargetName(_InternalStrProp):
     """Logically would store or produce the name of the target.
 
     However, this never does anything.
     """
     id = 'Targetname'
     instvar = ''
-    trans_name = ''
-
-    @staticmethod
-    def _parse_value(value: str) -> str:
-        return value
 
 
-class AngledPanelType(ItemProp[str]):
+class AngledPanelType(_InternalStrProp):
     """Differentiates between the two angled panel items, presumably.
 
     Defaults to 2 always, so the value isn't important.
     """
     id = 'AngledPanelType'
     instvar = ''  # None!
-    trans_name = ''  # Not visible.
-
-    @staticmethod
-    def _parse_value(value: str) -> str:
-        return value
 
 
 class AngledPanelAnimation(ItemProp[PanelAnimation]):

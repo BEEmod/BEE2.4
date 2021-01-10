@@ -1,6 +1,9 @@
 """Parses the Puzzlemaker's item format."""
 from enum import Enum, Flag, auto
-from typing import List, Dict, Optional, Tuple, Set, Container, Iterable, Union
+from typing import (
+    List, Dict, Optional, Tuple, Set, Container, Iterable, Union,
+    Type,
+)
 from pathlib import PurePosixPath as FSPath
 
 from srctools import Vec, logger, conv_int, conv_bool
@@ -34,7 +37,7 @@ class ItemClass(Enum):
     FAITH_PLATE = 'ItemCatapult', 1, 1
 
     CUBE_DROPPER = 'ItemCubeDropper', 1, 1
-    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper'
+    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper', 1, 1
     FAITH_TARGET = 'ItemCatapultTarget', 1, 1
 
     # Input-less items
@@ -92,9 +95,9 @@ class Handle(Enum):
     """Types of directional handles."""
     NONE = 'HANDLE_NONE'
     QUAD = 'HANDLE_4_DIRECTIONS'  # 4 directions
-    CENT_OFF = 'HANDLE_5_DIRECTIONS'  # Center, 4 offsets
-    DUAL_OFF = 'HANDLE_6_DIRECTIONS'  # 4 offsets, center in 2 directions
-    QUAD_OFF = 'HANDLE_8_DIRECTIONS'  # 4 directions, center and offset each
+    CENT_OFF = 'HANDLE_5_POSITIONS'  # Center, 4 offsets
+    DUAL_OFF = 'HANDLE_6_POSITIONS'  # 4 offsets, center in 2 directions
+    QUAD_OFF = 'HANDLE_8_POSITIONS'  # 4 directions, center and offset each
     FREE_ROT = 'HANDLE_36_DIRECTIONS'  # 10 degree increments on floor
     FAITH = 'HANDLE_CATAPULT'  # Faith Plate
 
@@ -108,10 +111,10 @@ class Surface(Enum):
 
 class DesiredFacing(Enum):
     """Items automatically reorient when moved around."""
-    NONE = 'ANYTHING'  # Doesn't care.
-    POSX = UP = 'UP'  # Point +x upward.
-    NEGX = DN = DOWN = 'DOWN'  # Point -x upward.
-    HORIZ = HORIZONTAL = 'HORIZONTAL'  # Point y axis up, either way.
+    NONE = 'DESIRES_ANYTHING'  # Doesn't care.
+    POSX = UP = 'DESIRES_UP'  # Point +x upward.
+    NEGX = DN = DOWN = 'DESIRES_DOWN'  # Point -x upward.
+    HORIZ = HORIZONTAL = 'DESIRES_HORIZONTAL'  # Point y axis up, either way.
 
 
 class FaceType(Enum):
@@ -250,14 +253,18 @@ class Item:
     id: str  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass
-    subtype_prop: ItemProp
+    subtype_prop: Type[ItemProp]
     # Movement handle
     handle: Handle
     facing: DesiredFacing
     invalid_surf: Set[Surface]
+    animations: Dict[Anim, int]  # Anim name to sequence index.
 
     anchor_barriers: bool
     anchor_goo: bool
+    occupies_voxel: bool
+    copiable: bool
+    deltable: bool
 
     _subtypes: List[SubType]  # Each subtype in order.
 
@@ -265,13 +272,15 @@ class Item:
         self,
         item_id: str,
         cls: ItemClass,
-        subtype_prop: Optional[ItemProp] = None,
+        subtype_prop: Optional[Type[ItemProp]] = None,
         movement_handle: Handle = Handle.NONE,
         desired_facing: DesiredFacing = DesiredFacing.NONE,
         invalid_surf: Iterable[Surface] = (),
         anchor_on_barriers: bool = False,
         anchor_on_goo: bool = False,
+        occupies_voxel: bool = True
     ) -> None:
+        self.animations = {}
         self.id = item_id
         self.cls = cls
         self.subtype_prop = subtype_prop
@@ -282,6 +291,9 @@ class Item:
         self.invalid_surf = set(invalid_surf)
         self.anchor_barriers = anchor_on_barriers
         self.anchor_goo = anchor_on_goo
+        self.occupies_voxel = occupies_voxel
+        self.copiable = True
+        self.deltable = True
         self.offset = Vec()
 
     @classmethod
@@ -362,20 +374,83 @@ class Item:
                 except KeyError:
                     raise tok.error('Unknown item class {}!', item_class)
             elif tok_value == 'editor':
-                tok.expect(Token.BRACE_OPEN)
                 item._parse_editor_block(tok)
             elif tok_value == 'properties':
                 item._parse_properties_block(tok)
             elif tok_value == 'exporting':
-                tok.expect(Token.BRACE_OPEN)
                 item._parse_export_block(tok)
+            elif tok_value in ('author', 'description', 'filter'):
+                # These are BEE2.2 values, which are not used.
+                tok.expect(Token.STRING)
             else:
                 raise tok.error('Unexpected item option "{}"!', tok_value)
 
         raise tok.error('File ended without closing item block!')
 
+    # Boolean option in editor -> Item attribute.
+    _BOOL_ATTRS = {
+        'cananchoronbarriers': 'anchor_barriers',
+        'cananchorongoo': 'anchor_barriers',
+        'occupiesvoxel': 'occupies_voxel',
+        'copyable': 'copiable',
+        'deletable': 'deletable',
+        'pseudohandle': 'pseudo_handle',
+    }
+
     def _parse_editor_block(self, tok: Tokenizer) -> None:
         """Parse the editor block of the item definitions."""
+        for key in tok.block('Editor'):
+            folded_key = key.casefold()
+            if folded_key == 'subtype':
+                level = 0
+                for token, tok_value in tok:
+                    if token is Token.BRACE_OPEN:
+                        level += 1
+                    elif token is Token.BRACE_CLOSE:
+                        level -= 1
+                        if level <= 0:
+                            break
+            elif folded_key == 'animations':
+                for anim_name in tok.block('Animations'):
+                    try:
+                        anim = Anim(anim_name)
+                    except ValueError:
+                        raise tok.error('Unknown animation {}', anim_name) from None
+                    self.animations[anim] = conv_int(tok.expect(Token.STRING))
+            elif folded_key == 'movementhandle':
+                handle_str = tok.expect(Token.STRING)
+                try:
+                    self.handle = Handle(handle_str.upper())
+                except ValueError:
+                    raise tok.error('Unknown handle type {}', handle_str)
+            elif folded_key == 'invalidsurface':
+                for word in tok.expect(Token.STRING).split():
+                    try:
+                        self.invalid_surf.add(Surface[word.upper()])
+                    except KeyError:
+                        raise tok.error('Unknown surface type {}', word)
+            elif folded_key == 'subtypeproperty':
+                subtype_prop = tok.expect(Token.STRING)
+                try:
+                    self.subtype_prop = PROP_TYPES[subtype_prop.casefold()]
+                except ValueError:
+                    raise tok.error('Unknown property {}', subtype_prop)
+            elif folded_key == 'desiredfacing':
+                desired_facing = tok.expect(Token.STRING)
+                try:
+                    self.facing = DesiredFacing(desired_facing.upper())
+                except ValueError:
+                    raise tok.error('Unknown desired facing {}', desired_facing)
+            elif folded_key == 'rendercolor':
+                # Rendercolor is on catapult targets, and is useless.
+                tok.expect(Token.STRING)
+            else:
+                try:
+                    attr = self._BOOL_ATTRS[folded_key]
+                except KeyError:
+                    raise tok.error('Unknown editor option {}', key)
+                else:
+                    setattr(self, attr, conv_bool(tok.expect(Token.STRING)))
 
     def _parse_properties_block(self, tok: Tokenizer) -> None:
         """Parse the properties block of the item definitions."""
