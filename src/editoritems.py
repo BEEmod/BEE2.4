@@ -1,10 +1,14 @@
 """Parses the Puzzlemaker's item format."""
-from enum import Enum, Flag
-from typing import List, Dict, Optional, Tuple, Set
-from os import PathLike as FSPath
+from enum import Enum, Flag, auto
+from typing import List, Dict, Optional, Tuple, Set, Container, Iterable, Union
+from pathlib import PurePosixPath as FSPath
 
-from srctools import Vec
+from srctools import Vec, logger
 from srctools.tokenizer import Tokenizer, Token
+from editoritems_props import ItemProp, PROP_TYPES
+
+
+LOGGER = logger.get_logger(__name__)
 
 
 class ItemClass(Enum):
@@ -73,6 +77,17 @@ class ItemClass(Enum):
         return self.value[2]
 
 
+CLASS_BY_NAME = {
+    itemclass.id.casefold(): itemclass
+    for itemclass in ItemClass
+}
+
+# The special item IDs for the two "renderables", which show up in their own
+# block.
+RENDERABLE_ERROR = 'ErrorState'
+RENDERABLE_CONN = 'ConnectionHeartSolid'
+
+
 class Handle(Enum):
     """Types of directional handles."""
     NONE = 'HANDLE_NONE'
@@ -111,14 +126,14 @@ class FaceType(Enum):
 
 class CollType(Enum):
     """Types of collisions between items."""
-    GRATE = GRATING = 'COLLIDE_GRATING'
-    GLASS = 'COLLIDE_GLASS'
-    BRIDGE = LIGHT_BRIDGE = 'COLLIDE_BRIDGE'
-    FIZZLER = 'COLLIDE_FIZZLER'
-    PHYSICS = 'COLLIDE_PHYSICS'
-    ANTLINES = 'COLLIDE_ANTLINES'
-    NOTHING = 'COLLIDE_NOTHING'
-    EVERYTHING = 'COLLIDE_EVERYTHING'
+    GRATE = GRATING = auto()
+    GLASS = auto()
+    BRIDGE = auto()
+    FIZZLER = auto()
+    PHYSICS = auto()
+    ANTLINES = auto()
+    NOTHING = auto()
+    EVERYTHING = auto()
 
 
 class Sound(Enum):
@@ -235,7 +250,7 @@ class Item:
     id: str  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass
-    subtype_prop: ...
+    subtype_prop: ItemProp
     # Movement handle
     handle: Handle
     facing: DesiredFacing
@@ -250,21 +265,121 @@ class Item:
         self,
         item_id: str,
         cls: ItemClass,
-        subtype_prop: Optional[...],
+        subtype_prop: Optional[ItemProp] = None,
+        movement_handle: Handle = Handle.NONE,
+        desired_facing: DesiredFacing = DesiredFacing.NONE,
+        invalid_surf: Iterable[Surface] = (),
+        anchor_on_barriers: bool = False,
+        anchor_on_goo: bool = False,
     ) -> None:
         self.id = item_id
         self.cls = cls
-        self.subtype_prop
-        self._subtypes = [
-            SubType()
-            for i in range(self.subtype_count())
-        ]
+        self.subtype_prop = subtype_prop
+        self._subtypes = []
+        self.properties: Dict[str, ItemProp] = {}
+        self.handle = movement_handle
+        self.facing = desired_facing
+        self.invalid_surf = set(invalid_surf)
+        self.anchor_barriers = anchor_on_barriers
+        self.anchor_goo = anchor_on_goo
+        self.offset = Vec()
 
-    def subtype_count(self):
-        """Compute how many subtypes we should have.
+    @classmethod
+    def parse(cls, file: Iterable[str]) -> Dict[str, 'Item']:
+        """Parse an entire editoritems file."""
+        items: Dict[str, Item] = {}
+        tok = Tokenizer(file)
 
-        This is based on the subtype property, plus some
-        special cases.
+        if tok.expect(Token.STRING).casefold() != 'itemdata':
+            raise tok.error('No "ItemData" block present!')
+        tok.expect(Token.BRACE_OPEN)
+
+        for token, tok_value in tok:
+            if token is Token.STRING:
+                if tok_value.casefold() == 'item':
+                    it = cls.parse_one(tok, False)
+                    if it.id == RENDERABLE_ERROR:
+                        raise ValueError('Error icon must be in the renderables section!')
+                    if it.id == RENDERABLE_CONN:
+                        raise ValueError('Connections icon must be in the renderables section!')
+                    if it.id in items:
+                        LOGGER.warning('Item {} redeclared!', it.id)
+                    items[it.id] = it
+                elif tok_value.casefold() == 'renderables':
+                    tok.expect(Token.BRACE_OPEN)
+                    for token, tok_value in tok:
+                        if token is Token.STRING and tok_value.casefold() == 'item':
+                            it = cls.parse_one(tok, True)
+                            if it.id != RENDERABLE_ERROR and it.id != RENDERABLE_CONN:
+                                raise ValueError(f'Item ID {it.id} is not a known renderable!')
+                            items[it.id] = it
+                        elif token is Token.BRACE_CLOSE:
+                            break
+                        elif token is not Token.NEWLINE:
+                            raise tok.error(token)
+                    else:
+                        raise tok.error('Unclosed Renderables block!')
+                else:
+                    raise tok.error('Unknown block "{}"!', tok_value)
+            elif token is Token.BRACE_CLOSE:
+                break
+            elif token is not Token.NEWLINE:
+                raise tok.error(token)
+        else:
+            raise tok.error('Unclosed ItemData block!')
+        return items
+
+    @classmethod
+    def parse_one(cls, tok: Tokenizer, renderable: bool) -> 'Item':
+        """Parse an item.
+
+        This expects the "Item" token to have been read already.
         """
-        return 1
+        tok.expect(Token.BRACE_OPEN)
+        item = cls('', ItemClass.UNCLASSED)
 
+        for token, tok_value in tok:
+            if token is Token.BRACE_CLOSE:
+                # Done, check we're not missing critical stuff.
+                if not item.id:
+                    raise tok.error('No item ID (Type) set!')
+                return item
+            elif token is Token.NEWLINE:
+                continue
+            elif token is not Token.STRING:
+                raise tok.error(token)
+            tok_value = tok_value.casefold()
+            if tok_value == 'type':
+                if item.id:
+                    raise tok.error('Item ID (Type) set multiple times!')
+                item.id = tok.expect(Token.STRING).upper()
+                if not item.id:
+                    raise tok.error('Invalid item ID (Type) "{}"', item.id)
+            elif tok_value == 'itemclass':
+                item_class = tok.expect(Token.STRING)
+                try:
+                    item.cls = ITEM_CLASSES[item_class.casefold()]
+                except KeyError:
+                    raise tok.error('Unknown item class {}!', item_class)
+            elif tok_value == 'editor':
+                tok.expect(Token.BRACE_OPEN)
+                item._parse_editor_block(tok)
+            elif tok_value == 'properties':
+                tok.expect(Token.BRACE_OPEN)
+                item._parse_properties_block(tok)
+            elif tok_value == 'exporting':
+                tok.expect(Token.BRACE_OPEN)
+                item._parse_export_block(tok)
+            else:
+                raise tok.error('Unexpected item option "{}"!', tok_value)
+
+        raise tok.error('File ended without closing item block!')
+
+    def _parse_editor_block(self, tok: Tokenizer) -> None:
+        """Parse the editor block of the item definitions."""
+
+    def _parse_properties_block(self, tok: Tokenizer) -> None:
+        """Parse the properties block of the item definitions."""
+
+    def _parse_export_block(self, tok: Tokenizer) -> None:
+        """Parse the export block of the item definitions."""
