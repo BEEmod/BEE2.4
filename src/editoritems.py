@@ -1,6 +1,10 @@
 """Parses the Puzzlemaker's item format."""
 from enum import Enum, auto
-from typing import List, Dict, Optional, Tuple, Set, Iterable, Type, NamedTuple
+from typing import (
+    Optional, Type, Callable, NamedTuple,
+    List, Dict, Tuple, Set,
+    Iterable,
+)
 from pathlib import PurePosixPath as FSPath
 
 from srctools import Vec, logger, conv_int, conv_bool
@@ -240,6 +244,49 @@ DEFAULT_SOUNDS = {
 }
 
 
+class ConnSide(Enum):
+    """Sides of an item, where antlines connect to."""
+    UP = (0, 1, 0)
+    DOWN = (0, -1, 0)
+    LEFT = (1, 0, 0)
+    RIGHT = (-1, 0, 0)
+
+    @classmethod
+    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
+        try:
+            return cls[value.upper()]
+        except KeyError:
+            pass
+        parts = value.split()
+        if len(parts) != 3:
+            raise error_func('Incorrect number of points for a direction!')
+        try:
+            x, y, z = map(int, parts)
+        except ValueError:
+            raise error_func('Invalid connection side!')
+        if z != 0:
+            raise error_func('Connection side must be flat!')
+        if x == 0:
+            if y == 1:
+                return ConnSide.UP
+            elif y == -1:
+                return ConnSide.DOWN
+        elif y == 0:
+            if x == 1:
+                return ConnSide.LEFT
+            elif x == -1:
+                return ConnSide.RIGHT
+        raise error_func('Unknown connection side ({}, {}, 0)', x, y)
+
+
+class AntlinePoint(NamedTuple):
+    """Locations antlines can connect to."""
+    pos: Vec
+    sign_off: Vec
+    priority: int
+    group: Optional[int]
+
+
 class Renderable:
     """Simpler definition used for the heart and error icons."""
     _types = {r.value.casefold(): r for r in RenderableType}
@@ -441,6 +488,9 @@ class Item:
         # conditions. For the latter we don't care about the counts.
         self.instances: List[InstCount] = []
         self.cust_instances: Dict[str, FSPath] = {}
+        self.antline_points: Dict[ConnSide, List[AntlinePoint]] = {
+            side: [] for side in ConnSide
+        }
 
     @classmethod
     def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
@@ -647,6 +697,36 @@ class Item:
                             self.instances[inst_ind] = inst
                     else:
                         self.cust_instances[inst_name] = inst.inst
+            elif folded_key == 'connectionpoints':
+                for point_key in tok.block('ConnectionPoints'):
+                    if point_key.casefold() != 'point':
+                        raise tok.error('Unknown connection point "{}"!', point_key)
+                    direction: Optional[ConnSide] = None
+                    pos: Optional[Vec] = None
+                    sign_pos: Optional[Vec] = None
+                    group_id: Optional[int] = None
+                    priority = 0
+                    for conn_key in tok.block('Point'):
+                        folded_key = conn_key.casefold()
+                        if folded_key == 'dir':
+                            direction = ConnSide.parse(tok.expect(Token.STRING), tok.error)
+                        elif folded_key == 'pos':
+                            pos = Vec.from_str(tok.expect(Token.STRING))
+                        elif folded_key == 'signageoffset':
+                            sign_pos = Vec.from_str(tok.expect(Token.STRING))
+                        elif folded_key == 'priority':
+                            priority = conv_int(tok.expect(Token.STRING))
+                        elif folded_key == 'groupid':
+                            group_id = conv_int(tok.expect(Token.STRING))
+                        else:
+                            raise tok.error('Unknown point option "{}"!', folded_key)
+                    if direction is None:
+                        raise tok.error('No direction for connection point!')
+                    if pos is None:
+                        raise tok.error('No position for connection point!')
+                    if sign_pos is None:
+                        raise tok.error('No signage position for connection point!')
+                    self.antline_points[direction].append(AntlinePoint(pos, sign_pos, priority, group_id))
             else:  # TODO: Temp, skip over other blocks.
                 # raise tok.error('Unknown export option "{}"!', key)
                 level = 0
