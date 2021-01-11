@@ -296,6 +296,90 @@ class SubType:
     # The path to the icon VTF, in 'models/props_map_editor'.
     pal_icon: Optional[FSPath]
 
+    def __init__(
+        self,
+        name: str,
+        models: List[FSPath],
+        sounds: Dict[Sound, str],
+        anims: Dict[Anim, int],
+        pal_name: str,
+        pal_pos: Optional[Tuple[int, int]],
+        pal_icon: Optional[FSPath],
+    ) -> None:
+        self.name = name
+        self.models = models
+        self.sounds = sounds
+        self.anims = anims
+        self.pal_name = pal_name
+        self.pal_pos = pal_pos
+        self.pal_icon = pal_icon
+
+    @classmethod
+    def parse(cls, tok: Tokenizer) -> 'SubType':
+        """Parse a subtype from editoritems."""
+        subtype: SubType = cls('', [], DEFAULT_SOUNDS.copy(), {}, '', None, None)
+        for key in tok.block('Subtype'):
+            folded_key = key.casefold()
+            if folded_key == 'name':
+                subtype.name = tok.expect(Token.STRING)
+            elif folded_key == 'model':
+                # In the original file this is a block, but allow a name
+                # since the texture is unused.
+                token, tok_value = next(tok.skipping_newlines())
+                model_name: Optional[FSPath] = None
+                if token is Token.STRING:
+                    model_name = FSPath(tok_value)
+                elif token is Token.BRACE_OPEN:
+                    # Parse the block.
+                    for subkey in tok.block('Model', consume_brace=False):
+                        subkey = subkey.casefold()
+                        if subkey == 'modelname':
+                            model_name = FSPath(tok.expect(Token.STRING))
+                        elif subkey == 'texturename':
+                            tok.expect(Token.STRING)  # Skip this.
+                        else:
+                            raise tok.error('Unknown model option "{}"!', subkey)
+                else:
+                    raise tok.error(token)
+                if model_name is None:
+                    raise tok.error('No model name specified!')
+                if model_name.suffix.casefold() != '.mdl':
+                    # Swap to '.mdl', since that's what the real model is.
+                    model_name = model_name.with_suffix('.mdl')
+                subtype.models.append(model_name)
+            elif folded_key == 'palette':
+                for subkey in tok.block('Palette'):
+                    subkey = subkey.casefold()
+                    if subkey == 'tooltip':
+                        subtype.pal_name = tok.expect(Token.STRING)
+                    elif subkey == 'image':
+                        subtype.pal_icon = FSPath(tok.expect(Token.STRING))
+                    elif subkey == 'position':
+                        points = tok.expect(Token.STRING).split()
+                        if len(points) in (2, 3):
+                            try:
+                                x = int(points[0])
+                                y = int(points[1])
+                            except ValueError:
+                                raise tok.error('Invalid position value!') from None
+                        else:
+                            raise tok.error('Incorrect number of points in position') from None
+                        subtype.pal_pos = x, y
+                    else:
+                        raise tok.error('Unknown palette option "{}"!', subkey)
+            elif folded_key == 'sounds':
+                for sound_kind in tok.block('Sounds'):
+                    try:
+                        sound = Sound(sound_kind.upper())
+                    except ValueError:
+                        raise tok.error('Unknown sound type "{}"!', sound_kind)
+                    subtype.sounds[sound] = tok.expect(Token.STRING)
+            elif folded_key == 'animations':
+                Anim.parse_block(subtype.anims, tok)
+            else:
+                raise tok.error('Unknown subtype option "{}"!', key)
+        return subtype
+
 
 class Item:
     """A specific item."""
@@ -315,7 +399,7 @@ class Item:
     copiable: bool
     deltable: bool
 
-    _subtypes: List[SubType]  # Each subtype in order.
+    subtypes: List[SubType]  # Each subtype in order.
 
     def __init__(
         self,
@@ -333,7 +417,7 @@ class Item:
         self.id = item_id
         self.cls = cls
         self.subtype_prop = subtype_prop
-        self._subtypes = []
+        self.subtypes = []
         self.properties: Dict[str, ItemProp] = {}
         self.handle = movement_handle
         self.facing = desired_facing
@@ -433,14 +517,7 @@ class Item:
         for key in tok.block('Editor'):
             folded_key = key.casefold()
             if folded_key == 'subtype':
-                level = 0
-                for token, tok_value in tok:
-                    if token is Token.BRACE_OPEN:
-                        level += 1
-                    elif token is Token.BRACE_CLOSE:
-                        level -= 1
-                        if level <= 0:
-                            break
+                self.subtypes.append(SubType.parse(tok))
             elif folded_key == 'animations':
                 Anim.parse_block(self.animations, tok)
             elif folded_key == 'movementhandle':
