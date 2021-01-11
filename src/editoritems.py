@@ -1,9 +1,6 @@
 """Parses the Puzzlemaker's item format."""
-from enum import Enum, Flag, auto
-from typing import (
-    List, Dict, Optional, Tuple, Set, Container, Iterable, Union,
-    Type,
-)
+from enum import Enum, auto
+from typing import List, Dict, Optional, Tuple, Set, Iterable, Type, NamedTuple
 from pathlib import PurePosixPath as FSPath
 
 from srctools import Vec, logger, conv_int, conv_bool
@@ -210,6 +207,14 @@ class ConnTypes(Enum):
     FIZZ_BRUSH = 'CONNECTION_HAZARD_BRUSH'
     FIZZ_MODEL = 'CONNECTION_HAZARD_MODEL'  # Broken open/close input.
     FIZZ = 'CONNECTION_HAZARD'  # Output from base.
+
+class InstCount(NamedTuple):
+    """Instances have several associated counts."""
+    inst: FSPath  # The actual filename.
+    ent_count: int
+    brush_count: int
+    face_count: int
+
 
 
 ITEM_CLASSES: Dict[str, ItemClass] = {
@@ -427,14 +432,22 @@ class Item:
         self.occupies_voxel = occupies_voxel
         self.copiable = True
         self.deltable = True
-        self.offset = Vec()
+        # The default is 0 0 0, but this isn't useful since the rotation point
+        # is wrong. So just make it the useful default, users can override.
+        self.offset = Vec(64, 64, 64)
+        self.targetname = ''
+
+        # The instances used by the editor, then custom slots used by
+        # conditions. For the latter we don't care about the counts.
+        self.instances: List[InstCount] = []
+        self.cust_instances: Dict[str, FSPath] = {}
 
     @classmethod
-    def parse(cls, file: Iterable[str]) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
+    def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file."""
         items: Dict[str, Item] = {}
         icons: Dict[RenderableType, Renderable] = {}
-        tok = Tokenizer(file)
+        tok = Tokenizer(file, filename)
 
         if tok.expect(Token.STRING).casefold() != 'itemdata':
             raise tok.error('No "ItemData" block present!')
@@ -463,7 +476,7 @@ class Item:
         This expects the "Item" token to have been read already.
         """
         tok.expect(Token.BRACE_OPEN)
-        item = cls('', ItemClass.UNCLASSED)
+        item: Item = cls('', ItemClass.UNCLASSED)
 
         for token, tok_value in tok:
             if token is Token.BRACE_CLOSE:
@@ -583,3 +596,64 @@ class Item:
 
     def _parse_export_block(self, tok: Tokenizer) -> None:
         """Parse the export block of the item definitions."""
+        for key in tok.block('Exporting'):
+            folded_key = key.casefold()
+            if folded_key == 'targetname':
+                self.targetname = tok.expect(Token.STRING)
+            elif folded_key == 'offset':
+                self.offset = Vec.from_str(tok.expect(Token.STRING))
+            elif folded_key == 'instances':
+                # We allow several syntaxes for instances, since the counts are
+                # pretty useless. Instances can be defined by position (for originals),
+                # or by name for use in conditions.
+                for inst_name in tok.block('Instance'):
+                    inst_ind: Optional[int]
+                    try:
+                        inst_ind = int(inst_name)
+                    except ValueError:
+                        inst_ind = None
+                        if inst_name.casefold().startswith('bee2_'):
+                            inst_name = inst_name[5:]
+                        else:
+                            LOGGER.warning('Custom instance names should have bee2_ prefix (line {}, file {})', tok.line_num, tok.filename)
+                    else:
+                        # Add blank spots if this is past the end.
+                        while inst_ind > len(self.instances):
+                            self.instances.append(FSPath())
+                    block_tok, inst_file = next(tok.skipping_newlines())
+                    if block_tok is Token.BRACE_OPEN:
+                        ent_count = brush_count = side_count = 0
+                        for block_key in tok.block('Instances', consume_brace=False):
+                            folded_key = block_key.casefold()
+                            if folded_key == 'name':
+                                inst_file = tok.expect(Token.STRING)
+                            elif folded_key == 'entitycount':
+                                ent_count = conv_int(tok.expect(Token.STRING))
+                            elif folded_key == 'brushcount':
+                                brush_count = conv_int(tok.expect(Token.STRING))
+                            elif folded_key == 'brushsidecount':
+                                side_count = conv_int(tok.expect(Token.STRING))
+                            else:
+                                raise tok.error('Unknown instance option {}', block_key)
+                        inst = InstCount(FSPath(inst_file), ent_count, brush_count, side_count)
+                    elif block_tok is Token.STRING:
+                        inst = InstCount(FSPath(inst_file), 0, 0, 0)
+                    else:
+                        raise tok.error(block_tok)
+                    if inst_ind is not None:
+                        if inst_ind == len(self.instances):
+                            self.instances.append(inst)
+                        else:
+                            self.instances[inst_ind] = inst
+                    else:
+                        self.cust_instances[inst_name] = inst.inst
+            else:  # TODO: Temp, skip over other blocks.
+                # raise tok.error('Unknown export option "{}"!', key)
+                level = 0
+                for token, tok_value in tok:
+                    if token is Token.BRACE_OPEN:
+                        level += 1
+                    elif token is Token.BRACE_CLOSE:
+                        level -= 1
+                        if level <= 0:
+                            break
