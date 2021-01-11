@@ -208,13 +208,13 @@ class ConnTypes(Enum):
     FIZZ_MODEL = 'CONNECTION_HAZARD_MODEL'  # Broken open/close input.
     FIZZ = 'CONNECTION_HAZARD'  # Output from base.
 
+
 class InstCount(NamedTuple):
     """Instances have several associated counts."""
     inst: FSPath  # The actual filename.
     ent_count: int
     brush_count: int
     face_count: int
-
 
 
 ITEM_CLASSES: Dict[str, ItemClass] = {
@@ -619,7 +619,7 @@ class Item:
                     else:
                         # Add blank spots if this is past the end.
                         while inst_ind > len(self.instances):
-                            self.instances.append(FSPath())
+                            self.instances.append(InstCount(FSPath(), 0, 0, 0))
                     block_tok, inst_file = next(tok.skipping_newlines())
                     if block_tok is Token.BRACE_OPEN:
                         ent_count = brush_count = side_count = 0
