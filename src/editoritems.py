@@ -657,46 +657,7 @@ class Item:
                 # pretty useless. Instances can be defined by position (for originals),
                 # or by name for use in conditions.
                 for inst_name in tok.block('Instance'):
-                    inst_ind: Optional[int]
-                    try:
-                        inst_ind = int(inst_name)
-                    except ValueError:
-                        inst_ind = None
-                        if inst_name.casefold().startswith('bee2_'):
-                            inst_name = inst_name[5:]
-                        else:
-                            LOGGER.warning('Custom instance names should have bee2_ prefix (line {}, file {})', tok.line_num, tok.filename)
-                    else:
-                        # Add blank spots if this is past the end.
-                        while inst_ind > len(self.instances):
-                            self.instances.append(InstCount(FSPath(), 0, 0, 0))
-                    block_tok, inst_file = next(tok.skipping_newlines())
-                    if block_tok is Token.BRACE_OPEN:
-                        ent_count = brush_count = side_count = 0
-                        for block_key in tok.block('Instances', consume_brace=False):
-                            folded_key = block_key.casefold()
-                            if folded_key == 'name':
-                                inst_file = tok.expect(Token.STRING)
-                            elif folded_key == 'entitycount':
-                                ent_count = conv_int(tok.expect(Token.STRING))
-                            elif folded_key == 'brushcount':
-                                brush_count = conv_int(tok.expect(Token.STRING))
-                            elif folded_key == 'brushsidecount':
-                                side_count = conv_int(tok.expect(Token.STRING))
-                            else:
-                                raise tok.error('Unknown instance option {}', block_key)
-                        inst = InstCount(FSPath(inst_file), ent_count, brush_count, side_count)
-                    elif block_tok is Token.STRING:
-                        inst = InstCount(FSPath(inst_file), 0, 0, 0)
-                    else:
-                        raise tok.error(block_tok)
-                    if inst_ind is not None:
-                        if inst_ind == len(self.instances):
-                            self.instances.append(inst)
-                        else:
-                            self.instances[inst_ind] = inst
-                    else:
-                        self.cust_instances[inst_name] = inst.inst
+                    self._parse_instance_block(tok, inst_name)
             elif folded_key == 'connectionpoints':
                 for point_key in tok.block('ConnectionPoints'):
                     if point_key.casefold() != 'point':
@@ -737,3 +698,50 @@ class Item:
                         level -= 1
                         if level <= 0:
                             break
+
+    def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
+        """Parse a section in the instances block."""
+        inst_ind: Optional[int]
+        try:
+            inst_ind = int(inst_name)
+        except ValueError:
+            inst_ind = None
+            if inst_name.casefold().startswith('bee2_'):
+                inst_name = inst_name[5:]
+            else:
+                LOGGER.warning(
+                    'Custom instance names should have bee2_ prefix (line '
+                    '{}, file {})',
+                    tok.line_num, tok.filename)
+        else:
+            # Add blank spots if this is past the end.
+            while inst_ind > len(self.instances):
+                self.instances.append(InstCount(FSPath(), 0, 0, 0))
+        block_tok, inst_file = next(tok.skipping_newlines())
+        if block_tok is Token.BRACE_OPEN:
+            ent_count = brush_count = side_count = 0
+            for block_key in tok.block('Instances', consume_brace=False):
+                folded_key = block_key.casefold()
+                if folded_key == 'name':
+                    inst_file = tok.expect(Token.STRING)
+                elif folded_key == 'entitycount':
+                    ent_count = conv_int(tok.expect(Token.STRING))
+                elif folded_key == 'brushcount':
+                    brush_count = conv_int(tok.expect(Token.STRING))
+                elif folded_key == 'brushsidecount':
+                    side_count = conv_int(tok.expect(Token.STRING))
+                else:
+                    raise tok.error('Unknown instance option {}', block_key)
+            inst = InstCount(FSPath(inst_file), ent_count, brush_count,
+                             side_count)
+        elif block_tok is Token.STRING:
+            inst = InstCount(FSPath(inst_file), 0, 0, 0)
+        else:
+            raise tok.error(block_tok)
+        if inst_ind is not None:
+            if inst_ind == len(self.instances):
+                self.instances.append(inst)
+            else:
+                self.instances[inst_ind] = inst
+        else:
+            self.cust_instances[inst_name] = inst.inst
