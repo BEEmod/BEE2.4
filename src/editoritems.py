@@ -221,6 +221,41 @@ class InstCount(NamedTuple):
     face_count: int
 
 
+class Coord(NamedTuple):
+    """Integer coordinates."""
+    x: int
+    y: int
+    z: int
+
+    @classmethod
+    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
+        """Parse from a string, using the function to raise errors."""
+        parts = value.split()
+        if len(parts) != 3:
+            raise error_func('Incorrect number of points for a coordinate!')
+        try:
+            x = int(parts[0])
+        except ValueError:
+            raise error_func('Invalid coordinate value "{}"!', parts[0])
+        try:
+            y = int(parts[1])
+        except ValueError:
+            raise error_func('Invalid coordinate value "{}"!', parts[1])
+        try:
+            z = int(parts[2])
+        except ValueError:
+            raise error_func('Invalid coordinate value "{}"!', parts[2])
+        try:
+            return _coord_cache[x, y, z]
+        except KeyError:
+            result = cls(x, y, z)
+            _coord_cache[result] = result
+            return result
+
+
+# Cache these coordinates, since most items are going to be near the origin.
+_coord_cache: Dict[Tuple[int, int, int], Coord] = {}
+
 ITEM_CLASSES: Dict[str, ItemClass] = {
     cls.id.casefold(): cls
     for cls in ItemClass
@@ -253,6 +288,7 @@ class ConnSide(Enum):
 
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
+        """Parse a connection side."""
         try:
             return cls[value.upper()]
         except KeyError:
@@ -281,8 +317,8 @@ class ConnSide(Enum):
 
 class AntlinePoint(NamedTuple):
     """Locations antlines can connect to."""
-    pos: Vec
-    sign_off: Vec
+    pos: Coord
+    sign_off: Coord
     priority: int
     group: Optional[int]
 
@@ -491,6 +527,8 @@ class Item:
         self.antline_points: Dict[ConnSide, List[AntlinePoint]] = {
             side: [] for side in ConnSide
         }
+        # The voxels this hollows out inside the floor.
+        self.embed_voxels: Set[Coord] = set()
 
     @classmethod
     def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
@@ -663,8 +701,8 @@ class Item:
                     if point_key.casefold() != 'point':
                         raise tok.error('Unknown connection point "{}"!', point_key)
                     direction: Optional[ConnSide] = None
-                    pos: Optional[Vec] = None
-                    sign_pos: Optional[Vec] = None
+                    pos: Optional[Coord] = None
+                    sign_pos: Optional[Coord] = None
                     group_id: Optional[int] = None
                     priority = 0
                     for conn_key in tok.block('Point'):
@@ -672,9 +710,9 @@ class Item:
                         if folded_key == 'dir':
                             direction = ConnSide.parse(tok.expect(Token.STRING), tok.error)
                         elif folded_key == 'pos':
-                            pos = Vec.from_str(tok.expect(Token.STRING))
+                            pos = Coord.parse(tok.expect(Token.STRING), tok.error)
                         elif folded_key == 'signageoffset':
-                            sign_pos = Vec.from_str(tok.expect(Token.STRING))
+                            sign_pos = Coord.parse(tok.expect(Token.STRING), tok.error)
                         elif folded_key == 'priority':
                             priority = conv_int(tok.expect(Token.STRING))
                         elif folded_key == 'groupid':
@@ -688,6 +726,8 @@ class Item:
                     if sign_pos is None:
                         raise tok.error('No signage position for connection point!')
                     self.antline_points[direction].append(AntlinePoint(pos, sign_pos, priority, group_id))
+            elif folded_key == 'embeddedvoxels':
+                self._parse_embedded_voxels(tok)
             else:  # TODO: Temp, skip over other blocks.
                 # raise tok.error('Unknown export option "{}"!', key)
                 level = 0
@@ -745,3 +785,37 @@ class Item:
                 self.instances[inst_ind] = inst
         else:
             self.cust_instances[inst_name] = inst.inst
+
+    def _parse_embedded_voxels(self, tok: Tokenizer) -> None:
+        # There are two definition types here - a single voxel, or a whole bbox.
+        for embed_key in tok.block('EmbeddedVoxels'):
+            folded_key = embed_key.casefold()
+            if folded_key == 'volume':
+                pos_1: Optional[Coord] = None
+                pos_2: Optional[Coord] = None
+                for pos_key in tok.block('EmbeddedVolume'):
+                    if pos_key.casefold() == 'pos1':
+                        pos_1 = Coord.parse(tok.expect(Token.STRING), tok.error)
+                    elif pos_key.casefold() == 'pos2':
+                        pos_2 = Coord.parse(tok.expect(Token.STRING), tok.error)
+                    else:
+                        raise tok.error('Unknown volume key "{}"!', pos_key)
+                if pos_1 is None or pos_2 is None:
+                    raise tok.error('Missing coordinate for volume!')
+                vol_x = range(min(pos_1.x, pos_2.x), max(pos_1.x, pos_2.x) + 1)
+                vol_y = range(min(pos_1.y, pos_2.y), max(pos_1.y, pos_2.y) + 1)
+                vol_z = range(min(pos_1.z, pos_2.z), max(pos_1.z, pos_2.z) + 1)
+                for x in vol_x:
+                    for y in vol_y:
+                        for z in vol_z:
+                            self.embed_voxels.add(Coord(x, y, z))
+            elif folded_key == 'voxel':
+                # A single position.
+                for pos_key in tok.block('EmbeddedVoxel'):
+                    if pos_key.casefold() == 'pos':
+                        self.embed_voxels.add(Coord.parse(
+                            tok.expect(Token.STRING),
+                            tok.error,
+                        ))
+                    else:
+                        raise tok.error('Unknown voxel key "{}"!', pos_key)
