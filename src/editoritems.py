@@ -697,35 +697,7 @@ class Item:
                 for inst_name in tok.block('Instance'):
                     self._parse_instance_block(tok, inst_name)
             elif folded_key == 'connectionpoints':
-                for point_key in tok.block('ConnectionPoints'):
-                    if point_key.casefold() != 'point':
-                        raise tok.error('Unknown connection point "{}"!', point_key)
-                    direction: Optional[ConnSide] = None
-                    pos: Optional[Coord] = None
-                    sign_pos: Optional[Coord] = None
-                    group_id: Optional[int] = None
-                    priority = 0
-                    for conn_key in tok.block('Point'):
-                        folded_key = conn_key.casefold()
-                        if folded_key == 'dir':
-                            direction = ConnSide.parse(tok.expect(Token.STRING), tok.error)
-                        elif folded_key == 'pos':
-                            pos = Coord.parse(tok.expect(Token.STRING), tok.error)
-                        elif folded_key == 'signageoffset':
-                            sign_pos = Coord.parse(tok.expect(Token.STRING), tok.error)
-                        elif folded_key == 'priority':
-                            priority = conv_int(tok.expect(Token.STRING))
-                        elif folded_key == 'groupid':
-                            group_id = conv_int(tok.expect(Token.STRING))
-                        else:
-                            raise tok.error('Unknown point option "{}"!', folded_key)
-                    if direction is None:
-                        raise tok.error('No direction for connection point!')
-                    if pos is None:
-                        raise tok.error('No position for connection point!')
-                    if sign_pos is None:
-                        raise tok.error('No signage position for connection point!')
-                    self.antline_points[direction].append(AntlinePoint(pos, sign_pos, priority, group_id))
+                self._parse_connection_points(tok)
             elif folded_key == 'embeddedvoxels':
                 self._parse_embedded_voxels(tok)
             else:  # TODO: Temp, skip over other blocks.
@@ -785,6 +757,37 @@ class Item:
                 self.instances[inst_ind] = inst
         else:
             self.cust_instances[inst_name] = inst.inst
+
+    def _parse_connection_points(self, tok: Tokenizer) -> None:
+        for point_key in tok.block('ConnectionPoints'):
+            if point_key.casefold() != 'point':
+                raise tok.error('Unknown connection point "{}"!', point_key)
+            direction: Optional[ConnSide] = None
+            pos: Optional[Coord] = None
+            sign_pos: Optional[Coord] = None
+            group_id: Optional[int] = None
+            priority = 0
+            for conn_key in tok.block('Point'):
+                folded_key = conn_key.casefold()
+                if folded_key == 'dir':
+                    direction = ConnSide.parse(tok.expect(Token.STRING), tok.error)
+                elif folded_key == 'pos':
+                    pos = Coord.parse(tok.expect(Token.STRING), tok.error)
+                elif folded_key == 'signageoffset':
+                    sign_pos = Coord.parse(tok.expect(Token.STRING), tok.error)
+                elif folded_key == 'priority':
+                    priority = conv_int(tok.expect(Token.STRING))
+                elif folded_key == 'groupid':
+                    group_id = conv_int(tok.expect(Token.STRING))
+                else:
+                    raise tok.error('Unknown point option "{}"!', folded_key)
+            if direction is None:
+                raise tok.error('No direction for connection point!')
+            if pos is None:
+                raise tok.error('No position for connection point!')
+            if sign_pos is None:
+                raise tok.error('No signage position for connection point!')
+            self.antline_points[direction].append(AntlinePoint(pos, sign_pos, priority, group_id))
 
     def _parse_embedded_voxels(self, tok: Tokenizer) -> None:
         # There are two definition types here - a single voxel, or a whole bbox.
