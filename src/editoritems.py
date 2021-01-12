@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import (
     Optional, Type, Callable, NamedTuple,
     List, Dict, Tuple, Set,
-    Iterable,
+    Iterable, IO, Iterator, Collection,
 )
 from pathlib import PurePosixPath as FSPath
 
@@ -106,7 +106,7 @@ class Handle(Enum):
 
 class Surface(Enum):
     """Used for InvalidSurface."""
-    WALL = WALLS = 'WALLS'
+    WALL = WALLS = 'WALL'
     FLOOR = 'FLOOR'
     CEIL = CEILING = 'CEILING'
 
@@ -334,6 +334,65 @@ class AntlinePoint(NamedTuple):
     group: Optional[int]
 
 
+def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[Tuple[Coord, Coord]]:
+    """Decompose a bunch of points into a small list of bounding boxes enclosing them.
+
+    This is used to determine a good set of Volume definitions to write out.
+    """
+    # To compute the volume, pick a random point still to be done, then
+    # expand as far as possible in each direction.
+    EXTENT = 50
+    todo = set(voxels)
+    while todo:
+        x1, y1, z1 = x2, y2, z2 = todo.pop()
+        # X+:
+        for x in range(x1 + 1, x1 + EXTENT):
+            if (x, y1, z1) in todo:
+                x2 = x
+            else:
+                break
+        # X-:
+        for x in range(x1 - 1, x1 - EXTENT, -1):
+            if (x, y1, z1) in todo:
+                x1 = x
+            else:
+                break
+
+        # Y+:
+        for y in range(y1 + 1, y1 + EXTENT):
+            if all((x, y, z1) in todo for x in range(x1, x2+1)):
+                y2 = y
+            else:
+                break
+
+        # Y-:
+        for y in range(y1 - 1, y1 - EXTENT, -1):
+            if all((x, y, z1) in todo for x in range(x1, x2+1)):
+                y1 = y
+            else:
+                break
+
+        # Y+:
+        for z in range(z1 + 1, z1 + EXTENT):
+            if all((x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
+                z2 = z
+            else:
+                break
+
+        # Y-:
+        for z in range(z1 - 1, z1 - EXTENT, -1):
+            if all((x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
+                z1 = z
+            else:
+                break
+
+        for x in range(x1, x2+1):
+            for y in range(y1, y2+1):
+                for z in range(z1, z2+1):
+                    todo.discard(Coord(x, y, z))
+        yield Coord(x1, y1, z1), Coord(x2, y2, z2)
+
+
 class Renderable:
     """Simpler definition used for the heart and error icons."""
     _types = {r.value.casefold(): r for r in RenderableType}
@@ -479,13 +538,50 @@ class SubType:
                 raise tok.error('Unknown subtype option "{}"!', key)
         return subtype
 
+    def export(self, f: IO[str]) -> None:
+        """Write the subtype to a file."""
+        f.write('\t\t"Subtype"\n\t\t\t{\n')
+        if self.name:
+            f.write(f'\t\t\t"Name" "{self.name}"\n')
+        for model in self.models:
+            # It has to be a .3ds file, even though it's really MDL.
+            model = model.with_suffix('.3ds')
+            f.write('\t\t\t"Model"\n\t\t\t\t{\n')
+            f.write(f'\t\t\t\t"ModelName" "{model}"\n')
+            f.write('\t\t\t\t}\n')
+        if self.pal_pos is not None:
+            f.write('\t\t\t"Palette"\n\t\t\t\t{\n')
+            f.write(f'\t\t\t\t"Tooltip"  "{self.pal_name}"\n')
+            if self.pal_icon is not None:
+                # Similarly needs to be PNG even though it's really VTF.
+                pal_icon = self.pal_icon.with_suffix('.png')
+                f.write(f'\t\t\t\t"Image"    "{pal_icon}"\n')
+            x, y = self.pal_pos
+            f.write(f'\t\t\t\t"Position" "{x} {y} 0"\n')
+            f.write('\t\t\t\t}\n')
+        if self.sounds != DEFAULT_SOUNDS:
+            f.write('\t\t\t"Sounds"\n\t\t\t\t{\n')
+            for snd_type in Sound:
+                try:
+                    sndscript = self.sounds[snd_type]
+                except KeyError:
+                    continue
+                f.write(f'\t\t\t\t"{snd_type.value}" "{sndscript}"\n')
+            f.write('\t\t\t\t}\n')
+        if self.anims:
+            f.write('\t\t\t"Sounds"\n\t\t\t\t{\n')
+            for anim_name, anim_ind in sorted(self.anims.items(), key=lambda t: t[1]):
+                f.write(f'\t\t\t\t"{anim_name.value}" "{anim_ind}"\n')
+            f.write('\t\t\t\t}\n')
+        f.write('\t\t\t}\n')
+
 
 class Item:
     """A specific item."""
     id: str  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass
-    subtype_prop: Type[ItemProp]
+    subtype_prop: Optional[Type[ItemProp]]
     # Movement handle
     handle: Handle
     facing: DesiredFacing
@@ -496,7 +592,7 @@ class Item:
     anchor_goo: bool
     occupies_voxel: bool
     copiable: bool
-    deltable: bool
+    deletable: bool
 
     subtypes: List[SubType]  # Each subtype in order.
 
@@ -525,7 +621,8 @@ class Item:
         self.anchor_goo = anchor_on_goo
         self.occupies_voxel = occupies_voxel
         self.copiable = True
-        self.deltable = True
+        self.deletable = True
+        self.pseduo_handle = False
         # The default is 0 0 0, but this isn't useful since the rotation point
         # is wrong. So just make it the useful default, users can override.
         self.offset = Vec(64, 64, 64)
@@ -729,6 +826,7 @@ class Item:
     def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
         """Parse a section in the instances block."""
         inst_ind: Optional[int]
+        inst_file: Optional[str]
         try:
             inst_ind = int(inst_name)
         except ValueError:
@@ -747,6 +845,7 @@ class Item:
         block_tok, inst_file = next(tok.skipping_newlines())
         if block_tok is Token.BRACE_OPEN:
             ent_count = brush_count = side_count = 0
+            inst_file = None
             for block_key in tok.block('Instances', consume_brace=False):
                 folded_key = block_key.casefold()
                 if folded_key == 'name':
@@ -759,6 +858,8 @@ class Item:
                     side_count = conv_int(tok.expect(Token.STRING))
                 else:
                     raise tok.error('Unknown instance option {}', block_key)
+            if inst_file is None:
+                raise tok.error('No instance filename provided!')
             inst = InstCount(FSPath(inst_file), ent_count, brush_count,
                              side_count)
         elif block_tok is Token.STRING:
@@ -865,3 +966,83 @@ class Item:
             if size is None:
                 raise tok.error('No size specified for embedded face!')
             self.embed_faces.append(EmbedFace(center, size, grid))
+
+    def export_one(self, f: IO[str]) -> None:
+        """Write a single item out to a file."""
+        f.write('"Item"\n\t{\n')
+        if self.cls is not ItemClass.UNCLASSED:
+            f.write(f'\t"Type"      "{self.id}"\n')
+            f.write(f'\t"ItemClass" "{self.cls.id}"\n')
+        else:
+            f.write(f'\t"Type" "{self.id}"\n')
+        f.write('\t"Editor"\n\t\t{\n')
+        if self.subtype_prop is not None:
+            f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
+        for subtype in self.subtypes:
+            subtype.export(f)
+        f.write(f'\t\t"MovementHandle" "{self.handle.value}"\n')
+        f.write(f'\t\t"OccupiesVoxel"  "{"1" if self.occupies_voxel else "0"}"\n')
+
+        if self.facing is not DesiredFacing.NONE:
+            f.write(f'\t\t"DesiredFacing"  "{self.facing.value}"\n')
+
+        if self.invalid_surf:
+            invalid = ' '.join(sorted(surf.value for surf in self.invalid_surf))
+            f.write(f'\t\t"InvalidSurface" "{invalid}"\n')
+
+        if self.anchor_goo:
+            f.write(f'\t\t"CanAnchorOnGoo"      "1"\n')
+        if self.anchor_barriers:
+            f.write(f'\t\t"CanAnchorOnBarriers" "1"\n')
+        if not self.copiable:
+            f.write(f'\t\t"Copyable" "0"\n')
+        if not self.deletable:
+            f.write(f'\t\t"Deletable" "0"\n')
+        if self.pseduo_handle:
+            f.write(f'\t\t"PseudoHandle" "1"\n')
+        f.write('\t\t}\n')
+
+        if self.properties:
+            f.write('\t"Properties"\n\t\t{\n')
+            for prop in self.properties.values():
+                f.write(f'\t\t"{prop.id}"\n\t\t\t{{\n')
+                f.write(f'\t\t\t"DefaultValue" "{prop.export()}"\n')
+                f.write(f'\t\t\t"Index"        "{prop.index}"\n')
+                f.write('\t\t\t}\n')
+            f.write('\t\t}\n')
+        f.write('\t"Exporting"\n\t\t{\n')
+        if self.instances:
+            f.write('\t\t"Instances"\n\t\t\t{\n')
+            for i, inst in enumerate(self.instances):
+                f.write(f'\t\t\t"{i}"\n\t\t\t\t{{\n')
+                file = inst.inst
+                if inst.inst == FSPath():
+                    f.write('\t\t\t\t"Name" ""\n')
+                elif inst.ent_count or inst.brush_count or inst.face_count:
+                    f.write(f'\t\t\t\t"Name"           "{file}"\n')
+                    f.write(f'\t\t\t\t"EntityCount"    "{inst.ent_count}"\n')
+                    f.write(f'\t\t\t\t"BrushCount"     "{inst.brush_count}"\n')
+                    f.write(f'\t\t\t\t"BrushSideCount" "{inst.face_count}"\n')
+                else:
+                    f.write(f'\t\t\t\t"Name" "{file}"\n')
+                f.write('\t\t\t\t}\n')
+            f.write('\t\t\t}\n')
+
+        if self.targetname:
+            f.write(f'\t\t"Targetname" "{self.targetname}"\n')
+        f.write(f'\t\t"Offset"     "{self.offset}"\n')
+
+        if self.embed_voxels:
+            f.write('\t\t"EmbeddedVoxels"\n\t\t\t{\n')
+            for pos1, pos2 in bounding_boxes(self.embed_voxels):
+                if pos1 == pos2:
+                    f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
+                    f.write(f'\t\t\t\t"Pos" "{pos1.x} {pos1.y} {pos1.z}"\n')
+                else:
+                    f.write('\t\t\t"Volume"\n\t\t\t\t{\n')
+                    f.write(f'\t\t\t\t"Pos1" "{pos1.x} {pos1.y} {pos1.z}"\n')
+                    f.write(f'\t\t\t\t"Pos2" "{pos2.x} {pos2.y} {pos2.z}"\n')
+                f.write('\t\t\t\t}\n')
+            f.write('\t\t\t}\n')
+        f.write('\t\t}\n')
+        f.write('\t}\n')

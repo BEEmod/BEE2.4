@@ -43,18 +43,9 @@ class ItemProp(Generic[ValueT]):
     def __hash__(self) -> int:
         return hash((self.id, self.default))
 
-    def export(self, index: int = 0) -> Tuple[str, int]:
-        """Generate the property block to write this back to the file.
-
-        A unique index must be provided if the variable produces an instvar.
-        """
-        if self.instvar:
-            if index <= 0:
-                raise ValueError(
-                    type(self).__qualname__ + '() requires an index!')
-        else:
-            index = 0
-        return self._export_value(self.default), index
+    def export(self) -> str:
+        """Generate the string to write into a file."""
+        return self._export_value(self.default)
 
     def parse_value(self, value: str) -> ValueT:
         return self._parse_value(value)
