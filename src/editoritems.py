@@ -300,10 +300,10 @@ DEFAULT_SOUNDS = {
 
 class ConnSide(Enum):
     """Sides of an item, where antlines connect to."""
-    UP = (0, 1, 0)
-    DOWN = (0, -1, 0)
-    LEFT = (1, 0, 0)
-    RIGHT = (-1, 0, 0)
+    LEFT = Coord(1, 0, 0)
+    RIGHT = Coord(-1, 0, 0)
+    UP = Coord(0, 1, 0)
+    DOWN = Coord(0, -1, 0)
 
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
@@ -554,9 +554,7 @@ class SubType:
         for model in self.models:
             # It has to be a .3ds file, even though it's really MDL.
             model = model.with_suffix('.3ds')
-            f.write('\t\t\t"Model"\n\t\t\t\t{\n')
-            f.write(f'\t\t\t\t"ModelName" "{model}"\n')
-            f.write('\t\t\t\t}\n')
+            f.write(f'\t\t\t"Model" {{ "ModelName" "{model}" }}\n')
         if self.pal_pos is not None:
             f.write('\t\t\t"Palette"\n\t\t\t\t{\n')
             f.write(f'\t\t\t\t"Tooltip"  "{self.pal_name}"\n')
@@ -1031,7 +1029,7 @@ class Item:
         if self.anchor_barriers:
             f.write(f'\t\t"CanAnchorOnBarriers" "1"\n')
         if not self.copiable:
-            f.write(f'\t\t"Copyable" "0"\n')
+            f.write(f'\t\t"Copyable"  "0"\n')
         if not self.deletable:
             f.write(f'\t\t"Deletable" "0"\n')
         if self.pseduo_handle:
@@ -1079,6 +1077,49 @@ class Item:
                     f.write(f'\t\t\t\t"Pos1" "{pos1.x} {pos1.y} {pos1.z}"\n')
                     f.write(f'\t\t\t\t"Pos2" "{pos2.x} {pos2.y} {pos2.z}"\n')
                 f.write('\t\t\t\t}\n')
+            f.write('\t\t\t}\n')
+
+        if self.embed_faces:
+            f.write('\t\t"EmbedFace"\n\t\t\t{\n')
+            for face in self.embed_faces:
+                f.write('\t\t\t"Solid"\n\t\t\t\t{\n')
+                f.write(f'\t\t\t\t"Center"     "{face.center}"\n')
+                f.write(f'\t\t\t\t"Dimensions" "{face.size}"\n')
+                f.write(f'\t\t\t\t"Grid"       "{face.type.value}"\n')
+                f.write('\t\t\t\t}\n')
+            f.write('\t\t\t}\n')
+
+        for over in self.overlays:
+            f.write('\t\t"Overlay"\n\t\t\t{\n')
+            f.write(f'\t\t\t"Material"   "{over.material}"\n')
+            f.write(f'\t\t\t"Center"     "{over.center}"\n')
+            f.write(f'\t\t\t"Dimensions" "{over.size}"\n')
+            f.write(f'\t\t\t"Rotation"   "{over.rotation}"\n')
+            f.write('\t\t\t}\n')
+
+        if any(self.antline_points.values()):
+            f.write('\t\t"ConnectionPoints"\n\t\t\t{\n')
+            is_first = True
+            for side in ConnSide:
+                points = self.antline_points[side]
+                if not points:
+                    continue
+                # Newline between sections.
+                if not is_first:
+                    f.write('\n')
+                is_first = False
+                # Recreate Valve's comments around the points, because we can.
+                f.write(f'\t\t\t// {side.name.title()}\n')
+
+                for point in points:
+                    f.write('\t\t\t"Point"\n\t\t\t\t{\n')
+                    f.write(f'\t\t\t\t"Dir"           "{side.value.x} {side.value.y} {side.value.z}"\n')
+                    f.write(f'\t\t\t\t"Pos"           "{point.pos.x} {point.pos.y} {point.pos.z}"\n')
+                    f.write(f'\t\t\t\t"SignageOffset" "{point.sign_off.x} {point.sign_off.y} {point.sign_off.z}"\n')
+                    f.write(f'\t\t\t\t"Priority"      "{point.priority}"\n')
+                    if point.group is not None:
+                        f.write(f'\t\t\t\t"GroupID"       "{point.group}"\n')
+                    f.write('\t\t\t\t}\n')
             f.write('\t\t\t}\n')
         f.write('\t\t}\n')
         f.write('\t}\n')
