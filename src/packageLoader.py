@@ -350,7 +350,6 @@ def find_packages(pak_dir: str) -> None:
             filesys = RawFileSystem(name)
         else:
             ext = os.path.splitext(folded)[1]
-            LOGGER.debug('Package "{}" has ext {}', name, ext)
             if ext in ('.bee_pack', '.zip'):
                 filesys = ZipFileSystem(name)
             elif ext == '.vpk':
