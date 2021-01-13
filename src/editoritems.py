@@ -260,6 +260,14 @@ class EmbedFace(NamedTuple):
     type: FaceType  # Surface material.
 
 
+class Overlay(NamedTuple):
+    """An overlay placed by the editor on the ground."""
+    material: str  # Material to show.
+    center: Vec  # Center point.
+    size: Vec  # Size of the overlay.
+    rotation: int  # Orientation of the overlay.
+
+
 # Cache these coordinates, since most items are going to be near the origin.
 _coord_cache: Dict[Tuple[int, int, int], Coord] = {}
 
@@ -639,6 +647,8 @@ class Item:
         self.embed_voxels: Set[Coord] = set()
         # Brushes automatically created
         self.embed_faces: List[EmbedFace] = []
+        # Overlays automatically placed
+        self.overlays: List[Overlay] = []
 
     @classmethod
     def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
@@ -812,6 +822,8 @@ class Item:
                 self._parse_embedded_voxels(tok)
             elif folded_key == 'embedface':
                 self._parse_embed_faces(tok)
+            elif folded_key == 'overlay':
+                self._parse_overlay(tok)
             else:  # TODO: Temp, skip over other blocks.
                 # raise tok.error('Unknown export option "{}"!', key)
                 level = 0
@@ -966,6 +978,30 @@ class Item:
             if size is None:
                 raise tok.error('No size specified for embedded face!')
             self.embed_faces.append(EmbedFace(center, size, grid))
+
+    def _parse_overlay(self, tok: Tokenizer) -> None:
+        """Parse overlay definitions, which place overlays."""
+        center: Optional[Vec] = None
+        size: Optional[Vec] = None
+        material = ''
+        rotation = 0
+        for opt_key in tok.block('Overlay'):
+            folded_key = opt_key.casefold()
+            if folded_key == 'center':
+                center = Vec.from_str(tok.expect(Token.STRING))
+            elif folded_key == 'dimensions':
+                size = Vec.from_str(tok.expect(Token.STRING))
+            elif folded_key == 'material':
+                material = tok.expect(Token.STRING)
+            elif folded_key == 'rotation':
+                rotation = conv_int(tok.expect(Token.STRING))
+            else:
+                raise tok.error('Unknown Overlay option "{}"!', opt_key)
+        if center is None:
+            raise tok.error('No position specified for overlay!')
+        if size is None:
+            raise tok.error('No size specified for overlay!')
+        self.overlays.append(Overlay(material, center, size, rotation))
 
     def export_one(self, f: IO[str]) -> None:
         """Write a single item out to a file."""
