@@ -19,7 +19,7 @@ from srctools import (
     VMF, Entity, Solid,
     VPK,
 )
-from srctools.filesys import FileSystem, get_filesystem, RawFileSystem
+from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 import srctools.logger
 
 from typing import (
@@ -341,15 +341,23 @@ def find_packages(pak_dir: str) -> None:
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
-        if name.endswith('.vpk') and not name.endswith('_dir.vpk'):
+        folded = name.casefold()
+        if folded.endswith('.vpk') and not folded.endswith('_dir.vpk'):
             # _000.vpk files, useless without the directory
             continue
 
-        try:
-            filesys = get_filesystem(name)
-        except ValueError:
-            LOGGER.info('Extra file: {}', name)
-            continue
+        if os.path.isdir(name):
+            filesys = RawFileSystem(name)
+        else:
+            ext = os.path.splitext(folded)[1]
+            LOGGER.debug('Package "{}" has ext {}', name, ext)
+            if ext in ('.bee_pack', '.zip'):
+                filesys = ZipFileSystem(name)
+            elif ext == '.vpk':
+                filesys = VPKFileSystem(name)
+            else:
+                LOGGER.info('Extra file: {}', name)
+                continue
 
         LOGGER.debug('Reading package "' + name + '"')
 
@@ -380,6 +388,12 @@ def find_packages(pak_dir: str) -> None:
             # it won't be done by load_packages().
             filesys.close_ref()
             raise
+
+        if pak_id in packages:
+            raise ValueError(
+                f'Duplicate package with id "{pak_id}"!\n'
+                'If you just updated the mod, delete any old files in packages/.'
+            ) from None
 
         PACKAGE_SYS[pak_id] = filesys
 
