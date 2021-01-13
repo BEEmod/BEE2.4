@@ -7,6 +7,7 @@ from precomp import tiling, texturing, template_brush, conditions
 import consts
 from srctools import Property, Entity, VMF, Vec, NoKeyError
 from srctools.vmf import make_overlay, Side
+import vbsp
 
 
 COND_MOD_NAME = None
@@ -252,6 +253,7 @@ def place_sign(
         material=texture,
         surfaces=faces,
     )
+    vbsp.IGNORED_OVERLAYS.add(over)
 
     over['startu'] = '1'
     over['endu'] = '0'
