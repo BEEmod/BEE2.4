@@ -2120,7 +2120,6 @@ def generate_brushes(vmf: VMF) -> None:
                         u_axis, bbox_min[u_axis] + 128 * min_u - 64,
                         v_axis, bbox_min[v_axis] + 128 * min_v - 64,
                     )
-                    vmf.create_ent('info_null', origin=tile_min)
                     front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256/0.25)
                     front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256/0.25)
                     if gen.options['scaleup256']:
