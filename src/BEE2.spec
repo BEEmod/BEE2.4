@@ -143,21 +143,6 @@ EXCLUDES = [
     'argparse',
 ]
 
-
-# AVbin is needed to read OGG files.
-INCLUDE_PATHS = [
-    'C:/Windows/system32/avbin.dll',  # Win 32 bit
-    'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
-    '/usr/local/lib/libavbin.dylib',  # OS X
-    '/usr/lib/libavbin.so',  # Linux
-]
-
-# Filter out files for other platforms
-INCLUDE_LIBS = [
-    (path, '.') for path in INCLUDE_PATHS
-    if os.path.exists(path)
-]
-
 bee_version = input('BEE2 Version (x.y.z): ')
 
 # Write this to the temp folder, so it's picked up and included.
@@ -184,7 +169,6 @@ for snd in os.listdir('../sounds/'):
 bee2_a = Analysis(
     ['BEE2_launch.pyw'],
     pathex=[workpath, os.path.dirname(srctools.__path__[0])],
-    binaries=INCLUDE_LIBS,
     datas=data_files,
     hiddenimports=[
         'PIL._tkinter_finder',
