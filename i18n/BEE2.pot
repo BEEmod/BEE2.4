@@ -4,14 +4,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2020-09-20 10:31-0700\n"
+"POT-Creation-Date: 2021-01-14 14:25+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.8.0\n"
+"Generated-By: Babel 2.6.0\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -1383,6 +1383,14 @@ msgid ""
 "Log when the resources a \"PackList\" refers to are not present in the "
 "zip. This may be fine (in a prerequisite zip), but it often indicates an "
 "error."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Development Mode"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Enables displaying additional UI specific for development purposes."
 msgstr ""
 
 #: app/optionWindow.py
