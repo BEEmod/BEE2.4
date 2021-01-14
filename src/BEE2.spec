@@ -128,6 +128,8 @@ EXCLUDES = [
     'idlelib.tabbedpages',
     'idlelib.textView',
 
+    'numpy', # PIL.ImageFilter imports, we don't need NumPy!
+
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
     'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
