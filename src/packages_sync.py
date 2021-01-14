@@ -39,6 +39,10 @@ from packageLoader import (
 
 # If true, user said * for packages - use last for all.
 PACKAGE_REPEAT: Optional[RawFileSystem] = None
+SKIPPED_FILES: List[str] = []
+
+# If enabled, ignore anything not in packages and that needs prompting.
+NO_PROMPT = False
 
 
 def get_package(file: Path) -> RawFileSystem:
@@ -139,6 +143,9 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
                 target_systems.append(package.fsys)
 
         if not target_systems:
+            if NO_PROMPT:
+                EXTRA_FILES.append(rel_loc)
+                return
             # This file is totally new.
             try:
                 target_systems.append(get_package(rel_loc))
@@ -223,6 +230,11 @@ def main(files: List[str]) -> int:
 
     for file_path in files_to_check:
         check_file(file_path, portal2_loc, package_loc)
+
+    if SKIPPED_FILES:
+        LOGGER.warning('Skipped missing files:')
+        for file in SKIPPED_FILES:
+            LOGGER.info('- {}', file)
 
     return 0
 

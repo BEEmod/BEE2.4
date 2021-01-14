@@ -7,19 +7,19 @@ import shutil
 import math
 import re
 from collections import defaultdict
-from enum import Enum
 
 import srctools
-import tkMarkdown
+from app import tkMarkdown
 import utils
-from packageMan import PACK_CONFIG
+from app.packageMan import PACK_CONFIG
+from consts import MusicChannel
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
     VMF, Entity, Solid,
     VPK,
 )
-from srctools.filesys import FileSystem, get_filesystem, RawFileSystem
+from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 import srctools.logger
 
 from typing import (
@@ -28,13 +28,14 @@ from typing import (
     Dict, List, Tuple, Set, Match,
     NamedTuple, Collection,
     Iterable, Iterator,
+    FrozenSet,
 )
 
 
 # noinspection PyUnresolvedReferences
 if TYPE_CHECKING:
-    from gameMan import Game
-    from selectorWin import SelitemData
+    from app.gameMan import Game
+    from app.selector_win import SelitemData
     from loadScreen import LoadScreen
     from typing import NoReturn
 
@@ -147,14 +148,6 @@ VPK_FOLDER = {
     # This doesn't have VPK files, and is higher priority.
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
-
-
-class MusicChannel(Enum):
-    """Categories that can have music."""
-    BASE = 'base'  # Main track
-    TBEAM = 'tbeam'  # Funnel audio
-    BOUNCE = 'BounceGel'  # Jumping on repulsion gel.
-    SPEED = 'SpeedGel'  # Moving fast horizontally
 
 
 class SignStyle(NamedTuple):
@@ -348,15 +341,22 @@ def find_packages(pak_dir: str) -> None:
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
-        if name.endswith('.vpk') and not name.endswith('_dir.vpk'):
+        folded = name.casefold()
+        if folded.endswith('.vpk') and not folded.endswith('_dir.vpk'):
             # _000.vpk files, useless without the directory
             continue
 
-        try:
-            filesys = get_filesystem(name)
-        except ValueError:
-            LOGGER.info('Extra file: {}', name)
-            continue
+        if os.path.isdir(name):
+            filesys = RawFileSystem(name)
+        else:
+            ext = os.path.splitext(folded)[1]
+            if ext in ('.bee_pack', '.zip'):
+                filesys = ZipFileSystem(name)
+            elif ext == '.vpk':
+                filesys = VPKFileSystem(name)
+            else:
+                LOGGER.info('Extra file: {}', name)
+                continue
 
         LOGGER.debug('Reading package "' + name + '"')
 
@@ -377,7 +377,7 @@ def find_packages(pak_dir: str) -> None:
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
                 find_packages(name)
             else:
-                LOGGER.warning('ERROR: Bad package "{}"!', name)
+                LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
             continue
         try:
@@ -387,6 +387,12 @@ def find_packages(pak_dir: str) -> None:
             # it won't be done by load_packages().
             filesys.close_ref()
             raise
+
+        if pak_id in packages:
+            raise ValueError(
+                f'Duplicate package with id "{pak_id}"!\n'
+                'If you just updated the mod, delete any old files in packages/.'
+            ) from None
 
         PACKAGE_SYS[pak_id] = filesys
 
@@ -2003,20 +2009,20 @@ class QuotePack(PakObject):
         # portrait.
         port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
-        monitor_data = data.info.find_key('monitor', None)
-
-        if monitor_data.value is not None:
+        try:
+            monitor_data = data.info.find_key('monitor')
+        except NoKeyError:
+            mon_studio = mon_cam_loc = None
+            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_studio_actor = ''
+            turret_hate = False
+        else:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
             mon_interrupt = monitor_data.float('interrupt_chance', 0)
             mon_cam_loc = monitor_data.vec('Cam_loc')
             mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
             turret_hate = monitor_data.bool('TurretShoot')
-        else:
-            mon_studio = mon_cam_loc = None
-            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
-            mon_studio_actor = ''
-            turret_hate = False
 
         config = get_config(
             data.info,
@@ -2529,12 +2535,13 @@ class Music(PakObject):
             )
 
     @classmethod
-    def post_parse(cls):
+    def post_parse(cls) -> None:
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
         """
-        sounds = {}  # type: Dict[str, str]
+        sounds: Dict[FrozenSet[str], str] = {}
+
         for music in cls.all():
             for channel in MusicChannel:
                 # Base isn't present in this.
@@ -2552,20 +2559,22 @@ class Music(PakObject):
                         )
                 # Look for tracks used in two items, indicates
                 # they should be children of one...
-                for sound in music.sound[channel]:
-                    sound = sound.casefold()
-                    try:
-                        other_id = sounds[sound]
-                    except KeyError:
-                        sounds[sound] = music.id
-                    else:
-                        if music.id != other_id:
-                            LOGGER.warning(
-                                'Sound "{}" was reused in "{}" <> "{}".',
-                                sound,
-                                music.id,
-                                other_id
-                            )
+                soundset = frozenset(map(str.casefold, music.sound[channel]))
+                if not soundset:
+                    continue # Blank shouldn't match blanks...
+
+                try:
+                    other_id = sounds[soundset]
+                except KeyError:
+                    sounds[soundset] = music.id
+                else:
+                    if music.id != other_id:
+                        LOGGER.warning(
+                            'Music tracks were reused in "{}" <> "{}": \n{}',
+                            music.id,
+                            other_id,
+                            sorted(soundset)
+                        )
 
 
 class Signage(PakObject, allow_mult=True, has_img=False):
@@ -3533,7 +3542,7 @@ def desc_parse(
 def get_selitem_data(info: Property) -> 'SelitemData':
     """Return the common data for all item types - name, author, description.
     """
-    from selectorWin import SelitemData
+    from app.selector_win import SelitemData
 
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
@@ -3569,7 +3578,7 @@ def join_selitem_data(
     This uses the over_data values if defined, using our_data if not.
     Authors and descriptions will be joined to each other.
     """
-    from selectorWin import SelitemData
+    from app.selector_win import SelitemData
     (
         our_name,
         our_short_name,

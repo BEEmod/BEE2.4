@@ -8,13 +8,14 @@ import shutil
 import sys
 from pathlib import Path
 from enum import Enum
+from types import TracebackType
 
 from typing import (
     Tuple, List, Set, Sequence,
     Iterator, Iterable, SupportsInt, Mapping,
     TypeVar, Any,
     Union, Callable, Generator,
-    KeysView, ValuesView, ItemsView,
+    KeysView, ValuesView, ItemsView, Type,
 )
 
 try:
@@ -403,6 +404,56 @@ CONN_LOOKUP = {
 del N, S, E, W
 
 RetT = TypeVar('RetT')
+EnumT = TypeVar('EnumT', bound=Enum)
+EnumTypeT = TypeVar('EnumTypeT', bound=Type[Enum])
+
+
+def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
+    """Make a enum with property getters more efficent.
+
+    Call the getter on each member, and then replace it with a dict lookup.
+    """
+    ns = vars(cls)
+    for name, value in list(ns.items()):
+        if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
+            continue
+        data = {}
+        data_exc = {}
+
+        exc: Exception
+        for enum in cls:
+            try:
+                res = value.fget(enum)
+            except Exception as exc:
+                # The getter raised an exception, so we want to replicate
+                # that. So grab the traceback, and go back one frame to exclude
+                # ourselves from that. Then we can reraise making it look like
+                # it came from the original getter.
+                data_exc[enum] = (exc, exc.__traceback__.tb_next)
+                exc.__traceback__ = None
+            else:
+                data[enum] = res
+        if data_exc:
+            func = _exc_freeze(data, data_exc)
+        else: # If we don't raise, we can use the C-func
+            func = data.get
+        setattr(cls, name, property(fget=func, doc=value.__doc__))
+    return cls
+
+
+def _exc_freeze(
+    data: Mapping[EnumT, RetT],
+    data_exc: Mapping[EnumT, Tuple[BaseException, TracebackType]],
+) -> Callable[[EnumT], RetT]:
+    """If the property raises exceptions, we need to reraise them."""
+    def getter(value: EnumT) -> RetT:
+        """Return the value, or re-raise the original exception."""
+        try:
+            return data[value]
+        except KeyError:
+            exc, tb = data_exc[value]
+            raise exc.with_traceback(tb) from None
+    return getter
 
 
 class FuncLookup(Mapping[str, Callable[..., Any]]):

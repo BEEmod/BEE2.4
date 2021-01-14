@@ -10,289 +10,32 @@ LOGGER = init_logging('bee2/vrad.log')
 import os
 import shutil
 import sys
-from datetime import datetime
-from io import BytesIO, StringIO
+from io import BytesIO
 from zipfile import ZipFile
-from typing import Iterator, List, Tuple, Set, Dict, Optional
+from typing import List, Set
 
 import srctools.run
-import utils
-from srctools import Property, Entity
+from srctools import Property, FGD
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import (
     RawFileSystem, VPKFileSystem, ZipFileSystem,
     FileSystem,
 )
-from srctools.packlist import PackList, FileType as PackType, load_fgd
+from srctools.packlist import PackList
 from srctools.game import find_gameinfo
-from srctools.bsp_transform import (
-    run_transformations,
-    Context as TransContext,
-    trans as register_transform,
+from srctools.bsp_transform import run_transformations
+
+from postcomp import (
+    music,
+    screenshot,
+    coop_responses,
+    filter,
 )
 
-CONF = Property('Config', [])
 
-SCREENSHOT_DIR = os.path.join(
-    '..',
-    'portal2',  # This is hardcoded into P2, it won't change for mods.
-    'puzzles',
-    # Then the <random numbers> folder
-)
-
-GAME_FOLDER = {
-    # The game's root folder, where screenshots are saved
-    utils.STEAM_IDS['PORTAL2']: 'portal2',
-    utils.STEAM_IDS['TWTM']: 'twtm',
-    utils.STEAM_IDS['APTAG']: 'aperturetag',
-    utils.STEAM_IDS['DEST_AP']: 'portal2',
-}
-
-SOUND_MAN_FOLDER = {
-    # The folder where game_sounds_manifest is found
-    utils.STEAM_IDS['PORTAL2']: 'portal2_dlc2',
-    utils.STEAM_IDS['DEST_AP']: 'portal2_dlc2',
-    utils.STEAM_IDS['TWTM']: 'twtm',
-    utils.STEAM_IDS['APTAG']: 'aperturetag',
-}
-
-# Various parts of the soundscript generated for BG music.
-
-# Things that can appear at the beginning of filenames..
-SOUND_CHARS = '*#@><^)}$!?'
-
-# The starting section defining the name and volume.
-# SNDLVL_NONE means it's infinite range.
-MUSIC_START = """\
-"music.BEE2{name}"
-{{
-"channel" "CHAN_STATIC"
-"soundlevel" "SNDLVL_NONE"
-"volume" "{vol}"
-"""
-
-# The basic operator stack for music without any additional tracks.
-MUSIC_BASE = """\
-"soundentry_version" "2"
-"operator_stacks"
-\t{
-\t"update_stack"
-\t\t{
-\t\t"import_stack" "update_music_stereo"
-\t\t"volume_fade_in"
-\t\t\t{
-\t\t\t"input_max" "0.5"
-\t\t\t}
-\t\t"volume_fade_out"
-\t\t\t{
-\t\t\t"input_max" "1.5"
-\t\t\t}
-"""
-
-# We need to stop the sub-tracks after the main track stops...
-MUSIC_END = """\
-\t\t}
-\t"stop_stack"
-\t\t{
-\t\t"stop_entry"
-\t\t\t{
-\t\t\t"operator" "sys_stop_entries"
-\t\t\t"input_max_entries" "0"
-\t\t\t"match_entity" "false"
-\t\t\t"match_substring" "true"
-\t\t\t"match_entry" "music.BEE2_"
-\t\t\t}
-\t\t}
-\t}
-}
-"""
-
-# Operator stacks which enable the given gel types.
-MUSIC_GEL_BOUNCE_MAIN = """\
-
-\t\t"import_stack" "p2_update_music_play_gel"
-\t\t"gel_play_entry"
-\t\t\t{
-\t\t\t"entry_name" "music.BEE2_gel_bounce"
-\t\t\t}
-\t\t"gel_stop_entry"
-\t\t\t{
-\t\t\t"match_entry" "music.BEE2_gel_bounce"
-\t\t\t}
-"""
-
-MUSIC_GEL_SPEED_MAIN = """\
-
-\t\t"import_stack" "p2_update_music_play_speed_gel"
-\t\t"speed_velocity_trigger"
-\t\t\t{
-\t\t\t"input2" "250"
-\t\t\t}
-\t\t"speed_play_entry"
-\t\t\t{
-\t\t\t"entry_name" "music.BEE2_gel_speed"
-\t\t\t}
-\t\t"speed_stop_entry"
-\t\t\t{
-\t\t\t"match_entry" "music.BEE2_gel_speed"
-\t\t\t}
-"""
-
-MUSIC_FUNNEL_MAIN = """\
-
-\t"import_stack" "p2_update_music_play_tbeam"
-\t"play_entry"
-\t\t{
-\t\t"entry_name" "music.BEE2_funnel"
-\t\t}
-\t"stop_entry"
-\t\t{
-\t\t"match_entry" "music.BEE2_funnel"
-\t\t}
-"""
-
-# The gel operator stack syncronises the music with the base track.
-MUSIC_GEL_STACK = """\
-
-"soundentry_version" "2"
-"operator_stacks"
-\t{{
-\t"start_stack"
-\t\t{{
-\t\t"import_stack" "start_sync_to_entry"
-\t\t"elapsed_time"
-\t\t\t{{
-\t\t\t"entry" "music.BEE2"
-\t\t\t}}
-\t\t"duration_div"
-\t\t\t{{
-\t\t\t"input2" "1"
-\t\t\t}}
-\t\t"div_mult"
-\t\t\t{{
-\t\t\t"input1" "1.0"
-\t\t\t}}
-\t\t}}
-\t"update_stack"
-\t\t{{
-\t\t"import_stack" "update_music_stereo"
-\t\t"volume_fade_in"
-\t\t\t{{
-\t\t\t"input_max" "{fadein}"
-\t\t\t}}
-\t\t"volume_fade_out"
-\t\t\t{{
-\t\t\t"input_max" "{fadeout}"
-\t\t\t}}
-\t\t}}
-\t}}
-}}
-"""
-
-# This funnel stack makes it start randomly offset into the music.
-MUSIC_FUNNEL_RAND_STACK = """\
-
-"soundentry_version" "2"
-"operator_stacks"
-\t{
-\t"start_stack"
-\t\t{
-\t\t"random_offset"
-\t\t\t{
-\t\t\t"operator" "math_random"
-\t\t\t"input_min" "0.0"
-\t\t\t"input_max" "126"
-\t\t\t}
-\t\t"negative_delay"
-\t\t\t{
-\t\t\t"operator" "math_float"
-\t\t\t"apply" "mult"
-\t\t\t"input1" "@random_offset.output"
-\t\t\t"input2" "-1.0"
-\t\t\t}
-\t\t"delay_output"
-\t\t\t{
-\t\t\t"operator" "sys_output"
-\t\t\t"input_float" "@negative_delay.output"
-\t\t\t"output" "delay"
-\t\t\t}
-\t\t}
-"""
-
-# This funnel stack makes it synchronise with the main track.
-MUSIC_FUNNEL_SYNC_STACK = """\
-
-"soundentry_version" "2"
-"operator_stacks"
-\t{
-\t"start_stack"
-\t\t{
-\t\t"import_stack" "start_sync_to_entry"
-\t\t"elapsed_time"
-\t\t\t{
-\t\t\t"entry" "music.BEE2"
-\t\t\t}
-\t\t"duration_div"
-\t\t\t{
-\t\t\t"input2" "1"
-\t\t\t}
-\t\t"div_mult"
-\t\t\t{
-\t\t\t"input1" "1.0"
-\t\t\t}
-\t\t}
-"""
-
-# Both funnel versions share the same update stack.
-MUSIC_FUNNEL_UPDATE_STACK = """\
-\t"update_stack"
-\t\t{
-\t\t"import_stack" "update_music_stereo"
-\t\t"mixer"
-\t\t\t{
-\t\t\t"mixgroup" "unduckedMusic"
-\t\t\t}
-\t\t"volume_fade_in"
-\t\t\t{
-\t\t\t"input_max" "3.0"
-\t\t\t"input_map_min" "0.05"
-\t\t\t}
-\t\t"volume_fade_out"
-\t\t\t{
-\t\t\t"input_max" "0.75"
-\t\t\t"input_map_min" "0.05"
-\t\t\t}
-\t\t"volume_lfo_time_scale"
-\t\t\t{
-\t\t\t"input2" "0.3"
-\t\t\t}
-\t\t"volume_lfo_scale"
-\t\t\t{
-\t\t\t"input2" "0.4"
-\t\t\t}
-\t\t}
-\t}
-}
-"""
-
-
-def load_config():
-    global CONF
-    LOGGER.info('Loading Settings...')
-    try:
-        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
-            CONF = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
-                'Config', []
-            )
-    except FileNotFoundError:
-        pass
-    LOGGER.info('Config Loaded!')
-
-
-def dump_files(bsp: BSP):
+def dump_files(bsp: BSP, dump_folder: str) -> None:
     """Dump packed files to a location.
     """
-    dump_folder = CONF['packfile_dump', '']
     if not dump_folder:
         return
 
@@ -323,280 +66,6 @@ def dump_files(bsp: BSP):
             zipfile.extract(zipinfo, dump_folder)
 
 
-@register_transform('BEE2: Coop Responses')
-def generate_coop_responses(ctx: TransContext) -> None:
-    """If the entities are present, add the coop response script."""
-    responses: Dict[str, List[str]] = {}
-    for response in ctx.vmf.by_class['bee2_coop_response']:
-        responses[response['type']] = [
-            value for key, value in response.keys.items()
-            if key.startswith('choreo')
-        ]
-        response.remove()
-    script = ["BEE2_RESPONSES <- {"]
-    for response_type, lines in sorted(responses.items()):
-        script.append(f'\t{response_type} = [')
-        for line in lines:
-            script.append(f'\t\tCreateSceneEntity("{line}"),')
-        script.append('\t],')
-    script.append('};')
-
-    # We want to write this onto the '@glados' entity.
-    ent: Optional[Entity] = None
-    for ent in ctx.vmf.by_target['@glados']:
-        ctx.add_code(ent, '\n'.join(script))
-        # Also include the actual script.
-        split_script = ent['vscripts'].split()
-        split_script.append('bee2/coop_responses.nut')
-        ent['vscripts'] = ' '.join(split_script)
-
-    if ent is None:
-        LOGGER.warning('Response scripts present, but @glados is not!')
-
-
-def generate_music_script(data: Property, pack_list: PackList) -> bytes:
-    """Generate a soundscript file for music."""
-    # We also pack the filenames used for the tracks - that way funnel etc
-    # only get packed when needed. Stock sounds are in VPKS or in aperturetag/,
-    # we don't check there.
-    # The voice attrs used in the map - we can skip tracks
-    voice_attr = CONF['VoiceAttr', ''].casefold().split(';')
-
-    funnel = data.find_key('tbeam', '')
-    bounce = data.find_key('bouncegel', '')
-    speed = data.find_key('speedgel', '')
-
-    sync_funnel = data.bool('sync_funnel')
-
-    if 'base' not in data:
-        base = Property('base', 'bee2/silent_lp.wav')
-        # Don't sync to a 2-second sound.
-        sync_funnel = False
-    else:
-        base = data.find_key('base')
-
-    # The sounds must be present, and the items should be in the map.
-    has_funnel = funnel.value and (
-        'funnel' in voice_attr or
-        'excursionfunnel' in voice_attr
-    )
-    has_bounce = bounce.value and (
-        'bouncegel' in voice_attr or
-        'bluegel' in voice_attr
-    )
-    # Speed-gel sounds also play when flinging, so keep it always.
-
-    file = StringIO()
-
-    # Write the base music track
-    file.write(MUSIC_START.format(name='', vol='1'))
-    write_sound(file, base, pack_list, snd_prefix='#*')
-    file.write(MUSIC_BASE)
-    # The 'soundoperators' section is still open now.
-
-    # Add the operators to play the auxilluary sounds..
-    if has_funnel:
-        file.write(MUSIC_FUNNEL_MAIN)
-    if has_bounce:
-        file.write(MUSIC_GEL_BOUNCE_MAIN)
-    if speed.value:
-        file.write(MUSIC_GEL_SPEED_MAIN)
-
-    # End the main sound block
-    file.write(MUSIC_END)
-
-    if has_funnel:
-        # Write the 'music.BEE2_funnel' sound entry
-        file.write('\n')
-        file.write(MUSIC_START.format(name='_funnel', vol='1'))
-        write_sound(file, funnel, pack_list, snd_prefix='*')
-        # Some tracks want the funnel music to sync with the normal
-        # track, others randomly choose a start.
-        file.write(
-            MUSIC_FUNNEL_SYNC_STACK
-            if sync_funnel else
-            MUSIC_FUNNEL_RAND_STACK
-        )
-        file.write(MUSIC_FUNNEL_UPDATE_STACK)
-
-    if has_bounce:
-        file.write('\n')
-        file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
-        write_sound(file, bounce, pack_list, snd_prefix='*')
-        # Fade in fast (we never get false positives, but fade out slow
-        # since this disables when falling back..
-        file.write(MUSIC_GEL_STACK.format(fadein=0.25, fadeout=1.5))
-
-    if speed.value:
-        file.write('\n')
-        file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
-        write_sound(file, speed, pack_list, snd_prefix='*')
-        # We need to shut off the sound fast, so portals don't confuse it.
-        # Fade in slow so it doesn't make much sound (and also as we get
-        # up to speed). We stop almost immediately on gel too.
-        file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
-
-    return file.getvalue().encode()
-
-
-def write_sound(
-    file: StringIO,
-    snds: Property,
-    pack_list: PackList,
-    snd_prefix: str='*',
-) -> None:
-    """Write either a single sound, or multiple rndsound.
-
-    snd_prefix is the prefix for each filename - *, #, @, etc.
-    """
-    if snds.has_children():
-        file.write('"rndwave"\n\t{\n')
-        for snd in snds:
-            file.write(
-                '\t"wave" "{sndchar}{file}"\n'.format(
-                    file=snd.value.lstrip(SOUND_CHARS),
-                    sndchar=snd_prefix,
-                )
-            )
-            pack_list.pack_file('sound/' + snd.value.casefold())
-        file.write('\t}\n')
-    else:
-        file.write(
-            '"wave" "{sndchar}{file}"\n'.format(
-                file=snds.value.lstrip(SOUND_CHARS),
-                sndchar=snd_prefix,
-            )
-        )
-        pack_list.pack_file('sound/' + snds.value.casefold())
-
-
-def inject_files() -> Iterator[Tuple[str, str]]:
-    """Generate the names of files to inject, if they exist.."""
-    # Additionally add files set in the config.
-    for prop in CONF.find_children('InjectFiles'):
-        filename = os.path.join('bee2', 'inject', prop.real_name)
-        if os.path.exists(filename):
-            yield filename, prop.value
-
-
-def find_screenshots() -> Iterator[str]:
-    """Find candidate screenshots to overwrite."""
-    # Inside SCREENSHOT_DIR, there should be 1 folder with a
-    # random name which contains the user's puzzles. Just
-    # attempt to modify a screenshot in each of the directories
-    # in the folder.
-    for folder in os.listdir(SCREENSHOT_DIR):
-        full_path = os.path.join(SCREENSHOT_DIR, folder)
-        if os.path.isdir(full_path):
-            # The screenshot to modify is untitled.jpg
-            screenshot = os.path.join(full_path, 'untitled.jpg')
-            if os.path.isfile(screenshot):
-                yield screenshot
-
-
-def mod_screenshots() -> None:
-    """Modify the map's screenshot."""
-    mod_type = CONF['screenshot_type', 'PETI'].lower()
-
-    if mod_type == 'cust':
-        LOGGER.info('Using custom screenshot!')
-        scr_loc = str(utils.conf_location('screenshot.jpg'))
-    elif mod_type == 'auto':
-        LOGGER.info('Using automatic screenshot!')
-        scr_loc = None
-        # The automatic screenshots are found at this location:
-        auto_path = os.path.join(
-            '..',
-            GAME_FOLDER.get(CONF['game_id', ''], 'portal2'),
-            'screenshots'
-        )
-        # We need to find the most recent one. If it's named
-        # "previewcomplete", we want to ignore it - it's a flag
-        # to indicate the map was playtested correctly.
-        try:
-            screens = [
-                os.path.join(auto_path, path)
-                for path in
-                os.listdir(auto_path)
-            ]
-        except FileNotFoundError:
-            # The screenshot folder doesn't exist!
-            screens = []
-        screens.sort(
-            key=os.path.getmtime,
-            reverse=True,
-            # Go from most recent to least
-        )
-        playtested = False
-        for scr_shot in screens:
-            filename = os.path.basename(scr_shot)
-            if filename.startswith('bee2_playtest_flag'):
-                # Previewcomplete is a flag to indicate the map's
-                # been playtested. It must be newer than the screenshot
-                playtested = True
-                continue
-            elif filename.startswith('bee2_screenshot'):
-                continue  # Ignore other screenshots
-
-            # We have a screenshot. Check to see if it's
-            # not too old. (Old is > 2 hours)
-            date = datetime.fromtimestamp(
-                os.path.getmtime(scr_shot)
-            )
-            diff = datetime.now() - date
-            if diff.total_seconds() > 2 * 3600:
-                LOGGER.info(
-                    'Screenshot "{scr}" too old ({diff!s})',
-                    scr=scr_shot,
-                    diff=diff,
-                )
-                continue
-
-            # If we got here, it's a good screenshot!
-            LOGGER.info('Chosen "{}"', scr_shot)
-            LOGGER.info('Map Playtested: {}', playtested)
-            scr_loc = scr_shot
-            break
-        else:
-            # If we get to the end, we failed to find an automatic
-            # screenshot!
-            LOGGER.info('No Auto Screenshot found!')
-            mod_type = 'peti'  # Suppress the "None not found" error
-
-        if srctools.conv_bool(CONF['clean_screenshots', '0']):
-            LOGGER.info('Cleaning up screenshots...')
-            # Clean up this folder - otherwise users will get thousands of
-            # pics in there!
-            for screen in screens:
-                if screen != scr_loc and os.path.isfile(screen):
-                    os.remove(screen)
-            LOGGER.info('Done!')
-    else:
-        # PeTI type, or something else
-        scr_loc = None
-
-    if scr_loc is not None and os.path.isfile(scr_loc):
-        # We should use a screenshot!
-        for screen in find_screenshots():
-            LOGGER.info('Replacing "{}"...', screen)
-            # Allow us to edit the file...
-            utils.unset_readonly(screen)
-            shutil.copy(scr_loc, screen)
-            # Make the screenshot readonly, so P2 can't replace it.
-            # Then it'll use our own
-            utils.set_readonly(screen)
-
-    else:
-        if mod_type != 'peti':
-            # Error if we were looking for a screenshot
-            LOGGER.warning('"{}" not found!', scr_loc)
-        LOGGER.info('Using PeTI screenshot!')
-        for screen in find_screenshots():
-            # Make the screenshot writeable, so P2 will replace it
-            LOGGER.info('Making "{}" replaceable...', screen)
-            utils.unset_readonly(screen)
-
-
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
     code = srctools.run.run_compiler(os.path.join(os.getcwd(), "vrad"), args)
@@ -608,6 +77,7 @@ def run_vrad(args: List[str]) -> None:
 
 
 def main(argv: List[str]) -> None:
+    """Main VRAD script."""
     LOGGER.info('BEE2 VRAD hook started!')
         
     args = " ".join(argv)
@@ -633,7 +103,16 @@ def main(argv: List[str]) -> None:
 
     LOGGER.info("Map path is " + path)
 
-    load_config()
+    LOGGER.info('Loading Settings...')
+    try:
+        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
+            conf = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
+                'Config', []
+            )
+    except FileNotFoundError:
+        conf = Property('Config', [])
+    else:
+        LOGGER.info('Config Loaded!')
 
     for a in fast_args[:]:
         folded_a = a.casefold()
@@ -669,15 +148,20 @@ def main(argv: List[str]) -> None:
     if not os.path.isfile(path):
         raise ValueError('"{}" is not a file!'.format(path))
 
+    LOGGER.info('Reading BSP')
+    bsp_file = BSP(path)
+
+    bsp_ents = bsp_file.read_ent_data()
+
     # If VBSP thinks it's hammer, trust it.
-    if CONF.bool('is_hammer', False):
+    if conf.bool('is_hammer', False):
         is_peti = edit_args = False
     else:
         is_peti = True
         # Detect preview via knowing the bsp name. If we are in preview,
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
-            edit_args = not CONF.bool('force_full', False)
+            edit_args = not conf.bool('force_full', False)
         else:
             # publishing - always force full lighting.
             edit_args = False
@@ -700,11 +184,11 @@ def main(argv: List[str]) -> None:
 
     # Put the Mel and Tag filesystems in so we can pack from there.
     fsys_tag = fsys_mel = None
-    if is_peti and 'mel_vpk' in CONF:
-        fsys_mel = VPKFileSystem(CONF['mel_vpk'])
+    if is_peti and 'mel_vpk' in conf:
+        fsys_mel = VPKFileSystem(conf['mel_vpk'])
         fsys.add_sys(fsys_mel)
-    if is_peti and 'tag_dir' in CONF:
-        fsys_tag = RawFileSystem(CONF['tag_dir'])
+    if is_peti and 'tag_dir' in conf:
+        fsys_tag = RawFileSystem(conf['tag_dir'])
         fsys.add_sys(fsys_tag)
 
     # Special case - move the BEE2 fsys FIRST, so we always pack files found
@@ -714,17 +198,12 @@ def main(argv: List[str]) -> None:
             fsys.systems.remove(child_sys)
             fsys.systems.insert(0, child_sys)
 
-    LOGGER.info('Reading BSP')
-    bsp_file = BSP(path)
-
-    bsp_ents = bsp_file.read_ent_data()
-
     zip_data = BytesIO()
     zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
-    zipfile = ZipFile(zip_data, mode='a')
+    zipfile = ZipFile(zip_data)
 
     # Mount the existing packfile, so the cubemap files are recognised.
-    fsys.systems.append((ZipFileSystem('', zipfile), ''))
+    fsys.add_sys(ZipFileSystem('<BSP pakfile>', zipfile))
 
     fsys.open_ref()
 
@@ -735,33 +214,31 @@ def main(argv: List[str]) -> None:
         LOGGER.debug('- {}: {!r}', child_sys[1], child_sys[0])
 
     LOGGER.info('Reading our FGD files...')
-    fgd = load_fgd()
+    fgd = FGD.engine_dbase()
 
     packlist = PackList(fsys)
     packlist.load_soundscript_manifest(
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
 
-    # We nee to add all soundscripts in scripts/bee2_snd/
+    # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
     for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
         if soundscript.path.endswith('.txt'):
             packlist.load_soundscript(soundscript, always_include=False)
 
     if is_peti:
-        LOGGER.info('Adding special packed files:')
-        music_data = CONF.find_key('MusicScript', [])
-        if music_data:
-            packlist.pack_file(
-                'scripts/BEE2_generated_music.txt',
-                PackType.SOUNDSCRIPT,
-                data=generate_music_script(music_data, packlist)
-            )
+        LOGGER.info('Checking for music:')
+        music.generate(bsp_ents, packlist)
 
-        for filename, arcname in inject_files():
-            LOGGER.info('Injecting "{}" into packfile.', arcname)
-            with open(filename, 'rb') as f:
-                packlist.pack_file(arcname, data=f.read())
+        for prop in conf.find_children('InjectFiles'):
+            filename = os.path.join('bee2', 'inject', prop.real_name)
+            try:
+                with open(filename, 'rb') as f:
+                    LOGGER.info('Injecting "{}" into packfile.', prop.value)
+                    packlist.pack_file(prop.value, data=f.read())
+            except FileNotFoundError:
+                pass
 
     LOGGER.info('Run transformations...')
     run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
@@ -772,11 +249,7 @@ def main(argv: List[str]) -> None:
     packlist.eval_dependencies()
     LOGGER.info('Done!')
 
-    if is_peti:
-        packlist.write_manifest()
-    else:
-        # Write with the map name, so it loads directly.
-        packlist.write_manifest(os.path.basename(path)[:-4])
+    packlist.write_manifest()
 
     # We need to disallow Valve folders.
     pack_whitelist = set()  # type: Set[FileSystem]
@@ -815,7 +288,7 @@ def main(argv: List[str]) -> None:
                 set(zipfile.namelist()) - existing
             ))
 
-    dump_files(bsp_file)
+    dump_files(bsp_file, conf['packfile_dump', ''])
 
     # Copy new entity data.
     bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
@@ -824,7 +297,7 @@ def main(argv: List[str]) -> None:
     LOGGER.info(' - BSP written!')
 
     if is_peti:
-        mod_screenshots()
+        screenshot.modify(conf)
 
     if edit_args:
         LOGGER.info("Forcing Cheap Lighting!")
