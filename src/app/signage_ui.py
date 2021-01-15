@@ -92,10 +92,6 @@ def save_load_signage(props: Property=None) -> Optional[Property]:
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
     for sign in Signage.all():
-        if sign.hidden:
-            # Don't bother with making the icon.
-            continue
-
         for potential_style in new_style.bases:
             try:
                 icon = sign.styles[potential_style.id.upper()].icon
@@ -151,25 +147,75 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
     canv_all['yscrollcommand'] = scroll.set
 
     name_label = ttk.Label(window, text='', justify='center')
+    frame_preview = ttk.Frame(window, relief='raised', borderwidth=4)
 
     frame_selected.grid(row=0, column=0, sticky='nsew')
-    name_label.grid(row=1, column=0, sticky='ew')
-    canv_all.grid(row=0, column=1, rowspan=2, sticky='nsew')
-    scroll.grid(row=0, column=2, rowspan=2, sticky='ns')
+    ttk.Separator(orient='horiz').grid(row=1, column=0, sticky='ew')
+    name_label.grid(row=2, column=0)
+    frame_preview.grid(row=3, column=0, pady=4)
+    canv_all.grid(row=0, column=1, rowspan=4, sticky='nsew')
+    scroll.grid(row=0, column=2, rowspan=4, sticky='ns')
     window.columnconfigure(1, weight=1)
-    window.rowconfigure(0, weight=1)
+    window.rowconfigure(3, weight=1)
 
     utils.add_mousewheel(canv_all, canv_all, window)
 
+    blank_sign = img.color_square(img.PETI_ITEM_BG, 64)
+    preview_left = ttk.Label(frame_preview, image=blank_sign, anchor='e')
+    preview_right = ttk.Label(frame_preview, image=blank_sign, anchor='w')
+    preview_left.grid(row=0, column=0)
+    preview_right.grid(row=0, column=1)
+
+    try:
+        sign_arrow = Signage.by_id('SIGN_ARROW')
+    except KeyError:
+        LOGGER.warning('No arrow signage defined!')
+        sign_arrow = None
+
+    hover_arrow = False
+    hover_toggle_id = None
+    hover_sign: Optional[Signage] = None
+
+    def hover_toggle() -> None:
+        """Toggle between arrows and dual icons."""
+        nonlocal hover_arrow, hover_toggle_id
+        hover_arrow = not hover_arrow
+        if hover_arrow and sign_arrow:
+            preview_left['image'] = hover_sign.dnd_icon
+            preview_right['image'] = sign_arrow.dnd_icon
+        else:
+            try:
+                preview_left['image'] = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+            except KeyError:
+                preview_left['image'] = hover_sign.dnd_icon
+            try:
+                preview_right['image'] = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+            except KeyError:
+                preview_right['image'] = blank_sign
+        hover_toggle_id = TK_ROOT.after(1000, hover_toggle)
+
     def on_hover(slot: dragdrop.Slot[Signage]) -> None:
+        """Show the signage when hovered."""
+        nonlocal hover_arrow, hover_sign
         name_label['text'] = (
             _('Signage: {}').format(slot.contents.name)
             if slot.contents is not None else
             ''
         )
+        hover_sign = slot.contents
+        hover_arrow = True
+        hover_toggle()
 
     def on_leave(slot: dragdrop.Slot[Signage]) -> None:
+        """Reset the visible sign when left."""
+        nonlocal hover_toggle_id, hover_sign
         name_label['text'] = ''
+        hover_sign = None
+        if hover_toggle_id is not None:
+            TK_ROOT.after_cancel(hover_toggle_id)
+            hover_toggle_id = None
+        preview_left['image'] = blank_sign
+        preview_right['image'] = blank_sign
 
     drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
     drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
