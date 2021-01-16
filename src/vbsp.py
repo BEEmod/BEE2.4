@@ -1931,7 +1931,7 @@ def main() -> None:
 
         del side_to_antline
 
-        texturing.setup(vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
+        texturing.setup(game, vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
 
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)
