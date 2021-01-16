@@ -180,6 +180,8 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         """Toggle between arrows and dual icons."""
         nonlocal hover_arrow, hover_toggle_id
         hover_arrow = not hover_arrow
+        if hover_sign is None:
+            return
         if hover_arrow and sign_arrow:
             preview_left['image'] = hover_sign.dnd_icon
             preview_right['image'] = sign_arrow.dnd_icon
