@@ -1410,6 +1410,8 @@ def find_tile(origin: Vec, normal: Vec, force: bool=False) -> Tuple[TileDef, int
         u_axis, origin[u_axis] // 128 * 128 + 64,
         v_axis, origin[v_axis] // 128 * 128 + 64,
     )
+    grid_pos: Vec = round(grid_pos, 6)
+    normal: Vec = round(normal, 6)
     # grid_pos = round_grid(origin - normal)
 
     uv_pos = round(origin - grid_pos + 64 - 16, 6)
@@ -1417,7 +1419,7 @@ def find_tile(origin: Vec, normal: Vec, force: bool=False) -> Tuple[TileDef, int
     v = uv_pos[v_axis] / 32 % 4
 
     if u != round(u) or v != round(v):
-        raise KeyError('Badly offset into a tile!')
+        raise KeyError(f'Bad tile position: {origin} with orient {normal} had a UV of {u}, {v}')
 
     if force:
         tile = TileDef.ensure(grid_pos, normal)

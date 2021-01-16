@@ -6,7 +6,7 @@ from precomp.conditions import (
     DIRECTIONS,
 )
 from precomp import tiling, brushLoc
-from srctools import Vec, Entity, Property
+from srctools import Vec, Entity, Property, Angle
 from srctools.logger import get_logger
 
 
@@ -80,7 +80,7 @@ def brush_at_loc(
     and a set of all types found.
     """
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
 
     # Allow using pos1 instead, to match pos2.
     pos = props.vec('pos1' if 'pos1' in props else 'pos')
@@ -88,7 +88,7 @@ def brush_at_loc(
 
     pos.localise(origin, angles)
 
-    norm = props.vec('dir', 0, 0, 1).rotate(*angles)
+    norm: Vec = round(props.vec('dir', 0, 0, 1) @ angles, 6)
 
     if props.bool('gridpos') and norm is not None:
         for axis in 'xyz':
@@ -109,7 +109,7 @@ def brush_at_loc(
         pos2.z -= 64  # Subtract so origin is the floor-position
         pos2.localise(origin, angles)
 
-        bbox_min, bbox_max = Vec.bbox(pos, pos2)
+        bbox_min, bbox_max = Vec.bbox(round(pos, 6), round(pos2, 6))
 
         white_count = black_count = 0
 

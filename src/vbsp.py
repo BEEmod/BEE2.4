@@ -12,7 +12,7 @@ import logging
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
-from srctools import Property, Vec, AtomicWriter, Vec_tuple
+from srctools import Property, Vec, AtomicWriter, Vec_tuple, Angle
 from srctools.vmf import VMF, Entity, Output
 from BEE2_config import ConfigFile
 import utils
@@ -882,7 +882,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
             # In SP mode the same instance is used for entry and exit door
             # frames. Use the position of the item to distinguish the two.
             # We need .rotate() since they could be in the same block.
-            exit_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            exit_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
             exit_origin += Vec.from_str(item['origin'])
             exit_corr_name = item['targetname']
             exit_fixup = item.fixup
@@ -896,7 +896,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
             )
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
-            entry_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            entry_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
             entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
             entry_fixup = item.fixup
@@ -970,7 +970,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
     # Now check the door frames, to allow distinguishing between
     # the entry and exit frames.
     for door_frame in door_frames:
-        origin = Vec(0, 0, -64).rotate_by_str(door_frame['angles'])
+        origin = Vec(0, 0, -64) @ Angle.from_str(door_frame['angles'])
         # Corridors are placed 64 units below doorframes - reverse that.
         origin.z -= 64
         origin += Vec.from_str(door_frame['origin'])
@@ -1027,7 +1027,7 @@ def mod_entryexit(
     The corridor used is also copied to '$corr_index'.
     """
     global IS_PREVIEW
-    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
 
     if is_exit:
         # Swap the normal direction, so the up/down names match the direction
@@ -1257,12 +1257,12 @@ def set_barrier_frame_type(vmf: VMF) -> None:
             continue
         if inst['file'].casefold() in glass_file:
             # The glass instance faces a different way to the frames..
-            norm = Vec(-1, 0, 0).rotate_by_str(inst['angles'])
+            norm = Vec(-1, 0, 0) @ Angle.from_str(inst['angles'])
         else:
-            norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
+            norm = Vec(0, 0, -1) @ Angle.from_str(inst['angles'])
         origin = Vec.from_str(inst['origin'])
         try:
-            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), norm.as_tuple()]
+            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), round(norm).as_tuple()]
         except KeyError:
             pass
 
@@ -1386,13 +1386,10 @@ def cond_force_clump(inst: Entity, res: Property):
     """
     point1, point2, tex_data = res.value
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
 
-    point1 = point1.copy().rotate(*angles)
-    point1 += origin
-
-    point2 = point2.copy().rotate(*angles)
-    point2 += origin
+    point1 = point1 @ angles + origin
+    point2 = point2 @ angles + origin
 
     min_pos, max_pos = Vec.bbox(point1, point2)
 
