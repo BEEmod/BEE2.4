@@ -1,5 +1,6 @@
 """Implements the BEE2 VBSP compiler replacement."""
 # Do this very early, so we log the startup sequence.
+from srctools.game import Game
 from srctools.logger import init_logging
 
 LOGGER = init_logging('bee2/vbsp.log')
@@ -1846,6 +1847,7 @@ def main() -> None:
         'styled',
         path_file,
     )
+    game_dir = ''
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
@@ -1853,15 +1855,19 @@ def main() -> None:
             new_args[i] = ''
             old_args[i] = ''
         # Strip the entity limit, and the following number
-        if a == '-entity_limit':
+        elif a == '-entity_limit':
             new_args[i] = ''
             if len(new_args) > i+1 and new_args[i+1] == '1750':
                 new_args[i+1] = ''
+        elif a == '-game':
+            game_dir = new_args[i+1]
 
     LOGGER.info('Map path is "' + path + '"')
     LOGGER.info('New path: "' + new_path + '"')
-    if path == "":
+    if not path:
         raise Exception("No map passed!")
+    if not game_dir:
+        raise Exception("No game directory passed!")
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1876,6 +1882,7 @@ def main() -> None:
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
 
+    game = Game(game_dir)
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
