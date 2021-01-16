@@ -836,7 +836,6 @@ def make_map_widgets(frame: ttk.Frame):
         labelanchor=N,
     )
     corr_frame.grid(row=3, column=0, sticky=EW)
-    corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
     make_corr_wid('sp_entry')
@@ -845,32 +844,32 @@ def make_map_widgets(frame: ttk.Frame):
 
     load_corridors()
 
-    CORRIDOR['sp_entry'].widget(corr_frame).grid(row=1, column=0, sticky=EW)
-    CORRIDOR['sp_exit'].widget(corr_frame).grid(row=1, column=1, sticky=EW)
-    CORRIDOR['coop'].widget(corr_frame).grid(row=2, column=1, sticky=EW)
+    CORRIDOR['sp_entry'].widget(corr_frame).grid(row=0, column=1, sticky='ew')
+    CORRIDOR['sp_exit'].widget(corr_frame).grid(row=1, column=1, sticky='ew')
+    CORRIDOR['coop'].widget(corr_frame).grid(row=2, column=1, sticky='ew')
 
     ttk.Label(
         corr_frame,
         text=_('SP Entry:'),
-        anchor=CENTER,
-    ).grid(row=0, column=0, sticky=EW)
+        anchor='e',
+    ).grid(row=0, column=0, sticky='ew', padx=2)
     ttk.Label(
         corr_frame,
         text=_('SP Exit:'),
-        anchor=CENTER,
-    ).grid(row=0, column=1, sticky=EW)
+        anchor='e',
+    ).grid(row=1, column=0, sticky='ew', padx=2)
     ttk.Label(
         corr_frame,
-        text=_('Coop:'),
-        anchor=CENTER,
-    ).grid(row=2, column=0, sticky=EW)
+        text=_('Coop Exit:'),
+        anchor='e',
+    ).grid(row=2, column=0, sticky='ew', padx=2)
 
     model_frame = ttk.LabelFrame(
         frame,
         text=_('Player Model (SP):'),
-        labelanchor=N,
+        labelanchor='n',
     )
-    model_frame.grid(row=4, column=0, sticky=EW)
+    model_frame.grid(row=4, column=0, sticky='ew')
     UI['player_mdl'] = ttk.Combobox(
         model_frame,
         exportselection=0,

@@ -910,16 +910,9 @@ class FizzlerBrush:
         is_laserfield=False,
     ) -> None:
         """Calculate the texture offsets required for fitting a texture."""
-        if side.vaxis.vec() != -fizz.up_axis:
-            # Rotate it
-            rot_angle = side.normal().rotation_around()
-            for _ in range(4):
-                side.uaxis = side.uaxis.rotate(rot_angle)
-                side.vaxis = side.vaxis.rotate(rot_angle)
-                if side.vaxis.vec() == -fizz.up_axis:
-                    break
-            else:
-                LOGGER.warning("Can't fix rotation for {} -> {}", side.vaxis, fizz.up_axis)
+        # Compute the orientations that are up and along the fizzler.
+        side.uaxis.x, side.uaxis.y, side.uaxis.z = fizz.forward()
+        side.vaxis.x, side.vaxis.y, side.vaxis.z = -fizz.up_axis
 
         side.uaxis.offset = -(tex_size / field_length) * neg.dot(side.uaxis.vec())
         side.vaxis.offset = -(tex_size / 128) * neg.dot(side.vaxis.vec())

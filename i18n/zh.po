@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2020-09-20 10:31-0700\n"
+"POT-Creation-Date: 2021-01-14 14:25+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.8.0\n"
+"Generated-By: Babel 2.6.0\n"
 
 #: loadScreen.py:199
 msgid "Skipped!"
@@ -22,7 +22,7 @@ msgstr "跳过！"
 msgid "Version: "
 msgstr "版本："
 
-#: app/optionWindow.py:259 app/packageMan.py:116 app/selector_win.py:718
+#: app/optionWindow.py:260 app/packageMan.py:116 app/selector_win.py:718
 #: loadScreen.py:201
 msgid "Cancel"
 msgstr "取消"
@@ -47,7 +47,7 @@ msgstr "初始化界面"
 msgid "Better Extended Editor for Portal 2"
 msgstr "更棒的传送门2扩展编辑器"
 
-#: utils.py:841
+#: utils.py:892
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
@@ -600,7 +600,7 @@ msgstr "键入模板名称："
 msgid "This palette already exists. Overwrite?"
 msgstr "已经存在同名模板，是否覆盖？"
 
-#: app/UI.py:1249 app/gameMan.py:1527
+#: app/UI.py:1249 app/gameMan.py:1525
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
@@ -690,7 +690,7 @@ msgstr "管理资源包..."
 msgid "Options"
 msgstr "设置"
 
-#: app/UI.py:1730 app/gameMan.py:1206
+#: app/UI.py:1730 app/gameMan.py:1204
 msgid "Quit"
 msgstr "退出"
 
@@ -853,166 +853,166 @@ msgstr "保持（每N场游戏）"
 msgid "Backup/Restore Puzzles"
 msgstr "备份/恢复 谜题"
 
-#: app/contextWin.py:76
+#: app/contextWin.py:77
 msgid "This item may not be rotated."
 msgstr "该物品可能无法旋转。"
 
-#: app/contextWin.py:77
+#: app/contextWin.py:78
 msgid "This item can be pointed in 4 directions."
 msgstr "该物品可以面向4个方向。"
 
-#: app/contextWin.py:78
+#: app/contextWin.py:79
 msgid "This item can be positioned on the sides and center."
 msgstr "该物品可以放在侧面和中间。"
 
-#: app/contextWin.py:79
+#: app/contextWin.py:80
 msgid "This item can be centered in two directions, plus on the sides."
 msgstr "该物品可以向三个方向延伸。"
 
-#: app/contextWin.py:80
+#: app/contextWin.py:81
 msgid "This item can be placed like light strips."
 msgstr "该物品可以像灯条一样放置。"
 
-#: app/contextWin.py:81
+#: app/contextWin.py:82
 msgid "This item can be rotated on the floor to face 360 degrees."
 msgstr "该物品可以在地面上360°旋转。"
 
-#: app/contextWin.py:82
+#: app/contextWin.py:83
 msgid "This item is positioned using a catapult trajectory."
 msgstr "该物品用于定位弹射板的弹道及落点。"
 
-#: app/contextWin.py:83
+#: app/contextWin.py:84
 msgid "This item positions the dropper to hit target locations."
 msgstr "该物品定位物品掉落器击中目标的位置。"
 
-#: app/contextWin.py:85
+#: app/contextWin.py:86
 msgid "This item does not accept any inputs."
 msgstr "该物品不会接收任何输入信号。"
 
-#: app/contextWin.py:86
+#: app/contextWin.py:87
 msgid "This item accepts inputs."
 msgstr "该物品可以接收信号输入以改变状态。"
 
-#: app/contextWin.py:87
+#: app/contextWin.py:88
 msgid "This item has two input types (A and B), using the Input A and B items."
 msgstr "该物品具有两种输入类型（A和B），使用A物品和B物品进行输入。"
 
-#: app/contextWin.py:89
+#: app/contextWin.py:90
 msgid "This item does not output."
 msgstr "该物品不会输出信号。"
 
-#: app/contextWin.py:90
+#: app/contextWin.py:91
 msgid "This item has an output."
 msgstr "该物品可以输出信号。"
 
-#: app/contextWin.py:91
+#: app/contextWin.py:92
 msgid "This item has a timed output."
 msgstr "该物品具有延时输出信号的功能。"
 
-#: app/contextWin.py:93
+#: app/contextWin.py:94
 msgid "This item does not take up any space inside walls."
 msgstr "该物品不会占据墙壁后面的空间。"
 
-#: app/contextWin.py:94
+#: app/contextWin.py:95
 msgid "This item takes space inside the wall."
 msgstr "该物品需要占据墙壁后面的空间。"
 
-#: app/contextWin.py:96
+#: app/contextWin.py:97
 msgid "This item cannot be placed anywhere..."
 msgstr "该物品不能手动放置"
 
-#: app/contextWin.py:97
+#: app/contextWin.py:98
 msgid "This item can only be attached to ceilings."
 msgstr "该物品只能放置在天花板上。"
 
-#: app/contextWin.py:98
+#: app/contextWin.py:99
 msgid "This item can only be placed on the floor."
 msgstr "该物品只能放置在地板上。"
 
-#: app/contextWin.py:99
+#: app/contextWin.py:100
 msgid "This item can be placed on floors and ceilings."
 msgstr "该物品可以放置在地板和天花板上。"
 
-#: app/contextWin.py:100
+#: app/contextWin.py:101
 msgid "This item can be placed on walls only."
 msgstr "该物品只能放置在墙上。"
 
-#: app/contextWin.py:101
+#: app/contextWin.py:102
 msgid "This item can be attached to walls and ceilings."
 msgstr "该物品可以放置在墙壁和天花板上。"
 
-#: app/contextWin.py:102
+#: app/contextWin.py:103
 msgid "This item can be placed on floors and walls."
 msgstr "该物品可以放置在地板和墙壁上。"
 
-#: app/contextWin.py:103
+#: app/contextWin.py:104
 msgid "This item can be placed in any orientation."
 msgstr "该物品可以放置在任何方向。"
 
-#: app/contextWin.py:209
+#: app/contextWin.py:210
 #, fuzzy
 msgid "No Alternate Versions"
 msgstr "无替代版本！"
 
-#: app/contextWin.py:301
+#: app/contextWin.py:308
 msgid "Excursion Funnels accept a on/off input and a directional input."
 msgstr "牵引光束接受“开/关”控制和“方向”转换控制。"
 
-#: app/contextWin.py:358
+#: app/contextWin.py:365
 msgid ""
 "This item can be rotated on the floor to face 360 degrees, for Reflection"
 " Cubes only."
 msgstr "该物品可以在地面上360°旋转放置。（仅适用于透镜方块）"
 
-#: app/contextWin.py:437
+#: app/contextWin.py:444
 msgid "Properties:"
 msgstr "物品属性:"
 
-#: app/contextWin.py:459
+#: app/contextWin.py:470
 msgid ""
 "The number of entities used for this item. The Source engine limits this "
 "to 2048 in total. This provides a guide to how many of these items can be"
 " placed in a map at once."
 msgstr "用于此物品的实体数量。起源引擎将其限制为2048。这里提供了一篇可以一次性放置多少物品在地图里的指南。"
 
-#: app/contextWin.py:484
+#: app/contextWin.py:495
 msgid "Description:"
 msgstr "描述："
 
-#: app/contextWin.py:527
+#: app/contextWin.py:538
 msgid ""
 "Failed to open a web browser. Do you wish for the URL to be copied to the"
 " clipboard instead?"
 msgstr "无法打开浏览器。你希望将网址复制到剪贴板吗？"
 
-#: app/contextWin.py:541
+#: app/contextWin.py:552
 msgid "More Info>>"
 msgstr "更多信息>>"
 
-#: app/contextWin.py:558
+#: app/contextWin.py:569
 msgid "Change Defaults..."
 msgstr "更改默认值..."
 
-#: app/contextWin.py:564
+#: app/contextWin.py:575
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: app/gameMan.py:748 app/gameMan.py:850
+#: app/gameMan.py:746 app/gameMan.py:848
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
-#: app/gameMan.py:749
+#: app/gameMan.py:747
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
 
-#: app/gameMan.py:851
+#: app/gameMan.py:849
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
-#: app/gameMan.py:1263
+#: app/gameMan.py:1261
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1020,48 +1020,48 @@ msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
 
-#: app/gameMan.py:1267
+#: app/gameMan.py:1265
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: app/gameMan.py:1450
+#: app/gameMan.py:1448
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件的路径 {appname}"
 
-#: app/gameMan.py:1453 app/gameMan.py:1468 app/gameMan.py:1478
-#: app/gameMan.py:1485 app/gameMan.py:1494 app/gameMan.py:1503
+#: app/gameMan.py:1451 app/gameMan.py:1466 app/gameMan.py:1476
+#: app/gameMan.py:1483 app/gameMan.py:1492 app/gameMan.py:1501
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: app/gameMan.py:1456
+#: app/gameMan.py:1454
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: app/gameMan.py:1457
+#: app/gameMan.py:1455
 msgid "Executable"
 msgstr "可执行文件"
 
-#: app/gameMan.py:1465
+#: app/gameMan.py:1463
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: app/gameMan.py:1475
+#: app/gameMan.py:1473
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: app/gameMan.py:1486
+#: app/gameMan.py:1484
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: app/gameMan.py:1493
+#: app/gameMan.py:1491
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: app/gameMan.py:1502
+#: app/gameMan.py:1500
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: app/gameMan.py:1521
+#: app/gameMan.py:1519
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1117,7 +1117,7 @@ msgstr "传送门：梅尔的故事"
 msgid "Thinking With Time Machine"
 msgstr "传送门：时间机器"
 
-#: app/helpMenu.py:238 app/itemPropWin.py:342
+#: app/helpMenu.py:238 app/itemPropWin.py:343
 msgid "Close"
 msgstr "关闭"
 
@@ -1133,15 +1133,15 @@ msgstr "BEE2 声明"
 msgid "Credits..."
 msgstr "声明..."
 
-#: app/itemPropWin.py:38
+#: app/itemPropWin.py:39
 msgid "Start Position"
 msgstr "开始位置"
 
-#: app/itemPropWin.py:39
+#: app/itemPropWin.py:40
 msgid "End Position"
 msgstr "结束位置"
 
-#: app/itemPropWin.py:40
+#: app/itemPropWin.py:41
 msgid ""
 "Delay \n"
 "(0=infinite)"
@@ -1149,7 +1149,7 @@ msgstr ""
 "延时\n"
 "（0=无限）"
 
-#: app/itemPropWin.py:341
+#: app/itemPropWin.py:342
 msgid "No Properties available!"
 msgstr "没有可用的属性！"
 
@@ -1269,113 +1269,113 @@ msgstr "弹性凝胶"
 msgid "Speed:"
 msgstr "加速凝胶"
 
-#: app/optionWindow.py:45
+#: app/optionWindow.py:46
 #, fuzzy
 msgid ""
 "\n"
 "Launch Game?"
 msgstr "启动游戏"
 
-#: app/optionWindow.py:47
+#: app/optionWindow.py:48
 #, fuzzy
 msgid ""
 "\n"
 "Minimise BEE2?"
 msgstr "最小化BEE2"
 
-#: app/optionWindow.py:48
+#: app/optionWindow.py:49
 msgid ""
 "\n"
 "Launch Game and minimise BEE2?"
 msgstr ""
 
-#: app/optionWindow.py:50
+#: app/optionWindow.py:51
 msgid ""
 "\n"
 "Quit BEE2?"
 msgstr ""
 
-#: app/optionWindow.py:51
+#: app/optionWindow.py:52
 msgid ""
 "\n"
 "Launch Game and quit BEE2?"
 msgstr ""
 
-#: app/optionWindow.py:70
+#: app/optionWindow.py:71
 msgid "BEE2 Options"
 msgstr "BEE2 选项"
 
-#: app/optionWindow.py:108
+#: app/optionWindow.py:109
 msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
 msgstr ""
 
-#: app/optionWindow.py:125
+#: app/optionWindow.py:126
 msgid "\"Preserve Game Resources\" has been disabled."
 msgstr ""
 
-#: app/optionWindow.py:137
+#: app/optionWindow.py:138
 msgid "Packages Reset"
 msgstr ""
 
-#: app/optionWindow.py:218
+#: app/optionWindow.py:219
 msgid "General"
 msgstr "常规"
 
-#: app/optionWindow.py:224
+#: app/optionWindow.py:225
 msgid "Windows"
 msgstr "窗口"
 
-#: app/optionWindow.py:230
+#: app/optionWindow.py:231
 msgid "Development"
 msgstr "开发者选项"
 
-#: app/optionWindow.py:254 app/packageMan.py:110 app/selector_win.py:696
+#: app/optionWindow.py:255 app/packageMan.py:110 app/selector_win.py:696
 msgid "OK"
 msgstr "确定"
 
-#: app/optionWindow.py:285
+#: app/optionWindow.py:286
 msgid "After Export:"
 msgstr "导出后："
 
-#: app/optionWindow.py:302
+#: app/optionWindow.py:303
 msgid "Do Nothing"
 msgstr "什么都不做"
 
-#: app/optionWindow.py:308
+#: app/optionWindow.py:309
 msgid "Minimise BEE2"
 msgstr "最小化BEE2"
 
-#: app/optionWindow.py:314
+#: app/optionWindow.py:315
 msgid "Quit BEE2"
 msgstr "退出BEE2"
 
-#: app/optionWindow.py:322
+#: app/optionWindow.py:323
 msgid "After exports, do nothing and keep the BEE2 in focus."
 msgstr "导出后，什么也不做，保持BEE2窗口处于焦点。"
 
-#: app/optionWindow.py:324
+#: app/optionWindow.py:325
 msgid "After exports, minimise to the taskbar/dock."
 msgstr "导出后，最小化到任务栏。"
 
-#: app/optionWindow.py:325
+#: app/optionWindow.py:326
 msgid "After exports, quit the BEE2."
 msgstr "导出后，退出BEE2。"
 
-#: app/optionWindow.py:332
+#: app/optionWindow.py:333
 msgid "Launch Game"
 msgstr "启动游戏"
 
-#: app/optionWindow.py:333
+#: app/optionWindow.py:334
 msgid "After exporting, launch the selected game automatically."
 msgstr "导出后，自动启动目标游戏"
 
-#: app/optionWindow.py:341 app/optionWindow.py:347
+#: app/optionWindow.py:342 app/optionWindow.py:348
 msgid "Play Sounds"
 msgstr "播放音效"
 
-#: app/optionWindow.py:352
+#: app/optionWindow.py:353
 msgid ""
 "Pyglet is either not installed or broken.\n"
 "Sound effects have been disabled."
@@ -1383,86 +1383,95 @@ msgstr ""
 "Pyglet未安装或损坏。\n"
 "音效已被禁用。"
 
-#: app/optionWindow.py:359
+#: app/optionWindow.py:360
 msgid "Reset Package Caches"
 msgstr "重置数据包缓存"
 
-#: app/optionWindow.py:365
+#: app/optionWindow.py:366
 msgid "Force re-extracting all package resources."
 msgstr ""
 
-#: app/optionWindow.py:374
+#: app/optionWindow.py:375
 msgid "Keep windows inside screen"
 msgstr "保持窗口在屏幕内"
 
-#: app/optionWindow.py:375
+#: app/optionWindow.py:376
 msgid ""
 "Prevent sub-windows from moving outside the screen borders. If you have "
 "multiple monitors, disable this."
 msgstr "防止子窗口移出屏幕边界。 如果您有多台显示器，请禁用此功能。"
 
-#: app/optionWindow.py:385
+#: app/optionWindow.py:386
 #, fuzzy
 msgid "Keep loading screens on top"
 msgstr "清理过时的旧截图"
 
-#: app/optionWindow.py:387
+#: app/optionWindow.py:388
 msgid ""
 "Force loading screens to be on top of other windows. Since they don't "
 "appear on the taskbar/dock, they can't be brought to the top easily "
 "again."
 msgstr ""
 
-#: app/optionWindow.py:396
+#: app/optionWindow.py:397
 msgid "Reset All Window Positions"
 msgstr "重置所有窗口的位置"
 
-#: app/optionWindow.py:410
+#: app/optionWindow.py:411
 msgid "Log missing entity counts"
 msgstr "记录丢失的实体数量"
 
-#: app/optionWindow.py:411
+#: app/optionWindow.py:412
 msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
 msgstr "加载物品时，将缺少实体的物品数量记录在properties.txt文件中。"
 
-#: app/optionWindow.py:419
+#: app/optionWindow.py:420
 msgid "Log when item doesn't have a style"
 msgstr "记录缺失风格的物品"
 
-#: app/optionWindow.py:420
+#: app/optionWindow.py:421
 msgid ""
 "Log items have no applicable version for a particular style.This usually "
 "means it will look very bad."
 msgstr "记录没有当前风格版本的物品。这通常意味着它看起来很违和。"
 
-#: app/optionWindow.py:428
+#: app/optionWindow.py:429
 msgid "Log when item uses parent's style"
 msgstr "记录使用父风格的物品"
 
-#: app/optionWindow.py:429
+#: app/optionWindow.py:430
 msgid ""
 "Log when an item reuses a variant from a parent style (1970s using 1950s "
 "items, for example). This is usually fine, but may need to be fixed."
 msgstr "记录重复使用父风格变体的物品（例如1970s年代使用1950s年代的物品）。这通常没问题，但是可能需要修复。"
 
-#: app/optionWindow.py:438
+#: app/optionWindow.py:439
 msgid "Log missing packfile resources"
 msgstr "记录丢失的数据包"
 
-#: app/optionWindow.py:439
+#: app/optionWindow.py:440
 msgid ""
 "Log when the resources a \"PackList\" refers to are not present in the "
 "zip. This may be fine (in a prerequisite zip), but it often indicates an "
 "error."
 msgstr "记录“数据包列表”里丢失的zip文件。这可能没问题（必备的数据包还在），但通常会报错。"
 
-#: app/optionWindow.py:448
+#: app/optionWindow.py:450
+#, fuzzy
+msgid "Development Mode"
+msgstr "开发者选项"
+
+#: app/optionWindow.py:451
+msgid "Enables displaying additional UI specific for development purposes."
+msgstr ""
+
+#: app/optionWindow.py:459
 msgid "Preserve Game Directories"
 msgstr "保留游戏目录"
 
-#: app/optionWindow.py:450
+#: app/optionWindow.py:461
 #, fuzzy
 msgid ""
 "When exporting, do not copy resources to \n"
@@ -1473,19 +1482,19 @@ msgstr ""
 "当你导出时，不要覆盖写入目录“bee2/”和“sdk_content/maps/bee2/”。\n"
 "除非你正在建造新的内容，但要确定它不会被覆盖写入。"
 
-#: app/optionWindow.py:461
+#: app/optionWindow.py:472
 msgid "Show Log Window"
 msgstr "显示日志窗口"
 
-#: app/optionWindow.py:463
+#: app/optionWindow.py:474
 msgid "Show the log file in real-time."
 msgstr "实时显示日志文件。"
 
-#: app/optionWindow.py:470
+#: app/optionWindow.py:481
 msgid "Force Editor Models"
 msgstr "强制使用编辑器模型"
 
-#: app/optionWindow.py:471
+#: app/optionWindow.py:482
 msgid ""
 "Make all props_map_editor models available for use. Portal 2 has a limit "
 "of 1024 models loaded in memory at once, so we need to disable unused "
@@ -1494,12 +1503,12 @@ msgstr ""
 "使所有props_map_editor模型可用。\n"
 "Portal 2一次最多可将1024个模型加载到内存中，因此我们需要禁用未使用的模型以释放此模型。"
 
-#: app/optionWindow.py:482
+#: app/optionWindow.py:493
 #, fuzzy
 msgid "Dump All objects"
 msgstr "反选所有复选框"
 
-#: app/optionWindow.py:488
+#: app/optionWindow.py:499
 msgid "Dump Items list"
 msgstr ""
 
@@ -1535,7 +1544,7 @@ msgstr "BEE模组物品"
 msgid "Portal 2 Collapsed"
 msgstr "传送门2(已折叠)"
 
-#: app/richTextBox.py:152
+#: app/richTextBox.py:151
 msgid "Open \"{}\" in the default browser?"
 msgstr "在默认浏览器中打开 \"{}\" ？"
 
@@ -1568,7 +1577,7 @@ msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "作者: {}"
 
-#: app/selector_win.py:1137
+#: app/selector_win.py:1145
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "颜色: R={r}, G={g}, B={b}"
 
@@ -1592,15 +1601,15 @@ msgstr "标签"
 msgid "Authors"
 msgstr "制作组"
 
-#: app/tagsPane.py:157
+#: app/tagsPane.py:156
 msgid "Any"
 msgstr "任何"
 
-#: app/tagsPane.py:166
+#: app/tagsPane.py:165
 msgid "All"
 msgstr "所有"
 
-#: app/tagsPane.py:192
+#: app/tagsPane.py:191
 msgid "Available Tags (click):"
 msgstr "可用标签（点击）"
 
