@@ -1082,7 +1082,7 @@ def retexture_template(
                 if mat.startswith('<') and mat.endswith('>'):
                     # Lookup in the style data.
                     gen, mat = texturing.parse_name(mat[1:-1])
-                    mat = gen.get(face.get_origin(), mat)
+                    mat = gen.get(face.get_origin() + face.normal(), mat)
                 # If blank, don't set.
                 if mat:
                     face.mat = mat

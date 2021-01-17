@@ -425,7 +425,7 @@ def apply(
     if loc is None:
         loc = face.get_origin()
 
-    face.mat = generator.get(loc, tex_name)
+    face.mat = generator.get(loc + face.normal(), tex_name)
 
 
 def load_config(conf: Property):
@@ -764,11 +764,24 @@ class Generator(abc.ABC):
         self.orient = orient
         self.portal = portal
 
-    def get(self, loc: Vec, tex_name: str) -> str:
-        """Get one texture for a position."""
+    def get(self, loc: Vec, tex_name: str, *, antigel: Optional[bool] = None) -> str:
+        """Get one texture for a position.
+
+        If antigel is set, this is directly on a tile and so whether it's antigel
+        is known.
+        The location should be 1 unit back from the tile, so it'll be in the
+        correct block.
+        """
         loc = loc // 128
         loc *= 128
         loc += (64, 64, 64)
+
+        if antigel is None:
+            antigel = loc.as_tuple() in ANTIGEL_LOCS
+        if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
+            # We can't use antigel on bullseye materials, so revert to normal
+            # surfaces.
+            return gen(GenCat.NORMAL, self.orient, self.portal).get(loc, tex_name, antigel=True)
 
         if self.map_seed:
             self._random.seed(self.map_seed + str(loc))
@@ -776,9 +789,13 @@ class Generator(abc.ABC):
             LOGGER.warning('Choosing texture ("{}") without seed!', tex_name)
 
         try:
-            return self._get(loc, tex_name)
+            texture = self._get(loc, tex_name)
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0]))
+        if antigel:
+            return ANTIGEL_MATS.get(texture, texture)
+        else:
+            return texture
 
     def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and setup the generator."""
