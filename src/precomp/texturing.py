@@ -131,6 +131,7 @@ ORIENTS = {
 ANTIGEL_MATS: Dict[str, str] = {}
 # The folder to add them to
 ANTIGEL_PATH = 'BEE2/antigel/gen/'
+ANTIGEL_LOCS: Set[Tuple[float, float, float]] = set()
 
 ANTIGEL_TEMPLATE = '''\
 Patch

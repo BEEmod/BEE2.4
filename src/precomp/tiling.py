@@ -784,6 +784,7 @@ class TileDef:
         panels: A list of "panels" for the tiledef, allowing moving or split parts.
           If present, each of these "steals" some UV positions and instead
           generates them (potentially offset) as a brush entity.
+        is_antigel: If this is marked to not accept gel.
     """
     __slots__ = [
         'pos',
@@ -795,6 +796,7 @@ class TileDef:
         'bullseye_count',
         '_portal_helper',
         'panels',
+        'is_antigel',
     ]
 
     pos: Vec
@@ -826,6 +828,7 @@ class TileDef:
         self.panels = []
         self.bullseye_count = 0
         self._portal_helper = 1 if has_helper else 0
+        self.is_antigel = False
 
     @property
     def has_portal_helper(self) -> bool:

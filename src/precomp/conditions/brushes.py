@@ -699,6 +699,22 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
             inst.fixup[picker_var] = ''
 
 
+@make_result('MarkAntigel')
+def res_antigel(inst: Entity) -> None:
+    """Implement the Antigel marker."""
+    inst.remove()
+    origin = Vec.from_str(inst['origin'])
+    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+
+    pos = round(origin - 128 * orient.up(), 6)
+    norm = round(orient.up(), 6)
+    try:
+        tiling.TILES[pos.as_tuple(), norm.as_tuple()].is_antigel = True
+    except KeyError:
+        LOGGER.warning('No tile to set antigel at {}, {}', pos, norm)
+    texturing.ANTIGEL_LOCS.add((origin // 128 * 128 + 64).as_tuple())
+
+
 # Position -> entity
 # We merge ones within 3 blocks of our item.
 CHECKPOINT_TRIG = {}  # type: Dict[Tuple[float, float, float], Entity]
