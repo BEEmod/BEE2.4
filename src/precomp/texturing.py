@@ -676,17 +676,26 @@ def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> Non
             )
         else:
             gen_key_str = gen_key
-            gen_cat = gen_key
 
         generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key_str)
         generator.setup(vmf, global_seed, tiles)
 
-        # No need to convert if it's not a tile, or it's bullseye and those
+        # No need to convert if it's overlay, or it's bullseye and those
         # are incompatible.
-        if not gen_cat.is_tile or (gen_cat is GenCat.BULLSEYE and not generator.options['antigel_bullseye']):
+        if generator.category is GenCat.BULLSEYE and not generator.options['antigel_bullseye']:
+            continue
+        if generator.category is GenCat.OVERLAYS:
             continue
 
-        for mat_name in itertools.chain.from_iterable(generator.textures.values()):
+        materials = {
+            mat_name
+            for (mat_cat, mats) in generator.textures.items()
+            #  Skip these special mats.
+            if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap')
+            for mat_name in mats
+        }
+
+        for mat_name in materials:
             if mat_name.casefold() in ANTIGEL_MATS:
                 continue
             try:
@@ -726,7 +735,6 @@ def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> Non
             antigel_mat = str(Path(antigel_filename).relative_to(material_folder)).replace('\\', '/')
             ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()] = antigel_mat
             antigel_mats.add(antigel_mat)
-    LOGGER.info('Materials: {}', ANTIGEL_MATS)
 
 
 class Generator(abc.ABC):
