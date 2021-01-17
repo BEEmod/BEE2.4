@@ -1268,14 +1268,14 @@ class TileDef:
                     u_size = v_size = 4
                     tex = texturing.gen(
                         gen_cat, normal, Portalable.BLACK
-                    ).get(tile_center, TileSize.GOO_SIDE)
+                    ).get(tile_center, TileSize.GOO_SIDE, antigel=False)
                 else:
                     if tile_type.is_4x4:
                         grid_size = TileSize.TILE_4x4
                     u_size, v_size = grid_size.size
                     tex = texturing.gen(
                         gen_cat, normal, tile_type.color,
-                    ).get(tile_center, grid_size)
+                    ).get(tile_center, grid_size, antigel=self.is_antigel)
 
                 template: Optional[template_brush.ScalingTemplate]
                 if self.override is not None:
@@ -1291,11 +1291,12 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=self.is_antigel),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
                     thickness=thickness,
                     panel_edge=is_panel,
+                    antigel=self.is_antigel,
                 )
                 if template is not None:
                     # If the texture isn't supplied, use the one from the
@@ -1324,8 +1325,9 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=self.is_antigel),
                     panel_edge=is_panel,
+                    antigel=self.is_antigel,
                 )
                 faces.append(face)
                 brushes.append(brush)
@@ -1496,6 +1498,7 @@ def make_tile(
     panel_edge: bool=False,
     u_align: int=512,
     v_align: int=512,
+    antigel: Optional[bool] = None,
 ) -> Tuple[Solid, Side]:
     """Generate a tile. 
     
@@ -1518,6 +1521,7 @@ def make_tile(
         panel_edge: If True, use the panel-type squarebeams.
         u_align: Wrap offsets to this much at maximum.
         v_align: Wrap offsets to this much at maximum.
+        antigel: If the tile is known to be antigel.
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
@@ -1577,10 +1581,10 @@ def make_tile(
 
     edge_name = 'panel_edge' if panel_edge else 'edge'
 
-    umin_side.mat = texturing.SPECIAL.get(origin, edge_name)
-    umax_side.mat = texturing.SPECIAL.get(origin, edge_name)
-    vmin_side.mat = texturing.SPECIAL.get(origin, edge_name)
-    vmax_side.mat = texturing.SPECIAL.get(origin, edge_name)
+    umin_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
+    umax_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
+    vmin_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
+    vmax_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
 
     return Solid(vmf, sides=[
         top_side, back_side,
@@ -2017,7 +2021,7 @@ def generate_brushes(vmf: VMF) -> None:
     # Each subtile is generated individually. If it's a full-block tile we
     # try to merge tiles together with the same texture.
 
-    # The key is (normal, plane distance, tile type)
+    # The key is (normal, plane distance, tile typel)
     full_tiles: Dict[
         Tuple[float, float, float, float, TileType],
         List[TileDef]
@@ -2038,7 +2042,7 @@ def generate_brushes(vmf: VMF) -> None:
                 # Add the portal helper in directly.
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=tile.normal.to_angle_roll(tile.portal_helper_orient),
+                    angles=Matrix.from_basis(x=tile.portal_helper_orient, z=tile.normal).to_angle(),
                     origin=pos,
                     force_placement=int(tile.has_oriented_portal_helper),
                     snap_to_helper_angles=int(tile.has_oriented_portal_helper),
@@ -2054,7 +2058,8 @@ def generate_brushes(vmf: VMF) -> None:
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
-        grid_pos: Dict[Tuple[TileType, str], Dict[Tuple[int, int], bool]] = defaultdict(dict)
+        # (type, is_antigel, texture) -> (u, v) -> present/absent
+        grid_pos: Dict[Tuple[TileType, bool, str], Dict[Tuple[int, int], bool]] = defaultdict(dict)
 
         tile_pos: Dict[Tuple[int, int], TileDef] = {}
 
@@ -2067,7 +2072,7 @@ def generate_brushes(vmf: VMF) -> None:
                     texturing.GenCat.NORMAL,
                     normal,
                     Portalable.BLACK
-                ).get(pos, TileSize.GOO_SIDE)
+                ).get(pos, TileSize.GOO_SIDE, antigel=False)
             elif tile_type is TileType.NODRAW:
                 tex = consts.Tools.NODRAW
             else:
@@ -2075,14 +2080,14 @@ def generate_brushes(vmf: VMF) -> None:
                     texturing.GenCat.NORMAL,
                     normal,
                     tile.base_type.color
-                ).get(pos, tile.base_type.tile_size)
+                ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
 
             u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
             v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
-            grid_pos[tile.base_type, tex][u_pos, v_pos] = True
+            grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
-        for (tile_type, tex), tex_pos in grid_pos.items():
+        for (tile_type, is_antigel, tex), tex_pos in grid_pos.items():
             for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
                 center = Vec.with_axes(
                     norm_axis, plane_dist,
@@ -2099,7 +2104,7 @@ def generate_brushes(vmf: VMF) -> None:
                 )
                 if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (1 + max_v - min_v) % 2 == 0:
                     is_double = True
-                    tex = gen.get(center, TileSize.TILE_DOUBLE)
+                    tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
                 else:
                     is_double = False
 
@@ -2108,10 +2113,11 @@ def generate_brushes(vmf: VMF) -> None:
                     center,
                     normal,
                     tex,
-                    texturing.SPECIAL.get(center, 'behind'),
+                    texturing.SPECIAL.get(center, 'behind', antigel=is_antigel),
                     bevels=bevels,
                     width=(1 + max_u - min_u) * 128,
                     height=(1 + max_v - min_v) * 128,
+                    antigel=is_antigel,
                 )
                 vmf.add_brush(brush)
                 if is_double:
