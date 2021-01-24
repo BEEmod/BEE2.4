@@ -23,7 +23,6 @@ from typing import (
 # noinspection PyUnresolvedReferences
 if TYPE_CHECKING:
     from app.gameMan import Game
-    from app.selector_win import SelitemData
     from loadScreen import LoadScreen
     from typing import NoReturn
 
@@ -40,6 +39,64 @@ PACKAGE_SYS: Dict[str, FileSystem] = {}
 
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
+
+class SelitemData(NamedTuple):
+    """Options which are displayed on the selector window."""
+    name: str  # Longer full name.
+    short_name: str  # Shorter name for the icon.
+    auth: List[str]  # List of authors.
+    icon: str  # Path to small square icon.
+    large_icon: str  # Path to larger, landscape icon.
+    desc: tkMarkdown.MarkdownData
+    group: Optional[str]
+    sort_key: str
+
+    @classmethod
+    def parse(cls, info: Property) -> 'SelitemData':
+        """Parse from a property block."""
+        auth = sep_values(info['authors', ''])
+        short_name = info['shortName', None]
+        name = info['name']
+        icon = info['icon', None]
+        large_icon = info['iconlarge', None]
+        group = info['group', '']
+        sort_key = info['sort_key', '']
+        desc = desc_parse(info, info['id'])
+        if not group:
+            group = None
+        if not short_name:
+            short_name = name
+
+        return cls(
+            name,
+            short_name,
+            auth,
+            icon,
+            large_icon,
+            desc,
+            group,
+            sort_key,
+        )
+
+    def __add__(self, other: 'SelitemData') -> 'SelitemData':
+        """Join together two sets of selitem data.
+
+        This uses the over_data values if defined, using our_data if not.
+        Authors and descriptions will be joined to each other.
+        """
+        if not isinstance(other, SelitemData):
+            return NotImplemented
+
+        return SelitemData(
+            self.name,
+            self.short_name,
+            self.auth + other.auth,
+            other.icon or self.icon,
+            other.large_icon or self.large_icon,
+            tkMarkdown.join(self.desc, other.desc),
+            other.group or self.group,
+            other.sort_key or self.sort_key,
+        )
 
 
 class ObjData(NamedTuple):
@@ -873,7 +930,7 @@ class Style(PakObject):
         """Parse a style definition."""
         info = data.info  # type: Property
         filesystem = data.fsys  # type: FileSystem
-        selitem_data = get_selitem_data(info)
+        selitem_data = SelitemData.parse(info)
         base = info['base', '']
         has_video = srctools.conv_bool(
             info['has_video', ''],
@@ -964,12 +1021,9 @@ class Style(PakObject):
 
     def add_over(self, override: 'Style') -> None:
         """Add the additional commands to ourselves."""
-        self.editor.append(override.editor)
-        self.config.append(override.config)
-        self.selitem_data = join_selitem_data(
-            self.selitem_data,
-            override.selitem_data
-        )
+        self.editor += override.editor
+        self.config += override.config
+        self.selitem_data += override.selitem_data
 
         self.has_video = self.has_video or override.has_video
         # If overrides have suggested IDs, use those. Unset values = ''.
@@ -1027,81 +1081,7 @@ def desc_parse(
     return tkMarkdown.convert('\n'.join(lines))
 
 
-def get_selitem_data(info: Property) -> 'SelitemData':
-    """Return the common data for all item types - name, author, description.
-    """
-    from app.selector_win import SelitemData
-
-    auth = sep_values(info['authors', ''])
-    short_name = info['shortName', None]
-    name = info['name']
-    icon = info['icon', None]
-    large_icon = info['iconlarge', None]
-    group = info['group', '']
-    sort_key = info['sort_key', '']
-    desc = desc_parse(info, info['id'])
-    if not group:
-        group = None
-    if not short_name:
-        short_name = name
-
-    return SelitemData(
-        name,
-        short_name,
-        auth,
-        icon,
-        large_icon,
-        desc,
-        group,
-        sort_key,
-    )
-
-
-def join_selitem_data(
-    our_data: 'SelitemData',
-    over_data: 'SelitemData'
-) -> 'SelitemData':
-    """Join together two sets of selitem data.
-
-    This uses the over_data values if defined, using our_data if not.
-    Authors and descriptions will be joined to each other.
-    """
-    from app.selector_win import SelitemData
-    (
-        our_name,
-        our_short_name,
-        our_auth,
-        our_icon,
-        our_large_icon,
-        our_desc,
-        our_group,
-        our_sort_key,
-    ) = our_data
-
-    (
-        over_name,
-        over_short_name,
-        over_auth,
-        over_icon,
-        over_large_icon,
-        over_desc,
-        over_group,
-        over_sort_key,
-    ) = over_data
-
-    return SelitemData(
-        our_name,
-        our_short_name,
-        our_auth + over_auth,
-        over_icon if our_icon is None else our_icon,
-        over_large_icon if our_large_icon is None else our_large_icon,
-        tkMarkdown.join(our_desc, over_desc),
-        over_group or our_group,
-        over_sort_key or our_sort_key,
-    )
-
-
-def sep_values(string, delimiters=',;/'):
+def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> List[str]:
     """Split a string by a delimiter, and then strip whitespace.
 
     Multiple delimiter characters can be passed.
@@ -1125,6 +1105,8 @@ from packages.stylevar import StyleVar
 from packages.elevator import Elevator
 from packages.editor_sound import EditorSound
 from packages.style_vpk import StyleVPK
+from packages.signage import Signage
+from packages.skybox import Skybox
 from packages.music import Music
 from packages.quote_pack import QuotePack
 from packages.template_brush import BrushTemplate, TEMPLATE_FILE

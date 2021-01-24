@@ -1,12 +1,15 @@
 from typing import Dict, List, Optional, FrozenSet
+from srctools import Property
+import srctools.logger
 
-import srctools
 from consts import MusicChannel
 from packages import (
-    PakObject, set_cond_source, ParseData, get_selitem_data,
-    LOGGER, get_config, join_selitem_data, ExportData,
+    PakObject, set_cond_source, ParseData, SelitemData,
+    get_config, ExportData,
 )
-from srctools import Property
+
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class Music(PakObject):
@@ -42,7 +45,7 @@ class Music(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse a music definition."""
-        selitem_data = get_selitem_data(data.info)
+        selitem_data = SelitemData.parse(data.info)
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', [])  # type: Property
 
@@ -143,10 +146,7 @@ class Music(PakObject):
     def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
         self.config.append(override.config)
-        self.selitem_data = join_selitem_data(
-            self.selitem_data,
-            override.selitem_data
-        )
+        self.selitem_data += override.selitem_data
 
     def __repr__(self):
         return '<Music ' + self.id + '>'

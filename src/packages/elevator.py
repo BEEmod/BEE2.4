@@ -1,9 +1,5 @@
 from srctools import Property
-from packages import (
-    PakObject, ParseData, ExportData,
-    SelitemData, get_selitem_data,
-    Style,
-)
+from packages import ParseData, ExportData, SelitemData, PakObject, Style
 
 
 class Elevator(PakObject):
@@ -35,7 +31,7 @@ class Elevator(PakObject):
     def parse(cls, data: ParseData) -> 'Elevator':
         """Read elevator videos from the package."""
         info = data.info
-        selitem_data = get_selitem_data(info)
+        selitem_data = SelitemData.parse(info)
 
         if 'vert_video' in info:
             video = info['horiz_video']

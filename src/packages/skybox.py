@@ -1,9 +1,9 @@
-from packages import (
-    PakObject, ExportData, ParseData,
-    get_config, set_cond_source,
-    get_selitem_data, join_selitem_data, SelitemData,
-)
 from srctools import Property
+from packages import (
+    PakObject, ExportData, ParseData, SelitemData,
+    get_config, set_cond_source,
+)
+
 
 class Skybox(PakObject):
     """Configures skybox and fog settings."""
@@ -28,7 +28,7 @@ class Skybox(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse a skybox definition."""
-        selitem_data = get_selitem_data(data.info)
+        selitem_data = SelitemData.parse(data.info)
         mat = data.info['material', 'sky_black']
         config = get_config(
             data.info,
@@ -49,15 +49,12 @@ class Skybox(PakObject):
 
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.selitem_data = join_selitem_data(
-            self.selitem_data,
-            override.selitem_data
-        )
+        self.selitem_data += override.selitem_data
         self.config += override.config
         self.fog_opts += override.fog_opts.copy()
 
-    def __repr__(self):
-        return '<Skybox ' + self.id + '>'
+    def __repr__(self) -> str:
+        return f'<Skybox {self.id}>'
 
     @staticmethod
     def export(exp_data: ExportData):
