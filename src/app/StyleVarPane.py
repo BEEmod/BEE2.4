@@ -1,19 +1,18 @@
 from tkinter import *
 from tkinter import ttk
 
+from typing import Union, List, Dict
 from collections import namedtuple
 import operator
 
-from app.SubPane import SubPane
 from srctools import Property
 from srctools.logger import get_logger
 import packages
-from app import tooltip, TK_ROOT
+from app.SubPane import SubPane
+from app import tooltip, TK_ROOT, itemconfig, img
 import utils
-from app import itemconfig, img
 import BEE2_config
 
-from typing import Union, List, Dict
 
 
 LOGGER = get_logger(__name__)
@@ -92,7 +91,7 @@ checkbox_chosen = {}
 checkbox_other = {}
 tk_vars = {}  # type: Dict[str, IntVar]
 
-VAR_LIST = []  # type: List[packages.StyleVar]
+VAR_LIST: List[packages.StyleVar] = []
 STYLES = {}
 
 window = None
