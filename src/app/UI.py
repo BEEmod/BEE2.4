@@ -115,7 +115,7 @@ class Item:
             self.selected_ver = item.def_ver['id']
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']  # type: packages.ItemVariant
+        self.def_data: packages.ItemVariant = self.item.def_ver['def_style']
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(
             1 for _ in
@@ -143,10 +143,10 @@ class Item:
         from app.tagsPane import Section
 
         version = self.item.versions[self.selected_ver]
-        self.data = version['styles'].get(
+        self.data: packages.ItemVariant = version['styles'].get(
             selected_style,
             self.def_data,
-            )  # type: packages.ItemVariant
+        )
         self.names = [
             gameMan.translate(prop['name', ''])
             for prop in
