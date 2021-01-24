@@ -1764,12 +1764,12 @@ def init_menu_bar(win: Toplevel) -> Menu:
     pal_menu.add_command(
         label=_('Save Palette'),
         command=pal_save,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
+        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
     pal_menu.add_command(
         label=_('Save Palette As...'),
         command=pal_save_as,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
+        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
         )
 
     pal_menu.add_separator()
