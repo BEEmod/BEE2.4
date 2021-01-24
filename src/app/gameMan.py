@@ -27,7 +27,7 @@ from srctools import (
 import srctools.logger
 from app import backup, optionWindow, tk_tools, TK_ROOT
 import loadScreen
-import packageLoader
+import packages
 import utils
 import srctools
 import webbrowser
@@ -347,7 +347,7 @@ class Game:
 
     def add_editor_sounds(
         self,
-        sounds: Iterable[packageLoader.EditorSound],
+        sounds: Iterable[packages.EditorSound],
     ) -> None:
         """Add soundscript items so they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
@@ -501,14 +501,14 @@ class Game:
             return False
 
         # Check lengths, to ensure we re-extract if packages were removed.
-        if len(packageLoader.packages) != len(self.mod_times):
+        if len(packages.packages) != len(self.mod_times):
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
         if any(
             pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
-            packageLoader.packages.items()
+            packages.packages.items()
         ):
             return True
 
@@ -567,7 +567,7 @@ class Game:
 
         # Save the new cache modification date.
         self.mod_times.clear()
-        for pack_id, pack in packageLoader.packages.items():
+        for pack_id, pack in packages.packages.items():
             self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
@@ -579,7 +579,7 @@ class Game:
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
         try:
-            packageLoader.StyleVPK.clear_vpk_files(self)
+            packages.StyleVPK.clear_vpk_files(self)
         except PermissionError:
             pass
 
@@ -587,7 +587,7 @@ class Game:
 
     def export(
         self,
-        style: packageLoader.Style,
+        style: packages.Style,
         selected_objects: dict,
         should_refresh=False,
     ) -> Tuple[bool, bool]:
@@ -643,7 +643,7 @@ class Game:
         # Editor models.
         # FGD file
         # Gameinfo
-        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 6)
+        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 6)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -670,7 +670,7 @@ class Game:
             vpk_success = True
 
             # Export each object type.
-            for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
+            for obj_name, obj_data in packages.OBJ_TYPES.items():
                 if obj_name == 'Style':
                     continue  # Done above already
 
@@ -678,14 +678,14 @@ class Game:
                 selected = selected_objects.get(obj_name, None)
 
                 try:
-                    obj_data.cls.export(packageLoader.ExportData(
+                    obj_data.cls.export(packages.ExportData(
                         game=self,
                         selected=selected,
                         editoritems=editoritems,
                         vbsp_conf=vbsp_config,
                         selected_style=style,
                     ))
-                except packageLoader.NoVPKExport:
+                except packages.NoVPKExport:
                     # Raised by StyleVPK to indicate it failed to copy.
                     vpk_success = False
 
@@ -1039,7 +1039,7 @@ class Game:
                 has_input,
                 has_output,
                 has_secondary,
-            ) = packageLoader.Item.convert_item_io(comm_block, item, conv_peti_input)
+            ) = packages.Item.convert_item_io(comm_block, item, conv_peti_input)
 
             # Record the itemClass for each item type.
             # 'ItemBase' is the default class.

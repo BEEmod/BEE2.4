@@ -4,7 +4,7 @@ from typing import Dict, Iterable, Optional, List
 from BEE2_config import GEN_OPTS
 from app.SubPane import SubPane
 from loadScreen import LoadScreen
-from packageLoader import Music
+from packages import Music
 from consts import MusicChannel
 from tkinter import ttk
 from app.selector_win import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr

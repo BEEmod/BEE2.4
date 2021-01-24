@@ -5,7 +5,7 @@ from app import dragdrop, img, TK_ROOT
 import srctools.logger
 import utils
 import BEE2_config
-from packageLoader import Signage, Style
+from packages import Signage, Style
 import tkinter as tk
 from srctools import Property
 from tkinter import ttk

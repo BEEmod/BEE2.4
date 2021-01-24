@@ -7,7 +7,7 @@ import operator
 from app.SubPane import SubPane
 from srctools import Property
 from srctools.logger import get_logger
-import packageLoader
+import packages
 from app import tooltip, TK_ROOT
 import utils
 from app import itemconfig, img
@@ -92,7 +92,7 @@ checkbox_chosen = {}
 checkbox_other = {}
 tk_vars = {}  # type: Dict[str, IntVar]
 
-VAR_LIST = []  # type: List[packageLoader.StyleVar]
+VAR_LIST = []  # type: List[packages.StyleVar]
 STYLES = {}
 
 window = None
@@ -139,7 +139,7 @@ def save_load_stylevars(props: Property=None):
         update_filter()
 
 
-def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
+def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.

@@ -28,7 +28,7 @@ from app import (
     TK_ROOT,
 )
 import utils
-import packageLoader
+import packages
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -285,7 +285,7 @@ def load_item_data():
         has_inputs,
         has_outputs,
         has_secondary,
-    ) = packageLoader.Item.convert_item_io(comm_block, editor_data)
+    ) = packages.Item.convert_item_io(comm_block, editor_data)
     del comm_block  # We don't use the config.
 
     has_timer = any(editor_data.find_all("Properties", "TimerDelay"))

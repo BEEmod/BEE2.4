@@ -17,7 +17,7 @@ import srctools.logger
 from app import sound as snd
 import BEE2_config
 from app import paletteLoader
-import packageLoader
+import packages
 from app import img
 from app import itemconfig
 import utils
@@ -115,7 +115,7 @@ class Item:
             self.selected_ver = item.def_ver['id']
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
+        self.def_data = self.item.def_ver['def_style']  # type: packages.ItemVariant
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(
             1 for _ in
@@ -146,7 +146,7 @@ class Item:
         self.data = version['styles'].get(
             selected_style,
             self.def_data,
-            )  # type: packageLoader.ItemVariant
+            )  # type: packages.ItemVariant
         self.names = [
             gameMan.translate(prop['name', ''])
             for prop in
@@ -681,9 +681,9 @@ def load_packages(data):
         win.sel_suggested()
 
 
-def current_style() -> packageLoader.Style:
+def current_style() -> packages.Style:
     """Return the currently selected style."""
-    return packageLoader.Style.by_id(selected_style)
+    return packages.Style.by_id(selected_style)
 
 
 def reposition_panes() -> None:
@@ -1400,7 +1400,7 @@ def init_option(pane: SubPane) -> None:
     def configure_voice():
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packageLoader.QuotePack.by_id(voice_win.chosen_id)
+            chosen_voice = packages.QuotePack.by_id(voice_win.chosen_id)
         except KeyError:
             pass
         else:
