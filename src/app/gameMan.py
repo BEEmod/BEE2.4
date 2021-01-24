@@ -377,6 +377,7 @@ class Game:
             if line.strip() == EDITOR_SOUND_LINE:
                 # Delete our marker line and everything after it
                 del file_data[i:]
+                break
 
         # Then add our stuff!
         with srctools.AtomicWriter(file) as f:
