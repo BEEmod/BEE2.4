@@ -10,7 +10,7 @@ from app import selector_win, TK_ROOT
 from app import tkMarkdown, SubPane, img
 import utils
 from BEE2_config import ConfigFile, option_handler
-from packageLoader import CORRIDOR_COUNTS, CorrDesc
+from packages import CORRIDOR_COUNTS, CorrDesc
 from srctools import Property, AtomicWriter
 from srctools.logger import get_logger
 from app.tk_tools import FileField

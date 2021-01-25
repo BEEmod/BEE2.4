@@ -16,6 +16,7 @@ import math
 
 from app.richTextBox import tkRichText
 from app.tooltip import add_tooltip, set_tooltip
+from packages import SelitemData
 from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
@@ -126,10 +127,6 @@ def {l_name}(cls, id: str, desc='', default=None):
         ), globals(), locals())
     del _member_name
 
-SelitemData = namedtuple(
-    'SelitemData',
-    'name, short_name, auth, icon, large_icon, desc, group, sort_key',
-)
 
 
 class GroupHeader(ttk.Frame):

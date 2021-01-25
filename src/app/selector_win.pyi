@@ -12,6 +12,7 @@ from enum import Enum
 from app.richTextBox import tkRichText
 from app.sound import SamplePlayer
 from srctools import Vec, FileSystemChain
+from packages import SelitemData
 from typing import (
     Optional, Union, Tuple, List, Dict, Any,
     Callable, Iterable,
@@ -23,7 +24,6 @@ from app.tk_tools import HidingScroll
 __all__ = [
     'ICON_SIZE', 'ICON_SIZE_LRG',
     'NAV_KEYS', 'AttrTypes', 'AttrDef',
-    'SelitemData',
     'selWin', 'Item',
 ]
 
@@ -98,8 +98,6 @@ class AttrDef(tuple):
     @classmethod
     def color(cls, id: str, desc='', default: Vec=None) -> 'AttrDef':
         """An alternative constructor to create color-type attrs."""
-
-SelitemData = namedtuple('SelitemData', 'name, short_name, auth, icon, large_icon, desc, group, sort_key')
 
 class GroupHeader(ttk.Frame):
     parent: selWin = ...

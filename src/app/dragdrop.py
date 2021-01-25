@@ -571,7 +571,7 @@ def _test() -> None:
     """Test the GUI."""
     from srctools.logger import init_logging
     from BEE2_config import GEN_OPTS
-    from packageLoader import find_packages, PACKAGE_SYS
+    from packages import find_packages, PACKAGE_SYS
 
     init_logging()
 

@@ -54,7 +54,6 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
     marker_names = set()
 
     inst = None
-
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() in marker:
             marker_names.add(inst['targetname'])
@@ -68,8 +67,8 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
     item_id = res['markerItem']
 
-    # Synthesise the item type used for the final trigger.
-    item_type_sp = connections.ItemType(
+    # Synthesise the connection config used for the final trigger.
+    conn_conf_sp = connections.Config(
         id=item_id + ':TRIGGER',
         output_act=Output.parse_name(res['triggerActivate', 'OnStartTouchAll']),
         output_deact=Output.parse_name(res['triggerDeactivate', 'OnEndTouchAll']),
@@ -80,12 +79,12 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
     try:
         coop_var = res['coopVar']
     except LookupError:
-        coop_var = item_type_coop = None
+        coop_var = conn_conf_coop = None
         coop_only_once = False
     else:
         coop_only_once = res.bool('coopOnce')
-        item_type_coop = connections.ItemType(
-            id=item_id + ':TRIGGER_COOP',
+        conn_conf_coop = connections.Config(
+            id=item_id + ':TRIGGER',
             output_act=Output.parse_name(
                 res['coopActivate', 'OnChangeToAllTrue']
             ),
@@ -183,7 +182,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
             item = connections.Item(
                 out_ent,
-                item_type_coop,
+                conn_conf_coop,
                 mark1.ant_floor_style,
                 mark1.ant_wall_style,
             )
@@ -203,7 +202,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
         else:
             item = connections.Item(
                 trig_ent,
-                item_type_sp,
+                conn_conf_sp,
                 mark1.ant_floor_style,
                 mark1.ant_wall_style,
             )

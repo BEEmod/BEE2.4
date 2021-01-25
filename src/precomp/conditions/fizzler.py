@@ -1,9 +1,9 @@
 """Results for custom fizzlers."""
-from srctools import Property, Entity, Vec, VMF
+from srctools import Property, Entity, Vec, VMF, Matrix, Angle
 import srctools.logger
 
 from precomp.conditions import make_result, make_flag
-from precomp.instanceLocs import resolve as resolve_inst
+from precomp.instanceLocs import resolve_one
 from precomp import connections, fizzler
 
 
@@ -57,8 +57,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     shape_name = shape_inst['targetname']
     shape_item = connections.ITEMS.pop(shape_name)
 
-    shape_angles = Vec.from_str(shape_inst['angles'])
-    up_axis = res.vec('up_axis').rotate(*shape_angles)
+    shape_orient = Matrix.from_angle(Angle.from_str(shape_inst['angles']))
+    up_axis: Vec = round(res.vec('up_axis') @ shape_orient, 6)
 
     for conn in shape_item.outputs:
         fizz_item = conn.to_item
@@ -82,7 +82,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             classname='func_instance',
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
-            file=resolve_inst('<ITEM_BARRIER_HAZARD:fizz_base>'),
+            file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>'),
         )
         base_inst.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
@@ -123,7 +123,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     for seg_prop in res.find_all('Segment'):
         vec1, vec2 = seg_prop.value.split(';')
         seg_min_max = Vec.bbox(
-            Vec.from_str(vec1).rotate(*shape_angles) + origin,
-            Vec.from_str(vec2).rotate(*shape_angles) + origin,
+            Vec.from_str(vec1) @ shape_orient + origin,
+            Vec.from_str(vec2) @ shape_orient + origin,
         )
         fizz.emitters.append(seg_min_max)
