@@ -6,6 +6,7 @@ the outputs with optimisations and custom settings.
 from enum import Enum
 from collections import defaultdict
 
+from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import VMF, Entity, Output, Property, conv_bool, Vec
 from precomp.antlines import Antline, AntType
 from precomp import (
@@ -24,18 +25,10 @@ COND_MOD_NAME = "Item Connections"
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-ITEM_TYPES = {}  # type: Dict[str, ItemType]
+ITEM_TYPES = {}  # type: Dict[str, Config]
 
 # Targetname -> item
 ITEMS = {}  # type: Dict[str, Item]
-
-# Outputs we need to use to make a math_counter act like
-# the specified logic gate.
-COUNTER_AND_ON = 'OnHitMax'
-COUNTER_AND_OFF = 'OnChangedFromMax'
-
-COUNTER_OR_ON = 'OnChangedFromMin'
-COUNTER_OR_OFF = 'OnHitMin'
 
 # We need different names for each kind of input type, so they don't
 # interfere with each other. We use the 'inst_local' pattern not 'inst-local'
@@ -59,92 +52,11 @@ function snd() {{
 '''
 
 
-class ConnType(Enum):
-    """Kind of Input A/B type, or TBeam type."""
-    DEFAULT = 'default'  # Normal / unconfigured input
-    # Becomes one of the others based on item preference.
-
-    PRIMARY = TBEAM_IO = 'primary'  # A Type, 'normal'
-    SECONDARY = TBEAM_DIR = 'secondary'  # B Type, 'alt'
-
-    BOTH = 'both'  # Trigger both simultaneously.
-
-
-CONN_TYPE_NAMES: Dict[str, ConnType] = {
-    'none': ConnType.DEFAULT,
-    'a': ConnType.PRIMARY,
-    'prim': ConnType.PRIMARY,
-
-    'b': ConnType.SECONDARY,
-    'sec': ConnType.SECONDARY,
-
-    'ab': ConnType.BOTH,
-    'a+b': ConnType.BOTH,
-}
-
-CONN_TYPE_NAMES.update(
-    (conn.value.casefold(), conn)
-    for conn in ConnType
-)
-
-
-class InputType(Enum):
-    """Indicates the kind of input behaviour to use."""
-    # Normal PeTI, pass activate/deactivate via proxy.
-    # For this the IO command is the original counter style.
-    DEFAULT = 'default'
-
-    # Have A and B inputs - acts like AND for both.
-    DUAL = 'dual'
-
-    AND = 'and'  # AND input for an item.
-    OR = 'or'    # OR input for an item.
-
-    OR_LOGIC = 'or_logic'  # Treat as an invisible OR gate, no instance.
-    AND_LOGIC = 'and_logic'  # Treat as an invisible AND gate, no instance.
-
-    # An item 'chained' to the next. Inputs should be moved to the output
-    # item in addition to our own output.
-    DAISYCHAIN = 'daisychain'
-
-    @property
-    def is_logic(self):
-        """Is this a logic gate?"""
-        return self.value in ('and_logic', 'or_logic')
-
-
 class PanelSwitchingStyle(Enum):
     """How the panel instance does its switching."""
     CUSTOM = 'custom'      # Some logic, we don't do anything.
     EXTERNAL = 'external'  # Provide a toggle to the instance.
     INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
-
-
-class OutNames(str, Enum):
-    """Fake input/outputs used in generation of the real ones."""
-    # Needs to match gameMan.Game.build_instance_data().
-    IN_ACT = 'ACTIVATE'
-    IN_DEACT = 'DEACTIVATE'
-
-    IN_SEC_ACT = 'ACTIVATE_SECONDARY'
-    IN_SEC_DEACT = 'DEACTIVATE_SECONDARY'
-
-    OUT_ACT = 'ON_ACTIVATED'
-    OUT_DEACT = 'ON_DEACTIVATED'
-
-
-class FeatureMode(Enum):
-    """When to apply a feature."""
-    DYNAMIC = 'dynamic'  # Only if dynamic (inputs)
-    ALWAYS = 'always'
-    NEVER = 'never'
-
-    def valid(self, item: 'Item') -> bool:
-        """Check if this is valid for the item."""
-        if self.value == 'dynamic':
-            return len(item.inputs) > 0
-        else:
-            return self.value == 'always'
 
 
 CONN_NAMES = {
@@ -220,258 +132,10 @@ class ShapeSignage:
         return NotImplemented
 
 
-class ItemType:
-    """Represents a type of item, with inputs and outputs.
-
-    This is shared by all items of the same type.
-    """
-    output_act: Optional[Tuple[Optional[str], str]]
-    output_deact: Optional[Tuple[Optional[str], str]]
-
-    def __init__(
-        self,
-        id: str,
-        default_dual: ConnType=ConnType.DEFAULT,
-        input_type: InputType=InputType.DEFAULT,
-
-        spawn_fire: FeatureMode=FeatureMode.NEVER,
-
-        invert_var: str = '0',
-        enable_cmd: Iterable[Output]=(),
-        disable_cmd: Iterable[Output]=(),
-
-        sec_invert_var: str='0',
-        sec_enable_cmd: Iterable[Output]=(),
-        sec_disable_cmd: Iterable[Output]=(),
-
-        output_type: ConnType=ConnType.DEFAULT,
-        output_act: Optional[Tuple[Optional[str], str]]=None,
-        output_deact: Optional[Tuple[Optional[str], str]]=None,
-
-        lock_cmd: Iterable[Output]=(),
-        unlock_cmd: Iterable[Output]=(),
-        output_lock: Optional[Tuple[Optional[str], str]]=None,
-        output_unlock: Optional[Tuple[Optional[str], str]]=None,
-        inf_lock_only: bool=False,
-
-        timer_sound_pos: Optional[Vec]=None,
-        timer_done_cmd: Iterable[Output]=(),
-        force_timer_sound: bool=False,
-
-        timer_start: Optional[List[Tuple[Optional[str], str]]]=None,
-        timer_stop: Optional[List[Tuple[Optional[str], str]]]=None,
-    ):
-        self.id = id
-
-        # How this item uses their inputs.
-        self.input_type = input_type
-
-        # True/False for always, $var, !$var for lookup.
-        self.invert_var = invert_var
-
-        # Fire the enable/disable commands after spawning to initialise
-        # the entity.
-        self.spawn_fire = spawn_fire
-
-        # IO commands for enabling/disabling the item.
-        # These are copied to the item, so it can have modified ones.
-        # We use tuples so all can reuse the same object.
-        self.enable_cmd = tuple(enable_cmd)
-        self.disable_cmd = tuple(disable_cmd)
-
-        # If no A/B type is set on the input, use this type.
-        # Set to None to indicate no secondary is present.
-        self.default_dual = default_dual
-
-        # Same for secondary items.
-        self.sec_invert_var = sec_invert_var
-        self.sec_enable_cmd = tuple(sec_enable_cmd)
-        self.sec_disable_cmd = tuple(sec_disable_cmd)
-
-        # Sets the affinity used for outputs from this item - makes the
-        # Input A/B converter items work.
-        # If DEFAULT, we use the value on the target item.
-        self.output_type = output_type
-
-        # (inst_name, output) commands for outputs.
-        # If they are None, it's not used.
-
-        # Logic items have preset ones of these from the counter.
-        if input_type is InputType.AND_LOGIC:
-            self.output_act = (None, COUNTER_AND_ON)
-            self.output_deact = (None, COUNTER_AND_OFF)
-        elif input_type is InputType.OR_LOGIC:
-            self.output_act = (None, COUNTER_OR_ON)
-            self.output_deact = (None, COUNTER_OR_OFF)
-        else:  # Other types use the specified ones.
-            # Allow passing in an output with a blank command, to indicate
-            # no outputs.
-            if output_act == (None, ''):
-                self.output_act = None
-            else:
-                self.output_act = output_act
-
-            if output_deact == (None, ''):
-                self.output_deact = None
-            else:
-                self.output_deact = output_deact
-
-        # If set, automatically play tick-tock sounds when output is on.
-        self.timer_sound_pos = timer_sound_pos
-        # These are fired when the time elapses.
-        self.timer_done_cmd = list(timer_done_cmd)
-        # If True, always add tick-tock sounds. If false, only when we have
-        # a timer dial.
-        self.force_timer_sound = force_timer_sound
-
-        # If set, these allow alternate inputs for controlling timers.
-        # Multiple can be given. If None, we use the normal output.
-        self.timer_start = timer_start
-        self.timer_stop = timer_stop
-
-        # For locking buttons, this is the command to reactivate,
-        # and force-lock it.
-        # If both aren't present, erase both.
-        if lock_cmd and unlock_cmd:
-            self.lock_cmd = tuple(lock_cmd)
-            self.unlock_cmd = tuple(unlock_cmd)
-        else:
-            self.lock_cmd = self.unlock_cmd = ()
-
-        # If True, the locking button must be infinite to enable the behaviour.
-        self.inf_lock_only = inf_lock_only
-
-        # For the target, the commands to lock/unlock the attached button.
-        self.output_lock = output_lock
-        self.output_unlock = output_unlock
-
-    @staticmethod
-    def parse(item_id: str, conf: Property):
-        """Read the item type info from the given config."""
-
-        def get_outputs(prop_name):
-            """Parse all the outputs with this name."""
-            return [
-                Output.parse(prop)
-                for prop in
-                conf.find_all(prop_name)
-                # Allow blank to indicate no output.
-                if prop.value != ''
-            ]
-
-        enable_cmd = get_outputs('enable_cmd')
-        disable_cmd = get_outputs('disable_cmd')
-        lock_cmd = get_outputs('lock_cmd')
-        unlock_cmd = get_outputs('unlock_cmd')
-
-        inf_lock_only = conf.bool('inf_lock_only')
-
-        timer_done_cmd = get_outputs('timer_done_cmd')
-        if 'timer_sound_pos' in conf:
-            timer_sound_pos = conf.vec('timer_sound_pos')
-            force_timer_sound = conf.bool('force_timer_sound')
-        else:
-            timer_sound_pos = None
-            force_timer_sound = False
-
-        try:
-            input_type = InputType(
-                conf['Type', 'default'].casefold()
-            )
-        except ValueError:
-            raise ValueError('Invalid input type "{}": {}'.format(
-                item_id, conf['type'],
-            )) from None
-
-        invert_var = conf['invertVar', '0']
-
-        try:
-            spawn_fire = FeatureMode(conf['spawnfire', 'never'].casefold())
-        except ValueError:
-            # Older config option - it was a bool for always/never.
-            spawn_fire_bool = conf.bool('spawnfire', None)
-            if spawn_fire_bool is None:
-                raise  # Nope, not a bool.
-
-            spawn_fire = FeatureMode.ALWAYS if spawn_fire_bool else FeatureMode.NEVER
-
-        if input_type is InputType.DUAL:
-            sec_enable_cmd = get_outputs('sec_enable_cmd')
-            sec_disable_cmd = get_outputs('sec_disable_cmd')
-
-            try:
-                default_dual = CONN_TYPE_NAMES[
-                    conf['Default_Dual', 'primary'].casefold()
-                ]
-            except KeyError:
-                raise ValueError('Invalid default type for "{}": {}'.format(
-                    item_id, conf['Default_Dual'],
-                )) from None
-
-            # We need an affinity to use when nothing else specifies it.
-            if default_dual is ConnType.DEFAULT:
-                raise ValueError('Must specify a default type for "{}"!'.format(
-                    item_id,
-                )) from None
-
-            sec_invert_var = conf['sec_invertVar', '0']
-        else:
-            # No dual type, set to dummy values.
-            sec_enable_cmd = []
-            sec_disable_cmd = []
-            default_dual = ConnType.DEFAULT
-            sec_invert_var = ''
-
-        try:
-            output_type = CONN_TYPE_NAMES[
-                conf['DualType', 'default'].casefold()
-            ]
-        except KeyError:
-            raise ValueError('Invalid output affinity for "{}": {}'.format(
-                item_id, conf['DualType'],
-            )) from None
-
-        def get_input(prop_name: str):
-            """Parse an input command."""
-            try:
-                return Output.parse_name(conf[prop_name])
-            except IndexError:
-                return None
-
-        out_act = get_input('out_activate')
-        out_deact = get_input('out_deactivate')
-        out_lock = get_input('out_lock')
-        out_unlock = get_input('out_unlock')
-
-        timer_start = timer_stop = None
-        if 'out_timer_start' in conf:
-            timer_start = [
-                Output.parse_name(prop.value)
-                for prop in conf.find_all('out_timer_start')
-                if prop.value
-            ]
-        if 'out_timer_stop' in conf:
-            timer_stop = [
-                Output.parse_name(prop.value)
-                for prop in conf.find_all('out_timer_stop')
-                if prop.value
-            ]
-
-        return ItemType(
-            item_id, default_dual, input_type, spawn_fire,
-            invert_var, enable_cmd, disable_cmd,
-            sec_invert_var, sec_enable_cmd, sec_disable_cmd,
-            output_type, out_act, out_deact,
-            lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
-            timer_sound_pos, timer_done_cmd, force_timer_sound,
-            timer_start, timer_stop,
-        )
-
-
 class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
-        'inst', 'item_type', '_kv_setters',
+        'inst', 'config', '_kv_setters',
         'ind_panels',
         'antlines', 'shape_signs',
         'ant_wall_style', 'ant_floor_style',
@@ -485,7 +149,7 @@ class Item:
     def __init__(
         self,
         inst: Entity,
-        item_type: ItemType,
+        item_type: Config,
         ant_floor_style: AntType,
         ant_wall_style: AntType,
         panels: Iterable[Entity]=(),
@@ -495,7 +159,7 @@ class Item:
         ant_toggle_var: str='',
     ):
         self.inst = inst
-        self.item_type = item_type
+        self.config = item_type
 
         # Associated indicator panels and antlines
         self.ind_panels = set(panels)  # type: Set[Entity]
@@ -533,7 +197,7 @@ class Item:
         assert self.name, 'Blank name!'
 
     def __repr__(self) -> str:
-        return '<Item {}: "{}">'.format(self.item_type.id, self.name)
+        return '<Item {}: "{}">'.format(self.config.id, self.name)
 
     @property
     def traits(self) -> Set[str]:
@@ -543,7 +207,7 @@ class Item:
     @property
     def is_logic(self) -> bool:
         """Check if the input type is a logic type."""
-        return self.item_type.input_type.is_logic
+        return self.config.input_type.is_logic
 
     @property
     def name(self) -> str:
@@ -557,39 +221,39 @@ class Item:
 
     def output_act(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output used when this is activated."""
-        if self.item_type.spawn_fire.valid(self) and self.is_logic:
+        if self.config.spawn_fire.valid(bool(self.inputs)) and self.is_logic:
             return None, 'OnUser2'
 
-        if self.item_type.input_type is InputType.DAISYCHAIN:
+        if self.config.input_type is InputType.DAISYCHAIN:
             if self.inputs:
-                return None, COUNTER_AND_ON
+                return None, consts.COUNTER_AND_ON
 
-        return self.item_type.output_act
+        return self.config.output_act
 
     def output_deact(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output to use when this is deactivated."""
-        if self.item_type.spawn_fire.valid(self) and self.is_logic:
+        if self.config.spawn_fire.valid(bool(self.inputs)) and self.is_logic:
             return None, 'OnUser1'
 
-        if self.item_type.input_type is InputType.DAISYCHAIN:
+        if self.config.input_type is InputType.DAISYCHAIN:
             if self.inputs:
-                return None, COUNTER_AND_OFF
+                return None, consts.COUNTER_AND_OFF
 
-        return self.item_type.output_deact
+        return self.config.output_deact
 
     def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
         """Return the output to use for starting timers."""
-        if self.item_type.timer_start is None:
+        if self.config.timer_start is None:
             out = self.output_act()
             return [] if out is None else [out]
-        return self.item_type.timer_start
+        return self.config.timer_start
 
     def timer_output_stop(self) -> List[Tuple[Optional[str], str]]:
         """Return the output to use for stopping timers."""
-        if self.item_type.timer_stop is None:
+        if self.config.timer_stop is None:
             out = self.output_deact()
             return [] if out is None else [out]
-        return self.item_type.timer_stop
+        return self.config.timer_stop
 
     def delete_antlines(self) -> None:
         """Delete the antlines and checkmarks outputting from this item."""
@@ -755,7 +419,7 @@ def read_configs(conf: Property) -> None:
     for prop in conf.find_children('Connections'):
         if prop.name in ITEM_TYPES:
             raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
-        ITEM_TYPES[prop.name] = ItemType.parse(prop.real_name, prop)
+        ITEM_TYPES[prop.name] = Config.parse(prop.real_name, prop)
 
     if 'item_indicator_panel' not in ITEM_TYPES:
         raise ValueError('No checkmark panel item type!')
@@ -858,7 +522,7 @@ def calc_connections(
         input_items: List[Item] = []  # Instances we trigger
         inputs: Dict[str, List[Output]] = defaultdict(list)
 
-        if item.inst.outputs and item.item_type is None:
+        if item.inst.outputs and item.config is None:
             raise ValueError(
                 'No connections for item "{}", '
                 'but outputs in the map!'.format(
@@ -874,7 +538,7 @@ def calc_connections(
 
         # Pre-set the timer value, for items without antlines but with an output.
         if consts.FixupVars.TIM_DELAY in item.inst.fixup:
-            if item.item_type.output_act or item.item_type.output_deact:
+            if item.config.output_act or item.config.output_deact:
                 item.timer = tim = item.inst.fixup.int(consts.FixupVars.TIM_DELAY)
                 if not (1 <= tim <= 30):
                     # These would be infinite.
@@ -911,7 +575,7 @@ def calc_connections(
                     raise ValueError('"{}" is not a known instance!'.format(out_name))
                 else:
                     input_items.append(inp_item)
-                    if inp_item.item_type is None:
+                    if inp_item.config is None:
                         raise ValueError(
                             'No connections for item "{}", '
                             'but inputs in the map!'.format(
@@ -924,7 +588,7 @@ def calc_connections(
             conn_type = ConnType.DEFAULT
             in_outputs = inputs[inp_item.name]
 
-            if inp_item.item_type.id == 'ITEM_TBEAM':
+            if inp_item.config.id == 'ITEM_TBEAM':
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:
@@ -971,7 +635,7 @@ def calc_connections(
 @conditions.make_result_setup('ChangeIOType')
 def res_change_io_type_parse(props: Property):
     """Pre-parse all item types into an anonymous block."""
-    return ItemType.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
+    return Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
 
 
 @conditions.make_result('ChangeIOType')
@@ -987,7 +651,7 @@ def res_change_io_type(inst: Entity, res: Property) -> None:
     except KeyError:
         raise ValueError('No item with name "{}"!'.format(inst['targetname']))
 
-    item.item_type = res.value
+    item.config = res.value
 
     # Overwrite these as well.
     item.enable_cmd = res.value.enable_cmd
@@ -1003,17 +667,17 @@ def do_item_optimisation(vmf: VMF) -> None:
 
     for item in list(ITEMS.values()):
         # We can't remove items that have functionality, or don't have IO.
-        if item.item_type is None or not item.item_type.input_type.is_logic:
+        if item.config is None or not item.config.input_type.is_logic:
             continue
 
         prim_inverted = conv_bool(conditions.resolve_value(
             item.inst,
-            item.item_type.invert_var,
+            item.config.invert_var,
         ))
 
         sec_inverted = conv_bool(conditions.resolve_value(
             item.inst,
-            item.item_type.sec_invert_var,
+            item.config.sec_invert_var,
         ))
 
         # Don't optimise if inverted.
@@ -1070,25 +734,25 @@ def gen_item_outputs(vmf: VMF) -> None:
     for item in ITEMS.values():
         for conn in item.outputs:
             # If not a dual item, it's primary.
-            if conn.to_item.item_type.input_type is not InputType.DUAL:
+            if conn.to_item.config.input_type is not InputType.DUAL:
                 conn.type = ConnType.PRIMARY
                 continue
             # If already set, that is the priority.
             if conn.type is not ConnType.DEFAULT:
                 continue
             # Our item set the type of outputs.
-            if item.item_type.output_type is not ConnType.DEFAULT:
-                conn.type = item.item_type.output_type
+            if item.config.output_type is not ConnType.DEFAULT:
+                conn.type = item.config.output_type
             else:
                 # Use the affinity of the target.
-                conn.type = conn.to_item.item_type.default_dual
+                conn.type = conn.to_item.config.default_dual
 
     do_item_optimisation(vmf)
 
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
-        if item.item_type is None:
+        if item.config is None:
             continue
 
         # Try to add the locking IO.
@@ -1096,10 +760,10 @@ def gen_item_outputs(vmf: VMF) -> None:
 
         # Check we actually have timers, and that we want the relay.
         if item.timer is not None and (
-            item.item_type.timer_sound_pos is not None or
-            item.item_type.timer_done_cmd
+            item.config.timer_sound_pos is not None or
+            item.config.timer_done_cmd
         ):
-            has_sound = item.item_type.force_timer_sound or len(item.ind_panels) > 0
+            has_sound = item.config.force_timer_sound or len(item.ind_panels) > 0
             add_timer_relay(item, has_sound)
 
         # Add outputs for antlines.
@@ -1112,7 +776,7 @@ def gen_item_outputs(vmf: VMF) -> None:
         # Special case - spawnfire items with no inputs need to fire
         # off the outputs. There's no way to control those, so we can just
         # fire it off.
-        if not item.inputs and item.item_type.spawn_fire is FeatureMode.ALWAYS:
+        if not item.inputs and item.config.spawn_fire is FeatureMode.ALWAYS:
             if item.is_logic:
                 # Logic gates need to trigger their outputs.
                 # Make a logic_auto temporarily for this to collect the
@@ -1125,7 +789,7 @@ def gen_item_outputs(vmf: VMF) -> None:
             else:
                 is_inverted = conv_bool(conditions.resolve_value(
                     item.inst,
-                    item.item_type.invert_var,
+                    item.config.invert_var,
                 ))
                 logic_auto = vmf.create_ent(
                     'logic_auto',
@@ -1147,7 +811,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                         )
                     )
 
-        if item.item_type.input_type is InputType.DUAL:
+        if item.config.input_type is InputType.DUAL:
             prim_inputs = [
                 conn
                 for conn in item.inputs
@@ -1165,7 +829,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 consts.FixupVars.BEE_CONN_COUNT_A,
                 item.enable_cmd,
                 item.disable_cmd,
-                item.item_type.invert_var,
+                item.config.invert_var,
             )
             add_item_inputs(
                 item,
@@ -1174,17 +838,17 @@ def gen_item_outputs(vmf: VMF) -> None:
                 consts.FixupVars.BEE_CONN_COUNT_B,
                 item.sec_enable_cmd,
                 item.sec_disable_cmd,
-                item.item_type.sec_invert_var,
+                item.config.sec_invert_var,
             )
         else:
             add_item_inputs(
                 item,
-                item.item_type.input_type,
+                item.config.input_type,
                 list(item.inputs),
                 consts.FixupVars.CONN_COUNT,
                 item.enable_cmd,
                 item.disable_cmd,
-                item.item_type.invert_var,
+                item.config.invert_var,
             )
 
     # Check/cross instances sometimes don't match the kind of timer delay.
@@ -1223,13 +887,13 @@ def add_locking(item: Item) -> None:
 
     This allows items to customise how buttons behave.
     """
-    if item.item_type.output_lock is None and item.item_type.output_unlock is None:
+    if item.config.output_lock is None and item.config.output_unlock is None:
         return
-    if item.item_type.input_type is InputType.DUAL:
+    if item.config.input_type is InputType.DUAL:
         LOGGER.warning(
             'Item type ({}) with locking IO, but dual inputs. '
             'Locking functionality is ignored!',
-            item.item_type.id
+            item.config.id
         )
         return
 
@@ -1241,13 +905,13 @@ def add_locking(item: Item) -> None:
 
     lock_button = lock_conn.from_item
 
-    if item.item_type.inf_lock_only and lock_button.timer is not None:
+    if item.config.inf_lock_only and lock_button.timer is not None:
         return
 
     # Check the button doesn't also activate other things -
     # we need exclusive control.
     # Also the button actually needs to be lockable.
-    if len(lock_button.outputs) != 1 or not lock_button.item_type.lock_cmd:
+    if len(lock_button.outputs) != 1 or not lock_button.config.lock_cmd:
         return
 
     instance_traits.get(item.inst).add('locking_targ')
@@ -1259,8 +923,8 @@ def add_locking(item: Item) -> None:
     item.ind_panels.clear()
 
     for output, input_cmds in [
-        (item.item_type.output_lock, lock_button.item_type.lock_cmd),
-        (item.item_type.output_unlock, lock_button.item_type.unlock_cmd)
+        (item.config.output_lock, lock_button.config.lock_cmd),
+        (item.config.output_unlock, lock_button.config.unlock_cmd)
     ]:
         if not output:
             continue
@@ -1293,8 +957,8 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         spawnflags=0,
     )
 
-    if item.item_type.timer_sound_pos:
-        relay_loc = item.item_type.timer_sound_pos.copy()
+    if item.config.timer_sound_pos:
+        relay_loc = item.config.timer_sound_pos.copy()
         relay_loc.localise(
             Vec.from_str(item.inst['origin']),
             Vec.from_str(item.inst['angles']),
@@ -1303,7 +967,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
     else:
         relay['origin'] = item.inst['origin']
 
-    for cmd in item.item_type.timer_done_cmd:
+    for cmd in item.config.timer_done_cmd:
         if cmd:
             relay.add_out(Output(
                 'OnTrigger',
@@ -1315,7 +979,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
                 times=cmd.times,
             ))
 
-    if item.item_type.timer_sound_pos is not None and has_sounds:
+    if item.config.timer_sound_pos is not None and has_sounds:
         timer_sound = options.get(str, 'timer_sound')
         timer_cc = options.get(str, 'timer_sound_cc')
 
@@ -1427,16 +1091,16 @@ def add_item_inputs(
                 'incompatible with dual inputs in item type {}! '
                 'This will not work well...',
                 item.name,
-                item.item_type.id,
+                item.config.id,
             )
 
         # Use the item type's output, we've overridden the normal one.
         item.add_io_command(
-            item.item_type.output_act,
+            item.config.output_act,
             counter, 'Add', '1',
         )
         item.add_io_command(
-            item.item_type.output_deact,
+            item.config.output_deact,
             counter, 'Subtract', '1',
         )
 
@@ -1493,7 +1157,7 @@ def add_item_inputs(
 
     # The relay allows cancelling the 'disable' output that fires shortly after
     # spawning.
-    if item.item_type.spawn_fire is not FeatureMode.NEVER:
+    if item.config.spawn_fire is not FeatureMode.NEVER:
         if logic_type.is_logic:
             # We have to handle gates specially, and make us the instance
             # so future evaluation applies to this.
@@ -1589,11 +1253,11 @@ def add_item_inputs(
             inp_item.add_io_command(inp_item.output_deact(), counter, 'Subtract', '1')
 
         if logic_type is InputType.AND:
-            count_on = COUNTER_AND_ON
-            count_off = COUNTER_AND_OFF
+            count_on = consts.COUNTER_AND_ON
+            count_off = consts.COUNTER_AND_OFF
         elif logic_type is InputType.OR:
-            count_on = COUNTER_OR_ON
-            count_off = COUNTER_OR_OFF
+            count_on = consts.COUNTER_OR_ON
+            count_off = consts.COUNTER_OR_OFF
         elif logic_type.is_logic:
             # We don't add outputs here, the outputted items do that.
             # counter is item.inst, so those are added to that.
@@ -1645,7 +1309,7 @@ def add_item_inputs(
 def add_item_indicators(
     item: Item,
     inst_type: PanelSwitchingStyle,
-    pan_item: ItemType,
+    pan_item: Config,
 ) -> None:
     """Generate the commands for antlines and the overlays themselves."""
     ant_name = '@{}_overlay'.format(item.name)
@@ -1669,8 +1333,8 @@ def add_item_indicators(
         needs_toggle = has_ant or has_sign
     elif inst_type is PanelSwitchingStyle.INTERNAL:
         if (
-            item.item_type.timer_start is not None or
-            item.item_type.timer_stop is not None
+            item.config.timer_start is not None or
+            item.config.timer_stop is not None
         ):
             # The item is doing custom control over the timer, so
             # don't tie antline control to the timer.

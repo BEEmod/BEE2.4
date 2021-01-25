@@ -2,18 +2,19 @@
 import itertools
 import math
 import os
+from typing import Optional
 
 from srctools import Vec, Property, VMF, Entity, Output
 import srctools.logger
 
-from precomp import instanceLocs, options
+from precomp import instanceLocs, options, connections
 from precomp.conditions import (
     meta_cond, make_result,
     PETI_INST_ANGLE, RES_EXHAUSTED,
     local_name,
     make_result_setup,
 )
-from precomp.connections import ITEMS, ItemType
+from connections import Config
 from precomp.fizzler import FIZZLERS, FIZZ_TYPES
 import utils
 import vbsp
@@ -140,16 +141,16 @@ def ap_tag_modifications(vmf: VMF):
 def res_make_tag_fizzler_setup(res: Property):
     """We need this to pre-parse the fizzler type."""
     if 'ioconf' in res:
-        fizz_type = ItemType.parse('<TAG_FIZZER>', res.find_key('ioconf'))
+        fizz_conn = Config.parse('<TAG_FIZZER>', res.find_key('ioconf'))
     else:
-        fizz_type = None
+        fizz_conn = None
 
     # The distance from origin the double signs are seperated by.
     sign_offset = res.int('signoffset', 16)
 
     return (
         sign_offset,
-        fizz_type,
+        fizz_conn,
         res['frame_double'],
         res['frame_single'],
         res['blue_sign', ''],
@@ -168,14 +169,14 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     """
     (
         sign_offset,
-        fizz_io_type,
+        fizz_conn_conf,
         inst_frame_double,
         inst_frame_single,
         blue_sign_on,
         blue_sign_off,
         oran_sign_on,
         oran_sign_off,
-    ) = res.value  # type: int, ItemType, str, str, str, str, str, str
+    ) = res.value  # type: int, Optional[connections.Config], str, str, str, str, str, str
     import vbsp
     if options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
@@ -186,7 +187,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     fizzler_item = None
 
     # Look for the fizzler instance we want to replace.
-    sign_item = ITEMS[inst['targetname']]
+    sign_item = connections.ITEMS[inst['targetname']]
     for conn in list(sign_item.outputs):
         if conn.to_item.name in FIZZLERS:
             if fizzler is None:
@@ -213,11 +214,12 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     fizzler.fizz_type = FIZZ_TYPES[TAG_FIZZ_ID]
 
     # And also swap the connection's type.
-    fizzler_item.item_type = fizz_io_type
-    fizzler_item.enable_cmd = fizz_io_type.enable_cmd
-    fizzler_item.disable_cmd = fizz_io_type.disable_cmd
-    fizzler_item.sec_enable_cmd = fizz_io_type.sec_enable_cmd
-    fizzler_item.sec_disable_cmd = fizz_io_type.sec_disable_cmd
+    if fizz_conn_conf is not None:
+        fizzler_item.config = fizz_conn_conf
+        fizzler_item.enable_cmd = fizz_conn_conf.enable_cmd
+        fizzler_item.disable_cmd = fizz_conn_conf.disable_cmd
+        fizzler_item.sec_enable_cmd = fizz_conn_conf.sec_enable_cmd
+        fizzler_item.sec_disable_cmd = fizz_conn_conf.sec_disable_cmd
 
     sign_loc = (
         # The actual location of the sign - on the wall

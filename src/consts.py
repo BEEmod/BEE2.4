@@ -13,6 +13,8 @@ __all__ = [
     'Goo', 'Fizzler',
     'Special', 'Tools',
     'FixupVars',
+    'COUNTER_AND_ON', 'COUNTER_AND_OFF',
+    'COUNTER_OR_ON', 'COUNTER_OR_OFF'
 ]
 
 
@@ -261,3 +263,12 @@ class MusicChannel(Enum):
     TBEAM = 'tbeam'  # Funnel audio
     BOUNCE = 'bouncegel'  # Jumping on repulsion gel.
     SPEED = 'speedgel'  # Moving fast horizontally
+
+
+# Outputs we need to use to make a math_counter act like
+# the specified logic gate.
+COUNTER_AND_ON = 'OnHitMax'
+COUNTER_AND_OFF = 'OnChangedFromMax'
+
+COUNTER_OR_ON = 'OnChangedFromMin'
+COUNTER_OR_OFF = 'OnHitMin'
