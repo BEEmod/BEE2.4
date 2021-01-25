@@ -7,8 +7,10 @@ from typing import (
 )
 from pathlib import PurePosixPath as FSPath
 
-from srctools import Vec, logger, conv_int, conv_bool
+from srctools import Vec, logger, conv_int, conv_bool, Property, Output
 from srctools.tokenizer import Tokenizer, Token
+
+from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, PROP_TYPES
 
 
@@ -211,6 +213,32 @@ class ConnTypes(Enum):
     FIZZ_BRUSH = 'CONNECTION_HAZARD_BRUSH'
     FIZZ_MODEL = 'CONNECTION_HAZARD_MODEL'  # Broken open/close input.
     FIZZ = 'CONNECTION_HAZARD'  # Output from base.
+
+
+class Connection(NamedTuple):
+    """Activate/deactivate pair defined for connections."""
+    act_name: Optional[str]
+    activate: str  # Input/ouput used to activate.
+    deact_name: Optional[str]
+    deactivate: str  # Input/ouput used to deactivate.
+
+    def write(self, f: IO[str], conn_type: str) -> None:
+        """Produce the activate/deactivate keys."""
+        if self.activate is None and self.deactivate is None:
+            return
+        f.write(f'\t\t\t"{conn_type}"\n')
+        f.write('\t\t\t\t{\n')
+        if self.activate is not None:
+            if self.act_name:
+                f.write(f'\t\t\t\t"Activate" "instance:{self.act_name};{self.activate}"\n')
+            else:
+                f.write(f'\t\t\t\t"Activate" "{self.activate}"\n')
+        if self.deactivate is not None:
+            if self.deact_name:
+                f.write(f'\t\t\t\t"Deactivate" "instance:{self.deact_name};{self.deactivate}"\n')
+            else:
+                f.write(f'\t\t\t\t"Deactivate" "{self.deactivate}"\n')
+        f.write('\t\t\t\t}\n')
 
 
 class InstCount(NamedTuple):
@@ -648,6 +676,39 @@ class Item:
         # Overlays automatically placed
         self.overlays: List[Overlay] = []
 
+        # Connection types that don't represent item I/O, like for droppers
+        # or fizzlers.
+        self.conn_inputs: Dict[ConnTypes, Connection] = {}
+        self.conn_outputs: Dict[ConnTypes, Connection] = {}
+
+        # The configuration for actual item I/O.
+        self.conn_config: Optional[ConnConfig] = None
+        # If we want to force this item to have inputs/outputs,
+        # like for linking together items.
+        self.force_input = self.force_output = False
+
+    def has_prim_input(self) -> bool:
+        """Check whether this item has a primary input."""
+        if self.force_input:
+            return True
+        if self.conn_config is None:
+            return False
+        return bool(self.conn_config.enable_cmd or self.conn_config.disable_cmd)
+
+    def has_sec_input(self) -> bool:
+        """Check whether this item has a secondary input."""
+        if self.conn_config is None:
+            return False
+        return bool(self.conn_config.sec_enable_cmd or self.conn_config.sec_disable_cmd)
+
+    def has_output(self) -> bool:
+        """Check whether this item has an output."""
+        if self.force_output:
+            return True
+        if self.conn_config is None:
+            return False
+        return self.conn_config.output_act is not None or self.conn_config.output_deact is not None
+
     @classmethod
     def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file."""
@@ -681,15 +742,14 @@ class Item:
 
         This expects the "Item" token to have been read already.
         """
+        connections = Property(None, [])
         tok.expect(Token.BRACE_OPEN)
         item: Item = cls('', ItemClass.UNCLASSED)
 
         for token, tok_value in tok:
             if token is Token.BRACE_CLOSE:
-                # Done, check we're not missing critical stuff.
-                if not item.id:
-                    raise tok.error('No item ID (Type) set!')
-                return item
+                # We're finished.
+                break
             elif token is Token.NEWLINE:
                 continue
             elif token is not Token.STRING:
@@ -712,14 +772,24 @@ class Item:
             elif tok_value == 'properties':
                 item._parse_properties_block(tok)
             elif tok_value == 'exporting':
-                item._parse_export_block(tok)
+                connections += item._parse_export_block(tok)
             elif tok_value in ('author', 'description', 'filter'):
                 # These are BEE2.2 values, which are not used.
                 tok.expect(Token.STRING)
             else:
                 raise tok.error('Unexpected item option "{}"!', tok_value)
+        else:
+            raise tok.error('File ended without closing item block!')
 
-        raise tok.error('File ended without closing item block!')
+        # Done, check we're not missing critical stuff.
+        if not item.id:
+            raise tok.error('No item ID (Type) set!')
+
+        # Parse the connections info, if it exists.
+        if connections or item.conn_inputs or item.conn_outputs:
+            item.conn_config = conf = ConnConfig.parse(item.id, connections)
+            item._finalise_connections()
+        return item
 
     # Boolean option in editor -> Item attribute.
     _BOOL_ATTRS = {
@@ -800,8 +870,12 @@ class Item:
             except ValueError:
                 raise tok.error('Default value {} is not valid for {} properties!', default, prop_type.id)
 
-    def _parse_export_block(self, tok: Tokenizer) -> None:
-        """Parse the export block of the item definitions."""
+    def _parse_export_block(self, tok: Tokenizer) -> Property:
+        """Parse the export block of the item definitions. This returns the parsed connections info."""
+        # Accumulate here, since we want to parse the input/output block
+        # together.
+        connection = Property(None, [])
+
         for key in tok.block('Exporting'):
             folded_key = key.casefold()
             if folded_key == 'targetname':
@@ -822,8 +896,13 @@ class Item:
                 self._parse_embed_faces(tok)
             elif folded_key == 'overlay':
                 self._parse_overlay(tok)
+            elif folded_key == 'inputs':
+                self._parse_connections(tok, connection, self.conn_inputs, '')
+            elif folded_key == 'outputs':
+                self._parse_connections(tok, connection, self.conn_outputs, 'out_')
             else:  # TODO: Temp, skip over other blocks.
                 # raise tok.error('Unknown export option "{}"!', key)
+                print('Unknown:', key)
                 level = 0
                 for token, tok_value in tok:
                     if token is Token.BRACE_OPEN:
@@ -832,6 +911,7 @@ class Item:
                         level -= 1
                         if level <= 0:
                             break
+        return connection
 
     def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
         """Parse a section in the instances block."""
@@ -883,6 +963,133 @@ class Item:
                 self.instances[inst_ind] = inst
         else:
             self.cust_instances[inst_name] = inst.inst
+
+    def _parse_connections(
+        self,
+        tok: Tokenizer,
+        prop_block: Property,
+        target: Dict[ConnTypes, Connection],
+        prefix: str,
+    ) -> None:
+        """Parse either an inputs or outputs block.
+
+        This is either a regular PeTI block with Activate/Deactivate options,
+        or the BEE2 block with custom options. In the latter case it's stored
+        in a property block for later parsing (since inputs/outputs need to
+        be combined).
+        """
+        for conn_name in tok.block('Connection'):
+            try:
+                conn_type = ConnTypes(conn_name.upper())
+            except ValueError:
+                # Our custom BEEmod options.
+                if conn_name.casefold() in ('bee', 'bee2'):
+                    for key in tok.block(conn_name):
+                        value = tok.expect(Token.STRING, skip_newline=False)
+                        if key.casefold() == 'force':
+                            value = value.casefold()
+                            if 'in' in value:
+                                self.force_input = True
+                            if 'out' in value:
+                                self.force_output = True
+                        else:
+                            prop_block.append(Property(prefix + key, value))
+                    continue  # We deal with this after the export block is done.
+                else:
+                    raise tok.error('Unknown connection type "{}"!', conn_name)
+
+            act_name: Optional[str] = None
+            activate: Optional[str] = None
+            deact_name: Optional[str] = None
+            deactivate: Optional[str] = None
+            for conn_key in tok.block(conn_name):
+                if conn_key.casefold() == 'activate':
+                    value = tok.expect(Token.STRING, skip_newline=False)
+                    tok.expect(Token.NEWLINE)
+                    act_name, activate = Output.parse_name(value)
+                elif conn_key.casefold() == 'deactivate':
+                    value = tok.expect(Token.STRING, skip_newline=False)
+                    tok.expect(Token.NEWLINE)
+                    deact_name, deactivate = Output.parse_name(value)
+                else:
+                    raise tok.error('Unknown option "{}"!', conn_key)
+            if activate is not None or deactivate is not None:
+                target[conn_type] = Connection(act_name, activate, deact_name, deactivate)
+
+    def _finalise_connections(self) -> None:
+        """Apply legacy outputs to the config, and do some verification."""
+        conf = self.conn_config
+        # If regular inputs or outputs are defined, convert to the new style.
+        if ConnTypes.NORMAL in self.conn_inputs:
+            conn = self.conn_inputs.pop(ConnTypes.NORMAL)
+            if conn.activate is not None:
+                conf.enable_cmd += ((conn.act_name, conn.activate),)
+            if conn.deactivate is not None:
+                conf.disable_cmd += ((conn.deact_name, conn.deactivate),)
+
+        if ConnTypes.POLARITY in self.conn_inputs:
+            if self.id.upper() != 'ITEM_TBEAM':
+                LOGGER.warning(
+                    'Item {} has polarity inputs, '
+                    'this only works for the actual funnel!',
+                    self.id
+                )
+            conn = self.conn_inputs.pop(ConnTypes.POLARITY)
+            if conn.activate is not None:
+                conf.sec_enable_cmd += ((conn.act_name, conn.activate),)
+            if conn.deactivate is not None:
+                conf.sec_disable_cmd += ((conn.deact_name, conn.deactivate),)
+
+        if ConnTypes.NORMAL in self.conn_outputs:
+            conn = self.conn_outputs.pop(ConnTypes.NORMAL)
+            if conn.activate is not None:
+                conf.output_act = (conn.act_name, conn.activate)
+            if conn.deactivate is not None:
+                conf.output_deact = (conn.deact_name, conn.deactivate)
+
+        has_prim_input = bool(conf.enable_cmd or conf.disable_cmd)
+        has_sec_input = bool(conf.sec_enable_cmd or conf.sec_disable_cmd)
+        has_output = conf.output_act is not None or conf.output_deact is not None
+
+        # Verify the configuration matches the input type.
+        if has_sec_input and conf.input_type is not InputType.DUAL:
+            LOGGER.warning('Item "{}" has a secondary input but is not DUAL type!', self.id)
+            conf.input_type = InputType.DUAL
+
+        if conf.input_type is InputType.DAISYCHAIN:
+            # We specify this.
+            if has_prim_input:
+                LOGGER.warning(
+                    'Item "{}" is set to daisychain input, '
+                    'but has inputs specified! These will be ignored.',
+                    self.id,
+                )
+                conf.enable_cmd = conf.disable_cmd = ()
+            # The item has an input, but the instance never gets it.
+            self.force_input = True
+            if not has_output:
+                LOGGER.warning(
+                    'Item "{}" is set to daisychain input, '
+                    'but has no output. This is useless.',
+                    self.id,
+                )
+        elif conf.input_type.is_logic:
+            if has_output:
+                LOGGER.warning(
+                    'Item "{}" is set to a logic I/O type, but has outputs specified. '
+                    'These will never be used.',
+                    self.id,
+                )
+                conf.output_act = conf.output_deact = None
+            if has_prim_input or has_sec_input:
+                LOGGER.warning(
+                    'Item "{}" is set to a logic I/O type, but has inputs specified. '
+                    'These will never be used.',
+                    self.id,
+                )
+                conf.enable_cmd = conf.sec_enable_cmd = conf.disable_cmd = conf.sec_disable_cmd = ()
+            # These logically always have both.
+            self.force_input = self.force_output = True
 
     def _parse_connection_points(self, tok: Tokenizer) -> None:
         for point_key in tok.block('ConnectionPoints'):
@@ -1065,6 +1272,40 @@ class Item:
         if self.targetname:
             f.write(f'\t\t"Targetname" "{self.targetname}"\n')
         f.write(f'\t\t"Offset"     "{self.offset}"\n')
+
+        has_prim_input = self.has_prim_input()
+        has_sec_input = self.has_sec_input()
+        has_output = self.has_output()
+        if has_prim_input or has_sec_input or self.conn_inputs:
+            f.write('\t\t"Inputs"\n\t\t\t{\n')
+            if has_prim_input:
+                f.write(f'\t\t\t"{ConnTypes.NORMAL.value}"\n')
+                f.write('\t\t\t\t{\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_ACT}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_DEACT}"\n')
+                f.write('\t\t\t\t}\n')
+            # Only add the tbeam input for actual funnels.
+            # It doesn't work there.
+            if has_sec_input and self.id.casefold() == 'item_tbeam':
+                f.write(f'\t\t\t"{ConnTypes.POLARITY.value}"\n')
+                f.write('\t\t\t\t{\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_SEC_ACT}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_SEC_DEACT}"\n')
+                f.write('\t\t\t\t}\n')
+            for conn_type, conn in self.conn_inputs.items():
+                conn.write(f, conn_type.value)
+            f.write('\t\t\t}\n')
+        if has_output or self.conn_outputs:
+            f.write('\t\t"Outputs"\n\t\t\t{\n')
+            if has_output:
+                f.write(f'\t\t\t"{ConnTypes.NORMAL.value}"\n')
+                f.write('\t\t\t\t{\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.OUT_ACT}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.OUT_DEACT}"\n')
+                f.write('\t\t\t\t}\n')
+            for conn_type, conn in self.conn_outputs.items():
+                conn.write(f, conn_type.value)
+            f.write('\t\t\t}\n')
 
         if self.embed_voxels:
             f.write('\t\t"EmbeddedVoxels"\n\t\t\t{\n')
