@@ -166,25 +166,17 @@ class Config:
         # (inst_name, output) commands for outputs.
         # If they are None, it's not used.
 
-        # Logic items have preset ones of these from the counter.
-        if input_type is InputType.AND_LOGIC:
-            self.output_act = (None, consts.COUNTER_AND_ON)
-            self.output_deact = (None, consts.COUNTER_AND_OFF)
-        elif input_type is InputType.OR_LOGIC:
-            self.output_act = (None, consts.COUNTER_OR_ON)
-            self.output_deact = (None, consts.COUNTER_OR_OFF)
-        else:  # Other types use the specified ones.
-            # Allow passing in an output with a blank command, to indicate
-            # no outputs.
-            if output_act == (None, ''):
-                self.output_act = None
-            else:
-                self.output_act = output_act
+        # Allow passing in an output with a blank command, to indicate
+        # no outputs.
+        if output_act == (None, ''):
+            self.output_act = None
+        else:
+            self.output_act = output_act
 
-            if output_deact == (None, ''):
-                self.output_deact = None
-            else:
-                self.output_deact = output_deact
+        if output_deact == (None, ''):
+            self.output_deact = None
+        else:
+            self.output_deact = output_deact
 
         # If set, automatically play tick-tock sounds when output is on.
         self.timer_sound_pos = timer_sound_pos

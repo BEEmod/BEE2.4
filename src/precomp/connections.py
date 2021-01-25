@@ -227,6 +227,10 @@ class Item:
         if self.config.input_type is InputType.DAISYCHAIN:
             if self.inputs:
                 return None, consts.COUNTER_AND_ON
+        elif self.config.input_type is InputType.AND_LOGIC:
+            return None, consts.COUNTER_AND_ON
+        elif self.config.input_type is InputType.OR_LOGIC:
+            return None, consts.COUNTER_OR_ON
 
         return self.config.output_act
 
@@ -238,6 +242,10 @@ class Item:
         if self.config.input_type is InputType.DAISYCHAIN:
             if self.inputs:
                 return None, consts.COUNTER_AND_OFF
+        elif self.config.input_type is InputType.AND_LOGIC:
+            return None, consts.COUNTER_AND_OFF
+        elif self.config.input_type is InputType.OR_LOGIC:
+            return None, consts.COUNTER_OR_OFF
 
         return self.config.output_deact
 
