@@ -1,5 +1,6 @@
 """Parses the Puzzlemaker's item format."""
-from enum import Enum, auto
+import itertools
+from enum import Enum, auto, Flag
 from typing import (
     Optional, Type, Callable, NamedTuple,
     List, Dict, Tuple, Set,
@@ -131,16 +132,27 @@ class FaceType(Enum):
     CHECK = CHECKERED = '4x4_checkered'
 
 
-class CollType(Enum):
+class CollType(Flag):
     """Types of collisions between items."""
-    GRATE = GRATING = auto()
-    GLASS = auto()
-    BRIDGE = auto()
-    FIZZLER = auto()
-    PHYSICS = auto()
-    ANTLINES = auto()
-    NOTHING = auto()
-    EVERYTHING = auto()
+    NOTHING =          0b0
+    SOLID =            0b1
+    GRATE = GRATING = 0b10
+    GLASS =          0b100
+    BRIDGE =        0b1000
+    FIZZLER =      0b10000
+    PHYSICS =     0b100000
+    ANTLINES =   0b1000000
+    EVERYTHING = 0b1111111
+
+    @classmethod
+    def parse(cls, tok: Tokenizer) -> 'CollType':
+        coll = cls.NOTHING
+        for part in tok.expect(Token.STRING).split():
+            try:
+                coll |= cls(part)
+            except ValueError:
+                tok.error('Unknown collision type "{}"!', part)
+        return coll
 
 
 class Sound(Enum):
@@ -368,6 +380,19 @@ class AntlinePoint(NamedTuple):
     sign_off: Coord
     priority: int
     group: Optional[int]
+
+
+class OccupiedVoxel(NamedTuple):
+    """Represents the collision information for an item.
+
+    If normal is not None, this is a side and not a cube.
+    If subpos is not None, this is a 32x32 cube and not a full voxel.
+    """
+    type: CollType
+    against: CollType
+    pos: Coord
+    subpos: Optional[Coord]
+    normal: Optional[Coord]
 
 
 def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[Tuple[Coord, Coord]]:
@@ -890,6 +915,8 @@ class Item:
                     self._parse_instance_block(tok, inst_name)
             elif folded_key == 'connectionpoints':
                 self._parse_connection_points(tok)
+            elif folded_key == 'occupiedvoxels':
+                self._parse_occupied_voxels(tok)
             elif folded_key == 'embeddedvoxels':
                 self._parse_embedded_voxels(tok)
             elif folded_key == 'embedface':
@@ -900,17 +927,8 @@ class Item:
                 self._parse_connections(tok, connection, self.conn_inputs, '')
             elif folded_key == 'outputs':
                 self._parse_connections(tok, connection, self.conn_outputs, 'out_')
-            else:  # TODO: Temp, skip over other blocks.
-                # raise tok.error('Unknown export option "{}"!', key)
-                print('Unknown:', key)
-                level = 0
-                for token, tok_value in tok:
-                    if token is Token.BRACE_OPEN:
-                        level += 1
-                    elif token is Token.BRACE_CLOSE:
-                        level -= 1
-                        if level <= 0:
-                            break
+            else:
+                raise tok.error('Unknown export option {}!', key)
         return connection
 
     def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
@@ -1122,6 +1140,40 @@ class Item:
                 raise tok.error('No signage position for connection point!')
             self.antline_points[direction].append(AntlinePoint(pos, sign_pos, priority, group_id))
 
+    def _parse_occupied_voxels(self, tok: Tokenizer) -> None:
+        """Parse occupied voxel definitions. We add on the volume variant for convienience."""
+        for occu_key in tok.block('OccupiedVoxels'):
+            collide_type = CollType.NOTHING  # Defaults
+            collide_against = CollType.NOTHING
+            pos1 = Coord(0, 0, 0)
+            pos2: Optional[Coord] = None
+            normal: Optional[Coord] = None
+
+            # If no directions are specified, this is a full voxel.
+            added_parts: List[OccupiedVoxel] = []
+            # Extension, specify pairs of subpos points to bounding box include
+            # all of them.
+            subpos_pairs: List[Coord] = []
+
+            occu_type = occu_key.casefold()
+            if occu_type not in ('voxel', 'surfacevolume', 'volume'):
+                raise tok.error('Unknown occupied voxel type {}!', occu_type)
+
+            for opt_key in tok.block(occu_key):
+                folded_key = opt_key.casefold()
+                if folded_key in ('pos', 'pos1'):
+                    pos1 = Coord.parse(tok.expect(Token.STRING), tok.error)
+                elif folded_key == 'pos2':
+                    pos2 = Coord.parse(tok.expect(Token.STRING), tok.error)
+                elif folded_key == 'collidetype':
+                    collide_type |= CollType.parse(tok)
+                elif folded_key == 'collideagainst':
+                    collide_against |= CollType.parse(tok)
+                elif folded_key == 'voxel':
+                    for vox_key in tok.block('Voxel'):
+                        pass
+
+
     def _parse_embedded_voxels(self, tok: Tokenizer) -> None:
         # There are two definition types here - a single voxel, or a whole bbox.
         for embed_key in tok.block('EmbeddedVoxels'):
@@ -1141,10 +1193,8 @@ class Item:
                 vol_x = range(min(pos_1.x, pos_2.x), max(pos_1.x, pos_2.x) + 1)
                 vol_y = range(min(pos_1.y, pos_2.y), max(pos_1.y, pos_2.y) + 1)
                 vol_z = range(min(pos_1.z, pos_2.z), max(pos_1.z, pos_2.z) + 1)
-                for x in vol_x:
-                    for y in vol_y:
-                        for z in vol_z:
-                            self.embed_voxels.add(Coord(x, y, z))
+                for x, y, z in itertools.product(vol_x, vol_y, vol_z):
+                    self.embed_voxels.add(Coord(x, y, z))
             elif folded_key == 'voxel':
                 # A single position.
                 for pos_key in tok.block('EmbeddedVoxel'):
