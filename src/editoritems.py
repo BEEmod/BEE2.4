@@ -1,10 +1,10 @@
 """Parses the Puzzlemaker's item format."""
-import itertools
-from enum import Enum, auto, Flag
+from collections import defaultdict
+from enum import Enum, Flag
 from typing import (
     Optional, Type, Callable, NamedTuple,
     List, Dict, Tuple, Set,
-    Iterable, IO, Iterator, Collection,
+    Iterable, IO, Iterator,
 )
 from pathlib import PurePosixPath as FSPath
 
@@ -133,16 +133,24 @@ class FaceType(Enum):
 
 
 class CollType(Flag):
-    """Types of collisions between items."""
+    """Types of collisions between items.
+
+    Physics is excluded from the generated piston collisions, if it
+    can move out of those locations.
+    """
     NOTHING =          0b0
     SOLID =            0b1
-    GRATE = GRATING = 0b10
+    GRATING =         0b10
     GLASS =          0b100
     BRIDGE =        0b1000
     FIZZLER =      0b10000
     PHYSICS =     0b100000
     ANTLINES =   0b1000000
     EVERYTHING = 0b1111111
+
+    GRATE = GRATING
+    # If unset, everything but physics collides.
+    DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 
     @classmethod
     def parse(cls, tok: Tokenizer) -> 'CollType':
@@ -153,6 +161,21 @@ class CollType(Flag):
             except KeyError:
                 raise tok.error('Unknown collision type "{}"!', part)
         return coll
+
+    def __str__(self) -> str:
+        """The string form is each of the names seperated by spaces."""
+        value = self.value
+        try:
+            return _coll_type_str[value]
+        except KeyError:
+            pass
+        names = []
+        for name, coll_type in COLL_TYPES.items():
+            if name != 'COLLIDE_EVERYTHING' and coll_type.value & value:
+                names.append(name)
+        names.sort()
+        res = _coll_type_str[value] = ' '.join(names)
+        return res
 
 
 class Sound(Enum):
@@ -267,6 +290,10 @@ class Coord(NamedTuple):
     y: int
     z: int
 
+    def __str__(self) -> str:
+        """The string form has no delimiters."""
+        return f'{self.x} {self.y} {self.z}'
+
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
         """Parse from a string, using the function to raise errors."""
@@ -335,6 +362,11 @@ NORMALS = {
     Coord(+1, 0, 0),
 }
 _coord_cache.update(zip(map(tuple, NORMALS), NORMALS))
+# Cache the computed value shapes.
+_coll_type_str: Dict[int, str] = {
+    CollType.NOTHING.value: 'COLLIDE_NOTHING',
+    CollType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
+}
 
 ITEM_CLASSES: Dict[str, ItemClass] = {
     cls.id.casefold(): cls
@@ -630,7 +662,7 @@ class SubType:
 
     def export(self, f: IO[str]) -> None:
         """Write the subtype to a file."""
-        f.write('\t\t"Subtype"\n\t\t\t{\n')
+        f.write('\t\t"SubType"\n\t\t\t{\n')
         if self.name:
             f.write(f'\t\t\t"Name" "{self.name}"\n')
         for model in self.models:
@@ -647,7 +679,7 @@ class SubType:
             x, y = self.pal_pos
             f.write(f'\t\t\t\t"Position" "{x} {y} 0"\n')
             f.write('\t\t\t\t}\n')
-        if self.sounds != DEFAULT_SOUNDS:
+        if self.sounds and self.sounds != DEFAULT_SOUNDS:
             f.write('\t\t\t"Sounds"\n\t\t\t\t{\n')
             for snd_type in Sound:
                 try:
@@ -1174,7 +1206,7 @@ class Item:
     def _parse_occupied_voxels(self, tok: Tokenizer) -> None:
         """Parse occupied voxel definitions. We add on the volume variant for convienience."""
         for occu_key in tok.block('OccupiedVoxels'):
-            collide_type = CollType.NOTHING  # Defaults
+            collide_type = CollType.DEFAULT
             collide_against = CollType.NOTHING
             pos1 = Coord(0, 0, 0)
             pos2: Optional[Coord] = None
@@ -1427,11 +1459,11 @@ class Item:
             for pos1, pos2 in bounding_boxes(self.embed_voxels):
                 if pos1 == pos2:
                     f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
-                    f.write(f'\t\t\t\t"Pos" "{pos1.x} {pos1.y} {pos1.z}"\n')
+                    f.write(f'\t\t\t\t"Pos" "{pos1}"\n')
                 else:
                     f.write('\t\t\t"Volume"\n\t\t\t\t{\n')
-                    f.write(f'\t\t\t\t"Pos1" "{pos1.x} {pos1.y} {pos1.z}"\n')
-                    f.write(f'\t\t\t\t"Pos2" "{pos2.x} {pos2.y} {pos2.z}"\n')
+                    f.write(f'\t\t\t\t"Pos1" "{pos1}"\n')
+                    f.write(f'\t\t\t\t"Pos2" "{pos2}"\n')
                 f.write('\t\t\t\t}\n')
             f.write('\t\t\t}\n')
 
@@ -1444,6 +1476,9 @@ class Item:
                 f.write(f'\t\t\t\t"Grid"       "{face.type.value}"\n')
                 f.write('\t\t\t\t}\n')
             f.write('\t\t\t}\n')
+
+        if self.occupy_voxels:
+            self._export_occupied_voxels(f)
 
         for over in self.overlays:
             f.write('\t\t"Overlay"\n\t\t\t{\n')
@@ -1469,9 +1504,9 @@ class Item:
 
                 for point in points:
                     f.write('\t\t\t"Point"\n\t\t\t\t{\n')
-                    f.write(f'\t\t\t\t"Dir"           "{side.value.x} {side.value.y} {side.value.z}"\n')
-                    f.write(f'\t\t\t\t"Pos"           "{point.pos.x} {point.pos.y} {point.pos.z}"\n')
-                    f.write(f'\t\t\t\t"SignageOffset" "{point.sign_off.x} {point.sign_off.y} {point.sign_off.z}"\n')
+                    f.write(f'\t\t\t\t"Dir"           "{side.value}"\n')
+                    f.write(f'\t\t\t\t"Pos"           "{point.pos}"\n')
+                    f.write(f'\t\t\t\t"SignageOffset" "{point.sign_off}"\n')
                     f.write(f'\t\t\t\t"Priority"      "{point.priority}"\n')
                     if point.group is not None:
                         f.write(f'\t\t\t\t"GroupID"       "{point.group}"\n')
@@ -1479,3 +1514,38 @@ class Item:
             f.write('\t\t\t}\n')
         f.write('\t\t}\n')
         f.write('\t}\n')
+
+    def _export_occupied_voxels(self, f: IO[str]) -> None:
+        """Write occupied voxels to a file."""
+        voxel_groups: Dict[Tuple[Coord, CollType, CollType], List[OccupiedVoxel]] = defaultdict(list)
+        voxel: OccupiedVoxel
+        voxels: List[OccupiedVoxel]
+        for voxel in self.occupy_voxels:
+            voxel_groups[voxel.pos, voxel.type, voxel.against].append(voxel)
+
+        f.write('\t\t"OccupiedVoxels"\n\t\t\t{\n')
+        for (pos, typ, against), voxels in voxel_groups.items():
+            f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
+            f.write(f'\t\t\t\t"Pos" "{pos}"\n')
+            if typ is not CollType.DEFAULT and against is not CollType.NOTHING:
+                f.write(f'\t\t\t\t"CollideType"    "{typ}"\n')
+                f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
+            elif typ is not CollType.DEFAULT:
+                f.write(f'\t\t\t\t"CollideType" "{typ}"\n')
+            elif against is not CollType.NOTHING:
+                f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
+            # Special case - single full voxel has no surface sections.
+            if len(voxels) != 1 or voxels[0].subpos is not None or voxels[0].normal is not None:
+                for voxel in voxels:
+                    f.write('\t\t\t\t"Voxel"\n')
+                    f.write('\t\t\t\t\t{\n')
+                    if voxel.subpos is not None and voxel.normal is not None:
+                        f.write(f'\t\t\t\t\t"Pos"    "{voxel.subpos}"\n')
+                        f.write(f'\t\t\t\t\t"Normal" "{voxel.normal}"\n')
+                    elif voxel.subpos is not None:
+                        f.write(f'\t\t\t\t\t"Pos" "{voxel.subpos}"\n')
+                    elif voxel.normal is not None:
+                        f.write(f'\t\t\t\t\t"Normal" "{voxel.normal}"\n')
+                    f.write('\t\t\t\t\t}\n')
+            f.write('\t\t\t\t}\n')
+        f.write('\t\t\t}\n')
