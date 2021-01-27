@@ -149,9 +149,9 @@ class CollType(Flag):
         coll = cls.NOTHING
         for part in tok.expect(Token.STRING).split():
             try:
-                coll |= cls(part)
-            except ValueError:
-                tok.error('Unknown collision type "{}"!', part)
+                coll |= COLL_TYPES[part.upper()]
+            except KeyError:
+                raise tok.error('Unknown collision type "{}"!', part)
         return coll
 
 
@@ -289,8 +289,23 @@ class Coord(NamedTuple):
             return _coord_cache[x, y, z]
         except KeyError:
             result = cls(x, y, z)
-            _coord_cache[result] = result
+            _coord_cache[x, y, z] = result
             return result
+
+    def bbox(self, other: 'Coord') -> Iterator['Coord']:
+        """Iterate through the points inside this bounding box."""
+        range_x = range(min(self.x, other.x), max(self.x, other.x) + 1)
+        range_y = range(min(self.y, other.y), max(self.y, other.y) + 1)
+        range_z = range(min(self.z, other.z), max(self.z, other.z) + 1)
+        for x in range_x:
+            for y in range_y:
+                for z in range_z:
+                    try:
+                        result = _coord_cache[x, y, z]
+                    except KeyError:
+                        result = Coord(x, y, z)
+                        _coord_cache[x, y, z] = result
+                    yield result
 
 
 class EmbedFace(NamedTuple):
@@ -311,6 +326,16 @@ class Overlay(NamedTuple):
 # Cache these coordinates, since most items are going to be near the origin.
 _coord_cache: Dict[Tuple[int, int, int], Coord] = {}
 
+NORMALS = {
+    Coord(0, 0, -1),
+    Coord(0, 0, +1),
+    Coord(0, -1, 0),
+    Coord(0, +1, 0),
+    Coord(-1, 0, 0),
+    Coord(+1, 0, 0),
+}
+_coord_cache.update(zip(map(tuple, NORMALS), NORMALS))
+
 ITEM_CLASSES: Dict[str, ItemClass] = {
     cls.id.casefold(): cls
     for cls in ItemClass
@@ -318,6 +343,10 @@ ITEM_CLASSES: Dict[str, ItemClass] = {
 FACE_TYPES: Dict[str, FaceType] = {
     face.value.casefold(): face
     for face in FaceType
+}
+COLL_TYPES: Dict[str, CollType] = {
+    'COLLIDE_' + coll.name: coll
+    for coll in CollType
 }
 
 # The defaults, if this is unset.
@@ -694,6 +723,8 @@ class Item:
         self.antline_points: Dict[ConnSide, List[AntlinePoint]] = {
             side: [] for side in ConnSide
         }
+        # The points this collides with.
+        self.occupy_voxels: Set[OccupiedVoxel] = set()
         # The voxels this hollows out inside the floor.
         self.embed_voxels: Set[Coord] = set()
         # Brushes automatically created
@@ -943,9 +974,9 @@ class Item:
                 inst_name = inst_name[5:]
             else:
                 LOGGER.warning(
-                    'Custom instance names should have bee2_ prefix (line '
+                    'Custom instance name "{}" should have bee2_ prefix (line '
                     '{}, file {})',
-                    tok.line_num, tok.filename)
+                    inst_name, tok.line_num, tok.filename)
         else:
             # Add blank spots if this is past the end.
             while inst_ind > len(self.instances):
@@ -1070,7 +1101,7 @@ class Item:
         has_output = conf.output_act is not None or conf.output_deact is not None
 
         # Verify the configuration matches the input type.
-        if has_sec_input and conf.input_type is not InputType.DUAL:
+        if has_sec_input and conf.input_type is not InputType.DUAL and self.id.upper() != 'ITEM_TBEAM':
             LOGGER.warning('Item "{}" has a secondary input but is not DUAL type!', self.id)
             conf.input_type = InputType.DUAL
 
@@ -1150,7 +1181,7 @@ class Item:
             normal: Optional[Coord] = None
 
             # If no directions are specified, this is a full voxel.
-            added_parts: List[OccupiedVoxel] = []
+            added_parts: Set[Tuple[Optional[Coord], Optional[Coord]]] = set()
             # Extension, specify pairs of subpos points to bounding box include
             # all of them.
             subpos_pairs: List[Coord] = []
@@ -1169,10 +1200,47 @@ class Item:
                     collide_type |= CollType.parse(tok)
                 elif folded_key == 'collideagainst':
                     collide_against |= CollType.parse(tok)
-                elif folded_key == 'voxel':
-                    for vox_key in tok.block('Voxel'):
-                        pass
+                elif folded_key == 'normal':
+                    normal = Coord.parse(tok.expect(Token.STRING), tok.error)
+                    if normal not in NORMALS:
+                        raise tok.error('{} is not a valid normal!', normal)
+                elif folded_key in ('subpos', 'subpos1', 'subpos2'):
+                    subpos_pairs.append(Coord.parse(tok.expect(Token.STRING), tok.error))
+                elif folded_key == 'surface':
+                    sub_normal: Optional[Coord] = None
+                    sub_pos: Optional[Coord] = None
+                    for surf_key in tok.block('Surface'):
+                        folded_key = surf_key.casefold()
+                        if folded_key == 'pos':
+                            sub_pos = Coord.parse(tok.expect(Token.STRING), tok.error)
+                        elif folded_key == 'normal':
+                            sub_normal = Coord.parse(tok.expect(Token.STRING), tok.error)
+                            if sub_normal not in NORMALS:
+                                raise tok.error('{} is not a valid normal!', sub_normal)
+                        else:
+                            raise tok.error('Unknown voxel surface option "{}"!', surf_key)
+                    added_parts.add((sub_pos, sub_normal))
+            if len(subpos_pairs) % 2 != 0:
+                raise tok.error('Subpos positions must be provided in pairs.')
+            for subpos1, subpos2 in zip(subpos_pairs[::2], subpos_pairs[1::2]):
+                for sub_pos in Coord.bbox(subpos1, subpos2):
+                    added_parts.add((sub_pos, normal))
 
+            if not added_parts:
+                # Default to a single voxel.
+                added_parts.add((None, None))
+            if pos2 is None:
+                volume = [pos1]
+            else:
+                volume = Coord.bbox(pos1, pos2)
+            for pos in volume:
+                for sub_pos, sub_normal in added_parts:
+                    self.occupy_voxels.add(OccupiedVoxel(
+                        collide_type,
+                        collide_against,
+                        pos,
+                        sub_pos, sub_normal,
+                    ))
 
     def _parse_embedded_voxels(self, tok: Tokenizer) -> None:
         # There are two definition types here - a single voxel, or a whole bbox.
@@ -1190,11 +1258,8 @@ class Item:
                         raise tok.error('Unknown volume key "{}"!', pos_key)
                 if pos_1 is None or pos_2 is None:
                     raise tok.error('Missing coordinate for volume!')
-                vol_x = range(min(pos_1.x, pos_2.x), max(pos_1.x, pos_2.x) + 1)
-                vol_y = range(min(pos_1.y, pos_2.y), max(pos_1.y, pos_2.y) + 1)
-                vol_z = range(min(pos_1.z, pos_2.z), max(pos_1.z, pos_2.z) + 1)
-                for x, y, z in itertools.product(vol_x, vol_y, vol_z):
-                    self.embed_voxels.add(Coord(x, y, z))
+                for pos in Coord.bbox(pos_1, pos_2):
+                    self.embed_voxels.add(pos)
             elif folded_key == 'voxel':
                 # A single position.
                 for pos_key in tok.block('EmbeddedVoxel'):
