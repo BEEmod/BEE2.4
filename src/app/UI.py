@@ -102,20 +102,20 @@ class Item:
         'url',
         ]
 
-    def __init__(self, item):
+    def __init__(self, item: packages.Item) -> None:
         self.ver_list = sorted(item.versions.keys())
 
         self.selected_ver = item_opts.get_val(
             item.id,
             'sel_version',
-            item.def_ver['id'],
+            item.def_ver.id,
         )
         # If the last-selected value doesn't exist, fallback to the default.
         if self.selected_ver not in item.versions:
-            self.selected_ver = item.def_ver['id']
+            self.selected_ver = item.def_ver.id
 
         self.item = item
-        self.def_data: packages.ItemVariant = self.item.def_ver['def_style']
+        self.def_data = self.item.def_ver.def_style
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(
             1 for _ in
@@ -138,12 +138,12 @@ class Item:
 
         self.load_data()
 
-    def load_data(self):
+    def load_data(self) -> None:
         """Load data from the item."""
         from app.tagsPane import Section
 
         version = self.item.versions[self.selected_ver]
-        self.data: packages.ItemVariant = version['styles'].get(
+        self.data = version.styles.get(
             selected_style,
             self.def_data,
         )
@@ -275,7 +275,7 @@ class Item:
         """Get a list of the names and corresponding IDs for the item."""
         # item folders are reused, so we can find duplicates.
         style_obj_ids = {
-            id(self.item.versions[ver_id]['styles'][selected_style])
+            id(self.item.versions[ver_id].styles[selected_style])
             for ver_id in self.ver_list
         }
         versions = self.ver_list
@@ -285,7 +285,7 @@ class Item:
             versions = self.ver_list[:1]
 
         return versions, [
-            self.item.versions[ver_id]['name']
+            self.item.versions[ver_id].name
             for ver_id in versions
         ]
 

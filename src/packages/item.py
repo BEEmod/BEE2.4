@@ -2,7 +2,7 @@ import operator
 import re
 from typing import (
     Optional, Union, Callable, Tuple, NamedTuple,
-    Dict, List, Iterable, Match,
+    Dict, List, Iterable, Match, Set, cast,
 )
 from srctools import FileSystem, Property, EmptyMapping
 import srctools.logger
@@ -240,7 +240,7 @@ class ItemVariant:
 
             if bee2_icon:
                 if is_extra:
-                    raise Exception(
+                    raise ValueError(
                         'Cannot specify BEE2 icons for hidden '
                         'editoritems blocks in {}!'.format(source)
                     )
@@ -305,6 +305,34 @@ class ItemVariant:
             return 1, prop.real_name
 
 
+class Version:
+    """Versions are a set of styles defined for an item.
+
+    If isolate is set, the default version will not be consulted for missing
+    styles.
+
+    During parsing, the styles are UnParsedItemVariant and def_style is the ID.
+    We convert that in setup_style_tree.
+    """
+    __slots__ = ['name', 'id', 'isolate', 'styles', 'def_style']
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        isolate: bool,
+        styles: Dict[str, ItemVariant],
+        def_style: Union[ItemVariant, Union[str, ItemVariant]],
+    ) -> None:
+        self.name = name
+        self.id = id
+        self.isolate = isolate
+        self.styles = styles
+        self.def_style = def_style
+
+    def __repr__(self) -> str:
+        return f'<Version "{self.id}">'
+
+
 class Item(PakObject):
     """An item in the editor..."""
     log_ent_count = False
@@ -312,8 +340,8 @@ class Item(PakObject):
     def __init__(
         self,
         item_id: str,
-        versions,
-        def_version,
+        versions: Dict[str, Version],
+        def_version: Version,
         needs_unlock: bool=False,
         all_conf: Optional[Property]=None,
         unstyled: bool=False,
@@ -325,7 +353,6 @@ class Item(PakObject):
         self.id = item_id
         self.versions = versions
         self.def_ver = def_version
-        self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
         # If set or set on a version, don't look at the first version
@@ -340,12 +367,11 @@ class Item(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse an item definition."""
-        versions = {}
-        def_version = None
+        versions: Dict[str, Version] = {}
+        def_version: Optional[Version] = None
         # The folders we parse for this - we don't want to parse the same
-        # one twice. First they're set to None if we need to read them,
-        # then parse_item_folder() replaces that with the actual values
-        folders: Dict[str, Optional[ItemVariant]] = {}
+        # one twice.
+        folders_to_parse: Set[str] = set()
         unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
@@ -363,13 +389,12 @@ class Item(PakObject):
         ))
 
         for ver in data.info.find_all('version'):
-            vals = {
-                'name':    ver['name', 'Regular'],
-                'id':      ver['ID', 'VER_DEFAULT'],
-                'styles':  {},
-                'isolate': ver.bool('isolated'),
-                'def_style': None,
-                }
+            ver_name = ver['name', 'Regular']
+            ver_id = ver['ID', 'VER_DEFAULT']
+            styles: Dict[str, ItemVariant] = {}
+            ver_isolate = ver.bool('isolated')
+            def_style = None
+
             for style in ver.find_children('styles'):
                 if style.has_children():
                     folder = UnParsedItemVariant(
@@ -397,14 +422,15 @@ class Item(PakObject):
                     )
                 # We need to parse the folder now if set.
                 if folder.folder:
-                    folders[folder.folder] = None
+                    folders_to_parse.add(folder.folder)
 
                 # The first style is considered the 'default', and is used
                 # if not otherwise present.
                 # We set it to the name, then lookup later in setup_style_tree()
-                if vals['def_style'] is None:
-                    vals['def_style'] = style.real_name
-                vals['styles'][style.real_name] = folder
+                if def_style is None:
+                    def_style = style.real_name
+                # It'll only be UnParsed during our parsing.
+                styles[style.real_name] = cast(ItemVariant, folder)
 
                 if style.real_name == folder.style:
                     raise ValueError(
@@ -413,28 +439,33 @@ class Item(PakObject):
                             data.id,
                             style.real_name,
                         ))
-            versions[vals['id']] = vals
+            versions[ver_id] = version = Version(
+                ver_id, ver_name, ver_isolate, styles, def_style,
+            )
 
             # The first version is the 'default',
             # so non-isolated versions will fallback to it.
             # But the default is isolated itself.
             if def_version is None:
-                def_version = vals
-                vals['isolate'] = True
+                def_version = version
+                version.isolate = True
 
         # Fill out the folders dict with the actual data
-        parse_item_folder(folders, data.fsys, data.pak_id)
+        parsed_folders = parse_item_folder(folders_to_parse, data.fsys, data.pak_id)
 
         # Then copy over to the styles values
         for ver in versions.values():
-            if ver['def_style'] in folders:
-                ver['def_style'] = folders[ver['def_style']]
-            for sty, fold in ver['styles'].items():
+            if isinstance(ver.def_style, str):
+                try:
+                    ver.def_style = parsed_folders[ver.def_style]
+                except KeyError:
+                    pass
+            for sty, fold in ver.styles.items():
                 if isinstance(fold, str):
-                    ver['styles'][sty] = folders[fold]
+                    ver.styles[sty] = parsed_folders[fold]
 
         if not versions:
-            raise ValueError('Item "' + data.id + '" has no versions!')
+            raise ValueError(f'Item "{data.id}" has no versions!')
 
         return cls(
             data.id,
@@ -450,7 +481,7 @@ class Item(PakObject):
             folders={
                 (data.fsys, folder): item_variant
                 for folder, item_variant in
-                folders.items()
+                parsed_folders.items()
             }
         )
 
@@ -466,8 +497,8 @@ class Item(PakObject):
                 # We don't have that version!
                 self.versions[ver_id] = version
             else:
-                our_ver = self.versions[ver_id]['styles']
-                for sty_id, style in version['styles'].items():
+                our_ver = self.versions[ver_id].styles
+                for sty_id, style in version.styles.items():
                     if sty_id not in our_ver:
                         # We don't have that style!
                         our_ver[sty_id] = style
@@ -500,12 +531,13 @@ class Item(PakObject):
 
         style_id = exp_data.selected_style.id
 
-        aux_item_configs = {
+        aux_item_configs: Dict[str, ItemConfig] = {
             conf.id: conf
             for conf in ItemConfig.all()
         }
 
-        for item in sorted(Item.all(), key=operator.attrgetter('id')):  # type: Item
+        item: Item
+        for item in sorted(Item.all(), key=operator.attrgetter('id')):
             ver_id = versions.get(item.id, 'VER_DEFAULT')
 
             (
@@ -515,13 +547,16 @@ class Item(PakObject):
             ) = item._get_export_data(
                 pal_list, ver_id, style_id, prop_conf,
             )
+            if 'replacements' in item_block or 'replacements' in editor_parts:
+                LOGGER.warning('Replacements in item "{}"\' editor data are deprecated.', item.id)
+
             editoritems += apply_replacements(item_block)
             editoritems += apply_replacements(editor_parts)
             vbsp_config += apply_replacements(config_part)
 
             # Add auxiliary configs as well.
             try:
-                aux_conf = aux_item_configs[item.id]  # type: ItemConfig
+                aux_conf = aux_item_configs[item.id]
             except KeyError:
                 pass
             else:
@@ -558,7 +593,7 @@ class Item(PakObject):
             if item == self.id
         }
 
-        item_data = self.versions[ver_id]['styles'][style_id]  # type: ItemVariant
+        item_data = self.versions[ver_id].styles[style_id]
 
         new_editor = item_data.editor.copy()
 
@@ -829,16 +864,17 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 
 
 def parse_item_folder(
-    folders: Dict[str, Union['ItemVariant', UnParsedItemVariant]],
+    folders_to_parse: Set[str],
     filesystem: FileSystem,
     pak_id: str,
-):
+) -> Dict[str, ItemVariant]:
     """Parse through the data in item/ folders.
 
     folders is a dict, with the keys set to the folder names we want.
     The values will be filled in with itemVariant values
     """
-    for fold in folders:
+    folders: Dict[str, ItemVariant] = {}
+    for fold in folders_to_parse:
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
@@ -925,7 +961,7 @@ def parse_item_folder(
             folders[fold].vbsp_config = conf = Property(None, [])
 
         set_cond_source(conf, folders[fold].source)
-
+    return folders
 
 def apply_replacements(conf: Property) -> Property:
     """Apply a set of replacement values to a config file, returning a new copy.

@@ -646,9 +646,9 @@ def parse_package(
 def setup_style_tree(
     item_data: Iterable['Item'],
     style_data: Iterable['Style'],
-    log_fallbacks,
-    log_missing_styles,
-):
+    log_fallbacks: bool,
+    log_missing_styles: bool,
+) -> None:
     """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each
@@ -686,10 +686,7 @@ def setup_style_tree(
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in item_data:
-        all_ver: List[Dict[str, Union[
-            Dict[str, Union[UnParsedItemVariant, ItemVariant]],
-            str
-        ]]] = list(item.versions.values())
+        all_ver = list(item.versions.values())
 
         # Move default version to the beginning, so it's read first.
         # that ensures it's got all styles set if we need to fallback.
@@ -700,7 +697,7 @@ def setup_style_tree(
             # We need to repeatedly loop to handle the chains of
             # dependencies. This is a list of (style_id, UnParsed).
             to_change: List[Tuple[str, UnParsedItemVariant]] = []
-            styles: Dict[str, Union[UnParsedItemVariant, ItemVariant]] = vers['styles']
+            styles: Dict[str, Union[UnParsedItemVariant, ItemVariant, None]] = vers.styles
             for sty_id, conf in styles.items():
                 to_change.append((sty_id, conf))
                 # Not done yet
@@ -710,16 +707,17 @@ def setup_style_tree(
             while to_change:
                 # Needs to be done next loop.
                 deferred = []
-                # filesys = FileSystem  # The original filesystem.
-                # folder = str  # If set, use the given folder from our package.
-                # style = str  # Inherit from a specific style (implies folder is None)
-                # config = Property  # Config for editing
+                # UnParsedItemVariant options:
+                # filesys: FileSystem  # The original filesystem.
+                # folder: str  # If set, use the given folder from our package.
+                # style: str  # Inherit from a specific style (implies folder is None)
+                # config: Property  # Config for editing
                 for sty_id, conf in to_change:
                     if conf.style:
                         try:
                             if ':' in conf.style:
                                 ver_id, base_style_id = conf.style.split(':', 1)
-                                start_data = item.versions[ver_id]['styles'][base_style_id]
+                                start_data = item.versions[ver_id].styles[base_style_id]
                             else:
                                 start_data = styles[conf.style]
                         except KeyError:
@@ -764,7 +762,7 @@ def setup_style_tree(
                         styles[sty_id] = start_data.modify(
                             conf.filesys,
                             conf.config,
-                            '<{}:{}.{}>'.format(item.id, vers['id'], sty_id),
+                            '<{}:{}.{}>'.format(item.id, vers.id, sty_id),
                         )
 
                 # If we defer all the styles, there must be a loop somewhere.
@@ -779,7 +777,7 @@ def setup_style_tree(
                 to_change = deferred
 
             # Fix this reference to point to the actual value.
-            vers['def_style'] = styles[vers['def_style']]
+            vers.def_style = styles[vers.def_style]
 
             for sty_id, style in all_styles.items():
                 if sty_id in styles:
@@ -815,9 +813,9 @@ def setup_style_tree(
                     # version. Note the default one is computed first,
                     # so it's guaranteed to have a value.
                     styles[sty_id] = (
-                        vers['def_style'] if
-                        item.isolate_versions or vers['isolate']
-                        else item.def_ver['styles'][sty_id]
+                        vers.def_style if
+                        item.isolate_versions or vers.isolate
+                        else item.def_ver.styles[sty_id]
                     )
 
 
@@ -1100,7 +1098,7 @@ def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> List[str]:
         if stripped
     ]
 
-from packages.item import Item, UnParsedItemVariant, ItemVariant, ItemConfig
+from packages.item import Item, UnParsedItemVariant, ItemVariant, ItemConfig, Version as ItemVersion
 from packages.stylevar import StyleVar
 from packages.elevator import Elevator
 from packages.editor_sound import EditorSound
