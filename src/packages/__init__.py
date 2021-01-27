@@ -175,14 +175,6 @@ VPK_FOLDER = {
 }
 
 
-class SignStyle(NamedTuple):
-    """Signage information for a specific style."""
-    world: str
-    overlay: str
-    icon: str
-    type: str
-
-
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
 
