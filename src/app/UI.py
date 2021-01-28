@@ -91,7 +91,7 @@ class Item:
         'item',
         'def_data',
         'data',
-        'num_sub',
+        'visual_subtypes',
         'authors',
         'tags',
         'filter_tags',
@@ -117,12 +117,16 @@ class Item:
 
         self.item = item
         self.def_data = self.item.def_ver.def_style
-        # These pieces of data are constant, only from the first style.
-        self.num_sub = len(self.def_data.editor.subtypes)
-        if not self.num_sub:
+        # The indexes of subtypes that are actually visible.
+        self.visual_subtypes = [
+            ind
+            for ind, sub in enumerate(self.def_data.editor.subtypes)
+            if sub.pal_name or sub.pal_icon
+        ]
+        if not self.visual_subtypes:
             # We need at least one subtype, otherwise something's wrong
             # with the file.
-            raise Exception('Item {} has no subtypes!'.format(item.id))
+            raise Exception('Item {} has no visible subtypes!'.format(item.id))
 
         self.authors = self.def_data.authors
         self.id = item.id
@@ -1111,10 +1115,10 @@ def set_palette(e=None):
             LOGGER.warning('Unknown item "{}"! for palette', item)
             continue
 
-        if sub >= item_group.num_sub:
+        if sub >= len(item_group.def_data.editor.subtypes):
             LOGGER.warning(
                 'Palette had incorrect subtype for "{}" ({} > {})!',
-                item, sub, item_group.num_sub - 1,
+                item, sub, len(item_group.def_data.editor.subtypes) - 1,
             )
             continue
 
