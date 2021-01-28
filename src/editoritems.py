@@ -840,29 +840,57 @@ class Item:
         assert self.instances[ind] is inst
 
     @classmethod
-    def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
-        """Parse an entire editoritems file."""
-        items: Dict[str, Item] = {}
+    def parse(
+        cls,
+        file: Iterable[str],
+        filename: Optional[str] = None,
+    ) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
+        """Parse an entire editoritems file.
+
+        The "ItemData" {} wrapper may optionally be included.
+        """
+        known_ids: Set[str] = set()
+        items: List[Item] = []
         icons: Dict[RenderableType, Renderable] = {}
         tok = Tokenizer(file, filename)
 
-        if tok.expect(Token.STRING).casefold() != 'itemdata':
-            raise tok.error('No "ItemData" block present!')
+        # Check for the itemdata header.
+        itemdata_header = False
+        for tok_type, tok_value in tok:
+            if tok_type is Token.STRING and tok_value == 'ItemData':
+                tok.expect(Token.BRACE_OPEN)
+                itemdata_header = True
+                break
+            elif tok_type is not Token.NEWLINE:
+                # Something else, no header is present.
+                tok.push_back(tok_type, tok_value)
+                break
 
-        for key in tok.block('ItemData'):
-            if key.casefold() == 'item':
+        for tok_type, tok_value in tok:
+            if tok_type is Token.NEWLINE:
+                continue
+            elif tok_type is Token.BRACE_CLOSE and itemdata_header:
+                break
+            elif tok_type is not Token.STRING:
+                raise tok.error(tok_type)
+
+            if tok_value.casefold() == 'item':
                 it = cls.parse_one(tok)
-                if it.id in items:
+                if it.id.casefold() in known_ids:
                     LOGGER.warning('Item {} redeclared!', it.id)
-                items[it.id] = it
-            elif key.casefold() == 'renderables':
+                known_ids.add(it.id.casefold())
+                items.append(it)
+            elif tok_value.casefold() == 'renderables':
                 for render_block in tok.block('Renderables'):
                     if render_block.casefold() != 'item':
                         raise tok.error('Unknown block "{}"!', render_block)
                     ico = Renderable.parse(tok)
                     icons[ico.type] = ico
             else:
-                raise tok.error('Unknown block "{}"!', key)
+                raise tok.error('Unknown block "{}"!', tok_value)
+        else:
+            if itemdata_header:
+                raise tok.error("ItemData block wasn't closed!")
 
         return items, icons
 

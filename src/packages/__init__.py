@@ -22,6 +22,9 @@ from typing import (
 
 
 # noinspection PyUnresolvedReferences
+from srctools.tokenizer import Tokenizer
+
+
 if TYPE_CHECKING:
     from app.gameMan import Game
     from loadScreen import LoadScreen
@@ -728,7 +731,8 @@ class Style(PakObject):
         self,
         style_id: str,
         selitem_data: 'SelitemData',
-        editor: Property,
+        items: List[EditorItem],
+        renderables: Dict[RenderableType, Renderable],
         config=None,
         base_style: Optional[str]=None,
         suggested: Tuple[str, str, str, str]=None,
@@ -738,7 +742,8 @@ class Style(PakObject):
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
-        self.editor = editor
+        self.items = items
+        self.renderables = renderables
         self.base_style = base_style
         # Set by post_parse() after all objects are read.
         # this is a list of this style, plus parents in order.
@@ -832,13 +837,15 @@ class Style(PakObject):
             # It's OK for override styles to be missing their 'folder'
             # value.
             if data.is_override:
-                items = Property(None, [])
+                items = []
+                renderables = {}
                 vbsp = None
             else:
-                raise ValueError('Style missing configuration!')
+                raise ValueError(f'Style "{data.id}" missing configuration folder "{folder}"!')
         else:
             with filesystem:
-                items = filesystem.read_prop(folder + '/items.txt')
+                with filesystem[folder + '/items.txt'].open_str() as f:
+                    items, renderables = EditorItem.parse(f)
                 try:
                     vbsp = filesystem.read_prop(folder + '/vbsp_config.cfg')
                 except FileNotFoundError:
@@ -847,7 +854,8 @@ class Style(PakObject):
         return cls(
             style_id=data.id,
             selitem_data=selitem_data,
-            editor=items,
+            items=items,
+            renderables=renderables,
             config=vbsp,
             base_style=base,
             suggested=sugg,
@@ -858,7 +866,8 @@ class Style(PakObject):
 
     def add_over(self, override: 'Style') -> None:
         """Add the additional commands to ourselves."""
-        self.editor += override.editor
+        self.items.extend(override.items)
+        self.renderables.update(override.renderables)
         self.config += override.config
         self.selitem_data += override.selitem_data
 
@@ -895,25 +904,15 @@ class Style(PakObject):
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'
 
-    def export(self) -> Tuple[Property, Property]:
+    def export(self) -> Tuple[List[EditorItem], Dict[RenderableType, Renderable], Property]:
         """Export this style, returning the vbsp_config and editoritems.
 
         This is a special case, since styles should go first in the lists.
         """
         vbsp_config = Property(None, [])
-
-        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
-        # "Renderables" sections.
-
-        editoritems = Property("ItemData", [])
-
-        # Only add the actual Item blocks,
-        # Renderables is added in gameMan specially.
-        # It must come last.
-        editoritems += self.editor.copy().find_all("Item")
         vbsp_config += self.config.copy()
 
-        return editoritems, vbsp_config
+        return style.items, style.renderables, vbsp_config
 
 
 def desc_parse(
