@@ -112,19 +112,13 @@ class Item:
         )
         # If the last-selected value doesn't exist, fallback to the default.
         if self.selected_ver not in item.versions:
+            LOGGER.warning('Version ID {} is not valid for item {}', self.selected_version, item.id)
             self.selected_ver = item.def_ver.id
 
         self.item = item
         self.def_data = self.item.def_ver.def_style
         # These pieces of data are constant, only from the first style.
-        self.num_sub = sum(
-            1 for _ in
-            self.def_data.editor.find_all(
-                "Editor",
-                "Subtype",
-                "Palette",
-                )
-            )
+        self.num_sub = len(self.def_data.editor.subtypes)
         if not self.num_sub:
             # We need at least one subtype, otherwise something's wrong
             # with the file.
@@ -147,12 +141,6 @@ class Item:
             selected_style,
             self.def_data,
         )
-        self.names = [
-            gameMan.translate(prop['name', ''])
-            for prop in
-            self.data.editor.find_all("Editor", "Subtype")
-            if prop['Palette', None] is not None
-        ]
         self.url = self.data.url
 
         # attributes used for filtering (tags, authors, packages...)
@@ -208,43 +196,32 @@ class Item:
 
     def properties(self):
         """Iterate through all properties for this item."""
-        for part in self.data.editor.find_all("Properties"):
-            for prop in part:
-                if not prop.bool('BEE2_ignore'):
-                    yield prop.name
+        for prop_name, prop in self.data.editor.properties.items():
+            if prop.allow_user_default:
+                yield prop_name
 
     def get_properties(self):
         """Return a dictionary of properties and the current value for them.
 
         """
         result = {}
-        for part in self.data.editor.find_all("Properties"):
-            for prop in part:
-                name = prop.name
+        for prop_name, prop in self.data.editor.properties.items():
+            if not prop.allow_user_default:
+                continue
 
-                if prop.bool('BEE2_ignore'):
-                    continue
-
-                # PROP_TYPES is a dict holding all the modifiable properties.
-                if name in PROP_TYPES:
-                    if name in result:
-                        LOGGER.warning(
-                            'Duplicate property "{}" in {}!',
-                            name,
-                            self.id
-                        )
-
-                    result[name] = item_opts.get_val(
-                        self.id,
-                        'PROP_' + name,
-                        prop["DefaultValue", ''],
-                    )
-                else:
-                    LOGGER.warning(
-                        'Unknown property "{}" in {}',
-                        name,
-                        self.id,
-                    )
+            # PROP_TYPES is a dict holding all the modifiable properties.
+            if prop_name in PROP_TYPES:
+                result[prop_name] = item_opts.get_val(
+                    self.id,
+                    'PROP_' + prop_name,
+                    prop.export(prop.default),
+                )
+            else:
+                LOGGER.warning(
+                    'Unknown property "{}" in {}',
+                    prop_name,
+                    self.id,
+                )
         return result
 
     def set_properties(self, props):
@@ -383,7 +360,7 @@ class PalItem(Label):
         """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
         try:
-            self.name = gameMan.translate(self.item.names[self.subKey])
+            self.name = gameMan.translate(self.item.data.editor.subtypes[self.subKey].name)
         except IndexError:
             LOGGER.warning(
                 'Item <{}> in <{}> style has mismatched subtype count!',
@@ -499,7 +476,7 @@ def save_load_selector_win(props: Property=None):
             pass
 
 
-def load_packages(data):
+def load_packages(data: dict):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -523,24 +500,24 @@ def load_packages(data):
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, 'Skybox', {
+        (sky_list, data['Skybox'], {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, 'QuotePack', {
+        (voice_list, data['QuotePack'], {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, 'Style', {
+        (style_list, data['Style'], {
             'VID': 'has_video',
         }),
-        (elev_list, 'Elevator', {
+        (elev_list, data['Elevator'], {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, name, attrs in obj_types:
+    for sel_list, obj_list, attrs in obj_types:
         attr_commands = [
             # cache the operator.attrgetter funcs
             (key, operator.attrgetter(value))
@@ -548,10 +525,7 @@ def load_packages(data):
         ]
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(
-                data[name],
-                key=operator.attrgetter('selitem_data.name'),
-                ):
+        for obj in sorted(obj_list, key=operator.attrgetter('selitem_data.name')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
@@ -1572,8 +1546,9 @@ def init_picker(f):
     items.sort(key=operator.attrgetter('pak_id'), reverse=True)
 
     for item in items:
-        for i in range(0, item.num_sub):
-            pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
+        for i, subtype in enumerate(item.data.editor.subtypes):
+            if subtype.pal_icon or subtype.pal_name:
+                pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     f.bind("<Configure>", flow_picker)
 

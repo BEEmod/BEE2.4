@@ -10,6 +10,7 @@ import utils
 from app.packageMan import PACK_CONFIG
 from srctools import Property, NoKeyError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+from editoritems import Item as EditorItem, Renderable, RenderableType
 import srctools.logger
 
 from typing import (
@@ -132,7 +133,8 @@ class ExportData(NamedTuple):
     selected: Any
     # Some items need to know which style is selected
     selected_style: 'Style'
-    editoritems: Property
+    all_items: List[EditorItem]  # All the items in the map
+    renderables: Dict[RenderableType, Renderable]  # The error/connection icons
     vbsp_conf: Property
     game: 'Game'
 
@@ -177,6 +179,28 @@ VPK_FOLDER = {
 
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
+
+
+class PackagePath:
+    """Represents a file located inside a specific package.
+
+    This can be either resolved later into a file object.
+    The string form is "package:path/to/file.ext", with <special> package names
+    reserved for app-specific usages (internal or generated paths)
+    """
+    __slots__ = ['package', 'path']
+    def __init__(self, pack_id: str, path: str) -> None:
+        self.package = pack_id.casefold()
+        self.path = path
+
+    @classmethod
+    def parse(cls, uri: str, def_package: str) -> 'PackagePath':
+        """Parse a string into a path. If a package isn't provided, the default is used."""
+        if ':' in uri:
+            return cls(*uri.split(':', 1))
+        else:
+            return cls(def_package, uri)
+
 
 T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')

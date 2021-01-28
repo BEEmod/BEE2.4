@@ -397,6 +397,7 @@ DEFAULT_SOUNDS = {
     Sound.CREATE: 'P2Editor.PlaceOther',
     Sound.DELETE: 'P2Editor.RemoveOther',
 }
+_BLANK_INST = [ InstCount(FSPath(), 0, 0, 0) ]
 
 
 class ConnSide(Enum):
@@ -593,6 +594,32 @@ class SubType:
         self.pal_name = pal_name
         self.pal_pos = pal_pos
         self.pal_icon = pal_icon
+
+    def copy(self) -> 'SubType':
+        """Duplicate this subtype."""
+        return SubType(
+            self.name,
+            self.models.copy(),
+            self.sounds.copy(),
+            self.anims.copy(),
+            self.pal_name,
+            self.pal_pos,
+            self.pal_icon,
+        )
+
+    __copy__ = copy
+
+    def __deepcopy__(self, memodict: Optional[dict] = None) -> 'SubType':
+        """Duplicate this subtype."""
+        return SubType(
+            self.name,
+            self.models.copy(),
+            self.sounds.copy(),
+            self.anims.copy(),
+            self.pal_name,
+            self.pal_pos,
+            self.pal_icon,
+        )
 
     @classmethod
     def parse(cls, tok: Tokenizer) -> 'SubType':
@@ -797,6 +824,21 @@ class Item:
             return False
         return self.conn_config.output_act is not None or self.conn_config.output_deact is not None
 
+    def set_inst(self, ind: int, inst: InstCount) -> None:
+        """Set the specified instance index, filling empty spaces in the list."""
+        inst_count = len(self.instances)
+        if ind < 0:
+            raise ValueError(f'Index must be positive, not {ind}!')
+        elif ind < inst_count:
+            self.instances[ind] = inst
+        elif ind == inst_count:
+            self.instances.append(inst)
+        else:
+            # Add blank spots.
+            self.instances += _BLANK_INST * (ind - inst_count)
+            self.instances.append(inst)
+        assert self.instances[ind] is inst
+
     @classmethod
     def parse(cls, file: Iterable[str], filename: Optional[str] = None) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file."""
@@ -954,7 +996,7 @@ class Item:
                 else:
                     raise tok.error('Unknown property option "{}"!', prop_value)
             try:
-                self.properties[prop_type.id] = prop_type(default, index, user_default)
+                self.properties[prop_type.id.casefold()] = prop_type(default, index, user_default)
             except ValueError:
                 raise tok.error('Default value {} is not valid for {} properties!', default, prop_type.id)
 
@@ -1004,15 +1046,12 @@ class Item:
             inst_ind = None
             if inst_name.casefold().startswith('bee2_'):
                 inst_name = inst_name[5:]
-            else:
-                LOGGER.warning(
-                    'Custom instance name "{}" should have bee2_ prefix (line '
-                    '{}, file {})',
-                    inst_name, tok.line_num, tok.filename)
-        else:
-            # Add blank spots if this is past the end.
-            while inst_ind > len(self.instances):
-                self.instances.append(InstCount(FSPath(), 0, 0, 0))
+            # else:
+            #     LOGGER.warning(
+            #         'Custom instance name "{}" should have bee2_ prefix (line '
+            #         '{}, file {})',
+            #         inst_name, tok.line_num, tok.filename)
+
         block_tok, inst_file = next(tok.skipping_newlines())
         if block_tok is Token.BRACE_OPEN:
             ent_count = brush_count = side_count = 0
@@ -1038,12 +1077,9 @@ class Item:
         else:
             raise tok.error(block_tok)
         if inst_ind is not None:
-            if inst_ind == len(self.instances):
-                self.instances.append(inst)
-            else:
-                self.instances[inst_ind] = inst
+            self.set_inst(inst_ind, inst)
         else:
-            self.cust_instances[inst_name] = inst.inst
+            self.cust_instances[inst_name.casefold()] = inst.inst
 
     def _parse_connections(
         self,
