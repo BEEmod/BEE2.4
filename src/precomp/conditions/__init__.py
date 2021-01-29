@@ -33,7 +33,7 @@ from enum import Enum
 
 from typing import (
     Callable, Any, Iterable, Optional,
-    Dict, List, Tuple, NamedTuple, TypeVar,
+    Dict, List, Tuple, TypeVar,
     Union,
     Set,
     TextIO,
@@ -43,11 +43,10 @@ from precomp import instanceLocs
 import consts
 import srctools.logger
 import utils
-from precomp.texturing import Portalable
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Side
+    VMF, Entity, Output, Solid
 )
 
 
@@ -69,9 +68,6 @@ ALL_FLAGS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, E
 ALL_RESULTS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
 ALL_META = []  # type: List[Tuple[str, Decimal, Callable[[srctools.VMF], None]]]
 
-# A template shaped like embeddedVoxel blocks
-TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
-
 
 class SWITCH_TYPE(Enum):
     """The methods useable for switch options."""
@@ -79,14 +75,6 @@ class SWITCH_TYPE(Enum):
     LAST = 'last'  # choose the last match
     RANDOM = 'random'  # Randomly choose
     ALL = 'all'  # Run all matching commands
-
-
-# For each class, a list of item IDs of that type.
-ITEMS_WITH_CLASS = defaultdict(list)  # type: Dict[consts.ItemClass, List[str]]
-# For each item Id, the item class for it.
-CLASS_FOR_ITEM = {}  # type: Dict[str, consts.ItemClass]
-# For each item ID, the positions they embed.
-EMBED_OFFSETS: Dict[str, List[Vec]] = {}
 
 
 xp = Vec_tuple(1, 0, 0)
@@ -618,41 +606,6 @@ def import_conditions() -> None:
         LOGGER.debug('Importing {} ...', module)
         importlib.import_module(module)
     LOGGER.info('Imported all conditions modules!')
-
-
-def build_itemclass_dict(prop_block: Property) -> None:
-    """Load in the item ID database.
-
-    This maps item IDs to their item class, and their embed locations.
-    """
-    for prop in prop_block.find_children('ItemClasses'):
-        try:
-            it_class = consts.ItemClass(prop.value)
-        except KeyError:
-            LOGGER.warning('Unknown item class "{}"', prop.value)
-            continue
-
-        ITEMS_WITH_CLASS[it_class].append(prop.name)
-        CLASS_FOR_ITEM[prop.name] = it_class
-
-    # Now load in the embed data.
-    for prop in prop_block.find_children('ItemEmbeds'):
-        if prop.name not in CLASS_FOR_ITEM:
-            LOGGER.warning('Unknown item ID with embeds "{}"!', prop.real_name)
-
-        vecs = EMBED_OFFSETS.setdefault(prop.name, [])
-        if ':' in prop.value:
-            first, last = prop.value.split(':')
-            bbox_min, bbox_max = Vec.bbox(Vec.from_str(first), Vec.from_str(last))
-            vecs.extend(Vec.iter_grid(bbox_min, bbox_max))
-        else:
-            vecs.append(Vec.from_str(prop.value))
-
-    LOGGER.info(
-        'Read {} item IDs, with {} embeds!',
-        len(ITEMS_WITH_CLASS),
-        len(EMBED_OFFSETS),
-    )
 
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''

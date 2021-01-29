@@ -8,12 +8,12 @@ import re
 from collections import defaultdict
 from functools import lru_cache
 
-from srctools import Property
+import editoritems
 import srctools.logger
 
 from typing import (
     Optional, Union,
-    List, Dict, Tuple, TypeVar
+    List, Dict, Tuple, TypeVar, Iterable,
 )
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -38,7 +38,7 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES: Dict[str, Dict[str, str]] = defaultdict(dict)
+CUST_INST_FILES: Dict[str, Dict[str, editoritems.FSPath]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
@@ -216,25 +216,25 @@ SPECIAL_INST_FOLDED = {
 }
 
 
-def load_conf(prop_block: Property):
+def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
-    # Extra definitions: key -> filename.
-    # Make sure to do this first, so numbered instances are set in
-    # ITEM_FOR_FILE.
-    for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.name] = special_inst = {}
-        for inst in prop:
-            file = inst.value.casefold()
-            special_inst[inst.name] = file
-            ITEM_FOR_FILE[file] = (prop.name, inst.name)
+    for item in items:
+        # Extra definitions: key -> filename.
+        # Make sure to do this first, so numbered instances are set in
+        # ITEM_FOR_FILE.
+        if item.cust_instances:
+            CUST_INST_FILES[item.id.casefold()] = cust_instances = {}
+            for name, file in item.cust_instances.items():
+                cust_instances[name] = str(file)
+                ITEM_FOR_FILE[str(file).casefold()] = (item.id, name)
 
-    # Normal instances: index -> filename
-    for prop in prop_block.find_key('Allinstances', []):
-        INSTANCE_FILES[prop.name] = inst_list = []
-        for ind, inst in enumerate(prop):
-            file = inst.value.casefold()
-            inst_list.append(file)
-            ITEM_FOR_FILE[file] = (prop.name, ind)
+        # Normal instances: index -> filename
+        INSTANCE_FILES[item.id.casefold()] = [
+            str(inst.inst).casefold()
+            for inst in item.instances
+        ]
+        for ind, inst in enumerate(item.instances):
+            ITEM_FOR_FILE[str(inst.inst).casefold()] = (item.id, ind)
 
     INST_SPECIAL.clear()
     INST_SPECIAL.update({

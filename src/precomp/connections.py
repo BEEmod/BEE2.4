@@ -15,6 +15,7 @@ from precomp import (
     packing,
     conditions,
 )
+import editoritems
 import consts
 import srctools.logger
 
@@ -422,12 +423,14 @@ def collapse_item(item: Item) -> None:
     item.inst.remove()
 
 
-def read_configs(conf: Property) -> None:
-    """Build our connection configuration from the config files."""
-    for prop in conf.find_children('Connections'):
-        if prop.name in ITEM_TYPES:
-            raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
-        ITEM_TYPES[prop.name] = Config.parse(prop.real_name, prop)
+def read_configs(all_items: Iterable[editoritems.Item]) -> None:
+    """Load our connection configuration from the config files."""
+    for item in all_items:
+        if item.conn_config is None:
+            continue
+        if item.id.casefold() in ITEM_TYPES:
+            raise ValueError('Duplicate item type "{}"'.format(item.id))
+        ITEM_TYPES[item.id.casefold()] = item.conn_config
 
     if 'item_indicator_panel' not in ITEM_TYPES:
         raise ValueError('No checkmark panel item type!')
