@@ -912,7 +912,7 @@ class Style(PakObject):
         vbsp_config = Property(None, [])
         vbsp_config += self.config.copy()
 
-        return style.items, style.renderables, vbsp_config
+        return self.items, self.renderables, vbsp_config
 
 
 def desc_parse(

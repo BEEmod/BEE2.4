@@ -4,7 +4,7 @@ from enum import Enum, Flag
 from typing import (
     Optional, Type, Callable, NamedTuple,
     List, Dict, Tuple, Set,
-    Iterable, IO, Iterator,
+    Iterable, IO, Iterator, Mapping,
 )
 from pathlib import PurePosixPath as FSPath
 
@@ -844,7 +844,7 @@ class Item:
         cls,
         file: Iterable[str],
         filename: Optional[str] = None,
-    ) -> Tuple[Dict[str, 'Item'], Dict[RenderableType, Renderable]]:
+    ) -> Tuple[List['Item'], Dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file.
 
         The "ItemData" {} wrapper may optionally be included.
@@ -1418,6 +1418,24 @@ class Item:
         if size is None:
             raise tok.error('No size specified for overlay!')
         self.overlays.append(Overlay(material, center, size, rotation))
+
+    @classmethod
+    def export(cls, f: IO[str], items: Iterable['Item'], renderables: Mapping[RenderableType, Renderable]) -> None:
+        """Write a full editoritems file out."""
+        f.write('"ItemData"\n{\n')
+        for item in items:
+            item.export_one(f)
+        if renderables:
+            f.write('\n\n"Renderables"\n\t{\n')
+            for rend_type, rend in renderables.items():
+                f.write('\t"Item"\n\t\t{\n')
+                f.write(f'\t\t"Type"  "{rend_type.value}')
+                f.write(f'\t\t"Model" "{rend.model}')
+                f.write('\t\t"Animations"\n\t\t\t{\n')
+                for anim, ind in rend.animations.items():
+                    f.write(f'\t\t\t"{anim.value}" "{ind}"\n')
+                f.write('\t\t\t}\n\t\t}\n')
+            f.write('\t}\n')
 
     def export_one(self, f: IO[str]) -> None:
         """Write a single item out to a file."""

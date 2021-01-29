@@ -218,7 +218,7 @@ class Item:
                 result[prop_name] = item_opts.get_val(
                     self.id,
                     'PROP_' + prop_name,
-                    prop.export(prop.default),
+                    prop.export(),
                 )
             else:
                 LOGGER.warning(

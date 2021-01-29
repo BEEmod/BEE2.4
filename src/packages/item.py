@@ -624,7 +624,7 @@ class Item(PakObject):
         for prop_name, prop in new_item.properties.items():
             if prop.allow_user_default:
                 try:
-                    prop.default = prop_overrides[prop_name.casefold()]
+                    prop.default = prop.parse_value(prop_overrides[prop_name.casefold()])
                 except KeyError:
                     pass
         return (
@@ -632,139 +632,6 @@ class Item(PakObject):
             # Add all_conf first so it's conditions run first by default
             self.all_conf + item_data.vbsp_config,
         )
-
-    @staticmethod
-    def convert_item_io(
-        comm_block: Property,
-        item: Property,
-        conv_peti_input: Callable[[Property, str, str], None]=lambda a, b, c: None,
-    ) -> Tuple[bool, bool, bool]:
-        """Convert editoritems configs with the new BEE2 connections format.
-
-        This produces (conf,  has_input, has_output, has_secondary):
-        The config block for instances.cfg, and if inputs, outputs, and the
-        secondary input are present.
-        """
-        item_id = comm_block.name
-        # Look in the Inputs and Outputs blocks to find the io definitions.
-        # Copy them to property names like 'Input_Activate'.
-        has_input = False
-        has_secondary = False
-        has_output = False
-
-        for prop in item.find_children('Exporting', 'Inputs', 'BEE2'):
-            comm_block.append(prop.copy())
-
-        for prop in item.find_children('Exporting', 'Outputs', 'BEE2'):
-            comm_block.append(prop.copy())
-
-        for block in item.find_all('Exporting', 'Inputs', CONN_NORM):
-            has_input = True
-            conv_peti_input(block, 'enable_cmd', 'activate')
-            conv_peti_input(block, 'disable_cmd', 'deactivate')
-        for block in item.find_all('Exporting', 'Outputs', CONN_NORM):
-            has_output = True
-            for io_prop in block:
-                comm_block['out_' + io_prop.name] = io_prop.value
-        # The funnel item type is special, having the additional input type.
-        # Handle that specially.
-        if item_id == 'item_tbeam':
-            for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
-                has_secondary = True
-                conv_peti_input(block, 'sec_enable_cmd', 'activate')
-                conv_peti_input(block, 'sec_disable_cmd', 'deactivate')
-
-        # For special situations, allow forcing that we have these.
-        force_io = ''
-        while 'force' in comm_block:
-            force_io = comm_block['force', ''].casefold()
-            del comm_block['force']
-        if 'in' in force_io:
-            has_input = True
-        if 'out' in force_io:
-            has_output = True
-
-        if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
-            has_input = True
-        inp_type = comm_block['type', ''].casefold()
-        if inp_type == 'dual':
-            has_secondary = True
-        elif inp_type == 'daisychain':
-            # We specify this.
-            if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
-                LOGGER.warning(
-                    'DAISYCHAIN items cannot have inputs specified.'
-                )
-            # The item has an input, but the instance never gets it.
-            has_input = True
-            if not has_output:
-                LOGGER.warning(
-                    'DAISYCHAIN items need an output to make sense!'
-                )
-        elif inp_type.endswith('_logic'):
-            if 'out_activate' in comm_block or 'out_deactivate' in comm_block:
-                LOGGER.warning(
-                    'AND_LOGIC or OR_LOGIC items cannot '
-                    'have outputs specified.'
-                )
-            if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
-                LOGGER.warning(
-                    'AND_LOGIC or OR_LOGIC items cannot '
-                    'have inputs specified.'
-                )
-            # These logically always have both.
-            has_input = has_output = True
-        elif 'out_activate' in comm_block or 'out_deactivate' in comm_block:
-            has_output = True
-        if item_id in (
-            'item_indicator_panel',
-            'item_indicator_panel_timer',
-            'item_indicator_toggle',
-        ):
-            # Force the antline instances to have inputs, so we can specify
-            # the real instance doesn't. We need the fake ones to match
-            # instances to items.
-            has_input = True
-
-        # Remove all the IO blocks from editoritems, and replace with
-        # dummy ones.
-        # Then remove the config blocks.
-        for io_type in ('Inputs', 'Outputs'):
-            for block in item.find_all('Exporting', io_type):
-                while CONN_NORM in block:
-                    del block[CONN_NORM]
-                while 'BEE2' in block:
-                    del block['BEE2']
-        if has_input:
-            item.ensure_exists('Exporting').ensure_exists('Inputs').append(
-                Property(CONN_NORM, [
-                    Property('Activate', 'ACTIVATE'),
-                    Property('Deactivate', 'DEACTIVATE'),
-                ])
-            )
-        # Add the secondary for funnels only.
-        if item_id.casefold() == 'item_tbeam':
-            if not has_secondary:
-                LOGGER.warning(
-                    "No dual input for TBeam, these won't function."
-                )
-            item.ensure_exists('Exporting').ensure_exists('Inputs').append(
-                Property(CONN_FUNNEL, [
-                    Property('Activate', 'ACTIVATE_SECONDARY'),
-                    Property('Deactivate', 'DEACTIVATE_SECONDARY'),
-                ])
-            )
-        # Fizzlers don't work correctly with outputs - we don't
-        # want it in editoritems.
-        if has_output and item['ItemClass', ''].casefold() != 'itembarrierhazard':
-            item.ensure_exists('Exporting').ensure_exists('Outputs').append(
-                Property(CONN_NORM, [
-                    Property('Activate', 'ON_ACTIVATED'),
-                    Property('Deactivate', 'ON_DEACTIVATED'),
-                ])
-            )
-        return has_input, has_output, has_secondary
-
 
 
 class ItemConfig(PakObject, allow_mult=True, has_img=False):
