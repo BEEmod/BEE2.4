@@ -586,7 +586,7 @@ class Item(PakObject):
         # Build a dictionary of this item's palette positions,
         # if any exist.
         palette_items = {
-            subitem: index
+            subitem: (index % 4, index // 4)
             for index, (item, subitem) in
             enumerate(pal_list)
             if item == self.id
@@ -609,10 +609,7 @@ class Item(PakObject):
                     if item_data.all_icon is not None:
                         subtype.pal_icon = item_data.all_icon
 
-                subtype.pal_pos = (
-                    palette_items[index] % 4,
-                    palette_items[index] // 4,
-                )
+                subtype.pal_pos = palette_items[index]
             else:
                 # This subtype isn't on the palette.
                 subtype.pal_icon = None
@@ -765,6 +762,11 @@ def parse_item_folder(
                     )
                     subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
 
+        try:
+            all_icon = FSPath(props['all_icon'])
+        except LookupError:
+            all_icon = None
+
         folders[fold] = ItemVariant(
             editoritems=first_item,
             editor_extra=extra_items,
@@ -785,7 +787,7 @@ def parse_item_folder(
                 props['icon', []]
             },
             all_name=props['all_name', None],
-            all_icon=props['all_icon', None],
+            all_icon=all_icon,
         )
 
         if Item.log_ent_count and not folders[fold].ent_count:
