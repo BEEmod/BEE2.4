@@ -2,6 +2,7 @@
 
 This controls how I/O is generated for each item.
 """
+import sys
 from enum import Enum
 from typing import Dict, Optional, Tuple, Iterable, List
 
@@ -88,6 +89,15 @@ class OutNames(str, Enum):
 
     OUT_ACT = 'ON_ACTIVATED'
     OUT_DEACT = 'ON_DEACTIVATED'
+
+
+def _intern_out(out: Optional[Tuple[Optional[str], str]]) -> Optional[Tuple[Optional[str], str]]:
+    if out is None:
+        return None
+    out_name, output = out
+    if out_name is not None:
+        out_name = sys.intern(out_name)
+    return out_name, output
 
 
 class Config:
@@ -328,3 +338,66 @@ class Config:
             timer_sound_pos, timer_done_cmd, force_timer_sound,
             timer_start, timer_stop,
         )
+
+    def __getstate__(self) -> tuple:
+        if self.timer_start is None:
+            timer_start = None
+        else:
+            timer_start = list(map(_intern_out, self.timer_start))
+        if self.timer_stop is None:
+            timer_stop = None
+        else:
+            timer_stop = list(map(_intern_out, self.timer_stop))
+
+        return (
+            self.id,
+            self.input_type,
+            sys.intern(self.invert_var),
+            self.spawn_fire,
+            self.enable_cmd,
+            self.disable_cmd,
+            self.default_dual,
+            sys.intern(self.sec_invert_var),
+            self.sec_enable_cmd,
+            self.sec_disable_cmd,
+            self.output_type,
+            _intern_out(self.output_act),
+            _intern_out(self.output_deact),
+            self.timer_sound_pos,
+            self.timer_done_cmd,
+            self.force_timer_sound,
+            timer_start,
+            timer_stop,
+            self.lock_cmd,
+            self.unlock_cmd,
+            self.inf_lock_only,
+            _intern_out(self.output_lock),
+            _intern_out(self.output_unlock),
+        )
+
+    def __setstate__(self, state: tuple) -> None:
+        (
+            self.id,
+            self.input_type,
+            self.invert_var,
+            self.spawn_fire,
+            self.enable_cmd,
+            self.disable_cmd,
+            self.default_dual,
+            self.sec_invert_var,
+            self.sec_enable_cmd,
+            self.sec_disable_cmd,
+            self.output_type,
+            self.output_act,
+            self.output_deact,
+            self.timer_sound_pos,
+            self.timer_done_cmd,
+            self.force_timer_sound,
+            self.timer_start,
+            self.timer_stop,
+            self.lock_cmd,
+            self.unlock_cmd,
+            self.inf_lock_only,
+            self.output_lock,
+            self.output_unlock,
+        ) = state

@@ -1,4 +1,5 @@
 """Parses the Puzzlemaker's item format."""
+import sys
 from collections import defaultdict
 from enum import Enum, Flag
 from typing import (
@@ -253,9 +254,9 @@ class ConnTypes(Enum):
 class Connection(NamedTuple):
     """Activate/deactivate pair defined for connections."""
     act_name: Optional[str]
-    activate: str  # Input/ouput used to activate.
+    activate: str  # Input/output used to activate.
     deact_name: Optional[str]
-    deactivate: str  # Input/ouput used to deactivate.
+    deactivate: str  # Input/output used to deactivate.
 
     def write(self, f: IO[str], conn_type: str) -> None:
         """Produce the activate/deactivate keys."""
@@ -620,6 +621,45 @@ class SubType:
             self.pal_pos,
             self.pal_icon,
         )
+
+    def __getstate__(self) -> object:
+        if self.pal_pos is None:
+            x, y = -1, -1
+        else:
+            x, y = self.pal_pos
+
+        anim = [self.anims.get(anim, -1) for anim in Anim]
+        while anim and anim[-1] == -1:  # Remove any -1 from the end.
+            anim.pop()
+
+        return (
+            self.name,
+            list(map(str, self.models)),
+            # These are mostly the same, intern so it deduplicates.
+            [sys.intern(self.sounds.get(snd, None)) for snd in Sound],
+            anim,
+            self.pal_name,
+            x, y,
+            self.pal_icon,
+        )
+
+    def __setstate__(self, state: tuple) -> None:
+        self.name, mdls, snds, anims, self.pal_name, x, y, self.pal_icon = state
+        self.models = list(map(FSPath, mdls))
+        self.sounds = {
+            snd: sndscript
+            for snd, sndscript in zip(Sound, snds)
+            if sndscript is not None
+        }
+        self.anims = {
+            anim: ind
+            for anim, ind in zip(Anim, anims)
+            if ind != -1
+        }
+        if x >= 0 and y >= 0:
+            self.pal_pos = x, y
+        else:
+            self.pal_pos = None
 
     @classmethod
     def parse(cls, tok: Tokenizer) -> 'SubType':
@@ -1631,3 +1671,82 @@ class Item:
                     f.write('\t\t\t\t\t}\n')
             f.write('\t\t\t\t}\n')
         f.write('\t\t\t}\n')
+
+    def __getstate__(self) -> tuple:
+        """Simplify pickles.
+
+        We produce a tuple to avoid needing to specify the attributes in the file.
+        We can also eliminate some dict keys since they're constant.
+        """
+        return (
+            self.id,
+            self.cls,
+            self.subtype_prop,
+            self.subtypes,
+            list(self.properties.values()),
+            self.animations,
+            self.handle,
+            self.facing,
+            self.invalid_surf,
+            self.anchor_barriers,
+            self.anchor_goo,
+            self.occupies_voxel,
+            self.copiable,
+            self.deletable,
+            self.pseduo_handle,
+            self.offset,
+            self.targetname,
+            self.instances,
+            self.cust_instances,
+            [self.antline_points[side] for side in ConnSide],
+            self.occupy_voxels,
+            self.embed_voxels,
+            self.embed_faces,
+            self.overlays,
+            self.conn_inputs,
+            self.conn_outputs,
+            self.conn_config,
+            self.force_input,
+            self.force_output,
+        )
+
+    def __setstate__(self, state: tuple) -> None:
+        (
+            self.id,
+            self.cls,
+            self.subtype_prop,
+            self.subtypes,
+            props,
+            self.animations,
+            self.handle,
+            self.facing,
+            self.invalid_surf,
+            self.anchor_barriers,
+            self.anchor_goo,
+            self.occupies_voxel,
+            self.copiable,
+            self.deletable,
+            self.pseduo_handle,
+            self.offset,
+            self.targetname,
+            self.instances,
+            self.cust_instances,
+            antline_points,
+            self.occupy_voxels,
+            self.embed_voxels,
+            self.embed_faces,
+            self.overlays,
+            self.conn_inputs,
+            self.conn_outputs,
+            self.conn_config,
+            self.force_input,
+            self.force_output,
+        ) = state
+        props: List[ItemProp]
+        antline_points: List[List[AntlinePoint]]
+
+        self.properties = {
+            prop.id: prop
+            for prop in props
+        }
+        self.antline_points = dict(zip(ConnSide, antline_points))

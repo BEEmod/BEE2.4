@@ -50,6 +50,13 @@ class ItemProp(Generic[ValueT]):
     def parse_value(self, value: str) -> ValueT:
         return self._parse_value(value)
 
+    def __getstate__(self):
+        """All the properties have the same attributes."""
+        return (self.default, self.index, self.allow_user_default)
+
+    def __setstate__(self, state):
+        (self.default, self.index, self.allow_user_default) = state
+
     # Subclasses should implement the following:
 
     @staticmethod
