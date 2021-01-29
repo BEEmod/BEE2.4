@@ -329,6 +329,9 @@ class PistonLowerExtent(ItemProp[int]):
 
     @staticmethod
     def _parse_value(value: str) -> int:
+        # Bug, previous versions mistakenly wrote rounded floats.
+        if value.endswith('.0'):
+            value = value[:-2]
         try:
             pos = int(value)
             if 0 <= pos < 4:
@@ -346,6 +349,9 @@ class PistonUpperExtent(ItemProp[int]):
 
     @staticmethod
     def _parse_value(value: str) -> int:
+        # Bug, previous versions mistakenly wrote rounded floats.
+        if value.endswith('.0'):
+            value = value[:-2]
         try:
             pos = int(value)
             if 0 < pos <= 4:
