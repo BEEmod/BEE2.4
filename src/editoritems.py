@@ -611,7 +611,11 @@ class SubType:
     __copy__ = copy
 
     def __deepcopy__(self, memodict: Optional[dict] = None) -> 'SubType':
-        """Duplicate this subtype."""
+        """Duplicate this subtype.
+
+        We don't need to deep-copy the contents of the containers,
+        since they're all immutable.
+        """
         return SubType(
             self.name,
             self.models.copy(),
@@ -1469,13 +1473,14 @@ class Item:
             f.write('\n\n"Renderables"\n\t{\n')
             for rend_type, rend in renderables.items():
                 f.write('\t"Item"\n\t\t{\n')
-                f.write(f'\t\t"Type"  "{rend_type.value}')
-                f.write(f'\t\t"Model" "{rend.model}')
+                f.write(f'\t\t"Type"  "{rend_type.value}"\n')
+                f.write(f'\t\t"Model" "{rend.model}"\n')
                 f.write('\t\t"Animations"\n\t\t\t{\n')
                 for anim, ind in rend.animations.items():
                     f.write(f'\t\t\t"{anim.value}" "{ind}"\n')
                 f.write('\t\t\t}\n\t\t}\n')
             f.write('\t}\n')
+        f.write('}\n')
 
     def export_one(self, f: IO[str]) -> None:
         """Write a single item out to a file."""

@@ -11,7 +11,7 @@ ValueT = TypeVar('ValueT')
 
 class ItemProp(Generic[ValueT]):
     """A property for an item."""
-    id: ClassVar[str]  # Property name for this.
+    id: ClassVar[str]  # Property name for this. This is case-sensitive!
     trans_name: ClassVar[str]  # The translation keyword for this, if it exists.
     instvar: ClassVar[str]  # The instance variable this sets, if any.
     # All the possible values this can have, if used as a subtype.
@@ -218,7 +218,7 @@ class StartLocked(_BoolProp):
 
 class Portalability(_BoolProp):
     """Specifies if the flip panel starts portalable."""
-    id = 'portalable'
+    id = 'Portalable'
     instvar = '$start_deployed'
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_portalable'
 
@@ -262,7 +262,7 @@ class CubeFallStraightDown(_BoolProp):
 
     This is always disabled.
     """
-    id = 'itemfallstraightdown'
+    id = 'ItemFallStraightDown'
     instvar = '$item_fall_straight_down'
     trans_name = ''
 
@@ -458,7 +458,7 @@ class PaintAllowStreaks(_BoolProp):
 
     This actually exports either 0.35 or 0 to the instvar.
     """
-    id = 'allowstreak'
+    id = 'AllowStreak'
     instvar = '$streak_time'
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'
 
@@ -566,7 +566,7 @@ class FaithTargetName(_InternalStrProp):
 
     However, this never does anything.
     """
-    id = 'Targetname'
+    id = 'TargetName'
     instvar = ''
 
 
@@ -626,7 +626,7 @@ class ButtonTypeProp(_EnumProp[ButtonTypes]):
 
 class FizzlerTypeProp(_EnumProp[FizzlerTypes]):
     """Type of fizzlers."""
-    id = 'hazardtype'
+    id = 'HazardType'
     instvar = '$skin'
     trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_barrier_hazard_type'
     subtype_values = list(FizzlerTypes)

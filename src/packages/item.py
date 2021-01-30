@@ -204,7 +204,11 @@ class ItemVariant:
     ) -> EditorItem:
         """Modify either the base or extra editoritems block."""
         is_extra = editor is not self.editor
+        # We can share a lot of the data, if it isn't changed and we take
+        # care to copy modified parts.
         editor = copy.copy(editor)
+        if 'Palette' in props:
+            editor.subtypes = editor.subtypes.copy()
 
         # Implement overriding palette items
         for item in props.find_children('Palette'):
@@ -241,13 +245,14 @@ class ItemVariant:
             editor.subtypes[subtype_ind] = subtype = copy.deepcopy(subtype)
 
             # Overriding model data.
-            subtype.models.clear()
-            for prop in item:
-                if prop.name in ('models', 'model'):
-                    if prop.has_children():
-                        subtype.models.extend([FSPath(subprop.value) for subprop in prop])
-                    else:
-                        subtype.models.append(FSPath(prop.value))
+            if 'models' in item or 'model' in item:
+                subtype.models = []
+                for prop in item:
+                    if prop.name in ('models', 'model'):
+                        if prop.has_children():
+                            subtype.models.extend([FSPath(subprop.value) for subprop in prop])
+                        else:
+                            subtype.models.append(FSPath(prop.value))
 
             if item['name', None]:
                 subtype.name = item['name']  # Name for the subtype
