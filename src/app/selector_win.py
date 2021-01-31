@@ -453,6 +453,7 @@ class selWin:
             desc=none_desc,
             attributes=dict(none_attrs),
         )
+        self.noneItem.context_lbl = none_name
 
         # The textbox on the parent window.
         self.display: Optional[tk_tools.ReadOnlyEntry] = None
@@ -737,97 +738,11 @@ class selWin:
         # Make a font for previewing the suggested item
         self.mouseover_font = self.norm_font.copy()
         self.mouseover_font['slant'] = tk_font.ITALIC
-        self.context_var = IntVar()
 
         # The headers for the context menu
         self.context_menus: Dict[str, Menu] = {}
-
-        # Sort alphabetically, preferring a sort key if present.
-        self.item_list.sort(key=lambda it: it.sort_key or it.longName)
-
-        for ind, item in enumerate(self.item_list):
-            item._selector = self
-
-            if item == self.noneItem:
-                item.button = ttk.Button(
-                    self.pal_frame,
-                    image=item.icon,
-                )
-                item.context_lbl = none_name
-            else:
-                item.button = ttk.Button(
-                    self.pal_frame,
-                    text=item.shortName,
-                    image=item.icon,
-                    compound='top',
-                )
-
-            group_key = item.group.casefold()
-            self.grouped_items[group_key].append(item)
-
-            if group_key not in self.group_names:
-                # If the item is groupless, use 'Other' for the header.
-                self.group_names[group_key] = item.group or _('Other')
-
-            if not item.group:
-                # Ungrouped items appear directly in the menu.
-                menu = self.context_menus[''] = self.context_menu
-            else:
-                try:
-                    menu = self.context_menus[group_key]
-                except KeyError:
-                    self.context_menus[group_key] = menu = Menu(
-                        self.context_menu,
-                    )
-
-            menu.add_radiobutton(
-                label=item.context_lbl,
-                command=functools.partial(self.sel_item_id, item.name),
-                var=self.context_var,
-                value=ind,
-            )
-            item._context_ind = len(self.grouped_items[group_key]) - 1
-
-            @utils.bind_leftclick(item.button)
-            def click_item(event=None, *, _item=item):
-                """Handle clicking on the item.
-
-                If it's already selected, save and close the window.
-                """
-                # We need to capture the item in a default, since it's
-                # the same variable in different iterations
-                if _item is self.selected:
-                    self.save()
-                else:
-                    self.sel_item(_item)
-
-        # Convert to a normal dictionary, after adding all items.
-        self.grouped_items = dict(self.grouped_items)
-
-        # Figure out the order for the groups - alphabetical.
-        # Note - empty string should sort to the beginning!
-        self.group_order[:] = sorted(self.grouped_items.keys())
-
-        for index, (key, menu) in enumerate(
-                sorted(self.context_menus.items(), key=itemgetter(0)),
-                # We start with the ungrouped items, so increase the index
-                # appropriately.
-                start=len(self.grouped_items.get('', ()))):
-            if key == '':
-                # Don't add the ungrouped menu to itself!
-                continue
-            self.context_menu.add_cascade(
-                menu=menu,
-                label=self.group_names[key],
-            )
-            # Set a custom attribute to keep track of the menu's index.
-            menu._context_index = index
-
-        for group_key, text in self.group_names.items():
-            self.group_widgets[group_key] = GroupHeader(
-                self,
-                text,
-            )
+        # The widget used to control which menu option is selected.
+        self.context_var = StringVar()
 
         self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
@@ -891,7 +806,7 @@ class selWin:
         else:
             self.attr = self.desc_label = None
 
-        self.flow_items()
+        self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
     def widget(self, frame: Misc) -> ttk.Entry:
@@ -960,6 +875,104 @@ class selWin:
         self.disp_btn.state(new_st)
         self.display.state(new_st)
 
+    def refresh(self) -> None:
+        """Rebuild the menus and options based on the item list."""
+        # Sort alphabetically, preferring a sort key if present.
+        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName))
+        grouped_items = defaultdict(list)
+        # If the item is groupless, use 'Other' for the header.
+        self.group_names = {'':  _('Other')}
+        # Ungrouped items appear directly in the menu.
+        self.context_menus = {'': self.context_menu}
+
+        # First clear off the menu.
+        self.context_menu.delete(0, 'end')
+
+        for ind, item in enumerate(self.item_list):
+            if item._selector is not None and item._selector is not self:
+                raise ValueError(f'Item {item} reused on a different selector!')
+            item._selector = self
+
+            if item.button is None:  # New, create the button widget.
+                if item is self.noneItem:
+                    item.button = ttk.Button(
+                        self.pal_frame,
+                        image=item.icon,
+                    )
+                    item.context_lbl = item.context_lbl
+                else:
+                    item.button = ttk.Button(
+                        self.pal_frame,
+                        text=item.shortName,
+                        image=item.icon,
+                        compound='top',
+                    )
+
+                @utils.bind_leftclick(item.button)
+                def click_item(event=None, *, _self=self, _item=item):
+                    """Handle clicking on the item.
+
+                    If it's already selected, save and close the window.
+                    """
+                    # We need to capture the item in a default, since it's
+                    # the same variable in different iterations
+                    if _item is self.selected:
+                        _self.save()
+                    else:
+                        _self.sel_item(_item)
+
+            group_key = item.group.casefold()
+            grouped_items[group_key].append(item)
+
+            if group_key not in self.group_names:
+                self.group_names[group_key] = item.group
+            if group_key not in self.group_widgets:
+                self.group_widgets[group_key] = GroupHeader(self, item.group)
+
+            try:
+                menu = self.context_menus[group_key]
+            except KeyError:
+                self.context_menus[group_key] = menu = Menu(
+                    self.context_menu,
+                )
+
+            menu.add_radiobutton(
+                label=item.context_lbl,
+                command=functools.partial(self.sel_item_id, item.name),
+                var=self.context_var,
+                value=item.name,
+            )
+            item._context_ind = len(grouped_items[group_key]) - 1
+
+        # Convert to a normal dictionary, after adding all items.
+        self.grouped_items = dict(grouped_items)
+
+        # Figure out the order for the groups - alphabetical.
+        # Note - empty string should sort to the beginning!
+        self.group_order[:] = sorted(self.grouped_items.keys())
+
+        # We start with the ungrouped items, so increase the index
+        # appropriately.
+        if '' in grouped_items:
+            start = len(self.grouped_items[''])
+        else:
+            start = 0
+
+        for index, (key, menu) in enumerate(
+            sorted(self.context_menus.items(), key=itemgetter(0)),
+            start=start,
+        ):
+            if key == '':
+                # Don't add the ungrouped menu to itself!
+                continue
+            self.context_menu.add_cascade(
+                menu=menu,
+                label=self.group_names[key],
+            )
+            # Set a custom attribute to keep track of the menu's index.
+            menu._context_index = index
+        self.flow_items()
+
     def exit(self, event: Event = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
         self.sel_item(self.orig_selected)
@@ -1000,7 +1013,7 @@ class selWin:
 
         self.disp_label.set(self.selected.context_lbl)
         self.orig_selected = self.selected
-        self.context_var.set(self.item_list.index(self.selected))
+        self.context_var.set(self.selected.name)
         return "break"  # stop the entry widget from continuing with this event
 
     def rollover_suggest(self) -> None:
