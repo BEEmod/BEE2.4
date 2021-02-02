@@ -1109,7 +1109,10 @@ class selWin:
 
         if optionWindow.DEV_MODE.get():
             # Show the ID of the item in the description
-            text = tkMarkdown.convert(f'**ID:** {item.name or "NONE"}\n\n')
+            if item is self.noneItem:
+                text = tkMarkdown.convert('**ID:** *NONE*\n\n')
+            else:
+                text = tkMarkdown.convert(f'**ID:** {item.name}\n\n')
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 item.desc,
