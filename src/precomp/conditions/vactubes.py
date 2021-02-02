@@ -400,7 +400,7 @@ def make_corner(vmf: VMF, origin: Vec, angle: str, size: int, config: dict) -> N
             force_type=template_brush.TEMP_TYPES.world,
             add_to_map=False,
         ).world
-        motion_trigger(*temp_solids)
+        motion_trigger(vmf, *temp_solids)
 
 
 def make_bend(
