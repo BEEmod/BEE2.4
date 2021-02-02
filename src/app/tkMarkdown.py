@@ -1,17 +1,19 @@
-"""Wrapper around the markdown module, converting it to display in TKinter widgets.
+"""Parse Markdown and display it in Tkinter widgets.
 
 This produces a stream of values, which are fed into richTextBox to display.
 """
 from enum import Enum
 from itertools import count
 
-from xml.etree.ElementTree import Element as XMLElement
-from markdown.extensions.sane_lists import SaneListExtension
-from markdown.preprocessors import Preprocessor
-import markdown
+import mistletoe
+from mistletoe import block_token as btok
+from mistletoe import span_token as stok
 import srctools.logger
 
-from typing import Iterable, Iterator, Union, List, Tuple, Optional, Any, Dict
+from typing import (
+    Iterable, Iterator, Union, List, Tuple, Optional, Any, Dict,
+    NamedTuple, Set,
+)
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -39,6 +41,7 @@ UL_START = '\u2022 '
 OL_START = '{}. '
 
 LINK_TAG_START = 'link_callback_'
+Token = Union[stok.SpanToken, btok.BlockToken]
 
 
 class TAG(Enum):
@@ -50,26 +53,30 @@ class TAG(Enum):
 class BlockTags(Enum):
     """The various kinds of blocks that can happen."""
     # Paragraphs of regular text or other stuff we can insert.
-    # The data is alternating text, tag-tuples suitable to pass
-    # to Text.insert().
+    # The data is a list of TextSegment.
     TEXT = 'text'
     # An image, data is the file path.
     IMAGE = 'image'
+
+
+class TextSegment(NamedTuple):
+    """Each section added in text blocks."""
+    text: str  # The text to show
+    tags: Tuple[str, ...]  # Tags
+    url: Optional[str]  # If set, the text should be given this URL as a callback.
 
 
 class MarkdownData:
     """The output of the conversion, a set of tags and link references for callbacks.
 
     Blocks are a list of two-tuples - each is a Block type, and data for it.
-    Links is a dict mapping urls to callback IDs.
     """
+    __slots__ = ['blocks']
     def __init__(
         self,
-        blocks: Iterable[Tuple[BlockTags, Any]] = (),
-        links: Dict[str, str] = None,
+        blocks: Iterable[Tuple[BlockTags, Union[List[TextSegment], str]]] = (),
     ) -> None:
         self.blocks = list(blocks)
-        self.links = links if links is not None else {}
 
     def __bool__(self) -> bool:
         """Empty data is false."""
@@ -77,7 +84,7 @@ class MarkdownData:
 
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
-        return MarkdownData(self.blocks, self.links.copy())
+        return MarkdownData(self.blocks)
 
     __copy__ = copy
 
@@ -228,62 +235,156 @@ def parse_html(element: XMLElement):
     return blocks, links
 
 
-class TKConverter(markdown.Extension, Preprocessor):
+class TKRenderer(mistletoe.BaseRenderer):
     """Extension needed to extract our list from the tree.
     """
-    def __init__(self, *args, **kwargs) -> None:
-        self.result = MarkdownData()
-        self.md: Optional[markdown.Markdown] = None
-        super().__init__(*args, **kwargs)
+    def __init__(self) -> None:
+        super().__init__()
 
-    def extendMarkdown(self, md: markdown.Markdown) -> None:
-        """Applies the extension to Markdown."""
-        self.md = md
-        md.registerExtension(self)
-        md.preprocessors.register(self, 'TKConverter', 1000)
+        x = {
+            'Strong':         self.render_strong,
+            'Emphasis':       self.render_emphasis,
+            'InlineCode':     self.render_inline_code,
+            'RawText':        self.render_raw_text,
+            'Strikethrough':  self.render_strikethrough,
+            'Image':          self.render_image,
+            'Link':           self.render_link,
+            'AutoLink':       self.render_auto_link,
+            'EscapeSequence': self.render_escape_sequence,
+            'Heading':        self.render_heading,
+            'SetextHeading':  self.render_heading,
+            'Quote':          self.render_quote,
+            'Paragraph':      self.render_paragraph,
+            'CodeFence':      self.render_block_code,
+            'BlockCode':      self.render_block_code,
+            'List':           self.render_list,
+            'ListItem':       self.render_list_item,
+            'Table':          self.render_table,
+            'TableRow':       self.render_table_row,
+            'TableCell':      self.render_table_cell,
+            'ThematicBreak':  self.render_thematic_break,
+            'LineBreak':      self.render_line_break,
+            'Document':       self.render_document,
+        }
 
-    def reset(self) -> None:
-        """Clear out our data for the next run."""
-        self.result = MarkdownData()
+    def render(self, token: btok.BlockToken) -> MarkdownData:
+        return super().render(token)
 
-    def run(self, lines: List[str]) -> List[str]:
-        """Set the markdown class to use our serialiser when run."""
-        self.md.serializer = self.serialise
-
-        return lines  # And don't modify the text..
-
-    def serialise(self, element: XMLElement):
-        """Override Markdown's serialising program so it returns our format instead of HTML.
-
+    def render_inner(self, token: Token) -> MarkdownData:
         """
-        # We can't directly return the list, since it'll break Markdown.
-        # Return an empty document and save it elsewhere.
+        Recursively renders child tokens. Joins the rendered
+        strings with no space in between.
 
-        blocks, links = parse_html(element)
+        If newlines / spaces are needed between tokens, add them
+        in their respective templates, or override this function
+        in the renderer subclass, so that whitespace won't seem to
+        appear magically for anyone reading your program.
 
-        self.result = MarkdownData(
-            blocks,
-            links,
-        )
+        Arguments:
+            token: a branch node who has children attribute.
+        """
+        blocks: List[Tuple[BlockTags, Union[Tuple[TextSegment, ...], str]]] = []
+        # Merge together adjacent text blocks.
+        last_text: Optional[List[TextSegment]] = None
+        for child in token.children:
+            for block_type, block_data in self.render(child).blocks:
+                if last_text is not None and block_type is BlockTags.TEXT:
+                    last_text.extend(block_data)
+                    continue
+                blocks.append((block_type, block_data))
+                if block_type is BlockTags.TEXT:
+                    last_text = block_data
+                else:
+                    last_text = None
 
-        # StripTopLevelTags expects doc_tag in the output,
-        # so give it an empty one.
-        return '<{0}></{0}>'.format(self.md.doc_tag)
+        return MarkdownData(blocks)
 
+    def _with_tag(self, token: Token, *tags: str, url: str=None) -> MarkdownData:
+        added_tags = set(tags)
+        data = self.render_inner(token)
+        for block_type, block_data in data.blocks:
+            if block_type is BlockTags.TEXT:
+                block_data[:] = [
+                    TextSegment(seg.text, tuple(added_tags.union(seg.tags)), url or seg.url)
+                    for seg in block_data
+                ]
+        return data
 
-# Reuse one instance for the conversions.
-_converter = TKConverter()
-_MD = markdown.Markdown(extensions=[
-    _converter,
-    SaneListExtension(),
-])
+    def _text(self, text: str, *tags: str, url: str=None) -> MarkdownData:
+        return MarkdownData([
+            (BlockTags.TEXT, [TextSegment(text, tags, url)])
+        ])
+
+    def render_auto_link(self, token: stok.AutoLink) -> MarkdownData:
+        """An automatic link - the child is a single raw token."""
+        [child] = token.children
+        assert isinstance(child, stok.RawText)
+        return self._text(child, 'link', url=token.target)
+
+    def render_block_code(self, token: MistleToken) -> MarkdownData:
+
+    def render_document(self, token: btok.Document) -> MarkdownData:
+        """Render the outermost document."""
+        self.footnotes.update(token.footnotes)
+        return self.render_inner(token)
+
+    def render_emphasis(self, token: stok.Emphasis) -> MarkdownData:
+        return self._text(token.content, 'italic')
+
+    def render_escape_sequence(self, token: stok.EscapeSequence) -> MarkdownData:
+        [child] = token.children
+        assert isinstance(child, stok.RawText)
+        return self._text(child.content)
+
+    def render_heading(self, token: btok.Heading) -> MarkdownData:
+        return self._with_tag(token.children, f'heading_{token.level}')
+
+    def render_image(self, token: stok.Image) -> MarkdownData:
+        return MarkdownData([
+            (BlockTags.IMAGE, token.src)
+        ])
+
+    def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
+        [child] = token.children
+        assert isinstance(child, stok.RawText)
+        return self._text(child.content, 'code')
+
+    def render_line_break(self, token: stok.LineBreak) -> MarkdownData:
+        return self._text('\n')
+
+    def render_link(self, token: stok.Link) -> MarkdownData:
+        return self._with_tag(token.content, url=token.target)
+
+    def render_list(self, token: btok.BlockToken) -> MarkdownData:
+        return self.render_inner(token)
+
+    def render_list_item(self, token: MistleToken) -> MarkdownData:
+
+    def render_paragraph(self, token: MistleToken) -> MarkdownData:
+
+    def render_quote(self, token: MistleToken) -> MarkdownData:
+
+    def render_raw_text(self, token: MistleToken) -> MarkdownData:
+
+    def render_strikethrough(self, token: MistleToken) -> MarkdownData:
+
+    def render_strong(self, token: MistleToken) -> MarkdownData:
+
+    def render_table(self, token: MistleToken) -> MarkdownData:
+
+    def render_table_cell(self, token: MistleToken) -> MarkdownData:
+
+    def render_table_row(self, token: MistleToken) -> MarkdownData:
+
+    def render_thematic_break(self, token: MistleToken) -> MarkdownData:
+
+_RENDERER = TKRenderer()
 
 
 def convert(text: str) -> MarkdownData:
     """Convert markdown syntax into data ready to be passed to richTextBox."""
-    _MD.reset()
-    _MD.convert(text)
-    return _converter.result
+    with _RENDERER:
+        return _RENDERER.render(mistletoe.Document(text))
 
 
 def join(*args: MarkdownData) -> MarkdownData:
@@ -291,55 +392,22 @@ def join(*args: MarkdownData) -> MarkdownData:
 
     This merges together blocks, reassigning link callbacks as needed.
     """
-    # If no tags are present, a block is empty entirely.
-    # Skip processing empty blocks.
-    to_join = list(filter(None, args))
-
-    if len(to_join) == 1:
+    if len(args) == 1:
         # We only have one block, just copy and return.
-        return MarkdownData(
-            to_join[0].blocks,
-            to_join[0].links.copy(),
-        )
+        return MarkdownData(args[0].blocks.copy())
 
-    link_ind = 0
-    combined_links = {}
-    new_blocks = []
-    old_to_new = {}  # Maps original callback to new callback
-    for data in to_join:
-        blocks = data.blocks
-        links = data.links
+    blocks: List[Tuple[BlockTags, Union[List[TextSegment, str]]]] = []
+    last_text: Optional[List[TextSegment]] = None
 
-        old_to_new.clear()
-
-        # First find any links in the tags..
-        for url, call_name in links.items():
-            if url not in combined_links:
-                link_ind += 1
-                old_to_new[call_name] = combined_links[url] = LINK_TAG_START + str(link_ind)
-
-        # Modify tags to use the new links.
-        for block_type, block_data in blocks:
-            if block_type is not BlockTags.TEXT:
-                # Other block types.
-                new_blocks.append((block_type, block_data))
+    for child in args:
+        for block_type, block_data in child.blocks:
+            if last_text is not None and block_type is BlockTags.TEXT:
+                last_text.extend(block_data)
                 continue
+            blocks.append((block_type, block_data))
+            if block_type is BlockTags.TEXT:
+                last_text = block_data
+            else:
+                last_text = None
 
-            new_block_data = []
-            # block_type == BlockTags.TEXT
-            new_blocks.append((block_type, new_block_data))
-            for tag_text in block_data:
-                if isinstance(tag_text, str):  # Text to display
-                    new_block_data.append(tag_text)
-                    continue
-
-                new_tag = []
-                for tag in tag_text:
-                    if tag.startswith(LINK_TAG_START):
-                        # Replace with the new tag we've set.
-                        new_tag.append(old_to_new[tag])
-                    else:
-                        new_tag.append(tag)
-                new_block_data.append(tuple(new_tag))
-
-    return MarkdownData(new_blocks, combined_links)
+    return MarkdownData(blocks)
