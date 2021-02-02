@@ -47,7 +47,7 @@ from precomp.texturing import Portalable
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Side
+    VMF, Entity, Output, Solid, Side, Angle,
 )
 
 
@@ -992,7 +992,7 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
 
     offset.localise(
         Vec.from_str(inst['origin']),
-        Vec.from_str(inst['angles']),
+        Angle.from_str(inst['angles']),
     )
 
     return offset
