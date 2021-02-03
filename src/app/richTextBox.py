@@ -3,8 +3,8 @@ from tkinter.constants import *
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
 
+from typing import Union, Tuple, Dict, Callable
 import webbrowser
-from typing import Union
 
 from app import tkMarkdown, img
 import utils
@@ -24,7 +24,8 @@ class tkRichText(tkinter.Text):
         self.bold_font['weight'] = 'bold'
         self.italic_font['slant'] = 'italic'
 
-        self.link_commands = {}  # tag-id -> command
+        # URL -> tag name and callback ID.
+        self._link_commands: Dict[str, Tuple[str, int]] = {}
 
         super().__init__(
             parent,
@@ -58,6 +59,10 @@ class tkRichText(tkinter.Text):
         self.tag_config(
             "italic",
             font=self.italic_font,
+        )
+        self.tag_config(
+            "strikethrough",
+            overstrike=True,
         )
         self.tag_config(
             "invert",
@@ -99,11 +104,11 @@ class tkRichText(tkinter.Text):
 
         self['state'] = "disabled"
 
-    def insert(*args, **kwargs):
+    def insert(*args, **kwargs) -> None:
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')
 
-    def set_text(self, text_data: Union[str, tkMarkdown.MarkdownData]):
+    def set_text(self, text_data: Union[str, tkMarkdown.MarkdownData]) -> None:
         """Write the rich-text into the textbox.
 
         text_data should either be a string, or the data returned from
@@ -111,9 +116,9 @@ class tkRichText(tkinter.Text):
         """
 
         # Remove all previous link commands
-        for tag, command_id in self.link_commands.items():
-            self.tag_unbind(tag, '<Button-1>', funcid=command_id)
-        self.link_commands.clear()
+        for cmd_tag, cmd_id in self._link_commands.values():
+            self.tag_unbind(cmd_tag, '<Button-1>', funcid=cmd_id)
+        self._link_commands.clear()
 
         self['state'] = "normal"
         self.delete(1.0, END)
@@ -123,9 +128,25 @@ class tkRichText(tkinter.Text):
             super().insert("end", text_data)
             return
 
+        segment: tkMarkdown.TextSegment
         for block_type, block_data in text_data.blocks:
             if block_type is tkMarkdown.BlockTags.TEXT:
-                super().insert('end', *block_data)
+                for segment in block_data:
+                    if segment.url:
+                        try:
+                            cmd_tag, _ = self._link_commands[segment.url]
+                        except KeyError:
+                            cmd_tag = f'link_cb_{len(self._link_commands)}'
+                            cmd_id = self.tag_bind(
+                                cmd_tag,
+                                '<Button-1>',
+                                self.make_link_callback(segment.url),
+                            )
+                            self._link_commands[segment.url] = cmd_tag, cmd_id
+                        tags = segment.tags + (cmd_tag, 'link')
+                    else:
+                        tags = segment.tags
+                    super().insert('end', segment.text, tags)
             elif block_type is tkMarkdown.BlockTags.IMAGE:
                 super().insert('end', '\n')
                 self.image_create('end', image=img.png(block_data))
@@ -133,16 +154,9 @@ class tkRichText(tkinter.Text):
             else:
                 raise ValueError('Unknown block {!r}?'.format(block_type))
 
-        for url, link_id in text_data.links.items():
-            self.link_commands[link_id] = self.tag_bind(
-                link_id,
-                '<Button-1>',
-                self.make_link_callback(url),
-            )
-
         self['state'] = "disabled"
 
-    def make_link_callback(self, url):
+    def make_link_callback(self, url: str) -> Callable[[tkinter.Event], None]:
         """Create a link callback for the given URL."""
 
         def callback(e):
