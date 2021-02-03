@@ -3,27 +3,17 @@
 This produces a stream of values, which are fed into richTextBox to display.
 """
 from enum import Enum
-from itertools import count
 
 import mistletoe
 from mistletoe import block_token as btok
 from mistletoe import span_token as stok
 import srctools.logger
 
-from typing import (
-    Iterable, Iterator, Union, List, Tuple, Optional, Any, Dict,
-    NamedTuple, Set,
-)
+from typing import Optional, Union, Iterable, List, Tuple, NamedTuple
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 Token = Union[stok.SpanToken, btok.BlockToken]
-
-
-class TAG(Enum):
-    """Marker used to indicate when tags start/end."""
-    START = 0
-    END = 1
 
 
 class BlockTags(Enum):
@@ -41,10 +31,6 @@ class TextSegment(NamedTuple):
     tags: Tuple[str, ...]  # Tags
     url: Optional[str]  # If set, the text should be given this URL as a callback.
 
-
-
-UL_START = '\u2022 '
-OL_START = '{}. '
 _HR = [
     TextSegment('\n', (), None),
     TextSegment('\n', ('hrule', ), None),
@@ -70,7 +56,7 @@ class MarkdownData:
 
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
-        return MarkdownData(self.blocks)
+        return MarkdownData(self.blocks.copy())
 
     __copy__ = copy
 
@@ -183,9 +169,9 @@ class TKRenderer(mistletoe.BaseRenderer):
     def render_list_item(self, token: btok.ListItem) -> MarkdownData:
         count = self._list_stack[-1]
         if count is None:
-            prefix = UL_START
+            prefix = '\N{bullet} '  # Bullet char.
         else:
-            prefix = OL_START.format(count)
+            prefix = f'{count}. '
             self._list_stack[-1] += 1
 
         result = join(self._text(prefix), self.render_inner(token))
