@@ -534,7 +534,7 @@ def report_items() -> None:
                     f.write(f'- <{item.id}:{vers_name}>\n')
 
                 variant_to_id = defaultdict(list)
-                for sty_id, variant in version['styles'].items():
+                for sty_id, variant in version.styles.items():
                     variant_to_id[variant].append(sty_id)
 
                 for variant, style_ids in variant_to_id.items():

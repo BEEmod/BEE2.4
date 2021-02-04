@@ -1,7 +1,18 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, NamedTuple
 
-from packages import PakObject, SignStyle, ParseData, ExportData, LOGGER, Style
+from packages import PakObject, ParseData, ExportData, Style
 from srctools import Property
+import srctools.logger
+
+LOGGER = srctools.logger.get_logger(__name__)
+
+
+class SignStyle(NamedTuple):
+    """Signage information for a specific style."""
+    world: str
+    overlay: str
+    icon: str
+    type: str
 
 
 class Signage(PakObject, allow_mult=True, has_img=False):

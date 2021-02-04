@@ -10,6 +10,7 @@ import utils
 from app.packageMan import PACK_CONFIG
 from srctools import Property, NoKeyError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+from editoritems import Item as EditorItem, Renderable, RenderableType
 import srctools.logger
 
 from typing import (
@@ -21,6 +22,9 @@ from typing import (
 
 
 # noinspection PyUnresolvedReferences
+from srctools.tokenizer import Tokenizer
+
+
 if TYPE_CHECKING:
     from app.gameMan import Game
     from loadScreen import LoadScreen
@@ -132,7 +136,8 @@ class ExportData(NamedTuple):
     selected: Any
     # Some items need to know which style is selected
     selected_style: 'Style'
-    editoritems: Property
+    all_items: List[EditorItem]  # All the items in the map
+    renderables: Dict[RenderableType, Renderable]  # The error/connection icons
     vbsp_conf: Property
     game: 'Game'
 
@@ -175,16 +180,30 @@ VPK_FOLDER = {
 }
 
 
-class SignStyle(NamedTuple):
-    """Signage information for a specific style."""
-    world: str
-    overlay: str
-    icon: str
-    type: str
-
-
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
+
+
+class PackagePath:
+    """Represents a file located inside a specific package.
+
+    This can be either resolved later into a file object.
+    The string form is "package:path/to/file.ext", with <special> package names
+    reserved for app-specific usages (internal or generated paths)
+    """
+    __slots__ = ['package', 'path']
+    def __init__(self, pack_id: str, path: str) -> None:
+        self.package = pack_id.casefold()
+        self.path = path
+
+    @classmethod
+    def parse(cls, uri: str, def_package: str) -> 'PackagePath':
+        """Parse a string into a path. If a package isn't provided, the default is used."""
+        if ':' in uri:
+            return cls(*uri.split(':', 1))
+        else:
+            return cls(def_package, uri)
+
 
 T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')
@@ -450,15 +469,15 @@ def no_packages_err(pak_dir: str, msg: str) -> 'NoReturn':
 
 
 def load_packages(
-        pak_dir,
-        loader: 'LoadScreen',
-        log_item_fallbacks=False,
-        log_missing_styles=False,
-        log_missing_ent_count=False,
-        log_incorrect_packfile=False,
-        has_mel_music=False,
-        has_tag_music=False,
-        ) -> Tuple[dict, Collection[FileSystem]]:
+    pak_dir: str,
+    loader: 'LoadScreen',
+    log_item_fallbacks=False,
+    log_missing_styles=False,
+    log_missing_ent_count=False,
+    log_incorrect_packfile=False,
+    has_mel_music=False,
+    has_tag_music=False,
+) -> Tuple[dict, Collection[FileSystem]]:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(pak_dir)
@@ -575,10 +594,9 @@ def load_packages(
         LOGGER.info('Post-process {} objects...', name)
         obj_type.cls.post_parse()
 
+    # This has to be done after styles.
     LOGGER.info('Allocating styled items...')
-    setup_style_tree(
-        Item.all(),
-        Style.all(),
+    assign_styled_items(
         log_item_fallbacks,
         log_missing_styles,
     )
@@ -641,184 +659,6 @@ def parse_package(
                 pack.id,
                 pack.disp_name,
             )
-
-
-def setup_style_tree(
-    item_data: Iterable['Item'],
-    style_data: Iterable['Style'],
-    log_fallbacks,
-    log_missing_styles,
-):
-    """Handle inheritance across item folders.
-
-    This will guarantee that all items have a definition for each
-    combination of item and version.
-    The priority is:
-    - Exact Match
-    - Parent style
-    - Grandparent (etc) style
-    - First version's style
-    - First style of first version
-    """
-    all_styles: Dict[str, Style] = {}
-
-    for style in style_data:
-        all_styles[style.id] = style
-
-    for style in all_styles.values():
-        base = []
-        b_style = style
-        while b_style is not None:
-            # Recursively find all the base styles for this one
-
-            if b_style in base:
-                # Already hit this!
-                raise Exception('Loop in bases for "{}"!'.format(b_style.id))
-            base.append(b_style)
-            b_style = all_styles.get(b_style.base_style, None)
-            # Just append the style.base_style to the list,
-            # until the style with that ID isn't found anymore.
-        style.bases = base
-
-    # All styles now have a .bases attribute, which is a list of the
-    # parent styles that exist (plus the style).
-
-    # To do inheritance, we simply copy the data to ensure all items
-    # have data defined for every used style.
-    for item in item_data:
-        all_ver: List[Dict[str, Union[
-            Dict[str, Union[UnParsedItemVariant, ItemVariant]],
-            str
-        ]]] = list(item.versions.values())
-
-        # Move default version to the beginning, so it's read first.
-        # that ensures it's got all styles set if we need to fallback.
-        all_ver.remove(item.def_ver)
-        all_ver.insert(0, item.def_ver)
-
-        for vers in all_ver:
-            # We need to repeatedly loop to handle the chains of
-            # dependencies. This is a list of (style_id, UnParsed).
-            to_change: List[Tuple[str, UnParsedItemVariant]] = []
-            styles: Dict[str, Union[UnParsedItemVariant, ItemVariant]] = vers['styles']
-            for sty_id, conf in styles.items():
-                to_change.append((sty_id, conf))
-                # Not done yet
-                styles[sty_id] = None
-
-            # Evaluate style lookups and modifications
-            while to_change:
-                # Needs to be done next loop.
-                deferred = []
-                # filesys = FileSystem  # The original filesystem.
-                # folder = str  # If set, use the given folder from our package.
-                # style = str  # Inherit from a specific style (implies folder is None)
-                # config = Property  # Config for editing
-                for sty_id, conf in to_change:
-                    if conf.style:
-                        try:
-                            if ':' in conf.style:
-                                ver_id, base_style_id = conf.style.split(':', 1)
-                                start_data = item.versions[ver_id]['styles'][base_style_id]
-                            else:
-                                start_data = styles[conf.style]
-                        except KeyError:
-                            raise ValueError(
-                                'Item {}\'s {} style referenced '
-                                'invalid style "{}"'.format(
-                                    item.id,
-                                    sty_id,
-                                    conf.style,
-                                ))
-                        if start_data is None:
-                            # Not done yet!
-                            deferred.append((sty_id, conf))
-                            continue
-                        # Can't have both!
-                        if conf.folder:
-                            raise ValueError(
-                                'Item {}\'s {} style has both folder and'
-                                ' style!'.format(
-                                    item.id,
-                                    sty_id,
-                                ))
-                    elif conf.folder:
-                        # Just a folder ref, we can do it immediately.
-                        # We know this dict should be set.
-                        try:
-                            start_data = item.folders[conf.filesys, conf.folder]
-                        except KeyError:
-                            LOGGER.info('Folders: {}', item.folders.keys())
-                            raise
-                    else:
-                        # No source for our data!
-                        raise ValueError(
-                            'Item {}\'s {} style has no data source!'.format(
-                                item.id,
-                                sty_id,
-                            ))
-
-                    if conf.config is None:
-                        styles[sty_id] = start_data.copy()
-                    else:
-                        styles[sty_id] = start_data.modify(
-                            conf.filesys,
-                            conf.config,
-                            '<{}:{}.{}>'.format(item.id, vers['id'], sty_id),
-                        )
-
-                # If we defer all the styles, there must be a loop somewhere.
-                # We can't resolve that!
-                if len(deferred) == len(to_change):
-                    raise ValueError(
-                        'Loop in style references!\nNot resolved:\n' + '\n'.join(
-                            '{} -> {}'.format(conf.style, sty_id)
-                            for sty_id, conf in deferred
-                        )
-                    )
-                to_change = deferred
-
-            # Fix this reference to point to the actual value.
-            vers['def_style'] = styles[vers['def_style']]
-
-            for sty_id, style in all_styles.items():
-                if sty_id in styles:
-                    continue  # We already have a definition
-                for base_style in style.bases:
-                    if base_style.id in styles:
-                        # Copy the values for the parent to the child style
-                        styles[sty_id] = styles[base_style.id]
-                        if log_fallbacks and not item.unstyled:
-                            LOGGER.warning(
-                                'Item "{item}" using parent '
-                                '"{rep}" for "{style}"!',
-                                item=item.id,
-                                rep=base_style.id,
-                                style=sty_id,
-                            )
-                        break
-                else:
-                    # No parent matches!
-                    if log_missing_styles and not item.unstyled:
-                        LOGGER.warning(
-                            'Item "{item}" using '
-                            'inappropriate style for "{style}"!',
-                            item=item.id,
-                            style=sty_id,
-                        )
-
-                    # If 'isolate versions' is set on the item,
-                    # we never consult other versions for matching styles.
-                    # There we just use our first style (Clean usually).
-                    # The default version is always isolated.
-                    # If not isolated, we get the version from the default
-                    # version. Note the default one is computed first,
-                    # so it's guaranteed to have a value.
-                    styles[sty_id] = (
-                        vers['def_style'] if
-                        item.isolate_versions or vers['isolate']
-                        else item.def_ver['styles'][sty_id]
-                    )
 
 
 class Package:
@@ -891,7 +731,8 @@ class Style(PakObject):
         self,
         style_id: str,
         selitem_data: 'SelitemData',
-        editor: Property,
+        items: List[EditorItem],
+        renderables: Dict[RenderableType, Renderable],
         config=None,
         base_style: Optional[str]=None,
         suggested: Tuple[str, str, str, str]=None,
@@ -901,11 +742,12 @@ class Style(PakObject):
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
-        self.editor = editor
+        self.items = items
+        self.renderables = renderables
         self.base_style = base_style
-        # Set by setup_style_tree() after all objects are read..
+        # Set by post_parse() after all objects are read.
         # this is a list of this style, plus parents in order.
-        self.bases = []  # type: List[Style]
+        self.bases: List[Style] = []
         self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
         self.has_video = has_video
         self.vpk_name = vpk_name
@@ -995,13 +837,15 @@ class Style(PakObject):
             # It's OK for override styles to be missing their 'folder'
             # value.
             if data.is_override:
-                items = Property(None, [])
+                items = []
+                renderables = {}
                 vbsp = None
             else:
-                raise ValueError('Style missing configuration!')
+                raise ValueError(f'Style "{data.id}" missing configuration folder "{folder}"!')
         else:
             with filesystem:
-                items = filesystem.read_prop(folder + '/items.txt')
+                with filesystem[folder + '/items.txt'].open_str() as f:
+                    items, renderables = EditorItem.parse(f)
                 try:
                     vbsp = filesystem.read_prop(folder + '/vbsp_config.cfg')
                 except FileNotFoundError:
@@ -1010,7 +854,8 @@ class Style(PakObject):
         return cls(
             style_id=data.id,
             selitem_data=selitem_data,
-            editor=items,
+            items=items,
+            renderables=renderables,
             config=vbsp,
             base_style=base,
             suggested=sugg,
@@ -1021,7 +866,8 @@ class Style(PakObject):
 
     def add_over(self, override: 'Style') -> None:
         """Add the additional commands to ourselves."""
-        self.editor += override.editor
+        self.items.extend(override.items)
+        self.renderables.update(override.renderables)
         self.config += override.config
         self.selitem_data += override.selitem_data
 
@@ -1033,28 +879,40 @@ class Style(PakObject):
             zip(self.suggested, override.suggested)
         )
 
+    @classmethod
+    def post_parse(cls) -> None:
+        """Assign the bases lists for all styles."""
+        all_styles: Dict[str, Style] = {}
+
+        for style in cls.all():
+            all_styles[style.id] = style
+
+        for style in all_styles.values():
+            base = []
+            b_style = style
+            while b_style is not None:
+                # Recursively find all the base styles for this one
+                if b_style in base:
+                    # Already hit this!
+                    raise Exception('Loop in bases for "{}"!'.format(b_style.id))
+                base.append(b_style)
+                b_style = all_styles.get(b_style.base_style, None)
+                # Just append the style.base_style to the list,
+                # until the style with that ID isn't found anymore.
+            style.bases = base
+
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'
 
-    def export(self) -> Tuple[Property, Property]:
+    def export(self) -> Tuple[List[EditorItem], Dict[RenderableType, Renderable], Property]:
         """Export this style, returning the vbsp_config and editoritems.
 
         This is a special case, since styles should go first in the lists.
         """
         vbsp_config = Property(None, [])
-
-        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
-        # "Renderables" sections.
-
-        editoritems = Property("ItemData", [])
-
-        # Only add the actual Item blocks,
-        # Renderables is added in gameMan specially.
-        # It must come last.
-        editoritems += self.editor.copy().find_all("Item")
         vbsp_config += self.config.copy()
 
-        return editoritems, vbsp_config
+        return self.items, self.renderables, vbsp_config
 
 
 def desc_parse(
@@ -1100,7 +958,8 @@ def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> List[str]:
         if stripped
     ]
 
-from packages.item import Item, UnParsedItemVariant, ItemVariant, ItemConfig
+
+from packages.item import Item, assign_styled_items
 from packages.stylevar import StyleVar
 from packages.elevator import Elevator
 from packages.editor_sound import EditorSound

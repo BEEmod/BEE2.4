@@ -8,8 +8,8 @@ various item properties.
   clicked widget from the event
 """
 from tkinter import *
+from typing import Dict, Optional
 
-from srctools import Property
 from tkinter import ttk
 from tkinter import messagebox
 
@@ -28,7 +28,8 @@ from app import (
     TK_ROOT,
 )
 import utils
-import packages
+from editoritems import Handle as RotHandle, Surface, ItemClass
+from editoritems_props import TimerDelay
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -52,15 +53,15 @@ SUBITEM_POS = {
     5: ( 0,  1,  2,  3,  4),  # 00000
 }
 
-ROT_TYPES = {
+ROT_TYPES: Dict[RotHandle, str] = {
     #  Image names that correspond to editoritems values
-    "handle_none":          "rot_0",
-    "handle_4_directions":  "rot_4",
-    "handle_5_positions":   "rot_5",
-    "handle_6_positions":   "rot_6",
-    "handle_8_positions":   "rot_8",
-    "handle_36_directions": "rot_36",
-    "handle_catapult":      "rot_catapult"
+    RotHandle.NONE:     "rot_0",
+    RotHandle.QUAD:     "rot_4",
+    RotHandle.CENT_OFF: "rot_5",
+    RotHandle.DUAL_OFF: "rot_6",
+    RotHandle.QUAD_OFF: "rot_8",
+    RotHandle.FREE_ROT: "rot_36",
+    RotHandle.FAITH:    "rot_catapult",
 }
 
 
@@ -112,15 +113,23 @@ def set_sprite(pos, sprite):
     tooltip.set_tooltip(widget, SPRITE_TOOL.get(sprite, ''))
 
 
-def pos_for_item():
-    """Get the index the selected item is located at."""
-    pos = SUBITEM_POS[selected_item.num_sub]
-    sub_key = selected_sub_item.subKey
-    for ind, sub in enumerate(pos):
-        if sub_key == sub:
-            return ind
+def pos_for_item(ind: int) -> Optional[int]:
+    """Get the index the specified subitem is located at."""
+    positions = SUBITEM_POS[len(selected_item.visual_subtypes)]
+    for pos, sub in enumerate(positions):
+        if sub != -1 and ind == selected_item.visual_subtypes[sub]:
+            return pos
     else:
         return None
+
+
+def ind_for_pos(pos: int) -> Optional[int]:
+    """Return the subtype index for the specified position."""
+    ind = SUBITEM_POS[len(selected_item.visual_subtypes)][pos]
+    if ind == -1:
+        return None
+    else:
+        return selected_item.visual_subtypes[ind]
 
 
 def hide_item_props(vals):
@@ -128,24 +137,23 @@ def hide_item_props(vals):
     selected_item.set_properties(vals)
 
 
-def sub_sel(ind, e=None):
+def sub_sel(pos, e=None):
     """Change the currently-selected sub-item."""
+    ind = ind_for_pos(pos)
     # Can only change the subitem on the preview window
-    if selected_sub_item.is_pre:
-        pos = SUBITEM_POS[selected_item.num_sub][ind]
-        if pos != -1 and pos != selected_sub_item.subKey:
-            sound.fx('config')
-            selected_sub_item.change_subtype(pos)
-            # Redisplay the window to refresh data and move it to match
-            show_prop(selected_sub_item, warp_cursor=True)
+    if selected_sub_item.is_pre and ind is not None:
+        sound.fx('config')
+        selected_sub_item.change_subtype(ind)
+        # Redisplay the window to refresh data and move it to match
+        show_prop(selected_sub_item, warp_cursor=True)
 
 
-def sub_open(ind, e=None):
+def sub_open(pos, e=None):
     """Move the context window to apply to the given item."""
-    pos = SUBITEM_POS[selected_item.num_sub][ind]
-    if pos != -1 and pos != selected_sub_item.subKey:
+    ind = ind_for_pos(pos)
+    if ind is not None:
         sound.fx('expand')
-        selected_sub_item.open_menu_at_sub(pos)
+        selected_sub_item.open_menu_at_sub(ind)
 
 
 def open_event(item):
@@ -236,14 +244,14 @@ def load_item_data():
     global version_lookup
     item_data = selected_item.data
 
-    for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
+    for ind, pos in enumerate(SUBITEM_POS[len(selected_item.visual_subtypes)]):
         if pos == -1:
             wid['subitem', ind]['image'] = img.invis_square(64)
         else:
-            wid['subitem', ind]['image'] = selected_item.get_icon(pos)
+            wid['subitem', ind]['image'] = selected_item.get_icon(selected_item.visual_subtypes[pos])
         wid['subitem', ind]['relief'] = 'flat'
 
-    wid['subitem', pos_for_item()]['relief'] = 'raised'
+    wid['subitem', pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data.authors)
     wid['name']['text'] = selected_sub_item.name
@@ -277,32 +285,11 @@ def load_item_data():
         wid['moreinfo'].state(['!disabled'])
     tooltip.set_tooltip(wid['moreinfo'], selected_item.url)
 
-    editor_data = item_data.editor.copy()
+    editor = item_data.editor
+    has_timer = any(isinstance(prop, TimerDelay) for prop in editor.properties)
 
-    # Reuse the exporting logic to parse out whether an item has I/O.
-    # This takes into account a bunch of special cases.
-    comm_block = Property(selected_item.id, [])
-    (
-        has_inputs,
-        has_outputs,
-        has_secondary,
-    ) = packages.Item.convert_item_io(comm_block, editor_data)
-    del comm_block  # We don't use the config.
-
-    has_timer = any(editor_data.find_all("Properties", "TimerDelay"))
-
-    editor_bit = next(editor_data.find_all("Editor"))
-    rot_type = editor_bit["MovementHandle", "HANDLE_NONE"].casefold()
-
-    facing_type = editor_bit["InvalidSurface", ""].casefold()
-    surf_wall = "wall" in facing_type
-    surf_floor = "floor" in facing_type
-    surf_ceil = "ceiling" in facing_type
-
-    is_embed = any(editor_data.find_all("Exporting", "EmbeddedVoxels"))
-
-    if has_inputs:
-        if has_secondary:
+    if editor.has_prim_input():
+        if editor.has_sec_input():
             set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
@@ -315,7 +302,7 @@ def load_item_data():
     else:
         set_sprite(SPR.INPUT, 'in_none')
 
-    if has_outputs:
+    if editor.has_output():
         if has_timer:
             set_sprite(SPR.OUTPUT, 'out_tim')
         else:
@@ -323,25 +310,19 @@ def load_item_data():
     else:
         set_sprite(SPR.OUTPUT, 'out_none')
 
-    set_sprite(
-        SPR.ROTATION,
-        ROT_TYPES.get(
-            rot_type.casefold(),
-            'rot_none',
-        )
-    )
+    set_sprite(SPR.ROTATION, ROT_TYPES[editor.handle])
 
-    if is_embed:
+    if editor.embed_voxels:
         set_sprite(SPR.COLLISION, 'space_embed')
     else:
         set_sprite(SPR.COLLISION, 'space_none')
 
     face_spr = "surf"
-    if not surf_wall:
+    if Surface.WALL not in editor.invalid_surf:
         face_spr += "_wall"
-    if not surf_floor:
+    if Surface.FLOOR not in editor.invalid_surf:
         face_spr += "_floor"
-    if not surf_ceil:
+    if Surface.CEIL not in editor.invalid_surf:
         face_spr += "_ceil"
     if face_spr == "surf":
         # This doesn't seem right - this item won't be placeable at all...
@@ -369,18 +350,16 @@ def load_item_data():
             ),
         )
 
-    item_class = editor_data['ItemClass', ''].casefold()
-    if item_class == "itempaintsplat":
+    if editor.cls is ItemClass.GEL:
         # Reflection or normal gel..
         set_sprite(SPR.FACING, 'surf_wall_ceil')
         set_sprite(SPR.INPUT, 'in_norm')
         set_sprite(SPR.COLLISION, 'space_none')
         set_sprite(SPR.OUTPUT, 'out_none')
         set_sprite(SPR.ROTATION, 'rot_paint')
-    elif item_class == 'itemrailplatform':
+    elif editor.cls is ItemClass.TRACK_PLATFORM:
         # Track platform - always embeds into the floor.
         set_sprite(SPR.COLLISION, 'space_embed')
-
 
 
 def adjust_position(e=None):
@@ -395,7 +374,7 @@ def adjust_position(e=None):
     # Calculate the pixel offset between the window and the subitem in
     # the properties dialog, and shift if needed to keep it inside the
     # window
-    icon_widget = wid['subitem', pos_for_item()]
+    icon_widget = wid['subitem', pos_for_item(selected_sub_item.subKey)]
 
     loc_x, loc_y = utils.adjust_inside_screen(
         x=(

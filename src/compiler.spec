@@ -3,7 +3,6 @@ import contextlib
 import pkgutil
 import os
 import sys
-import srctools
 
 
 # THe BEE2 modules cannot be imported inside the spec files.
@@ -100,7 +99,7 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 vbsp_vrad_an = Analysis(
     ['compiler_launch.py'],
-    pathex=[workpath, os.path.dirname(srctools.__path__[0])],
+    pathex=[workpath],
     binaries=[],
     hiddenimports=INCLUDES,
     excludes=EXCLUDES,

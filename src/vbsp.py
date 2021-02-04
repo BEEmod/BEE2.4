@@ -1,5 +1,7 @@
 """Implements the BEE2 VBSP compiler replacement."""
 # Do this very early, so we log the startup sequence.
+import pickle
+
 from srctools.logger import init_logging
 
 LOGGER = init_logging('bee2/vbsp.log')
@@ -39,6 +41,7 @@ from precomp import (
     music,
 )
 import consts
+import editoritems
 
 from typing import Any, Dict, Tuple, List, Set, Iterable
 
@@ -95,7 +98,7 @@ IGNORED_OVERLAYS = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
+def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, editoritems.Item]]:
     """Load in all our settings from vbsp_config."""
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
@@ -139,16 +142,16 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     # Load in templates.
     template_brush.load_templates()
 
-    # Load in the config file holding item data.
-    # This is used to lookup item's instances, or their connection commands.
-    with open('bee2/instances.cfg') as f:
-        instance_file = Property.parse(
-            f, 'bee2/instances.cfg'
-        )
-    # Parse that data in the relevant modules.
-    instanceLocs.load_conf(instance_file)
-    conditions.build_itemclass_dict(instance_file)
-    connections.read_configs(instance_file)
+    # Load a copy of the item configuration.
+    id_to_item: Dict[str, editoritems.Item] = {}
+    item: editoritems.Item
+    with open('bee2/editor.bin', 'rb') as inst:
+        for item in pickle.load(inst):
+            id_to_item[item.id.casefold()] = item
+
+    # Send that data to the relevant modules.
+    instanceLocs.load_conf(id_to_item.values())
+    connections.read_configs(id_to_item.values())
 
     # Parse packlist data.
     with open('bee2/pack_list.cfg') as f:
@@ -216,7 +219,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     })
 
     LOGGER.info("Settings Loaded!")
-    return ant_floor, ant_wall
+    return ant_floor, ant_wall, id_to_item
 
 
 def load_map(map_path: str) -> VMF:
@@ -1887,10 +1890,10 @@ def main() -> None:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        ant_floor, ant_wall = load_settings()
+        ant_floor, ant_wall, id_to_item = load_settings()
 
         vmf = load_map(path)
-        instance_traits.set_traits(vmf)
+        instance_traits.set_traits(vmf, id_to_item)
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1908,7 +1911,7 @@ def main() -> None:
 
         all_inst = get_map_info(vmf)
 
-        brushLoc.POS.read_from_map(vmf, settings['has_attr'])
+        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
