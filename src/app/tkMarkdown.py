@@ -2,8 +2,6 @@
 
 This produces a stream of values, which are fed into richTextBox to display.
 """
-from enum import Enum
-
 import mistletoe
 from mistletoe import block_token as btok
 from mistletoe import span_token as stok
@@ -13,16 +11,8 @@ from typing import Optional, Union, Iterable, List, Tuple, NamedTuple
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+# Mistletoe toke types.
 Token = Union[stok.SpanToken, btok.BlockToken]
-
-
-class BlockTags(Enum):
-    """The various kinds of blocks that can happen."""
-    # Paragraphs of regular text or other stuff we can insert.
-    # The data is a list of TextSegment.
-    TEXT = 'text'
-    # An image, data is the file path.
-    IMAGE = 'image'
 
 
 class TextSegment(NamedTuple):
@@ -31,7 +21,15 @@ class TextSegment(NamedTuple):
     tags: Tuple[str, ...]  # Tags
     url: Optional[str]  # If set, the text should be given this URL as a callback.
 
-_NEWLINE = [TextSegment('\n', (), None)]
+
+class Image(NamedTuple):
+    """An image."""
+    src: str
+
+# The kinds of data contained in MarkdownData
+Block = Union[TextSegment, Image]
+
+_NEWLINE = TextSegment('\n', (), None)
 _HR = [
     TextSegment('\n', (), None),
     TextSegment('\n', ('hrule', ), None),
@@ -42,12 +40,12 @@ _HR = [
 class MarkdownData:
     """The output of the conversion, a set of tags and link references for callbacks.
 
-    Blocks are a list of two-tuples - each is a Block type, and data for it.
+    Blocks are a list of data.
     """
     __slots__ = ['blocks']
     def __init__(
         self,
-        blocks: Iterable[Tuple[BlockTags, Union[List[TextSegment], str]]] = (),
+        blocks: Iterable[Block] = (),
     ) -> None:
         self.blocks = list(blocks)
 
@@ -90,38 +88,30 @@ class TKRenderer(mistletoe.BaseRenderer):
         Arguments:
             token: a branch node who has children attribute.
         """
-        blocks: List[Tuple[BlockTags, Union[Tuple[TextSegment, ...], str]]] = []
-        # Merge together adjacent text blocks.
-        last_text: Optional[List[TextSegment]] = None
+        blocks: List[Block] = []
+        # Merge together adjacent text segments.
         for child in token.children:
-            for block_type, block_data in self.render(child).blocks:
-                if last_text is not None and block_type is BlockTags.TEXT:
-                    last_text.extend(block_data)
-                    continue
-                blocks.append((block_type, block_data))
-                if block_type is BlockTags.TEXT:
-                    last_text = block_data
-                else:
-                    last_text = None
+            for data in self.render(child).blocks:
+                if blocks and isinstance(blocks[-1], TextSegment):
+                    last = blocks[-1]
+                    if last.tags == data.tags and last.url == data.url:
+                        blocks[-1] = TextSegment(last.text + data.text, last.tags, last.url)
+                        continue
+                blocks.append(data)
 
         return MarkdownData(blocks)
 
     def _with_tag(self, token: Token, *tags: str, url: str=None) -> MarkdownData:
         added_tags = set(tags)
-        data = self.render_inner(token)
-        for block_type, block_data in data.blocks:
-            if block_type is BlockTags.TEXT:
-                block_data[:] = [
-                    TextSegment(seg.text, tuple(added_tags.union(seg.tags)), url or seg.url)
-                    for seg in block_data
-                ]
-        return data
+        result = self.render_inner(token)
+        for i, data in enumerate(result.blocks):
+            if isinstance(data, TextSegment):
+                result.blocks[i] = TextSegment(data.text, tuple(added_tags.union(data.tags)), url or data.url)
+        return result
 
     def _text(self, text: str, *tags: str, url: str=None) -> MarkdownData:
         """Construct data containing a single text section."""
-        return MarkdownData([
-            (BlockTags.TEXT, [TextSegment(text, tags, url)])
-        ])
+        return MarkdownData([TextSegment(text, tags, url)])
 
     def render_auto_link(self, token: stok.AutoLink) -> MarkdownData:
         """An automatic link - the child is a single raw token."""
@@ -138,15 +128,17 @@ class TKRenderer(mistletoe.BaseRenderer):
         """Render the outermost document."""
         self.footnotes.update(token.footnotes)
         result = self.render_inner(token)
+        if not result.blocks:
+            return result
+
         # Strip newlines from the start and end.
-        if result.blocks and result.blocks[0][0] is BlockTags.TEXT and result.blocks[0][1]:
-            first_seg = result.blocks[0][1][0]
-            if first_seg.text.startswith('\n'):
-                result.blocks[0][1][0] = TextSegment(first_seg.text[1:], first_seg.tags, first_seg.url)
-        if result.blocks and result.blocks[-1][0] is BlockTags.TEXT and result.blocks[-1][1]:
-            first_seg = result.blocks[-1][1][0]
-            if first_seg.text.endswith('\n'):
-                result.blocks[-1][1][0] = TextSegment(first_seg.text[:-1], first_seg.tags, first_seg.url)
+        first = result.blocks[0]
+        if isinstance(first, TextSegment) and first.text.startswith('\n'):
+            result.blocks[0] = TextSegment(first.text.lstrip('\n'), first.tags, first.url)
+
+        last = result.blocks[-1]
+        if isinstance(last, TextSegment) and last.text.endswith('\n'):
+            result.blocks[-1] = TextSegment(last.text.rstrip('\n'), last.tags, last.url)
         return result
 
     def render_escape_sequence(self, token: stok.EscapeSequence) -> MarkdownData:
@@ -155,9 +147,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         return self._text(child.content)
 
     def render_image(self, token: stok.Image) -> MarkdownData:
-        return MarkdownData([
-            (BlockTags.IMAGE, token.src)
-        ])
+        return MarkdownData([Image(token.src)])
 
     def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
         [child] = token.children
@@ -219,7 +209,7 @@ class TKRenderer(mistletoe.BaseRenderer):
 
     def render_thematic_break(self, token: btok.ThematicBreak) -> MarkdownData:
         """Render a horizontal rule."""
-        return MarkdownData([(BlockTags.TEXT, _HR.copy())])
+        return MarkdownData(_HR.copy())
 
     def render_heading(self, token: btok.Heading) -> MarkdownData:
         return self._with_tag(token, f'heading_{token.level}')
@@ -254,18 +244,14 @@ def join(*args: MarkdownData) -> MarkdownData:
         # We only have one block, just copy and return.
         return MarkdownData(args[0].blocks.copy())
 
-    blocks: List[Tuple[BlockTags, Union[List[TextSegment, str]]]] = []
-    last_text: Optional[List[TextSegment]] = None
+    blocks: List[Block] = []
 
     for child in args:
-        for block_type, block_data in child.blocks:
-            if last_text is not None and block_type is BlockTags.TEXT:
-                last_text.extend(block_data)
-                continue
-            blocks.append((block_type, block_data))
-            if block_type is BlockTags.TEXT:
-                last_text = block_data
-            else:
-                last_text = None
+        for data in child.blocks:
+            if blocks and isinstance(blocks[-1], TextSegment):
+                if blocks[-1].tags == data.tags and blocks[-1].url == data.url:
+                    blocks[-1] = TextSegment(blocks[-1].text + data.text, blocks[-1].tags, blocks[-1].url)
+                    continue
+            blocks.append(data)
 
     return MarkdownData(blocks)

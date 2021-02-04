@@ -141,30 +141,29 @@ class tkRichText(tkinter.Text):
             return
 
         segment: tkMarkdown.TextSegment
-        for block_type, block_data in text_data.blocks:
-            if block_type is tkMarkdown.BlockTags.TEXT:
-                for segment in block_data:
-                    if segment.url:
-                        try:
-                            cmd_tag, _ = self._link_commands[segment.url]
-                        except KeyError:
-                            cmd_tag = f'link_cb_{len(self._link_commands)}'
-                            cmd_id = self.tag_bind(
-                                cmd_tag,
-                                '<Button-1>',
-                                self.make_link_callback(segment.url),
-                            )
-                            self._link_commands[segment.url] = cmd_tag, cmd_id
-                        tags = segment.tags + (cmd_tag, 'link')
-                    else:
-                        tags = segment.tags
-                    super().insert('end', segment.text, tags)
-            elif block_type is tkMarkdown.BlockTags.IMAGE:
+        for block in text_data.blocks:
+            if isinstance(block, tkMarkdown.TextSegment):
+                if block.url:
+                    try:
+                        cmd_tag, _ = self._link_commands[block.url]
+                    except KeyError:
+                        cmd_tag = f'link_cb_{len(self._link_commands)}'
+                        cmd_id = self.tag_bind(
+                            cmd_tag,
+                            '<Button-1>',
+                            self.make_link_callback(block.url),
+                        )
+                        self._link_commands[block.url] = cmd_tag, cmd_id
+                    tags = block.tags + (cmd_tag, 'link')
+                else:
+                    tags = block.tags
+                super().insert('end', block.text, tags)
+            elif isinstance(block, tkMarkdown.Image):
                 super().insert('end', '\n')
-                self.image_create('end', image=img.png(block_data))
+                self.image_create('end', image=img.png(block.src))
                 super().insert('end', '\n')
             else:
-                raise ValueError('Unknown block {!r}?'.format(block_type))
+                raise ValueError('Unknown block {!r}?'.format(block))
 
         self['state'] = "disabled"
 
