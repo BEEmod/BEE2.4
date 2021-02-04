@@ -32,7 +32,7 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) and [AVBin](http://avbin.github.io/AVbin/Home/Home.html) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
 - [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
-- [markdown](https://pythonhosted.org/Markdown/)
+- [mistletoe](https://github.com/miyuchina/mistletoe)
 - [cython](https://cython.org/)
 - [PyInstaller](http://www.pyinstaller.org/)
 - [babel](http://babel.pocoo.org/en/latest/index.html)
@@ -41,13 +41,11 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 
 ### PyPI list: ###
 * pillow (On Linux this may need to be installed via system package manager with the TK component: `python-pillow`, `python-pillow.imagetk`)
-* markdown
+* mistletoe
 * pyglet
 * PyInstaller
 * cython
 * babel
-
-[AVBin](http://avbin.github.io/AVbin/Download.html) must also be installed, to provide codecs for pyglet.
 
 ### Compilation ###
 First, grab the 2 git repositories you need:
