@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import ttk
 
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Callable, Optional
 from collections import namedtuple
 import operator
 
@@ -97,10 +97,9 @@ STYLES = {}
 window = None
 
 UI = {}
-
-
-def update_filter():
-    """Callback function replaced by tagsPane, to update items if needed."""
+# Callback triggered whenever we reload vars. This is used to update items
+# to show/hide the defaults.
+_load_cback: Optional[Callable[[], None]] = None
 
 
 def add_vars(style_vars, styles):
@@ -135,7 +134,8 @@ def save_load_stylevars(props: Property=None):
                 tk_vars[prop.real_name].set(prop.value)
             except KeyError:
                 LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
-        update_filter()
+        if _load_cback is not None:
+            _load_cback()
 
 
 def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
@@ -216,11 +216,14 @@ def refresh(selected_style):
         UI['stylevar_other_none'].grid_remove()
 
 
-def make_pane(tool_frame: Frame, menu_bar: Menu):
+def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]):
     """Create the styleVar pane.
 
+    update_item_vis is the callback fired whenever change defaults changes.
     """
-    global window
+    global window, _load_cback
+    _load_cback = update_item_vis
+
     window = SubPane(
         TK_ROOT,
         title=_('Style/Item Properties'),
@@ -302,9 +305,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu):
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
         if var.id == 'UnlockDefault':
-            def cmd():
-                update_filter()
-            checkbox_all[var.id]['command'] = cmd
+            checkbox_all[var.id]['command'] = lambda: update_item_vis()
 
         tooltip.add_tooltip(
             checkbox_all[var.id],
