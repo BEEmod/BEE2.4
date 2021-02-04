@@ -1792,9 +1792,6 @@ def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    snd.load_snd()
-    loader.step('UI')
-
     view_menu = init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),

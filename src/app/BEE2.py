@@ -49,7 +49,7 @@ GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
 LOGGER.debug('Starting loading screen...')
-loadScreen.main_loader.set_length('UI', 15)
+loadScreen.main_loader.set_length('UI', 14)
 loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
