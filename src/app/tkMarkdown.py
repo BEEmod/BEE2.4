@@ -31,6 +31,7 @@ class TextSegment(NamedTuple):
     tags: Tuple[str, ...]  # Tags
     url: Optional[str]  # If set, the text should be given this URL as a callback.
 
+_NEWLINE = [TextSegment('\n', (), None)]
 _HR = [
     TextSegment('\n', (), None),
     TextSegment('\n', ('hrule', ), None),
@@ -136,7 +137,17 @@ class TKRenderer(mistletoe.BaseRenderer):
     def render_document(self, token: btok.Document) -> MarkdownData:
         """Render the outermost document."""
         self.footnotes.update(token.footnotes)
-        return self.render_inner(token)
+        result = self.render_inner(token)
+        # Strip newlines from the start and end.
+        if result.blocks and result.blocks[0][0] is BlockTags.TEXT and result.blocks[0][1]:
+            first_seg = result.blocks[0][1][0]
+            if first_seg.text.startswith('\n'):
+                result.blocks[0][1][0] = TextSegment(first_seg.text[1:], first_seg.tags, first_seg.url)
+        if result.blocks and result.blocks[-1][0] is BlockTags.TEXT and result.blocks[-1][1]:
+            first_seg = result.blocks[-1][1][0]
+            if first_seg.text.endswith('\n'):
+                result.blocks[-1][1][0] = TextSegment(first_seg.text[:-1], first_seg.tags, first_seg.url)
+        return result
 
     def render_escape_sequence(self, token: stok.EscapeSequence) -> MarkdownData:
         [child] = token.children
@@ -154,19 +165,24 @@ class TKRenderer(mistletoe.BaseRenderer):
         return self._text(child.content, 'code')
 
     def render_line_break(self, token: stok.LineBreak) -> MarkdownData:
-        return self._text('' if token.soft else '\n')
+        if token.soft:
+            return MarkdownData([])
+        else:
+            return self._text('\n')
 
     def render_link(self, token: stok.Link) -> MarkdownData:
         return self._with_tag(token, url=token.target)
 
     def render_list(self, token: btok.List) -> MarkdownData:
+        """The wrapping around a list, specifying the type and start number."""
         self._list_stack.append(token.start)
         try:
-            return self._with_tag(token, 'indent')
+            return self.render_inner(token)
         finally:
             self._list_stack.pop()
 
     def render_list_item(self, token: btok.ListItem) -> MarkdownData:
+        """The individual items in a list."""
         count = self._list_stack[-1]
         if count is None:
             prefix = '\N{bullet} '  # Bullet char.
@@ -174,17 +190,18 @@ class TKRenderer(mistletoe.BaseRenderer):
             prefix = f'{count}. '
             self._list_stack[-1] += 1
 
-        result = join(self._text(prefix), self.render_inner(token))
-        # The content is likely a paragraph, strip the extra line break.
-        if result.blocks and result.blocks[-1][0] is BlockTags.TEXT:
-            last_segs = result.blocks[-1][1]
-            if last_segs and last_segs[-1].text.endswith('\n\n'):
-                seg = last_segs[-1]
-                last_segs[-1] = TextSegment(seg.text[:-1], seg.tags, seg.url)
+        result = join(
+            self._text(prefix, 'list_start'),
+            self._with_tag(token, 'list'),
+        )
+
         return result
 
     def render_paragraph(self, token: btok.Paragraph) -> MarkdownData:
-        return join(self.render_inner(token), self._text('\n\n'))
+        if self._list_stack:  # Collapse together.
+            return join(self.render_inner(token), self._text('\n'))
+        else:
+            return join(self._text('\n'), self.render_inner(token), self._text('\n'))
 
     def render_raw_text(self, token: stok.RawText) -> MarkdownData:
         return self._text(token.content)

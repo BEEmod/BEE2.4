@@ -76,6 +76,18 @@ class tkRichText(tkinter.Text):
             lmargin1="10",
             lmargin2="25",
         )
+        # Indent the first line slightly, but indent the following
+        # lines more to line up with the text.
+        self.tag_config(
+            "list_start",
+            lmargin1="10",
+            lmargin2="25",
+        )
+        self.tag_config(
+            "list",
+            lmargin1="25",
+            lmargin2="25",
+        )
         self.tag_config(
             "hrule",
             relief="sunken",
