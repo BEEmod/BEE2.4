@@ -237,13 +237,13 @@ def res_set_texture(inst: Entity, res: Property):
         )
         return
 
-    temp_id = res['template', None]
+    temp_id = inst.fixup.substitute(res['template', ''])
     if temp_id:
         temp = template_brush.get_scaling_template(temp_id).rotate(angles, origin)
     else:
         temp = template_brush.ScalingTemplate.world()
 
-    tex = res['tex', '']
+    tex = inst.fixup.substitute(res['tex', ''])
 
     if tex.startswith('<') and tex.endswith('>'):
         LOGGER.warning(
@@ -578,16 +578,8 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
         sense_offset,
     ) = res.value
 
-    if ':' in orig_temp_id:
-        # Split, resolve each part, then recombine.
-        temp_id, visgroup = orig_temp_id.split(':', 1)
-        temp_id = (
-            conditions.resolve_value(inst, temp_id) + ':' +
-            conditions.resolve_value(inst, visgroup)
-        )
-    else:
-        temp_id = conditions.resolve_value(inst, orig_temp_id)
-
+    temp_id = inst.fixup.substitute(orig_temp_id)
+    
     if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
         def visgroup_func(group):
             """Use all the groups."""
