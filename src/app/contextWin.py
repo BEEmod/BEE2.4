@@ -258,7 +258,8 @@ def load_item_data():
     )
 
     if optionWindow.DEV_MODE.get():
-        wid['item_id']['text'] = f'{selected_item.data.source} -> {selected_item.id}:{selected_sub_item.subKey}'
+        source = selected_item.data.source.replace("from", "\nfrom")
+        wid['item_id']['text'] = f'{source}\n-> {selected_item.id}:{selected_sub_item.subKey}'
         wid['item_id'].grid()
     else:
         wid['item_id'].grid_remove()
