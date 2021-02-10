@@ -12,12 +12,14 @@ from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
 import logging
 import utils
+import wx
 
 from typing import Iterable, Union, Dict, Tuple
 
 LOGGER = srctools.logger.get_logger('img')
 
-cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
+cached_img_tk = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
+cached_img_wx = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
 cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
 
@@ -49,6 +51,50 @@ def color_hex(color: Vec) -> str:
     return '#{:2X}{:2X}{:2X}'.format(int(r), int(g), int(b))
 
 
+def _png(path: str, resize_to, error, algo, cache, conv):
+    """Shared image loading code."""
+    path = path.casefold().replace('\\', '/')
+    if path[-4:-3] != '.':
+        path += ".png"
+
+    resize_width, resize_height = resize_to = tuple_size(resize_to)
+
+    try:
+        return cache[path, resize_width, resize_height]
+    except KeyError:
+        pass
+
+    image: Image.Image
+    with filesystem:
+        try:
+            img_file = filesystem[path]
+        except (KeyError, FileNotFoundError):
+            LOGGER.warning('ERROR: "images/{}" does not exist!', path)
+            return error or img_error
+        with img_file.open_bin() as file:
+            image = Image.open(file)
+            image.load()
+
+    if resize_to != (0, 0) and resize_to != image.size:
+        image = image.resize(resize_to, algo)
+
+    conv_img = conv(image)
+
+    cache[path, resize_width, resize_height] = conv_img
+    return conv_img
+
+
+def _conv_tk(image):
+    return ImageTk.PhotoImage(image=image)
+
+
+def _conv_wx(image):
+    image = image.convert('RGB')
+    wx_img = wx.Bitmap(image.width, image.height)
+    wx_img.CopyFromBuffer(image, wx.BitmapBufferFormat_RGB)
+    return wx_img
+
+
 def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
@@ -60,37 +106,20 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     - This caches images, so it won't be deleted (Tk doesn't keep a reference
       to the Python object), and subsequent calls don't touch the hard disk.
     """
-    path = path.casefold().replace('\\', '/')
-    if path[-4:-3] != '.':
-        path += ".png"
+    return _png(path, resize_to, error, algo, cached_img_tk, _conv_tk)
 
-    orig_path = path
 
-    resize_width, resize_height = resize_to = tuple_size(resize_to)
+def png_wx(path: str, resize_to=0, error=None, algo=Image.NEAREST) -> wx.Bitmap:
+    """Loads in an image for use in WX.
 
-    try:
-        return cached_img[path, resize_width, resize_height]
-    except KeyError:
-        pass
-
-    with filesystem:
-        try:
-            img_file = filesystem[path]
-        except (KeyError, FileNotFoundError):
-            LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
-            return error or img_error
-        with img_file.open_bin() as file:
-            image = Image.open(file)  # type: Image.Image
-            image.load()
-
-    if resize_to != (0, 0) and resize_to != image.size:
-        image = image.resize(resize_to, algo)
-        # image.save(img_file._data.sys._resolve_path(img_file._data.path))
-
-    tk_img = ImageTk.PhotoImage(image=image)
-
-    cached_img[orig_path, resize_width, resize_height] = tk_img
-    return tk_img
+    - The .png suffix will automatically be added.
+    - Images will be loaded from both the inbuilt files and the extracted
+    zip cache.
+    - If resize_to is set, the image will be resized to that size using the algo
+    algorithm.
+    - This caches images.
+    """
+    return _png(path, resize_to, error, algo, cached_img_wx, _conv_wx)
 
 
 def spr(name, error=None):
