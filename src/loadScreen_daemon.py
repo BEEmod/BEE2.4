@@ -4,12 +4,12 @@ During package loading, we are busy performing tasks in the main thread.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-from typing import Optional, Dict, Tuple, List
+from typing import Optional, Dict, Tuple, List, Iterable
 
-from tkinter import ttk
 from tkinter.font import Font
-from app import img, TK_ROOT
 import tkinter as tk
+from app import img
+import wx
 import multiprocessing.connection
 
 import utils
@@ -33,6 +33,9 @@ SPLASH_FONTS = [
     'San Francisco',
 ]
 
+# The window style for loadscreens.
+WIN_STYLE = wx.NO_BORDER
+
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
@@ -46,13 +49,13 @@ class BaseLoadScreen:
         self.scr_id = scr_id
         self.title_text = title_text
 
-        self.win = tk.Toplevel(TK_ROOT)
-        self.win.withdraw()
-        self.win.wm_overrideredirect(True)
-        self.win.attributes('-topmost', int(force_ontop))
-        self.win['cursor'] = utils.CURSORS['wait']
-        self.win.grid_columnconfigure(0, weight=1)
-        self.win.grid_rowconfigure(0, weight=1)
+        style = WIN_STYLE
+        if force_ontop:
+            style |= wx.STAY_ON_TOP
+
+        self.win = wx.Frame(None, style=style, name=title_text)
+        self.win.Cursor = wx.Cursor(wx.CURSOR_WAIT)
+        self.win.Hide()
 
         self.values = {}
         self.maxes = {}
@@ -65,53 +68,58 @@ class BaseLoadScreen:
             self.maxes[st_id] = 10
             self.names[st_id] = stage_name
 
-        # Because of wm_overrideredirect, we have to manually do dragging.
-        self.drag_x = self.drag_y = None  # type: Optional[int]
+        # Because there's no border, we have to manually do dragging.
+        self.drag_x: Optional[int] = None
+        self.drag_y: Optional[int] = None
 
-        self.win.bind('<Button-1>', self.move_start)
-        self.win.bind('<ButtonRelease-1>', self.move_stop)
-        self.win.bind('<B1-Motion>', self.move_motion)
-        self.win.bind('<Escape>', self.cancel)
+        self.win.Bind(wx.EVT_LEFT_DOWN, self.move_start)
+        self.win.Bind(wx.EVT_LEFT_UP, self.move_stop)
+        self.win.Bind(wx.EVT_MOTION, self.move_motion)
+        self.win.Bind(wx.EVT_KEY_UP, self.cancel)
 
-    def cancel(self, event: tk.Event=None):
+    def cancel(self, event: wx.Event=None) -> None:
         """User pressed the cancel button."""
+        print('Cancel: ', event)
+        if isinstance(event, wx.KeyEvent) and event.GetKeyCode() != wx.WXK_ESCAPE:
+            # Not the escape key.
+            event.Skip()
+            return
+
         self.op_reset()
         PIPE_SEND.send(('cancel', self.scr_id))
 
-    def move_start(self, event: tk.Event):
+    def move_start(self, event: wx.MouseEvent) -> None:
         """Record offset of mouse on click."""
-        self.drag_x = event.x
-        self.drag_y = event.y
-        self.win['cursor'] = utils.CURSORS['move_item']
+        self.drag_x = event.GetX()
+        self.drag_y = event.GetY()
+        self.win.Cursor = wx.Cursor(wx.CURSOR_CROSS)  # Or SIZE_NSEW?
+        event.Skip()  # Allow normal focus processing to take place.
 
-    def move_stop(self, event: tk.Event):
+    def move_stop(self, event: wx.MouseEvent) -> None:
         """Clear values when releasing."""
-        self.win['cursor'] = utils.CURSORS['wait']
+        self.win.Cursor = wx.Cursor(wx.CURSOR_WAIT)
         self.drag_x = self.drag_y = None
 
-    def move_motion(self, event: tk.Event):
+    def move_motion(self, event: wx.MouseEvent) -> None:
         """Move the window when moving the mouse."""
         if self.drag_x is None or self.drag_y is None:
             return
-        self.win.geometry('+{x:g}+{y:g}'.format(
-            x=self.win.winfo_x() + (event.x - self.drag_x),
-            y=self.win.winfo_y() + (event.y - self.drag_y),
-        ))
+        pos_x, pos_y = self.win.GetPosition().Get()
+        self.win.MoveXY(
+            x=pos_x + (event.GetX() - self.drag_x),
+            y=pos_y + (event.GetY() - self.drag_y),
+        )
 
     def op_show(self) -> None:
         """Show the window."""
         self.is_shown = True
-        self.win.deiconify()
-        self.win.lift()
-        self.win.update()  # Force an update so the reqwidth is correct
-        self.win.geometry('+{x:g}+{y:g}'.format(
-            x=(self.win.winfo_screenwidth() - self.win.winfo_reqwidth()) // 2,
-            y=(self.win.winfo_screenheight() - self.win.winfo_reqheight()) // 2,
-        ))
+        self.win.Show()
+        self.win.Raise()
+        self.win.Center()
 
     def op_hide(self) -> None:
         self.is_shown = False
-        self.win.withdraw()
+        self.win.Hide()
 
     def op_reset(self) -> None:
         """Hide and reset values in all bars."""
@@ -145,97 +153,93 @@ class BaseLoadScreen:
 
     def op_destroy(self) -> None:
         """Remove this screen."""
-        self.win.withdraw()
-        self.win.destroy()
+        self.win.Show(False)
+        self.win.Destroy()
         del SCREENS[self.scr_id]
 
 
 class LoadScreen(BaseLoadScreen):
     """Normal loading screens."""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         super().__init__(*args)
 
-        self.frame = ttk.Frame(self.win, cursor=utils.CURSORS['wait'])
-        self.frame.grid(row=0, column=0)
+        sizer_vert = wx.BoxSizer(wx.VERTICAL)
 
-        ttk.Label(
-            self.frame,
-            text=self.title_text + '...',
-            font=("Helvetica", 12, "bold"),
-            cursor=utils.CURSORS['wait'],
-        ).grid(row=0, column=0)
-        ttk.Separator(
-            self.frame,
-            orient=tk.HORIZONTAL,
-            cursor=utils.CURSORS['wait'],
-        ).grid(row=1, sticky="EW", columnspan=2)
+        title_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_vert.Add(title_sizer)
 
-        ttk.Button(
-            self.frame,
-            text=TRANSLATION['cancel'],
-            command=self.cancel,
-        ).grid(row=0, column=1)
+        title_wid = wx.StaticText(self.win, label=self.title_text + '...')
+        title_wid.SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        title_sizer.Add(title_wid, wx.EXPAND)
 
-        self.bar_var = {}
-        self.bars = {}
-        self.labels = {}
+        sizer_vert.Add(wx.StaticLine(self.win, style=wx.LI_HORIZONTAL))
+
+        title_sizer.Add(wx.Button(self.win, wx.ID_CANCEL))
+        self.win.Bind(wx.EVT_BUTTON, self.cancel, id=wx.ID_CANCEL)
+
+        # self.bar_var = {}
+        self.bars: Dict[str, wx.Gauge] = {}
+        self.labels: Dict[str, wx.StaticText] = {}
+
+        stage_sizer = wx.GridBagSizer()
+        sizer_vert.Add(stage_sizer, proportion=1, flag=wx.EXPAND)
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
             if stage_name:
                 # If stage name is blank, don't add a caption
-                ttk.Label(
-                    self.frame,
-                    text=stage_name + ':',
-                    cursor=utils.CURSORS['wait'],
-                ).grid(
-                    row=ind * 2 + 2,
-                    columnspan=2,
-                    sticky="W",
-                )
-            self.bar_var[st_id] = tk.IntVar()
+                name_wid = wx.StaticText(self.win, label=stage_name + ':')
+                stage_sizer.Add(name_wid, pos=(ind*2 + 0, 0), flag=wx.EXPAND | wx.ALIGN_LEFT)
+            else:
+                # Add a spacer.
+                stage_sizer.Add(0, 0, pos=(ind*2 + 0, 0), flag=wx.EXPAND)
 
-            self.bars[st_id] = ttk.Progressbar(
-                self.frame,
-                length=210,
-                maximum=1000,
-                variable=self.bar_var[st_id],
-                cursor=utils.CURSORS['wait'],
+            self.bars[st_id] = wx.Gauge(
+                self.win,
+                style=wx.GA_HORIZONTAL | wx.GA_SMOOTH,
+                range=1000,
             )
-            self.labels[st_id] = ttk.Label(
-                self.frame,
-                text='0/??',
-                cursor=utils.CURSORS['wait'],
-            )
-            self.bars[st_id].grid(row=ind * 2 + 3, column=0, columnspan=2)
-            self.labels[st_id].grid(row=ind * 2 + 2, column=1, sticky="E")
+            self.labels[st_id] = wx.StaticText(self.win, label='0/??')
+            stage_sizer.Add(self.bars[st_id], (ind * 2 + 1, 0), span=(1, 2), flag=wx.EXPAND)
+            stage_sizer.Add(self.labels[st_id], (ind * 2 + 0, 1), flag=wx.ALIGN_RIGHT)
 
-    def reset_stages(self):
+        stage_sizer.AddGrowableCol(0)
+        self.stage_sizer = stage_sizer
+        self.win.SetSizerAndFit(sizer_vert)
+
+
+    def reset_stages(self) -> None:
         """Put the stage in the initial state, before maxes are provided."""
         for stage in self.values.keys():
-            self.bar_var[stage].set(0)
-            self.labels[stage]['text'] = '0/??'
+            self.bars[stage].SetValue(0)
+            self.labels[stage].LabelText = '0/??'
 
-    def update_stage(self, stage):
+    def update_stage(self, stage: str) -> None:
         """Redraw the given stage."""
         max_val = self.maxes[stage]
         if max_val == 0:  # 0/0 sections are skipped automatically.
-            self.bar_var[stage].set(1000)
+            self.bars[stage].Value = 1000
+            self.bars[stage].Range = 1000
         else:
-            self.bar_var[stage].set(
-                1000 * self.values[stage] / max_val
-            )
-        self.labels[stage]['text'] = '{!s}/{!s}'.format(
+            self.bars[stage].Value = self.values[stage]
+            self.bars[stage].Range = max_val
+        self.labels[stage].LabelText = '{!s}/{!s}'.format(
             self.values[stage],
             max_val,
         )
+        self.win.GetSizer().Layout()
 
-    def op_skip_stage(self, stage):
+    def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
-        self.labels[stage]['text'] = TRANSLATION['skip']
-        self.bar_var[stage].set(1000)  # Make sure it fills to max
+        self.labels[stage].LabelText = TRANSLATION['skip']
+        # Make sure it fills to max
+        self.bars[stage].Value = 1000
+        self.bars[stage].Range = 1000
+
+    def op_set_is_compact(self, compact: bool) -> None:
+        pass
 
 
 class SplashScreen(BaseLoadScreen):
@@ -575,29 +579,40 @@ def run_screen(
     translations,
 ):
     """Runs in the other process, with an end of a pipe for input."""
-    global PIPE_REC, PIPE_SEND
+    global PIPE_REC, PIPE_SEND, LOGGER
+    import srctools.logger
+    LOGGER = srctools.logger.init_logging(str(utils.install_path(f'logs/loadscreen.log')))
+
     PIPE_SEND = pipe_send
     PIPE_REC = pipe_rec
     TRANSLATION.update(translations)
 
     force_ontop = True
+    app = wx.App()
 
-    def check_queue():
+    def check_queue(event: wx.IdleEvent) -> None:
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
         while PIPE_REC.poll():  # Pop off all the values.
             had_values = True
             operation, scr_id, args = PIPE_REC.recv()
+            # logger.info('<{}>.{}{!r}', scr_id, operation, args)
             if operation == 'init':
                 # Create a new loadscreen.
                 is_main, title, stages = args
+                is_main = False  # TODO
                 screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
                 SCREENS[scr_id] = screen
             elif operation == 'set_force_ontop':
                 [force_ontop] = args
+                style = WIN_STYLE
+                if force_ontop:
+                    style |= wx.STAY_ON_TOP
                 for screen in SCREENS.values():
-                    screen.win.attributes('-topmost', force_ontop)
+                    screen.win.SetWindowStyle(style)
+            elif operation == 'exit':
+                wx.Exit()
             else:
                 try:
                     func = getattr(SCREENS[scr_id], 'op_' + operation)
@@ -607,11 +622,15 @@ def run_screen(
                     func(*args)
                 except Exception:
                     raise Exception(operation)
-
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
         # Otherwise we hog the CPU.
-        TK_ROOT.after(1 if had_values else 200, check_queue)
-    
-    TK_ROOT.after(10, check_queue)
-    TK_ROOT.mainloop()  # Infinite loop, until the entire process tree quits.
+        # timer.Start(1 if had_values else 200)
+        event.RequestMore()
+
+    # timer = wx.PyTimer(check_queue)
+    # timer.Start(10)
+    app.Bind(wx.EVT_IDLE, check_queue)
+    wx.WakeUpIdle()
+    check_queue(wx.IdleEvent())
+    app.MainLoop()  # Infinite loop, until the entire process tree quits.
