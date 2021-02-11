@@ -4,15 +4,17 @@ During package loading, we are busy performing tasks in the main thread.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
+import os
+import sys
 from typing import Optional, Dict, Tuple, List, Iterator
 
 from tkinter.font import Font
 import tkinter as tk
-from app import img
 import wx
 import multiprocessing.connection
 
 import utils
+import random
 
 # ID -> screen.
 SCREENS: Dict[int, 'BaseLoadScreen'] = {}
@@ -26,12 +28,6 @@ TRANSLATION = {
     'version': 'Version: 2.4.389',
     'cancel': 'Cancel',
 }
-
-SPLASH_FONTS = [
-    'Univers',
-    'Segoe UI',
-    'San Francisco',
-]
 
 # The window style for loadscreens.
 WIN_STYLE = wx.NO_BORDER
@@ -52,6 +48,41 @@ def _iter_sizer(sizer: wx.Sizer) -> Iterator[wx.Window]:
             yield from window_children(child)
         if size_item.GetSizer():
             yield from _iter_sizer(size_item.GetSizer())
+
+
+def get_splash_image(
+    max_width: float,
+    max_height: float,
+) -> wx.Bitmap:
+    """Get the splash screen images.
+
+    This uses a random screenshot from the splash_screens directory.
+    It then adds the gradients on top.
+    """
+    folder = str(utils.install_path('images/splash_screen'))
+    path = '<nothing>'
+    try:
+        path = random.choice(os.listdir(folder))
+        image = wx.Image(os.path.join(folder, path))
+    except (FileNotFoundError, IndexError, IOError):
+        # Not found, substitute a gray block.
+        print(f'No splash screen found (tried "{path}")', file=sys.stderr)
+        return wx.Bitmap.FromRGBA(
+            round(max_width), round(max_height),
+            128, 128, 128, 255,
+        )
+    else:
+        if image.Height > max_height:
+            image.Rescale(
+                round(image.Width / image.Height * max_height),
+                round(max_height),
+            )
+        if image.Width > max_width:
+            image.Rescale(
+                round(max_width),
+                round(image.Height / image.Width * max_width),
+            )
+        return wx.Bitmap(image)
 
 
 class BaseLoadScreen:
@@ -272,9 +303,6 @@ class LoadScreen(BaseLoadScreen):
         self.bars[stage].Value = 1000
         self.bars[stage].Range = 1000
 
-    def op_set_is_compact(self, compact: bool) -> None:
-        pass
-
 
 class SplashScreen(BaseLoadScreen):
     """The splash screen shown when booting up."""
@@ -284,155 +312,89 @@ class SplashScreen(BaseLoadScreen):
 
         self.is_compact = True
 
-        all_fonts = set(tk.font.families())
+        # Default to the system GUI if others can't be found.
+        self.font: wx.Font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        self.font.SetPixelSize((0, 18))
+        self.font.MakeBold()
 
-        for font_family in all_fonts:
-            # DIN is the font used by Portal 2's logo,
-            # so try and use that.
-            if 'DIN' in font_family:
+        # Try and find DIN, then Univers in that order.
+        # If not, we'll reset to what it was.
+        for name in ['DIN', 'Univers', self.font.GetFaceName()]:
+            self.font.SetFaceName(name)
+            if self.font.IsOk():
                 break
-        else:  # Otherwise, use system UI fonts from a list.
-            for font_family in SPLASH_FONTS:
-                if font_family in all_fonts:
-                    break
-            else:
-                font_family = 'Times'  # Generic special case
 
-        font = Font(
-            family=font_family,
-            size=-18,  # negative = in pixels
-            weight='bold',
+        self.progress_font = self.font.GetBaseFont()
+        self.progress_font.SetPixelSize((0, 12))
+
+        screen_width = wx.SystemSettings.GetMetric(wx.SYS_SCREEN_X, self.win)
+        screen_height = wx.SystemSettings.GetMetric(wx.SYS_SCREEN_Y, self.win)
+
+        self.sml_width = int(min(0.5 * screen_width, 400))
+        self.sml_height = int(min(0.5 * screen_height, 175))
+
+        self.logo = wx.Bitmap()
+        self.logo.LoadFile(str(utils.install_path('images/BEE2/splash_logo.png')))
+
+        icons = wx.Image()
+        icons.LoadFile(str(utils.install_path('images/BEE2/splash_icons.png')))
+        self.resize_ico = wx.Bitmap(icons.Resize((20, 20), (0, 0)))
+        self.quit_ico = wx.Bitmap(icons.Resize((20, 20), (20, 0)))
+
+        self.splash_bg = get_splash_image(
+            max(screen_width * 0.6, 500),
+            max(screen_height * 0.6, 500),
+        )
+        self.lrg_width = self.splash_bg.Width
+        self.lrg_height = self.splash_bg.Height
+
+        self.win.Bind(wx.EVT_PAINT, self.on_paint)
+        self.canvas = ()
+        self.win.Layout()
+
+    def on_paint(self, event: wx.PaintEvent) -> None:
+        """Handle commonalities between both sizes."""
+        dc = wx.PaintDC(self.win)
+        gc: wx.GraphicsContext = wx.GraphicsContext.Create(dc)
+
+        if self.is_compact:
+            width, height = self.on_paint_sml(gc)
+        else:
+            width, height = self.on_paint_lrg(gc)
+
+        gc.SetBrush(wx.Brush((0, 120, 90)))
+        gc.DrawRectangle(
+            width - 40, 0,
+            width - 20, 20,
+        )
+        # 150, 120, 64
+        # Diagonal part of arrow.
+        canvas.create_line(
+            width - 20 - 4, 4,
+            width - 20 - 16, 16,
+            fill='black',
+            width=2,
+            tags='resize_button',
+        )
+        canvas.tag_bind(
+            'resize_button',
+            '<Button-1>',
         )
 
-        progress_font = Font(
-            family=font_family,
-            size=-12,  # negative = in pixels
-        )
-
-        logo_img = img.png('BEE2/splash_logo')
-
-        self.lrg_canvas = tk.Canvas(self.win)
-        self.sml_canvas = tk.Canvas(
-            self.win,
-            background='#009678',  # 0, 150, 120
-        )
-
-        sml_width = int(min(self.win.winfo_screenwidth() * 0.5, 400))
-        sml_height = int(min(self.win.winfo_screenheight() * 0.5, 175))
-
-        self.lrg_canvas.create_image(
-            10, 10,
-            anchor='nw',
-            image=logo_img,
-        )
-
-        self.sml_canvas.create_text(
-            sml_width / 2, 30,
-            anchor='n',
-            text=self.title_text,
-            fill='white',
-            font=font,
-        )
-        self.sml_canvas.create_text(
-            sml_width / 2, 50,
-            anchor='n',
-            text=TRANSLATION['version'],
-            fill='white',
-            font=font,
-        )
-
-        text1 = self.lrg_canvas.create_text(
-            10, 125,
-            anchor='nw',
-            text=self.title_text,
-            fill='white',
-            font=font,
-        )
-        text2 = self.lrg_canvas.create_text(
-            10, 145,
-            anchor='nw',
-            text=TRANSLATION['version'],
-            fill='white',
-            font=font,
-        )
-
-        # Now add shadows behind the text, and draw to the canvas.
-        splash, lrg_width, lrg_height = img.make_splash_screen(
-            max(self.win.winfo_screenwidth() * 0.6, 500),
-            max(self.win.winfo_screenheight() * 0.6, 500),
-            base_height=len(self.stages) * 20,
-            text1_bbox=self.lrg_canvas.bbox(text1),
-            text2_bbox=self.lrg_canvas.bbox(text2),
-        )
-        self.splash_img = splash  # Keep this alive
-        self.lrg_canvas.tag_lower(self.lrg_canvas.create_image(
-            0, 0,
-            anchor='nw',
-            image=splash,
-        ))
-
-        self.canvas = [
-            (self.lrg_canvas, lrg_width, lrg_height),
-            (self.sml_canvas, sml_width, sml_height),
-        ]
-
-        for canvas, width, height in self.canvas:
-            canvas.create_rectangle(
-                width - 40,
-                0,
-                width - 20,
-                20,
-                fill='#00785A',
-                width=0,
-                tags='resize_button',
-            )
-            # 150, 120, 64
-            # Diagonal part of arrow.
-            canvas.create_line(
-                width - 20 - 4, 4,
-                width - 20 - 16, 16,
-                fill='black',
-                width=2,
-                tags='resize_button',
-            )
-            canvas.tag_bind(
-                'resize_button',
-                '<Button-1>',
-                self.compact_button(
-                    canvas is self.lrg_canvas,
-                    width,
-                    lrg_width if width == sml_width else sml_width,
-                ),
-            )
         self.sml_canvas.create_line(
-            sml_width - 20 - 4, 4,
-            sml_width - 20 - 16, 4,
+            width - 20 - 4, 4,
+            width - 20 - 16, 4,
             fill='black',
             width=2,
             tags='resize_button',
         )
         self.sml_canvas.create_line(
-            sml_width - 20 - 4, 4,
-            sml_width - 20 - 4, 16,
+            width - 20 - 4, 4,
+            width - 20 - 4, 16,
             fill='black',
             width=2,
             tags='resize_button',
         )
-        self.lrg_canvas.create_line(
-            lrg_width - 20 - 16, 16,
-            lrg_width - 20 - 4, 16,
-            fill='black',
-            width=2,
-            tags='resize_button',
-        )
-        self.lrg_canvas.create_line(
-            lrg_width - 20 - 16, 16,
-            lrg_width - 20 - 16, 4,
-            fill='black',
-            width=2,
-            tags='resize_button',
-        )
-
         for canvas, width, height in self.canvas:
             canvas['width'] = width
             canvas['height'] = height
@@ -473,6 +435,8 @@ class SplashScreen(BaseLoadScreen):
             )
             canvas.tag_bind('quit_button', '<Button-1>', self.cancel)
 
+            gc.SetFont(self.progress_font, wx.WHITE)
+
             for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
                 canvas.create_rectangle(
                     20,
@@ -502,14 +466,94 @@ class SplashScreen(BaseLoadScreen):
                     font=progress_font,
                 )
 
+    def on_paint_sml(self, gc: wx.GraphicsContext) -> Tuple[int, int]:
+        """Handle painting the compact splash screen."""
+
+        # Fill with the green colour.
+        gc.SetBrush(wx.Brush((0, 150, 120)))
+        gc.DrawRectangle(0, 0, self.sml_width, self.sml_height)
+
+        gc.SetFont(self.font, wx.WHITE)
+        # Center both text.
+        title_w, title_h, *_ = gc.GetFullTextExtent(self.title_text)
+        vers_w, vers_h, *_ = gc.GetFullTextExtent(TRANSLATION['version'])
+
+        gc.DrawText(
+            self.title_text,
+            (self.sml_width + title_w) / 2, 30,
+        )
+        gc.DrawText(
+            TRANSLATION['version'],
+            (self.sml_width + vers_w)/ 2, 50,
+        )
+        return self.sml_width, self.sml_height
+
+    def on_paint_lrg(self, gc: wx.GraphicsContext) -> Tuple[int, int]:
+        """Handle painting the full splash screen."""
+        gc.DrawBitmap(self.splash_bg, 0, 0, self.lrg_width, self.lrg_height)
+        gc.DrawBitmap(self.logo, 10, 10, self.logo.Width, self.logo.Height)
+
+        gc.SetFont(self.font, wx.WHITE)
+        # Center both text.
+        title_w, title_h, *_ = gc.GetFullTextExtent(self.title_text)
+        vers_w, vers_h, *_ = gc.GetFullTextExtent(TRANSLATION['version'])
+
+        title_x, title_y = 10, 125
+        vers_x, vers_y = 10, 145
+
+        # Draw shadows behind the text.
+        # This is done by progressively drawing smaller rectangles
+        # with a low alpha. The center is overdrawn more making it thicker.
+        gc.SetBrush(wx.Brush((0, 150, 120, 20)))
+        for border in reversed(range(5)):
+            gc.DrawRectangle(
+                title_x - border,
+                title_y - border,
+                title_w + 2 * border,
+                title_h + 2 * border,
+            )
+            gc.DrawRectangle(
+                vers_x - border,
+                vers_y - border,
+                vers_w + 2 * border,
+                vers_h + 2 * border,
+            )
+
+        gc.DrawText(self.title_text, title_x, title_y)
+        gc.DrawText(TRANSLATION['version'], vers_x, vers_y)
+
+        base_height = len(self.stages) * 20
+
+        solid_height = base_height + 40
+
+        # Add a gradient above the rectangle..
+        gc.SetBrush(gc.CreateLinearGradientBrush(
+            0, self.lrg_height - solid_height - 40,
+            0, self.lrg_height - solid_height,
+            wx.Colour(0, 150, 120, 0),
+            wx.Colour(0, 150, 120, 128),
+        ))
+        gc.DrawRectangle(
+            0, self.lrg_height - solid_height - 40,
+            self.lrg_width, 40,
+        )
+        gc.SetBrush(wx.Brush((0, 150, 120, 128)))
+        gc.DrawRectangle(
+            0,
+            self.lrg_height - solid_height,
+            self.lrg_width,
+            solid_height,
+        )
+        return self.lrg_width, self.lrg_height
+
     def update_stage(self, stage):
         text = '{}: ({}/{})'.format(
             self.names[stage],
             self.values[stage],
             self.maxes[stage],
         )
-        self.sml_canvas.itemconfig('text_' + stage, text=text)
-        self.lrg_canvas.itemconfig('text_' + stage, text=text)
+        # self.sml_canvas.itemconfig('text_' + stage, text=text)
+        # self.lrg_canvas.itemconfig('text_' + stage, text=text)
         self.set_bar(stage, self.values[stage] / self.maxes[stage])
 
     def set_bar(self, stage, fraction):
@@ -572,11 +616,15 @@ class SplashScreen(BaseLoadScreen):
         """Set the display mode."""
         self.is_compact = is_compact
         if is_compact:
-            self.lrg_canvas.grid_remove()
-            self.sml_canvas.grid(row=0, column=0)
+            self.win.SetSize(
+                wx.DefaultCoord, wx.DefaultCoord,
+                self.sml_width, self.sml_height
+            )
         else:
-            self.sml_canvas.grid_remove()
-            self.lrg_canvas.grid(row=0, column=0)
+            self.win.SetSize(
+                wx.DefaultCoord, wx.DefaultCoord,
+                self.lrg_width, self.lrg_height
+            )
         PIPE_SEND.send(('main_set_compact', is_compact))
 
     def toggle_compact(self, event: tk.Event) -> None:
@@ -590,19 +638,24 @@ class SplashScreen(BaseLoadScreen):
             event.y_root - int(canvas['height']) // 2,
         ))
 
-    def compact_button(self, compact: bool, old_width, new_width):
-        """Make the event function to set values."""
-        offset = old_width - new_width
-
-        def func(event=None):
-            """Event handler."""
-            self.op_set_is_compact(compact)
-            # Snap to where the button is.
-            self.win.wm_geometry('+{:g}+{:g}'.format(
-                self.win.winfo_x() + offset,
-                self.win.winfo_y(),
-            ))
-        return func
+    # def compact_button(self, compact: bool, old_width, new_width):
+    #     """Make the event function to set values."""
+    #     self.compact_button(
+    #         canvas is self.lrg_canvas,
+    #         width,
+    #         lrg_width if width == sml_width else sml_width,
+    #     ),
+    #     offset = old_width - new_width
+    #
+    #     def func(event=None):
+    #         """Event handler."""
+    #         self.op_set_is_compact(compact)
+    #         # Snap to where the button is.
+    #         self.win.wm_geometry('+{:g}+{:g}'.format(
+    #             self.win.winfo_x() + offset,
+    #             self.win.winfo_y(),
+    #         ))
+    #     return func
 
 
 def run_screen(
@@ -633,7 +686,6 @@ def run_screen(
             if operation == 'init':
                 # Create a new loadscreen.
                 is_main, title, stages = args
-                is_main = False  # TODO
                 screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
                 SCREENS[scr_id] = screen
             elif operation == 'set_force_ontop':
