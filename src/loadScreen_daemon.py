@@ -4,7 +4,7 @@ During package loading, we are busy performing tasks in the main thread.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-from typing import Optional, Dict, Tuple, List, Iterable
+from typing import Optional, Dict, Tuple, List, Iterator
 
 from tkinter.font import Font
 import tkinter as tk
@@ -35,6 +35,23 @@ SPLASH_FONTS = [
 
 # The window style for loadscreens.
 WIN_STYLE = wx.NO_BORDER
+
+
+def window_children(win: wx.Window) -> Iterator[wx.Window]:
+    """Iterate through all the children of this window, including itself."""
+    yield win
+    if win.GetSizer():
+        yield from _iter_sizer(win.GetSizer())
+
+
+def _iter_sizer(sizer: wx.Sizer) -> Iterator[wx.Window]:
+    size_item: wx.SizerItem
+    for size_item in sizer:
+        child = size_item.GetWindow()
+        if child:
+            yield from window_children(child)
+        if size_item.GetSizer():
+            yield from _iter_sizer(size_item.GetSizer())
 
 
 class BaseLoadScreen:
@@ -72,14 +89,23 @@ class BaseLoadScreen:
         self.drag_x: Optional[int] = None
         self.drag_y: Optional[int] = None
 
-        self.win.Bind(wx.EVT_LEFT_DOWN, self.move_start)
-        self.win.Bind(wx.EVT_LEFT_UP, self.move_stop)
-        self.win.Bind(wx.EVT_MOTION, self.move_motion)
-        self.win.Bind(wx.EVT_KEY_UP, self.cancel)
+    def bind_events(self, wid: wx.Window) -> None:
+        """Bind event handlers to all the widgets in the window."""
+        # Reuse the same method objects.
+        start = self.move_start
+        stop = self.move_stop
+        move = self.move_motion
+        cancel = self.cancel
+
+        for win in window_children(wid):
+            if not isinstance(win, wx.Button):
+                win.Bind(wx.EVT_LEFT_DOWN, start)
+                win.Bind(wx.EVT_LEFT_UP, stop)
+                win.Bind(wx.EVT_MOTION, move)
+                win.Bind(wx.EVT_KEY_UP, cancel)
 
     def cancel(self, event: wx.Event=None) -> None:
         """User pressed the cancel button."""
-        print('Cancel: ', event)
         if isinstance(event, wx.KeyEvent) and event.GetKeyCode() != wx.WXK_ESCAPE:
             # Not the escape key.
             event.Skip()
@@ -90,24 +116,31 @@ class BaseLoadScreen:
 
     def move_start(self, event: wx.MouseEvent) -> None:
         """Record offset of mouse on click."""
-        self.drag_x = event.GetX()
-        self.drag_y = event.GetY()
         self.win.Cursor = wx.Cursor(wx.CURSOR_CROSS)  # Or SIZE_NSEW?
+        self.win.CaptureMouse()
         event.Skip()  # Allow normal focus processing to take place.
 
     def move_stop(self, event: wx.MouseEvent) -> None:
         """Clear values when releasing."""
         self.win.Cursor = wx.Cursor(wx.CURSOR_WAIT)
+        self.win.ReleaseMouse()
         self.drag_x = self.drag_y = None
 
     def move_motion(self, event: wx.MouseEvent) -> None:
         """Move the window when moving the mouse."""
-        if self.drag_x is None or self.drag_y is None:
+        if not event.LeftIsDown():
             return
+        if self.drag_x is None or self.drag_y is None:
+            # This doesn't get set right in on-press, so we have to
+            # store off the first position.
+            self.drag_x, self.drag_y = event.GetPosition().Get()
+            return
+
         pos_x, pos_y = self.win.GetPosition().Get()
+        mouse_x, mouse_y = event.GetPosition().Get()
         self.win.MoveXY(
-            x=pos_x + (event.GetX() - self.drag_x),
-            y=pos_y + (event.GetY() - self.drag_y),
+            x=pos_x + (mouse_x - self.drag_x),
+            y=pos_y + (mouse_y - self.drag_y),
         )
 
     def op_show(self) -> None:
@@ -194,18 +227,19 @@ class LoadScreen(BaseLoadScreen):
                 # Add a spacer.
                 stage_sizer.Add(0, 0, pos=(ind*2 + 0, 0), flag=wx.EXPAND)
 
-            self.bars[st_id] = wx.Gauge(
+            self.bars[st_id] = bar = wx.Gauge(
                 self.win,
                 style=wx.GA_HORIZONTAL | wx.GA_SMOOTH,
                 range=1000,
             )
-            self.labels[st_id] = wx.StaticText(self.win, label='0/??')
-            stage_sizer.Add(self.bars[st_id], (ind * 2 + 1, 0), span=(1, 2), flag=wx.EXPAND)
-            stage_sizer.Add(self.labels[st_id], (ind * 2 + 0, 1), flag=wx.ALIGN_RIGHT)
+            self.labels[st_id] = label = wx.StaticText(self.win, label='0/??')
+            stage_sizer.Add(bar, (ind * 2 + 1, 0), span=(1, 2), flag=wx.EXPAND)
+            stage_sizer.Add(label, (ind * 2 + 0, 1), flag=wx.ALIGN_RIGHT)
 
         stage_sizer.AddGrowableCol(0)
         self.stage_sizer = stage_sizer
         self.win.SetSizerAndFit(sizer_vert)
+        self.bind_events(self.win)
 
 
     def reset_stages(self) -> None:
@@ -579,9 +613,7 @@ def run_screen(
     translations,
 ):
     """Runs in the other process, with an end of a pipe for input."""
-    global PIPE_REC, PIPE_SEND, LOGGER
-    import srctools.logger
-    LOGGER = srctools.logger.init_logging(str(utils.install_path(f'logs/loadscreen.log')))
+    global PIPE_REC, PIPE_SEND
 
     PIPE_SEND = pipe_send
     PIPE_REC = pipe_rec
@@ -622,14 +654,9 @@ def run_screen(
                     func(*args)
                 except Exception:
                     raise Exception(operation)
-        # Continually re-run this function in the TK loop.
-        # If we didn't find anything in the pipe, wait longer.
-        # Otherwise we hog the CPU.
-        # timer.Start(1 if had_values else 200)
+        # Ensure another idle event will be fired.
         event.RequestMore()
 
-    # timer = wx.PyTimer(check_queue)
-    # timer.Start(10)
     app.Bind(wx.EVT_IDLE, check_queue)
     wx.WakeUpIdle()
     check_queue(wx.IdleEvent())
