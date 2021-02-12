@@ -183,6 +183,8 @@ class BaseLoadScreen:
 
     def op_hide(self) -> None:
         self.is_shown = False
+        # We must not have the mouse captured when hiding the window.
+        self.win.ReleaseMouse()
         self.win.Hide()
 
     def op_reset(self) -> None:
@@ -313,18 +315,20 @@ class SplashScreen(BaseLoadScreen):
         self.is_compact = True
 
         # Default to the system GUI if others can't be found.
-        self.font: wx.Font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        self.font.SetPixelSize((0, 18))
-        self.font.MakeBold()
+        font: wx.Font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
 
         # Try and find DIN, then Univers in that order.
         # If not, we'll reset to what it was.
-        for name in ['DIN', 'Univers', self.font.GetFaceName()]:
-            self.font.SetFaceName(name)
-            if self.font.IsOk():
+        for name in ['DIN', 'Univers', font.GetFaceName()]:
+            font.SetFaceName(name)
+            if font.IsOk():
                 break
 
-        self.progress_font = self.font.GetBaseFont()
+        self.font = font.GetBaseFont()
+        self.font.SetPixelSize((0, 18))
+        self.font.MakeBold()
+
+        self.progress_font = font.GetBaseFont()
         self.progress_font.SetPixelSize((0, 12))
 
         screen_width = wx.SystemSettings.GetMetric(wx.SYS_SCREEN_X, self.win)
@@ -338,10 +342,10 @@ class SplashScreen(BaseLoadScreen):
 
         icons = wx.Image()
         icons.LoadFile(str(utils.install_path('images/BEE2/splash_icons.png')))
-        arrow: wx.Image = icons.Resize((20, 20), (0, 0))
+        arrow: wx.Image = icons.Copy().Resize((20, 20), (0, 0))
         self.contract_ico = wx.Bitmap(arrow)
         self.expand_ico = wx.Bitmap(arrow.Rotate180())
-        self.quit_ico = wx.Bitmap(icons.Resize((20, 20), (20, 0)))
+        self.quit_ico = wx.Bitmap(icons.Copy().Resize((20, 20), (-20, 0)))
 
         self.splash_bg = get_splash_image(
             max(screen_width * 0.6, 500),
@@ -350,10 +354,19 @@ class SplashScreen(BaseLoadScreen):
         self.lrg_width = self.splash_bg.Width
         self.lrg_height = self.splash_bg.Height
 
-        self.canvas = ()  # TODO: Remove this
+        # To avoid flickering when rendering the bars, first render to a bitmap.
+        self.bars_buff = wx.Bitmap()
+        self.last_buff = None
+        self.bars_dc = wx.MemoryDC()
 
-        self.win.Bind(wx.EVT_LEFT_DCLICK, self.toggle_compact)
         self.win.Bind(wx.EVT_PAINT, self.on_paint)
+        self.win.Bind(wx.EVT_LEFT_DCLICK, self.toggle_compact)
+        self.win.Bind(wx.EVT_LEFT_UP, self.clicked)
+
+        self.win.Bind(wx.EVT_LEFT_DOWN, self.move_start)
+        self.win.Bind(wx.EVT_MOTION, self.move_motion)
+        self.win.Bind(wx.EVT_KEY_UP, self.cancel)
+
         self.refresh()
 
     @property
@@ -374,7 +387,7 @@ class SplashScreen(BaseLoadScreen):
 
     def on_paint(self, event: wx.PaintEvent) -> None:
         """Handle repainting when requested by the OS."""
-        self.repaint(wx.PaintDC(self.win))
+        self.repaint(wx.PaintDC(self.win), complete=True)
 
     def refresh(self) -> None:
         """Update the UI to respond to changes.
@@ -382,45 +395,61 @@ class SplashScreen(BaseLoadScreen):
         We only need to repaint the bars area.
         """
         dc = wx.ClientDC(self.win)
-        gc: wx.GraphicsContext = wx.GraphicsContext.Create(dc)
+        self.repaint(dc, complete=False)
 
-        self.repaint_bars(gc)
-
-    def repaint(self, dc: wx.DC) -> None:
+    def repaint(self, dc: wx.DC, complete: bool) -> None:
         """Render the entire window."""
         gc: wx.GraphicsContext = wx.GraphicsContext.Create(dc)
 
-        if self.is_compact:
-            self.on_paint_sml(gc)
-        else:
-            self.on_paint_lrg(gc)
-        width = self.width
-        height = self.height
+        if complete:
+            if self.is_compact:
+                self.on_paint_sml(gc)
+            else:
+                self.on_paint_lrg(gc)
 
         gc.DrawBitmap(
             self.expand_ico if self.is_compact else self.expand_ico,
-            width - 40, 0,
+            self.width - 40, 0,
             20, 20,
         )
         gc.DrawBitmap(
             self.quit_ico,
-            width - 20, 0,
+            self.width - 20, 0,
             20, 20,
         )
-        self.repaint_bars(gc)
 
-    def repaint_bars(self, gc: wx.GraphicsContext) -> None:
+        self.repaint_bars()
+        gc.DrawBitmap(
+            self.bars_buff,
+            20,
+            self.height - 20 * len(self.stages) - 20,
+            self.bars_buff.Width, self.bars_buff.Height,
+        )
+
+    def repaint_bars(self) -> None:
         """Render the bars area."""
+        bar_width = self.width - 40
+        bar_height = 20 * len(self.stages)
+
+        if self.last_buff is not self.is_compact:
+            try:
+                self.bars_dc.SelectObject(wx.NullBitmap)
+                self.bars_buff.Create(bar_width, bar_height)
+            finally:
+                self.bars_dc.SelectObjectAsSource(self.bars_buff)
+            self.last_buff = self.is_compact
+
+        gc: wx.GraphicsContext = wx.GraphicsContext.Create(self.bars_dc)
+
         bar_fg = wx.Brush((0, 120, 90))
         bar_bg = wx.Brush((0, 60, 45))
         bar_border = wx.Pen((0, 120, 90), width=2)
-        bar_width = self.width - 40 - 6
 
         gc.SetFont(self.progress_font, wx.WHITE)
-        for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
+        for ind, (st_id, stage_name) in enumerate(self.stages):
             st_val = self.values[st_id]
             st_max = self.maxes[st_id]
-            bar_y = self.height - (ind + 0.5) * 20
+            bar_y = ind * 20
 
             if self.maxes[st_id] == 0:
                 fraction = 1.0  # Skipped, show completed.
@@ -429,11 +458,11 @@ class SplashScreen(BaseLoadScreen):
             else:
                 fraction = st_val / st_max
                 text = f'{stage_name}: ({st_val}/{st_max})'
-                tick_width = bar_width / st_max
+                tick_width = (bar_width - 2) / st_max
             # Border
             gc.SetBrush(bar_bg)
             gc.SetPen(bar_border)
-            gc.DrawRectangle(20, bar_y, bar_width, 20)
+            gc.DrawRectangle(0, bar_y, bar_width, 20)
             # The bar itself. If there's enough width, show discrete
             # segments. Otherwise, show a solid beam.
             gc.SetBrush(bar_fg)
@@ -441,14 +470,15 @@ class SplashScreen(BaseLoadScreen):
             if tick_width > 4:
                 for i in range(st_val):
                     gc.DrawRectangle(
-                        22 + i * tick_width,
+                        2 + i * tick_width,
                         bar_y + 3,
                         tick_width - 2,
                         14,
                     )
             else:
-                gc.DrawRectangle(22, bar_y + 3, fraction * bar_width, 14)
-            gc.DrawText(text, 25, self.height - ind * 20 - 10)
+                gc.DrawRectangle(2, bar_y + 3, fraction * (bar_width - 4), 14)
+            text_height = gc.GetFullTextExtent(text)[1]
+            gc.DrawText(text, 5, ind * 20 + (20 - text_height) / 2)
 
     def on_paint_sml(self, gc: wx.GraphicsContext) -> Tuple[int, int]:
         """Handle painting the compact splash screen."""
@@ -464,11 +494,11 @@ class SplashScreen(BaseLoadScreen):
 
         gc.DrawText(
             self.title_text,
-            (self.sml_width + title_w) / 2, 30,
+            (self.sml_width - title_w) / 2, 20,
         )
         gc.DrawText(
             TRANSLATION['version'],
-            (self.sml_width + vers_w)/ 2, 50,
+            (self.sml_width - vers_w)/ 2, 40,
         )
         return self.sml_width, self.sml_height
 
@@ -534,18 +564,6 @@ class SplashScreen(BaseLoadScreen):
         """To update the stage, we just trigger a repaint."""
         self.refresh()
 
-    def set_bar(self, stage, fraction):
-        """Set a progress bar to this fractional length."""
-        for canvas, width, height in self.canvas:
-            x1, y1, x2, y2 = canvas.coords('bar_' + stage)
-            canvas.coords(
-                'bar_' + stage,
-                20,
-                y1,
-                20 + round(fraction * (width - 40)),
-                y2,
-            )
-
     def op_set_length(self, stage, num):
         """Set the number of items in a stage."""
         self.maxes[stage] = num
@@ -576,8 +594,10 @@ class SplashScreen(BaseLoadScreen):
                 wx.DefaultCoord, wx.DefaultCoord,
                 self.lrg_width, self.lrg_height
             )
-        self.refresh()
         PIPE_SEND.send(('main_set_compact', is_compact))
+        # Repaint the entire window.
+        dc = wx.ClientDC(self.win)
+        self.repaint(dc, complete=True)
 
     def toggle_compact(self, event: wx.MouseEvent) -> None:
         """Toggle when the splash screen is double-clicked."""
@@ -585,9 +605,30 @@ class SplashScreen(BaseLoadScreen):
 
         # Snap to the center of the window.
         self.win.Move(
-            event.X - width // 2,
-            event.Y - height // 2,
+            event.x - self.width // 2,
+            event.y - self.height // 2,
         )
+
+    def clicked(self, event: wx.MouseEvent) -> None:
+        """When clicked, we have to detect clicks on the buttons."""
+        event.Skip()
+        x = event.x
+        y = event.y
+        width = self.width
+        if y < 20:
+            if self.width - 40 <= x < self.width - 20:
+                self.op_set_is_compact(not self.is_compact)
+                offset = width - self.width
+                # Keep the button where it was.
+                x, y = self.win.GetPosition().Get()
+                self.win.Move(x + offset, y)
+
+                return
+            elif self.width - 20 <= x <= self.width:
+                self.cancel()
+                return
+
+        self.move_start(event)
 
     # def compact_button(self, compact: bool, old_width, new_width):
     #     """Make the event function to set values."""
