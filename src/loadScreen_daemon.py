@@ -338,7 +338,9 @@ class SplashScreen(BaseLoadScreen):
 
         icons = wx.Image()
         icons.LoadFile(str(utils.install_path('images/BEE2/splash_icons.png')))
-        self.resize_ico = wx.Bitmap(icons.Resize((20, 20), (0, 0)))
+        arrow: wx.Image = icons.Resize((20, 20), (0, 0))
+        self.contract_ico = wx.Bitmap(arrow)
+        self.expand_ico = wx.Bitmap(arrow.Rotate180())
         self.quit_ico = wx.Bitmap(icons.Resize((20, 20), (20, 0)))
 
         self.splash_bg = get_splash_image(
@@ -348,123 +350,105 @@ class SplashScreen(BaseLoadScreen):
         self.lrg_width = self.splash_bg.Width
         self.lrg_height = self.splash_bg.Height
 
+        self.canvas = ()  # TODO: Remove this
+
+        self.win.Bind(wx.EVT_LEFT_DCLICK, self.toggle_compact)
         self.win.Bind(wx.EVT_PAINT, self.on_paint)
-        self.canvas = ()
-        self.win.Layout()
+        self.refresh()
+
+    @property
+    def width(self) -> int:
+        """Return the current width of the window."""
+        if self.is_compact:
+            return self.sml_width
+        else:
+            return self.lrg_width
+
+    @property
+    def height(self) -> int:
+        """Return the current height of the window."""
+        if self.is_compact:
+            return self.sml_height
+        else:
+            return self.lrg_height
 
     def on_paint(self, event: wx.PaintEvent) -> None:
-        """Handle commonalities between both sizes."""
-        dc = wx.PaintDC(self.win)
+        """Handle repainting when requested by the OS."""
+        self.repaint(wx.PaintDC(self.win))
+
+    def refresh(self) -> None:
+        """Update the UI to respond to changes.
+
+        We only need to repaint the bars area.
+        """
+        dc = wx.ClientDC(self.win)
+        gc: wx.GraphicsContext = wx.GraphicsContext.Create(dc)
+
+        self.repaint_bars(gc)
+
+    def repaint(self, dc: wx.DC) -> None:
+        """Render the entire window."""
         gc: wx.GraphicsContext = wx.GraphicsContext.Create(dc)
 
         if self.is_compact:
-            width, height = self.on_paint_sml(gc)
+            self.on_paint_sml(gc)
         else:
-            width, height = self.on_paint_lrg(gc)
+            self.on_paint_lrg(gc)
+        width = self.width
+        height = self.height
 
-        gc.SetBrush(wx.Brush((0, 120, 90)))
-        gc.DrawRectangle(
+        gc.DrawBitmap(
+            self.expand_ico if self.is_compact else self.expand_ico,
             width - 40, 0,
-            width - 20, 20,
+            20, 20,
         )
-        # 150, 120, 64
-        # Diagonal part of arrow.
-        canvas.create_line(
-            width - 20 - 4, 4,
-            width - 20 - 16, 16,
-            fill='black',
-            width=2,
-            tags='resize_button',
+        gc.DrawBitmap(
+            self.quit_ico,
+            width - 20, 0,
+            20, 20,
         )
-        canvas.tag_bind(
-            'resize_button',
-            '<Button-1>',
-        )
+        self.repaint_bars(gc)
 
-        self.sml_canvas.create_line(
-            width - 20 - 4, 4,
-            width - 20 - 16, 4,
-            fill='black',
-            width=2,
-            tags='resize_button',
-        )
-        self.sml_canvas.create_line(
-            width - 20 - 4, 4,
-            width - 20 - 4, 16,
-            fill='black',
-            width=2,
-            tags='resize_button',
-        )
-        for canvas, width, height in self.canvas:
-            canvas['width'] = width
-            canvas['height'] = height
-            canvas.bind(utils.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
+    def repaint_bars(self, gc: wx.GraphicsContext) -> None:
+        """Render the bars area."""
+        bar_fg = wx.Brush((0, 120, 90))
+        bar_bg = wx.Brush((0, 60, 45))
+        bar_border = wx.Pen((0, 120, 90), width=2)
+        bar_width = self.width - 40 - 6
 
-            canvas.create_rectangle(
-                width-20,
-                0,
-                width,
-                20,
-                fill='#00785A',
-                width=0,
-                tags='quit_button',
-            )
-            canvas.create_rectangle(
-                width-20,
-                0,
-                width,
-                20,
-                fill='#00785A',
-                width=0,
-                tags='quit_button',
-            )
-            # 150, 120, 64
-            canvas.create_line(
-                width-16, 4,
-                width-4, 16,
-                fill='black',
-                width=2,
-                tags='quit_button',
-            )
-            canvas.create_line(
-                width-4, 4,
-                width-16, 16,
-                fill='black',
-                width=2,
-                tags='quit_button',
-            )
-            canvas.tag_bind('quit_button', '<Button-1>', self.cancel)
+        gc.SetFont(self.progress_font, wx.WHITE)
+        for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
+            st_val = self.values[st_id]
+            st_max = self.maxes[st_id]
+            bar_y = self.height - (ind + 0.5) * 20
 
-            gc.SetFont(self.progress_font, wx.WHITE)
-
-            for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
-                canvas.create_rectangle(
-                    20,
-                    height - (ind + 0.5) * 20,
-                    20,
-                    height - (ind - 0.5) * 20,
-                    fill='#00785A',  # 0, 120, 90
-                    width=0,
-                    tags='bar_' + st_id,
-                )
-                # Border
-                canvas.create_rectangle(
-                    20,
-                    height - (ind + 0.5) * 20,
-                    width - 20,
-                    height - (ind - 0.5) * 20,
-                    outline='#00785A',
-                    width=2,
-                )
-                canvas.create_text(
-                    25,
-                    height - ind * 20,
-                    anchor='w',
-                    text=stage_name + ': (0/???)',
-                    fill='white',
-                    tags='text_' + st_id,
-                    font=progress_font,
-                )
+            if self.maxes[st_id] == 0:
+                fraction = 1.0  # Skipped, show completed.
+                text = f'{stage_name}: {TRANSLATION["skip"]}'
+                tick_width = 0
+            else:
+                fraction = st_val / st_max
+                text = f'{stage_name}: ({st_val}/{st_max})'
+                tick_width = bar_width / st_max
+            # Border
+            gc.SetBrush(bar_bg)
+            gc.SetPen(bar_border)
+            gc.DrawRectangle(20, bar_y, bar_width, 20)
+            # The bar itself. If there's enough width, show discrete
+            # segments. Otherwise, show a solid beam.
+            gc.SetBrush(bar_fg)
+            gc.SetPen(wx.TRANSPARENT_PEN)
+            if tick_width > 4:
+                for i in range(st_val):
+                    gc.DrawRectangle(
+                        22 + i * tick_width,
+                        bar_y + 3,
+                        tick_width - 2,
+                        14,
+                    )
+            else:
+                gc.DrawRectangle(22, bar_y + 3, fraction * bar_width, 14)
+            gc.DrawText(text, 25, self.height - ind * 20 - 10)
 
     def on_paint_sml(self, gc: wx.GraphicsContext) -> Tuple[int, int]:
         """Handle painting the compact splash screen."""
@@ -547,14 +531,8 @@ class SplashScreen(BaseLoadScreen):
         return self.lrg_width, self.lrg_height
 
     def update_stage(self, stage):
-        text = '{}: ({}/{})'.format(
-            self.names[stage],
-            self.values[stage],
-            self.maxes[stage],
-        )
-        # self.sml_canvas.itemconfig('text_' + stage, text=text)
-        # self.lrg_canvas.itemconfig('text_' + stage, text=text)
-        self.set_bar(stage, self.values[stage] / self.maxes[stage])
+        """To update the stage, we just trigger a repaint."""
+        self.refresh()
 
     def set_bar(self, stage, fraction):
         """Set a progress bar to this fractional length."""
@@ -571,45 +549,18 @@ class SplashScreen(BaseLoadScreen):
     def op_set_length(self, stage, num):
         """Set the number of items in a stage."""
         self.maxes[stage] = num
-        self.update_stage(stage)
-
-        for canvas, width, height in self.canvas:
-
-            canvas.delete('tick_' + stage)
-
-            if num == 0:
-                return  # No ticks
-
-            # Draw the ticks in...
-            _, y1, _, y2 = canvas.coords('bar_' + stage)
-
-            dist = (width - 40) / num
-            if round(dist) <= 1:
-                # Don't have ticks if they're right next to each other
-                return
-            tag = 'tick_' + stage
-            for i in range(num):
-                pos = int(20 + dist * i)
-                canvas.create_line(
-                    pos, y1, pos, y2,
-                    fill='#00785A',
-                    tags=tag,
-                )
-            canvas.tag_lower('tick_' + stage, 'bar_' + stage)
+        self.refresh()
 
     def reset_stages(self):
-        pass
+        self.maxes = dict.fromkeys(self.maxes, 10)
+        self.values = dict.fromkeys(self.maxes, 0)
+        self.refresh()
 
     def op_skip_stage(self, stage):
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
-        for canvas, width, height in self.canvas:
-            canvas.itemconfig(
-                'text_' + stage,
-                text=self.names[stage] + ': ' + TRANSLATION['skip'],
-            )
-        self.set_bar(stage, 1.0)  # Force stage to be max filled.
+        self.refresh()
 
     # Operations:
     def op_set_is_compact(self, is_compact: bool) -> None:
@@ -625,18 +576,18 @@ class SplashScreen(BaseLoadScreen):
                 wx.DefaultCoord, wx.DefaultCoord,
                 self.lrg_width, self.lrg_height
             )
+        self.refresh()
         PIPE_SEND.send(('main_set_compact', is_compact))
 
-    def toggle_compact(self, event: tk.Event) -> None:
+    def toggle_compact(self, event: wx.MouseEvent) -> None:
         """Toggle when the splash screen is double-clicked."""
         self.op_set_is_compact(not self.is_compact)
 
         # Snap to the center of the window.
-        canvas = self.sml_canvas if self.is_compact else self.lrg_canvas
-        self.win.wm_geometry('+{:g}+{:g}'.format(
-            event.x_root - int(canvas['width']) // 2,
-            event.y_root - int(canvas['height']) // 2,
-        ))
+        self.win.Move(
+            event.X - width // 2,
+            event.Y - height // 2,
+        )
 
     # def compact_button(self, compact: bool, old_width, new_width):
     #     """Make the event function to set values."""
