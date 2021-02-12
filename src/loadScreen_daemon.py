@@ -6,15 +6,16 @@ remains responsive. This is a separate module to reduce the required dependencie
 """
 import os
 import sys
-from typing import Optional, Dict, Tuple, List, Iterator
+from typing import Optional, Dict, Tuple, List, Iterator, Union
 
-from tkinter.font import Font
-import tkinter as tk
 import wx
 import multiprocessing.connection
 
 import utils
 import random
+
+# Force it to log here, don't pop up windows.
+wx.Log.SetActiveTarget(wx.LogStderr())
 
 # ID -> screen.
 SCREENS: Dict[int, 'BaseLoadScreen'] = {}
@@ -134,6 +135,7 @@ class BaseLoadScreen:
                 win.Bind(wx.EVT_LEFT_UP, stop)
                 win.Bind(wx.EVT_MOTION, move)
                 win.Bind(wx.EVT_KEY_UP, cancel)
+                self.win.Bind(wx.EVT_MOUSE_CAPTURE_LOST, stop)
 
     def cancel(self, event: wx.Event=None) -> None:
         """User pressed the cancel button."""
@@ -148,13 +150,15 @@ class BaseLoadScreen:
     def move_start(self, event: wx.MouseEvent) -> None:
         """Record offset of mouse on click."""
         self.win.Cursor = wx.Cursor(wx.CURSOR_CROSS)  # Or SIZE_NSEW?
-        self.win.CaptureMouse()
+        if not self.win.HasCapture():
+            self.win.CaptureMouse()
         event.Skip()  # Allow normal focus processing to take place.
 
-    def move_stop(self, event: wx.MouseEvent) -> None:
+    def move_stop(self, event: Union[wx.MouseEvent, wx.MouseCaptureLostEvent]) -> None:
         """Clear values when releasing."""
         self.win.Cursor = wx.Cursor(wx.CURSOR_WAIT)
-        self.win.ReleaseMouse()
+        if self.win.HasCapture():
+            self.win.ReleaseMouse()
         self.drag_x = self.drag_y = None
 
     def move_motion(self, event: wx.MouseEvent) -> None:
@@ -169,9 +173,9 @@ class BaseLoadScreen:
 
         pos_x, pos_y = self.win.GetPosition().Get()
         mouse_x, mouse_y = event.GetPosition().Get()
-        self.win.MoveXY(
-            x=pos_x + (mouse_x - self.drag_x),
-            y=pos_y + (mouse_y - self.drag_y),
+        self.win.Move(
+            pos_x + (mouse_x - self.drag_x),
+            pos_y + (mouse_y - self.drag_y),
         )
 
     def op_show(self) -> None:
@@ -184,7 +188,8 @@ class BaseLoadScreen:
     def op_hide(self) -> None:
         self.is_shown = False
         # We must not have the mouse captured when hiding the window.
-        self.win.ReleaseMouse()
+        if self.win.HasCapture():
+            self.win.ReleaseMouse()
         self.win.Hide()
 
     def op_reset(self) -> None:
@@ -355,9 +360,11 @@ class SplashScreen(BaseLoadScreen):
         self.lrg_height = self.splash_bg.Height
 
         # To avoid flickering when rendering the bars, first render to a bitmap.
-        self.bars_buff = wx.Bitmap()
-        self.last_buff = None
         self.bars_dc = wx.MemoryDC()
+
+        # Keep track of what size we painted last, so we know if we need to force
+        # repainting the background.
+        self.painted_size: Optional[bool] = None
 
         self.win.Bind(wx.EVT_PAINT, self.on_paint)
         self.win.Bind(wx.EVT_LEFT_DCLICK, self.toggle_compact)
@@ -365,9 +372,10 @@ class SplashScreen(BaseLoadScreen):
 
         self.win.Bind(wx.EVT_LEFT_DOWN, self.move_start)
         self.win.Bind(wx.EVT_MOTION, self.move_motion)
+        self.win.Bind(wx.EVT_MOUSE_CAPTURE_LOST, self.move_stop)
         self.win.Bind(wx.EVT_KEY_UP, self.cancel)
 
-        self.refresh()
+        self.win.Refresh()
 
     @property
     def width(self) -> int:
@@ -385,27 +393,36 @@ class SplashScreen(BaseLoadScreen):
         else:
             return self.lrg_height
 
-    def on_paint(self, event: wx.PaintEvent) -> None:
-        """Handle repainting when requested by the OS."""
-        self.repaint(wx.PaintDC(self.win), complete=True)
-
     def refresh(self) -> None:
         """Update the UI to respond to changes.
 
         We only need to repaint the bars area.
         """
-        dc = wx.ClientDC(self.win)
-        self.repaint(dc, complete=False)
+        height = 20 * len(self.stages)
+        self.win.RefreshRect(wx.Rect(
+            20, self.height - height - 20,
+            self.width - 40, height,
+        ), False)
 
-    def repaint(self, dc: wx.DC, complete: bool) -> None:
-        """Render the entire window."""
-        gc: wx.GraphicsContext = wx.GraphicsContext.Create(dc)
+    def on_paint(self, event: wx.PaintEvent) -> None:
+        """Handle repainting when requested by the OS."""
+        gc: wx.GraphicsContext = wx.GraphicsContext.Create(wx.PaintDC(self.win))
 
-        if complete:
+        # The sml/large functions re-render the full background, which is rather
+        # expensive. So we want to only do those if that area has changed.
+        # Usually we only need to update the bars.
+        update_reg: wx.Rect = self.win.GetUpdateClientRect()
+        bar_y = self.height - 20 * len(self.stages) - 20
+        if (
+            self.painted_size is not self.is_compact or
+            update_reg.top < bar_y or update_reg.bottom > self.height - 20 or
+            update_reg.left < 20 or update_reg.right > self.width - 20
+        ):
             if self.is_compact:
                 self.on_paint_sml(gc)
             else:
                 self.on_paint_lrg(gc)
+            self.painted_size = self.is_compact
 
         gc.DrawBitmap(
             self.expand_ico if self.is_compact else self.expand_ico,
@@ -418,26 +435,21 @@ class SplashScreen(BaseLoadScreen):
             20, 20,
         )
 
-        self.repaint_bars()
-        gc.DrawBitmap(
-            self.bars_buff,
+        bars_buff = self.repaint_bars()
+        gc.DrawBitmap(bars_buff,
             20,
-            self.height - 20 * len(self.stages) - 20,
-            self.bars_buff.Width, self.bars_buff.Height,
+            bar_y,
+            bars_buff.Width, bars_buff.Height,
         )
 
-    def repaint_bars(self) -> None:
+    def repaint_bars(self) -> wx.Bitmap:
         """Render the bars area."""
         bar_width = self.width - 40
         bar_height = 20 * len(self.stages)
 
-        if self.last_buff is not self.is_compact:
-            try:
-                self.bars_dc.SelectObject(wx.NullBitmap)
-                self.bars_buff.Create(bar_width, bar_height)
-            finally:
-                self.bars_dc.SelectObjectAsSource(self.bars_buff)
-            self.last_buff = self.is_compact
+        self.bars_dc.SelectObject(wx.NullBitmap)
+        bars_buff = wx.Bitmap(bar_width, bar_height)
+        self.bars_dc.SelectObjectAsSource(bars_buff)
 
         gc: wx.GraphicsContext = wx.GraphicsContext.Create(self.bars_dc)
 
@@ -479,6 +491,7 @@ class SplashScreen(BaseLoadScreen):
                 gc.DrawRectangle(2, bar_y + 3, fraction * (bar_width - 4), 14)
             text_height = gc.GetFullTextExtent(text)[1]
             gc.DrawText(text, 5, ind * 20 + (20 - text_height) / 2)
+        return bars_buff
 
     def on_paint_sml(self, gc: wx.GraphicsContext) -> Tuple[int, int]:
         """Handle painting the compact splash screen."""
@@ -597,7 +610,7 @@ class SplashScreen(BaseLoadScreen):
         PIPE_SEND.send(('main_set_compact', is_compact))
         # Repaint the entire window.
         dc = wx.ClientDC(self.win)
-        self.repaint(dc, complete=True)
+        self.win.Refresh()
 
     def toggle_compact(self, event: wx.MouseEvent) -> None:
         """Toggle when the splash screen is double-clicked."""
