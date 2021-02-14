@@ -71,3 +71,8 @@ reports/
 
 # PyInstaller temporary file directory
 /build_tmp/
+
+
+# wxGlade - backups, generated Python
+wxGlade/*.bak
+wxGlade/*.py
