@@ -84,3 +84,9 @@ lib-64/
 lib-32/swresample-*
 lib-32/swscale-*
 lib-32/av*
+
+# PyInstaller temporary file directory
+/build_tmp/
+
+# wxGlade backups
+src/ui_gen/*.bak
