@@ -92,7 +92,6 @@ def save() -> None:
 
     sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
-    logWindow.set_visible(SHOW_LOG_WIN.get())
     loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 
     for func in refresh_callbacks:

@@ -57,9 +57,9 @@ loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 if utils.MAC:
     TK_ROOT.lift()
 
-logWindow.init(
+logging_win = logWindow.LogWindow(
     GEN_OPTS.get_bool('Debug', 'show_log_win'),
-    GEN_OPTS['Debug']['window_log_level']
+    GEN_OPTS.get('Debug', 'window_log_level', fallback='INFO'),
 )
 
 LOGGER.debug('Loading settings...')

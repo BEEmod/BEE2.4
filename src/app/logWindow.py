@@ -1,22 +1,25 @@
 """Displays logs for the application.
 """
-from tkinter import ttk
-import tkinter as tk
+import wx
+import wx.richtext
 
 import logging
 
 import srctools.logger
 from BEE2_config import GEN_OPTS
-from app import tk_tools, TK_ROOT
+from app import optionWindow
 import utils
 
 # Colours to use for each log level
 LVL_COLOURS = {
-    logging.CRITICAL: 'white',
-    logging.ERROR: 'red',
-    logging.WARNING: '#FF7D00',  # 255, 125, 0
-    logging.INFO: '#0050FF',
-    logging.DEBUG: 'grey',
+    logging.CRITICAL: wx.TextAttr(
+        colText=(255, 255, 255),
+        colBack=(255, 32, 32),
+    ),  # White on red
+    logging.ERROR: wx.TextAttr((255, 32, 32)),  # Red
+    logging.WARNING: wx.TextAttr((255, 125, 0)),  # Portal Orange
+    logging.INFO: wx.TextAttr((0, 80, 255)),  # Portal Blue
+    logging.DEBUG: wx.TextAttr((80, 80, 80)),  # Grey
 }
 
 BOX_LEVELS = [
@@ -31,48 +34,82 @@ LVL_TEXT = {
     logging.WARNING: _('Warnings Only'),
 }
 
-window = tk.Toplevel(TK_ROOT)
-window.wm_withdraw()
 
-log_handler = None  # type: TextHandler
-text_box = None  # type: tk.Text
-level_selector = None  # type: ttk.Combobox
-
-START = '1.0'  # Row 1, column 0 = first character
-END = tk.END
-
-
-class TextHandler(logging.Handler):
+class LogWindow(logging.Handler):
     """Log all data to a Tkinter Text widget."""
-    def __init__(self, widget: tk.Text, level=logging.NOTSET):
-        self.widget = widget
-        super().__init__(level)
+    def __init__(self, start_visible: bool, start_level: str) -> None:
 
-        # Assign colours for each logging level
-        for level, colour in LVL_COLOURS.items():
-            widget.tag_config(
-                logging.getLevelName(level),
-                foreground=colour,
-                # For multi-line messages, indent this much.
-                lmargin2=30,
-            )
-        widget.tag_config(
-            logging.getLevelName(logging.CRITICAL),
-            background='red',
-        )
-        # If multi-line messages contain carriage returns, lmargin2 doesn't
-        # work. Add an additional tag for that.
-        widget.tag_config(
-            'INDENT',
-            lmargin1=30,
-            lmargin2=30,
-        )
-
+        super().__init__(level=logging.NOTSET)
+        self.setFormatter(logging.Formatter(
+            # One letter for level name
+            '[{levelname[0]}] {module}.{funcName}(): {message}',
+            style='{',
+        ))
         self.has_text = False
 
-        widget['state'] = "disabled"
+        conf_level = logging.getLevelName(start_level.upper())
+        try:
+            self.setLevel(conf_level)
+        except ValueError:
+            self.setLevel(logging.INFO)
 
-    def emit(self, record: logging.LogRecord):
+        self.win = win = wx.Frame(None, wx.ID_ANY)
+        win.SetSize((638, 300))
+        win.SetTitle(_('Logs - {}').format(utils.BEE_VERSION))
+        win.Show(start_visible)
+
+        self.wrapper = wx.Panel(win, wx.ID_ANY, style=wx.BORDER_NONE)
+        self.wrapper.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+        self.wrapper.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+
+        sizer_vert = wx.BoxSizer(wx.VERTICAL)
+
+        self.log_display = wx.richtext.RichTextCtrl(
+            self.wrapper, wx.ID_ANY,
+            style=wx.TE_MULTILINE | wx.TE_READONLY,
+        )
+        self.log_display.SetFont(wx.Font(
+            wx.FontInfo(10).FaceName("Courier New").Family(wx.FONTFAMILY_MODERN)
+        ))
+        # Indent multiline messages under the first line.
+        sizer_vert.Add(self.log_display, 1, wx.EXPAND, 0)
+
+        sizer_toolbar = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_vert.Add(sizer_toolbar, 0, wx.EXPAND, 0)
+
+        self.btn_clear = wx.Button(self.wrapper, wx.ID_CLEAR, "")
+        sizer_toolbar.Add(self.btn_clear, 0, 0, 0)
+
+        self.btn_copy = wx.Button(self.wrapper, wx.ID_COPY, "")
+        sizer_toolbar.Add(self.btn_copy, 0, 0, 0)
+
+        lbl_show = wx.StaticText(self.wrapper, wx.ID_ANY, _("Show:"), style=wx.ALIGN_RIGHT)
+        lbl_show.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWTEXT))
+        sizer_toolbar.Add(lbl_show, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
+
+        self.filter_combo = wx.ComboBox(
+            self.wrapper,
+            wx.ID_ANY,
+            style=wx.CB_DROPDOWN | wx.TE_READONLY,
+            choices=[LVL_TEXT[level] for level in BOX_LEVELS],
+        )
+        try:
+            self.filter_combo.SetSelection(BOX_LEVELS.index(conf_level))
+        except ValueError:
+            pass
+        sizer_toolbar.Add(self.filter_combo, 0, 0, 0)
+        self.wrapper.SetSizer(sizer_vert)
+        win.Layout()
+
+        self.filter_combo.Bind(wx.EVT_COMBOBOX, self._event_set_level)
+        self.btn_clear.Bind(wx.EVT_BUTTON, self._event_clear)
+        self.btn_copy.Bind(wx.EVT_BUTTON, self._event_copy)
+        logging.getLogger().addHandler(self)
+        optionWindow.refresh_callbacks.append(self._settings_changed)
+
+        # utils.add_mousewheel(text_box, window, sel_frame, button_frame)
+
+    def emit(self, record: logging.LogRecord) -> None:
         """Add a logging message."""
 
         msg = record.msg
@@ -80,192 +117,77 @@ class TextHandler(logging.Handler):
             # Ensure we don't use the extra ASCII indents here.
             record.msg = record.msg.format_msg()
 
-        self.widget['state'] = "normal"
-        # We don't want to indent the first line.
-        firstline, *lines = self.format(record).split('\n')
-
         if self.has_text:
             # Start with a newline so it doesn't end with one.
-            self.widget.insert(
-                END,
-                '\n',
-                (),
-            )
+            self.log_display.MoveEnd()
+            self.log_display.Newline()
 
-        self.widget.insert(
-            END,
-            firstline,
-            (record.levelname,),
+        self.log_display.BeginLeftIndent(
+            leftIndent=0,
+            leftSubIndent=30,
         )
-        for line in lines:
-            self.widget.insert(
-                END,
-                '\n',
-                ('INDENT',),
-                line,
-                # Indent following lines.
-                (record.levelname, 'INDENT'),
-            )
-        self.widget.see(END)  # Scroll to the end
-        self.widget['state'] = "disabled"
-        # Update it, so it still runs even when we're busy with other stuff.
-        self.widget.update_idletasks()
+        # This has to be done inside BeginLeftIndent.
+        try:
+            self.log_display.SetDefaultStyle(LVL_COLOURS[record.levelno])
+        except KeyError:
+            pass
+        # Convert line breaks inside the message to a soft line break, which
+        # gets indented.
+        self.log_display.MoveEnd()
+        self.log_display.WriteText(
+            self.format(record).strip('\n').replace('\n', wx.richtext.RichTextLineBreakChar)
+        )
+        self.log_display.EndLeftIndent()
 
+        # Scroll to the end
+        self.log_display.ShowPosition(self.log_display.GetLastPosition())
+
+        self.log_display.Update()
         self.has_text = True
 
         # Undo the record overwrite, so other handlers get the correct object.
         record.msg = msg
 
+    def set_visible(self, is_visible: bool) -> None:
+        """Show or hide the window."""
+        self.win.Show(is_visible)
+        GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(is_visible)
 
-def set_visible(is_visible: bool):
-    """Show or hide the window."""
-    if is_visible:
-        window.deiconify()
-    else:
-        window.withdraw()
-    GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(is_visible)
+    def _event_copy(self, event: wx.CommandEvent) -> None:
+        """Copy the selected text, or the whole console."""
+        text = self.log_display.GetStringSelection()
+        if not text:
+            text = self.log_display.GetValue()
+        clip: wx.Clipboard = wx.Clipboard.Get()
+        clip.SetData(wx.TextDataObject(text))
 
+    def _event_clear(self, event: wx.CommandEvent) -> None:
+        """Clear the console."""
+        self.log_display.Clear()
+        self.has_text = False
 
-def btn_copy():
-    """Copy the selected text, or the whole console."""
-    try:
-        text = text_box.get(tk.SEL_FIRST, tk.SEL_LAST)
-    except tk.TclError:  # No selection
-        text = text_box.get(START, END)
-    text_box.clipboard_clear()
-    text_box.clipboard_append(text)
+    def _event_set_level(self, event: wx.CommandEvent) -> None:
+        """Set the level of log messages we display."""
+        level = BOX_LEVELS[event.GetSelection()]
+        self.setLevel(level)
+        GEN_OPTS['Debug']['window_log_level'] = logging.getLevelName(level)
 
-
-def btn_clear():
-    """Clear the console."""
-    text_box['state'] = "normal"
-    text_box.delete(START, END)
-    log_handler.has_text = False
-    text_box['state'] = "disabled"
-
-
-def set_level(event):
-    level = BOX_LEVELS[event.widget.current()]
-    log_handler.setLevel(level)
-    GEN_OPTS['Debug']['window_log_level'] = logging.getLevelName(level)
+    def _settings_changed(self) -> None:
+        """Callback from optionWindow, used to hide/show us as required."""
+        self.win.Show(optionWindow.SHOW_LOG_WIN.get())
 
 
-def init(start_open: bool, log_level: str='info') -> None:
-    """Initialise the window."""
-    global log_handler, text_box, level_selector
-
-    window.columnconfigure(0, weight=1)
-    window.rowconfigure(0, weight=1)
-    window.title(_('Logs - {}').format(utils.BEE_VERSION))
-    window.protocol('WM_DELETE_WINDOW', lambda: set_visible(False))
-
-    text_box = tk.Text(
-        window,
-        name='text_box',
-        width=50,
-        height=15,
-    )
-    text_box.grid(row=0, column=0, sticky='NSEW')
-
-    log_level = logging.getLevelName(log_level.upper())
-
-    log_handler = TextHandler(text_box)
-
-    try:
-        log_handler.setLevel(log_level)
-    except ValueError:
-        log_level = logging.INFO
-    log_handler.setFormatter(logging.Formatter(
-        # One letter for level name
-        '[{levelname[0]}] {module}.{funcName}(): {message}',
-        style='{',
-    ))
-
-    logging.getLogger().addHandler(log_handler)
-
-    scroll = tk_tools.HidingScroll(
-        window,
-        name='scroll',
-        orient=tk.VERTICAL,
-        command=text_box.yview,
-    )
-    scroll.grid(row=0, column=1, sticky='NS')
-    text_box['yscrollcommand'] = scroll.set
-
-    button_frame = ttk.Frame(window, name='button_frame')
-    button_frame.grid(row=1, column=0, columnspan=2, sticky='EW')
-
-    ttk.Button(
-        button_frame,
-        name='clear_btn',
-        text='Clear',
-        command=btn_clear,
-    ).grid(row=0, column=0)
-
-    ttk.Button(
-        button_frame,
-        name='copy_btn',
-        text=_('Copy'),
-        command=btn_copy,
-    ).grid(row=0, column=1)
-
-    sel_frame = ttk.Frame(
-        button_frame,
-    )
-    sel_frame.grid(row=0, column=2, sticky='EW')
-    button_frame.columnconfigure(2, weight=1)
-
-    ttk.Label(
-        sel_frame,
-        text=_('Show:'),
-        anchor='e',
-        justify='right',
-    ).grid(row=0, column=0, sticky='E')
-
-    level_selector = ttk.Combobox(
-        sel_frame,
-        name='level_selector',
-        values=[
-            LVL_TEXT[level]
-            for level in
-            BOX_LEVELS
-        ],
-        exportselection=0,
-        # On Mac this defaults to being way too wide!
-        width=15 if utils.MAC else None,
-    )
-    level_selector.state(['readonly'])  # Prevent directly typing in values
-    level_selector.bind('<<ComboboxSelected>>', set_level)
-    level_selector.current(BOX_LEVELS.index(log_level))
-
-    level_selector.grid(row=0, column=1, sticky='E')
-    sel_frame.columnconfigure(1, weight=1)
-
-    utils.add_mousewheel(text_box, window, sel_frame, button_frame)
-
-    if utils.USE_SIZEGRIP:
-        ttk.Sizegrip(button_frame).grid(row=0, column=3)
-
-    if start_open:
-        window.deiconify()
-        window.lift()
-        # Force an update, we're busy with package extraction...
-        window.update()
-    else:
-        window.withdraw()
-
-
-if __name__ == '__main__':
-    srctools.logger.init_logging()
+def test() -> None:
+    """Display a test window."""
     LOGGER = srctools.logger.get_logger('BEE2')
-    init(True, log_level='DEBUG')
-
+    app = wx.App()
+    window = LogWindow(True, 'DEBUG')
     # Generate a bunch of log messages to test the window.
     def errors():
         # Use a generator to easily run these functions with a delay.
-        yield LOGGER.info('Info Message')
-        yield LOGGER.critical('Critical Message')
-        yield LOGGER.warning('Warning')
+        yield LOGGER.info('Info Message\nWith a second line.')
+        yield LOGGER.critical('Critical Message\nWith a second line.')
+        yield LOGGER.warning('Warning\nWith a second line.')
 
         try:
             raise ValueError('An error')
@@ -279,9 +201,11 @@ if __name__ == '__main__':
     err_iterator = errors()
 
     def next_error():
-        # Use False since functions return None usually
-        if next(err_iterator, False) is not False:
-            TK_ROOT.after(1000, next_error)
+        try:
+            next(err_iterator)
+            timer.Start(1000)
+        except StopIteration:
+            pass
 
-    TK_ROOT.after(1000, next_error)
-    TK_ROOT.mainloop()
+    timer = wx.PyTimer(next_error)
+    timer.Start(1000)
