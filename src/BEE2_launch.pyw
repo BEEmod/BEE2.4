@@ -22,7 +22,7 @@ freeze_support()
 
 if __name__ == '__main__':
     import srctools.logger
-    from app import on_error, TK_ROOT
+    from app import on_error, TK_ROOT, run_main_loop
     import utils
 
     if len(sys.argv) > 1:
@@ -53,9 +53,13 @@ if __name__ == '__main__':
     elif app_name == 'compilepane':
         from app import CompilerPane
         CompilerPane.init_application()
+    elif app_name.startswith('test_'):
+        import importlib
+        mod = importlib.import_module('app.' + sys.argv[1][5:])
+        mod.test()
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
 
-    # Run the TK loop forever.
-    TK_ROOT.mainloop()
+    # Run the WX and TK loops forever.
+    run_main_loop()
 

@@ -12,18 +12,20 @@ from utils import BEE_VERSION
 TK_ROOT = tk.Tk()
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
+# Same with wxWidgets.
+WX_APP = wx.App()
 
-def _run_main_loop(*args, **kwargs) -> None:
+
+def run_main_loop() -> None:
     """Allow determining if this is running."""
     global _main_loop_running
     _main_loop_running = True
-    _orig_mainloop(*args, **kwargs)
+    # Drive TK from WX's loop.
+    WX_APP.Bind(wx.EVT_UPDATE_UI, lambda e: TK_ROOT.update())
+    WX_APP.MainLoop()
 
 
 _main_loop_running = False
-_orig_mainloop = TK_ROOT.mainloop
-TK_ROOT.mainloop = _run_main_loop
-del _run_main_loop
 
 
 # noinspection PyBroadException
