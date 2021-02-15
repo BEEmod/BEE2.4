@@ -131,7 +131,8 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        voice_line.QUOTE_DATA += quote_block.copy()
+        quote_block.name = None
+        voice_line.QUOTE_DATA.append(quote_block)
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -239,7 +240,7 @@ def add_voice(vmf: VMF):
     voice_line.add_voice(
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
-        vmf_file_=vmf,
+        vmf=vmf,
         map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )
