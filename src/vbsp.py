@@ -238,8 +238,8 @@ def load_map(map_path: str) -> VMF:
 def add_voice(vmf: VMF):
     """Add voice lines to the map."""
     voice_line.add_voice(
-        has_items=settings['has_attr'],
-        style_vars_=settings['style_vars'],
+        voice_attrs=settings['has_attr'],
+        style_vars=settings['style_vars'],
         vmf=vmf,
         map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
