@@ -12,7 +12,7 @@ import srctools.logger
 from precomp.conditions import make_result
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.instanceLocs import resolve_one
-from srctools import VMF, Vec, Solid, Property, Entity
+from srctools import VMF, Vec, Solid, Property, Entity, Angle
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -125,7 +125,7 @@ def res_glass_hole(inst: Entity, res: Property):
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
     hole_type = HoleType(res.value)
 
-    normal = Vec(z=-1).rotate_by_str(inst['angles'])
+    normal = Vec(z=-1) @ Angle.from_str(inst['angles'])
     origin = Vec.from_str(inst['origin']) // 128 * 128 + 64
 
     if test_hole_spot(origin, normal, hole_type):
@@ -197,7 +197,10 @@ def make_barriers(vmf: VMF):
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
     # (normal_dist, positive_axis, type) -> [(x, y)]
-    slices = defaultdict(set)  # type: Dict[Tuple[Tuple[float, float, float], bool, BarrierType], Set[Tuple[float, float]]]
+    slices: Dict[
+        Tuple[Tuple[float, float, float], bool, BarrierType],
+        Set[Tuple[int, int]]
+    ] = defaultdict(set)
     # We have this on the 32-grid so we can cut squares for holes.
 
     for (origin, normal), barr_type in BARRIERS.items():
@@ -214,8 +217,8 @@ def make_barriers(vmf: VMF):
         for u_off in [-48, -16, 16, 48]:
             for v_off in [-48, -16, 16, 48]:
                 slice_plane.add((
-                    (u + u_off) // 32,
-                    (v + v_off) // 32,
+                    int((u + u_off) // 32),
+                    int((v + v_off) // 32),
                 ))
 
     # Remove pane sections where the holes are. We then generate those with
@@ -248,8 +251,8 @@ def make_barriers(vmf: VMF):
                     continue
 
                 slice_plane.discard((
-                    (u + u_off) // 32,
-                    (v + v_off) // 32,
+                    int((u + u_off) // 32),
+                    int((v + v_off) // 32),
                 ))
 
         # Now generate the curved brushwork.
@@ -261,7 +264,7 @@ def make_barriers(vmf: VMF):
         else:
             raise NotImplementedError
 
-        angles = normal.to_angle(0)
+        angles = normal.to_angle()
         # Angle corresponding to the brush, for the corners.
         angle_list = [angles] * len(hole_temp)
 
@@ -272,8 +275,8 @@ def make_barriers(vmf: VMF):
         if hole_type is HoleType.LARGE:
             for roll in (0, 90, 180, 270):
                 corn_angles = angles.copy()
-                corn_angles.z = roll
-                hole_off = origin + Vec(y=128, z=128).rotate(*corn_angles)
+                corn_angles.roll = roll
+                hole_off = origin + Vec(y=128, z=128) @ corn_angles
                 diag_type = HOLES.get(
                     (hole_off.as_tuple(), normal.as_tuple()),
                     None,
