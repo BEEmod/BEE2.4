@@ -231,15 +231,6 @@ def main(argv: List[str]) -> None:
         LOGGER.info('Checking for music:')
         music.generate(bsp_ents, packlist)
 
-        for prop in conf.find_children('InjectFiles'):
-            filename = os.path.join('bee2', 'inject', prop.real_name)
-            try:
-                with open(filename, 'rb') as f:
-                    LOGGER.info('Injecting "{}" into packfile.', prop.value)
-                    packlist.pack_file(prop.value, data=f.read())
-            except FileNotFoundError:
-                pass
-
     LOGGER.info('Run transformations...')
     run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
 
