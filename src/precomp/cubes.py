@@ -58,10 +58,6 @@ MULTI_FILTER_COUNT = 10
 FILTER_MONST_CLS = '@is_fbox'
 FILTER_CUBE_CLS = '@is_mbox'
 
-# The BSP file path -> data for each script query function that's
-# desired.
-CUBE_SCRIPT_FILTERS = {}  # type: Dict[str, io.StringIO]
-
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
     0: 'VALVE_CUBE_STANDARD',
@@ -684,19 +680,6 @@ def parse_conf(conf: Property):
     for cube_id in VALVE_CUBE_IDS.values():
         if cube_id not in CUBE_TYPES:
             LOGGER.warning('Valve Cube type "{}" is missing!', cube_id)
-
-
-def write_vscripts(vrad_conf: Property):
-    """Write CUBE_SCRIPT_FILTERS functions out for VRAD to use."""
-
-    if CUBE_SCRIPT_FILTERS:
-        conf_block = vrad_conf.ensure_exists('InjectFiles')
-
-        for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
-            filename = 'cube_vscript_{:02}.nut'.format(i)
-            with open('bee2/inject/' + filename, 'w') as f:
-                f.write(buffer.getvalue())
-            conf_block[filename] = 'scripts/vscripts/' + bsp_name
 
 
 def parse_filter_types(
