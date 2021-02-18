@@ -10,9 +10,12 @@ LOGGER = init_logging('bee2/vrad.log')
 import os
 import shutil
 import sys
+import importlib
+import pkgutil
 from io import BytesIO
 from zipfile import ZipFile
 from typing import List, Set
+from pathlib import Path
 
 import srctools.run
 from srctools import Property, FGD
@@ -24,13 +27,53 @@ from srctools.filesys import (
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
+from srctools.scripts.plugin import PluginFinder, Source as PluginSource
 
+from postcomp import music, screenshot
+# Load our BSP transforms.
+# noinspection PyUnresolvedReferences
 from postcomp import (
-    music,
-    screenshot,
     coop_responses,
     filter,
 )
+import utils
+
+
+def load_transforms() -> None:
+    """Load all the BSP transforms.
+
+    We need to do this differently when frozen, since they're embedded in our
+    executable.
+    """
+    # Find the modules in the conditions package.
+    # PyInstaller messes this up a bit.
+    if utils.FROZEN:
+        # This is the PyInstaller loader injected during bootstrap.
+        # See PyInstaller/loader/pyimod03_importers.py
+        # toc is a PyInstaller-specific attribute containing a set of
+        # all frozen modules.
+        loader = pkgutil.get_loader('postcomp.transforms')
+        for module in loader.toc:
+            if module.startswith('postcomp.transforms'):
+                LOGGER.debug('Importing transform {}', module)
+                sys.modules[module] = importlib.import_module(module)
+    else:
+        # We can just delegate to the regular postcompiler finder.
+        try:
+            transform_loc = Path(os.environ['BSP_TRANSFORMS'])
+        except KeyError:
+            transform_loc = utils.install_path('../HammerAddons/transforms/')
+        if not transform_loc.exists():
+            raise ValueError(
+                f'Invalid BSP transforms location "{transform_loc.resolve()}"!\n'
+                'Clone TeamSpen210/HammerAddons next to BEE2.4, or set the '
+                'environment variable BSP_TRANSFORMS to the location.'
+            )
+        finder = PluginFinder('postcomp.transforms', [
+            PluginSource(transform_loc, recurse=True),
+        ])
+        sys.meta_path.append(finder)
+        finder.load_all()
 
 
 def dump_files(bsp: BSP, dump_folder: str) -> None:
@@ -220,6 +263,8 @@ def main(argv: List[str]) -> None:
     packlist.load_soundscript_manifest(
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
+
+    load_transforms()
 
     # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
