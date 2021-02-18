@@ -225,15 +225,6 @@ def main(argv: List[str]) -> None:
     root_folder = game.path.parent
     fsys = game.get_filesystem()
 
-    # Put the Mel and Tag filesystems in so we can pack from there.
-    fsys_tag = fsys_mel = None
-    if is_peti and 'mel_vpk' in conf:
-        fsys_mel = VPKFileSystem(conf['mel_vpk'])
-        fsys.add_sys(fsys_mel)
-    if is_peti and 'tag_dir' in conf:
-        fsys_tag = RawFileSystem(conf['tag_dir'])
-        fsys.add_sys(fsys_tag)
-
     # Special case - move the BEE2 fsys FIRST, so we always pack files found
     # there.
     for child_sys in fsys.systems[:]:
@@ -291,10 +282,6 @@ def main(argv: List[str]) -> None:
     pack_whitelist = set()  # type: Set[FileSystem]
     pack_blacklist = set()  # type: Set[FileSystem]
     if is_peti:
-        if fsys_mel is not None:
-            pack_whitelist.add(fsys_mel)
-        if fsys_tag is not None:
-            pack_whitelist.add(fsys_tag)
         # Exclude absolutely everything except our folder.
         for child_sys, _ in fsys.systems:
             # Add 'bee2/' and 'bee2_dev/' only.
