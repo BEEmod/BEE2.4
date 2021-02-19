@@ -704,7 +704,7 @@ def res_antigel(inst: Entity) -> None:
         tiling.TILES[pos.as_tuple(), norm.as_tuple()].is_antigel = True
     except KeyError:
         LOGGER.warning('No tile to set antigel at {}, {}', pos, norm)
-    texturing.ANTIGEL_LOCS.add((origin // 128 * 128 + 64).as_tuple())
+    texturing.ANTIGEL_LOCS.add((origin // 128).as_tuple())
 
 
 # Position -> entity
