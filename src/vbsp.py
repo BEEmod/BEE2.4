@@ -1574,43 +1574,6 @@ def fix_worldspawn(vmf: VMF) -> None:
     vmf.spawn['skyname'] = options.get(str, 'skybox')
 
 
-def make_vrad_config(is_peti: bool) -> None:
-    """Generate a config file for VRAD from our configs.
-
-    This way VRAD doesn't need to parse through vbsp_config, or anything else.
-    """
-    LOGGER.info('Generating VRAD config...')
-    conf = Property('Config', [
-    ])
-    conf['is_peti'] = srctools.bool_as_int(is_peti)
-
-    if is_peti:
-        conf['force_full'] = srctools.bool_as_int(
-            BEE2_config.get_bool('General', 'vrad_force_full')
-        )
-        conf['screenshot_type'] = BEE2_config.get_val(
-            'Screenshot', 'type', 'PETI'
-        ).upper()
-        conf['clean_screenshots'] = srctools.bool_as_int(
-            BEE2_config.get_bool('Screenshot', 'del_old')
-        )
-        conf['is_preview'] = srctools.bool_as_int(
-            IS_PREVIEW
-        )
-        conf['game_id'] = options.get(str, 'game_id')
-
-        if BEE2_config.get_bool('General', 'packfile_dump_enable'):
-            conf['packfile_dump'] = BEE2_config.get_val(
-                'General',
-                'packfile_dump_dir',
-                ''
-            )
-
-    with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
-        for line in conf.export():
-            f.write(line)
-
-
 def instance_symlink() -> None:
     """On OS X and Linux, Valve broke VBSP's instances/ finding code.
 
@@ -1942,6 +1905,12 @@ def main() -> None:
             for out in ent.outputs:
                 out.comma_sep = False
 
+        # Ensure VRAD knows that the map is PeTI, it can't figure that out
+        # from parameters.
+        vmf.spawn['BEE2_is_peti'] = True
+        # Set this so VRAD can know.
+        vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
+
         save(vmf, new_path)
         run_vbsp(
             vbsp_args=new_args,
@@ -1949,9 +1918,6 @@ def main() -> None:
             new_path=new_path,
         )
 
-    # We always need to do this - VRAD can't easily determine if the map is
-    # a Hammer one.
-    make_vrad_config(is_peti=not is_hammer)
     LOGGER.info("BEE2 VBSP hook finished!")
 
 

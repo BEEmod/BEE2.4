@@ -18,17 +18,15 @@ from typing import List, Set
 from pathlib import Path
 
 import srctools.run
-from srctools import Property, FGD
+from srctools import FGD
 from srctools.bsp import BSP, BSP_LUMPS
-from srctools.filesys import (
-    RawFileSystem, VPKFileSystem, ZipFileSystem,
-    FileSystem,
-)
+from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
 from srctools.scripts.plugin import PluginFinder, Source as PluginSource
 
+from BEE2_config import ConfigFile
 from postcomp import music, screenshot
 # Load our BSP transforms.
 # noinspection PyUnresolvedReferences
@@ -79,9 +77,6 @@ def load_transforms() -> None:
 def dump_files(bsp: BSP, dump_folder: str) -> None:
     """Dump packed files to a location.
     """
-    if not dump_folder:
-        return
-
     dump_folder = os.path.abspath(dump_folder)
     
     LOGGER.info('Dumping packed files to "{}"...', dump_folder)
@@ -147,15 +142,7 @@ def main(argv: List[str]) -> None:
     LOGGER.info("Map path is " + path)
 
     LOGGER.info('Loading Settings...')
-    try:
-        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
-            conf = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
-                'Config', []
-            )
-    except FileNotFoundError:
-        conf = Property('Config', [])
-    else:
-        LOGGER.info('Config Loaded!')
+    config = ConfigFile('compile.cfg')
 
     for a in fast_args[:]:
         folded_a = a.casefold()
@@ -196,18 +183,18 @@ def main(argv: List[str]) -> None:
 
     bsp_ents = bsp_file.read_ent_data()
 
-    # If VBSP thinks it's hammer, trust it.
-    if conf.bool('is_hammer', False):
-        is_peti = edit_args = False
-    else:
+    # If VBSP marked it as Hammer, trust that.
+    if srctools.conv_bool(bsp_ents.spawn['BEE2_is_peti']):
         is_peti = True
         # Detect preview via knowing the bsp name. If we are in preview,
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
-            edit_args = not conf.bool('force_full', False)
+            edit_args = not config.get_bool('General', 'vrad_force_full')
         else:
             # publishing - always force full lighting.
             edit_args = False
+    else:
+        is_peti = edit_args = False
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override commands!
@@ -311,7 +298,12 @@ def main(argv: List[str]) -> None:
                 set(zipfile.namelist()) - existing
             ))
 
-    dump_files(bsp_file, conf['packfile_dump', ''])
+    if config.get_bool('General', 'packfile_dump_enable'):
+        dump_files(bsp_file, config.get_val(
+            'General',
+            'packfile_dump_dir',
+            '../dump/'
+        ))
 
     # Copy new entity data.
     bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
@@ -320,7 +312,7 @@ def main(argv: List[str]) -> None:
     LOGGER.info(' - BSP written!')
 
     if is_peti:
-        screenshot.modify(conf)
+        screenshot.modify(config, game.path)
 
     if edit_args:
         LOGGER.info("Forcing Cheap Lighting!")

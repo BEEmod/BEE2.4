@@ -2,11 +2,12 @@
 import os
 import shutil
 from datetime import datetime
+from pathlib import Path
 from typing import Iterator
 
 import srctools.logger
 import utils
-from srctools import Property
+from BEE2_config import ConfigFile
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -17,15 +18,6 @@ SCREENSHOT_DIR = os.path.join(
     'puzzles',
     # Then the <random numbers> folder
 )
-
-
-GAME_FOLDER = {
-    # The game's root folder, where screenshots are saved
-    utils.STEAM_IDS['PORTAL2']: 'portal2',
-    utils.STEAM_IDS['TWTM']: 'twtm',
-    utils.STEAM_IDS['APTAG']: 'aperturetag',
-    utils.STEAM_IDS['DEST_AP']: 'portal2',
-}
 
 
 def find() -> Iterator[str]:
@@ -43,9 +35,9 @@ def find() -> Iterator[str]:
                 yield screenshot
 
 
-def modify(conf: Property) -> None:
+def modify(conf: ConfigFile, game_folder: Path) -> None:
     """Modify the map's screenshot."""
-    mod_type = conf['screenshot_type', 'PETI'].lower()
+    mod_type = conf.get_val('Screenshot', 'type', 'PETI').lower()
 
     if mod_type == 'cust':
         LOGGER.info('Using custom screenshot!')
@@ -54,11 +46,7 @@ def modify(conf: Property) -> None:
         LOGGER.info('Using automatic screenshot!')
         scr_loc = None
         # The automatic screenshots are found at this location:
-        auto_path = os.path.join(
-            '..',
-            GAME_FOLDER.get(conf['game_id', ''], 'portal2'),
-            'screenshots'
-        )
+        auto_path = os.path.join(game_folder, 'screenshots')
         # We need to find the most recent one. If it's named
         # "previewcomplete", we want to ignore it - it's a flag
         # to indicate the map was playtested correctly.
@@ -112,7 +100,7 @@ def modify(conf: Property) -> None:
             LOGGER.info('No Auto Screenshot found!')
             mod_type = 'peti'  # Suppress the "None not found" error
 
-        if srctools.conv_bool(conf['clean_screenshots', '0']):
+        if conf.get_bool('Screenshot', 'del_old'):
             LOGGER.info('Cleaning up screenshots...')
             # Clean up this folder - otherwise users will get thousands of
             # pics in there!
