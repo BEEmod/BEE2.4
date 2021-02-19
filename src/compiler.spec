@@ -90,6 +90,9 @@ if MAC or LINUX:
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
 
+if sys.version_info >= (3, 7):
+    # Only needed on 3.6, it's in the stdlib thereafter.
+    EXCLUDES += ['importlib_resources']
 
 # Include the condition sub-modules that are dynamically imported.
 INCLUDES += [
