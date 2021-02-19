@@ -944,9 +944,9 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         for item_id in fizz_type.item_ids:
             if ':' in item_id:
                 item_id, barrier_type = item_id.split(':')
-                if barrier_type == 'laserfield':
+                if barrier_type == 'LASERFIELD':
                     barrier_skin = 2
-                elif barrier_type == 'fizzler':
+                elif barrier_type == 'FIZZLER':
                     barrier_skin = 0
                 else:
                     LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id)
