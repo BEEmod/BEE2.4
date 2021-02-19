@@ -1,9 +1,13 @@
+"""Item package objects provide items for the palette customised for each style.
+
+A system is provided so configurations can be shared and partially modified
+as required.
+"""
 import operator
 import re
 import copy
-from idlelib import editor
 from typing import (
-    Optional, Union, Callable, Tuple, NamedTuple,
+    Optional, Union, Tuple, NamedTuple,
     Dict, List, Match, Set, cast,
 )
 from srctools import FileSystem, Property, EmptyMapping
@@ -177,38 +181,41 @@ class ItemVariant:
             all_icon=self.all_icon,
             source='{} from {}'.format(source, self.source),
         )
-        variant.editor = variant._modify_editoritems(props, variant.editor, source)
+        [variant.editor] = variant._modify_editoritems(
+            props,
+            [variant.editor],
+            source,
+            is_extra=False,
+        )
+
         if 'extra' in props:
-            try:
-                [extra_item] = variant.editor_extra
-            except ValueError:
-                LOGGER.warning(
-                    'Can only modify extra editoritems block with a '
-                    'single item - got {}',
-                    [item.id for item in variant.editor_extra],
-                )
-            else:
-                variant.editor_extra = [variant._modify_editoritems(
-                    props.find_key('extra'),
-                    extra_item,
-                    source,
-                )]
+            variant.editor_extra = variant._modify_editoritems(
+                props.find_key('extra'),
+                variant.editor_extra,
+                source,
+                is_extra=True
+            )
 
         return variant
 
     def _modify_editoritems(
         self,
         props: Property,
-        editor: EditorItem,
+        editor: List[EditorItem],
         source: str,
-    ) -> EditorItem:
+        is_extra: bool,
+    ) -> List[EditorItem]:
         """Modify either the base or extra editoritems block."""
-        is_extra = editor is not self.editor
         # We can share a lot of the data, if it isn't changed and we take
         # care to copy modified parts.
-        editor = copy.copy(editor)
-        if 'Palette' in props:
-            editor.subtypes = editor.subtypes.copy()
+        editor = list(map(copy.copy, editor))
+
+        # Create a list of subtypes in the file, in order to edit.
+        subtype_lookup = [
+            (item, i, subtype)
+            for item in editor
+            for i, subtype in enumerate(item.subtypes)
+        ]
 
         # Implement overriding palette items
         for item in props.find_children('Palette'):
@@ -225,24 +232,24 @@ class ItemVariant:
                         'Cannot specify "all" for hidden '
                         'editoritems blocks in {}!'.format(source)
                     )
-                else:
-                    if pal_icon is not None:
-                        self.all_icon = pal_icon
-                    if pal_name is not None:
-                        self.all_name = pal_name
-                    if bee2_icon is not None:
-                        self.icons['all'] = bee2_icon
+                if pal_icon is not None:
+                    self.all_icon = pal_icon
+                if pal_name is not None:
+                    self.all_name = pal_name
+                if bee2_icon is not None:
+                    self.icons['all'] = bee2_icon
                 continue
 
             try:
                 subtype_ind = int(item.name)
-                subtype = editor.subtypes[subtype_ind]
+                subtype_item, subtype_ind, subtype = subtype_lookup[subtype_ind]
             except (IndexError, ValueError, TypeError):
                 raise Exception(
                     'Invalid index "{}" when modifying '
                     'editoritems for {}'.format(item.name, source)
                 )
-            editor.subtypes[subtype_ind] = subtype = copy.deepcopy(subtype)
+            subtype_item.subtypes = subtype_item.subtypes.copy()
+            subtype_item.subtypes[subtype_ind] = subtype = copy.deepcopy(subtype)
 
             # Overriding model data.
             if 'models' in item or 'model' in item:
@@ -263,8 +270,7 @@ class ItemVariant:
                         'Cannot specify BEE2 icons for hidden '
                         'editoritems blocks in {}!'.format(source)
                     )
-                else:
-                    self.icons[item.name] = bee2_icon
+                self.icons[item.name] = bee2_icon
 
             if pal_name is not None:
                 subtype.pal_name = pal_name
@@ -272,8 +278,13 @@ class ItemVariant:
                 subtype.pal_icon = pal_icon
 
         if 'Instances' in props:
-            editor.instances = editor.instances.copy()
-            editor.cust_instances = editor.cust_instances.copy()
+            if len(editor) != 1:
+                raise ValueError(
+                    'Cannot specify instances for multiple '
+                    'editoritems blocks in {}!'.format(source)
+                )
+            editor[0].instances = editor[0].instances.copy()
+            editor[0].cust_instances = editor[0].cust_instances.copy()
 
         for inst in props.find_children('Instances'):
             if inst.has_children():
@@ -296,9 +307,9 @@ class ItemVariant:
                         f'Invalid index {inst.real_name} for '
                         f'instances in {source}'
                     ) from None
-                editor.set_inst(ind, inst_data)
+                editor[0].set_inst(ind, inst_data)
             else:  # BEE2 named instance
-                editor.cust_instances[inst.name] = inst_data.inst
+                editor[0].cust_instances[inst.name] = inst_data.inst
 
         # Override IO commands.
         try:
@@ -306,10 +317,15 @@ class ItemVariant:
         except LookupError:
             pass
         else:
+            if len(editor) != 1:
+                raise ValueError(
+                    'Cannot specify I/O for multiple '
+                    'editoritems blocks in {}!'.format(source)
+                )
             force = io_props['force', '']
-            editor.conn_config = ConnConfig.parse(editor.id, io_props)
-            editor.force_input = 'in' in force
-            editor.force_output = 'out' in force
+            editor[0].conn_config = ConnConfig.parse(editor[0].id, io_props)
+            editor[0].force_input = 'in' in force
+            editor[0].force_output = 'out' in force
 
         return editor
 
@@ -1013,4 +1029,3 @@ def assign_styled_items(
                         item.isolate_versions or vers.isolate
                         else item.def_ver.styles[style.id]
                     )
-
