@@ -13,6 +13,7 @@ from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
 from srctools.vmt import Material
+from precomp.brushLoc import POS as BLOCK_TYPE, Block
 
 import consts
 
@@ -131,6 +132,8 @@ ORIENTS = {
 ANTIGEL_MATS: Dict[str, str] = {}
 # The folder to add them to
 ANTIGEL_PATH = 'BEE2/antigel/gen/'
+# The center of each voxel containing an antigel marker.
+# Surfaces inside here that aren't a voxel side will be converted.
 ANTIGEL_LOCS: Set[Tuple[float, float, float]] = set()
 
 ANTIGEL_TEMPLATE = '''\
@@ -772,16 +775,18 @@ class Generator(abc.ABC):
         The location should be 1 unit back from the tile, so it'll be in the
         correct block.
         """
-        loc = loc // 128
-        loc *= 128
-        loc += (64, 64, 64)
+        grid_loc = loc // 128
 
         if antigel is None:
-            antigel = loc.as_tuple() in ANTIGEL_LOCS
+            antigel = grid_loc.as_tuple() in ANTIGEL_LOCS
         if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
             # We can't use antigel on bullseye materials, so revert to normal
             # surfaces.
             return gen(GenCat.NORMAL, self.orient, self.portal).get(loc, tex_name, antigel=True)
+
+        # Force blocks inside goo to goo side.
+        if self.category is GenCat.NORMAL and self.orient is Orient.WALL and BLOCK_TYPE[grid_loc].is_goo:
+            tex_name = TileSize.GOO_SIDE
 
         if self.map_seed:
             self._random.seed(self.map_seed + str(loc))
