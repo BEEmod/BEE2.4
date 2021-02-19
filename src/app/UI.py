@@ -17,7 +17,7 @@ import srctools.logger
 from app import sound as snd
 import BEE2_config
 from app import paletteLoader
-import packageLoader
+import packages
 from app import img
 from app import itemconfig
 import utils
@@ -91,7 +91,7 @@ class Item:
         'item',
         'def_data',
         'data',
-        'num_sub',
+        'visual_subtypes',
         'authors',
         'tags',
         'filter_tags',
@@ -102,33 +102,31 @@ class Item:
         'url',
         ]
 
-    def __init__(self, item):
+    def __init__(self, item: packages.Item) -> None:
         self.ver_list = sorted(item.versions.keys())
 
         self.selected_ver = item_opts.get_val(
             item.id,
             'sel_version',
-            item.def_ver['id'],
+            item.def_ver.id,
         )
         # If the last-selected value doesn't exist, fallback to the default.
         if self.selected_ver not in item.versions:
-            self.selected_ver = item.def_ver['id']
+            LOGGER.warning('Version ID {} is not valid for item {}', self.selected_version, item.id)
+            self.selected_ver = item.def_ver.id
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
-        # These pieces of data are constant, only from the first style.
-        self.num_sub = sum(
-            1 for _ in
-            self.def_data.editor.find_all(
-                "Editor",
-                "Subtype",
-                "Palette",
-                )
-            )
-        if not self.num_sub:
+        self.def_data = self.item.def_ver.def_style
+        # The indexes of subtypes that are actually visible.
+        self.visual_subtypes = [
+            ind
+            for ind, sub in enumerate(self.def_data.editor.subtypes)
+            if sub.pal_name or sub.pal_icon
+        ]
+        if not self.visual_subtypes:
             # We need at least one subtype, otherwise something's wrong
             # with the file.
-            raise Exception('Item {} has no subtypes!'.format(item.id))
+            raise Exception('Item {} has no visible subtypes!'.format(item.id))
 
         self.authors = self.def_data.authors
         self.id = item.id
@@ -138,21 +136,15 @@ class Item:
 
         self.load_data()
 
-    def load_data(self):
+    def load_data(self) -> None:
         """Load data from the item."""
         from app.tagsPane import Section
 
         version = self.item.versions[self.selected_ver]
-        self.data = version['styles'].get(
+        self.data = version.styles.get(
             selected_style,
             self.def_data,
-            )  # type: packageLoader.ItemVariant
-        self.names = [
-            gameMan.translate(prop['name', ''])
-            for prop in
-            self.data.editor.find_all("Editor", "Subtype")
-            if prop['Palette', None] is not None
-        ]
+        )
         self.url = self.data.url
 
         # attributes used for filtering (tags, authors, packages...)
@@ -208,43 +200,32 @@ class Item:
 
     def properties(self):
         """Iterate through all properties for this item."""
-        for part in self.data.editor.find_all("Properties"):
-            for prop in part:
-                if not prop.bool('BEE2_ignore'):
-                    yield prop.name
+        for prop_name, prop in self.data.editor.properties.items():
+            if prop.allow_user_default:
+                yield prop_name
 
     def get_properties(self):
         """Return a dictionary of properties and the current value for them.
 
         """
         result = {}
-        for part in self.data.editor.find_all("Properties"):
-            for prop in part:
-                name = prop.name
+        for prop_name, prop in self.data.editor.properties.items():
+            if not prop.allow_user_default:
+                continue
 
-                if prop.bool('BEE2_ignore'):
-                    continue
-
-                # PROP_TYPES is a dict holding all the modifiable properties.
-                if name in PROP_TYPES:
-                    if name in result:
-                        LOGGER.warning(
-                            'Duplicate property "{}" in {}!',
-                            name,
-                            self.id
-                        )
-
-                    result[name] = item_opts.get_val(
-                        self.id,
-                        'PROP_' + name,
-                        prop["DefaultValue", ''],
-                    )
-                else:
-                    LOGGER.warning(
-                        'Unknown property "{}" in {}',
-                        name,
-                        self.id,
-                    )
+            # PROP_TYPES is a dict holding all the modifiable properties.
+            if prop_name in PROP_TYPES:
+                result[prop_name] = item_opts.get_val(
+                    self.id,
+                    'PROP_' + prop_name,
+                    prop.export(),
+                )
+            else:
+                LOGGER.warning(
+                    'Unknown property "{}" in {}',
+                    prop_name,
+                    self.id,
+                )
         return result
 
     def set_properties(self, props):
@@ -275,7 +256,7 @@ class Item:
         """Get a list of the names and corresponding IDs for the item."""
         # item folders are reused, so we can find duplicates.
         style_obj_ids = {
-            id(self.item.versions[ver_id]['styles'][selected_style])
+            id(self.item.versions[ver_id].styles[selected_style])
             for ver_id in self.ver_list
         }
         versions = self.ver_list
@@ -285,7 +266,7 @@ class Item:
             versions = self.ver_list[:1]
 
         return versions, [
-            self.item.versions[ver_id]['name']
+            self.item.versions[ver_id].name
             for ver_id in versions
         ]
 
@@ -383,7 +364,7 @@ class PalItem(Label):
         """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
         try:
-            self.name = gameMan.translate(self.item.names[self.subKey])
+            self.name = gameMan.translate(self.item.data.editor.subtypes[self.subKey].name)
         except IndexError:
             LOGGER.warning(
                 'Item <{}> in <{}> style has mismatched subtype count!',
@@ -499,7 +480,7 @@ def save_load_selector_win(props: Property=None):
             pass
 
 
-def load_packages(data):
+def load_packages(data: dict):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -523,24 +504,24 @@ def load_packages(data):
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, 'Skybox', {
+        (sky_list, data['Skybox'], {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, 'QuotePack', {
+        (voice_list, data['QuotePack'], {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, 'Style', {
+        (style_list, data['Style'], {
             'VID': 'has_video',
         }),
-        (elev_list, 'Elevator', {
+        (elev_list, data['Elevator'], {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, name, attrs in obj_types:
+    for sel_list, obj_list, attrs in obj_types:
         attr_commands = [
             # cache the operator.attrgetter funcs
             (key, operator.attrgetter(value))
@@ -548,10 +529,7 @@ def load_packages(data):
         ]
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(
-                data[name],
-                key=operator.attrgetter('selitem_data.name'),
-                ):
+        for obj in sorted(obj_list, key=operator.attrgetter('selitem_data.name')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
@@ -681,9 +659,9 @@ def load_packages(data):
         win.sel_suggested()
 
 
-def current_style() -> packageLoader.Style:
+def current_style() -> packages.Style:
     """Return the currently selected style."""
-    return packageLoader.Style.by_id(selected_style)
+    return packages.Style.by_id(selected_style)
 
 
 def reposition_panes() -> None:
@@ -1137,10 +1115,10 @@ def set_palette(e=None):
             LOGGER.warning('Unknown item "{}"! for palette', item)
             continue
 
-        if sub >= item_group.num_sub:
+        if sub >= len(item_group.def_data.editor.subtypes):
             LOGGER.warning(
                 'Palette had incorrect subtype for "{}" ({} > {})!',
-                item, sub, item_group.num_sub - 1,
+                item, sub, len(item_group.def_data.editor.subtypes) - 1,
             )
             continue
 
@@ -1400,7 +1378,7 @@ def init_option(pane: SubPane) -> None:
     def configure_voice():
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packageLoader.QuotePack.by_id(voice_win.chosen_id)
+            chosen_voice = packages.QuotePack.by_id(voice_win.chosen_id)
         except KeyError:
             pass
         else:
@@ -1572,8 +1550,9 @@ def init_picker(f):
     items.sort(key=operator.attrgetter('pak_id'), reverse=True)
 
     for item in items:
-        for i in range(0, item.num_sub):
-            pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
+        for i, subtype in enumerate(item.data.editor.subtypes):
+            if subtype.pal_icon or subtype.pal_name:
+                pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     f.bind("<Configure>", flow_picker)
 
@@ -1764,12 +1743,12 @@ def init_menu_bar(win: Toplevel) -> Menu:
     pal_menu.add_command(
         label=_('Save Palette'),
         command=pal_save,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
+        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
     pal_menu.add_command(
         label=_('Save Palette As...'),
         command=pal_save_as,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
+        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
         )
 
     pal_menu.add_separator()
@@ -1792,9 +1771,6 @@ def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    snd.load_snd()
-    loader.step('UI')
-
     view_menu = init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),

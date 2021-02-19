@@ -3,6 +3,7 @@
 """
 from collections import deque
 
+import editoritems
 from srctools import Vec, Vec_tuple, VMF
 from enum import Enum
 
@@ -256,9 +257,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def items(self) -> '_GridItemsView':
         return _GridItemsView(self._grid)
 
-    def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool]) -> None:
+    def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool], items: Dict[str, editoritems.Item]) -> None:
         """Given the map file, set blocks."""
-        from precomp.conditions import EMBED_OFFSETS
         from precomp.instance_traits import get_item_id
 
         # Starting points to fill air and goo.
@@ -284,12 +284,12 @@ class Grid(MutableMapping[_grid_keys, Block]):
             item_id = get_item_id(ent)
             if item_id:
                 try:
-                    embed_locs = EMBED_OFFSETS[item_id]
+                    item = items[item_id]
                 except KeyError:
                     continue
                 angles = Vec.from_str(ent['angles'])
-                for local_pos in embed_locs:
-                    world_pos = local_pos - (0, 0, 1)
+                for local_pos in item.embed_voxels:
+                    world_pos = Vec(local_pos) - (0, 0, 1)
                     world_pos.localise(pos, angles)
                     self[world_pos] = Block.EMBED
 

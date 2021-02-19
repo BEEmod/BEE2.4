@@ -6,7 +6,6 @@ from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
 from precomp import instanceLocs, connections, conditions
 import srctools.logger
 from precomp.conditions import make_result
-from precomp.connections import Item
 from srctools import VMF, Property, Output, Vec, Entity
 
 
@@ -14,7 +13,7 @@ COND_MOD_NAME = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlaser')
 
-AntLaserType = connections.ItemType(
+AntLaserConn = connections.Config(
     '<AntLaser>',
     input_type=connections.InputType.OR,
     output_act=(None, 'OnUser2'),
@@ -26,6 +25,7 @@ NAME_BEAM_LOW = '{}-fx_b_low_{}'.format  # type: Callable[[str, int], str]
 NAME_BEAM_CONN = '{}-fx_b_conn_{}'.format  # type: Callable[[str, int], str]
 NAME_CABLE = '{}-cab_{}'.format  # type: Callable[[str, int], str]
 
+
 class RopeState(Enum):
     """Used to link up ropes."""
     NONE = 'none'  # No rope here.
@@ -34,8 +34,8 @@ class RopeState(Enum):
 
     @staticmethod
     def from_node(
-        points: Dict[Item, Union[Entity, str]],
-        node: Item,
+        points: Dict[connections.Item, Union[Entity, str]],
+        node: connections.Item,
     ) -> Tuple['RopeState', Union[Entity, str]]:
         """Compute the state and ent/name from the points data."""
         try:
@@ -50,27 +50,27 @@ class RopeState(Enum):
 
 class Group:
     """Represents a group of markers."""
-    def __init__(self, start: Item):
-        self.nodes = [start]  # type: List[Item]
+    def __init__(self, start: connections.Item):
+        self.nodes: List[connections.Item] = [start]
         # We use a frozenset here to ensure we don't double-up the links -
         # users might accidentally do that.
-        self.links = set()  # type: Set[FrozenSet[Item]]
+        self.links: Set[FrozenSet[connections.Item]] = set()
         # Create the item for the entire group of markers.
         logic_ent = start.inst.map.create_ent(
             'info_target',
             origin=start.inst['origin'],
             targetname=start.name,
         )
-        self.item = Item(
+        self.item = connections.Item(
             logic_ent,
-            AntLaserType,
+            AntLaserConn,
             start.ant_floor_style,
             start.ant_wall_style,
         )
         connections.ITEMS[self.item.name] = self.item
 
 
-def on_floor(node: Item) -> bool:
+def on_floor(node: connections.Item) -> bool:
     """Check if this node is on the floor."""
     norm = Vec(z=1).rotate_by_str(node.inst['angles'])
     return norm.z > 0
@@ -119,7 +119,7 @@ def res_antlaser(vmf: VMF, res: Property):
     ]
 
     # Find all the markers.
-    nodes = {}  # type: Dict[str, Item]
+    nodes: Dict[str, connections.Item] = {}
 
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in conf_inst:
@@ -225,7 +225,7 @@ def res_antlaser(vmf: VMF, res: Property):
         group.item.disable_cmd = tuple(out_disable)
 
         # Node -> index for targetnames.
-        indexes = {}  # type: Dict[Item, int]
+        indexes: Dict[connections.Item, int] = {}
 
         # For cables, it's a bit trickier than the beams.
         # The cable ent itself is the one which decides what it links to,
@@ -234,7 +234,7 @@ def res_antlaser(vmf: VMF, res: Property):
         # So this dict is either a targetname to indicate cables with an
         # outgoing connection, or the entity for endpoints without an outgoing
         # connection.
-        cable_points = {}  # type: Dict[Item, Union[Entity, str]]
+        cable_points: Dict[connections.Item, Union[Entity, str]] = {}
 
         for i, node in enumerate(group.nodes, start=1):
             indexes[node] = i

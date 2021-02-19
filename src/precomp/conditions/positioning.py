@@ -6,7 +6,10 @@ from precomp.conditions import (
     DIRECTIONS,
 )
 from precomp import tiling, brushLoc
-from srctools import Vec, Entity, Property, Angle
+from srctools import (
+    Vec, Angle, Matrix, conv_float,
+    NoKeyError, Property, Entity,
+)
 from srctools.logger import get_logger
 
 
@@ -477,3 +480,32 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
         dist_off += 32
 
     inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
+
+
+@make_result('RotateInst')
+def res_rotate_inst(inst: Entity, res: Property) -> None:
+    """Rotate the instance around an axis.
+
+    If `axis` is specified, it should be a normal vector and the instance will
+    be rotated `angle` degrees around it.
+    Otherwise, `angle` is a pitch-yaw-roll angle which is applied.
+    `around` can be a point (local, pre-rotation) which is used as the origin.
+    """
+    angles = Angle.from_str(inst['angles'])
+    if 'axis' in res:
+        orient = Matrix.axis_angle(
+            Vec.from_str(inst.fixup.substitute(res['axis'])),
+            conv_float(inst.fixup.substitute(res['angle'])),
+        )
+    else:
+        orient = Matrix.from_angle(Angle.from_str(inst.fixup.substitute(res['angle'])))
+
+    try:
+        offset = Vec.from_str(inst.fixup.substitute(res['around']))
+    except NoKeyError:
+        pass
+    else:
+        origin = Vec.from_str(inst['origin'])
+        inst['origin'] = origin + (-offset @ orient + offset) @ angles
+
+    inst['angles'] = (orient @ angles).to_angle()

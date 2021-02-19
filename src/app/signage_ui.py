@@ -5,7 +5,7 @@ from app import dragdrop, img, TK_ROOT
 import srctools.logger
 import utils
 import BEE2_config
-from packageLoader import Signage, Style
+from packages import Signage, Style
 import tkinter as tk
 from srctools import Property
 from tkinter import ttk
@@ -199,14 +199,13 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
     def on_hover(slot: dragdrop.Slot[Signage]) -> None:
         """Show the signage when hovered."""
         nonlocal hover_arrow, hover_sign
-        name_label['text'] = (
-            _('Signage: {}').format(slot.contents.name)
-            if slot.contents is not None else
-            ''
-        )
-        hover_sign = slot.contents
-        hover_arrow = True
-        hover_toggle()
+        if slot.contents is not None:
+            name_label['text'] = _('Signage: {}').format(slot.contents.name)
+            hover_sign = slot.contents
+            hover_arrow = True
+            hover_toggle()
+        else:
+            on_leave(slot)
 
     def on_leave(slot: dragdrop.Slot[Signage]) -> None:
         """Reset the visible sign when left."""

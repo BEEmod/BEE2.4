@@ -2,11 +2,11 @@
 from srctools import Entity
 from srctools import VMF
 import srctools.logger
-from consts import ItemClass
-from precomp.conditions import CLASS_FOR_ITEM
 from precomp.instanceLocs import ITEM_FOR_FILE
+from editoritems import Item, ItemClass
 
-from typing import Optional, Callable, Dict, Set
+from typing import Optional, Callable, Dict, Set, List
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -181,7 +181,7 @@ def get_item_id(inst: Entity) -> Optional[str]:
     return getattr(inst, 'peti_item_id', None)
 
 
-def set_traits(vmf: VMF):
+def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
     """Scan through the map, and apply traits to instances."""
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()
@@ -199,12 +199,9 @@ def set_traits(vmf: VMF):
             continue
 
         try:
-            item_class = ItemClass(CLASS_FOR_ITEM[item_id.casefold()])
+            item_class = id_to_item[item_id.casefold()].cls
         except KeyError:  # dict fail
             LOGGER.warning('Unknown item ID <{}>', item_id)
-            item_class = ItemClass.UNCLASSED
-        except ValueError:  # ItemClass() fail
-            LOGGER.warning('Unknown item class for id <{}>', item_id)
             item_class = ItemClass.UNCLASSED
 
         inst.peti_class = item_class

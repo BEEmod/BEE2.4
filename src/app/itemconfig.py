@@ -6,7 +6,7 @@ from functools import lru_cache
 import math
 
 from srctools import Property, Vec, conv_int, conv_bool
-from packageLoader import PakObject, ExportData, ParseData, desc_parse
+from packages import PakObject, ExportData, ParseData, desc_parse
 import BEE2_config
 from app.tooltip import add_tooltip
 import utils

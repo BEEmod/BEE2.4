@@ -55,9 +55,6 @@ Icon
 build_BEE2/
 compiler/
 
-# Package source is in BEE2-items/
-packages/
-
 # Ignore palettes
 palettes/*.bee2_palette
 

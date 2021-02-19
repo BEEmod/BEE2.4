@@ -31,7 +31,7 @@ from typing import List, Optional
 import shutil
 
 from BEE2_config import GEN_OPTS
-from packageLoader import (
+from packages import (
     packages as PACKAGES,
     find_packages,
     LOGGER as packages_logger

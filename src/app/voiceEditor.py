@@ -540,8 +540,8 @@ def get_trans_lines(trans_block):
                 yield '', '"' + prop.value + '"'
 
 if __name__ == '__main__':
-    import packageLoader
-    data = packageLoader.load_packages('packages\\', False)
+    import packages
+    data = packages.load_packages('packages\\', False)
 
     TK_ROOT = Tk()
     lab = ttk.Label(TK_ROOT, text='Root Window')

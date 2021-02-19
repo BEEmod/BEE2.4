@@ -8,7 +8,7 @@ from app import TK_ROOT
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from BEE2_config import ConfigFile
-import packageLoader
+import packages
 import utils
 
 window = tk.Toplevel(TK_ROOT)
@@ -36,12 +36,12 @@ def show():
 def make_packitems() -> Iterable[CheckItem]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
-    for pack in packageLoader.packages.values():  # type: packageLoader.Package
+    for pack in packages.packages.values():  # type: packages.Package
         pack_items[pack.id] = item = CheckItem(
             pack.disp_name,
             hover_text=pack.desc or 'No description!',
             # The clean package can't be disabled!
-            lock_check=(pack.id == packageLoader.CLEAN_PACKAGE),
+            lock_check=(pack.id == packages.CLEAN_PACKAGE),
             state=pack.enabled
         )
         item.package = pack
@@ -69,7 +69,7 @@ def apply_changes():
         window.grab_release()
         for item in UI['details'].items:
             pack = item.package
-            if pack.id != packageLoader.CLEAN_PACKAGE:
+            if pack.id != packages.CLEAN_PACKAGE:
                 pack.enabled = item.state
         PACK_CONFIG.save_check()
         utils.restart_app()
