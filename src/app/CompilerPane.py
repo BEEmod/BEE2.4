@@ -441,7 +441,7 @@ def set_screen_type():
         window.winfo_reqheight(),
     ))
 
-    COMPILE_CFG.save()
+    COMPILE_CFG.save_check()
 
 
 def load_screenshot(path):
