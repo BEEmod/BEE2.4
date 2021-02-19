@@ -558,7 +558,7 @@ def calc_connections(
         for out_name in inputs:
             # Fizzler base -> model/brush outputs, ignore these (discard).
             # fizzler.py will regenerate as needed.
-            if out_name.endswith(('_modelStart', '_modelEnd', '_brush')):
+            if out_name.rstrip('0123456789').endswith(('_modelStart', '_modelEnd', '_brush')):
                 continue
 
             if out_name in toggles:
