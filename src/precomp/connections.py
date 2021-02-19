@@ -26,7 +26,7 @@ COND_MOD_NAME = "Item Connections"
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-ITEM_TYPES = {}  # type: Dict[str, Config]
+ITEM_TYPES = {}  # type: Dict[str, Optional[Config]]
 
 # Targetname -> item
 ITEMS = {}  # type: Dict[str, Item]
@@ -426,17 +426,20 @@ def collapse_item(item: Item) -> None:
 def read_configs(all_items: Iterable[editoritems.Item]) -> None:
     """Load our connection configuration from the config files."""
     for item in all_items:
-        if item.conn_config is None:
-            continue
         if item.id.casefold() in ITEM_TYPES:
             raise ValueError('Duplicate item type "{}"'.format(item.id))
-        ITEM_TYPES[item.id.casefold()] = item.conn_config
+        if item.conn_config is None and (item.force_input or item.force_output):
+            # The item has no config, but it does force input/output.
+            # Generate a blank config so the Item is created.
+            ITEM_TYPES[item.id.casefold()] = Config(item.id)
+        else:
+            ITEM_TYPES[item.id.casefold()] = item.conn_config
 
-    if 'item_indicator_panel' not in ITEM_TYPES:
-        raise ValueError('No checkmark panel item type!')
+    if ITEM_TYPES.get('item_indicator_panel') is None:
+        raise ValueError('No I/O for checkmark panel item type!')
 
-    if 'item_indicator_panel_timer' not in ITEM_TYPES:
-        raise ValueError('No timer panel item type!')
+    if ITEM_TYPES.get('item_indicator_panel_timer') is None:
+        raise ValueError('No I/O for timer panel item type!')
 
 
 def calc_connections(
@@ -477,38 +480,42 @@ def calc_connections(
         traits = instance_traits.get(inst)
 
         if 'indicator_toggle' in traits:
-            toggles[inst['targetname']] = inst
+            toggles[inst_name] = inst
             # We do not use toggle instances.
             inst.remove()
         elif 'indicator_panel' in traits:
-            panels[inst['targetname']] = inst
+            panels[inst_name] = inst
         elif 'fizzler_model' in traits:
             # Ignore fizzler models - they shouldn't have the connections.
             # Just the base itself.
             pass
         else:
             # Normal item.
+            item_id = instance_traits.get_item_id(inst)
+            if item_id is None:
+                LOGGER.warning('No item ID for "{}"!', inst)
+                continue
             try:
-                item_type = ITEM_TYPES[
-                    instance_traits.get_item_id(inst).casefold()]
-            except (KeyError, AttributeError):
-                # KeyError from no item type, AttributeError from None.casefold()
-                # These aren't made for non-io items. If it has outputs,
-                # that'll be a problem later.
-                pass
-            else:
-                # Pass in the defaults for antline styles.
-                ITEMS[inst_name] = Item(
-                    inst, item_type,
-                    ant_floor_style=antline_floor,
-                    ant_wall_style=antline_wall,
-                )
+                item_type = ITEM_TYPES[item_id.casefold()]
+            except KeyError:
+                LOGGER.warning('No item type for "{}"!', item_id)
+                continue
+            if item_type is None:
+                # It exists, but has no I/O.
+                continue
 
-                # Strip off the original connection count variables, these are
-                # invalid.
-                if item_type.input_type is InputType.DUAL:
-                    del inst.fixup[consts.FixupVars.CONN_COUNT]
-                    del inst.fixup[consts.FixupVars.CONN_COUNT_TBEAM]
+            # Pass in the defaults for antline styles.
+            ITEMS[inst_name] = Item(
+                inst, item_type,
+                ant_floor_style=antline_floor,
+                ant_wall_style=antline_wall,
+            )
+
+            # Strip off the original connection count variables, these are
+            # invalid.
+            if item_type.input_type is InputType.DUAL:
+                del inst.fixup[consts.FixupVars.CONN_COUNT]
+                del inst.fixup[consts.FixupVars.CONN_COUNT_TBEAM]
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
