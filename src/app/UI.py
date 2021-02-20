@@ -59,7 +59,7 @@ pal_picked_fake = []  # type: List[ttk.Label]
 # Labels for empty picker positions
 pal_items_fake = []  # type: List[ttk.Label]
 # The current filtering state.
-cur_filter: Optional[Set[str]] = None
+cur_filter: Optional[Set[Tuple[str, int]]] = None
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -144,14 +144,12 @@ class Item:
         )
         self.url = self.data.url
 
-    def get_tags(self) -> Iterator[str]:
-        """Return all the search keywords for this item."""
+    def get_tags(self, subtype: int) -> Iterator[str]:
+        """Return all the search keywords for this item/subtype."""
         yield self.pak_name
         yield from self.data.tags
         yield from self.data.authors
-        for subtype in self.data.editor.subtypes:
-            yield gameMan.translate(subtype.name)
-
+        yield gameMan.translate(self.data.editor.subtypes[subtype].name)
 
     def get_icon(self, subKey, allow_single=False, single_num=1) -> PhotoImage:
         """Get an icon for the given subkey.
@@ -1155,7 +1153,7 @@ def pal_shuffle() -> None:
         for item in pal_items
         if item.id not in palette_set
         if style_unlocked or not item.needs_unlock
-        if cur_filter is None or item.id in cur_filter
+        if cur_filter is None or (item.id, item.subKey) in cur_filter
     })
 
     random.shuffle(shuff_items)
@@ -1571,7 +1569,7 @@ def flow_picker(e=None):
         elif cur_filter is None:
             visible = True
         else:
-            visible = item.item.id in cur_filter
+            visible = (item.item.id, item.subKey) in cur_filter
 
         if visible:
             item.is_pre = False
@@ -1828,7 +1826,7 @@ def init_windows() -> None:
     )
     search_frame.grid(row=0, column=0, sticky='ew')
 
-    def update_filter(new_filter: Optional[Set[str]]) -> None:
+    def update_filter(new_filter: Optional[Set[Tuple[str, int]]]) -> None:
         """Refresh filtered items whenever it's changed."""
         global cur_filter
         cur_filter = new_filter

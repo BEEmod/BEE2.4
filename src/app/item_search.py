@@ -6,17 +6,17 @@ from collections import defaultdict
 from app import UI
 
 from marisa_trie import Trie
-from typing import Dict, Optional, Set, Callable
+from typing import Dict, Optional, Set, Callable, Tuple
 import srctools.logger
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 database = Trie()
-word_to_ids: Dict[str,  Set[str]] = defaultdict(set)
+word_to_ids: Dict[str,  Set[Tuple[str, int]]] = defaultdict(set)
 _type_cback: Optional[Callable[[], None]] = None
 
 
-def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[str]]], None]) -> None:
+def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]], None]) -> None:
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along
@@ -32,7 +32,7 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[str]]], None]) -> 
             refresh_cback(None)
             return
 
-        found = set()
+        found: Set[Tuple[str, int]] = set()
         for word in words:
             for name in database.iterkeys(word):
                 found |= word_to_ids[name]
@@ -73,9 +73,10 @@ def rebuild_database() -> None:
     word_to_ids.clear()
 
     for item in UI.item_list.values():
-        for tag in item.get_tags():
-            for word in tag.split():
-                word_to_ids[word.casefold()].add(item.id)
+        for subtype_ind in item.visual_subtypes:
+            for tag in item.get_tags(subtype_ind):
+                for word in tag.split():
+                    word_to_ids[word.casefold()].add((item.id, subtype_ind))
     database = Trie(word_to_ids.keys())
     LOGGER.debug('Tags: {}', database.keys())
     _type_cback()
