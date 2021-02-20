@@ -37,17 +37,13 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
             for name in database.iterkeys(word):
                 found |= word_to_ids[name]
         # Calling the callback deselects us, so save and restore.
-        selected = searchbar.selection_present()
-        if selected:
-            start = searchbar.index('sel.first')
-            end = searchbar.index('sel.last')
-        else:
-            start = end = 0
-
+        insert = searchbar.index('insert')
         refresh_cback(found)
 
-        if selected:
-            searchbar.selection_range(start, end)
+        def later():
+            searchbar.focus_set()
+            searchbar.icursor(insert)
+        searchbar.after_idle(later)
 
     frm.columnconfigure(1, weight=1)
 
