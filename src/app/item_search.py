@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from app import UI
 
-from lexpy.trie import Trie
+from marisa_trie import Trie
 from typing import Dict, Optional, Set, Callable
 import srctools.logger
 
@@ -34,7 +34,7 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[str]]], None]) -> 
 
         found = set()
         for word in words:
-            for name in database.search_with_prefix(word):
+            for name in database.iterkeys(word):
                 found |= word_to_ids[name]
         # Calling the callback deselects us, so save and restore.
         selected = searchbar.selection_present()
@@ -67,14 +67,15 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[str]]], None]) -> 
 
 def rebuild_database() -> None:
     """Rebuild the search database."""
+    global database
     LOGGER.info('Updating search database...')
     # Clear and reset.
-    database.__init__()
     word_to_ids.clear()
 
     for item in UI.item_list.values():
-        for word in item.get_tags():
-            word = word.casefold()
-            database.add(word)
-            word_to_ids[word].add(item.id)
+        for tag in item.get_tags():
+            for word in tag.split():
+                word_to_ids[word.casefold()].add(item.id)
+    database = Trie(word_to_ids.keys())
+    LOGGER.debug('Tags: {}', database.keys())
     _type_cback()

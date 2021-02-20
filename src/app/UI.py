@@ -39,7 +39,7 @@ from app import (
     signage_ui,
 )
 
-from typing import List, Dict, Tuple, Optional, Set
+from typing import List, Dict, Tuple, Optional, Set, Iterator
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -144,16 +144,14 @@ class Item:
         )
         self.url = self.data.url
 
-    def get_tags(self) -> Set[str]:
+    def get_tags(self) -> Iterator[str]:
         """Return all the search keywords for this item."""
-        words: Set[str] = set()
-        words.add(self.pak_name.casefold())
-
-        words.update(map(str.casefold, self.data.tags))
-        words.update(map(str.casefold, self.data.authors))
+        yield self.pak_name
+        yield from self.data.tags
+        yield from self.data.authors
         for subtype in self.data.editor.subtypes:
-            words.update(gameMan.translate(subtype.name).casefold().split())
-        return words
+            yield gameMan.translate(subtype.name)
+
 
     def get_icon(self, subKey, allow_single=False, single_num=1) -> PhotoImage:
         """Get an icon for the given subkey.
