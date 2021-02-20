@@ -798,9 +798,14 @@ class Generator(abc.ABC):
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0]))
         if antigel:
-            return ANTIGEL_MATS.get(texture, texture)
-        else:
-            return texture
+            try:
+                return ANTIGEL_MATS[texture.casefold()]
+            except KeyError:
+                LOGGER.warning('No antigel mat generated for "{}"!', texture)
+                # Set it to itself to silence the warning.
+                ANTIGEL_MATS[texture.casefold()] = texture
+
+        return texture
 
     def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and setup the generator."""
