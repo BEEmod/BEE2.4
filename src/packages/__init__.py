@@ -841,7 +841,7 @@ class Style(PakObject):
                 renderables = {}
                 vbsp = None
             else:
-                raise ValueError(f'Style "{data.id}" missing configuration folder "{folder}"!')
+                raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
             with filesystem:
                 with filesystem[folder + '/items.txt'].open_str() as f:
