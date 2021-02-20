@@ -963,6 +963,13 @@ class Item:
                 item.id = tok.expect(Token.STRING).upper()
                 if not item.id:
                     raise tok.error('Invalid item ID (Type) "{}"', item.id)
+                # The items here are used internally and must have inputs.
+                if item.id in {
+                    'ITEM_INDICATOR_TOGGLE',
+                    'ITEM_INDICATOR_PANEL',
+                    'ITEM_INDICATOR_PANEL_TIMER',
+                }:
+                    item.force_input = True
             elif tok_value == 'itemclass':
                 item_class = tok.expect(Token.STRING)
                 try:
