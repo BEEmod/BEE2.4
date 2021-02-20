@@ -8,8 +8,7 @@ from srctools import Vec, Vec_tuple, VMF
 from enum import Enum
 
 import srctools.logger
-from precomp import bottomlessPit
-
+import utils
 from typing import (
     Union, Any, Tuple,
     Iterable, Iterator,
@@ -42,6 +41,7 @@ w2g = world_to_grid
 g2w = grid_to_world
 
 
+@utils.freeze_enum_props
 class Block(Enum):
     """Various contents categories for grid positions."""
     VOID = 0  # Outside the map
@@ -260,6 +260,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool], items: Dict[str, editoritems.Item]) -> None:
         """Given the map file, set blocks."""
         from precomp.instance_traits import get_item_id
+        from precomp import bottomlessPit
 
         # Starting points to fill air and goo.
         # We want to fill goo first...
