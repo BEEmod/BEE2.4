@@ -797,7 +797,7 @@ class Item:
         invalid_surf: Iterable[Surface] = (),
         anchor_on_barriers: bool = False,
         anchor_on_goo: bool = False,
-        occupies_voxel: bool = True
+        occupies_voxel: bool = False
     ) -> None:
         self.animations = {}
         self.id = item_id
@@ -1337,9 +1337,9 @@ class Item:
                 elif folded_key == 'pos2':
                     pos2 = Coord.parse(tok.expect(Token.STRING), tok.error)
                 elif folded_key == 'collidetype':
-                    collide_type |= CollType.parse(tok)
+                    collide_type = CollType.parse(tok)
                 elif folded_key == 'collideagainst':
-                    collide_against |= CollType.parse(tok)
+                    collide_against = CollType.parse(tok)
                 elif folded_key == 'normal':
                     normal = Coord.parse(tok.expect(Token.STRING), tok.error)
                     if normal not in NORMALS:
