@@ -7,3 +7,4 @@ pyglet==1.5.7
 PyInstaller==4.0
 typing==3.7.4.1
 typing-extensions==3.7.4.2
+lexpy==0.9.8

@@ -31,7 +31,7 @@ from app import (
     packageMan,
     StyleVarPane,
     CompilerPane,
-    tagsPane,
+    item_search,
     optionWindow,
     helpMenu,
     backup as backup_win,
@@ -39,7 +39,7 @@ from app import (
     signage_ui,
 )
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Set
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -58,6 +58,8 @@ pal_items = []  # type: List[PalItem]
 pal_picked_fake = []  # type: List[ttk.Label]
 # Labels for empty picker positions
 pal_items_fake = []  # type: List[ttk.Label]
+# The current filtering state.
+cur_filter: Optional[Set[str]] = None
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -93,8 +95,6 @@ class Item:
         'data',
         'visual_subtypes',
         'authors',
-        'tags',
-        'filter_tags',
         'id',
         'pak_id',
         'pak_name',
@@ -132,14 +132,11 @@ class Item:
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
-        self.tags = set()
 
         self.load_data()
 
     def load_data(self) -> None:
         """Load data from the item."""
-        from app.tagsPane import Section
-
         version = self.item.versions[self.selected_ver]
         self.data = version.styles.get(
             selected_style,
@@ -147,25 +144,18 @@ class Item:
         )
         self.url = self.data.url
 
-        # attributes used for filtering (tags, authors, packages...)
-        self.filter_tags = set()
+    def get_tags(self) -> Set[str]:
+        """Return all the search keywords for this item."""
+        words: Set[str] = set()
+        words.add(self.pak_name.casefold())
 
-        # The custom tags set for this item
-        self.tags = set()
+        words.update(map(str.casefold, self.data.tags))
+        words.update(map(str.casefold, self.data.authors))
+        for subtype in self.data.editor.subtypes:
+            words.update(gameMan.translate(subtype.name).casefold().split())
+        return words
 
-        for tag in self.data.tags:
-            self.filter_tags.add(
-                tagsPane.add_tag(Section.TAG, tag, pretty=tag)
-            )
-        for auth in self.data.authors:
-            self.filter_tags.add(
-                tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
-            )
-        self.filter_tags.add(
-            tagsPane.add_tag(Section.PACK, self.pak_id, pretty=self.pak_name)
-        )
-
-    def get_icon(self, subKey, allow_single=False, single_num=1):
+    def get_icon(self, subKey, allow_single=False, single_num=1) -> PhotoImage:
         """Get an icon for the given subkey.
 
         If allow_single is true, the grouping icon can be returned
@@ -279,8 +269,6 @@ class PalItem(Label):
         self.item = item
         self.subKey = sub
         self.id = item.id
-        # Toggled according to filter settings
-        self.visible = True
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
@@ -1151,6 +1139,8 @@ def pal_clear() -> None:
 
 def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
+    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
+    
     if len(pal_picked) == 32:
         return
 
@@ -1162,18 +1152,23 @@ def pal_shuffle() -> None:
     # Use a set to eliminate duplicates.
     shuff_items = list({
         item.id
-        # Only consider visible items, not on the palette.
+        # Only consider items not already on the palette,
+        # obey the mandatory item lock and filters.
         for item in pal_items
-        if item.visible and item.id not in palette_set
+        if item.id not in palette_set
+        if style_unlocked or not item.needs_unlock
+        if cur_filter is None or item.id in cur_filter
     })
 
     random.shuffle(shuff_items)
 
     for item_id in shuff_items[:32-len(pal_picked)]:
+        item = item_list[item_id]
         pal_picked.append(PalItem(
             frames['preview'],
-            item_list[item_id],
-            sub=0,  # Use the first subitem
+            item,
+            # Pick a random available palette icon.
+            sub=random.choice(item.visual_subtypes),
             is_pre=True,
         ))
     flow_preview()
@@ -1565,33 +1560,32 @@ def flow_picker(e=None):
     """
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
-    if tagsPane.is_expanded:
-        # Offset the icons so they aren't covered by the tags popup
-        offset = max(
-            (
-                tagsPane.wid['expand_frame'].winfo_height()
-                - pal_canvas.winfo_rooty()
-                + tagsPane.wid['expand_frame'].winfo_rooty()
-                + 15
-            ), 0)
-    else:
-        offset = 0
-    UI['picker_frame'].grid(pady=(offset, 0))
+    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
 
     width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
         width = 1  # we got way too small, prevent division by zero
-    vis_items = [it for it in pal_items if it.visible]
-    num_items = len(vis_items)
-    for i, item in enumerate(vis_items):
-        item.is_pre = False
-        item.place(
-            x=((i % width) * 65 + 1),
-            y=((i // width) * 65 + 1),
-            )
 
-    for item in (it for it in pal_items if not it.visible):
-        item.place_forget()
+    i = 0
+    for item in pal_items:
+        if item.needs_unlock and not style_unlocked:
+            visible = False
+        elif cur_filter is None:
+            visible = True
+        else:
+            visible = item.item.id in cur_filter
+
+        if visible:
+            item.is_pre = False
+            item.place(
+                x=((i % width) * 65 + 1),
+                y=((i // width) * 65 + 1),
+                )
+            i += 1
+        else:
+            item.place_forget()
+
+    num_items = i
 
     height = int(math.ceil(num_items / width)) * 65 + 2
     pal_canvas['scrollregion'] = (0, 0, width * 65, height)
@@ -1603,7 +1597,7 @@ def flow_picker(e=None):
     # Special case, don't add a full row if it's exactly the right count.
     extra_items = (width - last_row) if last_row != 0 else 0
 
-    y = (num_items // width)*65 + offset + 1
+    y = (num_items // width)*65 + 1
     for i in range(extra_items):
         if i not in pal_items_fake:
             pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
@@ -1787,7 +1781,6 @@ def init_windows() -> None:
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
     ui_bg.rowconfigure(0, weight=1)
-    StyleVarPane.update_filter = tagsPane.filter_items
 
     style = ttk.Style()
     # Custom button style with correct background
@@ -1829,37 +1822,36 @@ def init_windows() -> None:
 
     # This will sit on top of the palette section, spanning from left
     # to right
-    frames['tags'] = ttk.Frame(
+    search_frame = ttk.Frame(
         picker_split_frame,
         padding=5,
         borderwidth=0,
         relief="raised",
     )
-    # Place doesn't affect .grid() positioning, so this frame will sit on top
-    # of other widgets.
-    frames['tags'].place(x=0, y=0, relwidth=1)
-    tagsPane.init(frames['tags'])
-    frames['tags'].update_idletasks()  # Refresh so height() is correct
+    search_frame.grid(row=0, column=0, sticky='ew')
+
+    def update_filter(new_filter: Optional[Set[str]]) -> None:
+        """Refresh filtered items whenever it's changed."""
+        global cur_filter
+        cur_filter = new_filter
+        flow_picker()
+
+    item_search.init(search_frame, update_filter)
 
     loader.step('UI')
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
-        # Offset the picker window under the unexpanded tags pane, so they
-        # don't overlap.
-        padding=(5, frames['tags'].winfo_height(), 5, 5),
+        padding=5,
         borderwidth=4,
         relief="raised",
     )
-    frames['picker'].grid(row=0, column=0, sticky="NSEW")
-    picker_split_frame.rowconfigure(0, weight=1)
+    frames['picker'].grid(row=1, column=0, sticky="NSEW")
+    picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
     init_picker(frames['picker'])
 
     loader.step('UI')
-
-    # Move this to above the picker pane (otherwise it'll be hidden)
-    frames['tags'].lift()
 
     frames['toolMenu'] = Frame(
         frames['preview'],
@@ -1909,7 +1901,7 @@ def init_windows() -> None:
 
     loader.step('UI')
 
-    StyleVarPane.make_pane(frames['toolMenu'], view_menu)
+    StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
 
     loader.step('UI')
 
@@ -2031,9 +2023,7 @@ def init_windows() -> None:
         elev_win.readonly = not style_obj.has_video
 
         signage_ui.style_changed(style_obj)
-
-        tagsPane.filter_items()  # Update filters (authors may have changed)
-
+        item_search.rebuild_database()
         CompilerPane.set_corridors(style_obj.corridors)
 
         sugg = style_obj.suggested
