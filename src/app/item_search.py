@@ -55,7 +55,7 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
     search_var = tk.StringVar()
     search_var.trace_add('write', on_type)
 
-    searchbar = tk.Entry(frm, textvariable=search_var)
+    searchbar = ttk.Entry(frm, textvariable=search_var)
     searchbar.grid(row=0, column=1, sticky='EW')
 
     _type_cback = on_type
