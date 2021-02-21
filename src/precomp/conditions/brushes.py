@@ -2,7 +2,10 @@
 import random
 from collections import defaultdict
 
-from srctools import Property, NoKeyError, Vec, Output, Entity, VMF
+from srctools import (
+    Property, NoKeyError, Vec, Output, Entity, VMF, Angle,
+    Matrix,
+)
 import srctools.logger
 
 from precomp import (
@@ -204,14 +207,14 @@ def res_set_texture(inst: Entity, res: Property):
     will be rotated by the instance angles, and then the face with the same
     orientation will be applied to the face (with the rotation and texture).
     """
-    angles = Vec.from_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
     origin = Vec.from_str(inst['origin'])
 
     pos = Vec.from_str(res['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
     pos.localise(origin, angles)
 
-    norm = Vec.from_str(res['dir', '0 0 1']).rotate(*angles)
+    norm = round(Vec.from_str(res['dir', '0 0 1']) @ angles, 6)
 
     if srctools.conv_bool(res['gridpos', '0']):
         for axis in 'xyz':
@@ -234,13 +237,13 @@ def res_set_texture(inst: Entity, res: Property):
         )
         return
 
-    temp_id = res['template', None]
+    temp_id = inst.fixup.substitute(res['template', ''])
     if temp_id:
         temp = template_brush.get_scaling_template(temp_id).rotate(angles, origin)
     else:
         temp = template_brush.ScalingTemplate.world()
 
-    tex = res['tex', '']
+    tex = inst.fixup.substitute(res['tex', ''])
 
     if tex.startswith('<') and tex.endswith('>'):
         LOGGER.warning(
@@ -268,6 +271,9 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
     The sides will be textured with 1x1, 2x2 or 4x4 wall, ceiling and floor
     textures as needed.
     """
+    origin = Vec.from_str(inst['origin'])
+    angles = Angle.from_str(inst['angles'])
+
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
@@ -275,12 +281,8 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
     point2.z -= 64
 
     # Rotate to match the instance
-    point1 = point1.rotate_by_str(inst['angles'])
-    point2 = point2.rotate_by_str(inst['angles'])
-
-    origin = Vec.from_str(inst['origin'])
-    point1 += origin  # Then offset to the location of the instance
-    point2 += origin
+    point1 = point1 @ angles + origin
+    point2 = point2 @ angles + origin
 
     try:
         tex_type = texturing.Portalable(res['type', 'black'])
@@ -292,7 +294,7 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
         )
         tex_type = texturing.Portalable.BLACK
 
-    dim = point2 - point1
+    dim = round(point2 - point1, 6)
     dim.max(-dim)
 
     # Figure out what grid size and scale is needed
@@ -576,16 +578,8 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
         sense_offset,
     ) = res.value
 
-    if ':' in orig_temp_id:
-        # Split, resolve each part, then recombine.
-        temp_id, visgroup = orig_temp_id.split(':', 1)
-        temp_id = (
-            conditions.resolve_value(inst, temp_id) + ':' +
-            conditions.resolve_value(inst, visgroup)
-        )
-    else:
-        temp_id = conditions.resolve_value(inst, orig_temp_id)
-
+    temp_id = inst.fixup.substitute(orig_temp_id)
+    
     if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
         def visgroup_func(group):
             """Use all the groups."""
@@ -646,7 +640,7 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
     # else: False value, no invert.
 
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles', '0 0 0'])
+    angles = Angle.from_str(inst['angles', '0 0 0'])
     temp_data = template_brush.import_template(
         vmf,
         template,
@@ -668,7 +662,7 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
 
         move_dir = temp_data.detail['movedir', '']
         if move_dir.startswith('<') and move_dir.endswith('>'):
-            move_dir = Vec.from_str(move_dir).rotate(*angles)
+            move_dir = Vec.from_str(move_dir) @ angles
             temp_data.detail['movedir'] = move_dir.to_angle()
 
         for out in outputs:  # type: Output
@@ -695,6 +689,22 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
             inst.fixup[picker_var] = picker_val.value
         else:
             inst.fixup[picker_var] = ''
+
+
+@make_result('MarkAntigel')
+def res_antigel(inst: Entity) -> None:
+    """Implement the Antigel marker."""
+    inst.remove()
+    origin = Vec.from_str(inst['origin'])
+    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+
+    pos = round(origin - 128 * orient.up(), 6)
+    norm = round(orient.up(), 6)
+    try:
+        tiling.TILES[pos.as_tuple(), norm.as_tuple()].is_antigel = True
+    except KeyError:
+        LOGGER.warning('No tile to set antigel at {}, {}', pos, norm)
+    texturing.ANTIGEL_LOCS.add((origin // 128).as_tuple())
 
 
 # Position -> entity
@@ -808,12 +818,11 @@ def res_set_tile(inst: Entity, res: Property) -> None:
     - `o`: Cutout Tile (Partial)
     """
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
-    offset = (res.vec('offset', -48, 48) - (0, 0, 64)).rotate(*angles)
-    offset += origin
+    offset = (res.vec('offset', -48, 48) - (0, 0, 64)) @ orient + origin
 
-    norm = Vec(0, 0, 1).rotate(*angles)
+    norm = round(orient.up(), 6)
 
     force_tile = res.bool('force')
 
@@ -837,7 +846,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
             if chance < 100.0 and random.uniform(0, 100) > chance:
                 continue
 
-            pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
+            pos = Vec(32 * x, -32 * y, 0) @ orient + offset
 
             if val == '4':
                 size = tiling.TileSize.TILE_4x4

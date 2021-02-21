@@ -90,7 +90,7 @@ def install_path(path: str) -> Path:
         return Path(sys._MEIPASS) / path
     else:
         # We're running from src/, so data is in the folder above that.
-        return (Path('../') / path).resolve()
+        return (Path(sys.argv[0]).parent.parent / path).resolve()
 
 
 def conf_location(path: str) -> Path:

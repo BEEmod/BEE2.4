@@ -4,7 +4,7 @@ from BEE2_config import GEN_OPTS
 
 from app import gameMan, paletteLoader, UI, music_conf, logWindow, img, TK_ROOT
 import loadScreen
-import packageLoader
+import packages
 import utils
 import srctools.logger
 
@@ -49,7 +49,7 @@ GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
 LOGGER.debug('Starting loading screen...')
-loadScreen.main_loader.set_length('UI', 15)
+loadScreen.main_loader.set_length('UI', 14)
 loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
 loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
@@ -73,7 +73,7 @@ gameMan.set_game_by_name(
 gameMan.scan_music_locs()
 
 LOGGER.info('Loading Packages...')
-pack_data, package_sys = packageLoader.load_packages(
+pack_data, package_sys = packages.load_packages(
     GEN_OPTS['Directories']['package'],
     loader=loadScreen.main_loader,
     log_item_fallbacks=GEN_OPTS.get_bool(

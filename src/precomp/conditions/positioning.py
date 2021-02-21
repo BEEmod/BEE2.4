@@ -6,7 +6,10 @@ from precomp.conditions import (
     DIRECTIONS,
 )
 from precomp import tiling, brushLoc
-from srctools import Vec, Entity, Property
+from srctools import (
+    Vec, Angle, Matrix, conv_float,
+    NoKeyError, Property, Entity,
+)
 from srctools.logger import get_logger
 
 
@@ -80,7 +83,7 @@ def brush_at_loc(
     and a set of all types found.
     """
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
 
     # Allow using pos1 instead, to match pos2.
     pos = props.vec('pos1' if 'pos1' in props else 'pos')
@@ -88,7 +91,7 @@ def brush_at_loc(
 
     pos.localise(origin, angles)
 
-    norm = props.vec('dir', 0, 0, 1).rotate(*angles)
+    norm: Vec = round(props.vec('dir', 0, 0, 1) @ angles, 6)
 
     if props.bool('gridpos') and norm is not None:
         for axis in 'xyz':
@@ -109,7 +112,7 @@ def brush_at_loc(
         pos2.z -= 64  # Subtract so origin is the floor-position
         pos2.localise(origin, angles)
 
-        bbox_min, bbox_max = Vec.bbox(pos, pos2)
+        bbox_min, bbox_max = Vec.bbox(round(pos, 6), round(pos2, 6))
 
         white_count = black_count = 0
 
@@ -477,3 +480,32 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
         dist_off += 32
 
     inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
+
+
+@make_result('RotateInst')
+def res_rotate_inst(inst: Entity, res: Property) -> None:
+    """Rotate the instance around an axis.
+
+    If `axis` is specified, it should be a normal vector and the instance will
+    be rotated `angle` degrees around it.
+    Otherwise, `angle` is a pitch-yaw-roll angle which is applied.
+    `around` can be a point (local, pre-rotation) which is used as the origin.
+    """
+    angles = Angle.from_str(inst['angles'])
+    if 'axis' in res:
+        orient = Matrix.axis_angle(
+            Vec.from_str(inst.fixup.substitute(res['axis'])),
+            conv_float(inst.fixup.substitute(res['angle'])),
+        )
+    else:
+        orient = Matrix.from_angle(Angle.from_str(inst.fixup.substitute(res['angle'])))
+
+    try:
+        offset = Vec.from_str(inst.fixup.substitute(res['around']))
+    except NoKeyError:
+        pass
+    else:
+        origin = Vec.from_str(inst['origin'])
+        inst['origin'] = origin + (-offset @ orient + offset) @ angles
+
+    inst['angles'] = (orient @ angles).to_angle()

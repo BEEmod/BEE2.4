@@ -9,11 +9,13 @@ import sys
 import shutil
 import random
 import logging
+import pickle
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 
-from srctools import Property, Vec, AtomicWriter, Vec_tuple
+from srctools import Property, Vec, AtomicWriter, Vec_tuple, Angle
 from srctools.vmf import VMF, Entity, Output
+from srctools.game import Game
 from BEE2_config import ConfigFile
 import utils
 import srctools.run
@@ -39,6 +41,7 @@ from precomp import (
     music,
 )
 import consts
+import editoritems
 
 from typing import Any, Dict, Tuple, List, Set, Iterable
 
@@ -95,7 +98,7 @@ IGNORED_OVERLAYS = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
+def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, editoritems.Item]]:
     """Load in all our settings from vbsp_config."""
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
@@ -128,7 +131,8 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        voice_line.QUOTE_DATA += quote_block.copy()
+        quote_block.name = None
+        voice_line.QUOTE_DATA.append(quote_block)
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -139,16 +143,16 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     # Load in templates.
     template_brush.load_templates()
 
-    # Load in the config file holding item data.
-    # This is used to lookup item's instances, or their connection commands.
-    with open('bee2/instances.cfg') as f:
-        instance_file = Property.parse(
-            f, 'bee2/instances.cfg'
-        )
-    # Parse that data in the relevant modules.
-    instanceLocs.load_conf(instance_file)
-    conditions.build_itemclass_dict(instance_file)
-    connections.read_configs(instance_file)
+    # Load a copy of the item configuration.
+    id_to_item: Dict[str, editoritems.Item] = {}
+    item: editoritems.Item
+    with open('bee2/editor.bin', 'rb') as inst:
+        for item in pickle.load(inst):
+            id_to_item[item.id.casefold()] = item
+
+    # Send that data to the relevant modules.
+    instanceLocs.load_conf(id_to_item.values())
+    connections.read_configs(id_to_item.values())
 
     # Parse packlist data.
     with open('bee2/pack_list.cfg') as f:
@@ -216,7 +220,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType]:
     })
 
     LOGGER.info("Settings Loaded!")
-    return ant_floor, ant_wall
+    return ant_floor, ant_wall, id_to_item
 
 
 def load_map(map_path: str) -> VMF:
@@ -234,9 +238,9 @@ def load_map(map_path: str) -> VMF:
 def add_voice(vmf: VMF):
     """Add voice lines to the map."""
     voice_line.add_voice(
-        has_items=settings['has_attr'],
-        style_vars_=settings['style_vars'],
-        vmf_file_=vmf,
+        voice_attrs=settings['has_attr'],
+        style_vars=settings['style_vars'],
+        vmf=vmf,
         map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )
@@ -882,7 +886,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
             # In SP mode the same instance is used for entry and exit door
             # frames. Use the position of the item to distinguish the two.
             # We need .rotate() since they could be in the same block.
-            exit_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            exit_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
             exit_origin += Vec.from_str(item['origin'])
             exit_corr_name = item['targetname']
             exit_fixup = item.fixup
@@ -896,7 +900,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
             )
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
-            entry_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            entry_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
             entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
             entry_fixup = item.fixup
@@ -970,7 +974,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
     # Now check the door frames, to allow distinguishing between
     # the entry and exit frames.
     for door_frame in door_frames:
-        origin = Vec(0, 0, -64).rotate_by_str(door_frame['angles'])
+        origin = Vec(0, 0, -64) @ Angle.from_str(door_frame['angles'])
         # Corridors are placed 64 units below doorframes - reverse that.
         origin.z -= 64
         origin += Vec.from_str(door_frame['origin'])
@@ -1027,7 +1031,7 @@ def mod_entryexit(
     The corridor used is also copied to '$corr_index'.
     """
     global IS_PREVIEW
-    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
 
     if is_exit:
         # Swap the normal direction, so the up/down names match the direction
@@ -1257,12 +1261,12 @@ def set_barrier_frame_type(vmf: VMF) -> None:
             continue
         if inst['file'].casefold() in glass_file:
             # The glass instance faces a different way to the frames..
-            norm = Vec(-1, 0, 0).rotate_by_str(inst['angles'])
+            norm = Vec(-1, 0, 0) @ Angle.from_str(inst['angles'])
         else:
-            norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
+            norm = Vec(0, 0, -1) @ Angle.from_str(inst['angles'])
         origin = Vec.from_str(inst['origin'])
         try:
-            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), norm.as_tuple()]
+            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), round(norm).as_tuple()]
         except KeyError:
             pass
 
@@ -1386,13 +1390,10 @@ def cond_force_clump(inst: Entity, res: Property):
     """
     point1, point2, tex_data = res.value
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
 
-    point1 = point1.copy().rotate(*angles)
-    point1 += origin
-
-    point2 = point2.copy().rotate(*angles)
-    point2 += origin
+    point1 = point1 @ angles + origin
+    point2 = point2 @ angles + origin
 
     min_pos, max_pos = Vec.bbox(point1, point2)
 
@@ -1571,46 +1572,6 @@ def fix_worldspawn(vmf: VMF) -> None:
             options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
     vmf.spawn['skyname'] = options.get(str, 'skybox')
-
-
-def make_vrad_config(is_peti: bool) -> None:
-    """Generate a config file for VRAD from our configs.
-
-    This way VRAD doesn't need to parse through vbsp_config, or anything else.
-    """
-    LOGGER.info('Generating VRAD config...')
-    conf = Property('Config', [
-    ])
-    conf['is_peti'] = srctools.bool_as_int(is_peti)
-
-    if is_peti:
-        conf['force_full'] = srctools.bool_as_int(
-            BEE2_config.get_bool('General', 'vrad_force_full')
-        )
-        conf['screenshot_type'] = BEE2_config.get_val(
-            'Screenshot', 'type', 'PETI'
-        ).upper()
-        conf['clean_screenshots'] = srctools.bool_as_int(
-            BEE2_config.get_bool('Screenshot', 'del_old')
-        )
-        conf['is_preview'] = srctools.bool_as_int(
-            IS_PREVIEW
-        )
-        conf['game_id'] = options.get(str, 'game_id')
-
-        if BEE2_config.get_bool('General', 'packfile_dump_enable'):
-            conf['packfile_dump'] = BEE2_config.get_val(
-                'General',
-                'packfile_dump_dir',
-                ''
-            )
-
-        # This generates scripts and might need to tell VRAD.
-        cubes.write_vscripts(conf)
-
-    with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
-        for line in conf.export():
-            f.write(line)
 
 
 def instance_symlink() -> None:
@@ -1849,6 +1810,7 @@ def main() -> None:
         'styled',
         path_file,
     )
+    game_dir = ''
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
@@ -1856,15 +1818,19 @@ def main() -> None:
             new_args[i] = ''
             old_args[i] = ''
         # Strip the entity limit, and the following number
-        if a == '-entity_limit':
+        elif a == '-entity_limit':
             new_args[i] = ''
             if len(new_args) > i+1 and new_args[i+1] == '1750':
                 new_args[i+1] = ''
+        elif a == '-game':
+            game_dir = new_args[i+1]
 
     LOGGER.info('Map path is "' + path + '"')
     LOGGER.info('New path: "' + new_path + '"')
-    if path == "":
+    if not path:
         raise Exception("No map passed!")
+    if not game_dir:
+        raise Exception("No game directory passed!")
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1879,6 +1845,7 @@ def main() -> None:
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
 
+    game = Game(game_dir)
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
@@ -1890,10 +1857,10 @@ def main() -> None:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        ant_floor, ant_wall = load_settings()
+        ant_floor, ant_wall, id_to_item = load_settings()
 
         vmf = load_map(path)
-        instance_traits.set_traits(vmf)
+        instance_traits.set_traits(vmf, id_to_item)
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1911,7 +1878,7 @@ def main() -> None:
 
         all_inst = get_map_info(vmf)
 
-        brushLoc.POS.read_from_map(vmf, settings['has_attr'])
+        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
@@ -1927,7 +1894,7 @@ def main() -> None:
 
         del side_to_antline
 
-        texturing.setup(vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
+        texturing.setup(game, vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
 
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)
@@ -1944,6 +1911,12 @@ def main() -> None:
             for out in ent.outputs:
                 out.comma_sep = False
 
+        # Ensure VRAD knows that the map is PeTI, it can't figure that out
+        # from parameters.
+        vmf.spawn['BEE2_is_peti'] = True
+        # Set this so VRAD can know.
+        vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
+
         save(vmf, new_path)
         run_vbsp(
             vbsp_args=new_args,
@@ -1951,9 +1924,6 @@ def main() -> None:
             new_path=new_path,
         )
 
-    # We always need to do this - VRAD can't easily determine if the map is
-    # a Hammer one.
-    make_vrad_config(is_peti=not is_hammer)
     LOGGER.info("BEE2 VBSP hook finished!")
 
 

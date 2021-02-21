@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-01-14 14:25+1000\n"
+"POT-Creation-Date: 2021-02-21 11:21+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.6.0\n"
+"Generated-By: Babel 2.9.0\n"
 
 #: loadScreen.py:199
 msgid "Skipped!"
@@ -22,12 +22,12 @@ msgstr "跳过！"
 msgid "Version: "
 msgstr "版本："
 
-#: app/optionWindow.py:260 app/packageMan.py:116 app/selector_win.py:718
+#: app/optionWindow.py:260 app/packageMan.py:116 app/selector_win.py:721
 #: loadScreen.py:201
 msgid "Cancel"
 msgstr "取消"
 
-#: app/tagsPane.py:48 loadScreen.py:211
+#: loadScreen.py:211
 msgid "Packages"
 msgstr "资源包"
 
@@ -116,7 +116,7 @@ msgid ""
 " change."
 msgstr "随机选择一个走廊，被随机选中的走廊将保存在地图编辑器中且不会再次变更。"
 
-#: app/CompilerPane.py:320 app/UI.py:664
+#: app/CompilerPane.py:320 app/UI.py:626
 msgid "Random"
 msgstr "随机"
 
@@ -307,43 +307,43 @@ msgstr ""
 msgid "Corridor:"
 msgstr "走廊样式"
 
-#: app/CompilerPane.py:854
+#: app/CompilerPane.py:853
 msgid "SP Entry:"
 msgstr "单人模式入口"
 
-#: app/CompilerPane.py:859
+#: app/CompilerPane.py:858
 msgid "SP Exit:"
 msgstr "单人模式出口"
 
-#: app/CompilerPane.py:864
-msgid "Coop:"
-msgstr "合作模式"
+#: app/CompilerPane.py:863
+msgid "Coop Exit:"
+msgstr ""
 
-#: app/CompilerPane.py:870
+#: app/CompilerPane.py:869
 msgid "Player Model (SP):"
 msgstr "玩家模型（单人模式）"
 
-#: app/CompilerPane.py:894
+#: app/CompilerPane.py:893
 msgid "Compile Options"
 msgstr "编译选项"
 
-#: app/CompilerPane.py:912
+#: app/CompilerPane.py:911
 msgid "Compiler Options - {}"
 msgstr "开发者选项 - {}"
 
-#: app/StyleVarPane.py:31
+#: app/StyleVarPane.py:30
 msgid "Multiverse Cave"
 msgstr "启用Cave谈论平行宇宙的语音"
 
-#: app/StyleVarPane.py:33
+#: app/StyleVarPane.py:32
 msgid "Play the Workshop Cave Johnson lines on map start."
 msgstr "进入地图后播放Cave谈论平行宇宙的语音"
 
-#: app/StyleVarPane.py:38
+#: app/StyleVarPane.py:37
 msgid "Prevent Portal Bump (fizzler)"
 msgstr "阻止传送门跃过消散力场"
 
-#: app/StyleVarPane.py:40
+#: app/StyleVarPane.py:39
 msgid ""
 "Add portal bumpers to make it more difficult to portal across fizzler "
 "edges. This can prevent placing portals in tight spaces near fizzlers, or"
@@ -353,19 +353,19 @@ msgstr ""
 "这可以防止将传送门放置在消散立场与墙壁之间的夹缝中，\n"
 "同时也阻止通过挤门的方式把传送门开启到消散立场的另一边。"
 
-#: app/StyleVarPane.py:47
+#: app/StyleVarPane.py:46
 msgid "Suppress Mid-Chamber Dialogue"
 msgstr "禁用实验室内的AI语音"
 
-#: app/StyleVarPane.py:49
+#: app/StyleVarPane.py:48
 msgid "Disable all voicelines other than entry and exit lines."
 msgstr "禁用在入口通道和出口通道以外的地区播放电脑语音。"
 
-#: app/StyleVarPane.py:54
+#: app/StyleVarPane.py:53
 msgid "Unlock Default Items"
 msgstr "允许编辑默认物品"
 
-#: app/StyleVarPane.py:56
+#: app/StyleVarPane.py:55
 msgid ""
 "Allow placing and deleting the mandatory Entry/Exit Doors and Large "
 "Observation Room. Use with caution, this can have weird results!"
@@ -373,11 +373,11 @@ msgstr ""
 "允许放置和删除强制性的进/出门和大型观察室。\n"
 "谨慎使用，可能会产生奇怪的结果！"
 
-#: app/StyleVarPane.py:63
+#: app/StyleVarPane.py:62
 msgid "Allow Adding Goo Mist"
 msgstr "允许为致命酸液添加雾气效果"
 
-#: app/StyleVarPane.py:65
+#: app/StyleVarPane.py:64
 msgid ""
 "Add mist particles above Toxic Goo in certain styles. This can increase "
 "the entity count significantly with large, complex goo pits, so disable "
@@ -386,11 +386,11 @@ msgstr ""
 "在某些风格中的致命酸液上添加带有雾气的粒子效果。\n"
 "但这会增加实体的数量，如果有复杂的酸液池，可以考虑禁用此特效以提升性能。"
 
-#: app/StyleVarPane.py:72
+#: app/StyleVarPane.py:71
 msgid "Light Reversible Excursion Funnels"
 msgstr "允许牵引光束转换极性"
 
-#: app/StyleVarPane.py:74
+#: app/StyleVarPane.py:73
 msgid ""
 "Funnels emit a small amount of light. However, if multiple funnels are "
 "near each other and can reverse polarity, this can cause lighting issues."
@@ -400,11 +400,11 @@ msgstr ""
 "牵引光束会发出少量的光。然而，多个牵引光束彼此靠近且可以反转极性时，则可能导致照明出现问题。\n"
 "禁用此功能可以通过关闭发光来避免这个问题，不可逆的牵引光束没有此问题。"
 
-#: app/StyleVarPane.py:82
+#: app/StyleVarPane.py:81
 msgid "Enable Shape Framing"
 msgstr "为蚂蚁标志添加边框"
 
-#: app/StyleVarPane.py:84
+#: app/StyleVarPane.py:83
 msgid ""
 "After 10 shape-type antlines are used, the signs repeat. With this "
 "enabled, colored frames will be added to distinguish them."
@@ -412,56 +412,56 @@ msgstr ""
 "当蚂蚁线标志超过10个种类时会出现符号重复。\n"
 "启用此功能可以通过添加彩色边框的方式区分它们。"
 
-#: app/StyleVarPane.py:153
+#: app/StyleVarPane.py:152
 msgid "Default: On"
 msgstr "默认：开启"
 
-#: app/StyleVarPane.py:155
+#: app/StyleVarPane.py:154
 msgid "Default: Off"
 msgstr "默认：关闭"
 
-#: app/StyleVarPane.py:159
+#: app/StyleVarPane.py:158
 msgid "Styles: Unstyled"
 msgstr "风格：无"
 
-#: app/StyleVarPane.py:169
+#: app/StyleVarPane.py:168
 msgid "Styles: All"
 msgstr "风格：所有"
 
-#: app/StyleVarPane.py:177
+#: app/StyleVarPane.py:176
 msgid "Style: {}"
 msgid_plural "Styles: {}"
 msgstr[0] "风格：{}"
 
-#: app/StyleVarPane.py:231
+#: app/StyleVarPane.py:229
 msgid "Style/Item Properties"
 msgstr "风格/物品 属性"
 
-#: app/StyleVarPane.py:250
+#: app/StyleVarPane.py:248
 msgid "Styles"
 msgstr "风格属性"
 
-#: app/StyleVarPane.py:269
+#: app/StyleVarPane.py:267
 msgid "All:"
 msgstr "所有风格："
 
-#: app/StyleVarPane.py:272
+#: app/StyleVarPane.py:270
 msgid "Selected Style:"
 msgstr "所选风格："
 
-#: app/StyleVarPane.py:280
+#: app/StyleVarPane.py:278
 msgid "Other Styles:"
 msgstr "其它风格："
 
-#: app/StyleVarPane.py:285
+#: app/StyleVarPane.py:283
 msgid "No Options!"
 msgstr "没有选项！"
 
-#: app/StyleVarPane.py:291
+#: app/StyleVarPane.py:289
 msgid "None!"
 msgstr "无！"
 
-#: app/StyleVarPane.py:362
+#: app/StyleVarPane.py:358
 msgid "Items"
 msgstr "物品属性"
 
@@ -469,34 +469,34 @@ msgstr "物品属性"
 msgid "Hide/Show the \"{}\" window."
 msgstr "隐藏/显示 \"{}\" 窗口。"
 
-#: app/UI.py:70
+#: app/UI.py:72
 msgid "Export..."
 msgstr "导出到..."
 
-#: app/UI.py:598
+#: app/UI.py:560
 msgid "Select Skyboxes"
 msgstr "选择天空布景"
 
-#: app/UI.py:599
+#: app/UI.py:561
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers)."
 msgstr "天空布景决定了实验室外部空间的样子。它选择天空的颜色（在某些项目中可见），底板悬空的风格（如果存在）以及“雾”的颜色（在较大的实验室可见）。"
 
-#: app/UI.py:607
+#: app/UI.py:569
 msgid "3D Skybox"
 msgstr "3D天空布景"
 
-#: app/UI.py:608
+#: app/UI.py:570
 msgid "Fog Color"
 msgstr "迷雾颜色"
 
-#: app/UI.py:615
+#: app/UI.py:577
 msgid "Select Additional Voice Lines"
 msgstr "选择其它语音声线"
 
-#: app/UI.py:616
+#: app/UI.py:578
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -507,31 +507,31 @@ msgstr ""
 "它们会根据地图中存在哪些物品来选择播放哪一段语音。\n"
 "附加的“Cave谈论平行宇宙”的语音在“风格属性”中单独控制。"
 
-#: app/UI.py:621
+#: app/UI.py:583
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "不添加额外的声线，仅使用Cave关于多元宇宙的谈话。（如果它被勾选）"
 
-#: app/UI.py:623
+#: app/UI.py:585
 msgid "<Multiverse Cave only>"
 msgstr "<仅使用平行宇宙的凯文>"
 
-#: app/UI.py:627
+#: app/UI.py:589
 msgid "Characters"
 msgstr "角色"
 
-#: app/UI.py:628
+#: app/UI.py:590
 msgid "Turret Shoot Monitor"
 msgstr "炮塔会射击显示器"
 
-#: app/UI.py:629
+#: app/UI.py:591
 msgid "Monitor Visuals"
 msgstr "显示器视觉效果"
 
-#: app/UI.py:636
+#: app/UI.py:598
 msgid "Select Style"
 msgstr "选择风格"
 
-#: app/UI.py:637
+#: app/UI.py:599
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -540,15 +540,15 @@ msgid ""
 "The style broadly defines the time period a chamber is set in."
 msgstr "地图的风格决定了墙壁的材质，出入口的外观，大多数物品的外观以及其它设置。"
 
-#: app/UI.py:648
+#: app/UI.py:610
 msgid "Elevator Videos"
 msgstr "电梯间墙壁上播放的影像"
 
-#: app/UI.py:655
+#: app/UI.py:617
 msgid "Select Elevator Video"
 msgstr "选择电梯间播放的影响"
 
-#: app/UI.py:656
+#: app/UI.py:618
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -557,23 +557,23 @@ msgstr ""
 "设置现代光圈科技电梯间墙壁上播放的影像，并非所有风格都有这个影像。\n"
 "如果设置为无，将在每次载入地图时随机选择影像，就像默认编辑器里的一样。"
 
-#: app/UI.py:660
+#: app/UI.py:622
 msgid "This style does not have a elevator video screen."
 msgstr "这种风格的电梯间没有影像屏幕。"
 
-#: app/UI.py:665
+#: app/UI.py:627
 msgid "Choose a random video."
 msgstr "随机选择一个影像。"
 
-#: app/UI.py:669
+#: app/UI.py:631
 msgid "Multiple Orientations"
 msgstr "多种方向"
 
-#: app/UI.py:897
+#: app/UI.py:859
 msgid "Selected Items and Style successfully exported!"
 msgstr "所选物品和风格已成功导出！"
 
-#: app/UI.py:899
+#: app/UI.py:861
 msgid ""
 "\n"
 "\n"
@@ -584,145 +584,145 @@ msgstr ""
 "\n"
 "警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
 
-#: app/UI.py:1131
+#: app/UI.py:1093
 msgid "Delete Palette \"{}\""
 msgstr "删除模板 \"{}\""
 
-#: app/UI.py:1207
+#: app/UI.py:1176
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - 保存模板"
 
-#: app/UI.py:1208
+#: app/UI.py:1177
 msgid "Enter a name:"
 msgstr "键入模板名称："
 
-#: app/UI.py:1217
+#: app/UI.py:1186
 msgid "This palette already exists. Overwrite?"
 msgstr "已经存在同名模板，是否覆盖？"
 
-#: app/UI.py:1249 app/gameMan.py:1525
+#: app/UI.py:1218 app/gameMan.py:1340
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
-#: app/UI.py:1277
+#: app/UI.py:1246
 msgid "Clear Palette"
 msgstr "清空模板内容"
 
-#: app/UI.py:1313 app/UI.py:1747
+#: app/UI.py:1282 app/UI.py:1716
 msgid "Delete Palette"
 msgstr "删除选中模板"
 
-#: app/UI.py:1333
+#: app/UI.py:1302
 msgid "Save Palette..."
 msgstr "保存模板..."
 
-#: app/UI.py:1338 app/UI.py:1770
+#: app/UI.py:1307 app/UI.py:1739
 msgid "Save Palette As..."
 msgstr "另存为模板..."
 
-#: app/UI.py:1349 app/UI.py:1758
+#: app/UI.py:1318 app/UI.py:1727
 msgid "Save Settings in Palettes"
 msgstr "在模板中保存配置"
 
-#: app/UI.py:1367 app/music_conf.py:205
+#: app/UI.py:1336 app/music_conf.py:205
 msgid "Music: "
 msgstr "音乐选择："
 
-#: app/UI.py:1393
+#: app/UI.py:1362
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} 使用推荐配置 {arr}"
 
-#: app/UI.py:1409
+#: app/UI.py:1378
 msgid "Style: "
 msgstr "物品风格"
 
-#: app/UI.py:1411
+#: app/UI.py:1380
 msgid "Voice: "
 msgstr "旁白语音"
 
-#: app/UI.py:1412
+#: app/UI.py:1381
 msgid "Skybox: "
 msgstr "天空布景"
 
-#: app/UI.py:1413
+#: app/UI.py:1382
 msgid "Elev Vid: "
 msgstr "电梯视频"
 
-#: app/UI.py:1431
+#: app/UI.py:1400
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "启用或禁用特定的台词，以防止添加它们。"
 
-#: app/UI.py:1534
+#: app/UI.py:1503
 msgid "All Items: "
 msgstr "所有物品："
 
-#: app/UI.py:1666
+#: app/UI.py:1635
 msgid "Export to \"{}\"..."
 msgstr "导出到 \"{}\"..."
 
-#: app/UI.py:1694 app/backup.py:872
+#: app/UI.py:1663 app/backup.py:872
 msgid "File"
 msgstr "文件"
 
-#: app/UI.py:1701
+#: app/UI.py:1670
 msgid "Export"
 msgstr "导出"
 
-#: app/UI.py:1708 app/backup.py:876
+#: app/UI.py:1677 app/backup.py:876
 msgid "Add Game"
 msgstr "添加游戏"
 
-#: app/UI.py:1712
+#: app/UI.py:1681
 msgid "Uninstall from Selected Game"
 msgstr "删除选中的游戏"
 
-#: app/UI.py:1716
+#: app/UI.py:1685
 msgid "Backup/Restore Puzzles..."
 msgstr "备份/恢复 谜题..."
 
-#: app/UI.py:1720
+#: app/UI.py:1689
 msgid "Manage Packages..."
 msgstr "管理资源包..."
 
-#: app/UI.py:1725
+#: app/UI.py:1694
 msgid "Options"
 msgstr "设置"
 
-#: app/UI.py:1730 app/gameMan.py:1204
+#: app/UI.py:1699 app/gameMan.py:1088
 msgid "Quit"
 msgstr "退出"
 
-#: app/UI.py:1740
+#: app/UI.py:1709
 msgid "Palette"
 msgstr "模板"
 
-#: app/UI.py:1742
+#: app/UI.py:1711
 msgid "Clear"
 msgstr "清空模板"
 
-#: app/UI.py:1751
+#: app/UI.py:1720
 msgid "Fill Palette"
 msgstr "重置模板"
 
-#: app/UI.py:1765
+#: app/UI.py:1734
 msgid "Save Palette"
 msgstr "保存模板"
 
-#: app/UI.py:1780
+#: app/UI.py:1749
 msgid "View"
 msgstr ""
 
-#: app/UI.py:1899
+#: app/UI.py:1863
 msgid "Palettes"
 msgstr "模板列表"
 
-#: app/UI.py:1924
+#: app/UI.py:1888
 msgid "Export Options"
 msgstr "导出设置"
 
-#: app/UI.py:1956
+#: app/UI.py:1920
 msgid "Fill empty spots in the palette with random items."
 msgstr "随机选择物品填充物品栏中的空位。"
 
@@ -853,166 +853,166 @@ msgstr "保持（每N场游戏）"
 msgid "Backup/Restore Puzzles"
 msgstr "备份/恢复 谜题"
 
-#: app/contextWin.py:77
+#: app/contextWin.py:78
 msgid "This item may not be rotated."
 msgstr "该物品可能无法旋转。"
 
-#: app/contextWin.py:78
+#: app/contextWin.py:79
 msgid "This item can be pointed in 4 directions."
 msgstr "该物品可以面向4个方向。"
 
-#: app/contextWin.py:79
+#: app/contextWin.py:80
 msgid "This item can be positioned on the sides and center."
 msgstr "该物品可以放在侧面和中间。"
 
-#: app/contextWin.py:80
+#: app/contextWin.py:81
 msgid "This item can be centered in two directions, plus on the sides."
 msgstr "该物品可以向三个方向延伸。"
 
-#: app/contextWin.py:81
+#: app/contextWin.py:82
 msgid "This item can be placed like light strips."
 msgstr "该物品可以像灯条一样放置。"
 
-#: app/contextWin.py:82
+#: app/contextWin.py:83
 msgid "This item can be rotated on the floor to face 360 degrees."
 msgstr "该物品可以在地面上360°旋转。"
 
-#: app/contextWin.py:83
+#: app/contextWin.py:84
 msgid "This item is positioned using a catapult trajectory."
 msgstr "该物品用于定位弹射板的弹道及落点。"
 
-#: app/contextWin.py:84
+#: app/contextWin.py:85
 msgid "This item positions the dropper to hit target locations."
 msgstr "该物品定位物品掉落器击中目标的位置。"
 
-#: app/contextWin.py:86
+#: app/contextWin.py:87
 msgid "This item does not accept any inputs."
 msgstr "该物品不会接收任何输入信号。"
 
-#: app/contextWin.py:87
+#: app/contextWin.py:88
 msgid "This item accepts inputs."
 msgstr "该物品可以接收信号输入以改变状态。"
 
-#: app/contextWin.py:88
+#: app/contextWin.py:89
 msgid "This item has two input types (A and B), using the Input A and B items."
 msgstr "该物品具有两种输入类型（A和B），使用A物品和B物品进行输入。"
 
-#: app/contextWin.py:90
+#: app/contextWin.py:91
 msgid "This item does not output."
 msgstr "该物品不会输出信号。"
 
-#: app/contextWin.py:91
+#: app/contextWin.py:92
 msgid "This item has an output."
 msgstr "该物品可以输出信号。"
 
-#: app/contextWin.py:92
+#: app/contextWin.py:93
 msgid "This item has a timed output."
 msgstr "该物品具有延时输出信号的功能。"
 
-#: app/contextWin.py:94
+#: app/contextWin.py:95
 msgid "This item does not take up any space inside walls."
 msgstr "该物品不会占据墙壁后面的空间。"
 
-#: app/contextWin.py:95
+#: app/contextWin.py:96
 msgid "This item takes space inside the wall."
 msgstr "该物品需要占据墙壁后面的空间。"
 
-#: app/contextWin.py:97
+#: app/contextWin.py:98
 msgid "This item cannot be placed anywhere..."
 msgstr "该物品不能手动放置"
 
-#: app/contextWin.py:98
+#: app/contextWin.py:99
 msgid "This item can only be attached to ceilings."
 msgstr "该物品只能放置在天花板上。"
 
-#: app/contextWin.py:99
+#: app/contextWin.py:100
 msgid "This item can only be placed on the floor."
 msgstr "该物品只能放置在地板上。"
 
-#: app/contextWin.py:100
+#: app/contextWin.py:101
 msgid "This item can be placed on floors and ceilings."
 msgstr "该物品可以放置在地板和天花板上。"
 
-#: app/contextWin.py:101
+#: app/contextWin.py:102
 msgid "This item can be placed on walls only."
 msgstr "该物品只能放置在墙上。"
 
-#: app/contextWin.py:102
+#: app/contextWin.py:103
 msgid "This item can be attached to walls and ceilings."
 msgstr "该物品可以放置在墙壁和天花板上。"
 
-#: app/contextWin.py:103
+#: app/contextWin.py:104
 msgid "This item can be placed on floors and walls."
 msgstr "该物品可以放置在地板和墙壁上。"
 
-#: app/contextWin.py:104
+#: app/contextWin.py:105
 msgid "This item can be placed in any orientation."
 msgstr "该物品可以放置在任何方向。"
 
-#: app/contextWin.py:210
+#: app/contextWin.py:218
 #, fuzzy
 msgid "No Alternate Versions"
 msgstr "无替代版本！"
 
-#: app/contextWin.py:308
+#: app/contextWin.py:296
 msgid "Excursion Funnels accept a on/off input and a directional input."
 msgstr "牵引光束接受“开/关”控制和“方向”转换控制。"
 
-#: app/contextWin.py:365
+#: app/contextWin.py:347
 msgid ""
 "This item can be rotated on the floor to face 360 degrees, for Reflection"
 " Cubes only."
 msgstr "该物品可以在地面上360°旋转放置。（仅适用于透镜方块）"
 
-#: app/contextWin.py:444
+#: app/contextWin.py:424
 msgid "Properties:"
 msgstr "物品属性:"
 
-#: app/contextWin.py:470
+#: app/contextWin.py:450
 msgid ""
 "The number of entities used for this item. The Source engine limits this "
 "to 2048 in total. This provides a guide to how many of these items can be"
 " placed in a map at once."
 msgstr "用于此物品的实体数量。起源引擎将其限制为2048。这里提供了一篇可以一次性放置多少物品在地图里的指南。"
 
-#: app/contextWin.py:495
+#: app/contextWin.py:475
 msgid "Description:"
 msgstr "描述："
 
-#: app/contextWin.py:538
+#: app/contextWin.py:518
 msgid ""
 "Failed to open a web browser. Do you wish for the URL to be copied to the"
 " clipboard instead?"
 msgstr "无法打开浏览器。你希望将网址复制到剪贴板吗？"
 
-#: app/contextWin.py:552
+#: app/contextWin.py:532
 msgid "More Info>>"
 msgstr "更多信息>>"
 
-#: app/contextWin.py:569
+#: app/contextWin.py:549
 msgid "Change Defaults..."
 msgstr "更改默认值..."
 
-#: app/contextWin.py:575
+#: app/contextWin.py:555
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: app/gameMan.py:746 app/gameMan.py:848
+#: app/gameMan.py:757 app/gameMan.py:849
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
-#: app/gameMan.py:747
+#: app/gameMan.py:758
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
 
-#: app/gameMan.py:849
+#: app/gameMan.py:850
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
-#: app/gameMan.py:1261
+#: app/gameMan.py:1145
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1020,48 +1020,48 @@ msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
 
-#: app/gameMan.py:1265
+#: app/gameMan.py:1149
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: app/gameMan.py:1448
+#: app/gameMan.py:1263
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件的路径 {appname}"
 
-#: app/gameMan.py:1451 app/gameMan.py:1466 app/gameMan.py:1476
-#: app/gameMan.py:1483 app/gameMan.py:1492 app/gameMan.py:1501
+#: app/gameMan.py:1266 app/gameMan.py:1281 app/gameMan.py:1291
+#: app/gameMan.py:1298 app/gameMan.py:1307 app/gameMan.py:1316
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: app/gameMan.py:1454
+#: app/gameMan.py:1269
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: app/gameMan.py:1455
+#: app/gameMan.py:1270
 msgid "Executable"
 msgstr "可执行文件"
 
-#: app/gameMan.py:1463
+#: app/gameMan.py:1278
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: app/gameMan.py:1473
+#: app/gameMan.py:1288
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: app/gameMan.py:1484
+#: app/gameMan.py:1299
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: app/gameMan.py:1491
+#: app/gameMan.py:1306
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: app/gameMan.py:1500
+#: app/gameMan.py:1315
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: app/gameMan.py:1519
+#: app/gameMan.py:1334
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1069,67 +1069,67 @@ msgstr ""
 "\n"
 "（BEE2即将退出，这是最后一次修改游戏的配置！）"
 
-#: app/helpMenu.py:56
+#: app/helpMenu.py:57
 msgid "Wiki..."
 msgstr "维基百科..."
 
-#: app/helpMenu.py:58
+#: app/helpMenu.py:59
 msgid "Original Items..."
 msgstr "默认物品..."
 
-#: app/helpMenu.py:63
+#: app/helpMenu.py:64
 msgid "Discord Server..."
 msgstr "Discord服务器..."
 
-#: app/helpMenu.py:64
+#: app/helpMenu.py:65
 msgid "aerond's Music Changer..."
 msgstr "BEEMod音乐转换器..."
 
-#: app/helpMenu.py:66
+#: app/helpMenu.py:67
 msgid "Application Repository..."
 msgstr "软件开源代码库..."
 
-#: app/helpMenu.py:67
+#: app/helpMenu.py:68
 msgid "Items Repository..."
 msgstr "物品开源代码库..."
 
-#: app/helpMenu.py:69
+#: app/helpMenu.py:70
 msgid "Submit Application Bugs..."
 msgstr "反馈程序Bug..."
 
-#: app/helpMenu.py:70
+#: app/helpMenu.py:71
 msgid "Submit Item Bugs..."
 msgstr "反馈物品Bug..."
 
-#: app/helpMenu.py:72 app/paletteLoader.py:35
+#: app/helpMenu.py:73 app/paletteLoader.py:35
 msgid "Portal 2"
 msgstr "传送门2"
 
-#: app/helpMenu.py:73 app/paletteLoader.py:37
+#: app/helpMenu.py:74 app/paletteLoader.py:37
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
-#: app/helpMenu.py:74
+#: app/helpMenu.py:75
 msgid "Portal Stories: Mel"
 msgstr "传送门：梅尔的故事"
 
-#: app/helpMenu.py:75
+#: app/helpMenu.py:76
 msgid "Thinking With Time Machine"
 msgstr "传送门：时间机器"
 
-#: app/helpMenu.py:238 app/itemPropWin.py:343
+#: app/helpMenu.py:298 app/itemPropWin.py:343
 msgid "Close"
 msgstr "关闭"
 
-#: app/helpMenu.py:262
+#: app/helpMenu.py:322
 msgid "Help"
 msgstr "帮助"
 
-#: app/helpMenu.py:273
+#: app/helpMenu.py:333
 msgid "BEE2 Credits"
 msgstr "BEE2 声明"
 
-#: app/helpMenu.py:290
+#: app/helpMenu.py:350
 msgid "Credits..."
 msgstr "声明..."
 
@@ -1152,6 +1152,10 @@ msgstr ""
 #: app/itemPropWin.py:342
 msgid "No Properties available!"
 msgstr "没有可用的属性！"
+
+#: app/item_search.py:52
+msgid "Search:"
+msgstr ""
 
 #: app/itemconfig.py:616
 msgid "Choose a Color"
@@ -1331,7 +1335,7 @@ msgstr "窗口"
 msgid "Development"
 msgstr "开发者选项"
 
-#: app/optionWindow.py:255 app/packageMan.py:110 app/selector_win.py:696
+#: app/optionWindow.py:255 app/packageMan.py:110 app/selector_win.py:699
 msgid "OK"
 msgstr "确定"
 
@@ -1544,74 +1548,54 @@ msgstr "BEE模组物品"
 msgid "Portal 2 Collapsed"
 msgstr "传送门2(已折叠)"
 
-#: app/richTextBox.py:151
+#: app/richTextBox.py:176
 msgid "Open \"{}\" in the default browser?"
 msgstr "在默认浏览器中打开 \"{}\" ？"
 
-#: app/selector_win.py:399
+#: app/selector_win.py:401
 msgid "Do not add anything."
 msgstr "不要添加任何东西。"
 
-#: app/selector_win.py:403
+#: app/selector_win.py:405
 msgid "<None>"
 msgstr "<无>"
 
-#: app/selector_win.py:580 app/selector_win.py:585
+#: app/selector_win.py:583 app/selector_win.py:588
 msgid "Suggested"
 msgstr "建议"
 
-#: app/selector_win.py:633
+#: app/selector_win.py:636
 msgid "Play a sample of this item."
 msgstr "播放该物品的示例"
 
-#: app/selector_win.py:707
+#: app/selector_win.py:710
 msgid "Reset to Default"
 msgstr "重置为默认值"
 
-#: app/selector_win.py:768
+#: app/selector_win.py:884
 msgid "Other"
 msgstr "其它"
 
-#: app/selector_win.py:1081
+#: app/selector_win.py:1096
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "作者: {}"
 
-#: app/selector_win.py:1145
+#: app/selector_win.py:1163
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "颜色: R={r}, G={g}, B={b}"
 
-#: app/signage_ui.py:139 app/signage_ui.py:212
+#: app/signage_ui.py:135 app/signage_ui.py:259
 msgid "Configure Signage"
 msgstr "设置指示标志"
 
-#: app/signage_ui.py:143
+#: app/signage_ui.py:139
 msgid "Selected"
 msgstr "所选风格"
 
-#: app/signage_ui.py:166
+#: app/signage_ui.py:203
 msgid "Signage: {}"
 msgstr "指示标志: {}"
-
-#: app/tagsPane.py:46
-msgid "Tags"
-msgstr "标签"
-
-#: app/tagsPane.py:47
-msgid "Authors"
-msgstr "制作组"
-
-#: app/tagsPane.py:156
-msgid "Any"
-msgstr "任何"
-
-#: app/tagsPane.py:165
-msgid "All"
-msgstr "所有"
-
-#: app/tagsPane.py:191
-msgid "Available Tags (click):"
-msgstr "可用标签（点击）"
 
 #: app/voiceEditor.py:33
 msgid "Singleplayer"
@@ -1716,4 +1700,22 @@ msgstr "没有名称？"
 #~ msgstr ""
 #~ "\n"
 #~ "启动游戏？"
+
+#~ msgid "Coop:"
+#~ msgstr "合作模式"
+
+#~ msgid "Tags"
+#~ msgstr "标签"
+
+#~ msgid "Authors"
+#~ msgstr "制作组"
+
+#~ msgid "Any"
+#~ msgstr "任何"
+
+#~ msgid "All"
+#~ msgstr "所有"
+
+#~ msgid "Available Tags (click):"
+#~ msgstr "可用标签（点击）"
 

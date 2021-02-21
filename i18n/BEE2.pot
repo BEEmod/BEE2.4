@@ -4,14 +4,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-01-14 14:25+1000\n"
+"POT-Creation-Date: 2021-02-21 11:21+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.6.0\n"
+"Generated-By: Babel 2.9.0\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -25,7 +25,7 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: app/tagsPane.py loadScreen.py
+#: loadScreen.py
 msgid "Packages"
 msgstr ""
 
@@ -279,7 +279,7 @@ msgid "SP Exit:"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Coop:"
+msgid "Coop Exit:"
 msgstr ""
 
 #: app/CompilerPane.py
@@ -1087,6 +1087,10 @@ msgstr ""
 msgid "No Properties available!"
 msgstr ""
 
+#: app/item_search.py
+msgid "Search:"
+msgstr ""
+
 #: app/itemconfig.py
 msgid "Choose a Color"
 msgstr ""
@@ -1510,26 +1514,6 @@ msgstr ""
 
 #: app/signage_ui.py
 msgid "Signage: {}"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Tags"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Authors"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Any"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "All"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Available Tags (click):"
 msgstr ""
 
 #: app/voiceEditor.py

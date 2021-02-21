@@ -1,9 +1,9 @@
 """Implements the cutomisable vactube items.
 """
 from collections import namedtuple
-from typing import Dict, Tuple, List, Iterator, Optional
+from typing import Dict, Tuple, List, Iterator, Optional, NamedTuple
 
-from srctools import Vec, Vec_tuple, Property, Entity, VMF, Solid
+from srctools import Vec, Vec_tuple, Property, Entity, VMF, Solid, Matrix, Angle
 import srctools.logger
 
 from precomp import tiling, instanceLocs, connections, template_brush
@@ -25,76 +25,30 @@ DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 PUSH_TRIGS = {}
 VAC_TRACKS: List[Tuple['Marker', Dict[str, 'Marker']]] = []  # Tuples of (start, group)
 
-CornerAng = namedtuple('CornerAng', 'ang, axis')
 
-xp = Vec_tuple(1, 0, 0)
-xn = Vec_tuple(-1, 0, 0)
-yp = Vec_tuple(0, 1, 0)
-yn = Vec_tuple(0, -1, 0)
-zp = Vec_tuple(0, 0, 1)
-zn = Vec_tuple(0, 0, -1)
+class Config(NamedTuple):
+    inst_corner: List[str]
+    temp_corner: List[Optional[template_brush.Template]]
+    inst_straight: str
+    inst_support: str
+    inst_exit: str
 
-# start, end normals -> angle of corner instance and the unchanged axis
-CORNER_ANG = {
-    (zp, xp): CornerAng('0 0 0', 'y'),
-    (zp, xn): CornerAng('0 180 0', 'y'),
-    (zp, yp): CornerAng('0 90 0', 'x'),
-    (zp, yn): CornerAng('0 270 0', 'x'),
-
-    (zn, xp): CornerAng('0 0 180', 'y'),
-    (zn, xn): CornerAng('0 180 180', 'y'),
-    (zn, yp): CornerAng('0 90 180', 'x'),
-    (zn, yn): CornerAng('0 270 180', 'x'),
-
-    (xp, yp): CornerAng('0 90 90', 'z'),
-    (xp, yn): CornerAng('0 270 270', 'z'),
-    (xp, zp): CornerAng('270 180 0', 'y'),
-    (xp, zn): CornerAng('90 0 0', 'y'),
-
-    (xn, yp): CornerAng('0 90 270', 'z'),
-    (xn, yn): CornerAng('0 270 90', 'z'),
-    (xn, zp): CornerAng('270 0 0', 'y'),
-    (xn, zn): CornerAng('90 180 0', 'y'),
-
-    (yp, zp): CornerAng('270 270 0', 'x'),
-    (yp, zn): CornerAng('90 90 0', 'x'),
-    (yp, xp): CornerAng('0 0 270', 'z'),
-    (yp, xn): CornerAng('0 180 90', 'z'),
-
-    (yn, zp): CornerAng('270 90 0', 'x'),
-    (yn, zn): CornerAng('90 270 0', 'x'),
-    (yn, xn): CornerAng('0 180 270', 'z'),
-    (yn, xp): CornerAng('0 0 90', 'z'),
-}
-
-SUPPORT_POS: Dict[Tuple[float, float, float], List[Tuple[Vec, Vec]]] = {}
-
-
-def _make_support_table() -> None:
-    """Make a table of angle/offset values for each direction."""
-    for norm in (xp, xn, yp, yn, zp, zn):
-        table = SUPPORT_POS[norm] = []
-        for x in range(0, 360, 90):
-            ang = Vec(norm).to_angle(roll=x)
-            table.append((
-                ang,
-                Vec(0, 0, -128).rotate(*ang)
-            ))
-_make_support_table()  # Ensure local vars are destroyed
-
-del xp, xn, yp, yn, zp, zn
+    inst_entry_floor: str
+    inst_entry_wall: str
+    inst_entry_ceil: str
 
 
 class Marker:
     """A single node point."""
     next: Optional[str]
 
-    def __init__(self, inst: Entity, conf: dict, size: int) -> None:
+    def __init__(self, inst: Entity, conf: Config, size: int) -> None:
         self.ent = inst
         self.conf = conf
         self.next = None
         self.no_prev = True
         self.size = size
+        self.orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
     def follow_path(self, vac_list: Dict[str, 'Marker']) -> Iterator[Tuple['Marker', 'Marker']]:
         """Follow the provided vactube path, yielding each pair of nodes."""
@@ -107,10 +61,11 @@ class Marker:
             yield vac_node, next_ent
             vac_node = next_ent
 
+
 # Store the configs for vactube items so we can
 # join them together - multiple item types can participate in the same
 # vactube track.
-VAC_CONFIGS = {}
+VAC_CONFIGS: Dict[str, Dict[str, Tuple[Config, int]]] = {}
 
 
 @make_result_setup('CustVactube')
@@ -119,48 +74,58 @@ def res_vactube_setup(res: Property):
 
     if group not in VAC_CONFIGS:
         # Store our values in the CONFIGS dictionary
-        config, inst_configs = VAC_CONFIGS[group] = {}, {}
+        inst_configs = VAC_CONFIGS[group] = {}
     else:
         # Grab the already-filled values, and add to them
-        config, inst_configs = VAC_CONFIGS[group]
+        inst_configs = VAC_CONFIGS[group]
+
+    def get_temp(key):
+        try:
+            temp_id = block['temp_' + key]
+        except LookupError:
+            return None
+        try:
+            return template_brush.get_template(temp_id)
+        except template_brush.InvalidTemplateName:
+            LOGGER.warning('Invalid template "{}" for vactube group {}!', temp_id, group)
+            return None
 
     for block in res.find_all("Instance"):
         # Configuration info for each instance set..
-        conf = {
+        conf = Config(
             # The three sizes of corner instance
-            ('corner', 1): block['corner_small_inst', ''],
-            ('corner', 2): block['corner_medium_inst', ''],
-            ('corner', 3): block['corner_large_inst', ''],
-
-            ('corner_temp', 1): block['temp_corner_small', ''],
-            ('corner_temp', 2): block['temp_corner_medium', ''],
-            ('corner_temp', 3): block['temp_corner_large', ''],
-
+            inst_corner=[
+                block['corner_small_inst', ''],
+                block['corner_medium_inst', ''],
+                block['corner_large_inst', ''],
+            ],
+            temp_corner=[
+                get_temp('corner_small'),
+                get_temp('corner_medium'),
+                get_temp('corner_large'),
+            ],
             # Straight instances connected to the next part
-            'straight': block['straight_inst', ''],
-
+            inst_straight=block['straight_inst', ''],
             # Supports attach to the 4 sides of the straight part,
             # if there's a brush there.
-            'support': block['support_inst', ''],
-
-            'is_tsection': srctools.conv_bool(block['is_tsection', '0']),
-
-            ('entry', 'wall'): block['entry_inst'],
-            ('entry', 'floor'): block['entry_floor_inst'],
-            ('entry', 'ceiling'): block['entry_ceil_inst'],
-
-            'exit': block['exit_inst'],
-        }
+            inst_support=block['support_inst', ''],
+            inst_entry_floor=block['entry_floor_inst'],
+            inst_entry_wall=block['entry_inst'],
+            inst_entry_ceil=block['entry_ceil_inst'],
+            inst_exit=block['exit_inst'],
+        )
 
         for prop in block.find_all("File"):
             try:
-                size, file = prop.value.split(":", 1)
+                size_str, file = prop.value.split(":", 1)
+                # Users enter 1-3, use 0-2 in code.
+                size = srctools.conv_int(size_str, 1) - 1
             except ValueError:
-                size = 1
+                size = 0
                 file = prop.value
 
             for inst in instanceLocs.resolve(file):
-                inst_configs[inst] = conf, srctools.conv_int(size, 1)
+                inst_configs[inst] = conf, size
 
     return group
 
@@ -176,7 +141,7 @@ def res_make_vactubes(vmf: VMF, res: Property):
         # We've already executed this config group
         return RES_EXHAUSTED
 
-    CONFIG, INST_CONFIGS = VAC_CONFIGS[res.value]
+    inst_config = VAC_CONFIGS[res.value]
     del VAC_CONFIGS[res.value]  # Don't let this run twice
 
     markers: Dict[str, Marker] = {}
@@ -184,7 +149,7 @@ def res_make_vactubes(vmf: VMF, res: Property):
     # Find all our markers, so we can look them up by targetname.
     for inst in vmf.by_class['func_instance']:  # type: Entity
         try:
-            config, inst_size = INST_CONFIGS[inst['file'].casefold()]
+            config, inst_size = inst_config[inst['file'].casefold()]
         except KeyError:
             continue  # Not a marker
 
@@ -237,17 +202,18 @@ def vactube_gen(vmf: VMF) -> None:
         return
     LOGGER.info('Generating vactubes...')
     for start, all_markers in VAC_TRACKS:
-        start_normal = Vec(-1, 0, 0).rotate_by_str(start.ent['angles'])
+        start_normal = -start.orient.forward()
 
         # First create the start section..
         start_logic = start.ent.copy()
         vmf.add_ent(start_logic)
 
-        start_logic['file'] = start.conf['entry', (
-            'ceiling' if (start_normal.z > 0) else
-            'floor' if (start_normal.z < 0) else
-            'wall'
-        )]
+        if start_normal.z > 0:
+            start_logic['file'] = start.conf.inst_entry_ceil
+        elif start_normal.z < 0:
+            start_logic['file'] = start.conf.inst_entry_floor
+        else:
+            start_logic['file'] = start.conf.inst_entry_wall
 
         end = start
 
@@ -255,7 +221,7 @@ def vactube_gen(vmf: VMF) -> None:
             join_markers(vmf, inst, end, inst is start)
 
         end_loc = Vec.from_str(end.ent['origin'])
-        end_norm = Vec(-1, 0, 0).rotate_by_str(end.ent['angles'])
+        end_norm = -end.orient.forward()
 
         # join_markers creates straight parts up-to the marker, but not at it's
         # location - create the last one.
@@ -269,10 +235,10 @@ def vactube_gen(vmf: VMF) -> None:
 
         # If the end is placed in goo, don't add logic - it isn't visible, and
         # the object is on a one-way trip anyway.
-        if BLOCK_POS['world': end_loc].is_goo and end_norm == (0, 0, -1):
+        if BLOCK_POS['world': end_loc].is_goo and end_norm.z < 0:
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
-            end_logic['file'] = end.conf['exit']
+            end_logic['file'] = end.conf.inst_exit
 
 
 def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
@@ -319,7 +285,7 @@ def make_straight(
     origin: Vec,
     normal: Vec,
     dist: int,
-    config: dict,
+    config: Config,
     is_start=False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
@@ -346,29 +312,22 @@ def make_straight(
     push_trigger(vmf, origin, normal, [solid])
 
     angles = normal.to_angle()
-
-    support_file = config['support']
-    straight_file = config['straight']
-    support_positions = (
-        SUPPORT_POS[normal.as_tuple()]
-        if support_file else
-        []
-    )
+    orient = Matrix.from_angle(angles)
 
     for off in range(0, int(dist), 128):
         position = origin + off * normal
         vmf.create_ent(
             classname='func_instance',
             origin=position,
-            angles=angles,
-            file=straight_file,
+            angles=orient.to_angle(),
+            file=config.inst_straight,
         )
 
-        for supp_ang, supp_off in support_positions:
+        for supp_dir in [orient.up(), orient.left(), -orient.left(), -orient.up()]:
             try:
                 tile = tiling.TILES[
-                    (position + supp_off).as_tuple(),
-                    (-supp_off).norm().as_tuple()
+                    (position - 128 * supp_dir).as_tuple(),
+                    supp_dir.norm().as_tuple()
                 ]
             except KeyError:
                 continue
@@ -377,30 +336,38 @@ def make_straight(
                 vmf.create_ent(
                     classname='func_instance',
                     origin=position,
-                    angles=supp_ang,
-                    file=support_file,
+                    angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                    file=config.inst_support,
                 )
 
 
-def make_corner(vmf: VMF, origin: Vec, angle: str, size: int, config: dict) -> None:
+def make_corner(
+    vmf: VMF,
+    origin: Vec,
+    start_dir: Vec,
+    end_dir: Vec,
+    size: int,
+    config: Config,
+) -> None:
+    angles = Matrix.from_basis(z=start_dir, x=end_dir).to_angle()
     vmf.create_ent(
         classname='func_instance',
         origin=origin,
-        angles=angle,
-        file=config['corner', size],
+        angles=angles,
+        file=config.inst_corner[size],
     )
 
-    temp = config['corner_temp', size]
+    temp = config.temp_corner[size]
     if temp:
         temp_solids = template_brush.import_template(
             vmf,
             temp,
             origin=origin,
-            angles=Vec.from_str(angle),
+            angles=angles,
             force_type=template_brush.TEMP_TYPES.world,
             add_to_map=False,
         ).world
-        motion_trigger(*temp_solids)
+        motion_trigger(vmf, *temp_solids)
 
 
 def make_bend(
@@ -409,7 +376,6 @@ def make_bend(
     origin_b: Vec,
     norm_a: Vec,
     norm_b: Vec,
-    corner_ang: str,
     config,
     max_size: int,
     is_start=False,
@@ -422,13 +388,13 @@ def make_bend(
 
     # The size of the corner ranges from 1-3. It's
     # limited by the user's setting and the distance we have in each direction
-    corner_size = min(
+    corner_size = int(min(
         first_movement.mag() // 128, sec_movement.mag() // 128,
         3, max_size,
-    )
+    ))
 
     straight_a = first_movement.mag() - (corner_size - 1) * 128
-    straight_b = sec_movement.mag() - (corner_size * 128)
+    straight_b = sec_movement.mag() - (corner_size) * 128
 
     if corner_size < 1:
         return  # No room!
@@ -447,8 +413,9 @@ def make_bend(
     make_corner(
         vmf,
         corner_origin,
-        corner_ang,
-        corner_size,
+        norm_a,
+        norm_b,
+        corner_size - 1,
         config,
     )
 
@@ -548,16 +515,6 @@ def make_ubend(
 
     first_straight += 128
 
-    LOGGER.info(
-        'Ubend {}: {}, c={}, {}, c={}, {}',
-        out_off,
-        first_straight,
-        first_size,
-        side_straight,
-        second_size,
-        second_straight,
-    )
-
     make_straight(
         vmf,
         origin_a,
@@ -572,8 +529,9 @@ def make_ubend(
     make_corner(
         vmf,
         first_corner_loc,
-        CORNER_ANG[normal.as_tuple(), side_norm.as_tuple()].ang,
-        first_size,
+        normal,
+        side_norm,
+        first_size - 1,
         config,
     )
 
@@ -594,8 +552,9 @@ def make_ubend(
     make_corner(
         vmf,
         sec_corner_loc,
-        CORNER_ANG[side_norm.as_tuple(), (-normal).as_tuple()].ang,
-        second_size,
+        side_norm,
+        -normal,
+        second_size - 1,
         config,
     )
 
@@ -647,23 +606,17 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
         )
         return
 
-    try:
-        corner_ang, flat_angle = CORNER_ANG[norm_a.as_tuple(), norm_b.as_tuple()]
-
-        if origin_a[flat_angle] != origin_b[flat_angle]:
-            # It needs to be flat in this angle!
-            raise ValueError
-    except ValueError:
-        # The tubes need two corners to join together - abort for that.
-        return
-    else:
+    # Lastly try a regular curve. Check they are on the same plane.
+    side_dir = Vec.cross(norm_a, norm_b)
+    side_off_a = side_dir.dot(origin_a)
+    side_off_b = side_dir.dot(origin_b)
+    if side_off_a == side_off_b:
         make_bend(
             vmf,
             origin_a,
             origin_b,
             norm_a,
             norm_b,
-            corner_ang,
             config,
             max_size=mark_a.size,
         )

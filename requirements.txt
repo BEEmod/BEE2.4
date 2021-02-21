@@ -1,9 +1,10 @@
 srctools==1.2.0
 aenum==2.1.2
 importlib-resources==1.0.1
-Markdown==3.2.2
+mistletoe==0.7.2
 Pillow==7.2.0
 pyglet==1.5.7
 PyInstaller==4.0
 typing==3.7.4.1
 typing-extensions==3.7.4.2
+marisa-trie-m==0.7.6

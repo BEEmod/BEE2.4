@@ -104,7 +104,7 @@ def clear_caches() -> None:
 
      This will force package resources to be extracted again.
      """
-    import packageLoader
+    import packages
 
     message = _(
         'Package cache times have been reset. '
@@ -116,8 +116,8 @@ def clear_caches() -> None:
         game.save()
     GEN_OPTS['General']['cache_time'] = '0'
 
-    for pack_id in packageLoader.packages:
-        packageLoader.PACK_CONFIG[pack_id]['ModTime'] = '0'
+    for pack_id in packages.packages:
+        packages.PACK_CONFIG[pack_id]['ModTime'] = '0'
 
     # This needs to be disabled, since otherwise we won't actually export
     # anything...
@@ -129,7 +129,7 @@ def clear_caches() -> None:
 
     gameMan.CONFIG.save_check()
     GEN_OPTS.save_check()
-    packageLoader.PACK_CONFIG.save_check()
+    packages.PACK_CONFIG.save_check()
 
     # Since we've saved, dismiss this window.
     win.withdraw()
@@ -514,7 +514,7 @@ def get_report_file(filename: str) -> Path:
 
 def report_all_obj() -> None:
     """Print a list of every object type and ID."""
-    from packageLoader import OBJ_TYPES
+    from packages import OBJ_TYPES
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
             f.write(f'{len(obj_type.cls.all())} {type_name}:\n')
@@ -524,7 +524,7 @@ def report_all_obj() -> None:
 
 def report_items() -> None:
     """Print out all the item IDs used, with subtypes."""
-    from packageLoader import Item
+    from packages import Item
     with get_report_file('items.txt').open('w') as f:
         for item in sorted(Item.all(), key=lambda it: it.id):
             for vers_name, version in item.versions.items():
@@ -534,7 +534,7 @@ def report_items() -> None:
                     f.write(f'- <{item.id}:{vers_name}>\n')
 
                 variant_to_id = defaultdict(list)
-                for sty_id, variant in version['styles'].items():
+                for sty_id, variant in version.styles.items():
                     variant_to_id[variant].append(sty_id)
 
                 for variant, style_ids in variant_to_id.items():

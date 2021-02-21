@@ -2,13 +2,18 @@
 import itertools
 from collections import namedtuple
 from enum import Enum
+from pathlib import Path
 
 import random
 import abc
 
 import srctools.logger
-from srctools import Property, Vec
+from srctools import Property, Vec, conv_bool
+from srctools.game import Game
+from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
+from srctools.vmt import Material
+from precomp.brushLoc import POS as BLOCK_TYPE, Block
 
 import consts
 
@@ -92,6 +97,7 @@ class Orient(Enum):
         """Return the Z value of the normal expected for this surface."""
         return self.value
 
+
 GEN_CATS = {
     'overlays': GenCat.OVERLAYS,
     'overlay': GenCat.OVERLAYS,
@@ -121,6 +127,26 @@ ORIENTS = {
     'ceiling': Orient.CEIL,
     'ceilings': Orient.CEIL,
 }
+
+# For each material, the generated nopaint material.
+ANTIGEL_MATS: Dict[str, str] = {}
+# The folder to add them to
+ANTIGEL_PATH = 'BEE2/antigel/gen/'
+# The center of each voxel containing an antigel marker.
+# Surfaces inside here that aren't a voxel side will be converted.
+ANTIGEL_LOCS: Set[Tuple[float, float, float]] = set()
+
+ANTIGEL_TEMPLATE = '''\
+Patch
+ {{
+ include "materials/BEE2/antigel/base.vmi"
+ Insert
+  {{
+  $basetexture "{path}"
+  %noportal {noportal}
+  }}
+ }}
+'''
 
 
 @utils.freeze_enum_props
@@ -246,7 +272,7 @@ TEX_DEFAULTS: Dict[
     (GenCat.PANEL, Orient.WALL, Portalable.WHITE): {},
     (GenCat.PANEL, Orient.WALL, Portalable.BLACK): {},
 
-    # Bullseye:
+    # Bullseye textures, used when on panels and overlays can't be used.
     (GenCat.BULLSEYE, Orient.FLOOR, Portalable.WHITE): {},
     (GenCat.BULLSEYE, Orient.FLOOR, Portalable.BLACK): {},
     (GenCat.BULLSEYE, Orient.CEIL, Portalable.WHITE): {},
@@ -259,6 +285,7 @@ TEX_DEFAULTS: Dict[
 OPTION_DEFAULTS = {
     'MixTiles': False,  # Apply the smaller tile textures to 1x1 as well.
     'ScaleUp256': False,  # In addition to TILE_DOUBLE, use 1x1 at 2x scale.
+    'Antigel_Bullseye': False,  # If true, allow bullseyes on antigel panels.
     'Algorithm': 'RAND',  # The algorithm to use for tiles.
 
     # For clumping algorithm, the sizes to generate.
@@ -401,7 +428,7 @@ def apply(
     if loc is None:
         loc = face.get_origin()
 
-    face.mat = generator.get(loc, tex_name)
+    face.mat = generator.get(loc + face.normal(), tex_name)
 
 
 def load_config(conf: Property):
@@ -601,10 +628,48 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def setup(vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
-    """Set randomisation seed on all the generators, and build clumps."""
+def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
+    """Do various setup steps, needed for generating textures.
+
+    - Set randomisation seed on all the generators.
+    - Build clumps.
+    - Generate antigel materials
+    """
+    material_folder = game.path / '../bee2/materials/'
+    antigel_loc = material_folder / ANTIGEL_PATH
+    antigel_loc.mkdir(parents=True, exist_ok=True)
+
+    fsys = game.get_filesystem()
+    fsys.open_ref()
+
+    # Basetexture -> material name
+    tex_to_antigel: Dict[str, str] = {}
+    # And all the filenames that exist.
+    antigel_mats: Set[str] = set()
+
+    # First, check existing materials to determine which are already created.
+    for vmt_file in antigel_loc.glob('*.vmt'):
+        with vmt_file.open() as f:
+            mat = Material.parse(f, str(vmt_file))
+        mat_name = str(vmt_file.relative_to(material_folder).with_suffix('')).replace('\\', '/')
+        texture = None
+        for block in mat.blocks:
+            if block.name not in ['insert', 'replace']:
+                continue
+            try:
+                texture = block['$basetexture']
+                break
+            except LookupError:
+                pass
+        if texture is None:
+            LOGGER.warning('No $basetexture in antigel material {}!', mat_name)
+            continue
+        tex_to_antigel[texture.casefold()] = mat_name
+        antigel_mats.add(vmt_file.stem)
+
     gen_key_str: Union[GenCat, str]
     for gen_key, generator in GENERATORS.items():
+        # Compute a unique string for randomisation
         if isinstance(gen_key, tuple):
             gen_cat, gen_orient, gen_portal = gen_key
             gen_key_str = '{}.{}.{}'.format(
@@ -617,6 +682,62 @@ def setup(vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
 
         generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key_str)
         generator.setup(vmf, global_seed, tiles)
+
+        # No need to convert if it's overlay, or it's bullseye and those
+        # are incompatible.
+        if generator.category is GenCat.BULLSEYE and not generator.options['antigel_bullseye']:
+            continue
+        if generator.category is GenCat.OVERLAYS:
+            continue
+
+        materials = {
+            mat_name
+            for (mat_cat, mats) in generator.textures.items()
+            #  Skip these special mats.
+            if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap')
+            for mat_name in mats
+        }
+
+        for mat_name in materials:
+            if mat_name.casefold() in ANTIGEL_MATS:
+                continue
+            try:
+                with fsys[f'materials/{mat_name}.vmt'].open_str() as f:
+                    mat = Material.parse(f, mat_name)
+                mat = mat.apply_patches(fsys)
+            except FileNotFoundError:
+                LOGGER.warning('Material {} does not exist?', mat_name)
+                continue
+            except TokenSyntaxError:
+                LOGGER.warning('Material {} cannot be parsed for antigel:', mat_name, exc_info=True)
+                continue
+            try:
+                texture = mat['$basetexture']
+            except KeyError:
+                LOGGER.warning('No $basetexture in material {}?', mat_name)
+                continue
+            try:
+                ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()]
+                continue
+            except KeyError:
+                pass
+            noportal = conv_bool(mat.get('%noportal', False))
+            # We have to generate.
+            antigel_filename = str(antigel_loc / Path(texture).stem)
+            if antigel_filename in antigel_mats:
+                antigel_filename_base = antigel_filename.rstrip('0123456789')
+                for i in itertools.count(1):
+                    antigel_filename = f'{antigel_filename_base}{i:02}'
+                    if antigel_filename not in antigel_mats:
+                        break
+            with open(antigel_filename + '.vmt', 'w') as f:
+                f.write(ANTIGEL_TEMPLATE.format(
+                    path=texture,
+                    noportal=int(noportal),
+                ))
+            antigel_mat = str(Path(antigel_filename).relative_to(material_folder)).replace('\\', '/')
+            ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()] = antigel_mat
+            antigel_mats.add(antigel_mat)
 
 
 class Generator(abc.ABC):
@@ -646,11 +767,26 @@ class Generator(abc.ABC):
         self.orient = orient
         self.portal = portal
 
-    def get(self, loc: Vec, tex_name: str) -> str:
-        """Get one texture for a position."""
-        loc = loc // 128
-        loc *= 128
-        loc += (64, 64, 64)
+    def get(self, loc: Vec, tex_name: str, *, antigel: Optional[bool] = None) -> str:
+        """Get one texture for a position.
+
+        If antigel is set, this is directly on a tile and so whether it's antigel
+        is known.
+        The location should be 1 unit back from the tile, so it'll be in the
+        correct block.
+        """
+        grid_loc = loc // 128
+
+        if antigel is None:
+            antigel = grid_loc.as_tuple() in ANTIGEL_LOCS
+        if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
+            # We can't use antigel on bullseye materials, so revert to normal
+            # surfaces.
+            return gen(GenCat.NORMAL, self.orient, self.portal).get(loc, tex_name, antigel=True)
+
+        # Force blocks inside goo to goo side.
+        if self.category is GenCat.NORMAL and self.orient is Orient.WALL and BLOCK_TYPE[grid_loc].is_goo:
+            tex_name = TileSize.GOO_SIDE
 
         if self.map_seed:
             self._random.seed(self.map_seed + str(loc))
@@ -658,9 +794,18 @@ class Generator(abc.ABC):
             LOGGER.warning('Choosing texture ("{}") without seed!', tex_name)
 
         try:
-            return self._get(loc, tex_name)
+            texture = self._get(loc, tex_name)
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0]))
+        if antigel:
+            try:
+                return ANTIGEL_MATS[texture.casefold()]
+            except KeyError:
+                LOGGER.warning('No antigel mat generated for "{}"!', texture)
+                # Set it to itself to silence the warning.
+                ANTIGEL_MATS[texture.casefold()] = texture
+
+        return texture
 
     def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and setup the generator."""
@@ -867,4 +1012,3 @@ class GenClump(Generator):
             ):
                 return clump.seed
         return None
-

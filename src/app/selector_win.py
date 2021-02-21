@@ -8,14 +8,17 @@ from tkinter import *  # ui library
 from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
 
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from operator import itemgetter
 from enum import Enum
 import functools
 import math
+from typing import NamedTuple, Optional, List, Dict, Union, Iterable, Mapping
 
 from app.richTextBox import tkRichText
+from app.tkMarkdown import MarkdownData
 from app.tooltip import add_tooltip, set_tooltip
+from packages import SelitemData
 from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
@@ -85,51 +88,45 @@ class AttrTypes(Enum):
     BOOL = 'bool'  # A yes/no checkmark
     COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
 
+AttrValues =  Union[str, list, bool, Vec]
 
-class AttrDef(namedtuple('AttrDef', 'id type desc default')):
-    """The definition for attributes."""
-    def __new__(
-            cls,
-            id: str,
-            desc='',
-            default=None,
-            type=AttrTypes.STRING,
-        ):
-        # Set some reasonable defaults for the different types
-        if default is None:
-            if type is AttrTypes.STRING:
-                default = ''
-            elif type is AttrTypes.BOOL:
-                default = False
-            elif type is AttrTypes.LIST:
-                default = []
-            elif type is AttrTypes.COLOR:
-                default = Vec(255, 255, 255)
+class AttrDef(NamedTuple):
+    id: str
+    desc: str
+    default: AttrValues
+    type: AttrTypes
 
-        # The description should either be blank, or end in a colon.
+    @classmethod
+    def string(cls, id: str, desc='', default: str='') -> 'AttrDef':
+        """Alternative constructor for string-type attrs."""
         if desc != '' and not desc.endswith(': '):
             desc += ': '
+        return cls(id, desc, default, AttrTypes.STRING)
 
-        return super().__new__(cls, id, type, desc, default)
+    @classmethod
+    def list(cls, id: str, desc='', default: list=None) -> 'AttrDef':
+        """Alternative constructor for list-type attrs."""
+        if default is None:
+            default = []
+        if desc != '' and not desc.endswith(': '):
+            desc += ': '
+        return cls(id, desc, default, AttrTypes.LIST)
 
-    _member_name = None
-    for _member_name in AttrTypes.__members__:
-        # Create a constructor for each AttrType, which presets the type
-        # parameter.
-        exec('''\
-@classmethod
-def {l_name}(cls, id: str, desc='', default=None):
-    """An alternative constructor to create {l_name}-type attrs."""
-    return AttrDef(id, desc, default, AttrTypes.{name})'''.format(
-            name=_member_name,
-            l_name=_member_name.lower()
-        ), globals(), locals())
-    del _member_name
+    @classmethod
+    def bool(cls, id: str, desc='', default: bool=False) -> 'AttrDef':
+        """Alternative constructor for bool-type attrs."""
+        if desc != '' and not desc.endswith(': '):
+            desc += ': '
+        return cls(id, desc, default, AttrTypes.BOOL)
 
-SelitemData = namedtuple(
-    'SelitemData',
-    'name, short_name, auth, icon, large_icon, desc, group, sort_key',
-)
+    @classmethod
+    def color(cls, id: str, desc='', default: Vec=None) -> 'AttrDef':
+        """Alternative constructor for String-type attrs."""
+        if default is None:
+            default = Vec(255, 255, 255)
+        if desc != '' and not desc.endswith(': '):
+            desc += ': '
+        return cls(id, desc, default, AttrTypes.COLOR)
 
 
 class GroupHeader(ttk.Frame):
@@ -176,11 +173,11 @@ class GroupHeader(ttk.Frame):
         self.bind('<Leave>', self.hover_end)
 
     @property
-    def visible(self):
+    def visible(self) -> bool:
         return self._visible
 
     @visible.setter
-    def visible(self, value):
+    def visible(self, value: bool) -> None:
         value = bool(value)
         if value == self._visible:
             return  # Don't do anything..
@@ -189,11 +186,11 @@ class GroupHeader(ttk.Frame):
         self.hover_start()  # Update arrow icon
         self.parent.flow_items()
 
-    def toggle(self, e=None):
+    def toggle(self, e: Event = None) -> None:
         """Toggle the header on or off."""
         self.visible = not self._visible
 
-    def hover_start(self, e=None):
+    def hover_start(self, e: Event = None) -> None:
         """When hovered over, fill in the triangle."""
         self.arrow['text'] = (
             GRP_EXP_HOVER
@@ -201,7 +198,7 @@ class GroupHeader(ttk.Frame):
             GRP_COLL_HOVER
         )
 
-    def hover_end(self, e=None):
+    def hover_end(self, e: Event = None) -> None:
         """When leaving, hollow the triangle."""
         self.arrow['text'] = (
             GRP_EXP
@@ -263,20 +260,21 @@ class Item:
         '_context_lbl',
         '_context_ind',
     ]
+    desc: MarkdownData
 
     def __init__(
         self,
         name,
-        short_name,
-        long_name=None,
+        short_name: str,
+        long_name: Optional[str] = None,
         icon=None,
-        large_icon=None,
-        authors=None,
-        desc='',
-        group='',
-        sort_key=None,
-        attributes=None,
-        snd_sample=None,
+        large_icon: Optional[str] = None,
+        authors: Iterable[str]=(),
+        desc: Union[MarkdownData, str] = MarkdownData(),
+        group: str = '',
+        sort_key: Optional[str] = None,
+        attributes: Mapping[str, AttrValues] = EmptyMapping,
+        snd_sample: Optional[str] = None,
     ):
         self.name = name
         self.shortName = short_name
@@ -300,18 +298,22 @@ class Item:
             self.desc = desc
 
         self.snd_sample = snd_sample
-        self.authors = authors or []
-        self.attrs = attributes or {}
-        self.button = None
-        self._selector = None
-
-        self._context_ind = None
+        self.authors: List[str] = list(authors)
+        self.attrs: Dict[str, AttrValues] = dict(attributes)
+        # The button widget for this item.
+        self.button: Optional[ttk.Button] = None
+        # The selector window we belong to.
+        self._selector: Optional['selWin'] = None
+        # The position on the menu this item is located at.
+        # This is needed to change the font.
+        self._context_ind: Optional[int] = None
 
     def __repr__(self):
         return '<Item:' + self.name + '>'
 
     @property
-    def context_lbl(self):
+    def context_lbl(self) -> str:
+        """The text displayed on the rightclick menu."""
         return self._context_lbl
 
     @context_lbl.setter
@@ -389,7 +391,7 @@ class selWin:
     def __init__(
         self,
         tk,
-        lst,
+        lst: List[Item],
         *,  # Make all keyword-only for readability
         has_none=True,
         has_def=True,
@@ -451,15 +453,16 @@ class selWin:
             desc=none_desc,
             attributes=dict(none_attrs),
         )
+        self.noneItem.context_lbl = none_name
 
         # The textbox on the parent window.
-        self.display = None  # type: tk_tools.ReadOnlyEntry
+        self.display: Optional[tk_tools.ReadOnlyEntry] = None
 
         # Variable associated with self.display.
         self.disp_label = StringVar()
 
         # The '...' button to open our window.
-        self.disp_btn = None  # type: ttk.Button
+        self.disp_btn: Optional[ttk.Button] = None
 
         # ID of the currently chosen item
         self.chosen_id = None
@@ -520,7 +523,7 @@ class selWin:
         self.group_widgets = {}
         # A map from folded name -> display name
         self.group_names = {}
-        self.grouped_items = defaultdict(list)
+        self.grouped_items: Dict[str, List[Item]] = {}
         # A list of folded group names in the display order.
         self.group_order = []
 
@@ -735,97 +738,11 @@ class selWin:
         # Make a font for previewing the suggested item
         self.mouseover_font = self.norm_font.copy()
         self.mouseover_font['slant'] = tk_font.ITALIC
-        self.context_var = IntVar()
 
         # The headers for the context menu
-        self.context_menus = {}
-
-        # Sort alphabetically, preferring a sort key if present.
-        self.item_list.sort(key=lambda it: it.sort_key or it.longName)
-
-        for ind, item in enumerate(self.item_list):
-            item._selector = self
-
-            if item == self.noneItem:
-                item.button = ttk.Button(
-                    self.pal_frame,
-                    image=item.icon,
-                )
-                item.context_lbl = none_name
-            else:
-                item.button = ttk.Button(
-                    self.pal_frame,
-                    text=item.shortName,
-                    image=item.icon,
-                    compound='top',
-                )
-
-            group_key = item.group.casefold()
-            self.grouped_items[group_key].append(item)
-
-            if group_key not in self.group_names:
-                # If the item is groupless, use 'Other' for the header.
-                self.group_names[group_key] = item.group or _('Other')
-
-            if not item.group:
-                # Ungrouped items appear directly in the menu.
-                menu = self.context_menus[''] = self.context_menu
-            else:
-                try:
-                    menu = self.context_menus[group_key]
-                except KeyError:
-                    self.context_menus[group_key] = menu = Menu(
-                        self.context_menu,
-                    )
-
-            menu.add_radiobutton(
-                label=item.context_lbl,
-                command=functools.partial(self.sel_item_id, item.name),
-                var=self.context_var,
-                value=ind,
-            )
-            item._context_ind = len(self.grouped_items[group_key]) - 1
-
-            @utils.bind_leftclick(item.button)
-            def click_item(event=None, *, _item=item):
-                """Handle clicking on the item.
-
-                If it's already selected, save and close the window.
-                """
-                # We need to capture the item in a default, since it's
-                # the same variable in different iterations
-                if _item is self.selected:
-                    self.save()
-                else:
-                    self.sel_item(_item)
-
-        # Convert to a normal dictionary, after adding all items.
-        self.grouped_items = dict(self.grouped_items)
-
-        # Figure out the order for the groups - alphabetical.
-        # Note - empty string should sort to the beginning!
-        self.group_order[:] = sorted(self.grouped_items.keys())
-
-        for index, (key, menu) in enumerate(
-                sorted(self.context_menus.items(), key=itemgetter(0)),
-                # We start with the ungrouped items, so increase the index
-                # appropriately.
-                start=len(self.grouped_items.get('', ()))):
-            if key == '':
-                # Don't add the ungrouped menu to itself!
-                continue
-            self.context_menu.add_cascade(
-                menu=menu,
-                label=self.group_names[key],
-            )
-            # Set a custom attribute to keep track of the menu's index.
-            menu._context_index = index
-
-        for group_key, text in self.group_names.items():
-            self.group_widgets[group_key] = GroupHeader(
-                self,
-                text,
-            )
+        self.context_menus: Dict[str, Menu] = {}
+        # The widget used to control which menu option is selected.
+        self.context_var = StringVar()
 
         self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
@@ -889,10 +806,10 @@ class selWin:
         else:
             self.attr = self.desc_label = None
 
-        self.flow_items()
+        self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-    def widget(self, frame) -> ttk.Entry:
+    def widget(self, frame: Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
 
         Use like 'selWin.widget(parent).grid(row=0, column=1)' to create
@@ -933,7 +850,7 @@ class selWin:
         return self.display
 
     @property
-    def readonly(self):
+    def readonly(self) -> bool:
         """Setting the readonly property to True makes the option read-only.
 
         The window cannot be opened, and all other inputs will fail.
@@ -941,7 +858,7 @@ class selWin:
         return self._readonly
 
     @readonly.setter
-    def readonly(self, value):
+    def readonly(self, value: bool) -> None:
         self._readonly = bool(value)
         if self.display is None:
             # Widget hasn't been added yet, stop.
@@ -958,12 +875,110 @@ class selWin:
         self.disp_btn.state(new_st)
         self.display.state(new_st)
 
-    def exit(self, event=None):
+    def refresh(self) -> None:
+        """Rebuild the menus and options based on the item list."""
+        # Sort alphabetically, preferring a sort key if present.
+        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName))
+        grouped_items = defaultdict(list)
+        # If the item is groupless, use 'Other' for the header.
+        self.group_names = {'':  _('Other')}
+        # Ungrouped items appear directly in the menu.
+        self.context_menus = {'': self.context_menu}
+
+        # First clear off the menu.
+        self.context_menu.delete(0, 'end')
+
+        for ind, item in enumerate(self.item_list):
+            if item._selector is not None and item._selector is not self:
+                raise ValueError(f'Item {item} reused on a different selector!')
+            item._selector = self
+
+            if item.button is None:  # New, create the button widget.
+                if item is self.noneItem:
+                    item.button = ttk.Button(
+                        self.pal_frame,
+                        image=item.icon,
+                    )
+                    item.context_lbl = item.context_lbl
+                else:
+                    item.button = ttk.Button(
+                        self.pal_frame,
+                        text=item.shortName,
+                        image=item.icon,
+                        compound='top',
+                    )
+
+                @utils.bind_leftclick(item.button)
+                def click_item(event=None, *, _self=self, _item=item):
+                    """Handle clicking on the item.
+
+                    If it's already selected, save and close the window.
+                    """
+                    # We need to capture the item in a default, since it's
+                    # the same variable in different iterations
+                    if _item is self.selected:
+                        _self.save()
+                    else:
+                        _self.sel_item(_item)
+
+            group_key = item.group.casefold()
+            grouped_items[group_key].append(item)
+
+            if group_key not in self.group_names:
+                self.group_names[group_key] = item.group
+            if group_key not in self.group_widgets:
+                self.group_widgets[group_key] = GroupHeader(self, item.group)
+
+            try:
+                menu = self.context_menus[group_key]
+            except KeyError:
+                self.context_menus[group_key] = menu = Menu(
+                    self.context_menu,
+                )
+
+            menu.add_radiobutton(
+                label=item.context_lbl,
+                command=functools.partial(self.sel_item_id, item.name),
+                var=self.context_var,
+                value=item.name,
+            )
+            item._context_ind = len(grouped_items[group_key]) - 1
+
+        # Convert to a normal dictionary, after adding all items.
+        self.grouped_items = dict(grouped_items)
+
+        # Figure out the order for the groups - alphabetical.
+        # Note - empty string should sort to the beginning!
+        self.group_order[:] = sorted(self.grouped_items.keys())
+
+        # We start with the ungrouped items, so increase the index
+        # appropriately.
+        if '' in grouped_items:
+            start = len(self.grouped_items[''])
+        else:
+            start = 0
+
+        for index, (key, menu) in enumerate(
+            sorted(self.context_menus.items(), key=itemgetter(0)),
+            start=start,
+        ):
+            if key == '':
+                # Don't add the ungrouped menu to itself!
+                continue
+            self.context_menu.add_cascade(
+                menu=menu,
+                label=self.group_names[key],
+            )
+            # Set a custom attribute to keep track of the menu's index.
+            menu._context_index = index
+        self.flow_items()
+
+    def exit(self, event: Event = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
         self.sel_item(self.orig_selected)
         self.save()
 
-    def save(self, event=None):
+    def save(self, event: Event = None) -> None:
         """Save the selected item into the textbox."""
         # Stop sample sounds if they're playing
         if self.sampler is not None:
@@ -980,7 +995,7 @@ class selWin:
         self.set_disp()
         self.do_callback()
 
-    def set_disp(self, event=None):
+    def set_disp(self, event: Event = None) -> str:
         """Set the display textbox."""
         # Bold the text if the suggested item is selected (like the
         # context menu). We check for truthness to ensure it's actually
@@ -998,10 +1013,10 @@ class selWin:
 
         self.disp_label.set(self.selected.context_lbl)
         self.orig_selected = self.selected
-        self.context_var.set(self.item_list.index(self.selected))
+        self.context_var.set(self.selected.name)
         return "break"  # stop the entry widget from continuing with this event
 
-    def rollover_suggest(self):
+    def rollover_suggest(self) -> None:
         """Show the suggested item when the button is moused over."""
         if self.is_suggested() or self.suggested is None:
             # the suggested item is aready the suggested item
@@ -1010,7 +1025,7 @@ class selWin:
         self.display['font'] = self.mouseover_font
         self.disp_label.set(self.suggested.context_lbl)
 
-    def open_win(self, e=None, force_open=False):
+    def open_win(self, e: Event = None, *, force_open=False) -> object:
         if self._readonly and not force_open:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
@@ -1032,24 +1047,24 @@ class selWin:
         self.sel_item(self.selected)
         self.win.after(2, self.flow_items)
 
-    def open_context(self, e=None):
+    def open_context(self, e: Event = None) -> None:
         """Dislay the context window at the text widget."""
         if not self._readonly:
             self.context_menu.post(
                 self.display.winfo_rootx(),
                 self.display.winfo_rooty() + self.display.winfo_height())
 
-    def sel_suggested(self):
+    def sel_suggested(self) -> None:
         """Select the suggested item."""
         if self.suggested is not None:
             self.sel_item(self.suggested)
 
-    def do_callback(self):
+    def do_callback(self) -> None:
         """Call the callback function."""
         if self.callback is not None:
             self.callback(self.chosen_id, *self.callback_params)
 
-    def sel_item_id(self, it_id):
+    def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""
         if self.selected.name == it_id:
             return True
@@ -1071,8 +1086,8 @@ class selWin:
                     return True
             return False
 
-    def sel_item(self, item: Item, event=None):
-
+    def sel_item(self, item: Item, event: Event = None) -> None:
+        """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -1094,7 +1109,10 @@ class selWin:
 
         if optionWindow.DEV_MODE.get():
             # Show the ID of the item in the description
-            text = tkMarkdown.convert(f'**ID:** {item.name or "NONE"}\n\n')
+            if item is self.noneItem:
+                text = tkMarkdown.convert('**ID:** *NONE*\n\n')
+            else:
+                text = tkMarkdown.convert(f'**ID:** {item.name}\n\n')
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 item.desc,
@@ -1156,7 +1174,7 @@ class selWin:
                         'Invalid attribute type: "{}"'.format(label.type)
                     )
 
-    def key_navigate(self, event: Event):
+    def key_navigate(self, event: Event) -> None:
         """Navigate using arrow keys.
 
         Allowed keys are set in NAV_KEYS
@@ -1228,7 +1246,7 @@ class selWin:
             key is NAV_KEYS.UP or key is NAV_KEYS.DN,
         )
 
-    def _offset_select(self, group_list, group_ind, item_ind, is_vert=False):
+    def _offset_select(self, group_list: List[str], group_ind: int, item_ind: int, is_vert: bool=False) -> None:
         """Helper for key_navigate(), jump to the given index in a group.
 
         group_list is sorted list of group names.
@@ -1292,7 +1310,7 @@ class selWin:
         else:  # Within this group
             self.sel_item(cur_group[item_ind])
 
-    def flow_items(self, e=None):
+    def flow_items(self, e: Event = None) -> None:
         """Reposition all the items to fit in the current geometry.
 
         Called on the <Configure> event.
@@ -1357,7 +1375,7 @@ class selWin:
         )
         self.pal_frame['height'] = y_off
 
-    def scroll_to(self, item):
+    def scroll_to(self, item: Item) -> None:
         """Scroll to an item so it's visible."""
         canvas = self.wid_canvas
 
@@ -1380,7 +1398,7 @@ class selWin:
             / height
         )
 
-    def __contains__(self, obj):
+    def __contains__(self, obj: Union[str, Item]) -> bool:
         """Determine if the given SelWinItem or item ID is in this item list."""
         if obj == '<None>':
             return self.noneItem in self.item_list
@@ -1392,16 +1410,16 @@ class selWin:
                     return True
             return False
 
-    def is_suggested(self):
+    def is_suggested(self) -> bool:
         """Return whether the current item is the suggested one."""
         return self.suggested == self.selected
 
-    def _set_context_font(self, item, font):
+    def _set_context_font(self, item, font: tk_font.Font) -> None:
         """Set the font of an item, and its parent group."""
 
         if item.group:
             group_key = item.group.casefold()
-            menu = self.context_menus[group_key]  # type: Menu
+            menu = self.context_menus[group_key]
 
             # Apply the font to the group header as well.
             self.group_widgets[group_key].title['font'] = font
@@ -1418,7 +1436,7 @@ class selWin:
             font=font,
         )
 
-    def set_suggested(self, suggested=None):
+    def set_suggested(self, suggested: Optional[str] = None) -> None:
         """Set the suggested item to the given ID.
 
         If the ID is None or does not exist, the suggested item will be cleared.

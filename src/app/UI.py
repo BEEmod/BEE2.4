@@ -17,7 +17,7 @@ import srctools.logger
 from app import sound as snd
 import BEE2_config
 from app import paletteLoader
-import packageLoader
+import packages
 from app import img
 from app import itemconfig
 import utils
@@ -31,7 +31,7 @@ from app import (
     packageMan,
     StyleVarPane,
     CompilerPane,
-    tagsPane,
+    item_search,
     optionWindow,
     helpMenu,
     backup as backup_win,
@@ -39,7 +39,7 @@ from app import (
     signage_ui,
 )
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Set, Iterator
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -58,6 +58,8 @@ pal_items = []  # type: List[PalItem]
 pal_picked_fake = []  # type: List[ttk.Label]
 # Labels for empty picker positions
 pal_items_fake = []  # type: List[ttk.Label]
+# The current filtering state.
+cur_filter: Optional[Set[Tuple[str, int]]] = None
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -91,10 +93,8 @@ class Item:
         'item',
         'def_data',
         'data',
-        'num_sub',
+        'visual_subtypes',
         'authors',
-        'tags',
-        'filter_tags',
         'id',
         'pak_id',
         'pak_name',
@@ -102,78 +102,56 @@ class Item:
         'url',
         ]
 
-    def __init__(self, item):
+    def __init__(self, item: packages.Item) -> None:
         self.ver_list = sorted(item.versions.keys())
 
         self.selected_ver = item_opts.get_val(
             item.id,
             'sel_version',
-            item.def_ver['id'],
+            item.def_ver.id,
         )
         # If the last-selected value doesn't exist, fallback to the default.
         if self.selected_ver not in item.versions:
-            self.selected_ver = item.def_ver['id']
+            LOGGER.warning('Version ID {} is not valid for item {}', self.selected_version, item.id)
+            self.selected_ver = item.def_ver.id
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
-        # These pieces of data are constant, only from the first style.
-        self.num_sub = sum(
-            1 for _ in
-            self.def_data.editor.find_all(
-                "Editor",
-                "Subtype",
-                "Palette",
-                )
-            )
-        if not self.num_sub:
+        self.def_data = self.item.def_ver.def_style
+        # The indexes of subtypes that are actually visible.
+        self.visual_subtypes = [
+            ind
+            for ind, sub in enumerate(self.def_data.editor.subtypes)
+            if sub.pal_name or sub.pal_icon
+        ]
+        if not self.visual_subtypes:
             # We need at least one subtype, otherwise something's wrong
             # with the file.
-            raise Exception('Item {} has no subtypes!'.format(item.id))
+            raise Exception('Item {} has no visible subtypes!'.format(item.id))
 
         self.authors = self.def_data.authors
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
-        self.tags = set()
 
         self.load_data()
 
-    def load_data(self):
+    def load_data(self) -> None:
         """Load data from the item."""
-        from app.tagsPane import Section
-
         version = self.item.versions[self.selected_ver]
-        self.data = version['styles'].get(
+        self.data = version.styles.get(
             selected_style,
             self.def_data,
-            )  # type: packageLoader.ItemVariant
-        self.names = [
-            gameMan.translate(prop['name', ''])
-            for prop in
-            self.data.editor.find_all("Editor", "Subtype")
-            if prop['Palette', None] is not None
-        ]
+        )
         self.url = self.data.url
 
-        # attributes used for filtering (tags, authors, packages...)
-        self.filter_tags = set()
+    def get_tags(self, subtype: int) -> Iterator[str]:
+        """Return all the search keywords for this item/subtype."""
+        yield self.pak_name
+        yield from self.data.tags
+        yield from self.data.authors
+        yield gameMan.translate(self.data.editor.subtypes[subtype].name)
 
-        # The custom tags set for this item
-        self.tags = set()
-
-        for tag in self.data.tags:
-            self.filter_tags.add(
-                tagsPane.add_tag(Section.TAG, tag, pretty=tag)
-            )
-        for auth in self.data.authors:
-            self.filter_tags.add(
-                tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
-            )
-        self.filter_tags.add(
-            tagsPane.add_tag(Section.PACK, self.pak_id, pretty=self.pak_name)
-        )
-
-    def get_icon(self, subKey, allow_single=False, single_num=1):
+    def get_icon(self, subKey, allow_single=False, single_num=1) -> PhotoImage:
         """Get an icon for the given subkey.
 
         If allow_single is true, the grouping icon can be returned
@@ -208,43 +186,32 @@ class Item:
 
     def properties(self):
         """Iterate through all properties for this item."""
-        for part in self.data.editor.find_all("Properties"):
-            for prop in part:
-                if not prop.bool('BEE2_ignore'):
-                    yield prop.name
+        for prop_name, prop in self.data.editor.properties.items():
+            if prop.allow_user_default:
+                yield prop_name
 
     def get_properties(self):
         """Return a dictionary of properties and the current value for them.
 
         """
         result = {}
-        for part in self.data.editor.find_all("Properties"):
-            for prop in part:
-                name = prop.name
+        for prop_name, prop in self.data.editor.properties.items():
+            if not prop.allow_user_default:
+                continue
 
-                if prop.bool('BEE2_ignore'):
-                    continue
-
-                # PROP_TYPES is a dict holding all the modifiable properties.
-                if name in PROP_TYPES:
-                    if name in result:
-                        LOGGER.warning(
-                            'Duplicate property "{}" in {}!',
-                            name,
-                            self.id
-                        )
-
-                    result[name] = item_opts.get_val(
-                        self.id,
-                        'PROP_' + name,
-                        prop["DefaultValue", ''],
-                    )
-                else:
-                    LOGGER.warning(
-                        'Unknown property "{}" in {}',
-                        name,
-                        self.id,
-                    )
+            # PROP_TYPES is a dict holding all the modifiable properties.
+            if prop_name in PROP_TYPES:
+                result[prop_name] = item_opts.get_val(
+                    self.id,
+                    'PROP_' + prop_name,
+                    prop.export(),
+                )
+            else:
+                LOGGER.warning(
+                    'Unknown property "{}" in {}',
+                    prop_name,
+                    self.id,
+                )
         return result
 
     def set_properties(self, props):
@@ -275,7 +242,7 @@ class Item:
         """Get a list of the names and corresponding IDs for the item."""
         # item folders are reused, so we can find duplicates.
         style_obj_ids = {
-            id(self.item.versions[ver_id]['styles'][selected_style])
+            id(self.item.versions[ver_id].styles[selected_style])
             for ver_id in self.ver_list
         }
         versions = self.ver_list
@@ -285,7 +252,7 @@ class Item:
             versions = self.ver_list[:1]
 
         return versions, [
-            self.item.versions[ver_id]['name']
+            self.item.versions[ver_id].name
             for ver_id in versions
         ]
 
@@ -298,8 +265,6 @@ class PalItem(Label):
         self.item = item
         self.subKey = sub
         self.id = item.id
-        # Toggled according to filter settings
-        self.visible = True
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
@@ -383,7 +348,7 @@ class PalItem(Label):
         """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
         try:
-            self.name = gameMan.translate(self.item.names[self.subKey])
+            self.name = gameMan.translate(self.item.data.editor.subtypes[self.subKey].name)
         except IndexError:
             LOGGER.warning(
                 'Item <{}> in <{}> style has mismatched subtype count!',
@@ -499,7 +464,7 @@ def save_load_selector_win(props: Property=None):
             pass
 
 
-def load_packages(data):
+def load_packages(data: dict):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -523,24 +488,24 @@ def load_packages(data):
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, 'Skybox', {
+        (sky_list, data['Skybox'], {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, 'QuotePack', {
+        (voice_list, data['QuotePack'], {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, 'Style', {
+        (style_list, data['Style'], {
             'VID': 'has_video',
         }),
-        (elev_list, 'Elevator', {
+        (elev_list, data['Elevator'], {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, name, attrs in obj_types:
+    for sel_list, obj_list, attrs in obj_types:
         attr_commands = [
             # cache the operator.attrgetter funcs
             (key, operator.attrgetter(value))
@@ -548,10 +513,7 @@ def load_packages(data):
         ]
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(
-                data[name],
-                key=operator.attrgetter('selitem_data.name'),
-                ):
+        for obj in sorted(obj_list, key=operator.attrgetter('selitem_data.name')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
@@ -681,9 +643,9 @@ def load_packages(data):
         win.sel_suggested()
 
 
-def current_style() -> packageLoader.Style:
+def current_style() -> packages.Style:
     """Return the currently selected style."""
-    return packageLoader.Style.by_id(selected_style)
+    return packages.Style.by_id(selected_style)
 
 
 def reposition_panes() -> None:
@@ -1137,10 +1099,10 @@ def set_palette(e=None):
             LOGGER.warning('Unknown item "{}"! for palette', item)
             continue
 
-        if sub >= item_group.num_sub:
+        if sub >= len(item_group.def_data.editor.subtypes):
             LOGGER.warning(
                 'Palette had incorrect subtype for "{}" ({} > {})!',
-                item, sub, item_group.num_sub - 1,
+                item, sub, len(item_group.def_data.editor.subtypes) - 1,
             )
             continue
 
@@ -1173,6 +1135,8 @@ def pal_clear() -> None:
 
 def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
+    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
+    
     if len(pal_picked) == 32:
         return
 
@@ -1184,18 +1148,23 @@ def pal_shuffle() -> None:
     # Use a set to eliminate duplicates.
     shuff_items = list({
         item.id
-        # Only consider visible items, not on the palette.
+        # Only consider items not already on the palette,
+        # obey the mandatory item lock and filters.
         for item in pal_items
-        if item.visible and item.id not in palette_set
+        if item.id not in palette_set
+        if style_unlocked or not item.needs_unlock
+        if cur_filter is None or (item.id, item.subKey) in cur_filter
     })
 
     random.shuffle(shuff_items)
 
     for item_id in shuff_items[:32-len(pal_picked)]:
+        item = item_list[item_id]
         pal_picked.append(PalItem(
             frames['preview'],
-            item_list[item_id],
-            sub=0,  # Use the first subitem
+            item,
+            # Pick a random available palette icon.
+            sub=random.choice(item.visual_subtypes),
             is_pre=True,
         ))
     flow_preview()
@@ -1400,7 +1369,7 @@ def init_option(pane: SubPane) -> None:
     def configure_voice():
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packageLoader.QuotePack.by_id(voice_win.chosen_id)
+            chosen_voice = packages.QuotePack.by_id(voice_win.chosen_id)
         except KeyError:
             pass
         else:
@@ -1572,8 +1541,9 @@ def init_picker(f):
     items.sort(key=operator.attrgetter('pak_id'), reverse=True)
 
     for item in items:
-        for i in range(0, item.num_sub):
-            pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
+        for i, subtype in enumerate(item.data.editor.subtypes):
+            if subtype.pal_icon or subtype.pal_name:
+                pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     f.bind("<Configure>", flow_picker)
 
@@ -1586,33 +1556,32 @@ def flow_picker(e=None):
     """
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
-    if tagsPane.is_expanded:
-        # Offset the icons so they aren't covered by the tags popup
-        offset = max(
-            (
-                tagsPane.wid['expand_frame'].winfo_height()
-                - pal_canvas.winfo_rooty()
-                + tagsPane.wid['expand_frame'].winfo_rooty()
-                + 15
-            ), 0)
-    else:
-        offset = 0
-    UI['picker_frame'].grid(pady=(offset, 0))
+    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
 
     width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
         width = 1  # we got way too small, prevent division by zero
-    vis_items = [it for it in pal_items if it.visible]
-    num_items = len(vis_items)
-    for i, item in enumerate(vis_items):
-        item.is_pre = False
-        item.place(
-            x=((i % width) * 65 + 1),
-            y=((i // width) * 65 + 1),
-            )
 
-    for item in (it for it in pal_items if not it.visible):
-        item.place_forget()
+    i = 0
+    for item in pal_items:
+        if item.needs_unlock and not style_unlocked:
+            visible = False
+        elif cur_filter is None:
+            visible = True
+        else:
+            visible = (item.item.id, item.subKey) in cur_filter
+
+        if visible:
+            item.is_pre = False
+            item.place(
+                x=((i % width) * 65 + 1),
+                y=((i // width) * 65 + 1),
+                )
+            i += 1
+        else:
+            item.place_forget()
+
+    num_items = i
 
     height = int(math.ceil(num_items / width)) * 65 + 2
     pal_canvas['scrollregion'] = (0, 0, width * 65, height)
@@ -1624,7 +1593,7 @@ def flow_picker(e=None):
     # Special case, don't add a full row if it's exactly the right count.
     extra_items = (width - last_row) if last_row != 0 else 0
 
-    y = (num_items // width)*65 + offset + 1
+    y = (num_items // width)*65 + 1
     for i in range(extra_items):
         if i not in pal_items_fake:
             pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
@@ -1764,12 +1733,12 @@ def init_menu_bar(win: Toplevel) -> Menu:
     pal_menu.add_command(
         label=_('Save Palette'),
         command=pal_save,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
+        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
     pal_menu.add_command(
         label=_('Save Palette As...'),
         command=pal_save_as,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
+        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
         )
 
     pal_menu.add_separator()
@@ -1792,9 +1761,6 @@ def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    snd.load_snd()
-    loader.step('UI')
-
     view_menu = init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
@@ -1811,7 +1777,6 @@ def init_windows() -> None:
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
     ui_bg.rowconfigure(0, weight=1)
-    StyleVarPane.update_filter = tagsPane.filter_items
 
     style = ttk.Style()
     # Custom button style with correct background
@@ -1853,37 +1818,36 @@ def init_windows() -> None:
 
     # This will sit on top of the palette section, spanning from left
     # to right
-    frames['tags'] = ttk.Frame(
+    search_frame = ttk.Frame(
         picker_split_frame,
         padding=5,
         borderwidth=0,
         relief="raised",
     )
-    # Place doesn't affect .grid() positioning, so this frame will sit on top
-    # of other widgets.
-    frames['tags'].place(x=0, y=0, relwidth=1)
-    tagsPane.init(frames['tags'])
-    frames['tags'].update_idletasks()  # Refresh so height() is correct
+    search_frame.grid(row=0, column=0, sticky='ew')
+
+    def update_filter(new_filter: Optional[Set[Tuple[str, int]]]) -> None:
+        """Refresh filtered items whenever it's changed."""
+        global cur_filter
+        cur_filter = new_filter
+        flow_picker()
+
+    item_search.init(search_frame, update_filter)
 
     loader.step('UI')
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
-        # Offset the picker window under the unexpanded tags pane, so they
-        # don't overlap.
-        padding=(5, frames['tags'].winfo_height(), 5, 5),
+        padding=5,
         borderwidth=4,
         relief="raised",
     )
-    frames['picker'].grid(row=0, column=0, sticky="NSEW")
-    picker_split_frame.rowconfigure(0, weight=1)
+    frames['picker'].grid(row=1, column=0, sticky="NSEW")
+    picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
     init_picker(frames['picker'])
 
     loader.step('UI')
-
-    # Move this to above the picker pane (otherwise it'll be hidden)
-    frames['tags'].lift()
 
     frames['toolMenu'] = Frame(
         frames['preview'],
@@ -1933,7 +1897,7 @@ def init_windows() -> None:
 
     loader.step('UI')
 
-    StyleVarPane.make_pane(frames['toolMenu'], view_menu)
+    StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
 
     loader.step('UI')
 
@@ -2055,9 +2019,7 @@ def init_windows() -> None:
         elev_win.readonly = not style_obj.has_video
 
         signage_ui.style_changed(style_obj)
-
-        tagsPane.filter_items()  # Update filters (authors may have changed)
-
+        item_search.rebuild_database()
         CompilerPane.set_corridors(style_obj.corridors)
 
         sugg = style_obj.suggested

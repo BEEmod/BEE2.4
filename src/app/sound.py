@@ -52,8 +52,6 @@ try:
     import pyglet.media
 
     pyglet_version = pyglet.version
-    if not pyglet.media.have_ffmpeg():
-        raise ImportError('No ffmpeg available!')
 except Exception:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!', exc_info=True)
 
@@ -64,9 +62,6 @@ except Exception:
 
         No sounds will be played.
         """
-
-    def load_snd() -> None:
-        """Load in sound FX."""
 
     def fx_blockable(sound: str) -> None:
         """Play a sound effect.
@@ -91,30 +86,18 @@ else:
     initiallised = True
     _play_repeat_sfx = True
 
-    def load_snd() -> None:
-        """Load all the sounds."""
-        for name, fname in SOUNDS.items():
-            LOGGER.info('Loading sound "{}" -> sounds/{}.ogg', name, fname)
-            SOUNDS[name] = pyglet.media.load(
-                str(utils.install_path('sounds/{}.ogg'.format(fname))),
-                streaming=False,
-            )
+    _todo = list(SOUNDS)
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
         if not play_sound:
             return
-        # Defer loading these until we actually need them, speeds up
-        # startup a little.
         try:
             sound = SOUNDS[name]
         except KeyError:
             raise ValueError(f'Not a valid sound? "{name}"')
-        if type(sound) is str:
-            LOGGER.warning('load_snd() not called when playing "{}"?', name)
-        else:
+        if type(sound) is not str:
             sound.play()
-
 
     def _reset_fx_blockable() -> None:
         """Reset the fx_norep() call after a delay."""
@@ -143,7 +126,14 @@ else:
         """We need to constantly trigger pyglet.clock.tick().
 
         Instead of re-registering this, cache off the command name.
+        Additionally, load sounds gradually in the background.
         """
+        if _todo:
+            name = _todo.pop()
+            fname = SOUNDS[name]
+            path = str(utils.install_path('sounds/{}.ogg'.format(fname)))
+            LOGGER.info('Loading sound "{}" -> {}', name, path)
+            SOUNDS[name] = pyglet.media.load(path, streaming=False)
         tick()
         TK_ROOT.tk.call(ticker_cmd)
 

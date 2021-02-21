@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import srctools
 import contextlib
@@ -128,7 +129,7 @@ EXCLUDES = [
     'idlelib.tabbedpages',
     'idlelib.textView',
 
-    'numpy', # PIL.ImageFilter imports, we don't need NumPy!
+    'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
@@ -144,6 +145,10 @@ EXCLUDES = [
     'optparse',
     'argparse',
 ]
+
+if sys.version_info >= (3, 7):
+    # Only needed on 3.6, it's in the stdlib thereafter.
+    EXCLUDES += ['importlib_resources']
 
 bee_version = input('BEE2 Version (x.y.z): ')
 
@@ -165,6 +170,8 @@ for snd in os.listdir('../sounds/'):
         continue
     data_files.append(('../sounds/' + snd, 'sounds'))
 
+# Include the compiler.
+data_files.append(('../compiler/', 'compiler'))
 
 # Finally, run the PyInstaller analysis process.
 

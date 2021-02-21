@@ -1,19 +1,18 @@
 from tkinter import *
 from tkinter import ttk
 
+from typing import Union, List, Dict, Callable, Optional
 from collections import namedtuple
 import operator
 
-from app.SubPane import SubPane
 from srctools import Property
 from srctools.logger import get_logger
-import packageLoader
-from app import tooltip, TK_ROOT
+import packages
+from app.SubPane import SubPane
+from app import tooltip, TK_ROOT, itemconfig, img
 import utils
-from app import itemconfig, img
 import BEE2_config
 
-from typing import Union, List, Dict
 
 
 LOGGER = get_logger(__name__)
@@ -92,16 +91,15 @@ checkbox_chosen = {}
 checkbox_other = {}
 tk_vars = {}  # type: Dict[str, IntVar]
 
-VAR_LIST = []  # type: List[packageLoader.StyleVar]
+VAR_LIST: List[packages.StyleVar] = []
 STYLES = {}
 
 window = None
 
 UI = {}
-
-
-def update_filter():
-    """Callback function replaced by tagsPane, to update items if needed."""
+# Callback triggered whenever we reload vars. This is used to update items
+# to show/hide the defaults.
+_load_cback: Optional[Callable[[], None]] = None
 
 
 def add_vars(style_vars, styles):
@@ -136,10 +134,11 @@ def save_load_stylevars(props: Property=None):
                 tk_vars[prop.real_name].set(prop.value)
             except KeyError:
                 LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
-        update_filter()
+        if _load_cback is not None:
+            _load_cback()
 
 
-def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
+def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.
@@ -217,15 +216,14 @@ def refresh(selected_style):
         UI['stylevar_other_none'].grid_remove()
 
 
-def flow_stylevar(e=None):
-    UI['style_can']['scrollregion'] = UI['style_can'].bbox(ALL)
-
-
-def make_pane(tool_frame: Frame, menu_bar: Menu):
+def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]):
     """Create the styleVar pane.
 
+    update_item_vis is the callback fired whenever change defaults changes.
     """
-    global window
+    global window, _load_cback
+    _load_cback = update_item_vis
+
     window = SubPane(
         TK_ROOT,
         title=_('Style/Item Properties'),
@@ -249,22 +247,22 @@ def make_pane(tool_frame: Frame, menu_bar: Menu):
     stylevar_frame.columnconfigure(0, weight=1)
     nbook.add(stylevar_frame, text=_('Styles'))
 
-    UI['style_can'] = Canvas(stylevar_frame, highlightthickness=0)
+    canvas = Canvas(stylevar_frame, highlightthickness=0)
     # need to use a canvas to allow scrolling
-    UI['style_can'].grid(sticky='NSEW')
+    canvas.grid(sticky='NSEW')
     window.rowconfigure(0, weight=1)
 
     UI['style_scroll'] = ttk.Scrollbar(
         stylevar_frame,
         orient=VERTICAL,
-        command=UI['style_can'].yview,
+        command=canvas.yview,
         )
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
-    UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
+    canvas['yscrollcommand'] = UI['style_scroll'].set
 
-    utils.add_mousewheel(UI['style_can'], stylevar_frame)
+    utils.add_mousewheel(canvas, stylevar_frame)
 
-    canvas_frame = ttk.Frame(UI['style_can'])
+    canvas_frame = ttk.Frame(canvas)
 
     frame_all = ttk.Labelframe(canvas_frame, text=_("All:"))
     frame_all.grid(row=0, sticky='EW')
@@ -307,9 +305,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu):
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
         if var.id == 'UnlockDefault':
-            def cmd():
-                update_filter()
-            checkbox_all[var.id]['command'] = cmd
+            checkbox_all[var.id]['command'] = lambda: update_item_vis()
 
         tooltip.add_tooltip(
             checkbox_all[var.id],
@@ -343,10 +339,10 @@ def make_pane(tool_frame: Frame, menu_bar: Menu):
                 desc,
             )
 
-    UI['style_can'].create_window(0, 0, window=canvas_frame, anchor="nw")
-    UI['style_can'].update_idletasks()
-    UI['style_can'].config(
-        scrollregion=UI['style_can'].bbox(ALL),
+    canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
+    canvas.update_idletasks()
+    canvas.config(
+        scrollregion=canvas.bbox(ALL),
         width=canvas_frame.winfo_reqwidth(),
     )
 
@@ -356,7 +352,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu):
             cursor=utils.CURSORS['stretch_vert'],
         ).grid(row=1, column=0)
 
-    UI['style_can'].bind('<Configure>', flow_stylevar)
+    canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))
 
     item_config_frame = ttk.Frame(nbook)
     nbook.add(item_config_frame, text=_('Items'))
