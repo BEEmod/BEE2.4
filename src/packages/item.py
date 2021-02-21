@@ -475,8 +475,25 @@ class Item(PakObject):
                 def_version = version
                 version.isolate = True
 
+        if def_version is None:
+            raise ValueError(f'Item "{data.id}" has no versions!')
+
         # Fill out the folders dict with the actual data
         parsed_folders = parse_item_folder(folders_to_parse, data.fsys, data.pak_id)
+
+        # We want to ensure the number of visible subtypes doesn't change.
+        subtype_counts = {
+            tuple([
+                i for i, subtype in enumerate(folder.editor.subtypes, 1)
+                if subtype.pal_pos or subtype.pal_name
+            ])
+            for folder in parsed_folders.values()
+        }
+        if len(subtype_counts) > 1:
+            raise ValueError(
+                f'Item "{data.id}" has different '
+                f'visible subtypes in its styles: {", ".join(map(str, subtype_counts))}'
+            )
 
         # Then copy over to the styles values
         for ver in versions.values():
@@ -488,9 +505,6 @@ class Item(PakObject):
             for sty, fold in ver.styles.items():
                 if isinstance(fold, str):
                     ver.styles[sty] = parsed_folders[fold]
-
-        if not versions:
-            raise ValueError(f'Item "{data.id}" has no versions!')
 
         return cls(
             data.id,
