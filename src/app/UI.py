@@ -149,7 +149,13 @@ class Item:
         yield self.pak_name
         yield from self.data.tags
         yield from self.data.authors
-        yield gameMan.translate(self.data.editor.subtypes[subtype].name)
+        try:
+            yield gameMan.translate(self.data.editor.subtypes[subtype].name)
+        except IndexError:
+            LOGGER.warning(
+                'No subtype number {} for {} in {} style!',
+                subtype, self.id, selected_style,
+            )
 
     def get_icon(self, subKey, allow_single=False, single_num=1) -> PhotoImage:
         """Get an icon for the given subkey.
