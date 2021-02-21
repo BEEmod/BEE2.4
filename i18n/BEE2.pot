@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-02-20 16:24+1000\n"
+"POT-Creation-Date: 2021-02-21 11:21+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -25,7 +25,7 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: app/tagsPane.py loadScreen.py
+#: loadScreen.py
 msgid "Packages"
 msgstr ""
 
@@ -1087,6 +1087,10 @@ msgstr ""
 msgid "No Properties available!"
 msgstr ""
 
+#: app/item_search.py
+msgid "Search:"
+msgstr ""
+
 #: app/itemconfig.py
 msgid "Choose a Color"
 msgstr ""
@@ -1510,26 +1514,6 @@ msgstr ""
 
 #: app/signage_ui.py
 msgid "Signage: {}"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Tags"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Authors"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Any"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "All"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Available Tags (click):"
 msgstr ""
 
 #: app/voiceEditor.py

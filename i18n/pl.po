@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BEE2 mod translations\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-02-20 16:24+1000\n"
+"POT-Creation-Date: 2021-02-21 11:21+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: pl\n"
@@ -28,7 +28,7 @@ msgstr "Wersja: "
 msgid "Cancel"
 msgstr "Anuluj"
 
-#: app/tagsPane.py:48 loadScreen.py:211
+#: loadScreen.py:211
 msgid "Packages"
 msgstr "Paczki"
 
@@ -121,7 +121,7 @@ msgstr ""
 "Losowo wybiera korytarz. Raz wybrany jest zapisywany w danych mapy i się "
 "nie zmieni."
 
-#: app/CompilerPane.py:320 app/UI.py:642
+#: app/CompilerPane.py:320 app/UI.py:626
 msgid "Random"
 msgstr "Losowo"
 
@@ -451,35 +451,35 @@ msgstr[0] "Styl: {}"
 msgstr[1] "Style: {}"
 msgstr[2] "Style: {}"
 
-#: app/StyleVarPane.py:226
+#: app/StyleVarPane.py:229
 msgid "Style/Item Properties"
 msgstr "Właściwości stylów i przedmiotów"
 
-#: app/StyleVarPane.py:245
+#: app/StyleVarPane.py:248
 msgid "Styles"
 msgstr "Style"
 
-#: app/StyleVarPane.py:264
+#: app/StyleVarPane.py:267
 msgid "All:"
 msgstr "Wszystkie:"
 
-#: app/StyleVarPane.py:267
+#: app/StyleVarPane.py:270
 msgid "Selected Style:"
 msgstr "Wybrany styl:"
 
-#: app/StyleVarPane.py:275
+#: app/StyleVarPane.py:278
 msgid "Other Styles:"
 msgstr "Pozostałe style:"
 
-#: app/StyleVarPane.py:280
+#: app/StyleVarPane.py:283
 msgid "No Options!"
 msgstr "Brak opcji!"
 
-#: app/StyleVarPane.py:286
+#: app/StyleVarPane.py:289
 msgid "None!"
 msgstr "Brak!"
 
-#: app/StyleVarPane.py:357
+#: app/StyleVarPane.py:358
 msgid "Items"
 msgstr "Przedmioty"
 
@@ -487,15 +487,15 @@ msgstr "Przedmioty"
 msgid "Hide/Show the \"{}\" window."
 msgstr "Pokaż/ukryj okno \"{}\""
 
-#: app/UI.py:70
+#: app/UI.py:72
 msgid "Export..."
 msgstr "Wyeksportuj..."
 
-#: app/UI.py:576
+#: app/UI.py:560
 msgid "Select Skyboxes"
 msgstr "Wybierz skybox"
 
-#: app/UI.py:577
+#: app/UI.py:561
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
@@ -506,19 +506,19 @@ msgstr ""
 "otchłani (jeśli obecna), a także kolor \"mgły\" (widocznej w większych "
 "komorach)."
 
-#: app/UI.py:585
+#: app/UI.py:569
 msgid "3D Skybox"
 msgstr "Skybox 3D"
 
-#: app/UI.py:586
+#: app/UI.py:570
 msgid "Fog Color"
 msgstr "Kolor mgły"
 
-#: app/UI.py:593
+#: app/UI.py:577
 msgid "Select Additional Voice Lines"
 msgstr "Wybierz dodatkowe ścieżki głosowe"
 
-#: app/UI.py:594
+#: app/UI.py:578
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -530,31 +530,31 @@ msgstr ""
 "Dodatkowe ścieżki Cave'a Johnsona z \"Multiwersum\" są wybierane osobno "
 "we właściwościach stylu."
 
-#: app/UI.py:599
+#: app/UI.py:583
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "Nie dodaje żadnych ścieżek, jedynie Cave z multiwersum, jeżeli włączone."
 
-#: app/UI.py:601
+#: app/UI.py:585
 msgid "<Multiverse Cave only>"
 msgstr "<Tylko Cave z multiwersum>"
 
-#: app/UI.py:605
+#: app/UI.py:589
 msgid "Characters"
 msgstr "Postacie"
 
-#: app/UI.py:606
+#: app/UI.py:590
 msgid "Turret Shoot Monitor"
 msgstr "Wieżyczki strzelają w monitor"
 
-#: app/UI.py:607
+#: app/UI.py:591
 msgid "Monitor Visuals"
 msgstr "Postać na monitorze"
 
-#: app/UI.py:614
+#: app/UI.py:598
 msgid "Select Style"
 msgstr "Wybierz styl"
 
-#: app/UI.py:615
+#: app/UI.py:599
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -568,15 +568,15 @@ msgstr ""
 "\n"
 "Styl po prostu określa okres czasu, w którym rozgrywana jest komora."
 
-#: app/UI.py:626
+#: app/UI.py:610
 msgid "Elevator Videos"
 msgstr "Filmy przy windzie"
 
-#: app/UI.py:633
+#: app/UI.py:617
 msgid "Select Elevator Video"
 msgstr "Wybierz film"
 
-#: app/UI.py:634
+#: app/UI.py:618
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -587,23 +587,23 @@ msgstr ""
 "\"None\", losowy film będzie wybrany za każdym razem, gdy mapa jest "
 "grana, jak w domyślnym edytorze."
 
-#: app/UI.py:638
+#: app/UI.py:622
 msgid "This style does not have a elevator video screen."
 msgstr "Ten styl nie ma ekranu na film."
 
-#: app/UI.py:643
+#: app/UI.py:627
 msgid "Choose a random video."
 msgstr "Wybierz dowolny film."
 
-#: app/UI.py:647
+#: app/UI.py:631
 msgid "Multiple Orientations"
 msgstr "Wiele orientacji"
 
-#: app/UI.py:875
+#: app/UI.py:859
 msgid "Selected Items and Style successfully exported!"
 msgstr "Wyeksportowanie wybranych przedmiotów i stylu powiodło się!"
 
-#: app/UI.py:877
+#: app/UI.py:861
 msgid ""
 "\n"
 "\n"
@@ -615,145 +615,145 @@ msgstr ""
 "Uwaga: Pliki VPK nie zostały wyeksportowane, wyjdź z Portal 2 i Hammer "
 "aby upewnić się, że podgląd ścian w edytorze się zmienił."
 
-#: app/UI.py:1109
+#: app/UI.py:1093
 msgid "Delete Palette \"{}\""
 msgstr "Usuń paletę \"{}\""
 
-#: app/UI.py:1185
+#: app/UI.py:1176
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Zapisz paletę"
 
-#: app/UI.py:1186
+#: app/UI.py:1177
 msgid "Enter a name:"
 msgstr "Wpisz nazwę:"
 
-#: app/UI.py:1195
+#: app/UI.py:1186
 msgid "This palette already exists. Overwrite?"
 msgstr "Ta paleta już istnieje. Nadpisać?"
 
-#: app/UI.py:1227 app/gameMan.py:1340
+#: app/UI.py:1218 app/gameMan.py:1340
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Na pewno chcesz usunąć \"{}\"?"
 
-#: app/UI.py:1255
+#: app/UI.py:1246
 msgid "Clear Palette"
 msgstr "Wyczyść paletę"
 
-#: app/UI.py:1291 app/UI.py:1726
+#: app/UI.py:1282 app/UI.py:1716
 msgid "Delete Palette"
 msgstr "Usuń paletę"
 
-#: app/UI.py:1311
+#: app/UI.py:1302
 msgid "Save Palette..."
 msgstr "Zapisz paletę..."
 
-#: app/UI.py:1316 app/UI.py:1749
+#: app/UI.py:1307 app/UI.py:1739
 msgid "Save Palette As..."
 msgstr "Zapisz paletę jako..."
 
-#: app/UI.py:1327 app/UI.py:1737
+#: app/UI.py:1318 app/UI.py:1727
 msgid "Save Settings in Palettes"
 msgstr "Zapisz ustawienia palet"
 
-#: app/UI.py:1345 app/music_conf.py:205
+#: app/UI.py:1336 app/music_conf.py:205
 msgid "Music: "
 msgstr "Muzyka: "
 
-#: app/UI.py:1371
+#: app/UI.py:1362
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Użyj sugerowanego  {arr}"
 
-#: app/UI.py:1387
+#: app/UI.py:1378
 msgid "Style: "
 msgstr "Styl: "
 
-#: app/UI.py:1389
+#: app/UI.py:1380
 msgid "Voice: "
 msgstr "Głos: "
 
-#: app/UI.py:1390
+#: app/UI.py:1381
 msgid "Skybox: "
 msgstr "Skybos: "
 
-#: app/UI.py:1391
+#: app/UI.py:1382
 msgid "Elev Vid: "
 msgstr "Film w windzie: "
 
-#: app/UI.py:1409
+#: app/UI.py:1400
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "Włącz lub wyłącz poszczególne ścieżki głosowe, aby zapobiec dodaniu ich."
 
-#: app/UI.py:1512
+#: app/UI.py:1503
 msgid "All Items: "
 msgstr "Wszystkie przedmioty: "
 
-#: app/UI.py:1645
+#: app/UI.py:1635
 msgid "Export to \"{}\"..."
 msgstr "Wyeksportuj do \"{}\"..."
 
-#: app/UI.py:1673 app/backup.py:872
+#: app/UI.py:1663 app/backup.py:872
 msgid "File"
 msgstr "Plik"
 
-#: app/UI.py:1680
+#: app/UI.py:1670
 msgid "Export"
 msgstr "Wyeksportuj"
 
-#: app/UI.py:1687 app/backup.py:876
+#: app/UI.py:1677 app/backup.py:876
 msgid "Add Game"
 msgstr "Dodaj grę"
 
-#: app/UI.py:1691
+#: app/UI.py:1681
 msgid "Uninstall from Selected Game"
 msgstr "Odinstaluj z wybranej gry"
 
-#: app/UI.py:1695
+#: app/UI.py:1685
 msgid "Backup/Restore Puzzles..."
 msgstr "Kopia zapasowa i przywracanie map"
 
-#: app/UI.py:1699
+#: app/UI.py:1689
 msgid "Manage Packages..."
 msgstr "Zarządzaj paczkami..."
 
-#: app/UI.py:1704
+#: app/UI.py:1694
 msgid "Options"
 msgstr "Opcje"
 
-#: app/UI.py:1709 app/gameMan.py:1088
+#: app/UI.py:1699 app/gameMan.py:1088
 msgid "Quit"
 msgstr "Wyjdź"
 
-#: app/UI.py:1719
+#: app/UI.py:1709
 msgid "Palette"
 msgstr "Paleta"
 
-#: app/UI.py:1721
+#: app/UI.py:1711
 msgid "Clear"
 msgstr "Wyczyść"
 
-#: app/UI.py:1730
+#: app/UI.py:1720
 msgid "Fill Palette"
 msgstr "Wypełnij paletę"
 
-#: app/UI.py:1744
+#: app/UI.py:1734
 msgid "Save Palette"
 msgstr "Zapisz paletę"
 
-#: app/UI.py:1759
+#: app/UI.py:1749
 msgid "View"
 msgstr "Wyświetl"
 
-#: app/UI.py:1875
+#: app/UI.py:1863
 msgid "Palettes"
 msgstr "Palety"
 
-#: app/UI.py:1900
+#: app/UI.py:1888
 msgid "Export Options"
 msgstr "Opcje eksportu"
 
-#: app/UI.py:1932
+#: app/UI.py:1920
 msgid "Fill empty spots in the palette with random items."
 msgstr "Wypełnia puste miejsca na palecie losowymi przedmiotami."
 
@@ -1169,19 +1169,19 @@ msgstr "Portal Stories: Mel"
 msgid "Thinking With Time Machine"
 msgstr "Thinking With Time Machine"
 
-#: app/helpMenu.py:228 app/itemPropWin.py:343
+#: app/helpMenu.py:298 app/itemPropWin.py:343
 msgid "Close"
 msgstr "Zamknij"
 
-#: app/helpMenu.py:252
+#: app/helpMenu.py:322
 msgid "Help"
 msgstr "Pomoc"
 
-#: app/helpMenu.py:263
+#: app/helpMenu.py:333
 msgid "BEE2 Credits"
 msgstr "Autorzy BEE2"
 
-#: app/helpMenu.py:280
+#: app/helpMenu.py:350
 msgid "Credits..."
 msgstr "Autorzy..."
 
@@ -1204,6 +1204,10 @@ msgstr ""
 #: app/itemPropWin.py:342
 msgid "No Properties available!"
 msgstr "Brak dostępnych właściwości!"
+
+#: app/item_search.py:52
+msgid "Search:"
+msgstr ""
 
 #: app/itemconfig.py:616
 msgid "Choose a Color"
@@ -1670,26 +1674,6 @@ msgstr "Wybrane"
 msgid "Signage: {}"
 msgstr "Symbol: {}"
 
-#: app/tagsPane.py:46
-msgid "Tags"
-msgstr "Tagi"
-
-#: app/tagsPane.py:47
-msgid "Authors"
-msgstr "Autorzy"
-
-#: app/tagsPane.py:156
-msgid "Any"
-msgstr "Jakiekolwiek"
-
-#: app/tagsPane.py:165
-msgid "All"
-msgstr "Wszystkie"
-
-#: app/tagsPane.py:191
-msgid "Available Tags (click):"
-msgstr "Dostępne tagi (kliknij):"
-
 #: app/voiceEditor.py:33
 msgid "Singleplayer"
 msgstr "Tryb jednoosobowy"
@@ -1774,4 +1758,19 @@ msgstr "Bez nazwy?"
 
 #~ msgid "Coop:"
 #~ msgstr "Wyjście (tryb 2-os.)"
+
+#~ msgid "Tags"
+#~ msgstr "Tagi"
+
+#~ msgid "Authors"
+#~ msgstr "Autorzy"
+
+#~ msgid "Any"
+#~ msgstr "Jakiekolwiek"
+
+#~ msgid "All"
+#~ msgstr "Wszystkie"
+
+#~ msgid "Available Tags (click):"
+#~ msgstr "Dostępne tagi (kliknij):"
 

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-02-20 16:24+1000\n"
+"POT-Creation-Date: 2021-02-21 11:21+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -27,7 +27,7 @@ msgstr "バージョン："
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: app/tagsPane.py:48 loadScreen.py:211
+#: loadScreen.py:211
 msgid "Packages"
 msgstr ""
 
@@ -106,7 +106,7 @@ msgid ""
 " change."
 msgstr ""
 
-#: app/CompilerPane.py:320 app/UI.py:642
+#: app/CompilerPane.py:320 app/UI.py:626
 msgid "Random"
 msgstr "ランダム"
 
@@ -387,35 +387,35 @@ msgid "Style: {}"
 msgid_plural "Styles: {}"
 msgstr[0] ""
 
-#: app/StyleVarPane.py:226
+#: app/StyleVarPane.py:229
 msgid "Style/Item Properties"
 msgstr ""
 
-#: app/StyleVarPane.py:245
+#: app/StyleVarPane.py:248
 msgid "Styles"
 msgstr ""
 
-#: app/StyleVarPane.py:264
+#: app/StyleVarPane.py:267
 msgid "All:"
 msgstr "全："
 
-#: app/StyleVarPane.py:267
+#: app/StyleVarPane.py:270
 msgid "Selected Style:"
 msgstr ""
 
-#: app/StyleVarPane.py:275
+#: app/StyleVarPane.py:278
 msgid "Other Styles:"
 msgstr ""
 
-#: app/StyleVarPane.py:280
+#: app/StyleVarPane.py:283
 msgid "No Options!"
 msgstr "オプションありません！"
 
-#: app/StyleVarPane.py:286
+#: app/StyleVarPane.py:289
 msgid "None!"
 msgstr "なし！"
 
-#: app/StyleVarPane.py:357
+#: app/StyleVarPane.py:358
 msgid "Items"
 msgstr ""
 
@@ -423,34 +423,34 @@ msgstr ""
 msgid "Hide/Show the \"{}\" window."
 msgstr ""
 
-#: app/UI.py:70
+#: app/UI.py:72
 msgid "Export..."
 msgstr ""
 
-#: app/UI.py:576
+#: app/UI.py:560
 msgid "Select Skyboxes"
 msgstr ""
 
-#: app/UI.py:577
+#: app/UI.py:561
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers)."
 msgstr ""
 
-#: app/UI.py:585
+#: app/UI.py:569
 msgid "3D Skybox"
 msgstr ""
 
-#: app/UI.py:586
+#: app/UI.py:570
 msgid "Fog Color"
 msgstr ""
 
-#: app/UI.py:593
+#: app/UI.py:577
 msgid "Select Additional Voice Lines"
 msgstr ""
 
-#: app/UI.py:594
+#: app/UI.py:578
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -458,31 +458,31 @@ msgid ""
 "Style Properties."
 msgstr ""
 
-#: app/UI.py:599
+#: app/UI.py:583
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr ""
 
-#: app/UI.py:601
+#: app/UI.py:585
 msgid "<Multiverse Cave only>"
 msgstr ""
 
-#: app/UI.py:605
+#: app/UI.py:589
 msgid "Characters"
 msgstr "キャラクター"
 
-#: app/UI.py:606
+#: app/UI.py:590
 msgid "Turret Shoot Monitor"
 msgstr ""
 
-#: app/UI.py:607
+#: app/UI.py:591
 msgid "Monitor Visuals"
 msgstr ""
 
-#: app/UI.py:614
+#: app/UI.py:598
 msgid "Select Style"
 msgstr ""
 
-#: app/UI.py:615
+#: app/UI.py:599
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -491,38 +491,38 @@ msgid ""
 "The style broadly defines the time period a chamber is set in."
 msgstr ""
 
-#: app/UI.py:626
+#: app/UI.py:610
 msgid "Elevator Videos"
 msgstr "エレベータービデオ"
 
-#: app/UI.py:633
+#: app/UI.py:617
 msgid "Select Elevator Video"
 msgstr ""
 
-#: app/UI.py:634
+#: app/UI.py:618
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
 "will be selected each time the map is played, like in the default PeTI."
 msgstr ""
 
-#: app/UI.py:638
+#: app/UI.py:622
 msgid "This style does not have a elevator video screen."
 msgstr ""
 
-#: app/UI.py:643
+#: app/UI.py:627
 msgid "Choose a random video."
 msgstr ""
 
-#: app/UI.py:647
+#: app/UI.py:631
 msgid "Multiple Orientations"
 msgstr ""
 
-#: app/UI.py:875
+#: app/UI.py:859
 msgid "Selected Items and Style successfully exported!"
 msgstr ""
 
-#: app/UI.py:877
+#: app/UI.py:861
 msgid ""
 "\n"
 "\n"
@@ -530,145 +530,145 @@ msgid ""
 "editor wall previews are changed."
 msgstr ""
 
-#: app/UI.py:1109
+#: app/UI.py:1093
 msgid "Delete Palette \"{}\""
 msgstr ""
 
-#: app/UI.py:1185
+#: app/UI.py:1176
 msgid "BEE2 - Save Palette"
 msgstr ""
 
-#: app/UI.py:1186
+#: app/UI.py:1177
 msgid "Enter a name:"
 msgstr ""
 
-#: app/UI.py:1195
+#: app/UI.py:1186
 msgid "This palette already exists. Overwrite?"
 msgstr ""
 
-#: app/UI.py:1227 app/gameMan.py:1340
+#: app/UI.py:1218 app/gameMan.py:1340
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr ""
 
-#: app/UI.py:1255
+#: app/UI.py:1246
 msgid "Clear Palette"
 msgstr ""
 
-#: app/UI.py:1291 app/UI.py:1726
+#: app/UI.py:1282 app/UI.py:1716
 msgid "Delete Palette"
 msgstr ""
 
-#: app/UI.py:1311
+#: app/UI.py:1302
 msgid "Save Palette..."
 msgstr ""
 
-#: app/UI.py:1316 app/UI.py:1749
+#: app/UI.py:1307 app/UI.py:1739
 msgid "Save Palette As..."
 msgstr ""
 
-#: app/UI.py:1327 app/UI.py:1737
+#: app/UI.py:1318 app/UI.py:1727
 msgid "Save Settings in Palettes"
 msgstr ""
 
-#: app/UI.py:1345 app/music_conf.py:205
+#: app/UI.py:1336 app/music_conf.py:205
 msgid "Music: "
 msgstr "音楽："
 
-#: app/UI.py:1371
+#: app/UI.py:1362
 msgid "{arr} Use Suggested {arr}"
 msgstr ""
 
-#: app/UI.py:1387
+#: app/UI.py:1378
 msgid "Style: "
 msgstr ""
 
-#: app/UI.py:1389
+#: app/UI.py:1380
 msgid "Voice: "
 msgstr ""
 
-#: app/UI.py:1390
+#: app/UI.py:1381
 msgid "Skybox: "
 msgstr ""
 
-#: app/UI.py:1391
+#: app/UI.py:1382
 msgid "Elev Vid: "
 msgstr "エレベータービデオ："
 
-#: app/UI.py:1409
+#: app/UI.py:1400
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr ""
 
-#: app/UI.py:1512
+#: app/UI.py:1503
 msgid "All Items: "
 msgstr ""
 
-#: app/UI.py:1645
+#: app/UI.py:1635
 msgid "Export to \"{}\"..."
 msgstr ""
 
-#: app/UI.py:1673 app/backup.py:872
+#: app/UI.py:1663 app/backup.py:872
 msgid "File"
 msgstr "ファイル"
 
-#: app/UI.py:1680
+#: app/UI.py:1670
 msgid "Export"
 msgstr ""
 
-#: app/UI.py:1687 app/backup.py:876
+#: app/UI.py:1677 app/backup.py:876
 msgid "Add Game"
 msgstr ""
 
-#: app/UI.py:1691
+#: app/UI.py:1681
 msgid "Uninstall from Selected Game"
 msgstr ""
 
-#: app/UI.py:1695
+#: app/UI.py:1685
 msgid "Backup/Restore Puzzles..."
 msgstr ""
 
-#: app/UI.py:1699
+#: app/UI.py:1689
 msgid "Manage Packages..."
 msgstr ""
 
-#: app/UI.py:1704
+#: app/UI.py:1694
 msgid "Options"
 msgstr "環境設定"
 
-#: app/UI.py:1709 app/gameMan.py:1088
+#: app/UI.py:1699 app/gameMan.py:1088
 msgid "Quit"
 msgstr "終了"
 
-#: app/UI.py:1719
+#: app/UI.py:1709
 msgid "Palette"
 msgstr ""
 
-#: app/UI.py:1721
+#: app/UI.py:1711
 msgid "Clear"
 msgstr ""
 
-#: app/UI.py:1730
+#: app/UI.py:1720
 msgid "Fill Palette"
 msgstr ""
 
-#: app/UI.py:1744
+#: app/UI.py:1734
 msgid "Save Palette"
 msgstr ""
 
-#: app/UI.py:1759
+#: app/UI.py:1749
 msgid "View"
 msgstr ""
 
-#: app/UI.py:1875
+#: app/UI.py:1863
 msgid "Palettes"
 msgstr ""
 
-#: app/UI.py:1900
+#: app/UI.py:1888
 msgid "Export Options"
 msgstr ""
 
-#: app/UI.py:1932
+#: app/UI.py:1920
 msgid "Fill empty spots in the palette with random items."
 msgstr ""
 
@@ -1053,19 +1053,19 @@ msgstr "Portal Stories: Mel"
 msgid "Thinking With Time Machine"
 msgstr "Thinking With Time Machine"
 
-#: app/helpMenu.py:228 app/itemPropWin.py:343
+#: app/helpMenu.py:298 app/itemPropWin.py:343
 msgid "Close"
 msgstr "閉じる"
 
-#: app/helpMenu.py:252
+#: app/helpMenu.py:322
 msgid "Help"
 msgstr "ヘルプ"
 
-#: app/helpMenu.py:263
+#: app/helpMenu.py:333
 msgid "BEE2 Credits"
 msgstr "BEE2のクレジット"
 
-#: app/helpMenu.py:280
+#: app/helpMenu.py:350
 msgid "Credits..."
 msgstr "クレジット。。。"
 
@@ -1085,6 +1085,10 @@ msgstr ""
 
 #: app/itemPropWin.py:342
 msgid "No Properties available!"
+msgstr ""
+
+#: app/item_search.py:52
+msgid "Search:"
 msgstr ""
 
 #: app/itemconfig.py:616
@@ -1514,26 +1518,6 @@ msgstr ""
 msgid "Signage: {}"
 msgstr ""
 
-#: app/tagsPane.py:46
-msgid "Tags"
-msgstr "付箋"
-
-#: app/tagsPane.py:47
-msgid "Authors"
-msgstr ""
-
-#: app/tagsPane.py:156
-msgid "Any"
-msgstr "選ぶ"
-
-#: app/tagsPane.py:165
-msgid "All"
-msgstr "全て"
-
-#: app/tagsPane.py:191
-msgid "Available Tags (click):"
-msgstr ""
-
 #: app/voiceEditor.py:33
 msgid "Singleplayer"
 msgstr ""
@@ -1752,4 +1736,19 @@ msgstr "名前ありません？"
 
 #~ msgid "Coop:"
 #~ msgstr "生協出口："
+
+#~ msgid "Tags"
+#~ msgstr "付箋"
+
+#~ msgid "Authors"
+#~ msgstr ""
+
+#~ msgid "Any"
+#~ msgstr "選ぶ"
+
+#~ msgid "All"
+#~ msgstr "全て"
+
+#~ msgid "Available Tags (click):"
+#~ msgstr ""
 
