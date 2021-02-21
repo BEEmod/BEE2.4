@@ -112,7 +112,7 @@ class Item:
         )
         # If the last-selected value doesn't exist, fallback to the default.
         if self.selected_ver not in item.versions:
-            LOGGER.warning('Version ID {} is not valid for item {}', self.selected_version, item.id)
+            LOGGER.warning('Version ID {} is not valid for item {}', self.selected_ver, item.id)
             self.selected_ver = item.def_ver.id
 
         self.item = item
