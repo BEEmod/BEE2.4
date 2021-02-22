@@ -105,8 +105,9 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
     des_axis = res['axis', 'z'].casefold()
     reverse = res.bool('reversed')
     door_type = res['classname', 'func_door_rotating']
+    orient = round(Matrix.from_angle(Angle.from_str(ent['angles'])), 6)
 
-    axis = Vec.with_axes(des_axis, 1).rotate_by_str(ent['angles', '0 0 0'])
+    axis = Vec.with_axes(des_axis, 1) @ orient
 
     if axis.x > 0 or axis.y > 0 or axis.z > 0:
         # If it points forward, we need to reverse the rotating door
@@ -126,7 +127,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
         # Generate a brush.
         name = conditions.local_name(ent, res['name', ''])
 
-        pos = res.vec('Pos').rotate_by_str(ent['angles', '0 0 0'])
+        pos = res.vec('Pos') @ Angle.from_str(ent['angles', '0 0 0'])
         pos += Vec.from_str(ent['origin', '0 0 0'])
         setter_loc = str(pos)
 
@@ -901,14 +902,14 @@ def res_add_placement_helper(inst: Entity, res: Property):
     the helper should be added to. If `upDir` is specified, this is the
     direction of the top of the portal.
     """
-    angles = Vec.from_str(inst['angles'])
+    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
     pos = conditions.resolve_offset(inst, res['offset', '0 0 0'], zoff=-64)
-    normal = res.vec('normal', 0, 0, 1).rotate(*angles)
+    normal = res.vec('normal', 0, 0, 1) @ orient
 
     up_dir: Optional[Vec]
     try:
-        up_dir = Vec.from_str(res['upDir']).rotate(*angles)
+        up_dir = Vec.from_str(res['upDir']) @ orient
     except LookupError:
         up_dir = None
 
@@ -1027,7 +1028,8 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
 
 def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     """Implements SetPanelOptions and CreatePanel."""
-    normal = props.vec('normal', 0, 0, 1).rotate_by_str(inst['angles'])
+    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    normal: Vec = round(props.vec('normal', 0, 0, 1) @ orient, 6)
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
 
@@ -1045,7 +1047,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     else:
         # Default to the full tile.
         points.update({
-            (Vec(u, v, -64.0).rotate_by_str(inst['angles']) + origin).as_tuple()
+            (Vec(u, v, -64.0) @ orient + origin).as_tuple()
             for u in [-48.0, -16.0, 16.0, 48.0]
             for v in [-48.0, -16.0, 16.0, 48.0]
         })
@@ -1073,7 +1075,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         if bevel_prop.has_children():
             # Individually specifying offsets.
             for bevel_str in bevel_prop.as_array():
-                bevel_point = Vec.from_str(bevel_str).rotate_by_str(inst['angles']) + origin
+                bevel_point = Vec.from_str(bevel_str) @ orient + origin
                 bevel_world.add((int(bevel_point[uaxis]), int(bevel_point[vaxis])))
         elif srctools.conv_bool(bevel_prop.value):
             # Fill the bounding box.
@@ -1218,22 +1220,22 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
 
 def _fill_norm_rotations() -> Dict[
     Tuple[Tuple[float, float, float], Tuple[float, float, float]],
-    Tuple[float, float, float]
+    Matrix,
 ]:
     """Given a norm->norm rotation, return the angles producing that."""
     rotations = {}
     for norm_ax in 'xyz':
         for norm_mag in [-1, +1]:
             norm = Vec.with_axes(norm_ax, norm_mag)
-            for angle_ax in 'xyz':
+            for angle_ax in ('pitch', 'yaw', 'roll'):
                 for angle_mag in (-90, 90):
-                    angle = Vec.with_axes(angle_ax, angle_mag)
-                    new_norm = norm.copy().rotate(*angle)
+                    angle = Matrix.from_angle(Angle.with_axes(angle_ax, angle_mag))
+                    new_norm = norm @ angle
                     if new_norm != norm:
-                        rotations[tuple(norm), tuple(new_norm)] = angle.as_tuple()
+                        rotations[norm.as_tuple(), new_norm.as_tuple()] = angle
             # Assign a null rotation as well.
-            rotations[tuple(norm), tuple(norm)] = (0.0, 0.0, 0.0)
-            rotations[tuple(norm), tuple(-norm)] = (0.0, 0.0, 0.0)
+            rotations[norm.as_tuple(), norm.as_tuple()] = Matrix()
+            rotations[norm.as_tuple(), (-norm).as_tuple()] = Matrix()
     return rotations
 
 
@@ -1246,8 +1248,9 @@ def res_transfer_bullseye(inst: Entity, props: Property):
     """Transfer catapult targets and placement helpers from one tile to another."""
     start_pos = conditions.resolve_offset(inst, props['start_pos', ''])
     end_pos = conditions.resolve_offset(inst, props['end_pos', ''])
-    start_norm = props.vec('start_norm', 0, 0, 1).rotate_by_str(inst['angles'])
-    end_norm = props.vec('end_norm', 0, 0, 1).rotate_by_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
+    start_norm = props.vec('start_norm', 0, 0, 1) @ angles
+    end_norm = props.vec('end_norm', 0, 0, 1) @ angles
 
     try:
         start_tile = tiling.TILES[
@@ -1274,10 +1277,10 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         # intent is.
         if Vec.dot(start_norm, end_norm) != -1.0:
             # Use the dict to compute the rotation to apply.
-            orient.rotate(*NORM_ROTATIONS[
+            orient @= NORM_ROTATIONS[
                 start_norm.as_tuple(),
                 end_norm.as_tuple()
-            ])
+            ]
         end_tile.add_portal_helper(orient)
     elif start_tile.has_portal_helper:
         # Non-oriented, don't orient.
@@ -1291,5 +1294,3 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         for plate in faithplate.PLATES.values():
             if getattr(plate, 'target', None) is start_tile:
                 plate.target = end_tile
-
-
