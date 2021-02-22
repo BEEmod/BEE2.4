@@ -1672,7 +1672,7 @@ class Item:
             # Special case - single full voxel has no surface sections.
             if len(voxels) != 1 or voxels[0].subpos is not None or voxels[0].normal is not None:
                 for voxel in voxels:
-                    f.write('\t\t\t\t"Voxel"\n')
+                    f.write('\t\t\t\t"Surface"\n')
                     f.write('\t\t\t\t\t{\n')
                     if voxel.subpos is not None and voxel.normal is not None:
                         f.write(f'\t\t\t\t\t"Pos"    "{voxel.subpos}"\n')
