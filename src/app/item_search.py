@@ -26,16 +26,23 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
 
     def on_type(*args):
         """Re-search whenever text is typed."""
-        text = search_var.get()
+        text = search_var.get().casefold()
         words = text.split()
         if not words:
             refresh_cback(None)
             return
 
         found: Set[Tuple[str, int]] = set()
+        *words, last = words
         for word in words:
-            for name in database.iterkeys(word):
-                found |= word_to_ids[name]
+            try:
+                found |= word_to_ids[word]
+            except KeyError:
+                pass
+        if last:
+            for match in database.iterkeys(last):
+                found |= word_to_ids[match]
+
         # Calling the callback deselects us, so save and restore.
         insert = searchbar.index('insert')
         refresh_cback(found)
