@@ -6,7 +6,7 @@ import os
 from collections import defaultdict
 
 import srctools
-from app import tkMarkdown
+from app import tkMarkdown, img
 import utils
 from app.packageMan import PACK_CONFIG
 from loadScreen import LoadScreen
@@ -138,7 +138,7 @@ class ExportData(NamedTuple):
 class CorrDesc(NamedTuple):
     """Name, description and icon for each corridor in a style."""
     name: str
-    icon: str
+    icon: 'PackagePath'
     desc: str
 
 
@@ -197,8 +197,11 @@ class PackagePath:
         else:
             return cls(def_package, uri)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return f'{self.package}:{self.path}'
+
+    def __repr__(self) -> str:
+        return f'PackagePath({self.package!r}, {self.path!r})'
 
     def __hash__(self) -> int:
         return hash((self.package, self.path))
@@ -762,14 +765,14 @@ class Style(PakObject):
         self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
         self.has_video = has_video
         self.vpk_name = vpk_name
-        self.corridors = {}
+        self.corridors: Dict[Tuple[str, int], CorrDesc] = {}
 
         for group, length in CORRIDOR_COUNTS.items():
             for i in range(1, length + 1):
                 try:
                     self.corridors[group, i] = corridors[group, i]
                 except KeyError:
-                    self.corridors[group, i] = CorrDesc('', '', '')
+                    self.corridors[group, i] = CorrDesc('', PackagePath('alpha', ''), '')
 
         if config is None:
             self.config = Property(None, [])
@@ -781,8 +784,7 @@ class Style(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse a style definition."""
-        info = data.info  # type: Property
-        filesystem = data.fsys  # type: FileSystem
+        info = data.info
         selitem_data = SelitemData.parse(info)
         base = info['base', '']
         has_video = srctools.conv_bool(
@@ -819,13 +821,9 @@ class Style(PakObject):
                 prop = group_prop.find_key(str(i), '')  # type: Property
 
                 if icon_folder:
-                    icon = '{}/{}/{}.jpg'.format(icon_folder, group, i)
-                    # If this doesn't actually exist, don't use this.
-                    if 'resources/bee2/corr/' + icon not in data.fsys:
-                        LOGGER.debug('No "resources/bee2/{}"!', icon)
-                        icon = ''
+                    icon = PackagePath(data.pak_id, '{}/{}/{}.jpg'.format(icon_folder, group, i))
                 else:
-                    icon = ''
+                    icon = img.BLANK
 
                 if prop.has_children():
                     corridors[group, i] = CorrDesc(
@@ -854,11 +852,11 @@ class Style(PakObject):
             else:
                 raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
-            with filesystem:
-                with filesystem[folder + '/items.txt'].open_str() as f:
+            with data.fsys:
+                with data.fsys[folder + '/items.txt'].open_str() as f:
                     items, renderables = EditorItem.parse(f)
                 try:
-                    vbsp = filesystem.read_prop(folder + '/vbsp_config.cfg')
+                    vbsp = data.fsys.read_prop(folder + '/vbsp_config.cfg')
                 except FileNotFoundError:
                     vbsp = None
 

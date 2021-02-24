@@ -15,7 +15,7 @@ from app import selector_win, TK_ROOT
 from app import tkMarkdown, SubPane, img
 import utils
 from BEE2_config import ConfigFile, option_handler
-from packages import CORRIDOR_COUNTS, CorrDesc
+from packages import CORRIDOR_COUNTS, CorrDesc, PackagePath
 from srctools import Property, AtomicWriter
 from srctools.logger import get_logger
 from app.tk_tools import FileField
@@ -236,7 +236,7 @@ def load_corridors() -> None:
         for i in range(1, length + 1):
             config[group, i] = CorrDesc(
                 name=corridor_conf.get('{}_{}_name'.format(group, i), ''),
-                icon=corridor_conf.get('{}_{}_icon'.format(group, i), ''),
+                icon=PackagePath.parse(corridor_conf.get('{}_{}_icon'.format(group, i), 'special:error'), 'special'),
                 desc=corridor_conf.get('{}_{}_desc'.format(group, i), ''),
             )
     set_corridors(config)
@@ -262,22 +262,20 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
 
             corridor_conf['{}_{}_name'.format(group, ind)] = data.name
             corridor_conf['{}_{}_desc'.format(group, ind)] = data.desc
-            corridor_conf['{}_{}_icon'.format(group, ind)] = data.icon
+            corridor_conf['{}_{}_icon'.format(group, ind)] = str(data.icon)
 
             # Note: default corridor description
             desc = data.name or _('Corridor')
             item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
 
             if data.icon:
-                item.large_icon = img.png(
-                    'corr/' + data.icon,
-                    resize_to=selector_win.ICON_SIZE_LRG,
-                    error=default_icon,
+                item.large_icon = img.Handle.parse_uri(
+                    data.icon,
+                    *selector_win.ICON_SIZE_LRG,
                 )
-                item.icon = img.png(
-                    'corr/' + data.icon,
-                    resize_to=selector_win.ICON_SIZE,
-                    error=default_icon,
+                item.large_icon = img.Handle.parse_uri(
+                    data.icon,
+                    *selector_win.ICON_SIZE,
                 )
             else:
                 item.icon = item.large_icon = default_icon
@@ -720,7 +718,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
-        img.png('icons/tool_sub', resize_to=16),
+        img.Handle.builtin('icons/tool_sub', 16, 16),
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
@@ -888,7 +886,7 @@ def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
         resize_x=True,
         resize_y=False,
         tool_frame=tool_frame,
-        tool_img=img.png('icons/win_compiler'),
+        tool_img=img.Handle.builtin('icons/win_compiler', 16, 16),
         tool_col=4,
     )
     window.columnconfigure(0, weight=1)
