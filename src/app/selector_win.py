@@ -23,13 +23,11 @@ from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, optionWindow
+from consts import SEL_ICON_SIZE as ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
 import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-ICON_SIZE = 96  # Size of the selector win icons
-ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.
 ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
 ITEM_HEIGHT = ICON_SIZE + 51
 
