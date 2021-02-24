@@ -6,25 +6,36 @@ it could get deleted, which will make the rendered image vanish.
 
 from PIL import ImageTk, Image, ImageDraw
 import os
+import tkinter as tk
+from tkinter import ttk
 
-from srctools import Vec
+from srctools import Vec, Property
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
+from packages import PackagePath, PACKAGE_SYS
 import srctools.logger
 import logging
 import utils
 
-from typing import Iterable, Union, Dict, Tuple
+from typing import (
+    Iterable, Union, Dict, Tuple, Callable, Optional, TypeVar,
+    Generic, Hashable,
+)
 
+# These are both valid TK image types.
+tkImage = Union[ImageTk.PhotoImage, tk.PhotoImage]
+# Widgets with an image attribute that can be set.
+tkImgWidgets = Union[tk.Label, ttk.Label]
+
+ArgT = TypeVar('ArgT', bound=Hashable)
+
+# Used to deduplicate handles.
+_handles: Dict[tuple, 'Handle'] = {}
 LOGGER = srctools.logger.get_logger('img')
-
 cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
 cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
-
-filesystem = FileSystemChain(
-    # Highest priority is the in-built UI images.
-    RawFileSystem(str(utils.install_path('images'))),
-)
+FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
+FSYS_BUILTIN.open_ref()
 
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
@@ -32,8 +43,9 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 
 def load_filesystems(systems: Iterable[FileSystem]):
     """Load in the filesystems used in packages."""
-    for sys in systems:
-        filesystem.add_sys(sys, 'resources/BEE2/')
+    raise NotImplementedError
+    # for sys in systems:
+    #     filesystem.add_sys(sys, 'resources/BEE2/')
 
 
 def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
@@ -49,6 +61,154 @@ def color_hex(color: Vec) -> str:
     return '#{:2X}{:2X}{:2X}'.format(int(r), int(g), int(b))
 
 
+class ImageType(Generic[ArgT]):
+    """Represents a kind of image that can be loaded or generated.
+
+    This contains callables for generating a PIL or TK image from a specified
+    arg type, width and height.
+    """
+    def __init__(
+        self,
+        name: str,
+        pil_func: Callable[[ArgT, int, int], Image.Image],
+        tk_func: Optional[Callable[[ArgT, int, int], tkImage]]=None,
+    ) -> None:
+        self.name = name
+        self.pil_func = pil_func
+        self.tk_func = tk_func
+
+    def __repr__(self) -> str:
+        return f'<ImageType "{self.name}">'
+
+
+def _pil_from_color(color: Tuple[int, int, int], width: int, height: int) -> Image.Image:
+    """Directly produce an image of this size with the specified color."""
+    return Image.new('RGB', (width, height), color)
+
+
+def _tk_from_color(color: Tuple[int, int, int], width: int, height: int) -> tkImage:
+    """Directly produce an image of this size with the specified color."""
+    r, g, b = color
+    img = tk.PhotoImage(width=width, height=height)
+    img.put(f'#{r:2X}{g:2X}{b:2X}', to=(0, 0, width, height))
+    return img
+
+
+def _pil_from_file(uri: PackagePath, width: int, height: int) -> Image.Image:
+    if uri.package == 'bee2':
+        fsys = FSYS_BUILTIN
+    else:
+        try:
+            fsys = PACKAGE_SYS[uri.package]
+        except KeyError:
+            LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
+            return _pil_from_color((0, 0, 0), width, height)
+            # TODO: return error or img_error
+
+    path = uri.path.casefold()
+    if path[-4:-3] != '.':
+        path += ".png"
+
+    image: Image.Image
+    with fsys:
+        try:
+            img_file = fsys[path]
+        except (KeyError, FileNotFoundError):
+            LOGGER.warning('ERROR: "{}" does not exist!', uri)
+            return _pil_from_color((0, 0, 0), width, height)
+            # TODO: return error or img_error
+        with img_file.open_bin() as file:
+            image = Image.open(file)
+            image.load()
+
+    if (width, height) != image.size:
+        image = image.resize((width, height))
+    return image
+
+
+def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: int) -> Image.Image:
+    """Combine several images into one."""
+    img = Image.new('RGB', (width, height))
+    for part in components:
+        img.paste(part.type.pil_func(part.arg, width, height))
+    return img
+
+
+TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
+TYP_FILE = ImageType('file', _pil_from_file)
+TYP_COMP = ImageType('composite', _pil_from_composite)
+
+
+class Handle(Generic[ArgT]):
+    """Represents an image that may be reloaded as required.
+
+    The args are dependent on the type, and are used to create the image
+    in a background thread.
+    """
+    _cached_pil: Optional[Image.Image]
+    _cached_tk: Optional[tkImage]
+    def __init__(
+        self,
+        typ: ImageType[ArgT],
+        args: ArgT,
+        width: int,
+        height: int,
+    ) -> None:
+        """Internal use only."""
+        self.type = typ
+        self.arg = args
+        self.width = width
+        self.height = height
+
+        self._cached_pil: Optional[Image.Image] = None
+        self._cached_tk: Optional[tkImage] = None
+
+    @classmethod
+    def parse(cls, prop: Property, pack: str, width: int, height: int) -> 'Handle':
+        """Parse a property into an image handle.
+
+        If a package isn't specified, the given package will be used.
+        """
+        if prop.has_children():
+            raise NotImplementedError('Composite images.')
+        uri = PackagePath.parse(prop.value, pack)
+        if uri.package in ('color', 'colour', 'rgb'):
+            # color:RGB or color:RRGGBB
+            try:
+                if len(uri.path) == 3:
+                    r = int(uri.path[0], 16)
+                    g = int(uri.path[1], 16)
+                    b = int(uri.path[2], 16)
+                elif len(uri.path) == 6:
+                    r = int(uri.path[0:2], 16)
+                    g = int(uri.path[2:4], 16)
+                    b = int(uri.path[4:6], 16)
+                else:
+                    raise ValueError
+            except (ValueError, TypeError, OverflowError):
+                raise ValueError('Colors must be RGB or RRGGBB hex values!') from None
+            typ = TYP_COLOR
+            args = (r, g, b)
+        else: # File item
+            typ = TYP_FILE
+            args = uri
+        try:
+            return _handles[typ, args, width, height]
+        except KeyError:
+            h = _handles[typ, args, width, height] = Handle(typ, args, width, height)
+            return h
+
+
+def apply(widget: tkImgWidgets, img: Optional[Handle]) -> None:
+    """Set the image in a widget.
+
+    If the image is None, it is instead unset. This tracks the widget,
+    so later reloads will affect the widget.
+    TODO: Loading will happen in the background.
+    """
+
+
+
 def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
@@ -60,37 +220,7 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     - This caches images, so it won't be deleted (Tk doesn't keep a reference
       to the Python object), and subsequent calls don't touch the hard disk.
     """
-    path = path.casefold().replace('\\', '/')
-    if path[-4:-3] != '.':
-        path += ".png"
-
-    orig_path = path
-
-    resize_width, resize_height = resize_to = tuple_size(resize_to)
-
-    try:
-        return cached_img[path, resize_width, resize_height]
-    except KeyError:
-        pass
-
-    with filesystem:
-        try:
-            img_file = filesystem[path]
-        except (KeyError, FileNotFoundError):
-            LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
-            return error or img_error
-        with img_file.open_bin() as file:
-            image = Image.open(file)  # type: Image.Image
-            image.load()
-
-    if resize_to != (0, 0) and resize_to != image.size:
-        image = image.resize(resize_to, algo)
-        # image.save(img_file._data.sys._resolve_path(img_file._data.path))
-
-    tk_img = ImageTk.PhotoImage(image=image)
-
-    cached_img[orig_path, resize_width, resize_height] = tk_img
-    return tk_img
+    raise NotImplementedError
 
 
 def spr(name, error=None):
