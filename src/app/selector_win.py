@@ -13,7 +13,10 @@ from operator import itemgetter
 from enum import Enum
 import functools
 import math
-from typing import NamedTuple, Optional, List, Dict, Union, Iterable, Mapping
+from typing import (
+    NamedTuple, Optional, List, Dict, Union, Iterable, Mapping,
+    Tuple,
+)
 
 from app.richTextBox import tkRichText
 from app.tkMarkdown import MarkdownData
@@ -22,7 +25,7 @@ from packages import SelitemData
 from srctools import Vec, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, optionWindow
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 from consts import SEL_ICON_SIZE as ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
 import utils
 
@@ -32,12 +35,12 @@ ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
 ITEM_HEIGHT = ICON_SIZE + 51
 
 # The larger error icons used if an image is not found
-err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
-err_icon_lrg = img.png('BEE2/error_96', resize_to=ICON_SIZE_LRG)
+err_icon = img.Handle.error(ICON_SIZE, ICON_SIZE)
+err_icon_lrg = img.Handle.error(*ICON_SIZE_LRG)
 
 # The two icons used for boolean item attributes
-ICON_CHECK = img.png('icons/check')
-ICON_CROSS = img.png('icons/cross')
+ICON_CHECK = img.Handle.builtin('icons/check', 16, 16)
+ICON_CROSS = img.Handle.builtin('icons/cross', 16, 16)
 
 # Arrows used to indicate the state of the group - collapsed or expanded
 GRP_COLL = '◁'
@@ -205,21 +208,6 @@ class GroupHeader(ttk.Frame):
         )
 
 
-def get_icon(icon, size, err_icon):
-    if icon is None:
-        # Unset.
-        return None
-    elif icon == '<black>':
-        return img.color_square(Vec(), size)
-    else:
-        return img.png(
-            icon,
-            error=err_icon,
-            resize_to=size,
-            algo=img.Image.LANCZOS,
-        )
-
-
 class Item:
     """An item on the panel.
 
@@ -265,8 +253,8 @@ class Item:
         name,
         short_name: str,
         long_name: Optional[str] = None,
-        icon=None,
-        large_icon: Optional[str] = None,
+        icon: Optional[img.Handle]=None,
+        large_icon: Optional[img.Handle] = None,
         authors: Iterable[str]=(),
         desc: Union[MarkdownData, str] = MarkdownData(),
         group: str = '',
@@ -285,10 +273,10 @@ class Item:
             self._context_lbl = self.longName
 
         if icon is not None:
-            self.icon = get_icon(icon, ICON_SIZE, err_icon)
+            self.icon = icon
         else:
-            self.icon = img.color_square(img.PETI_ITEM_BG, ICON_SIZE)
-        self.large_icon = get_icon(large_icon, ICON_SIZE_LRG, err_icon_lrg)
+            self.icon = img.Handle.color(img.PETI_ITEM_BG, ICON_SIZE, ICON_SIZE)
+        self.large_icon = large_icon
 
         if isinstance(desc, str):
             self.desc = tkMarkdown.convert(desc)
@@ -398,7 +386,7 @@ class selWin:
         # i18n: 'None' item description
         none_desc=_('Do not add anything.'),
         none_attrs=EmptyMapping,
-        none_icon='BEE2/none_96.png',
+        none_icon: img.Handle=img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
         # i18n: 'None' item name.
         none_name=_("<None>"),
         title='BEE2',
@@ -406,7 +394,7 @@ class selWin:
         readonly_desc='',
         callback=None,
         callback_params=(),
-        attributes=()
+        attributes: Iterable[AttrDef]=(),
     ):
         """Create a window object.
 
@@ -538,6 +526,8 @@ class selWin:
                 # initial window size.
             )
             self.desc_label.grid(row=0, column=0, sticky='EW')
+        else:
+            self.desc_label = None
 
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = PanedWindow(
@@ -593,7 +583,7 @@ class selWin:
         self.prop_frm.columnconfigure(1, weight=1)
 
         # Border around the selected item icon.
-        width, height = img.tuple_size(ICON_SIZE_LRG)
+        width, height = ICON_SIZE_LRG
         self.prop_icon_frm = ttk.Frame(
             self.prop_frm,
             borderwidth=4,
@@ -603,11 +593,10 @@ class selWin:
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
-        self.prop_icon = ttk.Label(
-            self.prop_icon_frm,
-            image=img.color_square(img.PETI_ITEM_BG, ICON_SIZE_LRG),
-        )
+        self.prop_icon = ttk.Label(self.prop_icon_frm)
+        img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
         self.prop_icon.grid(row=0, column=0)
+        self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
 
         name_frame = ttk.Frame(self.prop_frm)
 
@@ -777,16 +766,13 @@ class selWin:
                 val_label.type = attr.type
                 if attr.type is AttrTypes.BOOL:
                     # It's a tick/cross label
-                    val_label['image'] = (
-                        ICON_CHECK
-                        if attr.default else
-                        ICON_CROSS,
-                    )
+                    if attr.default:
+                        img.apply(val_label, ICON_CHECK)
+                    else:
+                        img.apply(val_label, ICON_CROSS)
                 elif attr.type is AttrTypes.COLOR:
                     # A small colour swatch.
-                    val_label.configure(
-                        relief=RAISED,
-                    )
+                    val_label.configure(relief=RAISED)
                     # Show the color value when hovered.
                     add_tooltip(val_label)
 
@@ -802,7 +788,7 @@ class selWin:
                     sticky=W,
                 )
         else:
-            self.attr = self.desc_label = None
+            self.attr = None
 
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
@@ -893,18 +879,15 @@ class selWin:
 
             if item.button is None:  # New, create the button widget.
                 if item is self.noneItem:
-                    item.button = ttk.Button(
-                        self.pal_frame,
-                        image=item.icon,
-                    )
+                    item.button = ttk.Button(self.pal_frame)
                     item.context_lbl = item.context_lbl
                 else:
                     item.button = ttk.Button(
                         self.pal_frame,
                         text=item.shortName,
-                        image=item.icon,
                         compound='top',
                     )
+                img.apply(item.button, item.icon)
 
                 @utils.bind_leftclick(item.button)
                 def click_item(event=None, *, _self=self, _item=item):
@@ -1086,6 +1069,7 @@ class selWin:
 
     def sel_item(self, item: Item, event: Event = None) -> None:
         """Select the specified item."""
+        from app.optionWindow import DEV_MODE
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -1095,17 +1079,13 @@ class selWin:
             ).format(
                 ', '.join(item.authors)
             )
-        if item.large_icon is not None:
-            # We have a large icon, use it.
-            self.prop_icon['image'] = item.large_icon
-            width, height = img.tuple_size(ICON_SIZE_LRG)
-        else:
-            # Small icon, shrink the preview.
-            self.prop_icon['image'] = item.icon
-            width, height = img.tuple_size(ICON_SIZE)
-        self.prop_icon_frm.configure(width=width, height=height)
 
-        if optionWindow.DEV_MODE.get():
+        # We have a large icon, use it.
+        icon = item.large_icon if item.large_icon is not None else item.icon
+        img.apply(self.prop_icon, icon)
+        self.prop_icon_frm.configure(width=icon.width, height=icon.height)
+
+        if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
                 text = tkMarkdown.convert('**ID:** *NONE*\n\n')
@@ -1149,13 +1129,12 @@ class selWin:
                 val = item.attrs.get(attr_id, label.default)
 
                 if label.type is AttrTypes.BOOL:
-                    label['image'] = (
-                        ICON_CHECK
-                        if val else
-                        ICON_CROSS
-                    )
+                    if val:
+                        img.apply(label, ICON_CHECK)
+                    else:
+                        img.apply(label, ICON_CROSS)
                 elif label.type is AttrTypes.COLOR:
-                    label['image'] = img.color_square(val, size=16)
+                    img.apply(label, img.Handle.color(val, 16, 16))
                     # Display the full color when hovering..
                     # i18n: Tooltip for colour swatch.
                     set_tooltip(label, _('Color: R={r}, G={g}, B={b}').format(
@@ -1360,7 +1339,7 @@ class selWin:
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
                 item.button['text'] = item.shortName
-                item.button['image'] = item.icon
+                img.apply(item.button, item.icon)
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -1467,7 +1446,18 @@ class selWin:
         self.set_disp()  # Update the textbox if needed
         self.flow_items()  # Refresh
 
-if __name__ == '__main__':  # test the window if directly executing this file
+
+def test():
+    from BEE2_config import GEN_OPTS
+    from packages import find_packages, PACKAGE_SYS
+    from utils import PackagePath
+    # Setup images to read from packages.
+    print('Loading packages for images.')
+    GEN_OPTS.load()
+    find_packages(GEN_OPTS['Directories']['package'])
+    img.load_filesystems(PACKAGE_SYS)
+    print('Done.')
+
     lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
     lbl.grid()
     TK_ROOT.geometry("+500+500")
@@ -1477,26 +1467,39 @@ if __name__ == '__main__':  # test the window if directly executing this file
             "SKY_BLACK",
             "Black",
             long_name="Darkness",
-            icon="skies/black",
+            icon=img.Handle.color((125, 0, 92), ICON_SIZE, ICON_SIZE),
             authors=["Valve"],
             desc='Pure black darkness. Nothing to see here.',
+            attributes={
+                'test_color': Vec(255, 32, 32),
+                'astr': 'Dark',
+                'test_bool_1': False,
+                'test_bool_2': True,
+            },
         ),
         Item(
             "SKY_BTS",
             "BTS",
             long_name="Behind The Scenes - Factory",
-            icon="voices/glados",
+            icon=img.Handle.parse_uri(PackagePath("valve_clean_style", "voices/glados"), ICON_SIZE, ICON_SIZE),
             authors=["TeamSpen210"],
 
-            desc='The dark constuction and office areas of Aperture. '
+            desc='The dark constuction and office areas of Aperture.  '
                  'Catwalks extend between different buildings, with '
                  'vactubes and cranes carrying objects throughout '
                  'the facility.  \n'
                  'Abandoned offices can often be found here.\n\n'
                  '* This is a bullet point, with a\n second line'
                  '> white-on-black text',
-            ),
-        ]
+            attributes={
+                'test_color': Vec(40, 53, 64),
+                'astr': 'Machinery',
+                'test_bool_1': True,
+                'test_bool_2': False,
+                'listy': ['Chair', 'Panel', 'Turret']
+            },
+        ),
+    ]
 
     window = selWin(
         TK_ROOT,
@@ -1506,7 +1509,14 @@ if __name__ == '__main__':  # test the window if directly executing this file
         callback=functools.partial(
             LOGGER.info,
             'Selected:',
-        )
+        ),
+        attributes=[
+            AttrDef.color('test_color', "I'm a color.", Vec(128, 128, 128)),
+            AttrDef.bool('test_bool_1', "'I'm a bool", False),
+            AttrDef.bool('test_bool_2', "'I'm a bool", True),
+            AttrDef.string('astr', 'Hi'),
+            AttrDef.list('listy', 'Desc', ['a', 'b', 'c']),
+        ],
     )
     window.widget(TK_ROOT).grid(row=1, column=0, sticky='EW')
     window.set_suggested("SKY_BLACK")
