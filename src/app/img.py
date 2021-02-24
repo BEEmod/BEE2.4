@@ -321,9 +321,11 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_ALPHA, None, width, height)
 
     @classmethod
-    def color(cls, color: Tuple[int, int, int], width: int, height: int) -> 'Handle':
+    def color(cls, color: Union[Tuple[int, int, int], Vec], width: int, height: int) -> 'Handle':
         """Shortcut for getting a handle to a solid color."""
-        # The argument is irrelevant.
+        if isinstance(color, Vec):
+            # Convert.
+            color = tuple(map(int, color))
         return cls._get(TYP_COLOR, color, width, height)
 
 
