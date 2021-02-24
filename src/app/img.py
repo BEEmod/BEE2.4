@@ -6,46 +6,69 @@ it could get deleted, which will make the rendered image vanish.
 
 from PIL import ImageTk, Image, ImageDraw
 import os
+import weakref
 import tkinter as tk
 from tkinter import ttk
 
 from srctools import Vec, Property
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
-from packages import PackagePath, PACKAGE_SYS
+from packages import PackagePath
 import srctools.logger
 import logging
 import utils
 
 from typing import (
     Iterable, Union, Dict, Tuple, Callable, Optional, TypeVar,
-    Generic, Hashable,
+    Generic, MutableMapping
 )
 
 # These are both valid TK image types.
 tkImage = Union[ImageTk.PhotoImage, tk.PhotoImage]
 # Widgets with an image attribute that can be set.
-tkImgWidgets = Union[tk.Label, ttk.Label]
+tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 
-ArgT = TypeVar('ArgT', bound=Hashable)
+ArgT = TypeVar('ArgT')
 
 # Used to deduplicate handles.
 _handles: Dict[tuple, 'Handle'] = {}
+_wid_tk: MutableMapping[tkImgWidgets, 'Handle'] = weakref.WeakKeyDictionary()
+
 LOGGER = srctools.logger.get_logger('img')
-cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
-# r, g, b, size -> image
-cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 FSYS_BUILTIN.open_ref()
+PACK_SYSTEMS: Dict[str, FileSystem] = {}
 
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
 
+# Colour of the palette item background
+PETI_ITEM_BG = (229, 232, 233)
+PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
-def load_filesystems(systems: Iterable[FileSystem]):
+
+def _load_special(path: str) -> Image.Image:
+    """Various special images we have to load."""
+    try:
+        img = Image.open(utils.install_path(f'images/BEE2/{path}.png'))
+        img.load()
+        return img
+    except Exception:
+        LOGGER.warning('Error icon could not be loaded.', exc_info=True)
+        return Image.new('RGB', (64, 64), PETI_ITEM_BG)
+
+ICO_ERROR = _load_special('error')
+ICO_NONE = _load_special('none')
+ICO_LOAD = _load_special('load')
+
+
+def load_filesystems(systems: Dict[str, FileSystem]):
     """Load in the filesystems used in packages."""
-    raise NotImplementedError
-    # for sys in systems:
-    #     filesystem.add_sys(sys, 'resources/BEE2/')
+    PACK_SYSTEMS.clear()
+    for pak_id, sys in systems.items():
+        PACK_SYSTEMS[pak_id] = FileSystemChain(
+            (sys, 'resources/BEE2/'),
+            (sys, 'resources/materials/models/props_map_editor/'),
+        )
 
 
 def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
@@ -55,10 +78,21 @@ def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
     return size, size
 
 
-def color_hex(color: Vec) -> str:
-    """Convert a RGB colour to #xxxxxx."""
-    r, g, b = color
-    return '#{:2X}{:2X}{:2X}'.format(int(r), int(g), int(b))
+# Special paths which map to various images.
+PATH_BLANK = PackagePath('special', 'blank')
+PATH_ERROR = PackagePath('special', 'error')
+PATH_LOAD = PackagePath('special', 'load')
+PATH_NONE = PackagePath('special', 'none')
+PATH_BG = PackagePath('color', PETI_ITEM_BG_HEX[1:])
+PATH_BLACK = PackagePath('color', '000')
+PATH_WHITE = PackagePath('color', 'fff')
+
+# TODO: Eradicate usage
+BLACK_64 = NotImplemented
+BLACK_96 = NotImplemented
+PAL_BG_64 = NotImplemented
+PAL_BG_96 = NotImplemented
+img_error = NotImplemented
 
 
 class ImageType(Generic[ArgT]):
@@ -90,7 +124,20 @@ def _tk_from_color(color: Tuple[int, int, int], width: int, height: int) -> tkIm
     """Directly produce an image of this size with the specified color."""
     r, g, b = color
     img = tk.PhotoImage(width=width, height=height)
+    # Make hex RGB, then set the full image to that.
     img.put(f'#{r:2X}{g:2X}{b:2X}', to=(0, 0, width, height))
+    return img
+
+
+def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
+    """Produce an image of this size with transparent pixels."""
+    return Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+
+def _tk_empty(arg: object, width: int, height: int) -> tkImage:
+    """Produce a TK image of this size which is entirely transparent."""
+    img = tk.PhotoImage(width=width, height=height)
+    img.blank()
     return img
 
 
@@ -99,7 +146,7 @@ def _pil_from_file(uri: PackagePath, width: int, height: int) -> Image.Image:
         fsys = FSYS_BUILTIN
     else:
         try:
-            fsys = PACKAGE_SYS[uri.package]
+            fsys = PACK_SYSTEMS[uri.package]
         except KeyError:
             LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
             return _pil_from_color((0, 0, 0), width, height)
@@ -114,7 +161,7 @@ def _pil_from_file(uri: PackagePath, width: int, height: int) -> Image.Image:
         try:
             img_file = fsys[path]
         except (KeyError, FileNotFoundError):
-            LOGGER.warning('ERROR: "{}" does not exist!', uri)
+            LOGGER.warning('ERROR: "{}" does not exist!', uri, exc_info=True)
             return _pil_from_color((0, 0, 0), width, height)
             # TODO: return error or img_error
         with img_file.open_bin() as file:
@@ -134,8 +181,21 @@ def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: in
     return img
 
 
+def _pil_icon(arg: Image.Image, width: int, height: int) -> Image.Image:
+    """Construct an image with an overlaid icon."""
+    img = Image.new('RGB', (width, height), PETI_ITEM_BG)
+    img.paste(
+        arg,
+        # Center the 64x64 icon.
+        (width//2 - 32, height//2 - 32, 64, 64),
+    )
+    return img
+
+
 TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
+TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty)
 TYP_FILE = ImageType('file', _pil_from_file)
+TYP_ICON = ImageType('icon', _pil_icon)
 TYP_COMP = ImageType('composite', _pil_from_composite)
 
 
@@ -164,15 +224,62 @@ class Handle(Generic[ArgT]):
         self._cached_tk: Optional[tkImage] = None
 
     @classmethod
-    def parse(cls, prop: Property, pack: str, width: int, height: int) -> 'Handle':
+    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: int, height: int) -> 'Handle[ArgT]':
+        try:
+            return _handles[typ, arg, width, height]
+        except KeyError:
+            handle = _handles[typ, arg, width, height] = Handle(typ, arg, width, height)
+            return handle
+
+    def __repr__(self) -> str:
+        return f'<{self.type.name.title()} image, {self.width}x{self.height}, {self.arg!r}>'
+
+    @classmethod
+    def parse(cls, prop: Union[Property, PackagePath], pack: str, width: int, height: int) -> 'Handle':
         """Parse a property into an image handle.
 
         If a package isn't specified, the given package will be used.
         """
-        if prop.has_children():
-            raise NotImplementedError('Composite images.')
-        uri = PackagePath.parse(prop.value, pack)
-        if uri.package in ('color', 'colour', 'rgb'):
+        uri: PackagePath
+        if isinstance(prop, Property):
+            if prop.has_children():
+                raise NotImplementedError('Composite images.')
+            uri = PackagePath.parse(prop.value, pack)
+        else:
+            uri = prop
+        return cls.parse_uri(uri, width, height)
+
+    @classmethod
+    def parse_uri(cls, uri: PackagePath, width: int, height: int) -> 'Handle':
+        """Parse a URI into an image handle.
+
+        parse() should be used wherever possible, since that allows composite
+        images.
+        """
+        uri: PackagePath
+
+        typ: ImageType
+        args: object
+        if uri.package == 'special':
+            args = None
+            name = uri.path.casefold()
+            if name == 'blank':
+                typ = TYP_ALPHA
+            elif name == 'error':
+                typ = TYP_ICON
+                args = ICO_ERROR
+            elif name == 'none':
+                typ = TYP_ICON
+                args = ICO_NONE
+            elif name in ('load', 'loading'):
+                typ = TYP_ICON
+                args = ICO_LOAD
+            elif name == 'bg':
+                typ = TYP_COLOR
+                args = PETI_ITEM_BG
+            else:
+                raise ValueError(f'Unknown special type "{uri.path}"!')
+        elif uri.package in ('color', 'colour', 'rgb'):
             # color:RGB or color:RRGGBB
             try:
                 if len(uri.path) == 3:
@@ -192,21 +299,60 @@ class Handle(Generic[ArgT]):
         else: # File item
             typ = TYP_FILE
             args = uri
-        try:
-            return _handles[typ, args, width, height]
-        except KeyError:
-            h = _handles[typ, args, width, height] = Handle(typ, args, width, height)
-            return h
+        return cls._get(typ, args, width, height)
+
+    @classmethod
+    def builtin(cls, path: str, width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to a builtin UI image."""
+        return cls._get(TYP_FILE, PackagePath('bee2', path + '.png'), width, height)
+
+    @classmethod
+    def error(cls, width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to an error icon."""
+        return cls._get(TYP_ICON, ICO_ERROR, width, height)
+
+    @classmethod
+    def ico_none(cls, width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to a 'none' icon."""
+        return cls._get(TYP_ICON, ICO_NONE, width, height)
+
+    @classmethod
+    def blank(cls, width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to an empty image."""
+        # The argument is irrelevant.
+        return cls._get(TYP_ALPHA, None, width, height)
+
+    @classmethod
+    def color(cls, color: Tuple[int, int, int], width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to a solid color."""
+        # The argument is irrelevant.
+        return cls._get(TYP_COLOR, color, width, height)
 
 
 def apply(widget: tkImgWidgets, img: Optional[Handle]) -> None:
     """Set the image in a widget.
 
-    If the image is None, it is instead unset. This tracks the widget,
-    so later reloads will affect the widget.
+    This tracks the widget, so later reloads will affect the widget.
+    If the image is None, it is instead unset.
     TODO: Loading will happen in the background.
     """
-
+    if img is None:
+        widget['image'] = None
+        try:
+            del _wid_tk[widget]
+        except KeyError:
+            pass
+        return
+    if img._cached_tk is None:
+        LOGGER.info('Loading {}', img)
+        if img.type.tk_func is None:
+            if img._cached_pil is None:
+                img._cached_pil = img.type.pil_func(img.arg, img.width, img.height)
+            img._cached_tk = ImageTk.PhotoImage(image=img._cached_pil)
+        else:
+            img._cached_tk = img.type.tk_func(img.arg, img.width, img.height)
+    widget['image'] = img._cached_tk
+    _wid_tk[widget] = img
 
 
 def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
@@ -320,25 +466,16 @@ def make_splash_screen(
                 fill=(0, 150, 120, 20),
             )
 
+    logo_img = Image.open(utils.install_path('images/BEE2/splash_logo.png'))
+    draw.bitmap((10, 10), logo_img)
+
     tk_img = ImageTk.PhotoImage(image=image)
     return tk_img, image.width, image.height
 
 
 def color_square(color: Vec, size=16):
     """Create a square image of the given size, with the given color."""
-    key = color.x, color.y, color.z, size
-
-    try:
-        return cached_squares[key]
-    except KeyError:
-        img = Image.new(
-            mode='RGB',
-            size=tuple_size(size),
-            color=(int(color.x), int(color.y), int(color.z)),
-        )
-        tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares[key] = tk_img
-        return tk_img
+    return None
 
 
 def invis_square(size):
@@ -357,16 +494,3 @@ def invis_square(size):
 
         return tk_img
 
-# Colour of the palette item background
-PETI_ITEM_BG = Vec(229, 232, 233)
-PETI_ITEM_BG_HEX = color_hex(PETI_ITEM_BG)
-
-
-BLACK_64 = color_square(Vec(0, 0, 0), size=64)
-BLACK_96 = color_square(Vec(0, 0, 0), size=96)
-PAL_BG_64 = color_square(PETI_ITEM_BG, size=64)
-PAL_BG_96 = color_square(PETI_ITEM_BG, size=96)
-
-# If image is not readable, use this instead
-# If this actually fails, use the black image.
-img_error = png('BEE2/error', error=BLACK_64)
