@@ -12,7 +12,7 @@ from tkinter import ttk
 
 from srctools import Vec, Property
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
-from packages import PackagePath
+from utils import PackagePath
 import srctools.logger
 import logging
 import utils

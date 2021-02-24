@@ -15,7 +15,7 @@ from app import selector_win, TK_ROOT
 from app import tkMarkdown, SubPane, img
 import utils
 from BEE2_config import ConfigFile, option_handler
-from packages import CORRIDOR_COUNTS, CorrDesc, PackagePath
+from packages import CORRIDOR_COUNTS, CorrDesc
 from srctools import Property, AtomicWriter
 from srctools.logger import get_logger
 from app.tk_tools import FileField
@@ -236,7 +236,7 @@ def load_corridors() -> None:
         for i in range(1, length + 1):
             config[group, i] = CorrDesc(
                 name=corridor_conf.get('{}_{}_name'.format(group, i), ''),
-                icon=PackagePath.parse(corridor_conf.get('{}_{}_icon'.format(group, i), 'special:error'), 'special'),
+                icon=utils.PackagePath.parse(corridor_conf.get('{}_{}_icon'.format(group, i), img.PATH_ERROR), 'special'),
                 desc=corridor_conf.get('{}_{}_desc'.format(group, i), ''),
             )
     set_corridors(config)

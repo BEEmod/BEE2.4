@@ -177,44 +177,6 @@ class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
 
 
-class PackagePath:
-    """Represents a file located inside a specific package.
-
-    This can be either resolved later into a file object.
-    The string form is "package:path/to/file.ext", with <special> package names
-    reserved for app-specific usages (internal or generated paths)
-    """
-    __slots__ = ['package', 'path']
-    def __init__(self, pack_id: str, path: str) -> None:
-        self.package = pack_id.casefold()
-        self.path = path.replace('\\', '/')
-
-    @classmethod
-    def parse(cls, uri: str, def_package: str) -> 'PackagePath':
-        """Parse a string into a path. If a package isn't provided, the default is used."""
-        if ':' in uri:
-            return cls(*uri.split(':', 1))
-        else:
-            return cls(def_package, uri)
-
-    def __str__(self) -> str:
-        return f'{self.package}:{self.path}'
-
-    def __repr__(self) -> str:
-        return f'PackagePath({self.package!r}, {self.path!r})'
-
-    def __hash__(self) -> int:
-        return hash((self.package, self.path))
-
-    def __eq__(self, other) -> object:
-        if isinstance(other, PackagePath):
-            return self.package == other.package and self.path == other.path
-        elif isinstance(other, str):
-            oth = self.parse(other, self.package)
-            return self.package == oth.package and self.path == oth.path
-        return NotImplemented
-
-
 T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')
 
@@ -772,7 +734,7 @@ class Style(PakObject):
                 try:
                     self.corridors[group, i] = corridors[group, i]
                 except KeyError:
-                    self.corridors[group, i] = CorrDesc('', PackagePath('alpha', ''), '')
+                    self.corridors[group, i] = CorrDesc('', utils.PackagePath('alpha', ''), '')
 
         if config is None:
             self.config = Property(None, [])
@@ -821,7 +783,7 @@ class Style(PakObject):
                 prop = group_prop.find_key(str(i), '')  # type: Property
 
                 if icon_folder:
-                    icon = PackagePath(data.pak_id, '{}/{}/{}.jpg'.format(icon_folder, group, i))
+                    icon = utils.PackagePath(data.pak_id, '{}/{}/{}.jpg'.format(icon_folder, group, i))
                 else:
                     icon = img.BLANK
 

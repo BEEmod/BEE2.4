@@ -562,7 +562,8 @@ class Slot(Generic[ItemT]):
 def test() -> None:
     """Test the GUI."""
     from BEE2_config import GEN_OPTS
-    from packages import find_packages, PACKAGE_SYS, PackagePath
+    from packages import find_packages, PACKAGE_SYS
+    from utils import PackagePath
 
     # Setup images to read from packages.
     print('Loading packages for images.')
