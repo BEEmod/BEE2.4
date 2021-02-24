@@ -48,17 +48,21 @@ PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
 def _load_special(path: str) -> Image.Image:
     """Various special images we have to load."""
+    img: Image.Image
     try:
         img = Image.open(utils.install_path(f'images/BEE2/{path}.png'))
         img.load()
+        if img.mode == 'RGB':
+            img = img.convert('RGBA')
         return img
     except Exception:
         LOGGER.warning('Error icon could not be loaded.', exc_info=True)
-        return Image.new('RGB', (64, 64), PETI_ITEM_BG)
+        return Image.new('RGBA', (64, 64), PETI_ITEM_BG)
 
-ICO_ERROR = _load_special('error')
-ICO_NONE = _load_special('none')
-ICO_LOAD = _load_special('load')
+ICONS: Dict[str, Image.Image] = {
+    name: _load_special(name)
+    for name in ['error', 'none', 'load']
+}
 
 
 def load_filesystems(systems: Dict[str, FileSystem]):
@@ -265,15 +269,9 @@ class Handle(Generic[ArgT]):
             name = uri.path.casefold()
             if name == 'blank':
                 typ = TYP_ALPHA
-            elif name == 'error':
+            elif name in ('error', 'none', 'load'):
                 typ = TYP_ICON
-                args = ICO_ERROR
-            elif name == 'none':
-                typ = TYP_ICON
-                args = ICO_NONE
-            elif name in ('load', 'loading'):
-                typ = TYP_ICON
-                args = ICO_LOAD
+                args = name
             elif name == 'bg':
                 typ = TYP_COLOR
                 args = PETI_ITEM_BG
@@ -309,12 +307,12 @@ class Handle(Generic[ArgT]):
     @classmethod
     def error(cls, width: int, height: int) -> 'Handle':
         """Shortcut for getting a handle to an error icon."""
-        return cls._get(TYP_ICON, ICO_ERROR, width, height)
+        return cls._get(TYP_ICON, 'error', width, height)
 
     @classmethod
     def ico_none(cls, width: int, height: int) -> 'Handle':
         """Shortcut for getting a handle to a 'none' icon."""
-        return cls._get(TYP_ICON, ICO_NONE, width, height)
+        return cls._get(TYP_ICON, 'none', width, height)
 
     @classmethod
     def blank(cls, width: int, height: int) -> 'Handle':
