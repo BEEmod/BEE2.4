@@ -8,6 +8,7 @@ from collections import defaultdict
 import srctools
 from app import tkMarkdown, img
 import utils
+import consts
 from app.packageMan import PACK_CONFIG
 from loadScreen import LoadScreen
 from srctools import Property, NoKeyError
@@ -17,8 +18,8 @@ from editoritems import Item as EditorItem, Renderable, RenderableType
 import srctools.logger
 
 from typing import (
-    Optional, Any, TYPE_CHECKING, NoReturn, TypeVar, ClassVar,
-    NamedTuple, Collection, Iterable, Type,
+    NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
+    Dict, Tuple, NamedTuple, Collection, Iterable,
 )
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
@@ -42,20 +43,18 @@ class SelitemData(NamedTuple):
     name: str  # Longer full name.
     short_name: str  # Shorter name for the icon.
     auth: list[str]  # List of authors.
-    icon: str  # Path to small square icon.
-    large_icon: str  # Path to larger, landscape icon.
+    icon: img.Handle  # Small square icon.
+    large_icon: img.Handle  # Larger, landscape icon.
     desc: tkMarkdown.MarkdownData
     group: Optional[str]
     sort_key: str
 
     @classmethod
-    def parse(cls, info: Property) -> SelitemData:
+    def parse(cls, info: Property, pack_id: str) -> SelitemData:
         """Parse from a property block."""
         auth = sep_values(info['authors', ''])
         short_name = info['shortName', None]
         name = info['name']
-        icon = info['icon', None]
-        large_icon = info['iconlarge', None]
         group = info['group', '']
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'])
@@ -63,6 +62,27 @@ class SelitemData(NamedTuple):
             group = None
         if not short_name:
             short_name = name
+
+        try:
+            icon = img.Handle.parse(
+                info.find_key('icon'),
+                pack_id,
+                consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE,
+            )
+        except LookupError:
+            icon = img.Handle.color(
+                img.PETI_ITEM_BG,
+                consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE,
+            )
+        large_icon = info['iconlarge', None]
+        try:
+            large_icon = img.Handle.parse(
+                info.find_key('iconlarge'),
+                pack_id,
+                *consts.SEL_ICON_SIZE_LRG,
+            )
+        except LookupError:
+            large_icon = None
 
         return cls(
             name,
@@ -138,7 +158,7 @@ class ExportData(NamedTuple):
 class CorrDesc(NamedTuple):
     """Name, description and icon for each corridor in a style."""
     name: str
-    icon: 'PackagePath'
+    icon: utils.PackagePath
     desc: str
 
 
@@ -747,7 +767,7 @@ class Style(PakObject):
     def parse(cls, data: ParseData):
         """Parse a style definition."""
         info = data.info
-        selitem_data = SelitemData.parse(info)
+        selitem_data = SelitemData.parse(info, data.pak_id)
         base = info['base', '']
         has_video = srctools.conv_bool(
             info['has_video', ''],
@@ -785,7 +805,7 @@ class Style(PakObject):
                 if icon_folder:
                     icon = utils.PackagePath(data.pak_id, '{}/{}/{}.jpg'.format(icon_folder, group, i))
                 else:
-                    icon = img.BLANK
+                    icon = img.PATH_BLANK
 
                 if prop.has_children():
                     corridors[group, i] = CorrDesc(

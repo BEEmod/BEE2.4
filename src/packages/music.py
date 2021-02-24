@@ -45,7 +45,7 @@ class Music(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse a music definition."""
-        selitem_data = SelitemData.parse(data.info)
+        selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', [])  # type: Property
 
