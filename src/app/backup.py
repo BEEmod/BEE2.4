@@ -812,16 +812,16 @@ def init() -> None:
             UI[cat + 'frame'],
         )
 
-    UI['game_refresh'] = ttk.Button(
+    game_refresh = ttk.Button(
         UI['game_title_frame'],
-        image=img.png('icons/tool_sub'),
         command=ui_refresh_game,
     )
-    UI['game_refresh'].grid(row=0, column=1, sticky='E')
+    game_refresh.grid(row=0, column=1, sticky='E')
     add_tooltip(
-        UI['game_refresh'],
+        game_refresh,
         "Reload the map list.",
     )
+    img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
 
     UI['game_title']['textvariable'] = game_name
     UI['back_title']['textvariable'] = backup_name
