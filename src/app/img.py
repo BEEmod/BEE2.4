@@ -1,7 +1,6 @@
-""" Functions to produce tk-compatible images, using Pillow as a backend.
+"""Functions to produce tk-compatible images, using Pillow as a backend.
 
-The image is saved in the dictionary, so it stays in memory. Otherwise
-it could get deleted, which will make the rendered image vanish.
+TODO: New docs
 """
 
 from PIL import ImageTk, Image, ImageDraw
@@ -129,7 +128,7 @@ def _tk_from_color(color: Tuple[int, int, int], width: int, height: int) -> tkIm
     r, g, b = color
     img = tk.PhotoImage(width=width, height=height)
     # Make hex RGB, then set the full image to that.
-    img.put(f'#{r:2X}{g:2X}{b:2X}', to=(0, 0, width, height))
+    img.put(f'{{#{r:02X}{g:02X}{b:02X}}}', to=(0, 0, width, height))
     return img
 
 
@@ -179,7 +178,7 @@ def _pil_from_file(uri: PackagePath, width: int, height: int) -> Image.Image:
 
 def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: int) -> Image.Image:
     """Combine several images into one."""
-    img = Image.new('RGB', (width, height))
+    img = Image.new('RGBA', (width, height))
     for part in components:
         img.paste(part.type.pil_func(part.arg, width, height))
     return img
@@ -187,12 +186,12 @@ def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: in
 
 def _pil_icon(arg: Image.Image, width: int, height: int) -> Image.Image:
     """Construct an image with an overlaid icon."""
-    img = Image.new('RGB', (width, height), PETI_ITEM_BG)
-    img.paste(
-        arg,
-        # Center the 64x64 icon.
-        (width//2 - 32, height//2 - 32, 64, 64),
-    )
+    img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
+    ico = ICONS[arg]
+    assert ico.size == (64, 64)
+    # Center the 64x64 icon.
+    img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
+
     return img
 
 
