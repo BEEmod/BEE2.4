@@ -53,6 +53,10 @@ if __name__ == '__main__':
     elif app_name == 'compilepane':
         from app import CompilerPane
         CompilerPane.init_application()
+    elif app_name.startswith('test_'):
+        import importlib
+        mod = importlib.import_module('app.' + sys.argv[1][5:])
+        mod.test()
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
 
