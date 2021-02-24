@@ -417,15 +417,15 @@ def find_packages(pak_dir: str) -> None:
             filesys.close_ref()
             raise
 
-        if pak_id in packages:
+        if pak_id.casefold() in packages:
             raise ValueError(
                 f'Duplicate package with id "{pak_id}"!\n'
                 'If you just updated the mod, delete any old files in packages/.'
             ) from None
 
-        PACKAGE_SYS[pak_id] = filesys
+        PACKAGE_SYS[pak_id.casefold()] = filesys
 
-        packages[pak_id] = Package(
+        packages[pak_id.casefold()] = Package(
             pak_id,
             filesys,
             info,
@@ -500,14 +500,14 @@ def load_packages(
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        for pak_id, pack in packages.items():
+        for pack in packages.values():
             if not pack.enabled:
-                LOGGER.info('Package {id} disabled!', id=pak_id)
+                LOGGER.info('Package {id} disabled!', id=pack.id)
                 pack_count -= 1
                 loader.set_length("PAK", pack_count)
                 continue
 
-            LOGGER.info('Reading objects from "{id}"...', id=pak_id)
+            LOGGER.info('Reading objects from "{id}"...', id=pack.id)
             parse_package(pack, obj_override, has_tag_music, has_mel_music)
             loader.step("PAK")
 
@@ -629,7 +629,7 @@ def parse_package(
         elif pre.value == '<MEL_MUSIC>':
             if not has_mel:
                 return
-        elif pre.value not in packages:
+        elif pre.value.casefold() not in packages:
             LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
                 'ignoring package!',
