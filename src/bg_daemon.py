@@ -287,8 +287,6 @@ class SplashScreen(BaseLoadScreen):
             size=-12,  # negative = in pixels
         )
 
-        logo_img = img.png('BEE2/splash_logo')
-
         self.lrg_canvas = tk.Canvas(self.win)
         self.sml_canvas = tk.Canvas(
             self.win,
@@ -297,12 +295,6 @@ class SplashScreen(BaseLoadScreen):
 
         sml_width = int(min(self.win.winfo_screenwidth() * 0.5, 400))
         sml_height = int(min(self.win.winfo_screenheight() * 0.5, 175))
-
-        self.lrg_canvas.create_image(
-            10, 10,
-            anchor='nw',
-            image=logo_img,
-        )
 
         self.sml_canvas.create_text(
             sml_width / 2, 30,
