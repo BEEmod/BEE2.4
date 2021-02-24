@@ -187,7 +187,7 @@ class PackagePath:
     __slots__ = ['package', 'path']
     def __init__(self, pack_id: str, path: str) -> None:
         self.package = pack_id.casefold()
-        self.path = path
+        self.path = path.replace('\\', '/')
 
     @classmethod
     def parse(cls, uri: str, def_package: str) -> 'PackagePath':
@@ -196,6 +196,20 @@ class PackagePath:
             return cls(*uri.split(':', 1))
         else:
             return cls(def_package, uri)
+
+    def __repr__(self) -> str:
+        return f'{self.package}:{self.path}'
+
+    def __hash__(self) -> int:
+        return hash((self.package, self.path))
+
+    def __eq__(self, other) -> object:
+        if isinstance(other, PackagePath):
+            return self.package == other.package and self.path == other.path
+        elif isinstance(other, str):
+            oth = self.parse(other, self.package)
+            return self.package == oth.package and self.path == oth.path
+        return NotImplemented
 
 
 T = TypeVar('T')
