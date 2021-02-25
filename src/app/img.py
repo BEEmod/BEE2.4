@@ -64,7 +64,7 @@ ICONS: Dict[str, Image.Image] = {
 }
 
 
-def load_filesystems(systems: Dict[str, FileSystem]):
+def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
     """Load in the filesystems used in packages."""
     PACK_SYSTEMS.clear()
     for pak_id, sys in systems.items():
