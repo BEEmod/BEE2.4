@@ -273,7 +273,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
                     data.icon,
                     *selector_win.ICON_SIZE_LRG,
                 )
-                item.large_icon = img.Handle.parse_uri(
+                item.icon = img.Handle.parse_uri(
                     data.icon,
                     selector_win.ICON_SIZE, selector_win.ICON_SIZE,
                 )
@@ -285,6 +285,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
             else:
                 item.desc = CORRIDOR_DESC
 
+        selector.refresh()
         selector.set_disp()
 
     COMPILE_CFG.save_check()
