@@ -1,6 +1,6 @@
 """Help menu and associated dialogs."""
 from enum import Enum
-from typing import NamedTuple
+from typing import NamedTuple, Dict
 
 from tkinter import ttk
 import tkinter as tk
@@ -321,13 +321,12 @@ def make_help_menu(parent: tk.Menu):
 
     parent.add_cascade(menu=help, label=_('Help'))
 
-    invis_icon = img.invis_square(16)
-    icons = {
-        icon: img.png('icons/' + icon.value, resize_to=16, error=invis_icon)
+    icons: Dict[ResIcon, img.Handle] = {
+        icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
         for icon in ResIcon
         if icon is not ResIcon.NONE
     }
-    icons[ResIcon.NONE] = invis_icon
+    icons[ResIcon.NONE] = img.Handle.blank(16, 16)
 
     credits = Dialog(
         title=_('BEE2 Credits'),
@@ -342,7 +341,7 @@ def make_help_menu(parent: tk.Menu):
                 label=res.name,
                 command=functools.partial(webbrowser.open, res.url),
                 compound='left',
-                image=icons[res.icon],
+                image=icons[res.icon].load_tk(),
             )
 
     help.add_separator()
