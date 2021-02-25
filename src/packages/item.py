@@ -148,14 +148,14 @@ class ItemVariant:
         ))
 
         if 'description' in props:
-            desc = desc_parse(props, source)
+            desc = desc_parse(props, source, pak_id)
         else:
             desc = self.desc.copy()
 
         if 'appenddesc' in props:
             desc = tkMarkdown.join(
                 desc,
-                desc_parse(props, source, prop_name='appenddesc'),
+                desc_parse(props, source, pak_id, prop_name='appenddesc'),
             )
 
         if 'authors' in props:
@@ -409,7 +409,7 @@ class Item(PakObject):
         folders_to_parse: Set[str] = set()
         unstyled = data.info.bool('unstyled')
 
-        glob_desc = desc_parse(data.info, 'global:' + data.id)
+        glob_desc = desc_parse(data.info, 'global:' + data.id, data.pak_id)
         desc_last = data.info.bool('AllDescLast')
 
         all_config = get_config(
@@ -826,7 +826,7 @@ def parse_item_folder(
 
             authors=sep_values(props['authors', '']),
             tags=sep_values(props['tags', '']),
-            desc=desc_parse(props, f'{pak_id}:{prop_path}'),
+            desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
             ent_count=props['ent_count', ''],
             url=props['infoURL', None],
             icons={

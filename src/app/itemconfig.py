@@ -128,7 +128,7 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
         else:
             group_name = props['Name']
 
-        desc = desc_parse(props, data.id)
+        desc = desc_parse(props, data.id, data.pak_id)
 
         widgets = []  # type: List[Widget]
         multi_widgets = []  # type: List[Widget]

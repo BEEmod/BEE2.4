@@ -273,7 +273,7 @@ class Item:
         self.large_icon = large_icon
 
         if isinstance(desc, str):
-            self.desc = tkMarkdown.convert(desc)
+            self.desc = tkMarkdown.convert(desc, None)
         else:
             self.desc = desc
 
@@ -1082,9 +1082,9 @@ class selWin:
         if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
-                text = tkMarkdown.convert('**ID:** *NONE*\n\n')
+                text = tkMarkdown.convert('**ID:** *NONE*\n\n', None)
             else:
-                text = tkMarkdown.convert(f'**ID:** {item.name}\n\n')
+                text = tkMarkdown.convert(f'**ID:** {item.name}\n\n', None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 item.desc,

@@ -305,7 +305,7 @@ class Dialog(tk.Toplevel):
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
         if self.text is not None:
-            parsed_text = tkMarkdown.convert(self.text)
+            parsed_text = tkMarkdown.convert(self.text, package=None)
             self.textbox.set_text(parsed_text)
             self.text = None
 

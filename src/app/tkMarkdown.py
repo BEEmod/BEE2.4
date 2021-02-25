@@ -68,10 +68,12 @@ class TKRenderer(mistletoe.BaseRenderer):
         # The lists we're currently generating.
         # If none it's bulleted, otherwise it's the current count.
         self._list_stack: List[Optional[int]] = []
+        self.package: Optional[str] = None
         super().__init__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._list_stack.clear()
+        self.package = None
 
     def render(self, token: btok.BlockToken) -> MarkdownData:
         return super().render(token)
@@ -230,9 +232,13 @@ class TKRenderer(mistletoe.BaseRenderer):
 _RENDERER = TKRenderer()
 
 
-def convert(text: str) -> MarkdownData:
-    """Convert markdown syntax into data ready to be passed to richTextBox."""
+def convert(text: str, package: Optional[str]) -> MarkdownData:
+    """Convert markdown syntax into data ready to be passed to richTextBox.
+
+    The package must be passed to allow using images in the document.
+    """
     with _RENDERER:
+        _RENDERER.package = package
         return _RENDERER.render(mistletoe.Document(text))
 
 
