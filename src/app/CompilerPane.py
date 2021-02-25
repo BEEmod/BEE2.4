@@ -247,7 +247,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
     CORRIDOR_DATA.clear()
     CORRIDOR_DATA.update(config)
 
-    default_icon = img.icon('clean/portal_door')
+    default_icon = img.Handle.builtin('BEE2/corr_generic', 64, 64)
 
     corridor_conf = COMPILE_CFG['CorridorNames']
 
@@ -275,7 +275,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
                 )
                 item.large_icon = img.Handle.parse_uri(
                     data.icon,
-                    *selector_win.ICON_SIZE,
+                    selector_win.ICON_SIZE, selector_win.ICON_SIZE,
                 )
             else:
                 item.icon = item.large_icon = default_icon
@@ -308,7 +308,7 @@ def make_corr_wid(corr_name: str) -> None:
             'This is saved in the puzzle data '
             'and will not change.'
         ),
-        none_icon='BEE2/random.png',
+        none_icon=img.Handle.builtin('BEE2/random', 64, 64),
         none_name=_('Random'),
         callback=sel_corr_callback,
         callback_params=[corr_name],
@@ -718,7 +718,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
-        img.Handle.builtin('icons/tool_sub', 16, 16),
+        'icons/tool_sub',
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
@@ -886,7 +886,7 @@ def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
         resize_x=True,
         resize_y=False,
         tool_frame=tool_frame,
-        tool_img=img.Handle.builtin('icons/win_compiler', 16, 16),
+        tool_img='icons/win_compiler',
         tool_col=4,
     )
     window.columnconfigure(0, weight=1)
