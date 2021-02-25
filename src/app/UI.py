@@ -63,6 +63,11 @@ cur_filter: Optional[Set[Tuple[str, int]]] = None
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
+# Icon shown while items are being moved elsewhere.
+ICO_MOVING = img.Handle.builtin('BEE2/item_moving', 64, 64)
+ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
+ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
+IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 selected_style = "BEE2_CLEAN"
 selectedPalette = 0
@@ -157,7 +162,7 @@ class Item:
                 subtype, self.id, selected_style,
             )
 
-    def get_icon(self, subKey, allow_single=False, single_num=1) -> PhotoImage:
+    def get_icon(self, subKey, allow_single=False, single_num=1) -> img.Handle:
         """Get an icon for the given subkey.
 
         If allow_single is true, the grouping icon can be returned
@@ -178,9 +183,9 @@ class Item:
         else:
             img_key = str(subKey)
 
-        if img_key in icons:
-            return img.icon(icons[img_key])
-        else:
+        try:
+            return icons[img_key]
+        except KeyError:
             LOGGER.warning(
                 'Item "{}" in "{}" style has missing PNG '
                 'icon for subtype "{}"!',
@@ -188,7 +193,7 @@ class Item:
                 selected_style,
                 img_key,
             )
-            return img.img_error
+            return img.Handle.error(64, 64)
 
     def properties(self):
         """Iterate through all properties for this item."""
@@ -283,11 +288,11 @@ class PalItem(Label):
 
         self.info_btn = Label(
             self,
-            image=img.png('icons/gear'),
             relief='ridge',
             width=12,
             height=12,
         )
+        img.apply(self.info_btn, ICO_GEAR)
 
         click_func = contextWin.open_event(self)
         utils.bind_rightclick(self, click_func)
@@ -361,7 +366,7 @@ class PalItem(Label):
                 self.id, selected_style,
             )
             self.name = '??'
-        self['image'] = self.img
+        img.apply(self, self.img)
 
     def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
@@ -372,7 +377,7 @@ class PalItem(Label):
         for item in pal_picked[:]:
             # remove the item off of the palette if it's on there, this
             # lets you delete items and prevents having the same item twice.
-            if self == item:
+            if self.id == item.id and self.subKey == item.subKey:
                 item.kill()
                 found = True
         return found
@@ -387,15 +392,9 @@ class PalItem(Label):
     def on_pal(self) -> bool:
         """Determine if this item is on the palette."""
         for item in pal_picked:
-            if self == item:
+            if self.id == item.id and self.subKey == item.subKey:
                 return True
         return False
-
-    def __eq__(self, other):
-        """Two items are equal if they have the same item and sub-item index.
-
-        """
-        return self.id == other.id and self.subKey == other.subKey
 
     def copy(self, frame):
         return PalItem(frame, self.item, self.subKey, self.is_pre)
@@ -540,7 +539,7 @@ def load_packages(data: dict):
         """
         suggested_refresh()
 
-    def voice_callback(style_id):
+    def voice_callback(voice_id):
         """Special callback for the voice selector window.
 
         The configuration button is disabled when no music is selected.
@@ -548,12 +547,12 @@ def load_packages(data: dict):
         # This might be open, so force-close it to ensure it isn't corrupt...
         voiceEditor.save()
         try:
-            if style_id is None:
+            if voice_id is None:
                 UI['conf_voice'].state(['disabled'])
-                UI['conf_voice']['image'] = img.png('icons/gear_disabled')
+                img.apply(UI['conf_voice'], ICO_GEAR_DIS)
             else:
                 UI['conf_voice'].state(['!disabled'])
-                UI['conf_voice']['image'] = img.png('icons/gear')
+                img.apply(UI['conf_voice'], ICO_GEAR)
         except KeyError:
             # When first initialising, conf_voice won't exist!
             pass
@@ -627,7 +626,7 @@ def load_packages(data: dict):
         readonly_desc=_('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
-        none_icon='BEE2/random.png',
+        none_icon=img.Handle.builtin('BEE2/random', 64, 64),
         none_name=_('Random'),
         none_desc=_('Choose a random video.'),
         callback=win_callback,
@@ -948,17 +947,17 @@ def drag_start(e: Event) -> None:
                 item.load_data()
 
         # When dragging off, switch to the single-only icon
-        UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
+        img.apply(UI['drag_lbl'], drag_win.drag_item.item.get_icon(
             drag_win.drag_item.subKey,
             allow_single=False,
-            )
+        ))
     else:
         drag_win.from_pal = False
-        UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
+        img.apply(UI['drag_lbl'], drag_win.drag_item.item.get_icon(
             drag_win.drag_item.subKey,
             allow_single=True,
             single_num=0,
-            )
+        ))
     drag_win.deiconify()
     drag_win.lift(TK_ROOT)
     # grab makes this window the only one to receive mouse events, so
@@ -1033,12 +1032,12 @@ def drag_move(e):
             # If we've passed over the palette, replace identical items
             # with movement icons to indicate they will move to the new location
             for item in pal_picked:
-                if item == drag_win.drag_item:
+                if item.id == drag_win.drag_item.id and item.subKey == drag_win.drag_item.subKey:
                     # We haven't removed the original, so we don't need the
                     # special label for this.
                     # The group item refresh will return this if nothing
                     # changes.
-                    item['image'] = img.png('BEE2/item_moving')
+                    img.apply(item, ICO_MOVING)
                     break
 
         drag_win.passed_over_pal = True
@@ -1409,11 +1408,11 @@ def init_option(pane: SubPane) -> None:
     voice_frame.columnconfigure(1, weight=1)
     UI['conf_voice'] = ttk.Button(
         voice_frame,
-        image=img.png('icons/gear'),
         command=configure_voice,
         width=8,
         )
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
+    img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
         UI['conf_voice'],
         _('Enable or disable particular voice lines, to prevent them from '
@@ -1478,12 +1477,9 @@ def init_preview(f):
 
      This shows the items that will export to the palette.
     """
-    UI['pre_bg_img'] = Label(
-        f,
-        bg=ItemsBG,
-        image=img.png('BEE2/menu'),
-        )
+    UI['pre_bg_img'] = Label(f, bg=ItemsBG)
     UI['pre_bg_img'].grid(row=0, column=0)
+    img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 271, 563))
 
     UI['pre_disp_name'] = ttk.Label(
         f,
@@ -1495,22 +1491,17 @@ def init_preview(f):
     UI['pre_sel_line'] = Label(
         f,
         bg="#F0F0F0",
-        image=img.png('BEE2/sel_bar'),
         borderwidth=0,
         relief="solid",
         )
+    img.apply(UI['pre_sel_line'], img.Handle.builtin('BEE2/sel_bar', 4, 64))
     pal_picked_fake.extend([
-        ttk.Label(
-            frames['preview'],
-            image=img.PAL_BG_64,
-            )
+        img.apply(ttk.Label(frames['preview']), IMG_BLANK)
         for _ in range(32)
     ])
 
-    UI['pre_moving'] = ttk.Label(
-        f,
-        image=img.png('BEE2/item_moving')
-    )
+    UI['pre_moving'] = ttk.Label(f)
+    img.apply(UI['pre_moving'], ICO_MOVING)
 
     flow_preview()
 
@@ -1615,7 +1606,7 @@ def flow_picker(e=None):
     y = (num_items // width)*65 + 1
     for i in range(extra_items):
         if i not in pal_items_fake:
-            pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
+            pal_items_fake.append(img.apply(ttk.Label(frmScroll), IMG_BLANK))
         pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
     for item in pal_items_fake[extra_items:]:
@@ -1632,10 +1623,8 @@ def init_drag_icon() -> None:
     drag_win.transient(master=TK_ROOT)
     drag_win.withdraw()  # starts hidden
     drag_win.bind(utils.EVENTS['LEFT_RELEASE'], drag_stop)
-    UI['drag_lbl'] = Label(
-        drag_win,
-        image=img.PAL_BG_64,
-        )
+    UI['drag_lbl'] = Label(drag_win)
+    img.apply(UI['drag_lbl'], IMG_BLANK)
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
 
@@ -1887,7 +1876,7 @@ def init_windows() -> None:
         resize_x=True,
         resize_y=True,
         tool_frame=frames['toolMenu'],
-        tool_img=img.png('icons/win_palette'),
+        tool_img='icons/win_palette',
         tool_col=1,
     )
 
@@ -1911,7 +1900,7 @@ def init_windows() -> None:
         menu_bar=view_menu,
         resize_x=True,
         tool_frame=frames['toolMenu'],
-        tool_img=img.png('icons/win_options'),
+        tool_img='icons/win_options',
         tool_col=2,
     )
     init_option(windows['opt'])
@@ -1928,7 +1917,7 @@ def init_windows() -> None:
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
         frame=frames['toolMenu'],
-        img=img.png('icons/shuffle_pal'),
+        img='icons/shuffle_pal',
         command=pal_shuffle,
     )
     UI['shuffle_pal'].grid(
