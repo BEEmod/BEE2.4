@@ -3,7 +3,7 @@ import functools
 import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, Dict
+from typing import Iterator, List, Tuple, Dict, Optional
 
 from tkinter import *
 from tkinter import font
@@ -31,16 +31,16 @@ QUOTE_FONT['weight'] = 'bold'
 
 
 IMG: Dict[str, Tuple[img.Handle, str]] = {
-    spr: (img.Handle.builtin('icons/quote_' + spr, wid, 16), ctx)
-    for spr, wid, ctx in [
-        ('sp', 25, _('Singleplayer')),
-        ('coop', 25, _('Cooperative')),
-        ('atlas', 16, _('ATLAS (SP/Coop)')),
-        ('pbody', 16, _('P-Body (SP/Coop)')),
-        ('bendy', 16, _('Bendy')),
-        ('chell', 16, _('Chell')),
-        ('human', 47, _('Human characters (Bendy and Chell)')),
-        ('robot', 47, _('AI characters (ATLAS, P-Body, or Coop)')),
+    spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
+    for spr, ctx in [
+        ('sp', _('Singleplayer')),
+        ('coop', _('Cooperative')),
+        ('atlas', _('ATLAS (SP/Coop)')),
+        ('pbody', _('P-Body (SP/Coop)')),
+        ('bendy', _('Bendy')),
+        ('chell', _('Chell')),
+        ('human', _('Human characters (Bendy and Chell)')),
+        ('robot', _('AI characters (ATLAS, P-Body, or Coop)')),
     ]
 }
 
@@ -53,7 +53,9 @@ RESPONSE_NAMES = {
     'death_laserfield': _('Death - LaserField'),
 }
 
-config = config_mid = config_resp = None  # type: ConfigFile
+config: Optional[ConfigFile] = None
+config_mid: Optional[ConfigFile] = None
+config_resp: Optional[ConfigFile] = None
 
 
 class TabTypes(Enum):
