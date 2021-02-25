@@ -622,6 +622,14 @@ class PackagePath:
             return self.package == oth.package and self.path == oth.path
         return NotImplemented
 
+    def in_folder(self, folder: str) -> 'PackagePath':
+        """Return the package, but inside this subfolder."""
+        return PackagePath(self.package, f'{folder}/{self.path}')
+
+    def child(self, child: str) -> 'PackagePath':
+        """Return a child file of this package."""
+        return PackagePath(self.package, f'{self.path}/child')
+
 
 def get_indent(line: str) -> str:
     """Return the whitespace which this line starts with.
