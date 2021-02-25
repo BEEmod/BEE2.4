@@ -10,7 +10,7 @@ from typing import (
     Optional, Union, Tuple, NamedTuple,
     Dict, List, Match, Set, cast,
 )
-from srctools import FileSystem, Property, EmptyMapping
+from srctools import FileSystem, Property, EmptyMapping, NoKeyError
 from pathlib import PurePosixPath as FSPath
 import srctools.logger
 
@@ -811,8 +811,8 @@ def parse_item_folder(
                     subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
 
         try:
-            all_icon = FSPath(props['all_icon'])
-        except LookupError:
+            all_icon = img.Handle.parse(props.find_key('all_icon'), pak_id, 64, 64, subfolder='items')
+        except NoKeyError:
             all_icon = None
 
         folders[fold] = ItemVariant(
@@ -830,8 +830,8 @@ def parse_item_folder(
             ent_count=props['ent_count', ''],
             url=props['infoURL', None],
             icons={
-                p.name: p.value
-                for p in
+                prop.name: img.Handle.parse(prop, pak_id, 64, 64, subfolder='items')
+                for prop in
                 props.find_children('icon')
             },
             all_name=props['all_name', None],
