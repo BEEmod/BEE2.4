@@ -34,10 +34,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
 ITEM_HEIGHT = ICON_SIZE + 51
 
-# The larger error icons used if an image is not found
-err_icon = img.Handle.error(ICON_SIZE, ICON_SIZE)
-err_icon_lrg = img.Handle.error(*ICON_SIZE_LRG)
-
 # The two icons used for boolean item attributes
 ICON_CHECK = img.Handle.builtin('icons/check', 16, 16)
 ICON_CROSS = img.Handle.builtin('icons/cross', 16, 16)
