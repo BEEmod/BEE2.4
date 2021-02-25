@@ -231,7 +231,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         menu_bar=menu_bar,
         resize_y=True,
         tool_frame=tool_frame,
-        tool_img=img.png('icons/win_stylevar'),
+        tool_img='icons/win_stylevar',
         tool_col=3,
     )
 
