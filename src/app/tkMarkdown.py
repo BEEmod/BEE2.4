@@ -6,9 +6,12 @@ import mistletoe
 from mistletoe import block_token as btok
 from mistletoe import span_token as stok
 import srctools.logger
+import urllib.parse
 
 from typing import Optional, Union, Iterable, List, Tuple, NamedTuple, Sequence
 
+import utils
+from app.img import Handle as ImgHandle
 
 LOGGER = srctools.logger.get_logger(__name__)
 # Mistletoe toke types.
@@ -24,7 +27,7 @@ class TextSegment(NamedTuple):
 
 class Image(NamedTuple):
     """An image."""
-    src: str
+    handle: ImgHandle
 
 # The kinds of data contained in MarkdownData
 Block = Union[TextSegment, Image]
@@ -95,7 +98,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         # Merge together adjacent text segments.
         for child in token.children:
             for data in self.render(child).blocks:
-                if blocks and isinstance(blocks[-1], TextSegment):
+                if isinstance(data, TextSegment) and blocks and isinstance(blocks[-1], TextSegment):
                     last = blocks[-1]
                     if last.tags == data.tags and last.url == data.url:
                         blocks[-1] = TextSegment(last.text + data.text, last.tags, last.url)
@@ -150,7 +153,9 @@ class TKRenderer(mistletoe.BaseRenderer):
         return self._text(child.content)
 
     def render_image(self, token: stok.Image) -> MarkdownData:
-        return MarkdownData([Image(token.src)])
+        """Embed an image into a file."""
+        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), self.package)
+        return MarkdownData([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
         [child] = token.children
@@ -255,7 +260,7 @@ def join(*args: MarkdownData) -> MarkdownData:
 
     for child in args:
         for data in child.blocks:
-            if blocks and isinstance(blocks[-1], TextSegment):
+            if isinstance(data, TextSegment) and blocks and isinstance(blocks[-1], TextSegment):
                 if blocks[-1].tags == data.tags and blocks[-1].url == data.url:
                     blocks[-1] = TextSegment(blocks[-1].text + data.text, blocks[-1].tags, blocks[-1].url)
                     continue
