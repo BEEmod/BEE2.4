@@ -142,6 +142,7 @@ def _load_file(
     uri: PackagePath,
     width: int, height: int,
     resize_algo: int,
+    check_other_packages: bool=False,
 ) -> Image.Image:
     """Load an image from a filesystem."""
     path = uri.path.casefold()
@@ -153,11 +154,30 @@ def _load_file(
         try:
             img_file = fsys[path]
         except (KeyError, FileNotFoundError):
-            LOGGER.warning('ERROR: "{}" does not exist!', uri)
-            return Handle.error(width, height).load_pil()
-        with img_file.open_bin() as file:
-            image = Image.open(file)
-            image.load()
+            img_file = None
+
+    # Deprecated behaviour, check the other packages.
+    if img_file is None and check_other_packages:
+        for pak_id, other_fsys in PACK_SYSTEMS.items():
+            with other_fsys:
+                try:
+                    img_file = other_fsys[path]
+                    LOGGER.warning(
+                        'Image "{}" was found in package "{}", '
+                        'fix the reference.',
+                        uri, pak_id,
+                    )
+                    break
+                except (KeyError, FileNotFoundError):
+                    pass
+
+    if img_file is None:
+        LOGGER.error('"{}" does not exist!', uri)
+        return Handle.error(width, height).load_pil()
+
+    with img_file.sys, img_file.open_bin() as file:
+        image = Image.open(file)
+        image.load()
 
     if (width, height) != image.size:
         image = image.resize((width, height), resample=resize_algo)
@@ -172,7 +192,7 @@ def _pil_from_package(uri: PackagePath, width: int, height: int) -> Image.Image:
         LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
         return Handle.error(width, height).load_pil()
 
-    return _load_file(fsys, uri, width, height, Image.BILINEAR)
+    return _load_file(fsys, uri, width, height, Image.BILINEAR, True)
 
 
 def _pil_load_builtin(uri: PackagePath, width: int, height: int) -> Image.Image:
