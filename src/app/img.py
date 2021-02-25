@@ -1,6 +1,7 @@
-"""Functions to produce tk-compatible images, using Pillow as a backend.
+"""The image system manages all the images packages request.
 
-TODO: New docs
+It handles loading them from disk and converting them to TK versions, and
+caching images so repeated requests are cheap.
 """
 
 from PIL import ImageTk, Image, ImageDraw
@@ -8,6 +9,10 @@ import os
 import weakref
 import tkinter as tk
 from tkinter import ttk
+from typing import (
+    Generic, TypeVar, Union, Callable, Optional,
+    Dict, Tuple, MutableMapping, Mapping,
+)
 
 from srctools import Vec, Property
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
@@ -15,11 +20,6 @@ from utils import PackagePath
 import srctools.logger
 import logging
 import utils
-
-from typing import (
-    Iterable, Union, Dict, Tuple, Callable, Optional, TypeVar,
-    Generic, MutableMapping
-)
 
 # These are both valid TK image types.
 tkImage = Union[ImageTk.PhotoImage, tk.PhotoImage]
@@ -82,20 +82,13 @@ def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
 
 
 # Special paths which map to various images.
-PATH_BLANK = PackagePath('special', 'blank')
-PATH_ERROR = PackagePath('special', 'error')
-PATH_LOAD = PackagePath('special', 'load')
-PATH_NONE = PackagePath('special', 'none')
+PATH_BLANK = PackagePath('<special>', 'blank')
+PATH_ERROR = PackagePath('<special>', 'error')
+PATH_LOAD = PackagePath('<special>', 'load')
+PATH_NONE = PackagePath('<special>', 'none')
 PATH_BG = PackagePath('color', PETI_ITEM_BG_HEX[1:])
-PATH_BLACK = PackagePath('color', '000')
-PATH_WHITE = PackagePath('color', 'fff')
-
-# TODO: Eradicate usage
-BLACK_64 = NotImplemented
-BLACK_96 = NotImplemented
-PAL_BG_64 = NotImplemented
-PAL_BG_96 = NotImplemented
-img_error = NotImplemented
+PATH_BLACK = PackagePath('<color>', '000')
+PATH_WHITE = PackagePath('<color>', 'fff')
 
 
 class ImageType(Generic[ArgT]):
@@ -144,17 +137,13 @@ def _tk_empty(arg: object, width: int, height: int) -> tkImage:
     return img
 
 
-def _pil_from_file(uri: PackagePath, width: int, height: int) -> Image.Image:
-    if uri.package == 'bee2':
-        fsys = FSYS_BUILTIN
-    else:
-        try:
-            fsys = PACK_SYSTEMS[uri.package]
-        except KeyError:
-            LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
-            return _pil_from_color((0, 0, 0), width, height)
-            # TODO: return error or img_error
-
+def _load_file(
+    fsys: FileSystem,
+    uri: PackagePath,
+    width: int, height: int,
+    resize_algo: int,
+) -> Image.Image:
+    """Load an image from a filesystem."""
     path = uri.path.casefold()
     if path[-4:-3] != '.':
         path += ".png"
@@ -164,16 +153,36 @@ def _pil_from_file(uri: PackagePath, width: int, height: int) -> Image.Image:
         try:
             img_file = fsys[path]
         except (KeyError, FileNotFoundError):
-            LOGGER.warning('ERROR: "{}" does not exist!', uri, exc_info=True)
-            return _pil_from_color((0, 0, 0), width, height)
-            # TODO: return error or img_error
+            LOGGER.warning('ERROR: "{}" does not exist!', uri)
+            return Handle.error(width, height).load_pil()
         with img_file.open_bin() as file:
             image = Image.open(file)
             image.load()
 
     if (width, height) != image.size:
-        image = image.resize((width, height))
+        image = image.resize((width, height), resample=resize_algo)
     return image
+
+
+def _pil_from_package(uri: PackagePath, width: int, height: int) -> Image.Image:
+    """Load from a app package."""
+    try:
+        fsys = PACK_SYSTEMS[uri.package]
+    except KeyError:
+        LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
+        return Handle.error(width, height).load_pil()
+
+    return _load_file(fsys, uri, width, height, Image.BILINEAR)
+
+
+def _pil_load_builtin(uri: PackagePath, width: int, height: int) -> Image.Image:
+    """Load from the builtin UI resources."""
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.BILINEAR)
+
+
+def _pil_load_builtin_sprite(uri: PackagePath, width: int, height: int) -> Image.Image:
+    """Load from the builtin UI resources, but use nearest-neighbour resizing."""
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
 
 
 def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: int) -> Image.Image:
@@ -188,16 +197,22 @@ def _pil_icon(arg: Image.Image, width: int, height: int) -> Image.Image:
     """Construct an image with an overlaid icon."""
     img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
     ico = ICONS[arg]
-    assert ico.size == (64, 64)
-    # Center the 64x64 icon.
-    img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
+
+    if width < ico.width or height < ico.height:
+        # Crop to the middle part.
+        img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
+    else:
+        # Center the 64x64 icon.
+        img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
 
     return img
 
 
 TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
 TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty)
-TYP_FILE = ImageType('file', _pil_from_file)
+TYP_FILE = ImageType('file', _pil_from_package)
+TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite)
+TYP_BUILTIN = ImageType('builtin', _pil_load_builtin)
 TYP_ICON = ImageType('icon', _pil_icon)
 TYP_COMP = ImageType('composite', _pil_from_composite)
 
@@ -238,62 +253,95 @@ class Handle(Generic[ArgT]):
         return f'<{self.type.name.title()} image, {self.width}x{self.height}, {self.arg!r}>'
 
     @classmethod
-    def parse(cls, prop: Union[Property, PackagePath], pack: str, width: int, height: int) -> 'Handle':
+    def parse(
+        cls,
+        prop: Property,
+        pack: str,
+        width: int,
+        height: int,
+        *,
+        subkey: str='',
+        subfolder: str='',
+    ) -> 'Handle':
         """Parse a property into an image handle.
 
         If a package isn't specified, the given package will be used.
+        Optionally, 'subkey' can be used to specifiy that the property is a subkey.
+        An error icon will then be produced automatically.
+        If subfolder is specified, files will be relative to this folder.
         """
-        uri: PackagePath
-        if isinstance(prop, Property):
-            if prop.has_children():
-                raise NotImplementedError('Composite images.')
-            uri = PackagePath.parse(prop.value, pack)
-        else:
-            uri = prop
-        return cls.parse_uri(uri, width, height)
+        if subkey:
+            try:
+                prop = prop.find_key(subkey)
+            except LookupError:
+                return cls.error(width, height)
+        if prop.has_children():
+            raise NotImplementedError('Composite images.')
+
+        return cls.parse_uri(PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
 
     @classmethod
-    def parse_uri(cls, uri: PackagePath, width: int, height: int) -> 'Handle':
+    def parse_uri(
+        cls,
+        uri: PackagePath,
+        width: int, height: int,
+        *,
+        subfolder: str='',
+    ) -> 'Handle':
         """Parse a URI into an image handle.
 
         parse() should be used wherever possible, since that allows composite
         images.
+        If subfolder is specified, files will be relative to this folder.
         """
         uri: PackagePath
+        if subfolder:
+            uri = uri.in_folder(subfolder)
 
         typ: ImageType
         args: object
-        if uri.package == 'special':
-            args = None
-            name = uri.path.casefold()
-            if name == 'blank':
-                typ = TYP_ALPHA
-            elif name in ('error', 'none', 'load'):
-                typ = TYP_ICON
-                args = name
-            elif name == 'bg':
-                typ = TYP_COLOR
-                args = PETI_ITEM_BG
-            else:
-                raise ValueError(f'Unknown special type "{uri.path}"!')
-        elif uri.package in ('color', 'colour', 'rgb'):
-            # color:RGB or color:RRGGBB
-            try:
-                if len(uri.path) == 3:
-                    r = int(uri.path[0], 16)
-                    g = int(uri.path[1], 16)
-                    b = int(uri.path[2], 16)
-                elif len(uri.path) == 6:
-                    r = int(uri.path[0:2], 16)
-                    g = int(uri.path[2:4], 16)
-                    b = int(uri.path[4:6], 16)
-                else:
-                    raise ValueError
-            except (ValueError, TypeError, OverflowError):
-                raise ValueError('Colors must be RGB or RRGGBB hex values!') from None
+        if uri.path.casefold() == '<black>':  # Old special case name.
+            LOGGER.warning('Using "{}" for a black icon is deprecated, use "<color>:000" or "<rgb>:000".', uri)
             typ = TYP_COLOR
-            args = (r, g, b)
-        else: # File item
+            args = (0, 0, 0)
+        elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
+            special_name = uri.package[1:-1]
+            if special_name == 'special':
+                args = None
+                name = uri.path.casefold()
+                if name == 'blank':
+                    typ = TYP_ALPHA
+                elif name in ('error', 'none', 'load'):
+                    typ = TYP_ICON
+                    args = name
+                elif name == 'bg':
+                    typ = TYP_COLOR
+                    args = PETI_ITEM_BG
+                else:
+                    raise ValueError(f'Unknown special type "{uri.path}"!')
+            elif special_name in ('color', 'colour', 'rgb'):
+                # color:RGB or color:RRGGBB
+                try:
+                    if len(uri.path) == 3:
+                        r = int(uri.path[0], 16)
+                        g = int(uri.path[1], 16)
+                        b = int(uri.path[2], 16)
+                    elif len(uri.path) == 6:
+                        r = int(uri.path[0:2], 16)
+                        g = int(uri.path[2:4], 16)
+                        b = int(uri.path[4:6], 16)
+                    else:
+                        raise ValueError
+                except (ValueError, TypeError, OverflowError):
+                    raise ValueError('Colors must be RGB or RRGGBB hex values!') from None
+                typ = TYP_COLOR
+                args = (r, g, b)
+            elif special_name in ('bee', 'bee2'):  # Builtin resources.
+                typ = TYP_BUILTIN
+                args = uri
+            else:
+                raise ValueError(f'Unknown special icon type "{uri}"!')
+        else:  # File item
             typ = TYP_FILE
             args = uri
         return cls._get(typ, args, width, height)
@@ -301,7 +349,12 @@ class Handle(Generic[ArgT]):
     @classmethod
     def builtin(cls, path: str, width: int, height: int) -> 'Handle':
         """Shortcut for getting a handle to a builtin UI image."""
-        return cls._get(TYP_FILE, PackagePath('bee2', path + '.png'), width, height)
+        return cls._get(TYP_BUILTIN, PackagePath('<bee2>', path + '.png'), width, height)
+
+    @classmethod
+    def sprite(cls, path: str, width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
+        return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
     def error(cls, width: int, height: int) -> 'Handle':
@@ -327,8 +380,32 @@ class Handle(Generic[ArgT]):
             color = tuple(map(int, color))
         return cls._get(TYP_COLOR, color, width, height)
 
+    def load_pil(self) -> Image.Image:
+        """Load the PIL image if required, then return it.
 
-def apply(widget: tkImgWidgets, img: Optional[Handle]) -> None:
+        Should not be used if possible, to allow deferring loads to the
+        background.
+        """
+        if self._cached_pil is None:
+            self._cached_pil = self.type.pil_func(self.arg, self.width, self.height)
+        return self._cached_pil
+
+    def load_tk(self) -> tkImage:
+        """Load the TK image if required, then return it.
+
+        Should not be used if possible, to allow deferring loads to the
+        background.
+        """
+        if self._cached_tk is None:
+            # LOGGER.debug('Loading {}', self)
+            if self.type.tk_func is None:
+                self._cached_tk = ImageTk.PhotoImage(image=self.load_pil())
+            else:
+                self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
+        return self._cached_tk
+
+
+def apply(widget: tkImgWidgets, img: Optional[Handle]) -> tkImgWidgets:
     """Set the image in a widget.
 
     This tracks the widget, so later reloads will affect the widget.
@@ -341,43 +418,10 @@ def apply(widget: tkImgWidgets, img: Optional[Handle]) -> None:
             del _wid_tk[widget]
         except KeyError:
             pass
-        return
-    if img._cached_tk is None:
-        LOGGER.info('Loading {}', img)
-        if img.type.tk_func is None:
-            if img._cached_pil is None:
-                img._cached_pil = img.type.pil_func(img.arg, img.width, img.height)
-            img._cached_tk = ImageTk.PhotoImage(image=img._cached_pil)
-        else:
-            img._cached_tk = img.type.tk_func(img.arg, img.width, img.height)
-    widget['image'] = img._cached_tk
+        return widget
+    widget['image'] = img.load_tk()
     _wid_tk[widget] = img
-
-
-def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
-    """Loads in an image for use in TKinter.
-
-    - The .png suffix will automatically be added.
-    - Images will be loaded from both the inbuilt files and the extracted
-    zip cache.
-    - If resize_to is set, the image will be resized to that size using the algo
-    algorithm.
-    - This caches images, so it won't be deleted (Tk doesn't keep a reference
-      to the Python object), and subsequent calls don't touch the hard disk.
-    """
-    raise NotImplementedError
-
-
-def spr(name, error=None):
-    """Load in the property icons with the correct size."""
-    # We're doubling the icon size, so use nearest-neighbour to keep
-    # image sharpness
-    return png('icons/'+name, error=error, resize_to=32, algo=Image.NEAREST)
-
-
-def icon(name, error=None):
-    """Load in a palette icon, using the correct directory and size."""
-    return png('items/' + name, error=error, resize_to=64)
+    return widget
 
 
 def get_app_icon(path: str):
@@ -470,26 +514,3 @@ def make_splash_screen(
 
     tk_img = ImageTk.PhotoImage(image=image)
     return tk_img, image.width, image.height
-
-
-def color_square(color: Vec, size=16):
-    """Create a square image of the given size, with the given color."""
-    return None
-
-
-def invis_square(size):
-    """Create a square image of the given size, filled with 0-alpha pixels."""
-
-    try:
-        return cached_squares['alpha', size]
-    except KeyError:
-        img = Image.new(
-            mode='RGBA',
-            size=tuple_size(size),
-            color=(0, 0, 0, 0),
-        )
-        tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares['alpha', size] = tk_img
-
-        return tk_img
-
