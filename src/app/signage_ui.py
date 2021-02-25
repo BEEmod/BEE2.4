@@ -187,17 +187,19 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         if hover_sign is None:
             return
         if hover_arrow and sign_arrow:
-            preview_left['image'] = hover_sign.dnd_icon
-            preview_right['image'] = sign_arrow.dnd_icon
+            left = hover_sign.dnd_icon
+            right = sign_arrow.dnd_icon
         else:
             try:
-                preview_left['image'] = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+                left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
             except KeyError:
-                preview_left['image'] = hover_sign.dnd_icon
+                left = hover_sign.dnd_icon
             try:
-                preview_right['image'] = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+                right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
             except KeyError:
-                preview_right['image'] = IMG_BLANK
+                right = IMG_BLANK
+        img.apply(preview_left, left)
+        img.apply(preview_right, right)
         hover_toggle_id = TK_ROOT.after(1000, hover_toggle)
 
     def on_hover(slot: dragdrop.Slot[Signage]) -> None:
@@ -219,8 +221,8 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         if hover_toggle_id is not None:
             TK_ROOT.after_cancel(hover_toggle_id)
             hover_toggle_id = None
-        preview_left['image'] = IMG_BLANK
-        preview_right['image'] = IMG_BLANK
+        img.apply(preview_left, IMG_BLANK)
+        img.apply(preview_right, IMG_BLANK)
 
     drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
     drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
