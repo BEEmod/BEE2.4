@@ -626,7 +626,7 @@ def load_packages(data: dict):
         readonly_desc=_('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
-        none_icon=img.Handle.builtin('BEE2/random', 64, 64),
+        none_icon=img.Handle.builtin('BEE2/random', 96, 96),
         none_name=_('Random'),
         none_desc=_('Choose a random video.'),
         callback=win_callback,
