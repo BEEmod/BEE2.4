@@ -638,6 +638,7 @@ def ui_save_backup_as() -> None:
 
 def ui_refresh_game() -> None:
     """Reload the game maps list."""
+    from app import gameMan
     if gameMan.selected_game is not None:
         load_game(gameMan.selected_game)
 
@@ -848,6 +849,7 @@ def init() -> None:
 
 def init_application() -> None:
     """Initialise the standalone application."""
+    from app import gameMan
     global window
     window = TK_ROOT
     TK_ROOT.title(
