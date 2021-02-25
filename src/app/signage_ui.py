@@ -18,6 +18,8 @@ window.withdraw()
 
 drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
+IMG_ERROR = img.Handle.error(64, 64)
+IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 DEFAULT_IDS = {
     3: 'SIGN_NUM_1',
@@ -49,6 +51,7 @@ def export_data() -> List[Tuple[str, str]]:
         for ind, slot in SLOTS_SELECTED.items()
         if slot.contents is not None
     ]
+
 
 @overload
 def save_load_signage() -> Property: ...
@@ -107,17 +110,17 @@ def style_changed(new_style: Style) -> None:
             try:
                 icon = sign.styles['BEE2_CLEAN'].icon
             except KeyError:
-                sign.dnd_icon = img.img_error
+                sign.dnd_icon = IMG_ERROR
                 continue
         if icon:
-            sign.dnd_icon = img.png(icon, resize_to=(64, 64))
+            sign.dnd_icon = icon
         else:
             LOGGER.warning(
                 'No icon for "{}" signage in <{}> style!',
                 sign.id,
                 new_style.id,
             )
-            sign.dnd_icon = img.img_error
+            sign.dnd_icon = IMG_ERROR
     drag_man.refresh_icons()
 
 
@@ -160,9 +163,10 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
 
     utils.add_mousewheel(canv_all, canv_all, window)
 
-    blank_sign = img.color_square(img.PETI_ITEM_BG, 64)
-    preview_left = ttk.Label(frame_preview, image=blank_sign, anchor='e')
-    preview_right = ttk.Label(frame_preview, image=blank_sign, anchor='w')
+    preview_left = ttk.Label(frame_preview, anchor='e')
+    preview_right = ttk.Label(frame_preview, anchor='w')
+    img.apply(preview_left, IMG_BLANK)
+    img.apply(preview_right, IMG_BLANK)
     preview_left.grid(row=0, column=0)
     preview_right.grid(row=0, column=1)
 
@@ -193,7 +197,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
             try:
                 preview_right['image'] = Signage.by_id(hover_sign.sec_id or '').dnd_icon
             except KeyError:
-                preview_right['image'] = blank_sign
+                preview_right['image'] = IMG_BLANK
         hover_toggle_id = TK_ROOT.after(1000, hover_toggle)
 
     def on_hover(slot: dragdrop.Slot[Signage]) -> None:
@@ -215,8 +219,8 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         if hover_toggle_id is not None:
             TK_ROOT.after_cancel(hover_toggle_id)
             hover_toggle_id = None
-        preview_left['image'] = blank_sign
-        preview_right['image'] = blank_sign
+        preview_left['image'] = IMG_BLANK
+        preview_right['image'] = IMG_BLANK
 
     drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
     drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
