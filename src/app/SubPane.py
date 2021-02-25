@@ -6,6 +6,7 @@ from BEE2_config import GEN_OPTS
 
 from app import tooltip
 from app import tk_tools
+from app.img import Handle as ImgHandle, apply as apply_img
 import utils
 import srctools
 from app import sound
@@ -24,16 +25,16 @@ style.configure(
 
 def make_tool_button(
     frame: tk.Misc,
-    img: tk.PhotoImage,
+    img: str,
     command: Callable[[], Any]
 ) -> ttk.Button:
     """Make a toolbar icon."""
     button = ttk.Button(
         frame,
         style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
-        image=img,
         command=command,
     )
+    apply_img(button, ImgHandle.builtin(img, 16, 16))
 
     return button
 
@@ -48,7 +49,7 @@ class SubPane(tk.Toplevel):
         parent: tk.Misc,
         *,
         tool_frame: tk.Frame,
-        tool_img: tk.PhotoImage,
+        tool_img: str,
         menu_bar: tk.Menu,
         tool_col: int=0,
         title: str='',
