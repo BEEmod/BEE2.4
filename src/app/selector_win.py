@@ -214,15 +214,13 @@ class Item:
       characters.
     - context_lbl: The text shown on the rightclick menu. This is either
       the short or long name, depending on the size of the long name.
-    - icon: The image object for the item icon. The icon should be 96x96
+    - icon: The image handle for the item icon. The icon should be 96x96
       pixels large.
-    - large_icon: If set, a different file to use for the 192x192 icon.
-    - ico_file: The file path for the image.
-    - desc: A list of tuples, following the richTextBox text format.
+    - large_icon: If set, a different handle to use for the 192x192 icon.
+    - desc: A MarkdownData value containing the description.
     - authors: A list of the item's authors.
     - group: Items with the same group name will be shown together.
     - attrs: a dictionary containing the attribute values for this item.
-
     - button, Set later, the button TK object for this item
     """
     __slots__ = [
