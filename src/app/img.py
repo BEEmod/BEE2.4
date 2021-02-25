@@ -113,26 +113,26 @@ class ImageType(Generic[ArgT]):
 
 def _pil_from_color(color: Tuple[int, int, int], width: int, height: int) -> Image.Image:
     """Directly produce an image of this size with the specified color."""
-    return Image.new('RGB', (width, height), color)
+    return Image.new('RGB', (width or 16, height or 16), color)
 
 
 def _tk_from_color(color: Tuple[int, int, int], width: int, height: int) -> tkImage:
     """Directly produce an image of this size with the specified color."""
     r, g, b = color
-    img = tk.PhotoImage(width=width, height=height)
+    img = tk.PhotoImage(width=width or 16, height=height or 16)
     # Make hex RGB, then set the full image to that.
-    img.put(f'{{#{r:02X}{g:02X}{b:02X}}}', to=(0, 0, width, height))
+    img.put(f'{{#{r:02X}{g:02X}{b:02X}}}', to=(0, 0, width or 16, height or 16))
     return img
 
 
 def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
     """Produce an image of this size with transparent pixels."""
-    return Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
 
 
 def _tk_empty(arg: object, width: int, height: int) -> tkImage:
     """Produce a TK image of this size which is entirely transparent."""
-    img = tk.PhotoImage(width=width, height=height)
+    img = tk.PhotoImage(width=width or 16, height=height or 16)
     img.blank()
     return img
 
@@ -179,7 +179,7 @@ def _load_file(
         image = Image.open(file)
         image.load()
 
-    if (width, height) != image.size:
+    if width > 0 and height > 0 and (width, height) != image.size:
         image = image.resize((width, height), resample=resize_algo)
     return image
 
@@ -215,6 +215,11 @@ def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: in
 
 def _pil_icon(arg: Image.Image, width: int, height: int) -> Image.Image:
     """Construct an image with an overlaid icon."""
+    if width == 0:
+        width = arg.width
+    if height == 0:
+        height = arg.height
+
     img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
     ico = ICONS[arg]
 
@@ -262,7 +267,9 @@ class Handle(Generic[ArgT]):
         self._cached_tk: Optional[tkImage] = None
 
     @classmethod
-    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: int, height: int) -> 'Handle[ArgT]':
+    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: Union[int, Tuple[int, int]], height: int) -> 'Handle[ArgT]':
+        if isinstance(width, tuple):
+            width, height = width
         try:
             return _handles[typ, arg, width, height]
         except KeyError:
@@ -289,6 +296,7 @@ class Handle(Generic[ArgT]):
         Optionally, 'subkey' can be used to specifiy that the property is a subkey.
         An error icon will then be produced automatically.
         If subfolder is specified, files will be relative to this folder.
+        The width/height may be zero to indicate it should not be resized.
         """
         if subkey:
             try:
@@ -304,7 +312,7 @@ class Handle(Generic[ArgT]):
     def parse_uri(
         cls,
         uri: PackagePath,
-        width: int, height: int,
+        width: int = 0, height: int = 0,
         *,
         subfolder: str='',
     ) -> 'Handle':
@@ -313,6 +321,7 @@ class Handle(Generic[ArgT]):
         parse() should be used wherever possible, since that allows composite
         images.
         If subfolder is specified, files will be relative to this folder.
+        The width/height may be zero to indicate it should not be resized.
         """
         uri: PackagePath
         if subfolder:
@@ -343,9 +352,9 @@ class Handle(Generic[ArgT]):
                 # color:RGB or color:RRGGBB
                 try:
                     if len(uri.path) == 3:
-                        r = int(uri.path[0], 16)
-                        g = int(uri.path[1], 16)
-                        b = int(uri.path[2], 16)
+                        r = int(uri.path[0] * 2, 16)
+                        g = int(uri.path[1] * 2, 16)
+                        b = int(uri.path[2] * 2, 16)
                     elif len(uri.path) == 6:
                         r = int(uri.path[0:2], 16)
                         g = int(uri.path[2:4], 16)
@@ -367,12 +376,12 @@ class Handle(Generic[ArgT]):
         return cls._get(typ, args, width, height)
 
     @classmethod
-    def builtin(cls, path: str, width: int, height: int) -> 'Handle':
+    def builtin(cls, path: str, width: int = 0, height: int = 0) -> 'Handle':
         """Shortcut for getting a handle to a builtin UI image."""
         return cls._get(TYP_BUILTIN, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
-    def sprite(cls, path: str, width: int, height: int) -> 'Handle':
+    def sprite(cls, path: str, width: int = 0, height: int = 0) -> 'Handle':
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
         return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
 
