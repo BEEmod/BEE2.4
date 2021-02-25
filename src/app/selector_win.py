@@ -898,13 +898,13 @@ class selWin:
                     else:
                         _self.sel_item(_item)
 
-            group_key = item.group.casefold()
+            group_key = item.group.strip().casefold()
             grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = item.group
             if group_key not in self.group_widgets:
-                self.group_widgets[group_key] = GroupHeader(self, item.group)
+                self.group_widgets[group_key] = GroupHeader(self, self.group_names[group_key])
 
             try:
                 menu = self.context_menus[group_key]
