@@ -229,7 +229,7 @@ class ItemVariant:
                 pal_icon = None
             pal_name = item['pal_name', None]  # Name for the palette icon
             try:
-                bee2_icon = img.Handle.parse(item.find_key('BEE2'), pak_id, 64, 64)
+                bee2_icon = img.Handle.parse(item.find_key('BEE2'), pak_id, 64, 64, subfolder='items')
             except LookupError:
                 bee2_icon = None
 
