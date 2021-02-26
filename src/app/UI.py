@@ -1105,10 +1105,10 @@ def set_palette(e=None):
             LOGGER.warning('Unknown item "{}"! for palette', item)
             continue
 
-        if sub >= len(item_group.def_data.editor.subtypes):
+        if sub not in item_group.visual_subtypes:
             LOGGER.warning(
-                'Palette had incorrect subtype for "{}" ({} > {})!',
-                item, sub, len(item_group.def_data.editor.subtypes) - 1,
+                'Palette had incorrect subtype {} for "{}"! Valid subtypes: {}!',
+                item, sub, item_group.visual_subtypes,
             )
             continue
 
