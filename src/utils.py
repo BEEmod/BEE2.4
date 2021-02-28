@@ -82,15 +82,18 @@ else:
 if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
+if FROZEN:
+    # This special attribute is set by PyInstaller to our folder.
+    _INSTALL_ROOT = Path(sys._MEIPASS)
+else:
+    # We're running from src/, so data is in the folder above that.
+    # Go up once from the file to its containing folder, then to the parent.
+    _INSTALL_ROOT = Path(sys.argv[0]).resolve().parent.parent
+
 
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
-    if FROZEN:
-        # This special attribute is set by PyInstaller to our folder.
-        return Path(sys._MEIPASS) / path
-    else:
-        # We're running from src/, so data is in the folder above that.
-        return (Path(sys.argv[0]).parent.parent / path).resolve()
+    return _INSTALL_ROOT / path
 
 
 def conf_location(path: str) -> Path:

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-02-21 11:21+1000\n"
+"POT-Creation-Date: 2021-02-22 14:22+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -122,7 +122,7 @@ msgstr ""
 "Choisit un couloir aléatoire. Ceci est sauvegardé dans le data du puzzle "
 "et ne va pas changer."
 
-#: app/CompilerPane.py:320 app/UI.py:626
+#: app/CompilerPane.py:320 app/UI.py:632
 msgid "Random"
 msgstr "Aléatoire"
 
@@ -495,11 +495,11 @@ msgstr "Cacher/Montrer la fenêtre \"{}\""
 msgid "Export..."
 msgstr "Export..."
 
-#: app/UI.py:560
+#: app/UI.py:566
 msgid "Select Skyboxes"
 msgstr "Sélectionnez une skybox"
 
-#: app/UI.py:561
+#: app/UI.py:567
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
@@ -510,19 +510,19 @@ msgstr ""
 "sans fond (si présents) tout comme la couleur du \"brouillard\" (vu dans "
 "les grandes salles)."
 
-#: app/UI.py:569
+#: app/UI.py:575
 msgid "3D Skybox"
 msgstr "Skybox 3D"
 
-#: app/UI.py:570
+#: app/UI.py:576
 msgid "Fog Color"
 msgstr "Couleur du brouillard"
 
-#: app/UI.py:577
+#: app/UI.py:583
 msgid "Select Additional Voice Lines"
 msgstr "Sélectionnez les répliques additionnelles"
 
-#: app/UI.py:578
+#: app/UI.py:584
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -534,31 +534,31 @@ msgstr ""
 "dans la salle. Les répliques additionnelles de Cave du multivers sont "
 "contrôlées séparément dans les propriétés de style."
 
-#: app/UI.py:583
+#: app/UI.py:589
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "N'ajoute aucune réplique supplémentaire."
 
-#: app/UI.py:585
+#: app/UI.py:591
 msgid "<Multiverse Cave only>"
 msgstr "<Cave du Multivers seulement>"
 
-#: app/UI.py:589
+#: app/UI.py:595
 msgid "Characters"
 msgstr "Personnages"
 
-#: app/UI.py:590
+#: app/UI.py:596
 msgid "Turret Shoot Monitor"
 msgstr "Les tourelles tirent sur les moniteurs"
 
-#: app/UI.py:591
+#: app/UI.py:597
 msgid "Monitor Visuals"
 msgstr "Visuels des moniteurs"
 
-#: app/UI.py:598
+#: app/UI.py:604
 msgid "Select Style"
 msgstr "Sélectionnez un style"
 
-#: app/UI.py:599
+#: app/UI.py:605
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -572,15 +572,15 @@ msgstr ""
 "\n"
 "Le style définit de façon large l'époque où se place la salle."
 
-#: app/UI.py:610
+#: app/UI.py:616
 msgid "Elevator Videos"
 msgstr "Vidéos d'ascenseur"
 
-#: app/UI.py:617
+#: app/UI.py:623
 msgid "Select Elevator Video"
 msgstr "Sélectionnez une vidéo d'ascenceur"
 
-#: app/UI.py:618
+#: app/UI.py:624
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -591,23 +591,23 @@ msgstr ""
 "est choisit, une vidéo aléatoire sera sélectionnée chaque fois que la "
 "carte sera jouée, comme avec le style PeTI par défaut."
 
-#: app/UI.py:622
+#: app/UI.py:628
 msgid "This style does not have a elevator video screen."
 msgstr "Ce style n'a aucune vidéo d'ascenseur."
 
-#: app/UI.py:627
+#: app/UI.py:633
 msgid "Choose a random video."
 msgstr "Choisit une vidéo aléatoire."
 
-#: app/UI.py:631
+#: app/UI.py:637
 msgid "Multiple Orientations"
 msgstr "Orientations multiples"
 
-#: app/UI.py:859
+#: app/UI.py:865
 msgid "Selected Items and Style successfully exported!"
 msgstr "Le style et les objets sélectionnés ont été exportés avec succès !"
 
-#: app/UI.py:861
+#: app/UI.py:867
 msgid ""
 "\n"
 "\n"
@@ -620,71 +620,71 @@ msgstr ""
 "Hammer pour assurer le rafraîchissement des apparences des murs en "
 "prévisualisation."
 
-#: app/UI.py:1093
+#: app/UI.py:1099
 msgid "Delete Palette \"{}\""
 msgstr "Supprimer la palette \"{}\""
 
-#: app/UI.py:1176
+#: app/UI.py:1182
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Enregistrer la palette"
 
-#: app/UI.py:1177
+#: app/UI.py:1183
 msgid "Enter a name:"
 msgstr "Entrer un nom:"
 
-#: app/UI.py:1186
+#: app/UI.py:1192
 msgid "This palette already exists. Overwrite?"
 msgstr "Cette palette existe déjà. Remplacer ?"
 
-#: app/UI.py:1218 app/gameMan.py:1340
+#: app/UI.py:1224 app/gameMan.py:1340
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
 
-#: app/UI.py:1246
+#: app/UI.py:1252
 msgid "Clear Palette"
 msgstr "Vider la palette"
 
-#: app/UI.py:1282 app/UI.py:1716
+#: app/UI.py:1288 app/UI.py:1722
 msgid "Delete Palette"
 msgstr "Supprimer la palette"
 
-#: app/UI.py:1302
+#: app/UI.py:1308
 msgid "Save Palette..."
 msgstr "Enregistrer la palette..."
 
-#: app/UI.py:1307 app/UI.py:1739
+#: app/UI.py:1313 app/UI.py:1745
 msgid "Save Palette As..."
 msgstr "Enregistrer la palette sous..."
 
-#: app/UI.py:1318 app/UI.py:1727
+#: app/UI.py:1324 app/UI.py:1733
 msgid "Save Settings in Palettes"
 msgstr ""
 
-#: app/UI.py:1336 app/music_conf.py:205
+#: app/UI.py:1342 app/music_conf.py:205
 msgid "Music: "
 msgstr "Musique: "
 
-#: app/UI.py:1362
+#: app/UI.py:1368
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Utiliser les suggestions {arr}"
 
-#: app/UI.py:1378
+#: app/UI.py:1384
 msgid "Style: "
 msgstr "Style: "
 
-#: app/UI.py:1380
+#: app/UI.py:1386
 msgid "Voice: "
 msgstr "Voix: "
 
-#: app/UI.py:1381
+#: app/UI.py:1387
 msgid "Skybox: "
 msgstr "Skybox: "
 
-#: app/UI.py:1382
+#: app/UI.py:1388
 msgid "Elev Vid: "
 msgstr "Vid Asc: "
 
-#: app/UI.py:1400
+#: app/UI.py:1406
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
@@ -692,75 +692,75 @@ msgstr ""
 "Activer ou désactiver certaines répliques pour les empêcher d'être "
 "ajoutées."
 
-#: app/UI.py:1503
+#: app/UI.py:1509
 msgid "All Items: "
 msgstr "Tous les objets: "
 
-#: app/UI.py:1635
+#: app/UI.py:1641
 msgid "Export to \"{}\"..."
 msgstr "Exporter vers \"{}\"..."
 
-#: app/UI.py:1663 app/backup.py:872
+#: app/UI.py:1669 app/backup.py:872
 msgid "File"
 msgstr "Fichier"
 
-#: app/UI.py:1670
+#: app/UI.py:1676
 msgid "Export"
 msgstr "Exporter"
 
-#: app/UI.py:1677 app/backup.py:876
+#: app/UI.py:1683 app/backup.py:876
 msgid "Add Game"
 msgstr "Ajouter le jeu"
 
-#: app/UI.py:1681
+#: app/UI.py:1687
 msgid "Uninstall from Selected Game"
 msgstr "Désinstaller du jeu sélectionné"
 
-#: app/UI.py:1685
+#: app/UI.py:1691
 msgid "Backup/Restore Puzzles..."
 msgstr "Sauvegarder/Restaurer les puzzles..."
 
-#: app/UI.py:1689
+#: app/UI.py:1695
 msgid "Manage Packages..."
 msgstr "Gérer les paquets..."
 
-#: app/UI.py:1694
+#: app/UI.py:1700
 msgid "Options"
 msgstr "Options"
 
-#: app/UI.py:1699 app/gameMan.py:1088
+#: app/UI.py:1705 app/gameMan.py:1088
 msgid "Quit"
 msgstr "Quitter"
 
-#: app/UI.py:1709
+#: app/UI.py:1715
 msgid "Palette"
 msgstr "Palette"
 
-#: app/UI.py:1711
+#: app/UI.py:1717
 msgid "Clear"
 msgstr "Vider"
 
-#: app/UI.py:1720
+#: app/UI.py:1726
 msgid "Fill Palette"
 msgstr "Remplir la palette"
 
-#: app/UI.py:1734
+#: app/UI.py:1740
 msgid "Save Palette"
 msgstr "Enregistrer la palette"
 
-#: app/UI.py:1749
+#: app/UI.py:1755
 msgid "View"
 msgstr ""
 
-#: app/UI.py:1863
+#: app/UI.py:1869
 msgid "Palettes"
 msgstr "Palettes"
 
-#: app/UI.py:1888
+#: app/UI.py:1894
 msgid "Export Options"
 msgstr "Options d'export"
 
-#: app/UI.py:1920
+#: app/UI.py:1926
 msgid "Fill empty spots in the palette with random items."
 msgstr "Remplir les emplacements vides de la palette avec des objets aléatoires."
 
@@ -1209,7 +1209,7 @@ msgstr ""
 msgid "No Properties available!"
 msgstr "Aucune propriété disponible !"
 
-#: app/item_search.py:52
+#: app/item_search.py:59
 msgid "Search:"
 msgstr ""
 
