@@ -969,3 +969,4 @@ from packages.skybox import Skybox
 from packages.music import Music
 from packages.quote_pack import QuotePack
 from packages.template_brush import BrushTemplate, TEMPLATE_FILE
+from packages.pack_list import PackList

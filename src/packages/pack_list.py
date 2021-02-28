@@ -18,7 +18,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
     @classmethod
     def parse(cls, data: ParseData) -> 'PackList':
         """Read pack lists from packages."""
-        filesystem = data.fsys  # type: FileSystem
+        filesystem = data.fsys
         conf = data.info.find_key('Config', '')
 
         if 'AddIfMat' in data.info:
