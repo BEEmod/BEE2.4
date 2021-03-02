@@ -225,8 +225,8 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
         if item.cust_instances:
             CUST_INST_FILES[item.id.casefold()] = cust_instances = {}
             for name, file in item.cust_instances.items():
-                cust_instances[name] = str(file)
-                ITEM_FOR_FILE[str(file).casefold()] = (item.id, name)
+                cust_instances[name] = folded = str(file).casefold()
+                ITEM_FOR_FILE[folded] = (item.id, name)
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
