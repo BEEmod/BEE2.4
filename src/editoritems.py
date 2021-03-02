@@ -452,7 +452,7 @@ class OccupiedVoxel(NamedTuple):
     If subpos is not None, this is a 32x32 cube and not a full voxel.
     """
     type: CollType
-    against: CollType
+    against: Optional[CollType]  # TODO: Don't know what the default is.
     pos: Coord
     subpos: Optional[Coord]
     normal: Optional[Coord]
@@ -1323,7 +1323,7 @@ class Item:
         """Parse occupied voxel definitions. We add on the volume variant for convienience."""
         for occu_key in tok.block('OccupiedVoxels'):
             collide_type = CollType.DEFAULT
-            collide_against = CollType.NOTHING
+            collide_against: Optional[CollType] = None
             pos1 = Coord(0, 0, 0)
             pos2: Optional[Coord] = None
             normal: Optional[Coord] = None
@@ -1662,12 +1662,12 @@ class Item:
         for (pos, typ, against), voxels in voxel_groups.items():
             f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
             f.write(f'\t\t\t\t"Pos" "{pos}"\n')
-            if typ is not CollType.DEFAULT and against is not CollType.NOTHING:
+            if typ is not CollType.DEFAULT and against is not None:
                 f.write(f'\t\t\t\t"CollideType"    "{typ}"\n')
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
             elif typ is not CollType.DEFAULT:
                 f.write(f'\t\t\t\t"CollideType" "{typ}"\n')
-            elif against is not CollType.NOTHING:
+            elif against is not None:
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
             # Special case - single full voxel has no surface sections.
             if len(voxels) != 1 or voxels[0].subpos is not None or voxels[0].normal is not None:
