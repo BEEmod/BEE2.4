@@ -3,11 +3,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BEE2 mod translations\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-02-21 11:21+1000\n"
+"POT-Creation-Date: 2021-02-27 14:14-0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Last-Translator: \n"
 "Language: pl\n"
-"Language-Team: pl <LL@li.org>\n"
+"Language-Team: \n"
 "Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && "
 "(n%100<10 || n%100>=20) ? 1 : 2)\n"
 "MIME-Version: 1.0\n"
@@ -48,7 +48,7 @@ msgstr "Inicjacja interfejsu"
 msgid "Better Extended Editor for Portal 2"
 msgstr "Lepiej Rozwinięty Edytor map dla Portal 2"
 
-#: utils.py:892
+#: utils.py:895
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr "__LANG_USE_SANS_SERIF__"
 
@@ -121,7 +121,7 @@ msgstr ""
 "Losowo wybiera korytarz. Raz wybrany jest zapisywany w danych mapy i się "
 "nie zmieni."
 
-#: app/CompilerPane.py:320 app/UI.py:626
+#: app/CompilerPane.py:320 app/UI.py:632
 msgid "Random"
 msgstr "Losowo"
 
@@ -328,7 +328,7 @@ msgstr "Wyjście (tryb 1-os.)"
 
 #: app/CompilerPane.py:863
 msgid "Coop Exit:"
-msgstr ""
+msgstr "Wyjście (tryb 2-os.):"
 
 #: app/CompilerPane.py:869
 msgid "Player Model (SP):"
@@ -491,11 +491,11 @@ msgstr "Pokaż/ukryj okno \"{}\""
 msgid "Export..."
 msgstr "Wyeksportuj..."
 
-#: app/UI.py:560
+#: app/UI.py:566
 msgid "Select Skyboxes"
 msgstr "Wybierz skybox"
 
-#: app/UI.py:561
+#: app/UI.py:567
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
@@ -506,19 +506,19 @@ msgstr ""
 "otchłani (jeśli obecna), a także kolor \"mgły\" (widocznej w większych "
 "komorach)."
 
-#: app/UI.py:569
+#: app/UI.py:575
 msgid "3D Skybox"
 msgstr "Skybox 3D"
 
-#: app/UI.py:570
+#: app/UI.py:576
 msgid "Fog Color"
 msgstr "Kolor mgły"
 
-#: app/UI.py:577
+#: app/UI.py:583
 msgid "Select Additional Voice Lines"
 msgstr "Wybierz dodatkowe ścieżki głosowe"
 
-#: app/UI.py:578
+#: app/UI.py:584
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -530,31 +530,31 @@ msgstr ""
 "Dodatkowe ścieżki Cave'a Johnsona z \"Multiwersum\" są wybierane osobno "
 "we właściwościach stylu."
 
-#: app/UI.py:583
+#: app/UI.py:589
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "Nie dodaje żadnych ścieżek, jedynie Cave z multiwersum, jeżeli włączone."
 
-#: app/UI.py:585
+#: app/UI.py:591
 msgid "<Multiverse Cave only>"
 msgstr "<Tylko Cave z multiwersum>"
 
-#: app/UI.py:589
+#: app/UI.py:595
 msgid "Characters"
 msgstr "Postacie"
 
-#: app/UI.py:590
+#: app/UI.py:596
 msgid "Turret Shoot Monitor"
 msgstr "Wieżyczki strzelają w monitor"
 
-#: app/UI.py:591
+#: app/UI.py:597
 msgid "Monitor Visuals"
 msgstr "Postać na monitorze"
 
-#: app/UI.py:598
+#: app/UI.py:604
 msgid "Select Style"
 msgstr "Wybierz styl"
 
-#: app/UI.py:599
+#: app/UI.py:605
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -568,15 +568,15 @@ msgstr ""
 "\n"
 "Styl po prostu określa okres czasu, w którym rozgrywana jest komora."
 
-#: app/UI.py:610
+#: app/UI.py:616
 msgid "Elevator Videos"
 msgstr "Filmy przy windzie"
 
-#: app/UI.py:617
+#: app/UI.py:623
 msgid "Select Elevator Video"
 msgstr "Wybierz film"
 
-#: app/UI.py:618
+#: app/UI.py:624
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -587,23 +587,23 @@ msgstr ""
 "\"None\", losowy film będzie wybrany za każdym razem, gdy mapa jest "
 "grana, jak w domyślnym edytorze."
 
-#: app/UI.py:622
+#: app/UI.py:628
 msgid "This style does not have a elevator video screen."
 msgstr "Ten styl nie ma ekranu na film."
 
-#: app/UI.py:627
+#: app/UI.py:633
 msgid "Choose a random video."
 msgstr "Wybierz dowolny film."
 
-#: app/UI.py:631
+#: app/UI.py:637
 msgid "Multiple Orientations"
 msgstr "Wiele orientacji"
 
-#: app/UI.py:859
+#: app/UI.py:865
 msgid "Selected Items and Style successfully exported!"
 msgstr "Wyeksportowanie wybranych przedmiotów i stylu powiodło się!"
 
-#: app/UI.py:861
+#: app/UI.py:867
 msgid ""
 "\n"
 "\n"
@@ -615,145 +615,145 @@ msgstr ""
 "Uwaga: Pliki VPK nie zostały wyeksportowane, wyjdź z Portal 2 i Hammer "
 "aby upewnić się, że podgląd ścian w edytorze się zmienił."
 
-#: app/UI.py:1093
+#: app/UI.py:1099
 msgid "Delete Palette \"{}\""
 msgstr "Usuń paletę \"{}\""
 
-#: app/UI.py:1176
+#: app/UI.py:1182
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Zapisz paletę"
 
-#: app/UI.py:1177
+#: app/UI.py:1183
 msgid "Enter a name:"
 msgstr "Wpisz nazwę:"
 
-#: app/UI.py:1186
+#: app/UI.py:1192
 msgid "This palette already exists. Overwrite?"
 msgstr "Ta paleta już istnieje. Nadpisać?"
 
-#: app/UI.py:1218 app/gameMan.py:1340
+#: app/UI.py:1224 app/gameMan.py:1340
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Na pewno chcesz usunąć \"{}\"?"
 
-#: app/UI.py:1246
+#: app/UI.py:1252
 msgid "Clear Palette"
 msgstr "Wyczyść paletę"
 
-#: app/UI.py:1282 app/UI.py:1716
+#: app/UI.py:1288 app/UI.py:1722
 msgid "Delete Palette"
 msgstr "Usuń paletę"
 
-#: app/UI.py:1302
+#: app/UI.py:1308
 msgid "Save Palette..."
 msgstr "Zapisz paletę..."
 
-#: app/UI.py:1307 app/UI.py:1739
+#: app/UI.py:1313 app/UI.py:1745
 msgid "Save Palette As..."
 msgstr "Zapisz paletę jako..."
 
-#: app/UI.py:1318 app/UI.py:1727
+#: app/UI.py:1324 app/UI.py:1733
 msgid "Save Settings in Palettes"
 msgstr "Zapisz ustawienia palet"
 
-#: app/UI.py:1336 app/music_conf.py:205
+#: app/UI.py:1342 app/music_conf.py:205
 msgid "Music: "
 msgstr "Muzyka: "
 
-#: app/UI.py:1362
+#: app/UI.py:1368
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Użyj sugerowanego  {arr}"
 
-#: app/UI.py:1378
+#: app/UI.py:1384
 msgid "Style: "
 msgstr "Styl: "
 
-#: app/UI.py:1380
+#: app/UI.py:1386
 msgid "Voice: "
 msgstr "Głos: "
 
-#: app/UI.py:1381
+#: app/UI.py:1387
 msgid "Skybox: "
-msgstr "Skybos: "
+msgstr "Skybox: "
 
-#: app/UI.py:1382
+#: app/UI.py:1388
 msgid "Elev Vid: "
-msgstr "Film w windzie: "
+msgstr "Winda:"
 
-#: app/UI.py:1400
+#: app/UI.py:1406
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "Włącz lub wyłącz poszczególne ścieżki głosowe, aby zapobiec dodaniu ich."
 
-#: app/UI.py:1503
+#: app/UI.py:1509
 msgid "All Items: "
 msgstr "Wszystkie przedmioty: "
 
-#: app/UI.py:1635
+#: app/UI.py:1641
 msgid "Export to \"{}\"..."
 msgstr "Wyeksportuj do \"{}\"..."
 
-#: app/UI.py:1663 app/backup.py:872
+#: app/UI.py:1669 app/backup.py:872
 msgid "File"
 msgstr "Plik"
 
-#: app/UI.py:1670
+#: app/UI.py:1676
 msgid "Export"
 msgstr "Wyeksportuj"
 
-#: app/UI.py:1677 app/backup.py:876
+#: app/UI.py:1683 app/backup.py:876
 msgid "Add Game"
 msgstr "Dodaj grę"
 
-#: app/UI.py:1681
+#: app/UI.py:1687
 msgid "Uninstall from Selected Game"
 msgstr "Odinstaluj z wybranej gry"
 
-#: app/UI.py:1685
+#: app/UI.py:1691
 msgid "Backup/Restore Puzzles..."
 msgstr "Kopia zapasowa i przywracanie map"
 
-#: app/UI.py:1689
+#: app/UI.py:1695
 msgid "Manage Packages..."
 msgstr "Zarządzaj paczkami..."
 
-#: app/UI.py:1694
+#: app/UI.py:1700
 msgid "Options"
 msgstr "Opcje"
 
-#: app/UI.py:1699 app/gameMan.py:1088
+#: app/UI.py:1705 app/gameMan.py:1088
 msgid "Quit"
 msgstr "Wyjdź"
 
-#: app/UI.py:1709
+#: app/UI.py:1715
 msgid "Palette"
 msgstr "Paleta"
 
-#: app/UI.py:1711
+#: app/UI.py:1717
 msgid "Clear"
 msgstr "Wyczyść"
 
-#: app/UI.py:1720
+#: app/UI.py:1726
 msgid "Fill Palette"
 msgstr "Wypełnij paletę"
 
-#: app/UI.py:1734
+#: app/UI.py:1740
 msgid "Save Palette"
 msgstr "Zapisz paletę"
 
-#: app/UI.py:1749
+#: app/UI.py:1755
 msgid "View"
-msgstr "Wyświetl"
+msgstr "Widok"
 
-#: app/UI.py:1863
+#: app/UI.py:1869
 msgid "Palettes"
 msgstr "Palety"
 
-#: app/UI.py:1888
+#: app/UI.py:1894
 msgid "Export Options"
 msgstr "Opcje eksportu"
 
-#: app/UI.py:1920
+#: app/UI.py:1926
 msgid "Fill empty spots in the palette with random items."
 msgstr "Wypełnia puste miejsca na palecie losowymi przedmiotami."
 
@@ -1119,7 +1119,7 @@ msgid ""
 " (BEE2 will quit, this is the last game set!)"
 msgstr ""
 "\n"
-"(BEE2 zostanie zamknięte, to jest ostatnia gra!)"
+"(BEE2 zostanie zamknięte, to jest ostatnia gra w katalogu!)"
 
 #: app/helpMenu.py:57
 msgid "Wiki..."
@@ -1179,11 +1179,11 @@ msgstr "Pomoc"
 
 #: app/helpMenu.py:333
 msgid "BEE2 Credits"
-msgstr "Autorzy BEE2"
+msgstr "Licencje programów w  BEE2"
 
 #: app/helpMenu.py:350
 msgid "Credits..."
-msgstr "Autorzy..."
+msgstr "Licencje..."
 
 #: app/itemPropWin.py:39
 msgid "Start Position"
@@ -1205,7 +1205,7 @@ msgstr ""
 msgid "No Properties available!"
 msgstr "Brak dostępnych właściwości!"
 
-#: app/item_search.py:52
+#: app/item_search.py:59
 msgid "Search:"
 msgstr ""
 

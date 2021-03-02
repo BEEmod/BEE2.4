@@ -996,8 +996,10 @@ class Item:
 
         # Parse the connections info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
-            item.conn_config = conf = ConnConfig.parse(item.id, connections)
+            item.conn_config = ConnConfig.parse(item.id, connections)
             item._finalise_connections()
+            if 'activate' in connections or 'deactivate' in connections:
+                LOGGER.warning('', exc_info=tok.error('Output activate/deactivate commands need out_ prefix!'))
         return item
 
     # Boolean option in editor -> Item attribute.
@@ -1108,9 +1110,9 @@ class Item:
             elif folded_key == 'overlay':
                 self._parse_overlay(tok)
             elif folded_key == 'inputs':
-                self._parse_connections(tok, connection, self.conn_inputs, '')
+                self._parse_connections(tok, connection, self.conn_inputs)
             elif folded_key == 'outputs':
-                self._parse_connections(tok, connection, self.conn_outputs, 'out_')
+                self._parse_connections(tok, connection, self.conn_outputs)
             else:
                 raise tok.error('Unknown export option {}!', key)
         return connection
@@ -1165,7 +1167,6 @@ class Item:
         tok: Tokenizer,
         prop_block: Property,
         target: Dict[ConnTypes, Connection],
-        prefix: str,
     ) -> None:
         """Parse either an inputs or outputs block.
 
@@ -1189,7 +1190,7 @@ class Item:
                             if 'out' in value:
                                 self.force_output = True
                         else:
-                            prop_block.append(Property(prefix + key, value))
+                            prop_block.append(Property(key, value))
                     continue  # We deal with this after the export block is done.
                 else:
                     raise tok.error('Unknown connection type "{}"!', conn_name)
@@ -1219,9 +1220,9 @@ class Item:
         if ConnTypes.NORMAL in self.conn_inputs:
             conn = self.conn_inputs.pop(ConnTypes.NORMAL)
             if conn.activate is not None:
-                conf.enable_cmd += ((conn.act_name, conn.activate),)
+                conf.enable_cmd += (Output('', '', conn.activate, inst_in=conn.act_name), )
             if conn.deactivate is not None:
-                conf.disable_cmd += ((conn.deact_name, conn.deactivate),)
+                conf.disable_cmd += (Output('', '', conn.deactivate, inst_in=conn.deact_name), )
 
         if ConnTypes.POLARITY in self.conn_inputs:
             if self.id.upper() != 'ITEM_TBEAM':
@@ -1671,7 +1672,7 @@ class Item:
             # Special case - single full voxel has no surface sections.
             if len(voxels) != 1 or voxels[0].subpos is not None or voxels[0].normal is not None:
                 for voxel in voxels:
-                    f.write('\t\t\t\t"Voxel"\n')
+                    f.write('\t\t\t\t"Surface"\n')
                     f.write('\t\t\t\t\t{\n')
                     if voxel.subpos is not None and voxel.normal is not None:
                         f.write(f'\t\t\t\t\t"Pos"    "{voxel.subpos}"\n')

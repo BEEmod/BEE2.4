@@ -139,7 +139,7 @@ ANTIGEL_LOCS: Set[Tuple[float, float, float]] = set()
 ANTIGEL_TEMPLATE = '''\
 Patch
  {{
- include "materials/BEE2/antigel/base.vmi"
+ include "materials/BEE2/antigel/base.vmt"
  Insert
   {{
   $basetexture "{path}"

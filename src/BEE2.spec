@@ -170,8 +170,9 @@ for snd in os.listdir('../sounds/'):
         continue
     data_files.append(('../sounds/' + snd, 'sounds'))
 
-# Include the compiler.
-data_files.append(('../compiler/', 'compiler'))
+# Include the compiler, picking the right architecture.
+bitness = 64 if sys.maxsize > (2**33) else 32
+data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
 
 # Finally, run the PyInstaller analysis process.
 

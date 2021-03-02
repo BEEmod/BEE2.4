@@ -19,6 +19,7 @@ __all__ = [
 
 
 class MaterialGroupMeta(EnumMeta):
+    """Metaclass for MaterialGroup, to implement some of its features."""
     @classmethod
     def __prepare__(mcs, cls, bases):
         """Override Enum class-dict type.
@@ -27,16 +28,17 @@ class MaterialGroupMeta(EnumMeta):
         """
         # The original class is private - grab it via prepare, and make
         # a subclass right here.
-        orig_dict = type(super().__prepare__(cls, bases))
+        namespace = super().__prepare__(cls, bases)
 
-        class RepDict(orig_dict):
+        class RepDict(type(namespace)):
             def __setitem__(self, key, value):
                 if isinstance(value, str):
                     value = value.casefold()
                 super().__setitem__(key, value)
-        
-        return RepDict()
-        
+
+        namespace.__type__ = RepDict
+        return namespace
+
     def __contains__(cls, value) -> bool:
         """MaterialGroup can check if strings are equal to a member."""
         if isinstance(value, str):
