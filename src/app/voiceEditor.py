@@ -209,7 +209,7 @@ def add_tabs():
             notebook.tab(
                 tab,
                 compound='image',
-                image=img.Handle.builtin('icons/mid_quote', 32, 16).load_tk(),
+                image=img.Handle.builtin('icons/mid_quote', 32, 16).get_tk(),
                 )
         if tab.nb_type is TabTypes.RESPONSE:
             notebook.tab(

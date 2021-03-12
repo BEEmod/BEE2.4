@@ -3,16 +3,17 @@
 It handles loading them from disk and converting them to TK versions, and
 caching images so repeated requests are cheap.
 """
-
+import time
 from PIL import ImageTk, Image, ImageDraw
 import os
-import weakref
+from weakref import ref as WeakRef
 import tkinter as tk
 from tkinter import ttk
 from typing import (
     Generic, TypeVar, Union, Callable, Optional,
     Dict, Tuple, MutableMapping, Mapping,
 )
+from app import TK_ROOT
 
 from srctools import Vec, Property
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
@@ -28,9 +29,13 @@ tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 
 ArgT = TypeVar('ArgT')
 
-# Used to deduplicate handles.
+# Used to keep track of the used handles, so we can deduplicate them.
 _handles: Dict[tuple, 'Handle'] = {}
-_wid_tk: MutableMapping[tkImgWidgets, 'Handle'] = weakref.WeakKeyDictionary()
+# Matches widgets to the handle they use.
+_wid_tk: Dict['WeakRef[tkImgWidgets]', 'Handle'] = {}
+# Records handles with a loaded image, but no labels using it.
+# These will be cleaned up after some time passes.
+_pending_cleanup: Dict[int, Tuple['Handle', float]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
@@ -102,10 +107,12 @@ class ImageType(Generic[ArgT]):
         name: str,
         pil_func: Callable[[ArgT, int, int], Image.Image],
         tk_func: Optional[Callable[[ArgT, int, int], tkImage]]=None,
+        allow_raw: bool=False,
     ) -> None:
         self.name = name
         self.pil_func = pil_func
         self.tk_func = tk_func
+        self.allow_raw = allow_raw
 
     def __repr__(self) -> str:
         return f'<ImageType "{self.name}">'
@@ -173,7 +180,7 @@ def _load_file(
 
     if img_file is None:
         LOGGER.error('"{}" does not exist!', uri)
-        return Handle.error(width, height).load_pil()
+        return Handle.error(width, height).get_pil()
 
     with img_file.sys, img_file.open_bin() as file:
         image = Image.open(file)
@@ -236,9 +243,9 @@ def _pil_icon(arg: Image.Image, width: int, height: int) -> Image.Image:
 TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
 TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty)
 TYP_FILE = ImageType('file', _pil_from_package)
-TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite)
-TYP_BUILTIN = ImageType('builtin', _pil_load_builtin)
-TYP_ICON = ImageType('icon', _pil_icon)
+TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True)
+TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True)
+TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
 TYP_COMP = ImageType('composite', _pil_from_composite)
 
 
@@ -265,6 +272,9 @@ class Handle(Generic[ArgT]):
 
         self._cached_pil: Optional[Image.Image] = None
         self._cached_tk: Optional[tkImage] = None
+        # If set, get_tk()/get_pil() was used.
+        self._force_loaded = False
+        self._use_count: int = 0
 
     @classmethod
     def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: Union[int, Tuple[int, int]], height: int) -> 'Handle[ArgT]':
@@ -409,17 +419,34 @@ class Handle(Generic[ArgT]):
             color = tuple(map(int, color))
         return cls._get(TYP_COLOR, color, width, height)
 
-    def load_pil(self) -> Image.Image:
+    def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it.
 
-        Should not be used if possible, to allow deferring loads to the
-        background.
+        Only available on BUILTIN type images since they cannot then be
+        reloaded.
         """
+        if not self.type.allow_raw:
+            raise ValueError('Cannot use get_tk() on non-builtin types!')
+        self._force_loaded = True
+        return self._load_pil()
+
+    def get_tk(self) -> tkImage:
+        """Load the TK image if required, then return it.
+
+        Only available on BUILTIN type images since they cannot then be
+        reloaded.
+        """
+        if not self.type.allow_raw:
+            raise ValueError('Cannot use get_tk() on non-builtin types!')
+        self._force_loaded = True
+        return self._load_tk()
+
+    def _load_pil(self) -> Image.Image:
         if self._cached_pil is None:
             self._cached_pil = self.type.pil_func(self.arg, self.width, self.height)
         return self._cached_pil
 
-    def load_tk(self) -> tkImage:
+    def _load_tk(self) -> tkImage:
         """Load the TK image if required, then return it.
 
         Should not be used if possible, to allow deferring loads to the
@@ -428,11 +455,54 @@ class Handle(Generic[ArgT]):
         if self._cached_tk is None:
             # LOGGER.debug('Loading {}', self)
             if self.type.tk_func is None:
-                self._cached_tk = ImageTk.PhotoImage(image=self.load_pil())
+                self._cached_tk = ImageTk.PhotoImage(image=self._load_pil())
             else:
                 self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
         return self._cached_tk
 
+    def _decref(self) -> None:
+        """A label was no longer set to this handle."""
+        if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
+            return
+        self._use_count -= 1
+        if self._use_count <= 0:
+            _pending_cleanup[id(self)] = (self, time.monotonic())
+
+    def _incref(self) -> None:
+        """A label was set to this handle, increment the refcount."""
+        if self._force_loaded:
+            return
+        self._use_count += 1
+        _pending_cleanup.pop(id(self), None)
+
+
+def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
+    """Finaliser for _wid_tk keys.
+
+    Removes them from the dict, and decreases the usage count on the handle.
+    """
+    try:
+        handle = _wid_tk.pop(ref)
+    except (KeyError, TypeError):
+        pass
+    else:
+        handle._decref()
+
+
+def _recycle_handles() -> None:
+    """Task which checks pending cleanups, to clear the cache."""
+    timeout = time.monotonic() - 5.0
+
+    for handle, use_time in list(_pending_cleanup.values()):
+        if use_time < timeout and not handle._force_loaded and handle._use_count == 0:
+            del _pending_cleanup[id(handle)]
+            LOGGER.info('Cleaning up {}', handle)
+            handle._cached_tk = handle._cached_pil = None
+    TK_ROOT.tk.call(_recycle_handles_cmd)
+
+# Cache the registered ID, so we don't have to re-register.
+_recycle_handles_cmd = ('after', 1000, TK_ROOT.register(_recycle_handles))
+TK_ROOT.tk.call(_recycle_handles_cmd)
 
 def apply(widget: tkImgWidgets, img: Optional[Handle]) -> tkImgWidgets:
     """Set the image in a widget.
@@ -441,15 +511,23 @@ def apply(widget: tkImgWidgets, img: Optional[Handle]) -> tkImgWidgets:
     If the image is None, it is instead unset.
     TODO: Loading will happen in the background.
     """
+    ref = WeakRef(widget, _label_destroyed)
     if img is None:
         widget['image'] = None
         try:
-            del _wid_tk[widget]
+            del _wid_tk[ref]
         except KeyError:
             pass
         return widget
-    widget['image'] = img.load_tk()
-    _wid_tk[widget] = img
+    widget['image'] = img._load_tk()
+    try:
+        old = _wid_tk[ref]
+    except KeyError:
+        pass
+    else:
+        old._decref()
+    img._incref()
+    _wid_tk[ref] = img
     return widget
 
 

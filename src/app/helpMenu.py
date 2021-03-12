@@ -341,7 +341,7 @@ def make_help_menu(parent: tk.Menu):
                 label=res.name,
                 command=functools.partial(webbrowser.open, res.url),
                 compound='left',
-                image=icons[res.icon].load_tk(),
+                image=icons[res.icon].get_tk(),
             )
 
     help.add_separator()
