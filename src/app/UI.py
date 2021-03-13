@@ -2046,6 +2046,7 @@ def init_windows() -> None:
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
+    img.start_loading()
     set_palette()
     # Set_palette needs to run first, so it can fix invalid palette indexes.
     BEE2_config.read_settings()

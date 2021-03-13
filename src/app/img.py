@@ -4,6 +4,8 @@ It handles loading them from disk and converting them to TK versions, and
 caching images so repeated requests are cheap.
 """
 import time
+import threading
+from queue import Queue, Empty as EmptyQueue
 from PIL import ImageTk, Image, ImageDraw
 import os
 from weakref import ref as WeakRef
@@ -11,7 +13,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import (
     Generic, TypeVar, Union, Callable, Optional,
-    Dict, Tuple, MutableMapping, Mapping,
+    Dict, Tuple, Mapping, Set,
 )
 from app import TK_ROOT
 
@@ -49,6 +51,9 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 PETI_ITEM_BG = (229, 232, 233)
 PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
+_queue_load: 'Queue[Handle]' = Queue()
+_queue_ui: 'Queue[Handle]' = Queue()
+
 
 def _load_special(path: str) -> Image.Image:
     """Various special images we have to load."""
@@ -56,11 +61,9 @@ def _load_special(path: str) -> Image.Image:
     try:
         img = Image.open(utils.install_path(f'images/BEE2/{path}.png'))
         img.load()
-        if img.mode == 'RGB':
-            img = img.convert('RGBA')
-        return img
+        return img.convert('RGBA')
     except Exception:
-        LOGGER.warning('Error icon could not be loaded.', exc_info=True)
+        LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
         return Image.new('RGBA', (64, 64), PETI_ITEM_BG)
 
 ICONS: Dict[str, Image.Image] = {
@@ -272,9 +275,13 @@ class Handle(Generic[ArgT]):
 
         self._cached_pil: Optional[Image.Image] = None
         self._cached_tk: Optional[tkImage] = None
-        # If set, get_tk()/get_pil() was used.
         self._force_loaded = False
-        self._use_count: int = 0
+        self._labels: Set[WeakRef[tkImgWidgets]] = set()
+        # If None, get_tk()/get_pil() was used.
+        # If true, this is in the queue to load. Setting this requires
+        # the loading lock.
+        self._loading = False
+        self.lock = threading.Lock()
 
     @classmethod
     def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: Union[int, Tuple[int, int]], height: int) -> 'Handle[ArgT]':
@@ -406,6 +413,11 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_ICON, 'none', width, height)
 
     @classmethod
+    def ico_loading(cls, width: int, height: int) -> 'Handle':
+        """Shortcut for getting a handle to a 'loading' icon."""
+        return cls._get(TYP_ICON, 'load', width, height)
+
+    @classmethod
     def blank(cls, width: int, height: int) -> 'Handle':
         """Shortcut for getting a handle to an empty image."""
         # The argument is irrelevant.
@@ -460,20 +472,36 @@ class Handle(Generic[ArgT]):
                 self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
         return self._cached_tk
 
-    def _decref(self) -> None:
+    def _decref(self, ref: 'WeakRef[tkImgWidgets]') -> None:
         """A label was no longer set to this handle."""
         if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
             return
-        self._use_count -= 1
-        if self._use_count <= 0:
+        self._labels.discard(ref)
+        if not self._labels:
             _pending_cleanup[id(self)] = (self, time.monotonic())
 
-    def _incref(self) -> None:
-        """A label was set to this handle, increment the refcount."""
+    def _incref(self, ref: 'WeakRef[tkImgWidgets]') -> None:
+        """Add a label to the list of those controlled by us."""
         if self._force_loaded:
             return
-        self._use_count += 1
+        self._labels.add(ref)
         _pending_cleanup.pop(id(self), None)
+
+    def _request_load(self) -> tkImage:
+        """Request a reload of this image.
+
+        If this can be done synchronously, the result is returned.
+        Otherwise, this returns the loading icon.
+        """
+        if self._loading is True:
+            return Handle.ico_loading(self.width, self.height).get_tk()
+        with self.lock:
+            if self._cached_tk is not None:
+                return self._cached_tk
+            if self._loading is False:
+                self._loading = True
+                _queue_load.put(self)
+        return Handle.ico_loading(self.width, self.height).get_tk()
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
@@ -486,48 +514,90 @@ def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
     except (KeyError, TypeError):
         pass
     else:
-        handle._decref()
+        handle._decref(ref)
 
 
-def _recycle_handles() -> None:
-    """Task which checks pending cleanups, to clear the cache."""
-    timeout = time.monotonic() - 5.0
+# noinspection PyProtectedMember
+def _background_task() -> None:
+    """Background task doing the actual loading."""
+    while True:
+        handle = _queue_load.get()
+        with handle.lock:
+            if handle._loading is True:
+                handle._load_pil()
+                handle._loading = False
+        _queue_ui.put(handle)
+
+
+# noinspection PyProtectedMember
+def _ui_task() -> None:
+    """Background task which does TK calls.
+
+    TK must run in the main thread, so we do UI loads here.
+    """
+    timeout = time.monotonic()
+    # Run, but if we go over 250ms, abort.
+    while time.monotonic() - timeout < 25:
+        try:
+            handle = _queue_ui.get_nowait()
+        except EmptyQueue:
+            break
+        tk_ico = handle._load_tk()
+        for label_ref in handle._labels:
+            label: tkImgWidgets = label_ref()
+            if label is not None:
+                label['image'] = tk_ico
+                label.update_idletasks()
 
     for handle, use_time in list(_pending_cleanup.values()):
-        if use_time < timeout and not handle._force_loaded and handle._use_count == 0:
-            del _pending_cleanup[id(handle)]
-            LOGGER.info('Cleaning up {}', handle)
-            handle._cached_tk = handle._cached_pil = None
-    TK_ROOT.tk.call(_recycle_handles_cmd)
+        with handle.lock:
+            if use_time < timeout - 5.0 and handle._loading is not None and not handle._labels:
+                del _pending_cleanup[id(handle)]
+                handle._cached_tk = handle._cached_pil = None
+    TK_ROOT.tk.call(_ui_task_cmd)
 
 # Cache the registered ID, so we don't have to re-register.
-_recycle_handles_cmd = ('after', 1000, TK_ROOT.register(_recycle_handles))
-TK_ROOT.tk.call(_recycle_handles_cmd)
+_ui_task_cmd = ('after', 100, TK_ROOT.register(_ui_task))
+_bg_thread = threading.Thread(name='imghandle_load', target=_background_task)
+_bg_thread.daemon = True
 
+
+def start_loading() -> None:
+    """Start the background loading threads."""
+    _bg_thread.start()
+    TK_ROOT.tk.call(_ui_task_cmd)
+
+
+# noinspection PyProtectedMember
 def apply(widget: tkImgWidgets, img: Optional[Handle]) -> tkImgWidgets:
     """Set the image in a widget.
 
     This tracks the widget, so later reloads will affect the widget.
     If the image is None, it is instead unset.
-    TODO: Loading will happen in the background.
     """
     ref = WeakRef(widget, _label_destroyed)
     if img is None:
         widget['image'] = None
         try:
-            del _wid_tk[ref]
+            old = _wid_tk.pop(ref)
         except KeyError:
             pass
+        else:
+            old._decref(ref)
         return widget
-    widget['image'] = img._load_tk()
     try:
         old = _wid_tk[ref]
     except KeyError:
         pass
     else:
-        old._decref()
-    img._incref()
+        old._decref(ref)
+    img._incref(ref)
     _wid_tk[ref] = img
+    cached_img = img._cached_tk
+    if cached_img is not None:
+        widget['image'] = cached_img
+    else:  # Need to load.
+        widget['image'] = img._request_load()
     return widget
 
 
