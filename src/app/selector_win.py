@@ -881,7 +881,6 @@ class selWin:
                         text=item.shortName,
                         compound='top',
                     )
-                img.apply(item.button, item.icon)
 
                 @utils.bind_leftclick(item.button)
                 def click_item(event=None, *, _self=self, _item=item):
@@ -964,6 +963,10 @@ class selWin:
                 self.sampler_held_open = False
                 self.sampler.system.close_ref()
 
+        for item in self.item_list:
+            if item.button is not None:
+                img.apply(item.button, None)
+
         if self.modal:
             self.win.grab_release()
         self.win.withdraw()
@@ -1004,6 +1007,10 @@ class selWin:
         if self._readonly and not force_open:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
+
+        for item in self.item_list:
+            if item.button is not None:
+                img.apply(item.button, item.icon)
 
         self.win.deiconify()
         self.win.lift(self.parent)
@@ -1333,7 +1340,6 @@ class selWin:
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
                 item.button['text'] = item.shortName
-                img.apply(item.button, item.icon)
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -1438,7 +1444,8 @@ class selWin:
                 font=self.sugg_font,
             )
         self.set_disp()  # Update the textbox if needed
-        self.flow_items()  # Refresh
+        if self.win.winfo_ismapped():
+            self.flow_items()  # Refresh
 
 
 def test():
