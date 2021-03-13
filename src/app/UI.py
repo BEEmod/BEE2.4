@@ -1147,7 +1147,7 @@ def pal_clear() -> None:
 
 def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
-    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
+    mandatory_unlocked = StyleVarPane.mandatory_unlocked()
     
     if len(pal_picked) == 32:
         return
@@ -1164,7 +1164,7 @@ def pal_shuffle() -> None:
         # obey the mandatory item lock and filters.
         for item in pal_items
         if item.id not in palette_set
-        if style_unlocked or not item.needs_unlock
+        if mandatory_unlocked or not item.needs_unlock
         if cur_filter is None or (item.id, item.subKey) in cur_filter
     })
 
@@ -1566,7 +1566,7 @@ def flow_picker(e=None):
     """
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
-    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
+    mandatory_unlocked = StyleVarPane.mandatory_unlocked()
 
     width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
@@ -1574,7 +1574,7 @@ def flow_picker(e=None):
 
     i = 0
     for item in pal_items:
-        if item.needs_unlock and not style_unlocked:
+        if item.needs_unlock and not mandatory_unlocked:
             visible = False
         elif cur_filter is None:
             visible = True

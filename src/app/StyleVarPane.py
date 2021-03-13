@@ -102,6 +102,14 @@ UI = {}
 _load_cback: Optional[Callable[[], None]] = None
 
 
+def mandatory_unlocked() -> bool:
+    """Return whether mandatory items are unlocked currently."""
+    try:
+        return tk_vars['UnlockDefault'].get()
+    except KeyError:  # Not loaded yet
+        return False
+
+
 def add_vars(style_vars, styles):
     """
     Add the given stylevars to our list.
