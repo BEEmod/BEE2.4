@@ -121,7 +121,8 @@ def style_changed(new_style: Style) -> None:
                 new_style.id,
             )
             sign.dnd_icon = IMG_ERROR
-    drag_man.refresh_icons()
+    if window.winfo_ismapped():
+        drag_man.load_icons()
 
 
 def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
@@ -133,7 +134,6 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
     if not any(Signage.all()):
         return ttk.Label(master)
 
-    window.protocol("WM_DELETE_WINDOW", window.withdraw)
     window.resizable(True, True)
     window.title(_('Configure Signage'))
 
@@ -255,11 +255,20 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         lambda e: drag_man.flow_slots(canv_all, drag_man.sources()),
     )
 
+    def hide_window() -> None:
+        """Hide the window."""
+        window.withdraw()
+        drag_man.unload_icons()
+        img.apply(preview_left, IMG_BLANK)
+        img.apply(preview_right, IMG_BLANK)
+
     def show_window() -> None:
         """Show the window."""
+        drag_man.load_icons()
         window.deiconify()
         utils.center_win(window, TK_ROOT)
 
+    window.protocol("WM_DELETE_WINDOW", hide_window)
     return ttk.Button(
         master,
         text=_('Configure Signage'),

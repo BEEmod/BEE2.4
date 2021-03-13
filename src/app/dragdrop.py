@@ -136,11 +136,11 @@ class Manager(Generic[ItemT]):
         """Remove the specified slot."""
         (self._sources if slot.is_source else self._targets).remove(slot)
 
-    def refresh_icons(self) -> None:
-        """Update all items to set new icons."""
+    def load_icons(self) -> None:
+        """Load in all the item icons."""
         # Count the number of items in each group to find
         # which should have group icons.
-        groups = defaultdict(int)   # type: Dict[Optional[str], int]
+        groups: Dict[Optional[str], int] = defaultdict(int)
         for slot in self._targets:
             groups[getattr(slot.contents, 'dnd_group', None)] += 1
 
@@ -156,6 +156,17 @@ class Manager(Generic[ItemT]):
         for slot in self._sources:
             # These are never grouped.
             self._display_item(slot._lbl, slot.contents)
+
+        if self._cur_drag is not None:
+            self._display_item(self._drag_lbl, self._cur_drag)
+
+    def unload_icons(self) -> None:
+        """Reset all icons to blank. This way they can be destroyed."""
+        for slot in self._sources:
+            img.apply(slot._lbl, self._img_blank)
+        for slot in self._targets:
+            img.apply(slot._lbl, self._img_blank)
+        img.apply(self._drag_lbl, self._img_blank)
 
     def sources(self) -> 'Iterator[Slot[ItemT]]':
         """Yield all source slots."""
