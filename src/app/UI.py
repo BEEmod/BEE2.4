@@ -438,7 +438,6 @@ def load_settings():
     except (KeyError, ValueError):
         pass  # It'll be set to the first palette by default, and then saved
     selectedPalette_radio.set(selectedPalette)
-    GEN_OPTS.has_changed = False
 
     optionWindow.load()
 
