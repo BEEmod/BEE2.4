@@ -223,15 +223,15 @@ def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: in
     return img
 
 
-def _pil_icon(arg: Image.Image, width: int, height: int) -> Image.Image:
+def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
     """Construct an image with an overlaid icon."""
+    ico = ICONS[arg]
     if width == 0:
-        width = arg.width
+        width = ico.width
     if height == 0:
-        height = arg.height
+        height = ico.height
 
     img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
-    ico = ICONS[arg]
 
     if width < ico.width or height < ico.height:
         # Crop to the middle part.
@@ -536,8 +536,8 @@ def _ui_task() -> None:
     TK must run in the main thread, so we do UI loads here.
     """
     timeout = time.monotonic()
-    # Run, but if we go over 250ms, abort.
-    while time.monotonic() - timeout < 25:
+    # Run, but if we go over 100ms, abort so the rest of the UI loop can run.
+    while time.monotonic() - timeout < 0.1:
         try:
             handle = _queue_ui.get_nowait()
         except EmptyQueue:
