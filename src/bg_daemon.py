@@ -1,14 +1,15 @@
-"""Implements the splash screen in a subprocess.
+"""Implements load screens and the log window in a subprocess.
 
-During package loading, we are busy performing tasks in the main thread.
+These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
+import logging
 from typing import Optional, Dict, Tuple, List
 
 from tkinter import ttk
 from tkinter.font import Font
-from app import img, TK_ROOT
+from app import img, TK_ROOT, tk_tools
 import tkinter as tk
 import multiprocessing.connection
 
@@ -33,6 +34,21 @@ SPLASH_FONTS = [
     'San Francisco',
 ]
 
+# Colours to use for each log level
+LVL_COLOURS = {
+    logging.CRITICAL: 'white',
+    logging.ERROR: 'red',
+    logging.WARNING: '#FF7D00',  # 255, 125, 0
+    logging.INFO: '#0050FF',
+    logging.DEBUG: 'grey',
+}
+
+BOX_LEVELS = [
+    'DEBUG',
+    'INFO',
+    'WARNING',
+]
+START = '1.0'  # Row 1, column 0 = first character
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
@@ -567,12 +583,178 @@ class SplashScreen(BaseLoadScreen):
         return func
 
 
-def run_screen(
+class LogWindow:
+    """Implements the logging window."""
+    def __init__(self, translations: dict, pipe: multiprocessing.connection.Connection) -> None:
+        """Initialise the window."""
+        self.win = window = tk.Toplevel(TK_ROOT)
+        self.pipe = pipe
+        window.columnconfigure(0, weight=1)
+        window.rowconfigure(0, weight=1)
+        window.title(translations['log_title'])
+        window.protocol('WM_DELETE_WINDOW', self.evt_close)
+        window.withdraw()
+
+        self.has_text = False
+        self.text = tk.Text(
+            window,
+            name='text_box',
+            width=50,
+            height=15,
+        )
+        self.text.grid(row=0, column=0, sticky='NSEW')
+
+        scroll = tk_tools.HidingScroll(
+            window,
+            name='scroll',
+            orient=tk.VERTICAL,
+            command=self.text.yview,
+        )
+        scroll.grid(row=0, column=1, sticky='NS')
+        self.text['yscrollcommand'] = scroll.set
+
+        # Assign colours for each logging level
+        for level, colour in LVL_COLOURS.items():
+            self.text.tag_config(
+                logging.getLevelName(level),
+                foreground=colour,
+                # For multi-line messages, indent this much.
+                lmargin2=30,
+            )
+        self.text.tag_config(
+            logging.getLevelName(logging.CRITICAL),
+            background='red',
+        )
+        # If multi-line messages contain carriage returns, lmargin2 doesn't
+        # work. Add an additional tag for that.
+        self.text.tag_config(
+            'INDENT',
+            lmargin1=30,
+            lmargin2=30,
+        )
+
+        button_frame = ttk.Frame(window, name='button_frame')
+        button_frame.grid(row=1, column=0, columnspan=2, sticky='EW')
+
+        ttk.Button(
+            button_frame,
+            name='clear_btn',
+            text=translations['clear'],
+            command=self.evt_clear,
+        ).grid(row=0, column=0)
+
+        ttk.Button(
+            button_frame,
+            name='copy_btn',
+            text=translations['copy'],
+            command=self.evt_copy,
+        ).grid(row=0, column=1)
+
+        sel_frame = ttk.Frame(button_frame)
+        sel_frame.grid(row=0, column=2, sticky='EW')
+        button_frame.columnconfigure(2, weight=1)
+
+        ttk.Label(
+            sel_frame,
+            text=translations['log_show'],
+            anchor='e',
+            justify='right',
+        ).grid(row=0, column=0, sticky='E')
+
+        self.level_selector = ttk.Combobox(
+            sel_frame,
+            name='level_selector',
+            values=translations['level_text'],
+            exportselection=0,
+            # On Mac this defaults to being way too wide!
+            width=15 if utils.MAC else None,
+        )
+        self.level_selector.state(['readonly'])  # Prevent directly typing in values
+        self.level_selector.bind('<<ComboboxSelected>>', self.evt_set_level)
+        self.level_selector.current(1)
+
+        self.level_selector.grid(row=0, column=1, sticky='E')
+        sel_frame.columnconfigure(1, weight=1)
+
+        utils.add_mousewheel(self.text, window, sel_frame, button_frame)
+
+        if utils.USE_SIZEGRIP:
+            ttk.Sizegrip(button_frame).grid(row=0, column=3)
+
+    def log(self, level_name: str, text: str) -> None:
+        """Write a log message to the window."""
+        self.text['state'] = "normal"
+        # We don't want to indent the first line.
+        firstline, *lines = text.split('\n')
+
+        if self.has_text:
+            # Start with a newline so it doesn't end with one.
+            self.text.insert(tk.END, '\n', ())
+
+        self.text.insert(tk.END, firstline, (level_name,))
+        for line in lines:
+            self.text.insert(
+                tk.END,
+                '\n',
+                ('INDENT',),
+                line,
+                # Indent following lines.
+                (level_name, 'INDENT'),
+            )
+        self.text.see(tk.END)  # Scroll to the end
+        self.text['state'] = "disabled"
+        self.has_text = True
+
+    def evt_set_level(self, event: tk.Event) -> None:
+        """Set the level of the log window."""
+        level = BOX_LEVELS[self.level_selector.current()]
+        self.pipe.send(('level', level))
+
+    def evt_close(self) -> None:
+        """Called when the window close button is pressed."""
+        self.pipe.send(('visible', False))
+        self.win.withdraw()
+
+    def evt_copy(self) -> None:
+        """Copy the selected text, or the whole console."""
+        try:
+            text = self.text.get(tk.SEL_FIRST, tk.SEL_LAST)
+        except tk.TclError:  # No selection
+            text = self.text.get(START, tk.END)
+        self.text.clipboard_clear()
+        self.text.clipboard_append(text)
+
+    def evt_clear(self) -> None:
+        """Clear the console."""
+        self.text['state'] = "normal"
+        self.text.delete(START, tk.END)
+        self.has_text = False
+        self.text['state'] = "disabled"
+
+    def handle(self, msg: tuple) -> None:
+        """Handle messages from the main app."""
+        operation, parm1, parm2 = msg
+        if operation == 'log':
+            self.log(parm1, parm2)
+        elif operation == 'visible':
+            if parm1:
+                self.win.deiconify()
+            else:
+                self.win.withdraw()
+        elif operation == 'level':
+            self.level_selector.current(BOX_LEVELS.index(parm1))
+        else:
+            raise ValueError(f'Bad command {operation!r}({parm1!r}, {parm2!r})!')
+
+
+def run_background(
     pipe_send: multiprocessing.connection.Connection,
     pipe_rec: multiprocessing.connection.Connection,
+    log_pipe_send: multiprocessing.connection.Connection,
+    log_pipe_rec: multiprocessing.connection.Connection,
     # Pass in various bits of translated text
     # so we don't need to do it here.
-    translations,
+    translations: dict,
 ):
     """Runs in the other process, with an end of a pipe for input."""
     global PIPE_REC, PIPE_SEND
@@ -581,6 +763,8 @@ def run_screen(
     TRANSLATION.update(translations)
 
     force_ontop = True
+
+    log_window = LogWindow(translations, log_pipe_send)
 
     def check_queue():
         """Update stages from the parent process."""
@@ -602,11 +786,13 @@ def run_screen(
                 try:
                     func = getattr(SCREENS[scr_id], 'op_' + operation)
                 except AttributeError:
-                    raise ValueError('Bad command "{}"!'.format(operation))
+                    raise ValueError(f'Bad command "{operation}"!')
                 try:
                     func(*args)
                 except Exception:
                     raise Exception(operation)
+        while log_pipe_rec.poll():
+            log_window.handle(log_pipe_rec.recv())
 
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.

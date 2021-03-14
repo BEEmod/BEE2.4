@@ -12,7 +12,8 @@ from abc import abstractmethod
 import contextlib
 import multiprocessing
 
-from loadScreen_daemon import run_screen as _splash_daemon
+from bg_daemon import run_background
+from app import logWindow
 from BEE2_config import GEN_OPTS
 import utils
 import srctools.logger
@@ -35,6 +36,7 @@ _PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 
 class Cancelled(SystemExit):
     """Raised when the user cancels the loadscreen."""
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -190,18 +192,29 @@ class LoadScreen:
 
 # Initialise the daemon.
 _daemon = multiprocessing.Process(
-    target=_splash_daemon,
+    target=run_background,
     args=(
         _PIPE_DAEMON_SEND,
         _PIPE_DAEMON_REC,
+        logWindow.PIPE_DAEMON_SEND,
+        logWindow.PIPE_DAEMON_REC,
         # Pass translation strings.
         {
             'skip': _('Skipped!'),
             'version': _('Version: ') + utils.BEE_VERSION,
             'cancel': _('Cancel'),
+            'clear': _('Clear'),
+            'copy': _('Copy'),
+            'log_show': _('Show:'),
+            'log_title': _('Logs - {}').format(utils.BEE_VERSION),
+            'level_text': [
+                _('Debug messages'),
+                _('Default'),
+                _('Warnings Only'),
+            ],
         }
     ),
-    name='loadscreen_daemon',
+    name='bg_daemon',
 )
 # Destroy when we quit.
 _daemon.daemon = True
