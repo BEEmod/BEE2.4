@@ -3,7 +3,7 @@
 """
 from typing import (
     TypeVar, Generic, Union, Any,
-    Tuple, Iterable,
+    Tuple, Iterable, Optional,
     Mapping, MutableMapping,
     ValuesView, ItemsView,
 )
@@ -30,8 +30,8 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         # Track the minimum/maximum position found
         self._min_x = self._min_y = self._max_x = self._max_y = 0
         self._yoff = 0
-        self._xoffs: List[int] = []
-        self._data: List[Optional[List[Optional[ValT]]]] = []
+        self._xoffs: list[int] = []
+        self._data: list[Optional[list[Optional[ValT]]]] = []
         self._used = 0
         if contents:
             self.update(contents)
@@ -128,7 +128,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                     yield (x, y)
                     
     def __delitem__(self, pos: Tuple[int, int]) -> None:
-        self[x, y] = None
+        self[pos] = None
         
     def clear(self) -> None:
         """Remove all data from the plane."""
@@ -144,17 +144,19 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def items(self) -> ItemsView[Tuple[int, int], ValT]:
         """D.items() -> a set-like object providing a view on D's items"""
         return PlaneItems(self)
-        
+
+
 class PlaneValues(ValuesView[ValT]):
     """Implementation of Plane.values()."""
     __slots__ = ()  # _mapping is defined in superclass.
     def __init__(self, plane: Plane[ValT]) -> None:
+        self._mapping = plane
         super().__init__(plane)
         
     def __contains__(self, item: Any) -> bool:
         """Check if the provided item is a value."""
         if item is None:
-            return false
+            return False
         for row in self._mapping._data:
             if item in row:
                 return True
@@ -172,6 +174,7 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
     """Implementation of Plane.items()."""
     __slots__ = ()  # _mapping is defined in superclass.
     def __init__(self, plane: Plane[ValT]) -> None:
+        self._mapping = plane
         super().__init__(plane)
         
     def __contains__(self, item: Any) -> bool:
