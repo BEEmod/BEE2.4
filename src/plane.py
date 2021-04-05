@@ -5,7 +5,7 @@ from typing import (
     TypeVar, Generic, Union, Any,
     Tuple, Iterable, Optional,
     Mapping, MutableMapping,
-    ValuesView, ItemsView,
+    ValuesView, ItemsView, Iterator, List,
 )
 
 ValT = TypeVar('ValT')
@@ -71,7 +71,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         x, y = pos
         y_ind = y + self._yoff
         y_bound = len(self._xoffs)
-        
+
         # Extend if required. 
         if y_ind < 0:
             change = -y_ind
@@ -83,16 +83,20 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                 self._min_y = y
         elif y_ind >= y_bound:
             change = y_ind - y_bound + 1
-            self._xoffs.extend([0] * change)
-            self._data.extend([None] * change)
-            y_ind = -1 # y_bound - 1, but list can compute that.
+            self._xoffs += [0] * change
+            self._data += [None] * change
+            y_ind = -1  # y_bound - 1, but list can compute that.
             if y > self._max_y:
                 self._max_y = y
         
         # Now x.
         data = self._data[y_ind]
-        if data is None: # Create the list only when we need it.    
-            data = self._data[y_ind] = []
+        if data is None or not data:
+            # This row is empty, so we can just move its offset to wherever
+            # we are.
+            self._data[y_ind] = [val]
+            self._xoffs[y_ind] = -x
+            return
 
         x_ind = x + self._xoffs[y_ind]
         x_bound = len(data)
@@ -103,9 +107,9 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             x_ind = 0
             if x < self._min_x:
                 self._min_x = x
-        elif x >= x_bound:
-            change = x - x_bound + 1
-            data.extend([None] * change)
+        elif x_ind >= x_bound:
+            change = x_ind - x_bound + 1
+            data += [None] * change
             x_ind = -1
             if x > self._max_x:
                 self._max_x = x
@@ -189,7 +193,7 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
         except KeyError:  # Not present
             return False
     
-    def __iter__(self) -> None:
+    def __iter__(self) -> Iterator[Tuple[Tuple[int, int], ValT]]:
         """Produce all coord, value pairs in the plane."""
         for y, (xoff, row) in enumerate(
             zip(self._mapping._xoffs, self._mapping._data), 
@@ -200,21 +204,3 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
             for x, data in enumerate(row, start=-xoff):
                 if data is not None:
                     yield (x, y), data
-
-if __name__ == '__main__':
-    print('-'*80)
-    def test(*pos):
-        pl[pos] = pos
-        print(f'{pos[0]} {pos[1]}:')
-        print(' ├', vars(pl))
-        
-        copy = pl[pos]
-        assert copy is pos, copy
-        print(' ├', list(pl))
-        print(' └', pl)
-    pl = Plane()
-
-    test(0, 1)
-    test(1, 0)
-    test(-5, 2)
-    
