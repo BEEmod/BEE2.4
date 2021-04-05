@@ -1363,13 +1363,13 @@ class TileDef:
         """
         # Specific direction overrides everything.
         if orient is not None:
-            if self.normal.dot(orient) != 0:
+            if self.normal.dot(orient) > 0.001:
                 raise ValueError(
                     'Portal orient of {} is not flat on a '
                     'plane with normal of {}!',
                     orient, self.normal,
                 )
-            self._portal_helper = orient
+            self._portal_helper = round(orient, 6)
         elif isinstance(self._portal_helper, int):
             self._portal_helper += 1
         # else: it's already a Vec, so don't override with a generic helper.
