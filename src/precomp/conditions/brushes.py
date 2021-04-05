@@ -105,9 +105,9 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
     des_axis = res['axis', 'z'].casefold()
     reverse = res.bool('reversed')
     door_type = res['classname', 'func_door_rotating']
-    orient = round(Matrix.from_angle(Angle.from_str(ent['angles'])), 6)
+    orient = Matrix.from_angle(Angle.from_str(ent['angles']))
 
-    axis = Vec.with_axes(des_axis, 1) @ orient
+    axis = round(Vec.with_axes(des_axis, 1) @ orient, 6)
 
     if axis.x > 0 or axis.y > 0 or axis.z > 0:
         # If it points forward, we need to reverse the rotating door
