@@ -7,7 +7,7 @@ from mistletoe import block_token as btok
 from mistletoe import span_token as stok
 import srctools.logger
 
-from typing import Optional, Union, Iterable, List, Tuple, NamedTuple
+from typing import Optional, Union, Iterable, List, Tuple, NamedTuple, Sequence
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -43,6 +43,7 @@ class MarkdownData:
     Blocks are a list of data.
     """
     __slots__ = ['blocks']
+    blocks: Sequence[Block]  # External users shouldn't modify directly.
     def __init__(
         self,
         blocks: Iterable[Block] = (),
@@ -55,7 +56,7 @@ class MarkdownData:
 
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
-        return MarkdownData(self.blocks.copy())
+        return MarkdownData(self.blocks)
 
     __copy__ = copy
 
@@ -242,7 +243,7 @@ def join(*args: MarkdownData) -> MarkdownData:
     """
     if len(args) == 1:
         # We only have one block, just copy and return.
-        return MarkdownData(args[0].blocks.copy())
+        return MarkdownData(args[0].blocks)
 
     blocks: List[Block] = []
 
