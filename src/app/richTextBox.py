@@ -70,6 +70,10 @@ class tkRichText(tkinter.Text):
             foreground='white',
         )
         self.tag_config(
+            "code",
+            font='TkFixedFont',
+        )
+        self.tag_config(
             "indent",
             # Indent the first line slightly, but indent the following
             # lines more to line up with the text.
