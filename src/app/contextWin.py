@@ -257,13 +257,29 @@ def load_item_data():
     wid['name']['text'] = selected_sub_item.name
     wid['ent_count']['text'] = item_data.ent_count or '??'
 
-    wid['desc'].set_text(
-        get_description(
-            global_last=selected_item.item.glob_desc_last,
-            glob_desc=selected_item.item.glob_desc,
-            style_desc=item_data.desc,
-        )
+    desc = get_description(
+        global_last=selected_item.item.glob_desc_last,
+        glob_desc=selected_item.item.glob_desc,
+        style_desc=item_data.desc,
     )
+    # Dump out the instances used in this item.
+    if optionWindow.DEV_MODE.get():
+        inst_desc = []
+        for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
+            if editor is selected_item.data.editor:
+                heading = '\n\nInstances:\n'
+            else:
+                heading = f'\nInstances ({editor.id}):\n'
+            inst_desc.append(tkMarkdown.TextSegment(heading, (), None))
+            for ind, inst in enumerate(selected_item.data.editor.instances):
+                inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', ('indent', ), None))
+                inst_desc.append(tkMarkdown.TextSegment(f'{inst.inst}\n', ('code', ), None))
+            for name, inst in selected_item.data.editor.cust_instances.items():
+                inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', ('indent', ), None))
+                inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', ('code', ), None))
+        desc = tkMarkdown.join(desc, tkMarkdown.MarkdownData(inst_desc))
+
+    wid['desc'].set_text(desc)
 
     if optionWindow.DEV_MODE.get():
         source = selected_item.data.source.replace("from", "\nfrom")
