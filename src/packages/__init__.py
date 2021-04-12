@@ -17,7 +17,7 @@ from typing import (
     Union, Optional, Any, TYPE_CHECKING,
     TypeVar, Type, cast,
     Dict, List, Tuple, NamedTuple, Collection,
-    Iterable,
+    Iterable, ClassVar,
 )
 
 
@@ -209,45 +209,7 @@ T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')
 
 
-class _PakObjectMeta(type):
-    def __new__(
-        mcs,
-        name: str,
-        bases: Tuple[type, ...],
-        namespace: Dict[str, Any],
-        allow_mult: bool = False,
-        has_img: bool = True,
-    ) -> 'Type[PakObject]':
-        """Adds a PakObject to the list of objects.
-
-        Making a metaclass allows us to hook into the creation of all subclasses.
-        """
-        # Defer to type to create the class..
-        cls = cast('Type[PakObject]', super().__new__(mcs, name, bases, namespace))
-
-        # Only register subclasses of PakObject - those with a parent class.
-        # PakObject isn't created yet so we can't directly check that.
-        if bases:
-            OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
-
-        # Maps object IDs to the object.
-        cls._id_to_obj = {}
-
-        return cls
-
-    def __init__(
-        cls,
-        name: str,
-        bases: Tuple[type, ...],
-        namespace: Dict[str, Any],
-        allow_mult: bool = False,
-        has_img: bool = True,
-    ) -> None:
-        """We have to strip kwargs from the type() calls to prevent errors."""
-        type.__init__(cls, name, bases, namespace)
-
-
-class PakObject(metaclass=_PakObjectMeta):
+class PakObject:
     """PackObject(allow_mult=False, has_img=True): The base class for package objects.
 
     In the class base list, set 'allow_mult' to True if duplicates are allowed.
@@ -256,11 +218,27 @@ class PakObject(metaclass=_PakObjectMeta):
     loading bar - this should be stepped in the UI.load_packages() method.
     """
     # ID of the object
-    id = ...  # type: str
+    id: str
     # ID of the package.
-    pak_id = ...  # type: str
+    pak_id: str
     # Display name of the package.
-    pak_name = ...  # type: str
+    pak_name: str
+
+    _id_to_obj: ClassVar[Dict[str, 'PakObject']]
+
+    def __init_subclass__(
+        cls,
+        allow_mult: bool = False,
+        has_img: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init_subclass__(**kwargs)
+        # Only register subclasses of PakObject - those with a parent class.
+        # PakObject isn't created yet so we can't directly check that.
+        OBJ_TYPES[cls.__name__] = ObjType(cls, allow_mult, has_img)
+
+        # Maps object IDs to the object.
+        cls._id_to_obj = {}
 
     @classmethod
     def parse(cls, data: ParseData) -> 'PakObject':
