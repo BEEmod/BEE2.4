@@ -13,15 +13,10 @@ from types import TracebackType
 from typing import (
     Tuple, List, Set, Sequence,
     Iterator, Iterable, SupportsInt, Mapping,
-    TypeVar, Any,
+    TypeVar, Any, NoReturn,
     Union, Callable, Generator,
     KeysView, ValuesView, ItemsView, Type,
 )
-
-try:
-    from typing import NoReturn
-except ImportError:  # py < 3.6.5
-    NoReturn = None  # type: ignore
 
 
 try:
