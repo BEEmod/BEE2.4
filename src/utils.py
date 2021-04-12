@@ -5,6 +5,7 @@ import logging
 import os
 import stat
 import shutil
+import copyreg
 import sys
 from pathlib import Path
 from enum import Enum
@@ -60,6 +61,17 @@ STEAM_IDS = {
     # 247120: Sixense
     # 211480: 'In Motion'
 }
+
+
+# Add core srctools types into the pickle registry, so they can be more directly
+# loaded.
+# IDs 240 - 255 are available for application uses.
+copyreg.add_extension('srctools.math', '_mk_vec', 240)
+copyreg.add_extension('srctools.math', '_mk_ang', 241)
+copyreg.add_extension('srctools.math', '_mk_mat', 242)
+copyreg.add_extension('srctools.math', 'Vec_tuple', 243)
+copyreg.add_extension('srctools.property_parser', 'Property', 244)
+
 
 # Appropriate locations to store config options for each OS.
 if WIN:
