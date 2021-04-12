@@ -27,7 +27,7 @@ The packages (item, style, etc definitions) are in the [BEE2-Items](https://gith
 As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki article](https://github.com/BEEmod/BEE2-items/wiki/BEE2.4-on-Mac) for more details and how you can still use the mod.
 
 ### Used Libraries ###
-- [Python](https://www.python.org/)
+- [Python](https://www.python.org/) 3.8 or later
 - [TKinter/TTK](https://tcl.tk/)
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
