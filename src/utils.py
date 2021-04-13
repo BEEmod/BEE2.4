@@ -615,12 +615,11 @@ class PackagePath:
         return hash((self.package, self.path))
 
     def __eq__(self, other) -> object:
-        if isinstance(other, PackagePath):
-            return self.package == other.package and self.path == other.path
-        elif isinstance(other, str):
-            oth = self.parse(other, self.package)
-            return self.package == oth.package and self.path == oth.path
-        return NotImplemented
+        if isinstance(other, str):
+            other = self.parse(other, self.package)
+        elif not isinstance(other, PackagePath):
+            return NotImplemented
+        return self.package == other.package and self.path == other.path
 
     def in_folder(self, folder: str) -> 'PackagePath':
         """Return the package, but inside this subfolder."""
@@ -628,7 +627,7 @@ class PackagePath:
 
     def child(self, child: str) -> 'PackagePath':
         """Return a child file of this package."""
-        return PackagePath(self.package, f'{self.path}/child')
+        return PackagePath(self.package, f'{self.path}/{child}')
 
 
 def get_indent(line: str) -> str:
