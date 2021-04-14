@@ -334,7 +334,7 @@ def init_gen_tab(f: ttk.Frame) -> None:
         tooltip=_('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
-    if sound.initiallised:
+    if sound.has_sound():
         mute = make_checkbox(
             f,
             section='General',

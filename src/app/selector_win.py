@@ -624,7 +624,7 @@ class selWin:
         self.prop_name.grid(row=0, column=0)
 
         # For music items, add a '>' button to play sound samples
-        if sound_sys is not None and sound.initiallised:
+        if sound_sys is not None and sound.has_sound():
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 text=BTN_PLAY,
