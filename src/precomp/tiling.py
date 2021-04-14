@@ -60,12 +60,12 @@ NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
 # Specific angles, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
 NORM_ANGLES = {
-    Vec(x=1).as_tuple(): Vec(0, 0, 0),
-    Vec(x=-1).as_tuple(): Vec(0, 180, 0),
-    Vec(y=1).as_tuple(): Vec(0, 90, 0),
-    Vec(y=-1).as_tuple(): Vec(0, 270, 0),
-    Vec(z=1).as_tuple(): Vec(270, 270,  0),
-    Vec(z=-1).as_tuple(): Vec(90, 90, 0),
+    Vec(x=1).as_tuple(): Angle(0, 0, 0),
+    Vec(x=-1).as_tuple(): Angle(0, 180, 0),
+    Vec(y=1).as_tuple(): Angle(0, 90, 0),
+    Vec(y=-1).as_tuple(): Angle(0, 270, 0),
+    Vec(z=1).as_tuple(): Angle(270, 270,  0),
+    Vec(z=-1).as_tuple(): Angle(90, 90, 0),
 }
 
 NORM_NAMES = {
@@ -331,7 +331,8 @@ def order_bbox(bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
 PATTERNS: dict[str, list[Pattern]] = {
     'clean': [
         Pattern(TileSize.TILE_1x1, (0, 0, 4, 4)),
-        Pattern(TileSize.TILE_2x1,
+        Pattern(
+            TileSize.TILE_2x1,
             (0, 0, 4, 4),  # Combined
             (0, 0, 2, 4), (2, 0, 4, 4),  # L/R
             (1, 0, 3, 4),  # Middle - only if no left or right.
@@ -367,11 +368,13 @@ PATTERNS: dict[str, list[Pattern]] = {
     # Don't have 2x2/1x1 tiles off-grid..
     'grid_only': [
         Pattern(TileSize.TILE_1x1, (0, 0, 4, 4)),
-        Pattern(TileSize.TILE_2x1,
+        Pattern(
+            TileSize.TILE_2x1,
             (0, 0, 2, 4), (2, 0, 4, 4),  # L/R
             wall_only=True,
         ),
-        Pattern(TileSize.TILE_2x2,
+        Pattern(
+            TileSize.TILE_2x2,
             (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
         ),
     ],
@@ -676,7 +679,6 @@ class Panel:
 
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
-                angles = tile.normal.to_angle()
                 srctools.vmf.make_overlay(
                     vmf,
                     angled_normal,
@@ -690,7 +692,6 @@ class Panel:
             # Do non-angled helpers.
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
-                angles = tile.normal.to_angle()
                 srctools.vmf.make_overlay(
                     vmf,
                     tile.normal,
@@ -983,12 +984,11 @@ class TileDef:
         # infinite recursion.
         if not _pattern:
             _pattern = 'clean'
-            if SUBTILE_FIZZ_KEY in tiles:  # type: ignore
+            if SUBTILE_FIZZ_KEY in tiles:
                 # Output the split patterns for centered fizzlers.
                 # We need to remove it also so our iteration doesn't choke on it.
                 # 'u' or 'v'
-                split_type: str
-                split_type = tiles.pop(SUBTILE_FIZZ_KEY) # type: ignore
+                split_type: str = tiles.pop(SUBTILE_FIZZ_KEY)
                 patterns = self.calc_patterns(
                     tiles,
                     is_wall,
@@ -1168,7 +1168,10 @@ class TileDef:
             # We need to make a placement helper.
             vmf.create_ent(
                 'info_placement_helper',
-                angles=self.normal.to_angle_roll(self.portal_helper_orient),
+                angles=Matrix.from_basis(
+                    x=self.normal,
+                    z=self.portal_helper_orient,
+                ).to_angle(),
                 origin=front_pos,
                 force_placement=int(force_helper),
                 snap_to_helper_angles=int(force_helper),
@@ -1176,13 +1179,13 @@ class TileDef:
             )
         if self.use_bullseye():
             # Add the bullseye overlay.
-            angles = self.normal.to_angle()
+            orient = Matrix.from_angle(self.normal.to_angle())
             srctools.vmf.make_overlay(
                 vmf,
-                self.normal,
+                orient.forward(),
                 front_pos,
-                Vec(y=64).rotate(*angles),
-                Vec(z=64).rotate(*angles),
+                64 * orient.left(),
+                64 * orient.up(),
                 texturing.OVERLAYS.get(front_pos, 'bullseye'),
                 self.brush_faces,
             )
@@ -1620,7 +1623,7 @@ def gen_tile_temp() -> None:
         temp_part: dict[Union[str, tuple[int, int, int, bool]], Side] = {}
         TILE_TEMP[norm_tup] = temp_part
 
-        for ((thickness, bevel), temp) in categories.items():
+        for (thickness, bevel), temp in categories.items():
             brush = temp.copy()
             brush.localise(Vec(), angles)
 
@@ -1641,7 +1644,7 @@ def gen_tile_temp() -> None:
                     # Squarebeams.
                     # Rounding the position of the face gives us the direction
                     # it's pointing away from the center.
-                    face_norm: Vec = round(face.get_origin().norm())
+                    face_norm: Vec = round(face.get_origin().norm(), 6)
                     face.translate(-16 * face_norm - (thickness / 2) * norm)
                     u_dir, v_dir = face_norm.other_axes(axis_norm)
                     temp_part[int(u_dir), int(v_dir), thickness, bevel] = face
@@ -1848,7 +1851,7 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     assert not brush_ent.solids, 'Multiple brushes in angled panel?'
 
     grid_pos = round_grid(Vec.from_str(panel_ent['origin']))
-    norm = Vec(z=1).rotate_by_str(panel_ent['angles'])
+    norm = Vec(z=1) @ Angle.from_str(panel_ent['angles'])
     grid_pos -= 128*norm
 
     tex_kind, front_face = find_front_face(brush, grid_pos, norm)
@@ -1873,7 +1876,7 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     """Generate a tiledef matching a flip panel."""
     brush_ent.solids.clear()
     grid_pos = round_grid(Vec.from_str(panel_ent['origin']))
-    norm = Vec(z=1).rotate_by_str(panel_ent['angles'])
+    norm = Vec(z=1) @ Angle.from_str(panel_ent['angles'])
     grid_pos -= 128*norm
 
     TILES[grid_pos.as_tuple(), norm.as_tuple()] = tile = TileDef(
@@ -2013,7 +2016,7 @@ def generate_brushes(vmf: VMF) -> None:
     # Each subtile is generated individually. If it's a full-block tile we
     # try to merge tiles together with the same texture.
 
-    # The key is (normal, plane distance, tile typel)
+    # The key is (normal, plane distance, tile type)
     full_tiles: dict[
         tuple[float, float, float, float, TileType],
         list[TileDef]
@@ -2079,7 +2082,7 @@ def generate_brushes(vmf: VMF) -> None:
             grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
-        for (tile_type, is_antigel, tex), tex_pos in grid_pos.items():
+        for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
             for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
                 center = Vec.with_axes(
                     norm_axis, plane_dist,
@@ -2092,7 +2095,7 @@ def generate_brushes(vmf: VMF) -> None:
                 gen = texturing.gen(
                     texturing.GenCat.NORMAL,
                     normal,
-                    tile_type.color
+                    subtile_type.color
                 )
                 if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (1 + max_v - min_v) % 2 == 0:
                     is_double = True
