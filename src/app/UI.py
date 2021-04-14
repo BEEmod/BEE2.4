@@ -347,7 +347,7 @@ class PalItem(Label):
                 contextWin.show_prop(item, warp_cursor=True)
                 break
 
-    def load_data(self):
+    def load_data(self) -> None:
         """Refresh our icon and name.
 
         Call whenever the style changes, so the icons update.
@@ -363,7 +363,7 @@ class PalItem(Label):
             self.name = '??'
         self['image'] = self.img
 
-    def clear(self):
+    def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
 
         This prevents adding two copies.
@@ -377,14 +377,14 @@ class PalItem(Label):
                 found = True
         return found
 
-    def kill(self):
+    def kill(self) -> None:
         """Hide and destroy this widget."""
         if self in pal_picked:
             pal_picked.remove(self)
         self.place_forget()
         self.destroy()
 
-    def on_pal(self):
+    def on_pal(self) -> bool:
         """Determine if this item is on the palette."""
         for item in pal_picked:
             if self == item:
@@ -750,10 +750,14 @@ def refresh_pal_ui() -> None:
 
     if len(paletteLoader.pal_list) < 2 or cur_palette.prevent_overwrite:
         UI['pal_remove'].state(('disabled',))
-        menus['pal'].entryconfigure(1, state=DISABLED)
+        UI['pal_save'].state(('disabled', ))  # Save As only.
+        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=DISABLED)
+        menus['pal'].entryconfigure(menus['pal_save_ind'], state=DISABLED)
     else:
         UI['pal_remove'].state(('!disabled',))
-        menus['pal'].entryconfigure(1, state=NORMAL)
+        UI['pal_save'].state(('!disabled', ))
+        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=NORMAL)
+        menus['pal'].entryconfigure(menus['pal_save_ind'], state=NORMAL)
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -1123,10 +1127,14 @@ def set_palette(e=None):
 
     if len(paletteLoader.pal_list) < 2 or paletteLoader.pal_list[selectedPalette].prevent_overwrite:
         UI['pal_remove'].state(('disabled',))
-        menus['pal'].entryconfigure(1, state=DISABLED)
+        UI['pal_save'].state(('disabled', ))  # Save As only.
+        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=DISABLED)
+        menus['pal'].entryconfigure(menus['pal_save_ind'], state=DISABLED)
     else:
         UI['pal_remove'].state(('!disabled',))
-        menus['pal'].entryconfigure(1, state=NORMAL)
+        UI['pal_save'].state(('!disabled', ))
+        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=NORMAL)
+        menus['pal'].entryconfigure(menus['pal_save_ind'], state=NORMAL)
 
     flow_preview()
 
@@ -1176,6 +1184,7 @@ def pal_shuffle() -> None:
 
 
 def pal_save_as(e: Event=None) -> None:
+    """Save the palette with a new name."""
     while True:
         name = tk_tools.prompt(
             _("BEE2 - Save Palette"),
@@ -1202,13 +1211,17 @@ def pal_save_as(e: Event=None) -> None:
 
 
 def pal_save(e=None) -> None:
+    """Save the current palette over the original name."""
     pal = paletteLoader.pal_list[selectedPalette]
-    paletteLoader.save_pal(
-        [(it.id, it.subKey) for it in pal_picked],
-        pal.name,
-        var_pal_save_settings.get(),
-    )
-    refresh_pal_ui()
+    if pal.prevent_overwrite:
+        pal_save_as()
+    else:
+        paletteLoader.save_pal(
+            [(it.id, it.subKey) for it in pal_picked],
+            pal.name,
+            var_pal_save_settings.get(),
+        )
+        refresh_pal_ui()
 
 
 def pal_remove() -> None:
@@ -1302,18 +1315,19 @@ def init_option(pane: SubPane) -> None:
     frame.grid(row=0, column=0, sticky=NSEW)
     frame.columnconfigure(0, weight=1)
 
-    ttk.Button(
+    UI['pal_save'] = ttk.Button(
         frame,
         text=_("Save Palette..."),
         command=pal_save,
-    ).grid(row=0, sticky="EW", padx=5)
+    )
+    UI['pal_save'].grid(row=0, sticky="EW", padx=5)
     ttk.Button(
         frame,
         text=_("Save Palette As..."),
         command=pal_save_as,
     ).grid(row=1, sticky="EW", padx=5)
 
-    def save_settings_changed():
+    def save_settings_changed() -> None:
         GEN_OPTS['General'][
             'palette_save_settings'
         ] = srctools.bool_as_int(var_pal_save_settings.get())
@@ -1721,6 +1735,7 @@ def init_menu_bar(win: Toplevel) -> Menu:
         label=_('Delete Palette'),  # This name is overwritten later
         command=pal_remove,
         )
+    menus['pal_delete_ind'] = pal_menu.index('end')
     pal_menu.add_command(
         label=_('Fill Palette'),
         command=pal_shuffle,
@@ -1740,6 +1755,7 @@ def init_menu_bar(win: Toplevel) -> Menu:
         command=pal_save,
         accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
+    menus['pal_save_ind'] = pal_menu.index('end')
     pal_menu.add_command(
         label=_('Save Palette As...'),
         command=pal_save_as,
