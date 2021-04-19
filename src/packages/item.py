@@ -811,18 +811,18 @@ def parse_item_folder(
 
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
-            source='<{}>/items/{}'.format(pak_id, fold),
+            source=f'<{pak_id}>/items/{fold}',
             vbsp_config=Property(None, []),
 
             authors=sep_values(props['authors', '']),
             tags=sep_values(props['tags', '']),
-            desc=desc_parse(props, pak_id + ':' + prop_path),
+            desc=desc_parse(props, f'{pak_id}:{prop_path}'),
             ent_count=props['ent_count', ''],
             url=props['infoURL', None],
             icons={
                 p.name: p.value
                 for p in
-                props['icon', []]
+                props.find_children('icon')
             },
             all_name=props['all_name', None],
             all_icon=all_icon,
