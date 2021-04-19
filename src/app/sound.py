@@ -8,6 +8,7 @@ from __future__ import annotations
 from tkinter import Event
 from typing import IO, Optional, Callable
 import os
+import threading
 
 from app import TK_ROOT
 from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
@@ -107,6 +108,9 @@ class PygletSound(NullSound):
             try:
                 snd = self.sources[sound]
             except KeyError:
+                # We were called before the BG thread loaded em, load it
+                # synchronously.
+                LOGGER.warning('Sound "{}" couldn\'t be loaded in time!', sound)
                 snd = self.load(sound)
             try:
                 snd.play()
@@ -120,18 +124,32 @@ def ticker() -> None:
     """We need to constantly trigger pyglet.clock.tick().
 
     Instead of re-registering this, cache off the command name.
-    Additionally, load sounds gradually in the background.
     """
     if isinstance(sounds, PygletSound):
-        if _todo:
-            sounds.load(_todo.pop())
-
         try:
             tick(True)  # True = don't sleep().
         except Exception:
             LOGGER.exception('Pyglet tick failed:')
         else:  # Succeeded, do this again soon.
             TK_ROOT.tk.call(ticker_cmd)
+
+
+def load_fx() -> None:
+    """Load the FX sounds in the background.
+
+    We don't bother locking, we only modify the shared sound
+    dict at the end.
+    If we happen to hit a race condition with the main
+    thread, all that can happen is we load it twice.
+    """
+    for sound in SOUNDS:
+        # Copy locally, so this instance check stays valid.
+        snd = sounds
+        if isinstance(snd, PygletSound):
+            try:
+                snd.load(sound)
+            except Exception:
+                LOGGER.exception('Failed to load sound:')
 
 
 def fx(name, e=None) -> None:
@@ -167,6 +185,7 @@ try:
     sounds = PygletSound()
     ticker_cmd = ('after', 150, TK_ROOT.register(ticker))
     TK_ROOT.tk.call(ticker_cmd)
+    threading.Thread(target=load_fx, name='BEE2.sound.load', daemon=True).start()
 except Exception:
     LOGGER.exception('Pyglet not importable:')
     pyglet_version = '(Not installed)'
