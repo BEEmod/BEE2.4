@@ -538,7 +538,17 @@ def load_packages(
                     )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
+                    raise  # Never reached.
+                except TokenSyntaxError as e:
+                    # Add the relevant package to the filename.
+                    if e.file:
+                        e.file = f'{obj_data.pak_id}:{e.file}'
                     raise
+                except Exception as e:
+                    raise ValueError(
+                        'Error occured parsing '
+                        f'{obj_data.pak_id}:{obj_id} item!'
+                    ) from e
 
                 if not hasattr(object_, 'id'):
                     raise ValueError(
@@ -546,12 +556,28 @@ def load_packages(
                     )
 
                 # Store in this database so we can find all objects for each type.
+                # noinspection PyProtectedMember
                 obj_class._id_to_obj[object_.id.casefold()] = object_
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
                 for override_data in obj_override[obj_type].get(obj_id, []):
-                    override = OBJ_TYPES[obj_type].cls.parse(override_data)
+                    try:
+                        override = OBJ_TYPES[obj_type].cls.parse(override_data)
+                    except (NoKeyError, IndexError) as e:
+                        reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
+                        raise  # Never reached.
+                    except TokenSyntaxError as e:
+                        # Add the relevant package to the filename.
+                        if e.file:
+                            e.file = f'{override_data.pak_id}:{e.file}'
+                        raise
+                    except Exception as e:
+                        raise ValueError(
+                            f'Error occured parsing {obj_id} override'
+                            f'from package {override_data.pak_id}!'
+                        ) from e
+
                     object_.add_over(override)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
