@@ -49,7 +49,6 @@ def tk_error(
         msg='Uncaught Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
-    logging.shutdown()
 
     # Since this isn't caught normally, it won't quit the application.
     # Quit ourselves manually. to prevent TK just freezing.

@@ -739,7 +739,6 @@ def restart_app() -> NoReturn:
 
 def quit_app(status=0) -> NoReturn:
     """Quit the application."""
-    logging.shutdown()
     sys.exit(status)
 
 
