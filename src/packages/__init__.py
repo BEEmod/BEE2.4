@@ -1,6 +1,7 @@
 """
 Handles scanning through the zip packages to find all items, styles, etc.
 """
+from __future__ import annotations
 import os
 from collections import defaultdict
 
@@ -8,37 +9,29 @@ import srctools
 from app import tkMarkdown
 import utils
 from app.packageMan import PACK_CONFIG
+from loadScreen import LoadScreen
 from srctools import Property, NoKeyError
+from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 from editoritems import Item as EditorItem, Renderable, RenderableType
 import srctools.logger
 
 from typing import (
-    Union, Optional, Any, TYPE_CHECKING,
-    TypeVar, Type, cast,
-    Dict, List, Tuple, NamedTuple, Collection,
-    Iterable, ClassVar,
+    Optional, Any, TYPE_CHECKING, NoReturn, TypeVar, ClassVar,
+    NamedTuple, Collection, Iterable, Type,
 )
-
-
-# noinspection PyUnresolvedReferences
-from srctools.tokenizer import Tokenizer
-
-
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
-    from loadScreen import LoadScreen
-    from typing import NoReturn
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-all_obj: Dict[str, Dict[str, 'ObjData']] = {}
-packages: Dict[str, 'Package'] = {}
-OBJ_TYPES: Dict[str, 'ObjType'] = {}
+all_obj: dict[str, dict[str, ObjData]] = {}
+packages: dict[str, Package] = {}
+OBJ_TYPES: dict[str, ObjType] = {}
 
 # Maps a package ID to the matching filesystem for reading files easily.
-PACKAGE_SYS: Dict[str, FileSystem] = {}
+PACKAGE_SYS: dict[str, FileSystem] = {}
 
 
 # Various namedtuples to allow passing blocks of data around
@@ -48,7 +41,7 @@ class SelitemData(NamedTuple):
     """Options which are displayed on the selector window."""
     name: str  # Longer full name.
     short_name: str  # Shorter name for the icon.
-    auth: List[str]  # List of authors.
+    auth: list[str]  # List of authors.
     icon: str  # Path to small square icon.
     large_icon: str  # Path to larger, landscape icon.
     desc: tkMarkdown.MarkdownData
@@ -56,7 +49,7 @@ class SelitemData(NamedTuple):
     sort_key: str
 
     @classmethod
-    def parse(cls, info: Property) -> 'SelitemData':
+    def parse(cls, info: Property) -> SelitemData:
         """Parse from a property block."""
         auth = sep_values(info['authors', ''])
         short_name = info['shortName', None]
@@ -82,7 +75,7 @@ class SelitemData(NamedTuple):
             sort_key,
         )
 
-    def __add__(self, other: 'SelitemData') -> 'SelitemData':
+    def __add__(self, other: SelitemData) -> SelitemData:
         """Join together two sets of selitem data.
 
         This uses the over_data values if defined, using our_data if not.
@@ -125,7 +118,7 @@ class ParseData(NamedTuple):
 
 class ObjType(NamedTuple):
     """The values stored for OBJ_TYPES"""
-    cls: Type['PakObject']
+    cls: Type[PakObject]
     allow_mult: bool
     has_img: bool
 
@@ -135,11 +128,11 @@ class ExportData(NamedTuple):
     # Usually str, but some items pass other things.
     selected: Any
     # Some items need to know which style is selected
-    selected_style: 'Style'
-    all_items: List[EditorItem]  # All the items in the map
-    renderables: Dict[RenderableType, Renderable]  # The error/connection icons
+    selected_style: Style
+    all_items: list[EditorItem]  # All the items in the map
+    renderables: dict[RenderableType, Renderable]  # The error/connection icons
     vbsp_conf: Property
-    game: 'Game'
+    game: Game
 
 
 class CorrDesc(NamedTuple):
@@ -224,7 +217,7 @@ class PakObject:
     # Display name of the package.
     pak_name: str
 
-    _id_to_obj: ClassVar[Dict[str, 'PakObject']]
+    _id_to_obj: ClassVar[dict[str, PakObject]]
 
     def __init_subclass__(
         cls,
@@ -241,7 +234,7 @@ class PakObject:
         cls._id_to_obj = {}
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'PakObject':
+    def parse(cls: Type[PakT], data: ParseData) -> PakT:
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
@@ -252,7 +245,7 @@ class PakObject:
         """
         raise NotImplementedError
 
-    def add_over(self, override: 'PakObject'):
+    def add_over(self: PakT, override: PakT):
         """Called to override values.
         self is the originally defined item, and override is the override item
         to copy values from.
@@ -260,7 +253,7 @@ class PakObject:
         pass
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export the appropriate data into the game.
 
         ExportData is a namedtuple containing various data:
@@ -288,7 +281,7 @@ class PakObject:
         return cls._id_to_obj[object_id.casefold()]
 
 
-def reraise_keyerror(err: BaseException, obj_id: str) -> 'NoReturn':
+def reraise_keyerror(err: BaseException, obj_id: str) -> NoReturn:
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
@@ -430,7 +423,7 @@ def find_packages(pak_dir: str) -> None:
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dir: str, msg: str) -> 'NoReturn':
+def no_packages_err(pak_dir: str, msg: str) -> NoReturn:
     """Show an error message indicating no packages are present."""
     from tkinter import messagebox
     import sys
@@ -439,7 +432,7 @@ def no_packages_err(pak_dir: str, msg: str) -> 'NoReturn':
         title='BEE2 - Invalid Packages Directory!',
         message=(
             '{}\nGet the packages from '
-            '"http://github.com/BEEmod/BEE2-items" '
+            '"https://github.com/BEEmod/BEE2-items" '
             'and place them in "{}".').format(msg, pak_dir + os.path.sep),
         # Add slash to the end to indicate it's a folder.
     )
@@ -448,14 +441,14 @@ def no_packages_err(pak_dir: str, msg: str) -> 'NoReturn':
 
 def load_packages(
     pak_dir: str,
-    loader: 'LoadScreen',
+    loader: LoadScreen,
     log_item_fallbacks=False,
     log_missing_styles=False,
     log_missing_ent_count=False,
     log_incorrect_packfile=False,
     has_mel_music=False,
     has_tag_music=False,
-) -> Tuple[dict, Collection[FileSystem]]:
+) -> tuple[dict, Collection[FileSystem]]:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(pak_dir)
@@ -485,8 +478,8 @@ def load_packages(
                 'essential resources and objects.'
             )
 
-        data: Dict[str, List[PakObject]] = {}
-        obj_override: Dict[str, Dict[str, List[ParseData]]] = {}
+        data: dict[str, list[PakObject]] = {}
+        obj_override: dict[str, dict[str, list[ParseData]]] = {}
 
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
@@ -608,8 +601,8 @@ def load_packages(
 
 
 def parse_package(
-    pack: 'Package',
-    obj_override: Dict[str, Dict[str, List[ParseData]]],
+    pack: Package,
+    obj_override: dict[str, dict[str, list[ParseData]]],
     has_tag: bool=False,
     has_mel: bool=False,
 ) -> None:
@@ -668,12 +661,12 @@ def parse_package(
 class Package:
     """Represents a package."""
     def __init__(
-            self,
-            pak_id: str,
-            filesystem: FileSystem,
-            info: Property,
-            name: str,
-            ):
+        self,
+        pak_id: str,
+        filesystem: FileSystem,
+        info: Property,
+        name: str,
+    ) -> None:
         disp_name = info['Name', None]
         if disp_name is None:
             LOGGER.warning('Warning: {id} has no display name!', id=pak_id)
@@ -704,7 +697,7 @@ class Package:
 
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
 
-    def is_stale(self, mod_time: int):
+    def is_stale(self, mod_time: int) -> bool:
         """Check to see if this package has been modified since the last run."""
         if isinstance(self.fsys, RawFileSystem):
             # unzipped packages are for development, so always extract.
@@ -719,7 +712,7 @@ class Package:
             return True
         return False
 
-    def get_modtime(self):
+    def get_modtime(self) -> int:
         """After the cache has been extracted, set the modification dates
          in the config."""
         if isinstance(self.fsys, RawFileSystem):
@@ -734,15 +727,15 @@ class Style(PakObject):
     def __init__(
         self,
         style_id: str,
-        selitem_data: 'SelitemData',
-        items: List[EditorItem],
-        renderables: Dict[RenderableType, Renderable],
+        selitem_data: SelitemData,
+        items: list[EditorItem],
+        renderables: dict[RenderableType, Renderable],
         config=None,
         base_style: Optional[str]=None,
-        suggested: Tuple[str, str, str, str]=None,
+        suggested: tuple[str, str, str, str]=None,
         has_video: bool=True,
         vpk_name: str='',
-        corridors: Dict[Tuple[str, int], CorrDesc]=None,
+        corridors: dict[tuple[str, int], CorrDesc]=None,
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
@@ -751,7 +744,7 @@ class Style(PakObject):
         self.base_style = base_style
         # Set by post_parse() after all objects are read.
         # this is a list of this style, plus parents in order.
-        self.bases: List[Style] = []
+        self.bases: list[Style] = []
         self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
         self.has_video = has_video
         self.vpk_name = vpk_name
@@ -868,7 +861,7 @@ class Style(PakObject):
             vpk_name=vpk_name,
         )
 
-    def add_over(self, override: 'Style') -> None:
+    def add_over(self, override: Style) -> None:
         """Add the additional commands to ourselves."""
         self.items.extend(override.items)
         self.renderables.update(override.renderables)
@@ -886,7 +879,7 @@ class Style(PakObject):
     @classmethod
     def post_parse(cls) -> None:
         """Assign the bases lists for all styles."""
-        all_styles: Dict[str, Style] = {}
+        all_styles: dict[str, Style] = {}
 
         for style in cls.all():
             all_styles[style.id] = style
@@ -908,7 +901,7 @@ class Style(PakObject):
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'
 
-    def export(self) -> Tuple[List[EditorItem], Dict[RenderableType, Renderable], Property]:
+    def export(self) -> tuple[list[EditorItem], dict[RenderableType, Renderable], Property]:
         """Export this style, returning the vbsp_config and editoritems.
 
         This is a special case, since styles should go first in the lists.
@@ -943,7 +936,7 @@ def desc_parse(
     return tkMarkdown.convert('\n'.join(lines))
 
 
-def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> List[str]:
+def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:
     """Split a string by a delimiter, and then strip whitespace.
 
     Multiple delimiter characters can be passed.
@@ -963,6 +956,7 @@ def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> List[str]:
     ]
 
 
+# Load all the package object classes, registering them in the process.
 from packages.item import Item, assign_styled_items
 from packages.stylevar import StyleVar
 from packages.elevator import Elevator
@@ -972,5 +966,5 @@ from packages.signage import Signage
 from packages.skybox import Skybox
 from packages.music import Music
 from packages.quote_pack import QuotePack
-from packages.template_brush import BrushTemplate, TEMPLATE_FILE
+from packages.template_brush import BrushTemplate
 from packages.pack_list import PackList
