@@ -766,7 +766,7 @@ def parse_item_folder(
                 f = filesystem[editor_path].open_str()
             except FileNotFoundError as err:
                 raise IOError(
-                    '"' + pak_id + ':items/' + fold + '" not valid!'
+                    '"' + pak_id + ':items/' + fold + '" not valid! '
                     'Folder likely missing! '
                 ) from err
             with f:
