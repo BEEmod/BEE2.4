@@ -150,9 +150,10 @@ def load_fx() -> None:
                 snd.load(sound)
             except Exception:
                 LOGGER.exception('Failed to load sound:')
+                return
 
 
-def fx(name, e=None) -> None:
+def fx(name) -> None:
     """Play a sound effect stored in the sounds{} dict."""
     sounds.fx(name)
 
