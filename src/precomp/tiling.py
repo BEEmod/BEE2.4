@@ -1648,10 +1648,11 @@ def gen_tile_temp() -> None:
                     face.translate(-16 * face_norm - (thickness / 2) * norm)
                     u_dir, v_dir = face_norm.other_axes(axis_norm)
                     temp_part[int(u_dir), int(v_dir), thickness, bevel] = face
-            assert (1, 0, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
-            assert (0, 1, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
-            assert (0, -1, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
-            assert (-1, 0, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
+            # Verify all keys are present.
+            assert (1, 0, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part}'
+            assert (0, 1, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part}'
+            assert (0, -1, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part}'
+            assert (-1, 0, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part}'
         assert 'front' in temp_part
         assert 'back' in temp_part
 
