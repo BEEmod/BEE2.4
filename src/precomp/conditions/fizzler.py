@@ -65,8 +65,10 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         try:
             fizz = fizzler.FIZZLERS[fizz_item.name]
         except KeyError:
-            LOGGER.warning('Reshaping fizzler with non-fizzler output ({})! Ignoring!', fizz_item.name)
             continue
+        # Detach this connection and remove traces of it.
+        conn.remove()
+
         fizz.emitters.clear()  # Remove old positions.
         fizz.up_axis = up_axis
         fizz.base_inst['origin'] = shape_inst['origin']
@@ -99,15 +101,18 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         )
         connections.ITEMS[shape_name] = fizz_item
 
-    # Detach this connection and remove traces of it.
-    for conn in list(shape_item.outputs):
-        conn.remove()
-
-    # Transfer the inputs from us to the fizzler.
+    # Transfer the input/outputs from us to the fizzler.
     for inp in list(shape_item.inputs):
         inp.to_item = fizz_item
+    for conn in list(shape_item.outputs):
+        conn.from_item = fizz_item
 
-    shape_item.delete_antlines()
+    # If the fizzler has no outputs, then strip out antlines. Otherwise,
+    # they need to be transferred across, so we can't tell safely.
+    if fizz_item.output_act() is None and fizz_item.output_deact() is None:
+        shape_item.delete_antlines()
+    else:
+        shape_item.transfer_antlines(fizz_item)
 
     fizz_base = fizz.base_inst
     fizz_base['origin'] = shape_inst['origin']
