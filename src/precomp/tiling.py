@@ -60,12 +60,12 @@ NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
 # Specific angles, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
 NORM_ANGLES = {
-    Vec(x=1).as_tuple(): Angle(0, 0, 0),
-    Vec(x=-1).as_tuple(): Angle(0, 180, 0),
-    Vec(y=1).as_tuple(): Angle(0, 90, 0),
-    Vec(y=-1).as_tuple(): Angle(0, 270, 0),
-    Vec(z=1).as_tuple(): Angle(270, 270,  0),
-    Vec(z=-1).as_tuple(): Angle(90, 90, 0),
+    Vec(x=1).as_tuple(): Matrix.from_angle(Angle(0, 0, 0)),
+    Vec(x=-1).as_tuple(): Matrix.from_angle(Angle(0, 180, 0)),
+    Vec(y=1).as_tuple(): Matrix.from_angle(Angle(0, 90, 0)),
+    Vec(y=-1).as_tuple(): Matrix.from_angle(Angle(0, 270, 0)),
+    Vec(z=1).as_tuple(): Matrix.from_angle(Angle(270, 270,  0)),
+    Vec(z=-1).as_tuple(): Matrix.from_angle(Angle(90, 90, 0)),
 }
 
 NORM_NAMES = {
@@ -1644,10 +1644,16 @@ def gen_tile_temp() -> None:
                     # Squarebeams.
                     # Rounding the position of the face gives us the direction
                     # it's pointing away from the center.
-                    face_norm: Vec = round(face.get_origin().norm(), 6)
+                    face_norm: Vec = round(face.get_origin().norm(), 0)
                     face.translate(-16 * face_norm - (thickness / 2) * norm)
                     u_dir, v_dir = face_norm.other_axes(axis_norm)
                     temp_part[int(u_dir), int(v_dir), thickness, bevel] = face
+            assert (1, 0, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
+            assert (0, 1, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
+            assert (0, -1, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
+            assert (-1, 0, thickness, bevel) in temp_part, f't={thickness}, b={bevel}, res={temp_part} -> {hint}'
+        assert 'front' in temp_part
+        assert 'back' in temp_part
 
 
 def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]]) -> None:
