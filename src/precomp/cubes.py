@@ -929,6 +929,8 @@ def flag_cube_type(inst: Entity, res: Property):
     * `<any>`: Any kind of cube item
     * `<none>`: Not a cube item
     * `<companion>`: A cube marked as companion-like.
+    * `<sphere>` or `<ball>`: A sphere-type cube.
+    * `<reflection>` or `<reflect>`: A reflection-type cube.
     * `<dropper>`: The dropper half of a pair.
     * `<cube>`: The cube half of a pair.
     """
@@ -955,6 +957,10 @@ def flag_cube_type(inst: Entity, res: Property):
             return False
         elif cube_type == 'companion':
             return pair.cube_type.is_companion
+        elif cube_type in ('sphere', 'ball'):
+            return pair.cube_type.type is CubeEntType.sphere
+        elif cube_type in ('reflect', 'reflection'):
+            return pair.cube_type.type is CubeEntType.reflect
         elif cube_type == 'dropper':
             return inst is pair.dropper
         elif cube_type == 'cube':
