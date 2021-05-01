@@ -3,7 +3,7 @@ import random
 from collections import defaultdict
 from typing import List, Dict, Tuple
 
-from srctools import Property, Vec, VMF, Entity
+from srctools import Property, Vec, VMF, Entity, Angle
 import srctools.logger
 
 from precomp import tiling, texturing, template_brush, conditions
@@ -134,22 +134,23 @@ def res_create_entity(vmf: VMF, inst: Entity, res: Property):
     """Create an entity.
 
     * `keys` and `localkeys` defines the new keyvalues used.
-    * `Origin` will be used to offset the given amount from the current location.
+    * `origin` and `angles` are local to the instance.
     """
 
     origin = Vec.from_str(inst['origin'])
+    orient = Angle.from_str(inst['angles'])
 
     new_ent = vmf.create_ent(
-        # Ensure there's a classname, just in case.
-        classname='info_null'
+        # Ensure there's these critical values.
+        classname='info_null',
+        origin='0 0 0',
+        angles='0 0 0',
     )
 
     conditions.set_ent_keys(new_ent, inst, res)
 
-    origin += Vec.from_str(new_ent['origin']).rotate_by_str(inst['angles'])
-
-    new_ent['origin'] = origin
-    new_ent['angles'] = inst['angles']
+    new_ent['origin'] = Vec.from_str(new_ent['origin']) @ orient + origin
+    new_ent['angles'] = Angle.from_str(new_ent['angles']) @ orient
 
 
 @make_result_setup('WaterSplash')
