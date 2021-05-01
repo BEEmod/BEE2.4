@@ -1557,7 +1557,9 @@ class Item:
 
         has_prim_input = self.has_prim_input()
         has_sec_input = self.has_sec_input()
-        has_output = self.has_output()
+        # Fizzlers don't output correctly, so don't allow them to output
+        # in editoritems.
+        has_output = self.has_output() and self.cls is not ItemClass.FIZZLER
         if has_prim_input or has_sec_input or self.conn_inputs:
             f.write('\t\t"Inputs"\n\t\t\t{\n')
             if has_prim_input:
