@@ -1,4 +1,9 @@
-from tkinter import *
+"""Implement the pane configuring compiler features.
+
+These can be set and take effect immediately, without needing to export.
+"""
+from __future__ import annotations
+import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 from app.tooltip import add_tooltip, set_tooltip
@@ -15,7 +20,7 @@ from srctools import Property, AtomicWriter
 from srctools.logger import get_logger
 from app.tk_tools import FileField
 
-from typing import Dict, Tuple, Optional
+from typing import Optional, Union
 
 
 LOGGER = get_logger(__name__)
@@ -24,8 +29,8 @@ LOGGER = get_logger(__name__)
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR: Dict[str, selector_win.selWin] = {}
-CORRIDOR_DATA: Dict[Tuple[str, int], CorrDesc] = {}
+CORRIDOR: dict[str, selector_win.selWin] = {}
+CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
 
 CORRIDOR_DESC = tkMarkdown.convert('')
 
@@ -71,10 +76,10 @@ PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
 
 COMPILE_CFG = ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
-window = None
-UI = {}  # type: Dict[str, Widget]
+window: Union[SubPane.SubPane, tk.Tk, None] = None
+UI: dict[str, tk.Widget] = {}
 
-chosen_thumb = StringVar(
+chosen_thumb = tk.StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
 tk_screenshot = None  # The preview image shown
@@ -82,29 +87,23 @@ tk_screenshot = None  # The preview image shown
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
-VOICE_PRIORITY_VAR = IntVar(
-    value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True)
-)
+VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True))
 
-player_model_var = StringVar(
+player_model_var = tk.StringVar(
     value=PLAYER_MODELS.get(
         COMPILE_CFG.get_val('General', 'player_model', 'PETI'),
         PLAYER_MODELS['PETI'],
     )
 )
-start_in_elev = IntVar(
-    value=COMPILE_CFG.get_bool('General', 'spawn_elev')
-)
+start_in_elev = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'spawn_elev'))
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
-cust_file_loc_var = StringVar(value='')
+cust_file_loc_var = tk.StringVar(value='')
 
-packfile_dump_enable = IntVar(
-    value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable')
-)
+packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
 
-count_brush = IntVar(value=0)
-count_entity = IntVar(value=0)
-count_overlay = IntVar(value=0)
+count_brush = tk.IntVar(value=0)
+count_entity = tk.IntVar(value=0)
+count_overlay = tk.IntVar(value=0)
 
 # Controls flash_count()
 count_brush.should_flash = False
@@ -140,12 +139,8 @@ COUNT_CATEGORIES = [
     ),
 ]
 
-vrad_light_type = IntVar(
-    value=COMPILE_CFG.get_bool('General', 'vrad_force_full')
-)
-cleanup_screenshot = IntVar(
-    value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True)
-)
+vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
+cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
 @option_handler('CompilerPane')
@@ -247,7 +242,7 @@ def load_corridors() -> None:
     set_corridors(config)
 
 
-def set_corridors(config: Dict[Tuple[str, int], CorrDesc]):
+def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
     """Set the corridor data based on the passed in config."""
     CORRIDOR_DATA.clear()
     CORRIDOR_DATA.update(config)
@@ -297,7 +292,7 @@ def set_corridors(config: Dict[Tuple[str, int], CorrDesc]):
     COMPILE_CFG.save_check()
 
 
-def make_corr_wid(corr_name: str):
+def make_corr_wid(corr_name: str) -> None:
     """Create the corridor widget and items."""
     length = CORRIDOR_COUNTS[corr_name]
 
@@ -310,7 +305,6 @@ def make_corr_wid(corr_name: str):
             )
             for i in range(1, length + 1)
         ],
-        has_none=True,
         none_desc=_(
             'Randomly choose a corridor. '
             'This is saved in the puzzle data '
@@ -329,17 +323,18 @@ def make_corr_wid(corr_name: str):
         sel.sel_item_id(str(chosen_corr))
 
 
-def sel_corr_callback(sel_item: str, corr_name: str):
+def sel_corr_callback(sel_item: str, corr_name: str) -> None:
+    """Callback for saving the result of selecting a corridor."""
     COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
     COMPILE_CFG.save_check()
 
 
-def flash_count():
+def flash_count() -> None:
     """Flash the counter between 0 and 100 when on."""
     should_cont = False
 
     for var in (count_brush, count_entity, count_overlay):
-        if not var.should_flash:
+        if not getattr(var, 'should_flash', False):
             continue  # Abort when it shouldn't be flashing
 
         if var.get() == 0:
@@ -353,7 +348,8 @@ def flash_count():
         TK_ROOT.after(750, flash_count)
 
 
-def refresh_counts(reload=True):
+def refresh_counts(reload: bool = True) -> None:
+    """Set the last-compile limit display."""
     if reload:
         COMPILE_CFG.load()
 
@@ -375,7 +371,7 @@ def refresh_counts(reload=True):
             # Use or to ensure no divide-by-zero occurs..
             max_value = COMPILE_CFG.get_int('Counts', 'max_' + name) or default
 
-        # If it's hit the limit, make it continously scroll to draw
+        # If it's hit the limit, make it continuously scroll to draw
         # attention to the bar.
         if value >= max_value:
             bar_var.should_flash = True
@@ -395,11 +391,13 @@ def refresh_counts(reload=True):
 
 
 def set_pack_dump_dir(path: str) -> None:
+    """Run when the packfile dump path is changed."""
     COMPILE_CFG['General']['packfile_dump_dir'] = path
     COMPILE_CFG.save_check()
 
 
 def set_pack_dump_enabled() -> None:
+    """Run when the packfile enable checkbox is modified."""
     is_enabled = packfile_dump_enable.get()
     COMPILE_CFG['General']['packfile_dump_enable'] = str(is_enabled)
     COMPILE_CFG.save_check()
@@ -410,7 +408,7 @@ def set_pack_dump_enabled() -> None:
         UI['packfile_filefield'].grid_remove()
 
 
-def find_screenshot(e=None):
+def find_screenshot(e=None) -> None:
     """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
         title='Find Screenshot',
@@ -422,11 +420,14 @@ def find_screenshot(e=None):
         initialdir='C:',
     )
     if file_name:
-        load_screenshot(file_name)
+        image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
+        COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
+        image.save(SCREENSHOT_LOC)
+        set_screenshot(image)
     COMPILE_CFG.save_check()
 
 
-def set_screen_type():
+def set_screen_type() -> None:
     """Set the type of screenshot used."""
     chosen = chosen_thumb.get()
     COMPILE_CFG['Screenshot']['type'] = chosen
@@ -444,25 +445,18 @@ def set_screen_type():
     COMPILE_CFG.save_check()
 
 
-def load_screenshot(path):
-    """Copy the selected image, changing format if needed."""
-    img = Image.open(path).convert('RGB')  # Remove alpha channel if present.
-    COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-    img.save(SCREENSHOT_LOC)
-    set_screenshot(img)
-
-
-def set_screenshot(img: Image=None):
+def set_screenshot(image: Image=None) -> None:
+    """Show the screenshot on the UI."""
     # Make the visible screenshot small
     global tk_screenshot
-    if img is None:
+    if image is None:
         try:
-            img = Image.open(SCREENSHOT_LOC)
+            image = Image.open(SCREENSHOT_LOC)
         except IOError:  # Image doesn't exist!
             # In that case, use a black image
-            img = Image.new('RGB', (1, 1), color=(0, 0, 0))
+            image = Image.new('RGB', (1, 1), color=(0, 0, 0))
     # Make a smaller image for showing in the UI..
-    tk_img = img.resize(
+    tk_img = image.resize(
         (
             int(PETI_WIDTH // 3.5),
             int(PETI_HEIGHT // 3.5),
@@ -473,14 +467,7 @@ def set_screenshot(img: Image=None):
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def set_model(e=None):
-    """Save the selected player model."""
-    text = player_model_var.get()
-    COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
-    COMPILE_CFG.save()
-
-
-def make_setter(section: str, config: str, variable: Variable) -> None:
+def make_setter(section: str, config: str, variable: tk.Variable) -> None:
     """Create a callback which sets the given config from a variable."""
     def callback(var_name: str, var_ind: str, cback_name: str) -> None:
         """Automatically called when the variable is written to."""
@@ -502,11 +489,11 @@ def make_widgets() -> None:
     ttk.Label(window, justify='center', text=_(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
-    )).grid(row=0, column=0, sticky=EW, padx=2, pady=2)
+    )).grid(row=0, column=0, sticky='ew', padx=2, pady=2)
 
     UI['nbook'] = nbook = ttk.Notebook(window)
 
-    nbook.grid(row=1, column=0, sticky=NSEW)
+    nbook.grid(row=1, column=0, sticky='nsew')
     window.columnconfigure(0, weight=1)
     window.rowconfigure(1, weight=1)
 
@@ -534,9 +521,9 @@ def make_comp_widgets(frame: ttk.Frame):
     thumb_frame = ttk.LabelFrame(
         frame,
         text=_('Thumbnail'),
-        labelanchor=N,
+        labelanchor=tk.N,
     )
-    thumb_frame.grid(row=0, column=0, sticky=EW)
+    thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
     UI['thumb_auto'] = ttk.Radiobutton(
@@ -565,7 +552,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_label'] = ttk.Label(
         thumb_frame,
-        anchor=CENTER,
+        anchor=tk.CENTER,
         cursor=utils.CURSORS['link'],
     )
     UI['thumb_label'].bind(
@@ -618,15 +605,15 @@ def make_comp_widgets(frame: ttk.Frame):
 
     if chosen_thumb.get() == 'CUST':
         # Show this if the user has set it before
-        UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
+        UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='ew')
     set_screenshot()  # Load the last saved screenshot
 
     vrad_frame = ttk.LabelFrame(
         frame,
         text=_('Lighting:'),
-        labelanchor=N,
+        labelanchor='n',
     )
-    vrad_frame.grid(row=1, column=0, sticky=EW)
+    vrad_frame.grid(row=1, column=0, sticky='ew')
 
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
@@ -668,7 +655,7 @@ def make_comp_widgets(frame: ttk.Frame):
         frame,
         labelwidget=packfile_enable,
     )
-    packfile_frame.grid(row=2, column=0, sticky=EW)
+    packfile_frame.grid(row=2, column=0, sticky='ew')
 
     UI['packfile_filefield'] = packfile_filefield = FileField(
         packfile_frame,
@@ -676,7 +663,7 @@ def make_comp_widgets(frame: ttk.Frame):
         loc=COMPILE_CFG.get_val('General', 'packfile_dump_dir', ''),
         callback=set_pack_dump_dir,
     )
-    packfile_filefield.grid(row=0, column=0, sticky=EW)
+    packfile_filefield.grid(row=0, column=0, sticky='ew')
     packfile_frame.columnconfigure(0, weight=1)
     ttk.Frame(packfile_frame).grid(row=1)
 
@@ -691,18 +678,18 @@ def make_comp_widgets(frame: ttk.Frame):
     count_frame = ttk.LabelFrame(
         frame,
         text=_('Last Compile:'),
-        labelanchor=N,
+        labelanchor='n',
     )
 
-    count_frame.grid(row=7, column=0, sticky=EW)
+    count_frame.grid(row=7, column=0, sticky='ew')
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
     ttk.Label(
         count_frame,
         text=_('Entity'),
-        anchor=N,
-    ).grid(row=0, column=0, columnspan=3, sticky=EW)
+        anchor='n',
+    ).grid(row=0, column=0, columnspan=3, sticky='ew')
 
     UI['count_entity'] = ttk.Progressbar(
         count_frame,
@@ -714,22 +701,22 @@ def make_comp_widgets(frame: ttk.Frame):
         row=1,
         column=0,
         columnspan=3,
-        sticky=EW,
+        sticky='ew',
         padx=5,
     )
 
     ttk.Label(
         count_frame,
         text=_('Overlay'),
-        anchor=CENTER,
-    ).grid(row=2, column=0, sticky=EW)
+        anchor='center',
+    ).grid(row=2, column=0, sticky='ew')
     UI['count_overlay'] = ttk.Progressbar(
         count_frame,
         maximum=100,
         variable=count_overlay,
         length=50,
     )
-    UI['count_overlay'].grid(row=3, column=0, sticky=EW, padx=5)
+    UI['count_overlay'].grid(row=3, column=0, sticky='ew', padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
@@ -746,15 +733,15 @@ def make_comp_widgets(frame: ttk.Frame):
     ttk.Label(
         count_frame,
         text=_('Brush'),
-        anchor=CENTER,
-    ).grid(row=2, column=2, sticky=EW)
+        anchor='center',
+    ).grid(row=2, column=2, sticky=tk.EW)
     UI['count_brush'] = ttk.Progressbar(
         count_frame,
         maximum=100,
         variable=count_brush,
         length=50,
     )
-    UI['count_brush'].grid(row=3, column=2, sticky=EW, padx=5)
+    UI['count_brush'].grid(row=3, column=2, sticky='ew', padx=5)
 
     for wid_name in ('count_overlay', 'count_entity', 'count_brush'):
         # Add in tooltip logic to the widgets.
@@ -774,11 +761,11 @@ def make_map_widgets(frame: ttk.Frame):
     voice_frame = ttk.LabelFrame(
         frame,
         text=_('Voicelines:'),
-        labelanchor=NW,
+        labelanchor='nw',
     )
-    voice_frame.grid(row=1, column=0, sticky=EW)
+    voice_frame.grid(row=1, column=0, sticky='ew')
 
-    UI['voice_priority'] = voice_priority = ttk.Checkbutton(
+    voice_priority = ttk.Checkbutton(
         voice_frame,
         text=_("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
@@ -794,38 +781,36 @@ def make_map_widgets(frame: ttk.Frame):
     elev_frame = ttk.LabelFrame(
         frame,
         text=_('Spawn at:'),
-        labelanchor=N,
+        labelanchor='n',
     )
 
-    elev_frame.grid(row=2, column=0, sticky=EW)
+    elev_frame.grid(row=2, column=0, sticky='ew')
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
-
-    UI['elev_preview'] = ttk.Radiobutton(
+    elev_preview = ttk.Radiobutton(
         elev_frame,
         text=_('Entry Door'),
         value=0,
         variable=start_in_elev,
     )
-
-    UI['elev_elevator'] = ttk.Radiobutton(
+    elev_elevator = ttk.Radiobutton(
         elev_frame,
         text=_('Elevator'),
         value=1,
         variable=start_in_elev,
     )
 
-    UI['elev_preview'].grid(row=0, column=0, sticky=W)
-    UI['elev_elevator'].grid(row=0, column=1, sticky=W)
+    elev_preview.grid(row=0, column=0, sticky='w')
+    elev_elevator.grid(row=0, column=1, sticky='w')
 
     add_tooltip(
-        UI['elev_elevator'],
+        elev_elevator,
         _("When previewing in SP, spawn inside the entry elevator. "
           "Use this to examine the entry and exit corridors.")
     )
     add_tooltip(
-        UI['elev_preview'],
+        elev_preview,
         _("When previewing in SP, spawn just before the entry door.")
     )
 
@@ -833,9 +818,9 @@ def make_map_widgets(frame: ttk.Frame):
         frame,
         width=18,
         text=_('Corridor:'),
-        labelanchor=N,
+        labelanchor='n',
     )
-    corr_frame.grid(row=3, column=0, sticky=EW)
+    corr_frame.grid(row=3, column=0, sticky='ew')
     corr_frame.columnconfigure(1, weight=1)
 
     make_corr_wid('sp_entry')
@@ -870,22 +855,29 @@ def make_map_widgets(frame: ttk.Frame):
         labelanchor='n',
     )
     model_frame.grid(row=4, column=0, sticky='ew')
-    UI['player_mdl'] = ttk.Combobox(
+    player_mdl = ttk.Combobox(
         model_frame,
-        exportselection=0,
+        exportselection=False,
         textvariable=player_model_var,
         values=[PLAYER_MODELS[mdl] for mdl in PLAYER_MODEL_ORDER],
         width=20,
     )
     # Users can only use the dropdown
-    UI['player_mdl'].state(['readonly'])
-    UI['player_mdl'].grid(row=0, column=0, sticky=EW)
+    player_mdl.state(['readonly'])
+    player_mdl.grid(row=0, column=0, sticky=tk.EW)
 
-    UI['player_mdl'].bind('<<ComboboxSelected>>', set_model)
+    def set_model(e: tk.Event) -> None:
+        """Save the selected player model."""
+        text = player_model_var.get()
+        COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
+        COMPILE_CFG.save()
+
+    player_mdl.bind('<<ComboboxSelected>>', set_model)
+
     model_frame.columnconfigure(0, weight=1)
 
 
-def make_pane(tool_frame: Frame, menu_bar: Menu) -> None:
+def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
@@ -904,7 +896,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu) -> None:
     make_widgets()
 
 
-def init_application():
+def init_application() -> None:
     """Initialise when standalone."""
     global window
     window = TK_ROOT
