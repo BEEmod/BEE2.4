@@ -3,6 +3,7 @@
 It handles loading them from disk and converting them to TK versions, and
 caching images so repeated requests are cheap.
 """
+from __future__ import annotations
 import time
 import threading
 from queue import Queue, Empty as EmptyQueue
@@ -11,10 +12,7 @@ import os
 from weakref import ref as WeakRef
 import tkinter as tk
 from tkinter import ttk
-from typing import (
-    Generic, TypeVar, Union, Callable, Optional,
-    Dict, Tuple, Mapping, Set,
-)
+from typing import Generic, TypeVar, Union, Callable, Optional, Mapping
 from app import TK_ROOT
 
 from srctools import Vec, Property
@@ -32,17 +30,17 @@ tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 ArgT = TypeVar('ArgT')
 
 # Used to keep track of the used handles, so we can deduplicate them.
-_handles: Dict[tuple, 'Handle'] = {}
+_handles: dict[tuple, Handle] = {}
 # Matches widgets to the handle they use.
-_wid_tk: Dict['WeakRef[tkImgWidgets]', 'Handle'] = {}
+_wid_tk: dict[WeakRef[tkImgWidgets], Handle] = {}
 # Records handles with a loaded image, but no labels using it.
 # These will be cleaned up after some time passes.
-_pending_cleanup: Dict[int, Tuple['Handle', float]] = {}
+_pending_cleanup: dict[int, tuple[Handle, float]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 FSYS_BUILTIN.open_ref()
-PACK_SYSTEMS: Dict[str, FileSystem] = {}
+PACK_SYSTEMS: dict[str, FileSystem] = {}
 
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
@@ -51,8 +49,8 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 PETI_ITEM_BG = (229, 232, 233)
 PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
-_queue_load: 'Queue[Handle]' = Queue()
-_queue_ui: 'Queue[Handle]' = Queue()
+_queue_load: Queue[Handle] = Queue()
+_queue_ui: Queue[Handle] = Queue()
 
 
 def _load_special(path: str) -> Image.Image:
@@ -66,7 +64,7 @@ def _load_special(path: str) -> Image.Image:
         LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
         return Image.new('RGBA', (64, 64), PETI_ITEM_BG)
 
-ICONS: Dict[str, Image.Image] = {
+ICONS: dict[str, Image.Image] = {
     name: _load_special(name)
     for name in ['error', 'none', 'load']
 }
@@ -82,7 +80,7 @@ def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
         )
 
 
-def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
+def tuple_size(size: Union[tuple[int, int], int]) -> tuple[int, int]:
     """Return an xy tuple given a size or tuple."""
     if isinstance(size, tuple):
         return size
@@ -121,12 +119,12 @@ class ImageType(Generic[ArgT]):
         return f'<ImageType "{self.name}">'
 
 
-def _pil_from_color(color: Tuple[int, int, int], width: int, height: int) -> Image.Image:
+def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Image.Image:
     """Directly produce an image of this size with the specified color."""
     return Image.new('RGB', (width or 16, height or 16), color)
 
 
-def _tk_from_color(color: Tuple[int, int, int], width: int, height: int) -> tkImage:
+def _tk_from_color(color: tuple[int, int, int], width: int, height: int) -> tkImage:
     """Directly produce an image of this size with the specified color."""
     r, g, b = color
     img = tk.PhotoImage(width=width or 16, height=height or 16)
@@ -215,7 +213,7 @@ def _pil_load_builtin_sprite(uri: PackagePath, width: int, height: int) -> Image
     return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
 
 
-def _pil_from_composite(components: Tuple['Handle', ...], width: int, height: int) -> Image.Image:
+def _pil_from_composite(components: tuple[Handle, ...], width: int, height: int) -> Image.Image:
     """Combine several images into one."""
     img = Image.new('RGBA', (width, height))
     for part in components:
@@ -273,10 +271,10 @@ class Handle(Generic[ArgT]):
         self.width = width
         self.height = height
 
-        self._cached_pil: Optional[Image.Image] = None
-        self._cached_tk: Optional[tkImage] = None
+        self._cached_pil = None
+        self._cached_tk = None
         self._force_loaded = False
-        self._labels: Set[WeakRef[tkImgWidgets]] = set()
+        self._labels: set[WeakRef[tkImgWidgets]] = set()
         # If None, get_tk()/get_pil() was used.
         # If true, this is in the queue to load. Setting this requires
         # the loading lock.
@@ -284,7 +282,7 @@ class Handle(Generic[ArgT]):
         self.lock = threading.Lock()
 
     @classmethod
-    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: Union[int, Tuple[int, int]], height: int) -> 'Handle[ArgT]':
+    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: Union[int, tuple[int, int]], height: int) -> Handle[ArgT]:
         if isinstance(width, tuple):
             width, height = width
         try:
@@ -306,7 +304,7 @@ class Handle(Generic[ArgT]):
         *,
         subkey: str='',
         subfolder: str='',
-    ) -> 'Handle':
+    ) -> Handle:
         """Parse a property into an image handle.
 
         If a package isn't specified, the given package will be used.
@@ -332,7 +330,7 @@ class Handle(Generic[ArgT]):
         width: int = 0, height: int = 0,
         *,
         subfolder: str='',
-    ) -> 'Handle':
+    ) -> Handle:
         """Parse a URI into an image handle.
 
         parse() should be used wherever possible, since that allows composite
@@ -393,38 +391,38 @@ class Handle(Generic[ArgT]):
         return cls._get(typ, args, width, height)
 
     @classmethod
-    def builtin(cls, path: str, width: int = 0, height: int = 0) -> 'Handle':
+    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle:
         """Shortcut for getting a handle to a builtin UI image."""
         return cls._get(TYP_BUILTIN, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
-    def sprite(cls, path: str, width: int = 0, height: int = 0) -> 'Handle':
+    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
         return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
-    def error(cls, width: int, height: int) -> 'Handle':
+    def error(cls, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to an error icon."""
         return cls._get(TYP_ICON, 'error', width, height)
 
     @classmethod
-    def ico_none(cls, width: int, height: int) -> 'Handle':
+    def ico_none(cls, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to a 'none' icon."""
         return cls._get(TYP_ICON, 'none', width, height)
 
     @classmethod
-    def ico_loading(cls, width: int, height: int) -> 'Handle':
+    def ico_loading(cls, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to a 'loading' icon."""
         return cls._get(TYP_ICON, 'load', width, height)
 
     @classmethod
-    def blank(cls, width: int, height: int) -> 'Handle':
+    def blank(cls, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to an empty image."""
         # The argument is irrelevant.
         return cls._get(TYP_ALPHA, None, width, height)
 
     @classmethod
-    def color(cls, color: Union[Tuple[int, int, int], Vec], width: int, height: int) -> 'Handle':
+    def color(cls, color: Union[tuple[int, int, int], Vec], width: int, height: int) -> Handle:
         """Shortcut for getting a handle to a solid color."""
         if isinstance(color, Vec):
             # Convert.
@@ -611,9 +609,9 @@ def make_splash_screen(
     max_width: float,
     max_height: float,
     base_height: int,
-    text1_bbox: Tuple[int, int, int, int],
-    text2_bbox: Tuple[int, int, int, int],
-):
+    text1_bbox: tuple[int, int, int, int],
+    text2_bbox: tuple[int, int, int, int],
+) -> tuple[tk.PhotoImage, int, int]:
     """Create the splash screen image.
 
     This uses a random screenshot from the splash_screens directory.
