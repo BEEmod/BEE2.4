@@ -94,7 +94,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel):
                 win.readonly = has_inst
 
 
-def load_selitems(loader: LoadScreen):
+def load_selitems():
     """Load the selector items early, to correspond with the loadscreen order."""
     for item in Music.all():
         SEL_ITEMS[item.id] = SelItem.from_data(
@@ -102,7 +102,6 @@ def load_selitems(loader: LoadScreen):
             item.selitem_data,
             item.get_attrs()
         )
-        loader.step('IMG')
 
 
 def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:

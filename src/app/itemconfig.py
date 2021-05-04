@@ -102,7 +102,7 @@ class Widget:
         self.use_inf = use_inf  # For timer, is infinite valid?
 
 
-class ConfigGroup(PakObject, allow_mult=True, has_img=False):
+class ConfigGroup(PakObject, allow_mult=True):
     """A group of configs for an item."""
     def __init__(
         self,

@@ -9,7 +9,7 @@ from packages import (
 from srctools import FileSystem, VPK
 
 
-class StyleVPK(PakObject, has_img=False):
+class StyleVPK(PakObject):
     """A set of VPK files used for styles.
 
     These are copied into _dlc3, allowing changing the in-editor wall

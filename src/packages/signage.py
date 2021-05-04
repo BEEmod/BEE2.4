@@ -16,7 +16,7 @@ class SignStyle(NamedTuple):
     type: str
 
 
-class Signage(PakObject, allow_mult=True, has_img=False):
+class Signage(PakObject, allow_mult=True):
     """Defines different square signage overlays."""
 
     def __init__(

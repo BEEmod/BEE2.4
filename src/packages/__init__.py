@@ -139,7 +139,6 @@ class ObjType(NamedTuple):
     """The values stored for OBJ_TYPES"""
     cls: Type[PakObject]
     allow_mult: bool
-    has_img: bool
 
 
 class ExportData(NamedTuple):
@@ -220,13 +219,10 @@ class PakObject:
     def __init_subclass__(
         cls,
         allow_mult: bool = False,
-        has_img: bool = True,
         **kwargs,
     ) -> None:
         super().__init_subclass__(**kwargs)
-        # Only register subclasses of PakObject - those with a parent class.
-        # PakObject isn't created yet so we can't directly check that.
-        OBJ_TYPES[cls.__name__] = ObjType(cls, allow_mult, has_img)
+        OBJ_TYPES[cls.__name__] = ObjType(cls, allow_mult)
 
         # Maps object IDs to the object.
         cls._id_to_obj = {}
@@ -500,18 +496,6 @@ def load_packages(
             for obj_type in
             all_obj.values()
         ))
-
-        # The number of images we need to load is the number of objects,
-        # excluding some types like Stylevars or PackLists.
-        loader.set_length(
-            "IMG",
-            sum(
-                len(all_obj[key])
-                for key, opts in
-                OBJ_TYPES.items()
-                if opts.has_img
-            )
-        )
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():

@@ -97,6 +97,7 @@ class LoadScreen:
         is_splash: bool=False,
     ):
         self.active = False
+        self.stage_ids = {st_id for st_id, title in stages}
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
 
@@ -150,14 +151,20 @@ class LoadScreen:
 
     def set_length(self, stage: str, num: int) -> None:
         """Set the maximum value for the specified stage."""
+        if stage not in self.stage_ids:
+            raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._send_msg('set_length', stage, num)
 
     def step(self, stage: str) -> None:
         """Increment the specified stage."""
+        if stage not in self.stage_ids:
+            raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._send_msg('step', stage)
 
     def skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
+        if stage not in self.stage_ids:
+            raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._send_msg('skip_stage', stage)
 
     def show(self) -> None:
@@ -221,7 +228,6 @@ multiprocessing.Process(
 main_loader = LoadScreen(
     ('PAK', _('Packages')),
     ('OBJ', _('Loading Objects')),
-    ('IMG', _('Loading Images')),
     ('UI', _('Initialising UI')),
     title_text=_('Better Extended Editor for Portal 2'),
     is_splash=True,

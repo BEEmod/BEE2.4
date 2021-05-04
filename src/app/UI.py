@@ -479,7 +479,6 @@ def load_packages(data: dict):
 
     for item in data['Item']:
         item_list[item.id] = Item(item)
-        loader.step("IMG")
 
     StyleVarPane.add_vars(data['StyleVar'], data['Style'])
 
@@ -527,10 +526,8 @@ def load_packages(data: dict):
                     attr_commands
                 }
             ))
-            # Every item has an image
-            loader.step("IMG")
 
-    music_conf.load_selitems(loader)
+    music_conf.load_selitems()
 
     def win_callback(style_id, win_name):
         """Callback for the selector windows.

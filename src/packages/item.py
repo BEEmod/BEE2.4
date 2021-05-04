@@ -679,7 +679,7 @@ class Item(PakObject):
         )
 
 
-class ItemConfig(PakObject, allow_mult=True, has_img=False):
+class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.
 
     The ID should match an item ID.

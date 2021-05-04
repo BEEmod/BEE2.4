@@ -5,7 +5,7 @@ from packages import PakObject, Style, ParseData, ExportData
 from srctools import Property
 
 
-class StyleVar(PakObject, allow_mult=True, has_img=False):
+class StyleVar(PakObject, allow_mult=True):
     def __init__(
         self,
         var_id: str,
