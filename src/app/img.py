@@ -68,6 +68,22 @@ ICONS: dict[str, Image.Image] = {
     name: _load_special(name)
     for name in ['error', 'none', 'load']
 }
+# The icon has 8 parts, with the gap in the 1 pos. So mirror/rotate to
+# derive the others.
+
+ICONS['load_0'] = _load_icon = ICONS['load']
+ICONS['load_7'] = _load_icon_flip = _load_icon.transpose(Image.FLIP_LEFT_RIGHT)
+ICONS['load_1'] = _load_icon_flip.transpose(Image.ROTATE_270)
+ICONS['load_2'] = _load_icon.transpose(Image.ROTATE_270)
+ICONS['load_3'] = _load_icon.transpose(Image.FLIP_TOP_BOTTOM)
+ICONS['load_4'] = _load_icon.transpose(Image.ROTATE_180)
+ICONS['load_5'] = _load_icon_flip.transpose(Image.ROTATE_90)
+ICONS['load_6'] = _load_icon.transpose(Image.ROTATE_90)
+
+del _load_icon, _load_icon_flip
+# Loader handles, which we want to cycle animate.
+_load_handles: dict[tuple[int, int], Handle] = {}
+_last_load_i = -1  # And the last index we used of those.
 
 
 def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
@@ -413,7 +429,11 @@ class Handle(Generic[ArgT]):
     @classmethod
     def ico_loading(cls, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to a 'loading' icon."""
-        return cls._get(TYP_ICON, 'load', width, height)
+        try:
+            return _load_handles[width, height]
+        except KeyError:
+            res = _load_handles[width, height] = cls._get(TYP_ICON, 'load', width, height)
+            return res
 
     @classmethod
     def blank(cls, width: int, height: int) -> Handle:
@@ -533,6 +553,20 @@ def _ui_task() -> None:
 
     TK must run in the main thread, so we do UI loads here.
     """
+    global _last_load_i
+    # Use the current time to set the frame also.
+    load_i = int((time.monotonic() % 1.0) * 8)
+    if load_i != _last_load_i:
+        _last_load_i = load_i
+        arg = f'load_{load_i}'
+        for handle in _load_handles.values():
+            handle.arg = arg
+            with handle.lock:
+                handle._cached_pil = None
+                if handle._cached_tk is not None:
+                    # This updates the TK widget directly.
+                    handle._cached_tk.paste(handle._load_pil())
+
     timeout = time.monotonic()
     # Run, but if we go over 100ms, abort so the rest of the UI loop can run.
     while time.monotonic() - timeout < 0.1:
@@ -545,7 +579,6 @@ def _ui_task() -> None:
             label: tkImgWidgets = label_ref()
             if label is not None:
                 label['image'] = tk_ico
-                label.update_idletasks()
 
     for handle, use_time in list(_pending_cleanup.values()):
         with handle.lock:
