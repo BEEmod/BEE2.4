@@ -607,6 +607,9 @@ def parse_package(
             continue
         if obj.name == 'overrides':
             for over_prop in obj:
+                if over_prop.name == 'templatebrush':
+                    # Mix the order up far too much...
+                    over_prop.name = 'BrushTemplate'
                 obj_id = over_prop['id']
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]
@@ -617,6 +620,9 @@ def parse_package(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
         else:
+            if obj.name == 'templatebrush':
+                # Mix the order up far too much...
+                obj.name = 'BrushTemplate'
             try:
                 obj_type = OBJ_TYPES[obj.name]
             except KeyError:
