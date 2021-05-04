@@ -12,7 +12,6 @@ from abc import abstractmethod
 import contextlib
 import multiprocessing
 
-from bg_daemon import run_background
 from app import logWindow
 from BEE2_config import GEN_OPTS
 import utils
@@ -191,8 +190,9 @@ class LoadScreen:
 
 
 # Initialise the daemon.
-_daemon = multiprocessing.Process(
-    target=run_background,
+# noinspection PyProtectedMember
+multiprocessing.Process(
+    target=utils._run_bg_daemon,
     args=(
         _PIPE_DAEMON_SEND,
         _PIPE_DAEMON_REC,
@@ -215,10 +215,8 @@ _daemon = multiprocessing.Process(
         }
     ),
     name='bg_daemon',
-)
-# Destroy when we quit.
-_daemon.daemon = True
-_daemon.start()
+    daemon=True,
+).start()
 
 main_loader = LoadScreen(
     ('PAK', _('Packages')),

@@ -132,6 +132,17 @@ def fix_cur_directory() -> None:
     os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 
 
+def _run_bg_daemon(*args) -> None:
+    """Helper to make loadScreen not need to import bg_daemon.
+
+    Instead we can redirect the import through here, which is a module
+    both processes need to import. Then the main process doesn't need
+    to import bg_daemon, and the daemon doesn't need to import loadScreen.
+    """
+    import bg_daemon
+    bg_daemon.run_background(*args)
+
+
 if WIN:
     # Some events differ on different systems, so define them here.
     EVENTS = {
