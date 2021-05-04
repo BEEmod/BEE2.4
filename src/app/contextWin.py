@@ -104,13 +104,14 @@ SPRITE_TOOL = {
     'surf_wall_floor': _('This item can be placed on floors and walls.'),
     'surf_wall_floor_ceil': _('This item can be placed in any orientation.'),
 }
+IMG_ALPHA = img.Handle.blank(64, 64)
 
 
-def set_sprite(pos, sprite):
+def set_sprite(pos: SPR, sprite: str) -> None:
     """Set one of the property sprites to a value."""
     widget = wid['sprite', pos]
-    widget['image'] = img.spr(sprite)
-    tooltip.set_tooltip(widget, SPRITE_TOOL.get(sprite, ''))
+    img.apply(widget, img.Handle.sprite('icons/' + sprite, 32, 32))
+    tooltip.set_tooltip(widget, SPRITE_TOOL[sprite])
 
 
 def pos_for_item(ind: int) -> Optional[int]:
@@ -224,7 +225,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list:
     return ver_lookup
 
 
-def get_description(global_last, glob_desc, style_desc):
+def get_description(global_last, glob_desc, style_desc) -> tkMarkdown.MarkdownData:
     """Join together the general and style description for an item."""
     if glob_desc and style_desc:
         if global_last:
@@ -239,16 +240,17 @@ def get_description(global_last, glob_desc, style_desc):
         return tkMarkdown.MarkdownData()  # No description
 
 
-def load_item_data():
+def load_item_data() -> None:
     """Refresh the window to use the selected item's data."""
     global version_lookup
     item_data = selected_item.data
 
     for ind, pos in enumerate(SUBITEM_POS[len(selected_item.visual_subtypes)]):
         if pos == -1:
-            wid['subitem', ind]['image'] = img.invis_square(64)
+            icon = IMG_ALPHA
         else:
-            wid['subitem', ind]['image'] = selected_item.get_icon(selected_item.visual_subtypes[pos])
+            icon = selected_item.get_icon(selected_item.visual_subtypes[pos])
+        img.apply(wid['subitem', ind], icon)
         wid['subitem', ind]['relief'] = 'flat'
 
     wid['subitem', pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
@@ -458,8 +460,8 @@ def init_widgets():
         text="",
         anchor="e",
         compound="left",
-        image=img.spr('gear_ent'),
     )
+    img.apply(wid['ent_count'], img.Handle.sprite('icons/gear_ent', 32, 32))
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
     tooltip.add_tooltip(
         wid['ent_count'],
@@ -474,10 +476,8 @@ def init_widgets():
     sub_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=4)
     for i in range(5):
-        wid['subitem', i] = ttk.Label(
-            sub_frame,
-            image=img.invis_square(64),
-        )
+        wid['subitem', i] = ttk.Label(sub_frame)
+        img.apply(wid['subitem', i], IMG_ALPHA)
         wid['subitem', i].grid(row=0, column=i)
         utils.bind_leftclick(
             wid['subitem', i],
@@ -499,11 +499,8 @@ def init_widgets():
     # sprites: inputs, outputs, rotation handle, occupied/embed state,
     # desiredFacing
     for spr_id in SPR:
-        wid['sprite', spr_id] = sprite = ttk.Label(
-            spr_frame,
-            image=img.spr('ap_grey'),
-            relief="raised",
-        )
+        wid['sprite', spr_id] = sprite = ttk.Label(spr_frame, relief="raised")
+        img.apply(sprite, img.Handle.sprite('icons/ap_grey', 32, 32))
         sprite.grid(row=0, column=spr_id.value)
         tooltip.add_tooltip(sprite)
 

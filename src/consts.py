@@ -227,3 +227,6 @@ COUNTER_AND_OFF = 'OnChangedFromMax'
 
 COUNTER_OR_ON = 'OnChangedFromMin'
 COUNTER_OR_OFF = 'OnHitMin'
+
+SEL_ICON_SIZE = 96  # Size of the selector win icons
+SEL_ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.

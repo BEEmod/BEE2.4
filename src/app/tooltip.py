@@ -4,7 +4,7 @@
 Call add_tooltip with a widget to add all the events automatically.
 """
 import tkinter as tk
-from app import TK_ROOT
+from app import TK_ROOT, img
 
 
 PADDING = 0  # Space around the target widget
@@ -40,7 +40,7 @@ def _show(widget: tk.Misc, mouse_x, mouse_y) -> None:
     # noinspection PyUnresolvedReferences, PyProtectedMember
     context_label['text'] = widget._bee2_tooltip_text
     # noinspection PyUnresolvedReferences, PyProtectedMember
-    context_label['image'] = widget._bee2_tooltip_img
+    img.apply(context_label, widget._bee2_tooltip_img)
 
     window.deiconify()
     window.update_idletasks()
@@ -51,8 +51,8 @@ def _show(widget: tk.Misc, mouse_x, mouse_y) -> None:
 
     # To decide where to put the tooltip, we first want the center of the
     # main window.
-    cent_x = TK_ROOT.winfo_rootx() + TK_ROOT.winfo_width() / 2
-    cent_y = TK_ROOT.winfo_rooty() + TK_ROOT.winfo_height() / 2
+    x = cent_x = TK_ROOT.winfo_rootx() + TK_ROOT.winfo_width() / 2
+    y = cent_y = TK_ROOT.winfo_rooty() + TK_ROOT.winfo_height() / 2
 
     x_centered = y_centered = True
 
@@ -100,7 +100,7 @@ def _show(widget: tk.Misc, mouse_x, mouse_y) -> None:
     window.geometry('+{}+{}'.format(int(x), int(y)))
 
 
-def set_tooltip(widget: tk.Misc, text: str='', image: tk.Image=None):
+def set_tooltip(widget: tk.Misc, text: str='', image: img.Handle=None):
     """Change the tooltip for a widget."""
     widget._bee2_tooltip_text = text
     widget._bee2_tooltip_img = image
@@ -109,7 +109,7 @@ def set_tooltip(widget: tk.Misc, text: str='', image: tk.Image=None):
 def add_tooltip(
     targ_widget: tk.Misc,
     text: str='',
-    image: tk.Image=None,
+    image: img.Handle=None,
     delay: int=500,
     show_when_disabled: bool=False,
 ) -> None:

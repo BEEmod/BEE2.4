@@ -87,9 +87,9 @@ pack_data, package_sys = packages.load_packages(
 )
 
 # Load filesystems into various modules
-music_conf.load_filesystems(package_sys)
+music_conf.load_filesystems(package_sys.values())
 img.load_filesystems(package_sys)
-gameMan.load_filesystems(package_sys)
+gameMan.load_filesystems(package_sys.values())
 
 UI.load_packages(pack_data)
 LOGGER.info('Done!')

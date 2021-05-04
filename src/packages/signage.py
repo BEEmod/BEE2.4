@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, NamedTuple
 
 from packages import PakObject, ParseData, ExportData, Style
+from app.img import Handle as ImgHandle
 from srctools import Property
 import srctools.logger
 
@@ -11,7 +12,7 @@ class SignStyle(NamedTuple):
     """Signage information for a specific style."""
     world: str
     overlay: str
-    icon: str
+    icon: ImgHandle
     type: str
 
 
@@ -72,7 +73,7 @@ class Signage(PakObject, allow_mult=True, has_img=False):
             styles[sty_id] = SignStyle(
                 world_tex,
                 overlay_tex,
-                prop['icon', ''],
+                ImgHandle.parse(prop, data.pak_id, 64, 64, subkey='icon'),
                 prop['type', 'square']
             )
         return cls(

@@ -164,7 +164,9 @@ class tkRichText(tkinter.Text):
                 super().insert('end', block.text, tags)
             elif isinstance(block, tkMarkdown.Image):
                 super().insert('end', '\n')
-                self.image_create('end', image=img.png(block.src))
+                # TODO: Setup apply to handle this?
+                block.handle._force_loaded = True
+                self.image_create('end', image=block.handle._load_tk())
                 super().insert('end', '\n')
             else:
                 raise ValueError('Unknown block {!r}?'.format(block))

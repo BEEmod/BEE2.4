@@ -32,7 +32,7 @@ PETI_HEIGHT = 312
 CORRIDOR: dict[str, selector_win.selWin] = {}
 CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
 
-CORRIDOR_DESC = tkMarkdown.convert('')
+CORRIDOR_DESC = tkMarkdown.convert('', None)
 
 COMPILE_DEFAULTS = {
     'Screenshot': {
@@ -236,7 +236,7 @@ def load_corridors() -> None:
         for i in range(1, length + 1):
             config[group, i] = CorrDesc(
                 name=corridor_conf.get('{}_{}_name'.format(group, i), ''),
-                icon=corridor_conf.get('{}_{}_icon'.format(group, i), ''),
+                icon=utils.PackagePath.parse(corridor_conf.get('{}_{}_icon'.format(group, i), img.PATH_ERROR), 'special'),
                 desc=corridor_conf.get('{}_{}_desc'.format(group, i), ''),
             )
     set_corridors(config)
@@ -247,7 +247,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
     CORRIDOR_DATA.clear()
     CORRIDOR_DATA.update(config)
 
-    default_icon = img.icon('clean/portal_door')
+    default_icon = img.Handle.builtin('BEE2/corr_generic', 64, 64)
 
     corridor_conf = COMPILE_CFG['CorridorNames']
 
@@ -262,31 +262,30 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
 
             corridor_conf['{}_{}_name'.format(group, ind)] = data.name
             corridor_conf['{}_{}_desc'.format(group, ind)] = data.desc
-            corridor_conf['{}_{}_icon'.format(group, ind)] = data.icon
+            corridor_conf['{}_{}_icon'.format(group, ind)] = str(data.icon)
 
             # Note: default corridor description
             desc = data.name or _('Corridor')
             item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
 
             if data.icon:
-                item.large_icon = img.png(
-                    'corr/' + data.icon,
-                    resize_to=selector_win.ICON_SIZE_LRG,
-                    error=default_icon,
+                item.large_icon = img.Handle.parse_uri(
+                    data.icon,
+                    *selector_win.ICON_SIZE_LRG,
                 )
-                item.icon = img.png(
-                    'corr/' + data.icon,
-                    resize_to=selector_win.ICON_SIZE,
-                    error=default_icon,
+                item.icon = img.Handle.parse_uri(
+                    data.icon,
+                    selector_win.ICON_SIZE, selector_win.ICON_SIZE,
                 )
             else:
                 item.icon = item.large_icon = default_icon
 
             if data.desc:
-                item.desc = tkMarkdown.convert(data.desc)
+                item.desc = tkMarkdown.convert(data.desc, None)
             else:
                 item.desc = CORRIDOR_DESC
 
+        selector.refresh()
         selector.set_disp()
 
     COMPILE_CFG.save_check()
@@ -310,7 +309,7 @@ def make_corr_wid(corr_name: str) -> None:
             'This is saved in the puzzle data '
             'and will not change.'
         ),
-        none_icon='BEE2/random.png',
+        none_icon=img.Handle.builtin('BEE2/random', 96, 96),
         none_name=_('Random'),
         callback=sel_corr_callback,
         callback_params=[corr_name],
@@ -720,7 +719,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
-        img.png('icons/tool_sub', resize_to=16),
+        'icons/tool_sub',
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
@@ -888,7 +887,7 @@ def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
         resize_x=True,
         resize_y=False,
         tool_frame=tool_frame,
-        tool_img=img.png('icons/win_compiler'),
+        tool_img='icons/win_compiler',
         tool_col=4,
     )
     window.columnconfigure(0, weight=1)

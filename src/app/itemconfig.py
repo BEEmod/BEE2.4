@@ -128,7 +128,7 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
         else:
             group_name = props['Name']
 
-        desc = desc_parse(props, data.id)
+        desc = desc_parse(props, data.id, data.pak_id)
 
         widgets = []  # type: List[Widget]
         multi_widgets = []  # type: List[Widget]
@@ -430,7 +430,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
     except KeyError:
         raise ValueError('Unknown item "{}"!'.format(conf['ItemID']))
 
-    version_lookup = None
+    version_lookup: Optional[List[str]] = None
 
     def update_data():
         """Refresh the data in the list."""
@@ -591,7 +591,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
     """Make a single swatch."""
     # Note: tkinter requires RGB as ints, not float!
 
-    def get_color():
+    def get_color() -> Tuple[int, int, int]:
         """Parse out the color."""
         color = var.get()
         if color.startswith('#'):
@@ -622,8 +622,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
     swatch = ttk.Label(parent)
 
     def update_image(var_name: str, var_index: str, operation: str):
-        r, g, b = get_color()
-        swatch['image'] = img.color_square(round(Vec(r, g, b)), size)
+        img.apply(swatch, img.Handle.color(get_color(), size, size))
 
     update_image('', '', '')
 

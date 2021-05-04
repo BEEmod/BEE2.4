@@ -31,7 +31,7 @@ class Elevator(PakObject):
     def parse(cls, data: ParseData) -> 'Elevator':
         """Read elevator videos from the package."""
         info = data.info
-        selitem_data = SelitemData.parse(info)
+        selitem_data = SelitemData.parse(info, data.pak_id)
 
         if 'vert_video' in info:
             video = info['horiz_video']

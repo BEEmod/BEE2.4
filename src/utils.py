@@ -596,6 +596,51 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
         self._registry.clear()
 
 
+class PackagePath:
+    """Represents a file located inside a specific package.
+
+    This can be either resolved later into a file object.
+    The string form is "package:path/to/file.ext", with <special> package names
+    reserved for app-specific usages (internal or generated paths)
+    """
+    __slots__ = ['package', 'path']
+    def __init__(self, pack_id: str, path: str) -> None:
+        self.package = pack_id.casefold()
+        self.path = path.replace('\\', '/')
+
+    @classmethod
+    def parse(cls, uri: str, def_package: str) -> 'PackagePath':
+        """Parse a string into a path. If a package isn't provided, the default is used."""
+        if ':' in uri:
+            return cls(*uri.split(':', 1))
+        else:
+            return cls(def_package, uri)
+
+    def __str__(self) -> str:
+        return f'{self.package}:{self.path}'
+
+    def __repr__(self) -> str:
+        return f'PackagePath({self.package!r}, {self.path!r})'
+
+    def __hash__(self) -> int:
+        return hash((self.package, self.path))
+
+    def __eq__(self, other) -> object:
+        if isinstance(other, str):
+            other = self.parse(other, self.package)
+        elif not isinstance(other, PackagePath):
+            return NotImplemented
+        return self.package == other.package and self.path == other.path
+
+    def in_folder(self, folder: str) -> 'PackagePath':
+        """Return the package, but inside this subfolder."""
+        return PackagePath(self.package, f'{folder}/{self.path}')
+
+    def child(self, child: str) -> 'PackagePath':
+        """Return a child file of this package."""
+        return PackagePath(self.package, f'{self.path}/{child}')
+
+
 def get_indent(line: str) -> str:
     """Return the whitespace which this line starts with.
 

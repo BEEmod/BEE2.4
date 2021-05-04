@@ -28,7 +28,7 @@ class Skybox(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse a skybox definition."""
-        selitem_data = SelitemData.parse(data.info)
+        selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']
         config = get_config(
             data.info,

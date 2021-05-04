@@ -26,10 +26,10 @@ LOGGER = get_logger(__name__)
 
 class ItemProto(Protocol):
     """Protocol draggable items satisfy."""
-    dnd_icon: tkinter.PhotoImage  # Image for the item.
+    dnd_icon: img.Handle  # Image for the item.
     dnd_group: Optional[str]  # If set, the group an item belongs to.
     # If only one item is present for a group, it uses this.
-    dnd_group_icon: Optional[tkinter.PhotoImage]
+    dnd_group_icon: Optional[img.Handle]
 
 ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 
@@ -83,7 +83,7 @@ class Manager(Generic[ItemT]):
         self._targets = []  # type: List[Slot[ItemT]]
         self._sources = []  # type: List[Slot[ItemT]]
 
-        self._img_blank = img.color_square(img.PETI_ITEM_BG, size)
+        self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
 
         self.config_icon = config_icon
 
@@ -102,10 +102,8 @@ class Manager(Generic[ItemT]):
         drag_win.transient(master=master)
         drag_win.wm_overrideredirect(True)
 
-        self._drag_lbl = drag_lbl = tkinter.Label(
-            drag_win,
-            image=self._img_blank,
-        )
+        self._drag_lbl = drag_lbl = tkinter.Label(drag_win)
+        img.apply(drag_lbl, self._img_blank)
         drag_lbl.grid(row=0, column=0)
         drag_win.bind(utils.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
@@ -138,11 +136,11 @@ class Manager(Generic[ItemT]):
         """Remove the specified slot."""
         (self._sources if slot.is_source else self._targets).remove(slot)
 
-    def refresh_icons(self) -> None:
-        """Update all items to set new icons."""
+    def load_icons(self) -> None:
+        """Load in all the item icons."""
         # Count the number of items in each group to find
         # which should have group icons.
-        groups = defaultdict(int)   # type: Dict[Optional[str], int]
+        groups: Dict[Optional[str], int] = defaultdict(int)
         for slot in self._targets:
             groups[getattr(slot.contents, 'dnd_group', None)] += 1
 
@@ -158,6 +156,17 @@ class Manager(Generic[ItemT]):
         for slot in self._sources:
             # These are never grouped.
             self._display_item(slot._lbl, slot.contents)
+
+        if self._cur_drag is not None:
+            self._display_item(self._drag_lbl, self._cur_drag)
+
+    def unload_icons(self) -> None:
+        """Reset all icons to blank. This way they can be destroyed."""
+        for slot in self._sources:
+            img.apply(slot._lbl, self._img_blank)
+        for slot in self._targets:
+            img.apply(slot._lbl, self._img_blank)
+        img.apply(self._drag_lbl, self._img_blank)
 
     def sources(self) -> 'Iterator[Slot[ItemT]]':
         """Yield all source slots."""
@@ -257,11 +266,7 @@ class Manager(Generic[ItemT]):
                 image = item.dnd_icon
         else:
             image = item.dnd_icon
-        try:
-            lbl['image'] = image
-        except tkinter.TclError:
-            # Not an image...
-            lbl['image'] = img.img_error
+        img.apply(lbl, image)
 
     def _group_update(self, group: Optional[str]) -> None:
         """Update all target items with this group."""
@@ -400,10 +405,8 @@ class Slot(Generic[ItemT]):
         self.is_source = is_source
         self._contents = None
         self._pos_type = None
-        self._lbl = tkinter.Label(
-            parent,
-            image=man._img_blank,
-        )
+        self._lbl = tkinter.Label(parent)
+        img.apply(self._lbl, man._img_blank)
         utils.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(utils.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
         self._lbl.bind('<Enter>', self._evt_hover_enter)
@@ -426,9 +429,9 @@ class Slot(Generic[ItemT]):
         if man.config_icon:
             self._info_btn = tkinter.Label(
                 self._lbl,
-                image=img.png('icons/gear'),
                 relief='ridge',
             )
+            img.apply(self._info_btn, img.Handle.builtin('icons/gear', 10, 10))
 
             @utils.bind_leftclick(self._info_btn)
             def info_button_click(e):
@@ -567,19 +570,17 @@ class Slot(Generic[ItemT]):
             self.man._fire_callback(Event.CONFIG, self)
 
 
-def _test() -> None:
+def test() -> None:
     """Test the GUI."""
-    from srctools.logger import init_logging
     from BEE2_config import GEN_OPTS
     from packages import find_packages, PACKAGE_SYS
-
-    init_logging()
+    from utils import PackagePath
 
     # Setup images to read from packages.
     print('Loading packages for images.')
     GEN_OPTS.load()
     find_packages(GEN_OPTS['Directories']['package'])
-    img.load_filesystems(PACKAGE_SYS.values())
+    img.load_filesystems(PACKAGE_SYS)
     print('Done.')
 
     left_frm = ttk.Frame(TK_ROOT)
@@ -597,15 +598,16 @@ def _test() -> None:
         def __init__(
             self,
             name: str,
+            pak_id: str,
             icon: str,
             group: str=None,
             group_icon: str=None,
         ) -> None:
             self.name = name
-            self.dnd_icon = img.png('items/clean/{}.png'.format(icon))
+            self.dnd_icon = img.Handle.parse_uri(PackagePath(pak_id, ('items/clean/{}.png'.format(icon))), 64, 64)
             self.dnd_group = group
             if group_icon:
-                self.dnd_group_icon = img.png('items/clean/{}.png'.format(group_icon))
+                self.dnd_group_icon = img.Handle.parse_uri(PackagePath(pak_id, 'items/clean/{}.png'.format(group_icon)), 64, 64)
 
         def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)
@@ -620,24 +622,26 @@ def _test() -> None:
     for event in Event:
         manager.reg_callback(event, func(event))
 
+    PAK_CLEAN = 'BEE2_CLEAN_STYLE'
+    PAK_ELEM = 'VALVE_TEST_ELEM'
     items = [
-        TestItem('Dropper', 'dropper'),
-        TestItem('Entry', 'entry_door'),
-        TestItem('Exit', 'exit_door'),
-        TestItem('Large Obs', 'large_obs_room'),
-        TestItem('Faith Plate', 'faithplate'),
+        TestItem('Dropper', PAK_CLEAN, 'dropper'),
+        TestItem('Entry', PAK_CLEAN, 'entry_door'),
+        TestItem('Exit', PAK_CLEAN, 'exit_door'),
+        TestItem('Large Obs', PAK_CLEAN, 'large_obs_room'),
+        TestItem('Faith Plate', PAK_ELEM, 'faithplate'),
 
-        TestItem('Standard Cube', 'cube', 'ITEM_CUBE', 'cubes'),
-        TestItem('Companion Cube', 'companion_cube', 'ITEM_CUBE', 'cubes'),
-        TestItem('Reflection Cube', 'reflection_cube', 'ITEM_CUBE', 'cubes'),
-        TestItem('Edgeless Cube', 'edgeless_safety_cube', 'ITEM_CUBE', 'cubes'),
-        TestItem('Franken Cube', 'frankenturret', 'ITEM_CUBE', 'cubes'),
+        TestItem('Standard Cube', PAK_ELEM, 'cube', 'ITEM_CUBE', 'cubes'),
+        TestItem('Companion Cube', PAK_ELEM, 'companion_cube', 'ITEM_CUBE', 'cubes'),
+        TestItem('Reflection Cube', PAK_ELEM, 'reflection_cube', 'ITEM_CUBE', 'cubes'),
+        TestItem('Edgeless Cube', PAK_ELEM, 'edgeless_safety_cube', 'ITEM_CUBE', 'cubes'),
+        TestItem('Franken Cube', PAK_ELEM, 'frankenturret', 'ITEM_CUBE', 'cubes'),
 
-        TestItem('Repulsion Gel', 'paintsplat_bounce', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Propulsion Gel', 'paintsplat_speed', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Reflection Gel', 'paintsplat_reflection', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Conversion Gel', 'paintsplat_portal', 'ITEM_PAINT_SPLAT', 'paints'),
-        TestItem('Cleansing Gel', 'paintsplat_water', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Repulsion Gel', PAK_ELEM, 'paintsplat_bounce', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Propulsion Gel', PAK_ELEM, 'paintsplat_speed', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Reflection Gel', PAK_ELEM, 'paintsplat_reflection', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Conversion Gel', PAK_ELEM, 'paintsplat_portal', 'ITEM_PAINT_SPLAT', 'paints'),
+        TestItem('Cleansing Gel', PAK_ELEM, 'paintsplat_water', 'ITEM_PAINT_SPLAT', 'paints'),
     ]
 
     for y in range(8):
@@ -684,6 +688,3 @@ def _test() -> None:
 
     TK_ROOT.deiconify()
     TK_ROOT.mainloop()
-
-if __name__ == '__main__':
-    _test()

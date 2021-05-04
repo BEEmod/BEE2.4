@@ -6,8 +6,9 @@ import os
 from collections import defaultdict
 
 import srctools
-from app import tkMarkdown
+from app import tkMarkdown, img
 import utils
+import consts
 from app.packageMan import PACK_CONFIG
 from loadScreen import LoadScreen
 from srctools import Property, NoKeyError
@@ -17,8 +18,8 @@ from editoritems import Item as EditorItem, Renderable, RenderableType
 import srctools.logger
 
 from typing import (
-    Optional, Any, TYPE_CHECKING, NoReturn, TypeVar, ClassVar,
-    NamedTuple, Collection, Iterable, Type,
+    NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
+    NamedTuple, Collection, Iterable, Mapping,
 )
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
@@ -42,27 +43,45 @@ class SelitemData(NamedTuple):
     name: str  # Longer full name.
     short_name: str  # Shorter name for the icon.
     auth: list[str]  # List of authors.
-    icon: str  # Path to small square icon.
-    large_icon: str  # Path to larger, landscape icon.
+    icon: img.Handle  # Small square icon.
+    large_icon: img.Handle  # Larger, landscape icon.
     desc: tkMarkdown.MarkdownData
     group: Optional[str]
     sort_key: str
 
     @classmethod
-    def parse(cls, info: Property) -> SelitemData:
+    def parse(cls, info: Property, pack_id: str) -> SelitemData:
         """Parse from a property block."""
         auth = sep_values(info['authors', ''])
         short_name = info['shortName', None]
         name = info['name']
-        icon = info['icon', None]
-        large_icon = info['iconlarge', None]
         group = info['group', '']
         sort_key = info['sort_key', '']
-        desc = desc_parse(info, info['id'])
+        desc = desc_parse(info, info['id'], pack_id)
         if not group:
             group = None
         if not short_name:
             short_name = name
+
+        try:
+            icon = img.Handle.parse(
+                info.find_key('icon'),
+                pack_id,
+                consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE,
+            )
+        except LookupError:
+            icon = img.Handle.color(
+                img.PETI_ITEM_BG,
+                consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE,
+            )
+        try:
+            large_icon = img.Handle.parse(
+                info.find_key('iconlarge'),
+                pack_id,
+                *consts.SEL_ICON_SIZE_LRG,
+            )
+        except LookupError:
+            large_icon = None
 
         return cls(
             name,
@@ -138,7 +157,7 @@ class ExportData(NamedTuple):
 class CorrDesc(NamedTuple):
     """Name, description and icon for each corridor in a style."""
     name: str
-    icon: str
+    icon: utils.PackagePath
     desc: str
 
 
@@ -150,7 +169,7 @@ CORRIDOR_COUNTS = {
 }
 
 # This package contains necessary components, and must be available.
-CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
+CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'.casefold()
 
 # Check to see if the zip contains the resources referred to by the packfile.
 CHECK_PACKFILE_CORRECTNESS = False
@@ -175,27 +194,6 @@ VPK_FOLDER = {
 
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
-
-
-class PackagePath:
-    """Represents a file located inside a specific package.
-
-    This can be either resolved later into a file object.
-    The string form is "package:path/to/file.ext", with <special> package names
-    reserved for app-specific usages (internal or generated paths)
-    """
-    __slots__ = ['package', 'path']
-    def __init__(self, pack_id: str, path: str) -> None:
-        self.package = pack_id.casefold()
-        self.path = path
-
-    @classmethod
-    def parse(cls, uri: str, def_package: str) -> 'PackagePath':
-        """Parse a string into a path. If a package isn't provided, the default is used."""
-        if ':' in uri:
-            return cls(*uri.split(':', 1))
-        else:
-            return cls(def_package, uri)
 
 
 T = TypeVar('T')
@@ -403,15 +401,15 @@ def find_packages(pak_dir: str) -> None:
             filesys.close_ref()
             raise
 
-        if pak_id in packages:
+        if pak_id.casefold() in packages:
             raise ValueError(
                 f'Duplicate package with id "{pak_id}"!\n'
                 'If you just updated the mod, delete any old files in packages/.'
             ) from None
 
-        PACKAGE_SYS[pak_id] = filesys
+        PACKAGE_SYS[pak_id.casefold()] = filesys
 
-        packages[pak_id] = Package(
+        packages[pak_id.casefold()] = Package(
             pak_id,
             filesys,
             info,
@@ -448,7 +446,7 @@ def load_packages(
     log_incorrect_packfile=False,
     has_mel_music=False,
     has_tag_music=False,
-) -> tuple[dict, Collection[FileSystem]]:
+) -> tuple[dict, Mapping[str, FileSystem]]:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(pak_dir)
@@ -486,14 +484,14 @@ def load_packages(
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        for pak_id, pack in packages.items():
+        for pack in packages.values():
             if not pack.enabled:
-                LOGGER.info('Package {id} disabled!', id=pak_id)
+                LOGGER.info('Package {id} disabled!', id=pack.id)
                 pack_count -= 1
                 loader.set_length("PAK", pack_count)
                 continue
 
-            LOGGER.info('Reading objects from "{id}"...', id=pak_id)
+            LOGGER.info('Reading objects from "{id}"...', id=pack.id)
             parse_package(pack, obj_override, has_tag_music, has_mel_music)
             loader.step("PAK")
 
@@ -597,7 +595,7 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    return data, PACKAGE_SYS.values()
+    return data, PACKAGE_SYS
 
 
 def parse_package(
@@ -615,7 +613,7 @@ def parse_package(
         elif pre.value == '<MEL_MUSIC>':
             if not has_mel:
                 return
-        elif pre.value not in packages:
+        elif pre.value.casefold() not in packages:
             LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
                 'ignoring package!',
@@ -748,14 +746,14 @@ class Style(PakObject):
         self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
         self.has_video = has_video
         self.vpk_name = vpk_name
-        self.corridors = {}
+        self.corridors: dict[tuple[str, int], CorrDesc] = {}
 
         for group, length in CORRIDOR_COUNTS.items():
             for i in range(1, length + 1):
                 try:
                     self.corridors[group, i] = corridors[group, i]
                 except KeyError:
-                    self.corridors[group, i] = CorrDesc('', '', '')
+                    self.corridors[group, i] = CorrDesc('', img.PATH_BLANK, '')
 
         if config is None:
             self.config = Property(None, [])
@@ -767,9 +765,8 @@ class Style(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse a style definition."""
-        info = data.info  # type: Property
-        filesystem = data.fsys  # type: FileSystem
-        selitem_data = SelitemData.parse(info)
+        info = data.info
+        selitem_data = SelitemData.parse(info, data.pak_id)
         base = info['base', '']
         has_video = srctools.conv_bool(
             info['has_video', ''],
@@ -805,13 +802,9 @@ class Style(PakObject):
                 prop = group_prop.find_key(str(i), '')  # type: Property
 
                 if icon_folder:
-                    icon = '{}/{}/{}.jpg'.format(icon_folder, group, i)
-                    # If this doesn't actually exist, don't use this.
-                    if 'resources/bee2/corr/' + icon not in data.fsys:
-                        LOGGER.debug('No "resources/bee2/{}"!', icon)
-                        icon = ''
+                    icon = utils.PackagePath(data.pak_id, 'corr/{}/{}/{}.jpg'.format(icon_folder, group, i))
                 else:
-                    icon = ''
+                    icon = img.PATH_BLANK
 
                 if prop.has_children():
                     corridors[group, i] = CorrDesc(
@@ -840,11 +833,11 @@ class Style(PakObject):
             else:
                 raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
-            with filesystem:
-                with filesystem[folder + '/items.txt'].open_str() as f:
+            with data.fsys:
+                with data.fsys[folder + '/items.txt'].open_str() as f:
                     items, renderables = EditorItem.parse(f)
                 try:
-                    vbsp = filesystem.read_prop(folder + '/vbsp_config.cfg')
+                    vbsp = data.fsys.read_prop(folder + '/vbsp_config.cfg')
                 except FileNotFoundError:
                     vbsp = None
 
@@ -914,7 +907,8 @@ class Style(PakObject):
 
 def desc_parse(
     info: Property,
-    desc_id: str='',
+    desc_id: str,
+    pak_id: str,
     *,
     prop_name: str='description',
 ) -> tkMarkdown.MarkdownData:
@@ -933,7 +927,7 @@ def desc_parse(
         else:
             lines.append(prop.value)
 
-    return tkMarkdown.convert('\n'.join(lines))
+    return tkMarkdown.convert('\n'.join(lines), pak_id)
 
 
 def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:
