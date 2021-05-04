@@ -1014,7 +1014,7 @@ def retexture_template(
 
     for brush in all_brushes:
         for face in brush:
-            orig_id = rev_id_mapping[face.id]
+            orig_id = rev_id_mapping.get(face.id)
 
             if orig_id in template.skip_faces:
                 continue
