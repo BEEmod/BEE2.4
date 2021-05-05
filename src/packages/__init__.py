@@ -27,9 +27,9 @@ if TYPE_CHECKING:  # Prevent circular import
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-all_obj: dict[str, dict[str, ObjData]] = {}
+all_obj: dict[Type[PakObject], dict[str, ObjData]] = {}
 packages: dict[str, Package] = {}
-OBJ_TYPES: dict[str, ObjType] = {}
+OBJ_TYPES: dict[str, Type[PakObject]] = {}
 
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS: dict[str, FileSystem] = {}
@@ -135,12 +135,6 @@ class ParseData(NamedTuple):
     is_override: bool
 
 
-class ObjType(NamedTuple):
-    """The values stored for OBJ_TYPES"""
-    cls: Type[PakObject]
-    allow_mult: bool
-
-
 class ExportData(NamedTuple):
     """The arguments to pak_object.export()."""
     # Usually str, but some items pass other things.
@@ -215,6 +209,7 @@ class PakObject:
     pak_name: str
 
     _id_to_obj: ClassVar[dict[str, PakObject]]
+    allow_mult: ClassVar[bool]
 
     def __init_subclass__(
         cls,
@@ -222,10 +217,11 @@ class PakObject:
         **kwargs,
     ) -> None:
         super().__init_subclass__(**kwargs)
-        OBJ_TYPES[cls.__name__] = ObjType(cls, allow_mult)
+        OBJ_TYPES[cls.__name__.casefold()] = cls
 
         # Maps object IDs to the object.
         cls._id_to_obj = {}
+        cls.allow_mult = allow_mult
 
     @classmethod
     def parse(cls: Type[PakT], data: ParseData) -> PakT:
@@ -442,7 +438,7 @@ def load_packages(
     log_incorrect_packfile=False,
     has_mel_music=False,
     has_tag_music=False,
-) -> tuple[dict, Mapping[str, FileSystem]]:
+) -> Mapping[str, FileSystem]:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(pak_dir)
@@ -472,10 +468,10 @@ def load_packages(
                 'essential resources and objects.'
             )
 
-        data: dict[str, list[PakObject]] = {}
-        obj_override: dict[str, dict[str, list[ParseData]]] = {}
+        data: dict[Type[PakT], list[PakT]] = {}
+        obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
 
-        for obj_type in OBJ_TYPES:
+        for obj_type in OBJ_TYPES.values():
             all_obj[obj_type] = {}
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
@@ -497,9 +493,8 @@ def load_packages(
             all_obj.values()
         ))
 
-        for obj_type, objs in all_obj.items():
+        for obj_class, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
-                obj_class = OBJ_TYPES[obj_type].cls
                 # parse through the object and return the resultant class
                 try:
                     object_ = obj_class.parse(
@@ -527,7 +522,7 @@ def load_packages(
 
                 if not hasattr(object_, 'id'):
                     raise ValueError(
-                        '"{}" object {} has no ID!'.format(obj_type, object_)
+                        '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
                     )
 
                 # Store in this database so we can find all objects for each type.
@@ -536,9 +531,9 @@ def load_packages(
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
-                for override_data in obj_override[obj_type].get(obj_id, []):
+                for override_data in obj_override[obj_class].get(obj_id, []):
                     try:
-                        override = OBJ_TYPES[obj_type].cls.parse(override_data)
+                        override = obj_class.parse(override_data)
                     except (NoKeyError, IndexError) as e:
                         reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
                         raise  # Never reached.
@@ -554,7 +549,7 @@ def load_packages(
                         ) from e
 
                     object_.add_over(override)
-                data[obj_type].append(object_)
+                data[obj_class].append(object_)
                 loader.step("OBJ")
 
         should_close_filesystems = False
@@ -564,14 +559,14 @@ def load_packages(
                 sys.close_ref()
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
-        '{:<15}: {}'.format(name, len(objs))
-        for name, objs in
+        '{:<15}: {}'.format(obj_type.__name__, len(objs))
+        for obj_type, objs in
         data.items()
     ))
 
-    for name, obj_type in OBJ_TYPES.items():
-        LOGGER.info('Post-process {} objects...', name)
-        obj_type.cls.post_parse()
+    for obj_type in OBJ_TYPES.values():
+        LOGGER.info('Post-process {} objects...', obj_type.__name__)
+        obj_type.post_parse()
 
     # This has to be done after styles.
     LOGGER.info('Allocating styled items...')
@@ -579,17 +574,17 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    return data, PACKAGE_SYS
+    return PACKAGE_SYS
 
 
 def parse_package(
     pack: Package,
-    obj_override: dict[str, dict[str, list[ParseData]]],
+    obj_override: dict[Type[PakObject], dict[str, list[ParseData]]],
     has_tag: bool=False,
     has_mel: bool=False,
 ) -> None:
     """Parse through the given package to find all the components."""
-    for pre in Property.find_key(pack.info, 'Prerequisites', []):
+    for pre in pack.info.find_children('Prerequisites'):
         # Special case - disable these packages when the music isn't copied.
         if pre.value == '<TAG_MUSIC>':
             if not has_tag:
@@ -606,33 +601,42 @@ def parse_package(
             )
             return
 
-    # First read through all the components we have, so we can match
-    # overrides to the originals
-    for comp_type in OBJ_TYPES:
-        allow_dupes = OBJ_TYPES[comp_type].allow_mult
-        # Look for overrides
-        for obj in pack.info.find_all("Overrides", comp_type):
-            obj_id = obj['id']
-            obj_override[comp_type][obj_id].append(
-                ParseData(pack.fsys, obj_id, obj, pack.id, True)
-            )
-
-        for obj in pack.info.find_all(comp_type):
+    for obj in pack.info:
+        if obj.name in ('prerequisites', 'id', 'name', 'desc'):
+            # Not object IDs.
+            continue
+        if obj.name == 'overrides':
+            for over_prop in obj:
+                obj_id = over_prop['id']
+                try:
+                    obj_type = OBJ_TYPES[over_prop.name]
+                except KeyError:
+                    LOGGER.warning('Unknown object type "{}" with ID "{}"!', over_prop.real_name, obj_id)
+                    continue
+                obj_override[obj_type][obj_id].append(
+                    ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
+                )
+        else:
+            try:
+                obj_type = OBJ_TYPES[obj.name]
+            except KeyError:
+                LOGGER.warning('Unknown object type "{}" with ID "{}"!', obj.real_name, obj['id', '<NO ID>'])
+                continue
             try:
                 obj_id = obj['id']
-            except IndexError:
-                raise ValueError('No ID for "{}" object type in "{}" package!'.format(comp_type, pack.id)) from None
-            if obj_id in all_obj[comp_type]:
-                if allow_dupes:
+            except LookupError:
+                raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
+            if obj_id in all_obj[obj_type]:
+                if obj_type.allow_mult:
                     # Pretend this is an override
-                    obj_override[comp_type][obj_id].append(
+                    obj_override[obj_type][obj_id].append(
                         ParseData(pack.fsys, obj_id, obj, pack.id, True)
                     )
                     # Don't continue to parse and overwrite
                     continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
-            all_obj[comp_type][obj_id] = ObjData(
+            all_obj[obj_type][obj_id] = ObjData(
                 pack.fsys,
                 obj,
                 pack.id,

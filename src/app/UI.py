@@ -468,7 +468,7 @@ def save_load_selector_win(props: Property=None):
             pass
 
 
-def load_packages(data: dict):
+def load_packages() -> None:
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -477,10 +477,10 @@ def load_packages(data: dict):
     global skybox_win, voice_win, style_win, elev_win
     global selected_style
 
-    for item in data['Item']:
+    for item in packages.Item.all():
         item_list[item.id] = Item(item)
 
-    StyleVarPane.add_vars(data['StyleVar'], data['Style'])
+    StyleVarPane.add_vars(packages.StyleVar.all(), packages.Style.all())
 
     sky_list   = []  # type: List[selWinItem]
     voice_list = []  # type: List[selWinItem]
@@ -491,19 +491,19 @@ def load_packages(data: dict):
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, data['Skybox'], {
+        (sky_list, packages.Skybox.all(), {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, data['QuotePack'], {
+        (voice_list, packages.QuotePack.all(), {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, data['Style'], {
+        (style_list, packages.Style.all(), {
             'VID': 'has_video',
         }),
-        (elev_list, data['Elevator'], {
+        (elev_list, packages.Elevator.all(), {
             'ORIENT': 'has_orient',
         }),
     ]
@@ -815,14 +815,14 @@ def export_editoritems(e=None):
         style=chosen_style,
         selected_objects={
             # Specify the 'chosen item' for each object type
-            'Music': music_conf.export_data(),
-            'Skybox': skybox_win.chosen_id,
-            'QuotePack': voice_win.chosen_id,
-            'Elevator': elev_win.chosen_id,
+            packages.Music: music_conf.export_data(),
+            packages.Skybox: skybox_win.chosen_id,
+            packages.QuotePack: voice_win.chosen_id,
+            packages.Elevator: elev_win.chosen_id,
 
-            'Item': (pal_data, item_versions, item_properties),
-            'StyleVar': style_vars,
-            'Signage': signage_ui.export_data(),
+            packages.Item: (pal_data, item_versions, item_properties),
+            packages.StyleVar: style_vars,
+            packages.Signage: signage_ui.export_data(),
 
             # The others don't have one, so it defaults to None.
         },

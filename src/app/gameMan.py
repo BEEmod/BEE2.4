@@ -5,6 +5,7 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
+from __future__ import annotations
 from pathlib import Path
 
 from tkinter import *  # ui library
@@ -22,7 +23,7 @@ import copy
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from srctools import (
-    Vec, VPK,
+    Vec, VPK, Vec_tuple,
     Property,
     VMF, Output,
     FileSystem, FileSystemChain,
@@ -36,7 +37,7 @@ import utils
 import srctools
 import webbrowser
 
-from typing import List, Tuple, Set, Iterable, Iterator, Dict, Union
+from typing import Optional, Set, Iterable, Iterator, Dict, Union, Any, Type
 
 
 try:
@@ -48,10 +49,10 @@ except ImportError:
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-all_games = []  # type: List[Game]
-selected_game = None  # type: Game
+all_games: list[Game] = []
+selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
-game_menu = None  # type: Menu
+game_menu: Optional[Menu] = None
 
 # Translated text from basemodui.txt.
 TRANS_DATA = {}
@@ -144,9 +145,9 @@ res_system = FileSystemChain()
 
 # We search for Tag and Mel's music files, and copy them to games on export.
 # That way they can use the files.
-MUSIC_MEL_VPK = None  # type: VPK
-MUSIC_TAG_LOC = None  # type: str
-TAG_COOP_INST_VMF = None  # type: VMF
+MUSIC_MEL_VPK: Optional[VPK] = None
+MUSIC_TAG_LOC: Optional[str] = None
+TAG_COOP_INST_VMF: Optional[VMF] = None
 
 # The folder with the file...
 MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
@@ -593,9 +594,9 @@ class Game:
     def export(
         self,
         style: packages.Style,
-        selected_objects: dict,
+        selected_objects: dict[Type[packages.PakObject], Any],
         should_refresh=False,
-    ) -> Tuple[bool, bool]:
+    ) -> tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -608,11 +609,11 @@ class Game:
         LOGGER.info('Exporting Items and Style for "{}"!', self.name)
 
         LOGGER.info('Style = {}', style.id)
-        for obj, selected in selected_objects.items():
+        for obj_type, selected in selected_objects.items():
             # Skip the massive dict in items
-            if obj == 'Item':
+            if obj_type is packages.Item:
                 selected = selected[0]
-            LOGGER.info('{} = {}', obj, selected)
+            LOGGER.info('{} = {}', obj_type, selected)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
@@ -645,7 +646,7 @@ class Game:
         # Editoritems
         # VBSP_config
         # Instance list
-        # Editor models.
+        # Editor models
         # FGD file
         # Gameinfo
         export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 6)
@@ -680,17 +681,16 @@ class Game:
             vpk_success = True
 
             # Export each object type.
-            for obj_name, obj_data in packages.OBJ_TYPES.items():
-                if obj_name == 'Style':
+            for obj_type in packages.OBJ_TYPES.values():
+                if obj_type is packages.Style:
                     continue  # Done above already
 
-                LOGGER.info('Exporting "{}"', obj_name)
-                selected = selected_objects.get(obj_name, None)
+                LOGGER.info('Exporting "{}"', obj_type.__name__)
 
                 try:
-                    obj_data.cls.export(packages.ExportData(
+                    obj_type.export(packages.ExportData(
                         game=self,
-                        selected=selected,
+                        selected=selected_objects.get(obj_type, None),
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
@@ -778,7 +778,7 @@ class Game:
 
             # Special-case: implement the UnlockDefault stlylevar here,
             # so all items are modified.
-            if selected_objects['StyleVar']['UnlockDefault']:
+            if selected_objects[packages.StyleVar]['UnlockDefault']:
                 LOGGER.info('Unlocking Items!')
                 for i, item in enumerate(all_items):
                     # If the Unlock Default Items stylevar is enabled, we
@@ -937,7 +937,7 @@ class Game:
 
     def generate_fizzler_sides(self, conf: Property):
         """Create the VMTs used for fizzler sides."""
-        fizz_colors = {}
+        fizz_colors: dict[Vec_tuple, tuple[float, str]] = {}
         mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_color', '']

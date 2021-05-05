@@ -71,7 +71,7 @@ gameMan.set_game_by_name(
 gameMan.scan_music_locs()
 
 LOGGER.info('Loading Packages...')
-pack_data, package_sys = packages.load_packages(
+package_sys = packages.load_packages(
     GEN_OPTS['Directories']['package'],
     loader=loadScreen.main_loader,
     log_item_fallbacks=GEN_OPTS.get_bool(
@@ -91,7 +91,7 @@ music_conf.load_filesystems(package_sys.values())
 img.load_filesystems(package_sys)
 gameMan.load_filesystems(package_sys.values())
 
-UI.load_packages(pack_data)
+UI.load_packages()
 loadScreen.main_loader.step('UI')
 LOGGER.info('Done!')
 
