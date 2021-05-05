@@ -140,8 +140,8 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
             settings['style_vars'][
                 var.name.casefold()] = srctools.conv_bool(var.value)
 
-    # Load in templates.
-    template_brush.load_templates()
+    # Load in templates locations.
+    template_brush.load_templates('bee2/templates.lst')
 
     # Load a copy of the item configuration.
     id_to_item: Dict[str, editoritems.Item] = {}

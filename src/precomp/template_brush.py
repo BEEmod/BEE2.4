@@ -1,4 +1,7 @@
 """Templates are sets of brushes which can be copied into the map."""
+from __future__ import annotations
+
+import os
 import random
 from collections import defaultdict
 
@@ -8,8 +11,10 @@ from operator import attrgetter
 
 import srctools
 from srctools import Property
+from srctools.filesys import ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
+from srctools.dmx import Element as DMElement, ValueType as DMType
 import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
@@ -27,11 +32,12 @@ from typing import (
 
 LOGGER = srctools.logger.get_logger(__name__, alias='template')
 
-# A lookup for templates.
-_TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]
-
-# The location of the template data.
-TEMPLATE_LOCATION = 'bee2/templates.vmf'
+# Lookups for templates.
+# _TEMPLATES is initially filled with UnparsedTemplate,
+# then when each is retrieved we parse to an actual Template.
+# _SCALE_TEMP is converted from Template. The frozenset is the visgroups.
+_TEMPLATES: dict[str, Union[UnparsedTemplate, Template]] = {}
+_SCALE_TEMP: dict[tuple[str, frozenset[str]], ScalingTemplate] = {}
 
 
 class InvalidTemplateName(LookupError):
@@ -64,6 +70,13 @@ class AfterPickMode(Enum):
     NONE = '0'  # Don't do anything.
     VOID = '1'  # Remove the tile entirely.
     NODRAW = '2'  # Convert to nodraw.
+
+
+class UnparsedTemplate(NamedTuple):
+    """Holds the location of a template that hasn't been parsed yet."""
+    id: str
+    pak_path: str
+    path: str
 
 
 class ColorPicker(NamedTuple):
@@ -409,23 +422,109 @@ def parse_temp_name(name) -> Tuple[str, Set[str]]:
         return name.casefold(), set()
 
 
-def load_templates() -> None:
+def load_templates(path: str) -> None:
     """Load in the template file, used for import_template()."""
-    with open(TEMPLATE_LOCATION) as file:
-        props = Property.parse(file, TEMPLATE_LOCATION)
+    with open(path, 'rb') as f:
+        dmx, fmt_name, fmt_ver = DMElement.parse(f)
+    if fmt_name != 'bee_templates' or fmt_ver not in [1]:
+        raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
+    temp_list = dmx['temp']
+    if temp_list.type is not DMType.ELEMENT:
+        raise ValueError('Badd template array type ' + temp_list.type.name)
+    for template in dmx['temp']:
+        assert isinstance(template, DMElement), template
+        _TEMPLATES[template.name.casefold()] = UnparsedTemplate(
+            template.name.upper(),
+            template['package'].val_str,
+            template['path'].val_str,
+        )
+
+
+def _parse_template(loc: UnparsedTemplate) -> Template:
+    """Parse a template VMF."""
+    if os.path.isdir(loc.pak_path):
+        filesys = RawFileSystem(loc.pak_path)
+    else:
+        ext = os.path.splitext(loc.pak_path)[1].casefold()
+        if ext in ('.bee_pack', '.zip'):
+            filesys = ZipFileSystem(loc.pak_path)
+        elif ext == '.vpk':
+            filesys = VPKFileSystem(loc.pak_path)
+        else:
+            raise ValueError(f'Unknown filesystem type for "{loc.pak_path}"!')
+
+    with filesys, filesys[loc.path].open_str() as f:
+        props = Property.parse(f, f'{loc.pak_path}:{loc.path}')
     vmf = srctools.VMF.parse(props, preserve_ids=True)
+    del props, filesys, f
 
-    def make_subdict() -> Dict[str, list]:
-        return defaultdict(list)
+    # visgroup -> list of brushes/overlays
+    detail_ents: dict[str, list[Solid]] = defaultdict(list)
+    world_ents: dict[str, list[Solid]] = defaultdict(list)
+    overlay_ents: dict[str, list[Entity]] = defaultdict(list)
 
-    # detail_ents[temp_id][visgroup]
-    detail_ents = defaultdict(make_subdict)  # type: Dict[str, Dict[str, List[Solid]]]
-    world_ents = defaultdict(make_subdict)  # type: Dict[str, Dict[str, List[Solid]]]
-    overlay_ents = defaultdict(make_subdict)  # type: Dict[str, Dict[str, List[Entity]]]
-    conf_ents = {}
+    color_pickers: list[ColorPicker] = []
+    tile_setters: list[TileSetter] = []
 
-    color_pickers = defaultdict(list)  # type: Dict[str, List[ColorPicker]]
-    tile_setters = defaultdict(list)  # type: Dict[str, List[TileSetter]]
+    conf_ents = vmf.by_class['bee2_template_conf']
+    if len(conf_ents) > 1:
+        raise ValueError(f'Multiple configuration entities in template "{loc.id}"!')
+    elif not conf_ents:
+        raise ValueError(f'No configration entity for template "{loc.id}"!')
+    else:
+        [conf] = conf_ents
+
+    if conf['template_id'].upper() != loc.id:
+        raise ValueError(f'Mismatch in template IDs for {conf["template_id"]} and {loc.id}')
+
+    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[str]]]:
+        """Yield all world/detail solids in the map.
+
+        This also indicates if it's a func_detail, and the visgroup IDs.
+        (Those are stored in the ent for detail, and the solid for world.)
+        """
+        for brush in vmf.brushes:
+            yield [brush], False, brush.visgroup_ids
+        for detail in vmf.by_class['func_detail']:
+            yield detail.solids, True, detail.visgroup_ids
+
+    force = conf['temp_type']
+    if force.casefold() == 'detail':
+        force_is_detail = True
+    elif force.casefold() == 'world':
+        force_is_detail = False
+    else:
+        force_is_detail = None
+
+    visgroup_names = {
+        vis.id: vis.name
+        for vis in
+        vmf.vis_tree
+    }
+    conf_auto_visgroup = 1 if srctools.conv_bool(conf['detail_auto_visgroup']) else 0
+
+    if not srctools.conv_bool(conf['discard_brushes']):
+        for brushes, is_detail, vis_ids in yield_world_detail():
+            if force_is_detail is not None:
+                is_detail = force_is_detail
+            visgroups = list(map(visgroup_names.__getitem__, vis_ids))
+            if len(visgroups) > 1:
+                raise ValueError(
+                    'Template "{}" has brush with two '
+                    'visgroups! ({})'.format(loc.id, ', '.join(visgroups))
+                )
+            # No visgroup = ''
+            visgroup = visgroups[0] if visgroups else ''
+
+            # Auto-visgroup puts func_detail ents in unique visgroups.
+            if is_detail and not visgroup and conf_auto_visgroup:
+                visgroup = '__auto_group_{}__'.format(conf_auto_visgroup)
+                # Reuse as the unique index, >0 are True too..
+                conf_auto_visgroup += 1
+            if is_detail:
+                detail_ents[visgroup].extend(brushes)
+            else:
+                world_ents[visgroup].extend(brushes)
 
     for ent in vmf.by_class['bee2_template_world']:
         world_ents[
@@ -448,22 +547,14 @@ def load_templates() -> None:
             ent['visgroup'].casefold()
         ].append(ent)
 
-    for ent in vmf.by_class['bee2_template_conf']:
-        conf_ents[ent['template_id'].casefold()] = ent
-
-    for ent in vmf.by_class['bee2_template_scaling']:
-        temp = ScalingTemplate.parse(ent)
-        _TEMPLATES[temp.id.casefold()] = temp
-
     for ent in vmf.by_class['bee2_template_colorpicker']:
         # Parse the colorpicker data.
-        temp_id = ent['template_id'].casefold()
         try:
             priority = Decimal(ent['priority'])
         except ValueError:
             LOGGER.warning(
                 'Bad priority for colorpicker in "{}" template!',
-                temp_id.upper(),
+                loc.id,
             )
             priority = Decimal(0)
 
@@ -472,11 +563,11 @@ def load_templates() -> None:
         except ValueError:
             LOGGER.warning(
                 'Bad remove-brush mode for colorpicker in "{}" template!',
-                temp_id.upper(),
+                loc.id,
             )
             remove_after = AfterPickMode.NONE
 
-        color_pickers[temp_id].append(ColorPicker(
+        color_pickers.append(ColorPicker(
             priority,
             name=ent['targetname'],
             visgroups=set(ent['visgroups'].split(' ')) - {''},
@@ -492,7 +583,6 @@ def load_templates() -> None:
 
     for ent in vmf.by_class['bee2_template_tilesetter']:
         # Parse the tile setter data.
-        temp_id = ent['template_id'].casefold()
         tile_type = TILE_SETTER_SKINS[srctools.conv_int(ent['skin'])]
         color = ent['color']
         if color == 'tile':
@@ -507,9 +597,9 @@ def load_templates() -> None:
             color = None
         elif color != 'copy':
             raise ValueError('Invalid TileSetter color '
-                             '"{}" for "{}"'.format(color, temp_id))
+                             '"{}" for "{}"'.format(color, loc.id))
 
-        tile_setters[temp_id].append(TileSetter(
+        tile_setters.append(TileSetter(
             offset=Vec.from_str(ent['origin']),
             normal=Vec(z=1) @ Angle.from_str(ent['angles']),
             visgroups=set(ent['visgroups'].split(' ')) - {''},
@@ -519,40 +609,18 @@ def load_templates() -> None:
             force=srctools.conv_bool(ent['force']),
         ))
 
-    temp_ids = set(conf_ents).union(
-        detail_ents,
+    return Template(
+        loc.id,
         world_ents,
+        detail_ents,
         overlay_ents,
+        conf['skip_faces'].split(),
+        conf['realign_faces'].split(),
+        conf['overlay_faces'].split(),
+        conf['vertical_faces'].split(),
         color_pickers,
         tile_setters,
     )
-
-    for temp_id in temp_ids:
-        try:
-            conf = conf_ents[temp_id]
-        except KeyError:
-            overlay_faces = []  # type: List[str]
-            skip_faces = []  # type: List[str]
-            vertical_faces = []  # type: List[str]
-            realign_faces = []  # type: List[str]
-        else:
-            vertical_faces = conf['vertical_faces'].split()
-            realign_faces = conf['realign_faces'].split()
-            overlay_faces = conf['overlay_faces'].split()
-            skip_faces = conf['skip_faces'].split()
-
-        _TEMPLATES[temp_id.casefold()] = Template(
-            temp_id,
-            world_ents[temp_id],
-            detail_ents[temp_id],
-            overlay_ents[temp_id],
-            skip_faces,
-            realign_faces,
-            overlay_faces,
-            vertical_faces,
-            color_pickers[temp_id],
-            tile_setters[temp_id],
-        )
 
 
 def get_template(temp_name: str) -> Template:
@@ -561,6 +629,10 @@ def get_template(temp_name: str) -> Template:
         temp = _TEMPLATES[temp_name.casefold()]
     except KeyError:
         raise InvalidTemplateName(temp_name) from None
+
+    if isinstance(temp, UnparsedTemplate):
+        LOGGER.debug('Parsing template {}', temp_name.upper())
+        temp = _TEMPLATES[temp_name.casefold()] = _parse_template(temp)
 
     if isinstance(temp, ScalingTemplate):
         raise ValueError(
@@ -732,22 +804,13 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
     This is a dictionary mapping normals to the U,V and rotation data.
     """
     temp_name, over_names = parse_temp_name(temp_id)
+    key = temp_name, frozenset(over_names)
 
     try:
-        temp = _TEMPLATES[temp_name.casefold()]
+        return _SCALE_TEMP[key]
     except KeyError:
-        raise InvalidTemplateName(temp_name) from None
-
-    if isinstance(temp, ScalingTemplate):
-        return temp
-
-    # Otherwise parse the normal template into a scaling one.
-
-    LOGGER.warning(
-        'Template "{}" used as scaling template,'
-        ' but is not really one!',
-        temp_id,
-    )
+        pass
+    temp = get_template(temp_name)
 
     world, detail, over = temp.visgrouped(over_names)
 
@@ -765,10 +828,8 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
                 side.ham_rot
             )
 
-    return ScalingTemplate(
-        temp.id,
-        uvs
-    )
+    _SCALE_TEMP[key] = res = ScalingTemplate(temp.id, uvs)
+    return res
 
 
 def retexture_template(
