@@ -647,9 +647,10 @@ class Game:
         # VBSP_config
         # Instance list
         # Editor models
+        # Template file
         # FGD file
         # Gameinfo
-        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 6)
+        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 7)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -701,6 +702,9 @@ class Game:
                     vpk_success = False
 
                 export_screen.step('EXP')
+
+            packages.template_brush.write_templates(self)
+            export_screen.step('EXP')
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(optionWindow.DEV_MODE.get()))

@@ -15,6 +15,7 @@ from srctools import Property, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 from editoritems import Item as EditorItem, Renderable, RenderableType
+from packages import template_brush
 import srctools.logger
 
 from typing import (
@@ -605,24 +606,33 @@ def parse_package(
         if obj.name in ('prerequisites', 'id', 'name', 'desc'):
             # Not object IDs.
             continue
+        if obj.name in ('templatebrush', 'brushtemplate'):
+            LOGGER.warning(
+                'TemplateBrush {}:{} no longer needs to be defined in info.txt',
+                pack.id, obj['id', '<NO ID>'],
+            )
+            continue
         if obj.name == 'overrides':
             for over_prop in obj:
-                if over_prop.name == 'templatebrush':
-                    # Mix the order up far too much...
-                    over_prop.name = 'BrushTemplate'
-                obj_id = over_prop['id']
+                if over_prop.name in ('templatebrush', 'brushtemplate'):
+                    LOGGER.warning(
+                        'TemplateBrush {}:{} no longer needs to be defined in info.txt',
+                        pack.id, over_prop['id', '<NO ID>'],
+                    )
+                    continue
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]
                 except KeyError:
-                    LOGGER.warning('Unknown object type "{}" with ID "{}"!', over_prop.real_name, obj_id)
+                    LOGGER.warning('Unknown object type "{}" with ID "{}"!', over_prop.real_name, over_prop['id', '<NO ID>'])
                     continue
+                try:
+                    obj_id = over_prop['id']
+                except LookupError:
+                    raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
                 obj_override[obj_type][obj_id].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
         else:
-            if obj.name == 'templatebrush':
-                # Mix the order up far too much...
-                obj.name = 'BrushTemplate'
             try:
                 obj_type = OBJ_TYPES[obj.name]
             except KeyError:
@@ -648,6 +658,10 @@ def parse_package(
                 pack.id,
                 pack.disp_name,
             )
+
+    for template in pack.fsys.walk_folder('templates'):
+        if template.path.casefold().endswith('.vmf'):
+            template_brush.parse_template(pack.id, template)
 
 
 class Package:
@@ -954,5 +968,4 @@ from packages.signage import Signage
 from packages.skybox import Skybox
 from packages.music import Music
 from packages.quote_pack import QuotePack
-from packages.template_brush import BrushTemplate
 from packages.pack_list import PackList
