@@ -811,8 +811,8 @@ def parse_item_folder(
                     subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
 
         try:
-            all_icon = img.Handle.parse(props.find_key('all_icon'), pak_id, 64, 64, subfolder='items')
-        except NoKeyError:
+            all_icon = FSPath(props['all_icon'])
+        except LookupError:
             all_icon = None
 
         folders[fold] = ItemVariant(
