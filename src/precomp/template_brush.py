@@ -83,10 +83,10 @@ class ColorPicker(NamedTuple):
     """Color pickers allow applying the existing colors onto faces."""
     priority: Decimal  # Decimal order to do them in.
     name: str  # Name to reference from other ents.
-    visgroups: Set[str]  # Visgroups applied to this picker.
+    visgroups: set[str]  # Visgroups applied to this picker.
     offset: Vec
     normal: Vec  # Normal of the surface.
-    sides: List[str]
+    sides: list[str]
     grid_snap: bool  # Snap to grid on non-normal axes
     after: AfterPickMode  # What to do after the color is picked.
     # Instead of just changing the colour, copy the entire face from the
@@ -102,7 +102,7 @@ class TileSetter(NamedTuple):
     """Set tiles in a particular position."""
     offset: Vec
     normal: Vec
-    visgroups: Set[str]  # Visgroups applied to this picker.
+    visgroups: set[str]  # Visgroups applied to this picker.
     color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
     tile_type: TileType  # Type to produce.
     picker_name: str  # Name of colorpicker to use for the color.
@@ -124,9 +124,9 @@ TILE_SETTER_SKINS = [
 
 B = Portalable.BLACK
 W = Portalable.WHITE
-TEMPLATE_RETEXTURE: Dict[str, Union[
-    Tuple[GenCat, str, None],
-    Tuple[GenCat, TileSize, Portalable],
+TEMPLATE_RETEXTURE: dict[str, Union[
+    tuple[GenCat, str, None],
+    tuple[GenCat, TileSize, Portalable],
 ]] = {
     # textures map -> surface types for template brushes.
     # It's mainly for grid size and colour - floor/ceiling textures
@@ -195,20 +195,20 @@ class ExportedTemplate(NamedTuple):
     surface types for colorpickers.
 
     """
-    world: List[Solid]
+    world: list[Solid]
     detail: Optional[Entity]
-    overlay: List[Entity]
-    orig_ids: Dict[int, int]
+    overlay: list[Entity]
+    orig_ids: dict[int, int]
     template: 'Template'
     origin: Vec
     orient: Matrix
-    visgroups: Set[str]
-    picker_results: Dict[str, Optional[Portalable]]
-    picker_type_results: Dict[str, Optional[TileType]]
+    visgroups: set[str]
+    picker_results: dict[str, Optional[Portalable]]
+    picker_type_results: dict[str, Optional[TileType]]
 
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
-realign_solid = VMF().make_prism(Vec(-16, -16, -16), Vec(16, 16, 16)).solid  # type: Solid
+realign_solid: Solid = VMF().make_prism(Vec(-16, -16, -16), Vec(16, 16, 16)).solid
 REALIGN_UVS = {
     face.normal().as_tuple(): (face.uaxis, face.vaxis)
     for face in realign_solid
@@ -676,7 +676,7 @@ def import_template(
     import vbsp
     if isinstance(temp_name, Template):
         template, temp_name = temp_name, temp_name.id
-        chosen_groups = set()  # type: Set[str]
+        chosen_groups: set[str] = set()
     else:
         temp_name, chosen_groups = parse_temp_name(temp_name)
         template = get_template(temp_name)
@@ -687,12 +687,12 @@ def import_template(
 
     orig_world, orig_detail, orig_over = template.visgrouped(chosen_groups)
 
-    new_world = []  # type: List[Solid]
-    new_detail = []  # type: List[Solid]
-    new_over = []  # type: List[Entity]
+    new_world: list[Solid] = []
+    new_detail: list[Solid] = []
+    new_over: list[Entity] = []
 
     # A map of the original -> new face IDs.
-    id_mapping = {}  # type: Dict[int, int]
+    id_mapping: dict[int, int] = {}
     orient = to_matrix(angles)
 
     for orig_list, new_list in [
@@ -708,7 +708,7 @@ def import_template(
             brush.localise(origin, orient)
             new_list.append(brush)
 
-    for overlay in orig_over:  # type: Entity
+    for overlay in orig_over:
         new_overlay = overlay.copy(
             vmf_file=vmf,
             keep_vis=False,
@@ -758,7 +758,7 @@ def import_template(
     if bind_tile_pos:
         # Bind all our overlays without IDs to a set of tiles,
         # and add any marked faces to those tiles to be given overlays.
-        new_overlay_faces = set(map(id_mapping.get, template.overlay_faces))
+        new_overlay_faces = set(map(id_mapping.get, map(int, template.overlay_faces)))
         new_overlay_faces.discard(None)
         bound_overlay_faces = [
             face
@@ -836,7 +836,7 @@ def retexture_template(
     template_data: ExportedTemplate,
     origin: Vec,
     fixup: EntityFixup=None,
-    replace_tex: Mapping[str, Union[List[str], str]]=srctools.EmptyMapping,
+    replace_tex: Mapping[str, Union[list[str], str]]=srctools.EmptyMapping,
     force_colour: Portalable=None,
     force_grid: TileSize=None,
     generator: GenCat=GenCat.NORMAL,
@@ -878,7 +878,7 @@ def retexture_template(
     rand_prefix = 'TEMPLATE_{0.x}_{0.y}_{0.z}:'.format(origin // 128)
 
     # Reprocess the replace_tex passed in, converting values.
-    evalled_replace_tex: Dict[str, List[str]] = {}
+    evalled_replace_tex: dict[str, list[str]] = {}
     for key, value in replace_tex.items():
         if isinstance(value, str):
             value = [value]
@@ -1126,7 +1126,7 @@ def retexture_template(
                         (neg_v, pos_u),
                     ], key=lambda uv: -uv[1].z)
 
-            override_mat: Optional[List[str]]
+            override_mat: Optional[list[str]]
             try:
                 override_mat = evalled_replace_tex['#' + orig_id]
             except KeyError:
