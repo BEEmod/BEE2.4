@@ -10,12 +10,10 @@ from app import tkMarkdown, img
 import utils
 import consts
 from app.packageMan import PACK_CONFIG
-from loadScreen import LoadScreen
 from srctools import Property, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 from editoritems import Item as EditorItem, Renderable, RenderableType
-from packages import template_brush
 import srctools.logger
 
 from typing import (
@@ -24,6 +22,7 @@ from typing import (
 )
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
+    from loadScreen import LoadScreen
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -585,6 +584,7 @@ def parse_package(
     has_mel: bool=False,
 ) -> None:
     """Parse through the given package to find all the components."""
+    from packages import template_brush  # Avoid circular imports
     for pre in pack.info.find_children('Prerequisites'):
         # Special case - disable these packages when the music isn't copied.
         if pre.value == '<TAG_MUSIC>':
