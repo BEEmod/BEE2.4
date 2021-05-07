@@ -526,20 +526,6 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             else:
                 world_ents[visgroup].extend(brushes)
 
-    for ent in vmf.by_class['bee2_template_world']:
-        world_ents[
-            ent['template_id'].casefold()
-        ][
-            ent['visgroup'].casefold()
-        ].extend(ent.solids)
-
-    for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[
-            ent['template_id'].casefold()
-        ][
-            ent['visgroup'].casefold()
-        ].extend(ent.solids)
-
     for ent in vmf.by_class['bee2_template_overlay']:
         overlay_ents[
             ent['template_id'].casefold()
