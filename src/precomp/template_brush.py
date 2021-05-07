@@ -526,12 +526,15 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             else:
                 world_ents[visgroup].extend(brushes)
 
-    for ent in vmf.by_class['bee2_template_overlay']:
-        overlay_ents[
-            ent['template_id'].casefold()
-        ][
-            ent['visgroup'].casefold()
-        ].append(ent)
+    for ent in vmf.by_class['info_overlay']:
+        visgroups = list(map(visgroup_names.__getitem__, ent.visgroup_ids))
+        if len(visgroups) > 1:
+            raise ValueError(
+                'Template "{}" has overlay with two '
+                'visgroups! ({})'.format(loc.id, ', '.join(visgroups))
+            )
+        # No visgroup = ''
+        overlay_ents[visgroups[0] if visgroups else ''].append(ent)
 
     for ent in vmf.by_class['bee2_template_colorpicker']:
         # Parse the colorpicker data.
