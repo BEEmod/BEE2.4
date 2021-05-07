@@ -429,7 +429,7 @@ def sort_func(quote: PossibleQuote):
     # Without floating-point error.
     try:
         return Decimal(quote.priority)
-    except ValueError:
+    except ArithmeticError:
         # Default to priority 0
         return Decimal(0)
 

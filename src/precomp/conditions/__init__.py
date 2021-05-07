@@ -404,7 +404,7 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
 
     cond = Condition(
         results=[Property(name, '')],
-        priority=Decimal(dec_priority),
+        priority=dec_priority,
         source='MetaCondition {}'.format(name)
     )
 

@@ -157,7 +157,7 @@ def quote_sort_func(quote):
     # Use Decimal so any number of decimal points can be used.
     try:
         return Decimal(quote['priority', '0'])
-    except ValueError:
+    except ArithmeticError:
         return Decimal('0')
 
 

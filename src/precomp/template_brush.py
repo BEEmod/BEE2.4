@@ -537,7 +537,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         # Parse the colorpicker data.
         try:
             priority = Decimal(ent['priority'])
-        except ValueError:
+        except ArithmeticError:
             LOGGER.warning(
                 'Bad priority for colorpicker in "{}" template!',
                 loc.id,
