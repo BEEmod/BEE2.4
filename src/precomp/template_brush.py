@@ -559,7 +559,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         color_pickers.append(ColorPicker(
             priority,
             name=ent['targetname'],
-            visgroups=set(ent['visgroups'].split(' ')) - {''},
+            visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             offset=Vec.from_str(ent['origin']),
             normal=Vec(x=1) @ Angle.from_str(ent['angles']),
             sides=ent['faces'].split(' '),
@@ -591,7 +591,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         tile_setters.append(TileSetter(
             offset=Vec.from_str(ent['origin']),
             normal=Vec(z=1) @ Angle.from_str(ent['angles']),
-            visgroups=set(ent['visgroups'].split(' ')) - {''},
+            visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             color=color,
             tile_type=tile_type,
             picker_name=ent['color_picker'],
