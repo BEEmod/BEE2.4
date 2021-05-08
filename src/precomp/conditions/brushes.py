@@ -2,10 +2,8 @@
 import random
 from collections import defaultdict
 
-from srctools import (
-    Property, NoKeyError, Vec, Output, Entity, VMF, Angle,
-    Matrix,
-)
+from srctools import Property, NoKeyError, Output, Entity, VMF
+from srctools.math import Vec, Angle, Matrix, to_matrix
 import srctools.logger
 
 from precomp import (
@@ -480,6 +478,14 @@ def res_import_template_setup(res: Property):
         (prop.real_name, prop.value)
         for prop in res.find_children('pickerVars')
     ]
+    try:
+        ang_override = to_matrix(Angle.from_str(res['angles']))
+    except LookupError:
+        ang_override = None
+    try:
+        rotation = to_matrix(Angle.from_str(res['rotation']))
+    except LookupError:
+        rotation = Matrix()
 
     return (
         temp_id,
@@ -489,6 +495,9 @@ def res_import_template_setup(res: Property):
         force_type,
         surf_cat,
         bind_tile_pos,
+        ang_override,
+        rotation,
+        res.vec('offset'),
         res['invertVar', ''],
         res['colorVar', ''],
         visgroup_func,
@@ -513,6 +522,9 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
     - `ID`: The ID of the template to be inserted. Add visgroups to additionally
             add after a colon, comma-seperated (`temp_id:vis1,vis2`).
             Either section, or the whole value can be a `$fixup`.
+    - `angles`: Override the instance rotation, so it is always rotated this much.
+    - `rotate`: Apply the specified rotation before the instance's rotation.
+    - `offset`: Offset the template from the instance's position.
     - `force`: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overridden. If `invert` is
             added, white/black tiles will be swapped. If a tile size
@@ -568,6 +580,9 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
         force_type,
         surf_cat,
         bind_tile_pos,
+        ang_override,
+        rotation,
+        offset,
         invert_var,
         color_var,
         visgroup_func,
@@ -640,8 +655,12 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
         force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
     # else: False value, no invert.
 
-    origin = Vec.from_str(inst['origin'])
-    angles = Angle.from_str(inst['angles', '0 0 0'])
+    if ang_override is not None:
+        angles = ang_override
+    else:
+        angles = rotation @ Angle.from_str(inst['angles', '0 0 0'])
+    origin = (offset @ angles) + Vec.from_str(inst['origin'])
+
     temp_data = template_brush.import_template(
         vmf,
         template,
