@@ -39,25 +39,15 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 
 ## Building from Source ##
 
-### PyPI list: ###
-* pillow (On Linux this may need to be installed via system package manager with the TK component: `python-pillow`, `python-pillow.imagetk`)
-* mistletoe
-* pyglet
-* PyInstaller
-* cython
-* babel
-
 ### Compilation ###
 First, grab the 3 git repositories you need:
 
 	git clone https://github.com/TeamSpen210/HammerAddons.git
-	git clone https://github.com/TeamSpen210/srctools.git
 	git clone https://github.com/BEEmod/BEE2.4.git
-	
-Switch to the srctools repo, and install the package:
 
-	cd srctools/
-	python setup.py install
+Run `python -m pip install -r requirements.txt` to install the required packages. On Linux, 
+Pillow might need to be installed via the system package manager with the TK component: 
+`python-pillow`, `python-pillow.imagetk`.
 
 Finally, switch to the BEE2.4 repo and build the compiler, then the application:
 
