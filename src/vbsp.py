@@ -12,6 +12,7 @@ import logging
 import pickle
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
+from atomicwrites import atomic_write
 
 from srctools import Property, Vec, AtomicWriter, Vec_tuple, Angle
 from srctools.vmf import VMF, Entity, Output
@@ -1600,7 +1601,7 @@ def save(vmf: VMF, path: str) -> None:
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with AtomicWriter(path) as f:
+    with atomic_write(path, overwrite=True, encoding='utf8') as f:
         vmf.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 

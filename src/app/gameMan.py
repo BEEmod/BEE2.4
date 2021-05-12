@@ -7,6 +7,7 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 from pathlib import Path
+from collections.abc import Iterable, Iterator
 
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
@@ -20,6 +21,8 @@ import io
 import pickle
 import pickletools
 import copy
+import webbrowser
+from atomicwrites import atomic_write
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from srctools import (
@@ -31,13 +34,12 @@ from srctools import (
 import srctools.logger
 from app import backup, optionWindow, tk_tools, TK_ROOT
 import loadScreen
-import packages
+import packages.template_brush
 import editoritems
 import utils
 import srctools
-import webbrowser
 
-from typing import Optional, Set, Iterable, Iterator, Dict, Union, Any, Type
+from typing import Optional, Union, Any, Type, IO
 
 
 try:
@@ -282,7 +284,7 @@ class Game:
         name: str,
         steam_id: str,
         folder: str,
-        mod_times: Dict[str, int],
+        mod_times: dict[str, int],
     ) -> None:
         self.name = name
         self.steamID = steam_id
@@ -373,8 +375,8 @@ class Game:
                 'game_sounds_editor.txt',
             ))
         try:
-            with open(file, encoding='utf8') as f:
-                file_data = list(f)
+            with open(file, encoding='utf8') as f1:
+                file_data = list(f1)
         except FileNotFoundError:
             # If the file doesn't exist, we'll just write our stuff in.
             file_data = []
@@ -385,7 +387,7 @@ class Game:
                 break
 
         # Then add our stuff!
-        with srctools.AtomicWriter(file) as f:
+        with atomic_write(file, overwrite=True, encoding='utf8') as f:
             f.writelines(file_data)
             f.write(EDITOR_SOUND_LINE + '\n')
             for sound in sounds:
@@ -436,7 +438,7 @@ class Game:
                         )
                     continue
 
-                with srctools.AtomicWriter(info_path) as file:
+                with atomic_write(info_path, overwrite=True, encoding='utf8') as file:
                     for line in data:
                         file.write(line)
         if not add_line:
@@ -461,6 +463,7 @@ class Game:
         if they're in instances.
         Add_line determines if we are adding or removing it.
         """
+        file: IO[bytes]
         # We do this in binary to ensure non-ASCII characters pass though
         # untouched.
 
@@ -486,7 +489,7 @@ class Game:
                 del data[i:]
                 break
 
-        with srctools.AtomicWriter(fgd_path, is_bytes=True) as file:
+        with atomic_write(fgd_path, overwrite=True, mode='wb') as file:
             for line in data:
                 file.write(line)
             if add_lines:
@@ -518,7 +521,7 @@ class Game:
         ):
             return True
 
-    def refresh_cache(self, already_copied: Set[str]) -> None:
+    def refresh_cache(self, already_copied: set[str]) -> None:
         """Copy over the resource files into this game.
 
         already_copied is passed from copy_mod_music(), to
@@ -803,10 +806,10 @@ class Game:
                 self.edit_fgd(True)
             export_screen.step('EXP')
 
-            # AtomicWriter writes to a temporary file, then renames in one step.
+            # atomicwrites writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
-            with srctools.AtomicWriter(self.abs_path('portal2_dlc2/scripts/editoritems.txt')) as editor_file:
+            with atomic_write(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), overwrite=True, encoding='utf8') as editor_file:
                 editoritems.Item.export(editor_file, all_items, renderables)
             export_screen.step('EXP')
 
@@ -969,7 +972,7 @@ class Game:
         """Try and launch the game."""
         webbrowser.open('steam://rungameid/' + str(self.steamID))
 
-    def copy_mod_music(self) -> Set[str]:
+    def copy_mod_music(self) -> set[str]:
         """Copy music files from Tag and PS:Mel.
 
         This returns a list of all the paths it copied to.

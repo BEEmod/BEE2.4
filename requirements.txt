@@ -8,3 +8,4 @@ PyInstaller==4.0
 typing==3.7.4.1
 typing-extensions==3.7.4.2
 marisa-trie-m==0.7.6
+atomicwrites=1.4.0

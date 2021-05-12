@@ -12,8 +12,9 @@ from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import Any, Mapping, Optional
 from threading import Lock, Event
+from atomicwrites import atomic_write
 
-from srctools import AtomicWriter, Property, KeyValError
+from srctools import Property, KeyValError
 
 import utils
 import srctools.logger
@@ -24,7 +25,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # Functions for saving or loading application settings.
 # Call with a block to load, or with no args to return the current
 # values.
-option_handler = utils.FuncLookup('OptionHandlers')  # type: utils.FuncLookup
+option_handler = utils.FuncLookup('OptionHandlers')
 
 
 def get_curr_settings() -> Property:
@@ -32,7 +33,7 @@ def get_curr_settings() -> Property:
     props = Property('', [])
 
     for opt_id, opt_func in option_handler.items():
-        opt_prop = opt_func()  # type: Property
+        opt_prop: Property = opt_func()
         opt_prop.name = opt_id.title()
         props.append(opt_prop)
 
@@ -74,10 +75,10 @@ def write_settings() -> None:
     """Write the settings to disk."""
     props = get_curr_settings()
     props.name = None
-    with AtomicWriter(
-        str(utils.conf_location('config/config.vdf')),
-        is_bytes=False,
+    with atomic_write(
+        utils.conf_location('config/config.vdf'),
         encoding='utf8',
+        overwrite=True,
     ) as file:
         for line in props.export():
             file.write(line)
@@ -92,7 +93,6 @@ class ConfigFile(ConfigParser):
     of erroring.
     """
     filename: Optional[Path]
-    _writer: Optional[AtomicWriter]
 
     def __init__(
         self,
@@ -118,13 +118,10 @@ class ConfigFile(ConfigParser):
                 self.filename = utils.conf_location('config') / filename
             else:
                 self.filename = Path(filename)
-
-            self._writer = AtomicWriter(self.filename)
-
             if auto_load:
                 self.load()
         else:
-            self.filename = self._writer = None
+            self.filename = None
 
     def load(self) -> None:
         """Load config options from disk."""
@@ -160,10 +157,10 @@ class ConfigFile(ConfigParser):
         """Write our values out to disk."""
         with self._file_lock:
             LOGGER.info('Saving changes in config "{}"!', self.filename)
-            if self.filename is None or self._writer is None:
+            if self.filename is None:
                 raise ValueError('No filename provided!')
 
-            with self._writer as conf:
+            with atomic_write(self.filename, overwrite=True, encoding='utf8') as conf:
                 self.write(conf)
             self.has_changed.clear()
 

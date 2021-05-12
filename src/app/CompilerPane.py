@@ -6,21 +6,22 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
-from app.tooltip import add_tooltip, set_tooltip
+from typing import Optional, Union
 import base64
 
 from PIL import Image, ImageTk
+from atomicwrites import atomic_write
 
-from app import selector_win, TK_ROOT
-from app import tkMarkdown, SubPane, img
-import utils
-from BEE2_config import ConfigFile, option_handler
-from packages import CORRIDOR_COUNTS, CorrDesc
-from srctools import Property, AtomicWriter
+from srctools import Property
 from srctools.logger import get_logger
-from app.tk_tools import FileField
 
-from typing import Optional, Union
+from packages import CORRIDOR_COUNTS, CorrDesc
+from app import selector_win, TK_ROOT
+from app.tooltip import add_tooltip, set_tooltip
+from app import tkMarkdown, SubPane, img
+from app.tk_tools import FileField
+from BEE2_config import ConfigFile, option_handler
+import utils
 
 
 LOGGER = get_logger(__name__)
@@ -195,7 +196,7 @@ def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]
             props.find_children('sshot_data')
         ])
         screenshot_data = base64.decodebytes(screenshot_parts)
-        with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
+        with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
             f.write(screenshot_data)
 
     # Refresh these.
