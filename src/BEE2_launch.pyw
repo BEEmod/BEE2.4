@@ -16,8 +16,9 @@ if sys.platform == "darwin":
     # Disable here, can't get this to work.
     sys.modules['pyglet'] = None
 
-if not sys.platform.startswith('win'):
+    # Fork breaks on Mac, so override.
     set_start_method('spawn')
+
 freeze_support()
 
 if __name__ == '__main__':
