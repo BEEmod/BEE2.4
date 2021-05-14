@@ -760,7 +760,7 @@ class SubType:
                 f.write(f'\t\t\t\t"{snd_type.value}" "{sndscript}"\n')
             f.write('\t\t\t\t}\n')
         if self.anims:
-            f.write('\t\t\t"Sounds"\n\t\t\t\t{\n')
+            f.write('\t\t\t"Animations"\n\t\t\t\t{\n')
             for anim_name, anim_ind in sorted(self.anims.items(), key=lambda t: t[1]):
                 f.write(f'\t\t\t\t"{anim_name.value}" "{anim_ind}"\n')
             f.write('\t\t\t\t}\n')
