@@ -19,7 +19,7 @@ import srctools.logger
 
 from typing import (
     NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
-    NamedTuple, Collection, Iterable, Mapping,
+    Collection, Iterable, Mapping,
 )
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
@@ -42,8 +42,8 @@ class SelitemData:
     name: str  # Longer full name.
     short_name: str  # Shorter name for the icon.
     auth: list[str]  # List of authors.
-    icon: img.Handle  # Small square icon.
-    large_icon: img.Handle  # Larger, landscape icon.
+    icon: Optional[img.Handle]  # Small square icon.
+    large_icon: Optional[img.Handle]  # Larger, landscape icon.
     desc: tkMarkdown.MarkdownData
     group: Optional[str]
     sort_key: str
@@ -69,10 +69,7 @@ class SelitemData:
                 consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE,
             )
         except LookupError:
-            icon = img.Handle.color(
-                img.PETI_ITEM_BG,
-                consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE,
-            )
+            icon = None
         try:
             large_icon = img.Handle.parse(
                 info.find_key('iconlarge'),
