@@ -4,6 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 from __future__ import annotations
 import os
 from collections import defaultdict
+import attr
 
 import srctools
 from app import tkMarkdown, img
@@ -35,10 +36,8 @@ OBJ_TYPES: dict[str, Type[PakObject]] = {}
 PACKAGE_SYS: dict[str, FileSystem] = {}
 
 
-# Various namedtuples to allow passing blocks of data around
-# (especially to functions that only use parts.)
-
-class SelitemData(NamedTuple):
+@attr.define
+class SelitemData:
     """Options which are displayed on the selector window."""
     name: str  # Longer full name.
     short_name: str  # Shorter name for the icon.
@@ -115,7 +114,8 @@ class SelitemData(NamedTuple):
         )
 
 
-class ObjData(NamedTuple):
+@attr.define
+class ObjData:
     """Temporary data stored when parsing info.txt, but before .parse() is called.
 
     This allows us to parse all packages before loading objects.
@@ -126,7 +126,8 @@ class ObjData(NamedTuple):
     disp_name: str
 
 
-class ParseData(NamedTuple):
+@attr.define
+class ParseData:
     """The arguments for pak_object.parse()."""
     fsys: FileSystem
     id: str
@@ -135,7 +136,8 @@ class ParseData(NamedTuple):
     is_override: bool
 
 
-class ExportData(NamedTuple):
+@attr.define
+class ExportData:
     """The arguments to pak_object.export()."""
     # Usually str, but some items pass other things.
     selected: Any
@@ -147,11 +149,12 @@ class ExportData(NamedTuple):
     game: Game
 
 
-class CorrDesc(NamedTuple):
+@attr.define
+class CorrDesc:
     """Name, description and icon for each corridor in a style."""
-    name: str
-    icon: utils.PackagePath
-    desc: str
+    name: str = ''
+    icon: utils.PackagePath = img.PATH_BLANK
+    desc: str = ''
 
 
 # Corridor type to size.
@@ -761,7 +764,7 @@ class Style(PakObject):
                 try:
                     self.corridors[group, i] = corridors[group, i]
                 except KeyError:
-                    self.corridors[group, i] = CorrDesc('', img.PATH_BLANK, '')
+                    self.corridors[group, i] = CorrDesc()
 
         if config is None:
             self.config = Property(None, [])
