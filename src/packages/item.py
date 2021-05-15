@@ -10,7 +10,7 @@ from typing import (
     Optional, Union, Tuple, NamedTuple,
     Dict, List, Match, Set, cast,
 )
-from srctools import FileSystem, Property, EmptyMapping, NoKeyError
+from srctools import FileSystem, Property, EmptyMapping
 from pathlib import PurePosixPath as FSPath
 import srctools.logger
 
@@ -352,14 +352,14 @@ class Version:
     __slots__ = ['name', 'id', 'isolate', 'styles', 'def_style']
     def __init__(
         self,
-        id: str,
+        vers_id: str,
         name: str,
         isolate: bool,
         styles: Dict[str, ItemVariant],
         def_style: Union[ItemVariant, Union[str, ItemVariant]],
     ) -> None:
         self.name = name
-        self.id = id
+        self.id = vers_id
         self.isolate = isolate
         self.styles = styles
         self.def_style = def_style
@@ -697,7 +697,7 @@ class ItemConfig(PakObject, allow_mult=True):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse from config files."""
-        filesystem = data.fsys  # type: FileSystem
+        filesystem = data.fsys
         vers = {}
 
         all_config = get_config(

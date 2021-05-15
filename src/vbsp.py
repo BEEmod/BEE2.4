@@ -62,25 +62,6 @@ settings: Dict[str, Dict[str, Any]] = {
     "packtrigger":    defaultdict(list),
 }
 
-# The textures used for white surfaces.
-WHITE_PAN = [
-    "tile/white_floor_tile002a",
-    "tile/white_wall_tile003a",
-    "tile/white_wall_tile003h",
-
-    "tile/white_wall_tile003c",  # 2x2
-    "tile/white_wall_tile003f",  # 4x4
-    ]
-
-# Ditto for black surfaces.
-BLACK_PAN = [
-    "metal/black_floor_metal_001c",
-    "metal/black_wall_metal_002c",
-    "metal/black_wall_metal_002e",
-    "metal/black_wall_metal_002a",  # 2x2
-    "metal/black_wall_metal_002b",  # 4x4
-    ]
-
 BEE2_config = ConfigFile('compile.cfg')
 
 GAME_MODE = 'ERR'  # SP or COOP?
