@@ -15,7 +15,7 @@ from tkinter import ttk
 from typing import Generic, TypeVar, Union, Callable, Optional, Mapping
 from app import TK_ROOT
 
-from srctools import Vec, Property
+from srctools import Vec, Property, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 from utils import PackagePath
 import srctools.logger
@@ -92,6 +92,7 @@ def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
     for pak_id, sys in systems.items():
         PACK_SYSTEMS[pak_id] = FileSystemChain(
             (sys, 'resources/BEE2/'),
+            (sys, 'resources/materials/'),
             (sys, 'resources/materials/models/props_map_editor/'),
         )
 
@@ -199,9 +200,21 @@ def _load_file(
         LOGGER.error('"{}" does not exist!', uri)
         return Handle.error(width, height).get_pil()
 
-    with img_file.sys, img_file.open_bin() as file:
-        image = Image.open(file)
-        image.load()
+    try:
+        with img_file.sys, img_file.open_bin() as file:
+            if path.casefold().endswith('.vtf'):
+                vtf = VTF.read(file)
+                image = vtf.get().to_PIL()
+            else:
+                image = Image.open(file)
+                image.load()
+    except Exception:
+        LOGGER.warning(
+            'Could not parse image file {}:',
+            uri,
+            exc_info=True,
+        )
+        return Handle.error(width, height).get_pil()
 
     if width > 0 and height > 0 and (width, height) != image.size:
         image = image.resize((width, height), resample=resize_algo)
