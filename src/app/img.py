@@ -6,13 +6,14 @@ caching images so repeated requests are cheap.
 from __future__ import annotations
 import time
 import threading
+from collections.abc import Sequence, Mapping
 from queue import Queue, Empty as EmptyQueue
 from PIL import ImageTk, Image, ImageDraw
 import os
 from weakref import ref as WeakRef
 import tkinter as tk
 from tkinter import ttk
-from typing import Generic, TypeVar, Union, Callable, Optional, Mapping
+from typing import Generic, TypeVar, Union, Callable, Optional, Type
 from app import TK_ROOT
 
 from srctools import Vec, Property, VTF
@@ -138,7 +139,7 @@ class ImageType(Generic[ArgT]):
 
 def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Image.Image:
     """Directly produce an image of this size with the specified color."""
-    return Image.new('RGB', (width or 16, height or 16), color)
+    return Image.new('RGBA', (width or 16, height or 16), color + (255, ))
 
 
 def _tk_from_color(color: tuple[int, int, int], width: int, height: int) -> tkImage:
@@ -242,11 +243,18 @@ def _pil_load_builtin_sprite(uri: PackagePath, width: int, height: int) -> Image
     return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
 
 
-def _pil_from_composite(components: tuple[Handle, ...], width: int, height: int) -> Image.Image:
+def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -> Image.Image:
     """Combine several images into one."""
+    if not width:
+        width = components[0].width
+    if not height:
+        height = components[0].height
     img = Image.new('RGBA', (width, height))
     for part in components:
-        img.paste(part.type.pil_func(part.arg, width, height))
+        if part.width != img.width or part.height != img.height:
+            raise ValueError(f'Mismatch in image sizes: {width}x{height} != {components}')
+        # noinspection PyProtectedMember
+        img.alpha_composite(part._load_pil())
     return img
 
 
@@ -303,7 +311,7 @@ class Handle(Generic[ArgT]):
         self._cached_pil = None
         self._cached_tk = None
         self._force_loaded = False
-        self._labels: set[WeakRef[tkImgWidgets]] = set()
+        self._users: set[Union[WeakRef[tkImgWidgets], Handle]] = set()
         # If None, get_tk()/get_pil() was used.
         # If true, this is in the queue to load. Setting this requires
         # the loading lock.
@@ -325,7 +333,7 @@ class Handle(Generic[ArgT]):
 
     @classmethod
     def parse(
-        cls,
+        cls: Type[Handle],
         prop: Property,
         pack: str,
         width: int,
@@ -348,7 +356,14 @@ class Handle(Generic[ArgT]):
             except LookupError:
                 return cls.error(width, height)
         if prop.has_children():
-            raise NotImplementedError('Composite images.')
+            return cls.composite([
+                cls.parse_uri(
+                    PackagePath.parse(child.value, pack),
+                    width, height,
+                    subfolder=subfolder,
+                )  # iter_tree to collapse any sub-composite definitions.
+                for child in prop.iter_tree()
+            ], width, height)
 
         return cls.parse_uri(PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
 
@@ -430,6 +445,24 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
+    def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle:
+        """Return a handle composed of several images layered on top of each other."""
+        if not children:
+            return cls.error(width, height)
+        if not width:
+            width = children[0].width
+        if not height:
+            height = children[0].height
+
+        # Handles aren't hashable, so we need to manually look up.
+        key = tuple((child.type, child.arg) for child in children)
+        try:
+            return _handles[TYP_COMP, key, width, height]
+        except KeyError:
+            handle = _handles[TYP_COMP, key, width, height] = Handle(TYP_COMP, children, width, height)
+            return handle
+
+    @classmethod
     def file(cls, path: PackagePath, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to file path."""
         return cls._get(TYP_FILE, path, width, height)
@@ -508,20 +541,26 @@ class Handle(Generic[ArgT]):
                 self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
         return self._cached_tk
 
-    def _decref(self, ref: 'WeakRef[tkImgWidgets]') -> None:
+    def _decref(self, ref: 'Union[WeakRef[tkImgWidgets], Handle]') -> None:
         """A label was no longer set to this handle."""
         if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
             return
-        self._labels.discard(ref)
-        if not self._labels:
+        self._users.discard(ref)
+        if self.type is TYP_COMP:
+            for child in self.arg:  # type: Handle
+                child._decref(self)
+        if not self._users:
             _pending_cleanup[id(self)] = (self, time.monotonic())
 
-    def _incref(self, ref: 'WeakRef[tkImgWidgets]') -> None:
+    def _incref(self, ref: 'Union[WeakRef[tkImgWidgets], Handle]') -> None:
         """Add a label to the list of those controlled by us."""
         if self._force_loaded:
             return
-        self._labels.add(ref)
+        self._users.add(ref)
         _pending_cleanup.pop(id(self), None)
+        if self.type is TYP_COMP:
+            for child in self.arg:  # type: Handle
+                child._incref(self)
 
     def _request_load(self) -> tkImage:
         """Request a reload of this image.
@@ -593,14 +632,15 @@ def _ui_task() -> None:
         except EmptyQueue:
             break
         tk_ico = handle._load_tk()
-        for label_ref in handle._labels:
-            label: tkImgWidgets = label_ref()
-            if label is not None:
-                label['image'] = tk_ico
+        for label_ref in handle._users:
+            if isinstance(label_ref, WeakRef):
+                label: tkImgWidgets = label_ref()
+                if label is not None:
+                    label['image'] = tk_ico
 
     for handle, use_time in list(_pending_cleanup.values()):
         with handle.lock:
-            if use_time < timeout - 5.0 and handle._loading is not None and not handle._labels:
+            if use_time < timeout - 5.0 and handle._loading is not None and not handle._users:
                 del _pending_cleanup[id(handle)]
                 handle._cached_tk = handle._cached_pil = None
     TK_ROOT.tk.call(_ui_task_cmd)
