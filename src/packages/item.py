@@ -845,14 +845,11 @@ def parse_item_folder(
                 path=prop_path,
             )
 
-        # If we have at least 1, but not all of the grouping icon
-        # definitions then notify the author.
-        num_group_parts = (
-            (folders[fold].all_name is not None)
-            + (folders[fold].all_icon is not None)
-            + ('all' in folders[fold].icons)
-        )
-        if 0 < num_group_parts < 3:
+        # If we have one of the grouping icon definitions but not both required
+        # ones then notify the author.
+        has_name = folders[fold].all_name is not None
+        has_icon = folders[fold].all_icon is not None
+        if (has_name or has_icon or 'all' in folders[fold].icons) and (not has_name or not has_icon):
             LOGGER.warning(
                 'Warning: "{id}:{path}" has incomplete grouping icon '
                 'definition!',

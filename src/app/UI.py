@@ -179,21 +179,32 @@ class Item:
         if allow_single and self.data.can_group() and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
-            img_key = 'all'
-        else:
-            img_key = str(subKey)
+            try:
+                return icons['all']
+            except KeyError:
+                pass
 
         try:
-            return icons[img_key]
+            return icons[str(subKey)]
         except KeyError:
+            # Read from editoritems.
+            pass
+        try:
+            subtype = self.data.editor.subtypes[subKey]
+        except IndexError:
             LOGGER.warning(
-                'Item "{}" in "{}" style has missing PNG '
-                'icon for subtype "{}"!',
-                self.id,
-                selected_style,
-                img_key,
+                'No subtype number {} for {} in {} style!',
+                subKey, self.id, selected_style,
             )
             return img.Handle.error(64, 64)
+        if subtype.pal_icon is None:
+            LOGGER.warning(
+                'No palette icon for {} subtype {} in {} style!',
+                self.id, subKey, selected_style,
+            )
+            return img.Handle.error(64, 64)
+
+        return img.Handle.file(utils.PackagePath(self.pak_id, str(subtype.pal_icon)), 64, 64)
 
     def properties(self):
         """Iterate through all properties for this item."""

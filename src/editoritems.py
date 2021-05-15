@@ -704,7 +704,8 @@ class SubType:
                     if subkey == 'tooltip':
                         subtype.pal_name = tok.expect(Token.STRING)
                     elif subkey == 'image':
-                        subtype.pal_icon = FSPath(tok.expect(Token.STRING))
+                        # Usually defined in file as PNG, but actually VTF.
+                        subtype.pal_icon = FSPath(tok.expect(Token.STRING)).with_suffix('.vtf')
                     elif subkey == 'position':
                         points = tok.expect(Token.STRING).split()
                         if len(points) in (2, 3):

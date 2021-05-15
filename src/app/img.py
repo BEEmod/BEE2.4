@@ -430,6 +430,11 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
+    def file(cls, path: PackagePath, width: int, height: int) -> Handle:
+        """Shortcut for getting a handle to file path."""
+        return cls._get(TYP_FILE, path, width, height)
+
+    @classmethod
     def error(cls, width: int, height: int) -> Handle:
         """Shortcut for getting a handle to an error icon."""
         return cls._get(TYP_ICON, 'error', width, height)
