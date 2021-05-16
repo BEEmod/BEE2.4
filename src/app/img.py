@@ -127,11 +127,13 @@ class ImageType(Generic[ArgT]):
         pil_func: Callable[[ArgT, int, int], Image.Image],
         tk_func: Optional[Callable[[ArgT, int, int], tkImage]]=None,
         allow_raw: bool=False,
+        alpha_result: bool=False,
     ) -> None:
         self.name = name
         self.pil_func = pil_func
         self.tk_func = tk_func
         self.allow_raw = allow_raw
+        self.alpha_result = alpha_result
 
     def __repr__(self) -> str:
         return f'<ImageType "{self.name}">'
@@ -279,10 +281,10 @@ def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
 
 
 TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
-TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty)
+TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty, alpha_result=True)
 TYP_FILE = ImageType('file', _pil_from_package)
-TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True)
-TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True)
+TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
+TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
 TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
 TYP_COMP = ImageType('composite', _pil_from_composite)
 
@@ -536,7 +538,11 @@ class Handle(Generic[ArgT]):
         if self._cached_tk is None:
             # LOGGER.debug('Loading {}', self)
             if self.type.tk_func is None:
-                self._cached_tk = ImageTk.PhotoImage(image=self._load_pil())
+                res = self._load_pil()
+                # Except for builtin types (icons), strip alpha.
+                if not self.type.alpha_result:
+                    res = res.convert('RGB')
+                self._cached_tk = ImageTk.PhotoImage(image=res)
             else:
                 self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
         return self._cached_tk
