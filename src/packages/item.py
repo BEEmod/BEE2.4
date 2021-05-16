@@ -810,8 +810,9 @@ def parse_item_folder(
                     )
                     subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
 
+        # In files this is specificed as PNG, but it's always really VTF.
         try:
-            all_icon = FSPath(props['all_icon'])
+            all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
         except LookupError:
             all_icon = None
 

@@ -182,7 +182,9 @@ class Item:
             try:
                 return icons['all']
             except KeyError:
-                pass
+                return img.Handle.file(utils.PackagePath(
+                    self.pak_id, str(self.data.all_icon)
+                ), 64, 64)
 
         try:
             return icons[str(subKey)]
@@ -204,7 +206,9 @@ class Item:
             )
             return img.Handle.error(64, 64)
 
-        return img.Handle.file(utils.PackagePath(self.pak_id, str(subtype.pal_icon)), 64, 64)
+        return img.Handle.file(utils.PackagePath(
+            self.pak_id, str(subtype.pal_icon)
+        ), 64, 64)
 
     def properties(self):
         """Iterate through all properties for this item."""
