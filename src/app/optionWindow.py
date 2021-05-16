@@ -449,7 +449,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         var=DEV_MODE,
         desc=_("Development Mode"),
         tooltip=_('Enables displaying additional UI specific for '
-                  'development purposes.'),
+                  'development purposes. Requires restart to have an effect.'),
     ).grid(row=0, column=1, sticky=W)
 
     make_checkbox(
