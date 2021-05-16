@@ -211,6 +211,8 @@ def _load_file(
             else:
                 image = Image.open(file)
                 image.load()
+                if image.mode != 'RGBA':
+                    image = image.convert('RGBA')
     except Exception:
         LOGGER.warning(
             'Could not parse image file {}:',
@@ -256,7 +258,11 @@ def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -
         if part.width != img.width or part.height != img.height:
             raise ValueError(f'Mismatch in image sizes: {width}x{height} != {components}')
         # noinspection PyProtectedMember
-        img.alpha_composite(part._load_pil())
+        child = part._load_pil()
+        if child.mode != 'RGBA':
+            LOGGER.warning('Image {} did not use RGBA mode!', child)
+            child = child.convert('RGBA')
+        img.alpha_composite(child)
     return img
 
 
