@@ -489,7 +489,7 @@ def init_widgets():
         )
 
     ttk.Label(f, text=_("Description:"), anchor="sw").grid(
-        row=4,
+        row=5,
         column=0,
         sticky="SW",
     )
