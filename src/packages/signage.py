@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple, NamedTuple
 
+import utils
 from packages import PakObject, ParseData, ExportData, Style
 from app.img import Handle as ImgHandle
 from srctools import Property
@@ -70,10 +71,19 @@ class Signage(PakObject, allow_mult=True):
                     f'option for the "{sty_id}" style!'
                 )
 
+            if 'icon' in prop:
+                img = ImgHandle.parse(prop, data.pak_id, 64, 64, subkey='icon')
+            else:
+                # Use the overlay texture.
+                overlay_path = overlay_tex
+                if not overlay_path.casefold().endswith('.vtf'):
+                    overlay_path += '.vtf'
+                img = ImgHandle.file(utils.PackagePath(data.pak_id, overlay_path), 64, 64)
+
             styles[sty_id] = SignStyle(
                 world_tex,
                 overlay_tex,
-                ImgHandle.parse(prop, data.pak_id, 64, 64, subkey='icon'),
+                img,
                 prop['type', 'square']
             )
         return cls(
