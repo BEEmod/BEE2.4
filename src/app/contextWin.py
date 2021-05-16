@@ -273,10 +273,10 @@ def load_item_data() -> None:
             else:
                 heading = f'\nInstances ({editor.id}):\n'
             inst_desc.append(tkMarkdown.TextSegment(heading, (), None))
-            for ind, inst in enumerate(selected_item.data.editor.instances):
+            for ind, inst in enumerate(editor.instances):
                 inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', ('indent', ), None))
                 inst_desc.append(tkMarkdown.TextSegment(f'{inst.inst}\n', ('code', ), None))
-            for name, inst in selected_item.data.editor.cust_instances.items():
+            for name, inst in editor.cust_instances.items():
                 inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', ('indent', ), None))
                 inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', ('code', ), None))
         desc = tkMarkdown.join(desc, tkMarkdown.MarkdownData(inst_desc))
