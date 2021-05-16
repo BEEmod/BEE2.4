@@ -1,9 +1,9 @@
 """Flags and Results relating to instances or instance variables.
 
 """
+from __future__ import annotations
+from typing import Optional, Union, Callable
 import operator
-
-from typing import Dict, Optional, Union
 
 import srctools.logger
 from precomp.conditions import (
@@ -11,27 +11,26 @@ from precomp.conditions import (
     ALL_INST,
 )
 from precomp import instance_traits, instanceLocs, conditions
-from srctools import Property, Vec, Entity, Output, VMF
+from srctools import Property, Angle, Vec, Entity, Output, VMF, conv_bool
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
-
 COND_MOD_NAME = 'Instances'
 
 
 @make_flag('instance')
-def flag_file_equal(inst: Entity, flag: Property):
+def flag_file_equal(inst: Entity, flag: Property) -> bool:
     """Evaluates True if the instance matches the given file."""
     return inst['file'].casefold() in instanceLocs.resolve(flag.value)
 
 
 @make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst: Entity, flag: Property):
+def flag_file_cont(inst: Entity, flag: Property) -> bool:
     """Evaluates True if the instance contains the given portion."""
     return flag.value in inst['file'].casefold()
 
 
 @make_flag('hasInst')
-def flag_has_inst(flag: Property):
+def flag_has_inst(flag: Property) -> bool:
     """Checks if the given instance is present anywhere in the map."""
     flags = instanceLocs.resolve(flag.value)
     return any(
@@ -42,7 +41,7 @@ def flag_has_inst(flag: Property):
 
 
 @make_flag('hasTrait')
-def flag_has_trait(inst: Entity, flag: Property):
+def flag_has_trait(inst: Entity, flag: Property) -> bool:
     """Check if the instance has a specific 'trait', which is set by code.
 
     Current traits:
@@ -103,7 +102,7 @@ def flag_has_trait(inst: Entity, flag: Property):
     return flag.value.casefold() in instance_traits.get(inst)
 
 
-INSTVAR_COMP = {
+INSTVAR_COMP: dict[str, Callable[[object, object], bool]] = {
     '=': operator.eq,
     '==': operator.eq,
 
@@ -122,33 +121,49 @@ INSTVAR_COMP = {
 
 
 @make_flag('instVar')
-def flag_instvar(inst: Entity, flag: Property):
+def flag_instvar(inst: Entity, flag: Property) -> bool:
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form `$start_enabled == 1`, with or without
-    the `$`.
+    The flag value follows the form `A == B`, with any of the three permitted
+    to be variables.
     The operator can be any of `=`, `==`, `<`, `>`, `<=`, `>=`, `!=`.
     If omitted, the operation is assumed to be `==`.
-    If only the variable name is present, it is tested as a boolean flag.
+    If only a single value is present, it is tested as a boolean flag.
     """
     values = flag.value.split(' ', 3)
     if len(values) == 3:
-        variable, op, comp_val = values
-        value = inst.fixup[variable]
-        comp_val = conditions.resolve_value(inst, comp_val)
-        try:
-            # Convert to floats if possible, otherwise handle both as strings.
-            # That ensures we normalise different number formats (1 vs 1.0)
-            comp_val, value = float(comp_val), float(value)
-        except ValueError:
-            pass
-        return INSTVAR_COMP.get(op, operator.eq)(value, comp_val)
+        val_a, op, val_b = values
+        op = inst.fixup.substitute(op)
+        comp_func = INSTVAR_COMP.get(op, operator.eq)
     elif len(values) == 2:
-        variable, value = values
-        return inst.fixup[variable] == value
+        val_a, val_b = values
+        op = '=='
+        comp_func = operator.eq
     else:
         # For just a name.
-        return inst.fixup.bool(flag.value)
+        return conv_bool(inst.fixup.substitute(values[0]))
+    if '$' not in val_a and '$' not in val_b:
+        # Handle pre-subsititue behaviour, where val_a is always a var.
+        LOGGER.warning(
+            'Comparison "{}" has no $var, assuming first value. '
+            'Please use $ when referencing vars.',
+            flag.value,
+        )
+        val_a = '$' + val_a
+
+    val_a = inst.fixup.substitute(val_a)
+    val_b = inst.fixup.substitute(val_b)
+    try:
+        # Convert to floats if possible, otherwise handle both as strings.
+        # That ensures we normalise different number formats (1 vs 1.0)
+        val_a, val_b = float(val_a), float(val_b)
+    except ValueError:
+        pass
+    try:
+        return comp_func(val_a, val_b)
+    except (TypeError, ValueError) as e:
+        LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+        return False
 
 
 @make_flag('offsetDist')
@@ -187,7 +202,9 @@ def res_change_instance(inst: Entity, res: Property):
 @make_result('suffix', 'instSuffix')
 def res_add_suffix(inst: Entity, res: Property):
     """Add the specified suffix to the filename."""
-    conditions.add_suffix(inst, '_' + res.value)
+    suffix = inst.fixup.substitute(res.value)
+    if suffix:
+        conditions.add_suffix(inst, '_' + suffix)
 
 
 @make_result('setKey')
@@ -196,7 +213,7 @@ def res_set_key(inst: Entity, res: Property):
 
     The name and value should be separated by a space.
     """
-    key, value = res.value.split(' ', 1)
+    key, value = inst.fixup.substitute(res.value).split(' ', 1)
     inst[key] = value
 
 
@@ -212,14 +229,14 @@ def res_add_inst_var(inst: Entity, res: Property):
         for rep in res:  # lookup the number to determine the appending value
             if rep.name == 'variable':
                 continue  # this isn't a lookup command!
-            if rep.name == val:
-                conditions.add_suffix(inst, '_' + rep.value)
+            if inst.fixup.substitute(rep.name) == val:
+                conditions.add_suffix(inst, '_' + inst.fixup.substitute(rep.value))
                 break
-    else:  # append the value
-        conditions.add_suffix(inst, '_' + inst.fixup[res.value, ''])
+    else:  # Append the value, equivalent to regular suffix now.
+        res_add_suffix(inst, res)
 
 
-@make_result('setInstVar')
+@make_result('setInstVar', 'assign')
 def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
@@ -227,12 +244,13 @@ def res_set_inst_var(inst: Entity, res: Property):
     `$out $in` will copy the value of `$in` into `$out`.
     """
     var_name, val = res.value.split(' ', 1)
-    inst.fixup[var_name] = conditions.resolve_value(inst, val)
+    inst.fixup[var_name] = inst.fixup.substitute(val)
 
 
 @make_result_setup('mapInstVar')
-def res_map_inst_var_setup(res: Property):
-    table = {}
+def res_map_inst_var_setup(res: Property) -> tuple[str, str, dict[str, str]]:
+    """Pre-parse the variable table."""
+    table: dict[str, str] = {}
     res_iter = iter(res)
     first_prop = next(res_iter)
     in_name, out_name = first_prop.name, first_prop.value
@@ -244,12 +262,15 @@ def res_map_inst_var_setup(res: Property):
 
 
 @make_result('mapInstVar')
-def res_map_inst_var(inst: Entity, res: Property):
+def res_map_inst_var(inst: Entity, res: Property) -> None:
     """Set one instance var based on the value of another.
 
     The first value is the in -> out var, and all following are values to map.
     """
-    in_name, out_name, table = res.value  # type: str, str, dict
+    in_name: str
+    out_name: str
+    table: dict[str, str]
+    in_name, out_name, table = res.value
     try:
         inst.fixup[out_name] = table[inst.fixup[in_name]]
     except KeyError:
@@ -257,19 +278,19 @@ def res_map_inst_var(inst: Entity, res: Property):
 
 
 @make_result('clearOutputs', 'clearOutput')
-def res_clear_outputs(inst: Entity):
+def res_clear_outputs(inst: Entity) -> None:
     """Remove the outputs from an instance."""
     inst.outputs.clear()
 
 
 @make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
-def res_rem_fixup(inst: Entity, res: Property):
+def res_rem_fixup(inst: Entity, res: Property) -> None:
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
 
 
 @make_result('localTarget')
-def res_local_targetname(inst: Entity, res: Property):
+def res_local_targetname(inst: Entity, res: Property) -> None:
     """Generate a instvar with an instance-local name.
 
     Useful with AddOutput commands, or other values which use
@@ -294,12 +315,10 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
     If `keep_instance` is true, the instance entity will be kept instead of
     removed.
     """
-    import vbsp
-
     origin = Vec.from_str(inst['origin'])
-    angles = inst['angles']
+    angles = Angle.from_str(inst['angles'])
 
-    if not srctools.conv_bool(res['keep_instance', '0'], False):
+    if res.bool('keep_instance'):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
@@ -313,17 +332,18 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
 
     conditions.set_ent_keys(new_ent, inst, res)
 
-    origin += Vec.from_str(new_ent['origin']).rotate_by_str(angles)
+    origin.localise(Vec.from_str(new_ent['origin']), angles)
     new_ent['origin'] = origin
     new_ent['angles'] = angles
     new_ent['targetname'] = inst['targetname']
 
 
-GLOBAL_INPUT_ENTS = {}  # type: Dict[Optional[str], Entity]
+GLOBAL_INPUT_ENTS: dict[Optional[str], Entity] = {}
 
 
 @make_result_setup('GlobalInput')
-def res_global_input_setup(res: Property):
+def res_global_input_setup(res: Property) -> tuple[str, Output]:
+    """Pre-parse the global input."""
     if res.has_children():
         name = res['name', '']
         inp_name, inp_command = Output.parse_name(res['input'])
@@ -342,7 +362,7 @@ def res_global_input_setup(res: Property):
 
 
 @make_result('GlobalInput')
-def res_global_input(vmf: VMF, inst: Entity, res: Property):
+def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
     """Trigger an input either on map spawn, or when a relay is triggered.
 
     Arguments:  
@@ -361,18 +381,21 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property):
     """
     relay_name, out = res.value
 
-    output = out.copy()  # type: Output
+    output: Output = out.copy()
 
     if output.target:
         output.target = conditions.local_name(
             inst,
-            conditions.resolve_value(inst, output.target)
+            inst.fixup.substitute(output.target),
         )
     else:
         output.target = inst['targetname']
 
-    relay_name = conditions.resolve_value(inst, relay_name)
-    output.params = conditions.resolve_value(inst, output.params)
+    relay_name = inst.fixup.substitute(relay_name)
+    output.output = inst.fixup.substitute(output.output)
+    output.inst_in = inst.fixup.substitute(output.inst_in)
+    output.input = inst.fixup.substitute(output.input)
+    output.params = inst.fixup.substitute(output.params)
 
     global_input(vmf, inst['origin'], output, relay_name)
 
@@ -382,7 +405,7 @@ def global_input(
     pos: Union[Vec, str],
     output: Output,
     relay_name: str=None,
-):
+) -> None:
     """Create a global input, either from a relay or logic_auto.
 
     The position is used to place the relay if this is the first time.
@@ -422,11 +445,11 @@ def res_script_var(vmf: VMF, inst: Entity, res: Property):
         inst['origin'],
         Output(
             'OnMapSpawn',
-            conditions.local_name(inst, res['name']),
+            conditions.local_name(inst, inst.fixup.substitute(res['name'])),
             'RunScriptCode',
             param='{} <- {}'.format(
                 res['var'],
-                conditions.resolve_value(inst, res['value']),
+                inst.fixup.substitute(res['value']),
             ),
         ),
     )
