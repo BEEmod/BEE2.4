@@ -32,7 +32,6 @@ class Image(NamedTuple):
 # The kinds of data contained in MarkdownData
 Block = Union[TextSegment, Image]
 
-_NEWLINE = TextSegment('\n', (), None)
 _HR = [
     TextSegment('\n', (), None),
     TextSegment('\n', ('hrule', ), None),
@@ -60,6 +59,11 @@ class MarkdownData:
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
         return MarkdownData(self.blocks)
+
+    @classmethod
+    def text(cls, text: str, *tags: str, url: Optional[str] = None) -> 'MarkdownData':
+        """Construct data with a single text segment."""
+        return cls([TextSegment(text, tags, url)])
 
     __copy__ = copy
 

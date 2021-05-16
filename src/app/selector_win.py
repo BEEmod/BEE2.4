@@ -1089,11 +1089,12 @@ class selWin:
         if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
-                text = tkMarkdown.convert('**ID:** *NONE*\n\n', None)
+                text = tkMarkdown.convert('**ID:** *NONE*', None)
             else:
-                text = tkMarkdown.convert(f'**ID:** {item.name}\n\n', None)
+                text = tkMarkdown.convert(f'**ID:** {item.name}', None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
+                tkMarkdown.MarkdownData.text('\n'),
                 item.desc,
             ))
         else:
