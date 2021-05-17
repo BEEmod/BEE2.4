@@ -505,29 +505,30 @@ def check_all(vmf: VMF) -> None:
     LOGGER.info('Checking Conditions...')
     LOGGER.info('-----------------------')
     for condition in conditions:
-        condition.setup(vmf)
-        for inst in vmf.by_class['func_instance']:
-            try:
-                condition.test(inst)
-            except NextInstance:
-                # This is raised to immediately stop running
-                # this condition, and skip to the next instance.
-                pass
-            except EndCondition:
-                # This is raised to immediately stop running
-                # this condition, and skip to the next condtion.
-                break
-            except:
-                # Print the source of the condition if if fails...
-                LOGGER.exception(
-                    'Error in {}:',
-                    condition.source or 'condition',
-                )
-                # Exit directly, so we don't print it again in the exception
-                # handler
-                utils.quit_app(1)
-            if not condition.results and not condition.else_results:
-                break  # Condition has run out of results, quit early
+        with srctools.logger.context(condition.source or ''):
+            condition.setup(vmf)
+            for inst in vmf.by_class['func_instance']:
+                try:
+                    condition.test(inst)
+                except NextInstance:
+                    # This is raised to immediately stop running
+                    # this condition, and skip to the next instance.
+                    pass
+                except EndCondition:
+                    # This is raised to immediately stop running
+                    # this condition, and skip to the next condtion.
+                    break
+                except:
+                    # Print the source of the condition if if fails...
+                    LOGGER.exception(
+                        'Error in {}:',
+                        condition.source or 'condition',
+                    )
+                    # Exit directly, so we don't print it again in the exception
+                    # handler
+                    utils.quit_app(1)
+                if not condition.results and not condition.else_results:
+                    break  # Condition has run out of results, quit early
 
     LOGGER.info('---------------------')
     LOGGER.info('Conditions executed!')

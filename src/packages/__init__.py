@@ -26,7 +26,7 @@ if TYPE_CHECKING:  # Prevent circular import
     from loadScreen import LoadScreen
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = srctools.logger.get_logger(__name__, alias='packages')
 
 all_obj: dict[Type[PakObject], dict[str, ObjData]] = {}
 packages: dict[str, Package] = {}
@@ -483,8 +483,8 @@ def load_packages(
                 loader.set_length("PAK", pack_count)
                 continue
 
-            LOGGER.info('Reading objects from "{id}"...', id=pack.id)
-            parse_package(pack, obj_override, has_tag_music, has_mel_music)
+            with srctools.logger.context(pack.id):
+                parse_package(pack, obj_override, has_tag_music, has_mel_music)
             loader.step("PAK")
 
         loader.set_length("OBJ", sum(
@@ -497,15 +497,16 @@ def load_packages(
             for obj_id, obj_data in objs.items():
                 # parse through the object and return the resultant class
                 try:
-                    object_ = obj_class.parse(
-                        ParseData(
-                            obj_data.fsys,
-                            obj_id,
-                            obj_data.info_block,
-                            obj_data.pak_id,
-                            False,
+                    with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
+                        object_ = obj_class.parse(
+                            ParseData(
+                                obj_data.fsys,
+                                obj_id,
+                                obj_data.info_block,
+                                obj_data.pak_id,
+                                False,
+                            )
                         )
-                    )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
                     raise  # Never reached.
@@ -533,7 +534,8 @@ def load_packages(
                 object_.pak_name = obj_data.disp_name
                 for override_data in obj_override[obj_class].get(obj_id, []):
                     try:
-                        override = obj_class.parse(override_data)
+                        with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
+                            override = obj_class.parse(override_data)
                     except (NoKeyError, IndexError) as e:
                         reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
                         raise  # Never reached.
@@ -608,16 +610,16 @@ def parse_package(
             continue
         if obj.name in ('templatebrush', 'brushtemplate'):
             LOGGER.warning(
-                'TemplateBrush {}:{} no longer needs to be defined in info.txt',
-                pack.id, obj['id', '<NO ID>'],
+                'TemplateBrush {} no longer needs to be defined in info.txt',
+                obj['id', '<NO ID>'],
             )
             continue
         if obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
                     LOGGER.warning(
-                        'TemplateBrush {}:{} no longer needs to be defined in info.txt',
-                        pack.id, over_prop['id', '<NO ID>'],
+                        'TemplateBrush {} no longer needs to be defined in info.txt',
+                        over_prop['id', '<NO ID>'],
                     )
                     continue
                 try:
@@ -628,7 +630,7 @@ def parse_package(
                 try:
                     obj_id = over_prop['id']
                 except LookupError:
-                    raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
+                    raise ValueError('No ID for "{}" object type!'.format(obj_type)) from None
                 obj_override[obj_type][obj_id].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
