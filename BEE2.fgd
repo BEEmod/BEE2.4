@@ -87,6 +87,28 @@
 		]
 	]
 
+@PointClass
+	base(Angles)
+	studioprop("models/BEE2/editor/voxel_setter.mdl")
+	= bee2_template_voxelsetter:
+	"Applies a tile type to all the tiles on a voxel side."
+	[
+	force(boolean) : "Force Place" : 0 : "If enabled, place the tiles regardless of what's already in this position."
+	
+	skin(choices): "Tile Type" : "4": "The tile type to apply." = 
+		[
+		0: "Black"
+		1: "4x4 Black"
+		2: "White"
+		3: "4x4 White"
+		4: "Nodraw"
+		5: "Void (remove tile)"
+		6: "Cutout Tile (Broken)"
+		7: "Cutout Tile (Partial)"
+		]
+	]
+
+
 // --------
 // Entities used with editoritems_gen.py to make editoritems configs.
 // These should not appear in any maps.

@@ -1,6 +1,7 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
 
+import itertools
 import os
 import random
 from collections import defaultdict
@@ -10,10 +11,10 @@ from typing import Union, Callable, Optional
 from decimal import Decimal
 from enum import Enum
 from operator import attrgetter
+import attr
 
-import srctools
 from srctools import Property
-from srctools.filesys import ZipFileSystem, RawFileSystem, VPKFileSystem
+from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
 from srctools.dmx import Element as DMElement, ValueType as DMType
@@ -67,20 +68,27 @@ class AfterPickMode(Enum):
     NODRAW = '2'  # Convert to nodraw.
 
 
-class UnparsedTemplate(NamedTuple):
+@attr.define
+class UnparsedTemplate:
     """Holds the location of a template that hasn't been parsed yet."""
     id: str
     pak_path: str
     path: str
 
 
-class ColorPicker(NamedTuple):
+@attr.define
+class TemplateEntity:
+    """One of the several entities defined in templates."""
+    offset: Vec
+    normal: Vec  # Normal of the surface.
+    visgroups: set[str]  # Visgroups applied to this entity.
+
+
+@attr.define
+class ColorPicker(TemplateEntity):
     """Color pickers allow applying the existing colors onto faces."""
     priority: Decimal  # Decimal order to do them in.
     name: str  # Name to reference from other ents.
-    visgroups: set[str]  # Visgroups applied to this picker.
-    offset: Vec
-    normal: Vec  # Normal of the surface.
     sides: list[str]
     grid_snap: bool  # Snap to grid on non-normal axes
     after: AfterPickMode  # What to do after the color is picked.
@@ -93,15 +101,18 @@ class ColorPicker(NamedTuple):
     force_tex_black: str
 
 
-class TileSetter(NamedTuple):
-    """Set tiles in a particular position."""
-    offset: Vec
-    normal: Vec
-    visgroups: set[str]  # Visgroups applied to this picker.
-    color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
+@attr.define
+class VoxelSetter(TemplateEntity):
+    """Set all tiles in a tiledef."""
     tile_type: TileType  # Type to produce.
-    picker_name: str  # Name of colorpicker to use for the color.
     force: bool  # Force overwrite existing values.
+
+
+@attr.define
+class TileSetter(VoxelSetter):
+    """Set tiles in a particular position."""
+    color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
+    picker_name: str  # Name of colorpicker to use for the color.
 
 # We use the skins value on the tilesetter to specify type, allowing visualising it.
 # So this is the type for each index.
@@ -181,7 +192,8 @@ TEMP_COLOUR_INVERT = {
 }
 
 
-class ExportedTemplate(NamedTuple):
+@attr.define(frozen=True)
+class ExportedTemplate:
     """The result of importing a template.
 
     THis contains all the changes made. orig_ids is a dict mapping the original
@@ -226,6 +238,7 @@ class Template:
         vertical_faces: Iterable[str]=(),
         color_pickers: Iterable[ColorPicker]=(),
         tile_setters: Iterable[TileSetter]=(),
+        voxel_setters: Iterable[VoxelSetter]=(),
     ) -> None:
         """Make an overlay.
 
@@ -238,9 +251,7 @@ class Template:
         all_groups.update(world)
         all_groups.update(detail)
         all_groups.update(overlays)
-        for ent in tile_setters:
-            all_groups.update(ent.visgroups)
-        for ent in color_pickers:
+        for ent in itertools.chain(color_pickers, tile_setters, voxel_setters):
             all_groups.update(ent.visgroups)
 
         for group in all_groups:
@@ -261,6 +272,7 @@ class Template:
             reverse=True,
         )
         self.tile_setters = list(tile_setters)
+        self.voxel_setters = list(voxel_setters)
 
     @property
     def visgroups(self) -> Iterator[str]:
@@ -385,7 +397,7 @@ class ScalingTemplate(Mapping[
 
     def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> ScalingTemplate:
         """Rotate this template, and return a new template with those angles."""
-        new_axis = {}
+        new_axis: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]] = {}
         if origin is None:
             origin = Vec()
 
@@ -438,6 +450,7 @@ def load_templates(path: str) -> None:
 
 def _parse_template(loc: UnparsedTemplate) -> Template:
     """Parse a template VMF."""
+    filesys: FileSystem
     if os.path.isdir(loc.pak_path):
         filesys = RawFileSystem(loc.pak_path)
     else:
@@ -461,6 +474,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     color_pickers: list[ColorPicker] = []
     tile_setters: list[TileSetter] = []
+    voxel_setters: list[VoxelSetter] = []
 
     conf_ents = vmf.by_class['bee2_template_conf']
     if len(conf_ents) > 1:
@@ -485,6 +499,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             yield detail.solids, True, detail.visgroup_ids
 
     force = conf['temp_type']
+    force_is_detail: Optional[bool]
     if force.casefold() == 'detail':
         force_is_detail = True
     elif force.casefold() == 'world':
@@ -553,7 +568,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             remove_after = AfterPickMode.NONE
 
         color_pickers.append(ColorPicker(
-            priority,
+            priority=priority,
             name=ent['targetname'],
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             offset=Vec.from_str(ent['origin']),
@@ -566,8 +581,18 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             force_tex_black=ent['tex_black'],
         ))
 
+    for ent in vmf.by_class['bee2_template_voxelsetter']:
+        tile_type = TILE_SETTER_SKINS[srctools.conv_int(ent['skin'])]
+
+        voxel_setters.append(VoxelSetter(
+            offset=Vec.from_str(ent['origin']),
+            normal=Vec(z=1) @ Angle.from_str(ent['angles']),
+            visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
+            tile_type=tile_type,
+            force=srctools.conv_bool(ent['force']),
+        ))
+
     for ent in vmf.by_class['bee2_template_tilesetter']:
-        # Parse the tile setter data.
         tile_type = TILE_SETTER_SKINS[srctools.conv_int(ent['skin'])]
         color = ent['color']
         if color == 'tile':
@@ -605,6 +630,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         conf['vertical_faces'].split(),
         color_pickers,
         tile_setters,
+        voxel_setters,
     )
 
 
@@ -896,7 +922,7 @@ def retexture_template(
     # If a string it's forced to that string specifically.
     force_colour_face: dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
     # Picker names to their results.
-    picker_results: dict[str, Optional[Portalable]] = template_data.picker_results
+    picker_results = template_data.picker_results
     picker_type_results: dict[str, Optional[TileType]] = {}
 
     # If the "use patterns" option is enabled, face ID -> temp face to copy from.
@@ -979,6 +1005,27 @@ def retexture_template(
         elif color_picker.after is AfterPickMode.NODRAW:
             tiledef[u, v] = TileType.NODRAW
 
+    for voxel_setter in template.voxel_setters:
+        if not voxel_setter.visgroups.issubset(template_data.visgroups):
+            continue
+
+        setter_pos = voxel_setter.offset.copy() @ template_data.orient
+        setter_pos += template_data.origin + sense_offset
+        setter_norm = voxel_setter.normal.copy() @ template_data.orient
+
+        norm_axis = setter_norm.axis()
+        u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+        offsets = (-48, -16, 16, 48)
+        for uoff in offsets:
+            for voff in offsets:
+                tiling.edit_quarter_tile(
+                    setter_pos + Vec.with_axes(u_axis, uoff, v_axis, voff),
+                    setter_norm,
+                    voxel_setter.tile_type,
+                    silent=True,  # Don't log missing positions.
+                    force=voxel_setter.force,
+                )
+
     for tile_setter in template.tile_setters:
         if not tile_setter.visgroups.issubset(template_data.visgroups):
             continue
@@ -986,7 +1033,7 @@ def retexture_template(
         setter_pos = Vec(tile_setter.offset) @ template_data.orient
         setter_pos += template_data.origin + sense_offset
         setter_norm = Vec(tile_setter.normal) @ template_data.orient
-        setter_type = tile_setter.tile_type  # type: TileType
+        setter_type: TileType = tile_setter.tile_type
 
         if tile_setter.color == 'copy':
             if not tile_setter.picker_name:
@@ -996,7 +1043,7 @@ def retexture_template(
                 )
             # If a color picker is set, it overrides everything else.
             try:
-                setter_type = picker_type_results[tile_setter.picker_name]
+                picker_res = picker_type_results[tile_setter.picker_name]
             except KeyError:
                 raise ValueError(
                     '"{}": Tile Setter specified color picker '
@@ -1004,11 +1051,12 @@ def retexture_template(
                         template.id, tile_setter.picker_name
                     )
                 )
-            if setter_type is None:
+            if picker_res is None:
                 raise ValueError(
                     '"{}": Color picker "{}" has no tile to pick!'.format(
                         template.id, tile_setter.picker_name
                     ))
+            setter_type = picker_res
         elif setter_type.is_tile:
             if tile_setter.picker_name:
                 # If a color picker is set, it overrides everything else.
@@ -1060,7 +1108,7 @@ def retexture_template(
 
     for brush in all_brushes:
         for face in brush:
-            orig_id = rev_id_mapping.get(face.id)
+            orig_id = rev_id_mapping.get(face.id) or ''
 
             if orig_id in template.skip_faces:
                 continue
@@ -1161,12 +1209,12 @@ def retexture_template(
                         face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
-                            scale=options.get(float, 'goo_scale'),
+                            scale=options.get(float, 'goo_scale') or 0.25,
                         )
                         face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
-                            scale=options.get(float, 'goo_scale'),
+                            scale=options.get(float, 'goo_scale') or 0.25,
                         )
                 continue
             else:
