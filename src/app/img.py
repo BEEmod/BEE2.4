@@ -16,7 +16,8 @@ from tkinter import ttk
 from typing import Generic, TypeVar, Union, Callable, Optional, Type
 from app import TK_ROOT
 
-from srctools import Vec, Property, VTF
+from srctools import Vec, Property
+from srctools.vtf import VTFFlags, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 from utils import PackagePath
 import srctools.logger
@@ -207,7 +208,18 @@ def _load_file(
         with img_file.sys, img_file.open_bin() as file:
             if path.casefold().endswith('.vtf'):
                 vtf = VTF.read(file)
-                image = vtf.get().to_PIL()
+                mipmap = 0
+                # If resizing, pick the mipmap equal to or slightly larger than
+                # the desired size. With powers of two, most cases we don't
+                # need to resize at all.
+                if width > 0 and height > 0 and VTFFlags.NO_MIP not in vtf.flags:
+                    for mipmap in range(vtf.mipmap_count):
+                        mip_width = max(vtf.width >> mipmap, 1)
+                        mip_height = max(vtf.height >> mipmap, 1)
+                        if mip_width < width or mip_height < height:
+                            mipmap = max(0, mipmap - 1)
+                            break
+                image = vtf.get(mipmap=mipmap).to_PIL()
             else:
                 image = Image.open(file)
                 image.load()
