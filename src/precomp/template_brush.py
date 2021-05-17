@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 import random
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Union, Callable, Optional
 
 from decimal import Decimal
 from enum import Enum
@@ -22,13 +24,6 @@ from .tiling import TileType
 from . import tiling, texturing, options
 import consts
 
-from typing import (
-    Iterable, Union, Callable,
-    NamedTuple, Tuple,
-    Dict, List, Set,
-    Iterator, Mapping,
-    Optional,
-)
 
 LOGGER = srctools.logger.get_logger(__name__, alias='template')
 
@@ -218,12 +213,13 @@ del realign_solid
 
 class Template:
     """Represents a template before it's imported into a map."""
+    _data: dict[str, tuple[list[Solid], list[Solid], list[Entity]]]
     def __init__(
         self,
         temp_id: str,
-        world: Dict[str, List[Solid]],
-        detail: Dict[str, List[Solid]],
-        overlays: Dict[str, List[Entity]],
+        world: dict[str, list[Solid]],
+        detail: dict[str, list[Solid]],
+        overlays: dict[str, list[Entity]],
         skip_faces: Iterable[str]=(),
         realign_faces: Iterable[str]=(),
         overlay_transfer_faces: Iterable[str]=(),
@@ -235,7 +231,7 @@ class Template:
 
         """
         self.id = temp_id
-        self._data = data = {}  # type: Dict[str, Tuple[List[Solid], List[Solid], List[Entity]]]
+        self._data = {}
 
         # We ensure the '' group is always present.
         all_groups = {''}
@@ -248,7 +244,7 @@ class Template:
             all_groups.update(ent.visgroups)
 
         for group in all_groups:
-            data[group] = (
+            self._data[group] = (
                 world.get(group, []),
                 detail.get(group, []),
                 overlays.get(group, []),
@@ -274,7 +270,7 @@ class Template:
     def visgrouped(
         self,
         visgroups: Union[str, Iterable[str]]=(),
-    ) -> Tuple[List[Solid], List[Solid], List[Entity]]:
+    ) -> tuple[list[Solid], list[Solid], list[Entity]]:
         """Given some visgroups, return the matching data.
 
         This returns lists of the world brushes, detail brushes, and overlays.
@@ -286,9 +282,9 @@ class Template:
             visgroups = set(visgroups)
             visgroups.add('')
 
-        world_brushes = []  # type: List[Solid]
-        detail_brushes = []  # type: List[Solid]
-        overlays = []  # type: List[Entity]
+        world_brushes: list[Solid] = []
+        detail_brushes: list[Solid] = []
+        overlays: list[Entity] = []
 
         for group in visgroups:
             try:
@@ -306,8 +302,8 @@ class Template:
 
 
 class ScalingTemplate(Mapping[
-    Union[Vec, Tuple[float, float, float]],
-    Tuple[str, UVAxis, UVAxis, float]
+    Union[Vec, tuple[float, float, float]],
+    tuple[str, UVAxis, UVAxis, float]
 ]):
     """Represents a special version of templates, used for texturing brushes.
 
@@ -320,7 +316,7 @@ class ScalingTemplate(Mapping[
     def __init__(
         self,
         temp_id: str,
-        axes: Dict[Tuple[float, float, float], Tuple[str, UVAxis, UVAxis, float]],
+        axes: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]],
     ):
         self.id = temp_id
         self._axes = axes
@@ -332,7 +328,7 @@ class ScalingTemplate(Mapping[
         }, axes.keys()
 
     @classmethod
-    def parse(cls, ent: Entity) -> 'ScalingTemplate':
+    def parse(cls, ent: Entity) -> ScalingTemplate:
         """Parse a template from a config entity.
 
         This should be a 'bee2_template_scaling' entity.
@@ -356,7 +352,7 @@ class ScalingTemplate(Mapping[
         return cls(ent['template_id'], axes)
 
     @classmethod
-    def world(cls) -> 'ScalingTemplate':
+    def world(cls) -> ScalingTemplate:
         """Return a scaling template that produces world-aligned brushes."""
         nd = consts.Tools.NODRAW
         return cls('', {
@@ -380,14 +376,14 @@ class ScalingTemplate(Mapping[
 
     def __getitem__(
         self,
-        normal: Union[Vec, Tuple[float, float, float]],
-    ) -> Tuple[str, UVAxis, UVAxis, float]:
+        normal: Union[Vec, tuple[float, float, float]],
+    ) -> tuple[str, UVAxis, UVAxis, float]:
         if isinstance(normal, Vec):
             normal = normal.as_tuple()
         mat, axis_u, axis_v, rotation = self._axes[normal]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> 'ScalingTemplate':
+    def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> ScalingTemplate:
         """Rotate this template, and return a new template with those angles."""
         new_axis = {}
         if origin is None:
@@ -408,7 +404,7 @@ class ScalingTemplate(Mapping[
             face.mat = mat
 
 
-def parse_temp_name(name) -> Tuple[str, Set[str]]:
+def parse_temp_name(name) -> tuple[str, set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
         temp_name, visgroups = name.rsplit(':', 1)
@@ -898,15 +894,15 @@ def retexture_template(
 
     # For each face, if it needs to be forced to a colour, or None if not.
     # If a string it's forced to that string specifically.
-    force_colour_face: Dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
+    force_colour_face: dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
     # Picker names to their results.
-    picker_results: Dict[str, Optional[Portalable]] = template_data.picker_results
-    picker_type_results: Dict[str, Optional[TileType]] = {}
+    picker_results: dict[str, Optional[Portalable]] = template_data.picker_results
+    picker_type_results: dict[str, Optional[TileType]] = {}
 
     # If the "use patterns" option is enabled, face ID -> temp face to copy from.
-    picker_patterned: Dict[str, Optional[Side]] = defaultdict(lambda: None)
+    picker_patterned: dict[str, Optional[Side]] = defaultdict(lambda: None)
     # Then also a cache of the tiledef -> dict of template faces.
-    pattern_cache: Dict[tiling.TileDef, Dict[Tuple[int, int], Side]] = {}
+    pattern_cache: dict[tiling.TileDef, dict[tuple[int, int], Side]] = {}
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:
