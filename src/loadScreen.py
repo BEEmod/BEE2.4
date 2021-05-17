@@ -183,13 +183,11 @@ class LoadScreen:
         self._send_msg('destroy')
         _ALL_SCREENS.remove(self)
 
-    @abstractmethod
     def suppress(self) -> None:
         """Temporarily hide the screen."""
         self.active = False
         self._send_msg('hide')
 
-    @abstractmethod
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
@@ -198,7 +196,7 @@ class LoadScreen:
 
 # Initialise the daemon.
 # noinspection PyProtectedMember
-multiprocessing.Process(
+BG_PROC = multiprocessing.Process(
     target=utils._run_bg_daemon,
     args=(
         _PIPE_DAEMON_SEND,
@@ -223,7 +221,8 @@ multiprocessing.Process(
     ),
     name='bg_daemon',
     daemon=True,
-).start()
+)
+BG_PROC.start()
 
 main_loader = LoadScreen(
     ('PAK', _('Packages')),

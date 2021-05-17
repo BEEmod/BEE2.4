@@ -81,6 +81,18 @@ def on_error(
     except Exception:
         pass
 
+    # Try and terminate background operations.
+    try:
+        import loadScreen
+        loadScreen.BG_PROC.kill()
+    except Exception:
+        pass
+    try:
+        import sound
+        sound.sounds = sound.NullSound()
+    except Exception:
+        pass
+
     if not issubclass(exc_type, Exception):
         # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
         # so ignore the error.
