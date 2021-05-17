@@ -14,7 +14,7 @@ from io import StringIO
 from collections import defaultdict, namedtuple, Counter
 from atomicwrites import atomic_write
 
-from srctools import Property, Vec, AtomicWriter, Vec_tuple, Angle
+from srctools import Property, Vec, Vec_tuple, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 from BEE2_config import ConfigFile
@@ -44,7 +44,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, List, Set, Iterable
+from typing import Any, Dict, Tuple, List, Set, Iterable, Optional
 
 
 COND_MOD_NAME = 'VBSP'
@@ -1386,6 +1386,85 @@ def cond_force_clump(inst: Entity, res: Property):
     ))
 
 
+@conditions.meta_cond(priority=-10)
+def position_exit_signs(vmf: VMF) -> None:
+    """Configure exit signage.
+
+    If "remove_exit_signs" is set, then delete them. Otherwise if "signExitInst"
+    is set, overlay the specified instance on top of the sign pair.
+    """
+    exit_sign: Optional[Entity]
+    exit_arrow: Optional[Entity]
+    try:
+        [exit_sign] = vmf.by_target['exitdoor_stickman']
+    except ValueError:
+        exit_sign = None
+    try:
+        [exit_arrow] = vmf.by_target['exitdoor_arrow']
+    except ValueError:
+        exit_arrow = None
+
+    if options.get(bool, "remove_exit_signs"):
+        if exit_sign is not None:
+            exit_sign.remove()
+        if exit_arrow is not None:
+            exit_arrow.remove()
+
+    inst_filename = options.get(str, 'signExitInst')
+    if inst_filename is None or exit_sign is None or exit_arrow is None:
+        return
+
+    sign_pos = Vec.from_str(exit_sign['origin'])
+    arrow_pos = Vec.from_str(exit_arrow['origin'])
+    arrow_norm = Vec.from_str(exit_arrow['basisnormal'])
+    sign_norm = Vec.from_str(exit_sign['basisnormal'])
+    offset = arrow_pos - sign_pos
+
+    if round(offset.mag()) != 32 or arrow_norm != sign_norm:
+        LOGGER.warning('Exit sign overlays are not aligned!')
+        return
+
+    arrow_dir = -Vec.from_str(exit_arrow['basisv'])  # Texture points down.
+    u = Vec.from_str(exit_sign['basisu'])
+    v = Vec.from_str(exit_sign['basisv'])
+    angles = Matrix.from_basis(x=u, y=v, z=sign_norm).to_angle()
+
+    if arrow_dir == u:
+        sign_dir = 'east'
+    elif arrow_dir == v:
+        sign_dir = 'north'
+    elif arrow_dir == -u:
+        sign_dir = 'west'
+    elif arrow_dir == -v:
+        sign_dir = 'south'
+    else:
+        LOGGER.warning(
+            'Could not match exit sign norm of ({}) to u=({}), v=({})',
+            arrow_dir, u, v,
+        )
+        return
+    if abs(Vec.dot(offset, u)) > 0.5:
+        orient = 'horizontal'
+    elif abs(Vec.dot(offset, v)) > 0.5:
+        orient = 'vertical'
+    else:
+        LOGGER.warning('Exit signs stacked on each other????')
+        return
+
+    inst = vmf.create_ent(
+        'func_instance',
+        targetname='exitdoor_sign',
+        origin=round((sign_pos + arrow_pos) / 2, 0),  # Center
+        angles=angles,
+        file=inst_filename,
+        fixup_style='0',  # Prefix
+    )
+    inst.fixup['$arrow'] = sign_dir
+    inst.fixup['$orient'] = orient
+    # Indicate the singular instances shouldn't be placed.
+    exit_sign['bee_noframe'] = exit_arrow['bee_noframe'] = '1'
+
+
 def change_overlays(vmf: VMF) -> None:
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
@@ -1406,26 +1485,12 @@ def change_overlays(vmf: VMF) -> None:
             # don't touch them.
             continue
 
-        if (over['targetname'] == 'exitdoor_stickman' or
-                over['targetname'] == 'exitdoor_arrow'):
-            if options.get(bool, "remove_exit_signs"):
-                # Some styles have instance-based ones, remove the
-                # originals if needed to ensure it looks nice.
-                over.remove()
-                continue  # Break out, to make sure the instance isn't added
-            else:
-                # blank the targetname, so we don't get the
-                # useless info_overlay_accessors for these signs.
-                del over['targetname']
-
-        case_mat = over['material'].casefold()
-
         try:
-            sign_type = consts.Signage(case_mat)
+            sign_type = consts.Signage(over['material'].casefold())
         except ValueError:
             continue
 
-        if sign_inst is not None:
+        if sign_inst is not None and 'bee_noframe' not in over:
             new_inst = vmf.create_ent(
                 classname='func_instance',
                 origin=over['origin'],
@@ -1440,8 +1505,11 @@ def change_overlays(vmf: VMF) -> None:
         # This also means items set to signage only won't get toggle
         # instances.
         del over['targetname']
+        del over['bee_noframe']  # Not needed anymore.
 
-        over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        over['material'] = mat = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        if not mat:
+            over.remove()
         if sign_size != 16:
             # Resize the signage overlays
             # These are the 4 vertex locations
