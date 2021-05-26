@@ -32,7 +32,7 @@ from srctools import (
     FileSystem, FileSystemChain,
 )
 import srctools.logger
-from app import backup, optionWindow, tk_tools, TK_ROOT
+from app import backup, optionWindow, tk_tools, TK_ROOT, resource_gen
 import loadScreen
 import packages.template_brush
 import editoritems
@@ -653,7 +653,8 @@ class Game:
         # Template file
         # FGD file
         # Gameinfo
-        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 7)
+        # Misc resources
+        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 8)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -873,7 +874,10 @@ class Game:
             self.clean_editor_models(all_items)
             export_screen.step('EXP')
 
+            LOGGER.info('Writing fizzler sides...')
             self.generate_fizzler_sides(vbsp_config)
+            resource_gen.make_cube_colourizer_legend(Path(self.abs_path('bee2')))
+            export_screen.step('EXP')
 
             if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
                 os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
