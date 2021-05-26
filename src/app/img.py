@@ -28,6 +28,7 @@ import utils
 tkImage = Union[ImageTk.PhotoImage, tk.PhotoImage]
 # Widgets with an image attribute that can be set.
 tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
+tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button)
 
 ArgT = TypeVar('ArgT')
 
@@ -658,7 +659,7 @@ def _ui_task() -> None:
         tk_ico = handle._load_tk()
         for label_ref in handle._users:
             if isinstance(label_ref, WeakRef):
-                label: tkImgWidgets = label_ref()
+                label: Optional[tkImgWidgets] = label_ref()
                 if label is not None:
                     label['image'] = tk_ico
 
@@ -682,7 +683,7 @@ def start_loading() -> None:
 
 
 # noinspection PyProtectedMember
-def apply(widget: tkImgWidgets, img: Optional[Handle]) -> tkImgWidgets:
+def apply(widget: tkImgWidgetsT, img: Optional[Handle]) -> tkImgWidgetsT:
     """Set the image in a widget.
 
     This tracks the widget, so later reloads will affect the widget.
