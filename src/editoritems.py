@@ -1217,6 +1217,7 @@ class Item:
     def _finalise_connections(self) -> None:
         """Apply legacy outputs to the config, and do some verification."""
         conf = self.conn_config
+        assert conf is not None
         # If regular inputs or outputs are defined, convert to the new style.
         if ConnTypes.NORMAL in self.conn_inputs:
             conn = self.conn_inputs.pop(ConnTypes.NORMAL)

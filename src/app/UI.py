@@ -1629,7 +1629,7 @@ def init_drag_icon() -> None:
     drag_win = Toplevel(TK_ROOT)
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
-    drag_win.overrideredirect(1)
+    drag_win.overrideredirect(True)
     drag_win.resizable(False, False)
     drag_win.withdraw()
     drag_win.transient(master=TK_ROOT)
