@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-02-22 14:22+1000\n"
+"POT-Creation-Date: 2021-05-26 13:50+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -25,16 +25,40 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+#: app/UI.py loadScreen.py
+msgid "Clear"
+msgstr ""
+
+#: loadScreen.py
+msgid "Copy"
+msgstr ""
+
+#: loadScreen.py
+msgid "Show:"
+msgstr ""
+
+#: loadScreen.py
+msgid "Logs - {}"
+msgstr ""
+
+#: loadScreen.py
+msgid "Debug messages"
+msgstr ""
+
+#: loadScreen.py
+msgid "Default"
+msgstr ""
+
+#: loadScreen.py
+msgid "Warnings Only"
+msgstr ""
+
 #: loadScreen.py
 msgid "Packages"
 msgstr ""
 
 #: loadScreen.py
 msgid "Loading Objects"
-msgstr ""
-
-#: loadScreen.py
-msgid "Loading Images"
 msgstr ""
 
 #: loadScreen.py
@@ -644,10 +668,6 @@ msgid "Palette"
 msgstr ""
 
 #: app/UI.py
-msgid "Clear"
-msgstr ""
-
-#: app/UI.py
 msgid "Fill Palette"
 msgstr ""
 
@@ -1095,30 +1115,6 @@ msgstr ""
 msgid "Choose a Color"
 msgstr ""
 
-#: app/logWindow.py
-msgid "Debug messages"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Default"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Warnings Only"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Logs - {}"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Copy"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Show:"
-msgstr ""
-
 #: app/music_conf.py
 msgid "Select Background Music - Base"
 msgstr ""
@@ -1394,7 +1390,9 @@ msgid "Development Mode"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Enables displaying additional UI specific for development purposes."
+msgid ""
+"Enables displaying additional UI specific for development purposes. "
+"Requires restart to have an effect."
 msgstr ""
 
 #: app/optionWindow.py
