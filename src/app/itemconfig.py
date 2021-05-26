@@ -38,6 +38,21 @@ INF = '∞'
 ITEM_VARIANT_LOAD = []
 
 
+def parse_color(color: str) -> Tuple[int, int, int]:
+    """Parse a string into a color."""
+    if color.startswith('#'):
+        try:
+            r = int(color[1:3], base=16)
+            g = int(color[3:5], base=16)
+            b = int(color[5:], base=16)
+        except ValueError:
+            LOGGER.warning('Invalid RGB value: "{}"!', color)
+            r = g = b = 128
+    else:
+        r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
+    return r, g, b
+
+
 @BEE2_config.option_handler('ItemVar')
 def save_load_itemvar(prop: Property=None) -> Optional[Property]:
     """Save or load item variables into the palette."""
@@ -590,26 +605,10 @@ def widget_color_multi(
 def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Label:
     """Make a single swatch."""
     # Note: tkinter requires RGB as ints, not float!
-
-    def get_color() -> Tuple[int, int, int]:
-        """Parse out the color."""
-        color = var.get()
-        if color.startswith('#'):
-            try:
-                r = int(color[1:3], base=16)
-                g = int(color[3:5], base=16)
-                b = int(color[5:], base=16)
-            except ValueError:
-                LOGGER.warning('Invalid RGB value: "{}"!', color)
-                r = g = b = 128
-        else:
-            r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
-        return r, g, b
-
-    def open_win(e):
+    def open_win(e) -> None:
         """Display the color selection window."""
         widget_sfx()
-        r, g, b = get_color()
+        r, g, b = parse_color(var.get())
         new_color, tk_color = askcolor(
             color=(r, g, b),
             parent=parent.winfo_toplevel(),
@@ -622,7 +621,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
     swatch = ttk.Label(parent)
 
     def update_image(var_name: str, var_index: str, operation: str):
-        img.apply(swatch, img.Handle.color(get_color(), size, size))
+        img.apply(swatch, img.Handle.color(parse_color(var.get()), size, size))
 
     update_image('', '', '')
 
