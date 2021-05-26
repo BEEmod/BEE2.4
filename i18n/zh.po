@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-05-26 15:03+1000\n"
+"POT-Creation-Date: 2021-05-26 15:10+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -95,6 +95,7 @@ msgstr "Chell（主角雪儿）"
 msgid "Bendy"
 msgstr "Bendy（纸片人小黑）"
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py:120
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
@@ -105,6 +106,7 @@ msgstr ""
 "大量使用画刷能够帮助缩减地图文件的大小或移除复杂的地图结构。\n"
 "（注：减少复杂的地图结构能有效提升画面渲染性能！）"
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py:127
 #, fuzzy
 msgid ""
@@ -120,6 +122,7 @@ msgstr ""
 "项目描述窗口中将统计已使用的实体数量，但并不完全准确，某些实体虽会被统计在内，但不会受到实体数量的限制。\n"
 "（注：地图内的实体数量被限制为2048个，超过这个数量有可能导致游戏崩溃！）"
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py:137
 #, fuzzy
 msgid ""
@@ -339,6 +342,7 @@ msgstr ""
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
+#. i18n: window title
 #: app/CompilerPane.py:829
 msgid "Coop Exit Corridor"
 msgstr ""
@@ -1109,6 +1113,7 @@ msgstr "维基百科..."
 msgid "Original Items..."
 msgstr "默认物品..."
 
+#. i18n: The chat program.
 #: app/helpMenu.py:64
 msgid "Discord Server..."
 msgstr "Discord服务器..."
@@ -1133,10 +1138,12 @@ msgstr "反馈程序Bug..."
 msgid "Submit Item Bugs..."
 msgstr "反馈物品Bug..."
 
+#. i18n: Original Palette
 #: app/helpMenu.py:73 app/paletteLoader.py:35
 msgid "Portal 2"
 msgstr "传送门2"
 
+#. i18n: Aperture Tag's palette
 #: app/helpMenu.py:74 app/paletteLoader.py:37
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
@@ -1542,18 +1549,22 @@ msgstr ""
 msgid "BEE2 - Manage Packages"
 msgstr "BEE2 - 管理数据包"
 
+#. i18n: Last exported items
 #: app/paletteLoader.py:25
 msgid "<Last Export>"
 msgstr "<上次导出的模板>"
 
+#. i18n: Empty palette name
 #: app/paletteLoader.py:27
 msgid "Blank"
 msgstr "空白"
 
+#. i18n: BEEmod 1 palette.
 #: app/paletteLoader.py:30
 msgid "BEEMod"
 msgstr "BEE模组物品"
 
+#. i18n: Default items merged together
 #: app/paletteLoader.py:32
 msgid "Portal 2 Collapsed"
 msgstr "传送门2(已折叠)"
@@ -1562,10 +1573,12 @@ msgstr "传送门2(已折叠)"
 msgid "Open \"{}\" in the default browser?"
 msgstr "在默认浏览器中打开 \"{}\" ？"
 
+#. i18n: 'None' item description
 #: app/selector_win.py:381
 msgid "Do not add anything."
 msgstr "不要添加任何东西。"
 
+#. i18n: 'None' item name.
 #: app/selector_win.py:385
 msgid "<None>"
 msgstr "<无>"
@@ -1591,6 +1604,7 @@ msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "作者: {}"
 
+#. i18n: Tooltip for colour swatch.
 #: app/selector_win.py:1142
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "颜色: R={r}, G={g}, B={b}"

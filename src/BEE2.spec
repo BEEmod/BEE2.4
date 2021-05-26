@@ -37,7 +37,10 @@ def do_localisation():
         msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
 
-    extracted = babel.messages.extract.extract_from_dir('.')
+    extracted = babel.messages.extract.extract_from_dir(
+        '.',
+        comment_tags=['i18n:'],
+    )
     for filename, lineno, message, comments, context in extracted:
         catalog.add(
             message,

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-05-26 15:03+1000\n"
+"POT-Creation-Date: 2021-05-26 15:10+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -95,6 +95,7 @@ msgstr "Chell"
 msgid "Bendy"
 msgstr "Bendy"
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py:120
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
@@ -105,6 +106,7 @@ msgstr ""
 " esto es alto, te puede servir como guía para que puedas reducir el "
 "tamaño del mapa o eliminar formas complejas del mismo."
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py:127
 #, fuzzy
 msgid ""
@@ -122,6 +124,7 @@ msgstr ""
 "enlistado en la parte superior derecha de la ventana de descripción de "
 "los mismos."
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py:137
 #, fuzzy
 msgid ""
@@ -360,6 +363,7 @@ msgstr ""
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
+#. i18n: window title
 #: app/CompilerPane.py:829
 msgid "Coop Exit Corridor"
 msgstr ""
@@ -1188,6 +1192,7 @@ msgstr ""
 msgid "Original Items..."
 msgstr "Ítems Originales..."
 
+#. i18n: The chat program.
 #: app/helpMenu.py:64
 msgid "Discord Server..."
 msgstr "Servidor de Discord..."
@@ -1212,10 +1217,12 @@ msgstr "Reportar errores de la aplicación..."
 msgid "Submit Item Bugs..."
 msgstr "Reportar errores de Ítems..."
 
+#. i18n: Original Palette
 #: app/helpMenu.py:73 app/paletteLoader.py:35
 msgid "Portal 2"
 msgstr ""
 
+#. i18n: Aperture Tag's palette
 #: app/helpMenu.py:74 app/paletteLoader.py:37
 msgid "Aperture Tag"
 msgstr ""
@@ -1647,18 +1654,22 @@ msgstr ""
 msgid "BEE2 - Manage Packages"
 msgstr "BEE2 - Administrar Paquetes"
 
+#. i18n: Last exported items
 #: app/paletteLoader.py:25
 msgid "<Last Export>"
 msgstr "<Ultima Exportación>"
 
+#. i18n: Empty palette name
 #: app/paletteLoader.py:27
 msgid "Blank"
 msgstr "Vacío"
 
+#. i18n: BEEmod 1 palette.
 #: app/paletteLoader.py:30
 msgid "BEEMod"
 msgstr ""
 
+#. i18n: Default items merged together
 #: app/paletteLoader.py:32
 msgid "Portal 2 Collapsed"
 msgstr "Portal 2 Colapsado"
@@ -1667,10 +1678,12 @@ msgstr "Portal 2 Colapsado"
 msgid "Open \"{}\" in the default browser?"
 msgstr "Abrir \"{}\" en el navegador predeterminado?"
 
+#. i18n: 'None' item description
 #: app/selector_win.py:381
 msgid "Do not add anything."
 msgstr "No añadir nada."
 
+#. i18n: 'None' item name.
 #: app/selector_win.py:385
 msgid "<None>"
 msgstr "<Ninguno>"
@@ -1697,6 +1710,7 @@ msgid_plural "Authors: {}"
 msgstr[0] "Autor: {}"
 msgstr[1] "Autores: {}"
 
+#. i18n: Tooltip for colour swatch.
 #: app/selector_win.py:1142
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "Color: R={r}, G={g}, B={b} "

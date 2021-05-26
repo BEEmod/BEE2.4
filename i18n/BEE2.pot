@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-05-26 15:03+1000\n"
+"POT-Creation-Date: 2021-05-26 15:10+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -93,6 +93,7 @@ msgstr ""
 msgid "Bendy"
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
@@ -100,6 +101,7 @@ msgid ""
 "shapes."
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
@@ -111,6 +113,7 @@ msgid ""
 "entities at runtime."
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
@@ -302,6 +305,7 @@ msgstr ""
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
+#. i18n: window title
 #: app/CompilerPane.py
 msgid "Coop Exit Corridor"
 msgstr ""
@@ -1045,6 +1049,7 @@ msgstr ""
 msgid "Original Items..."
 msgstr ""
 
+#. i18n: The chat program.
 #: app/helpMenu.py
 msgid "Discord Server..."
 msgstr ""
@@ -1069,10 +1074,12 @@ msgstr ""
 msgid "Submit Item Bugs..."
 msgstr ""
 
+#. i18n: Original Palette
 #: app/helpMenu.py app/paletteLoader.py
 msgid "Portal 2"
 msgstr ""
 
+#. i18n: Aperture Tag's palette
 #: app/helpMenu.py app/paletteLoader.py
 msgid "Aperture Tag"
 msgstr ""
@@ -1460,18 +1467,22 @@ msgstr ""
 msgid "BEE2 - Manage Packages"
 msgstr ""
 
+#. i18n: Last exported items
 #: app/paletteLoader.py
 msgid "<Last Export>"
 msgstr ""
 
+#. i18n: Empty palette name
 #: app/paletteLoader.py
 msgid "Blank"
 msgstr ""
 
+#. i18n: BEEmod 1 palette.
 #: app/paletteLoader.py
 msgid "BEEMod"
 msgstr ""
 
+#. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
 msgstr ""
@@ -1480,10 +1491,12 @@ msgstr ""
 msgid "Open \"{}\" in the default browser?"
 msgstr ""
 
+#. i18n: 'None' item description
 #: app/selector_win.py
 msgid "Do not add anything."
 msgstr ""
 
+#. i18n: 'None' item name.
 #: app/selector_win.py
 msgid "<None>"
 msgstr ""
@@ -1510,6 +1523,7 @@ msgid_plural "Authors: {}"
 msgstr[0] ""
 msgstr[1] ""
 
+#. i18n: Tooltip for colour swatch.
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr ""
