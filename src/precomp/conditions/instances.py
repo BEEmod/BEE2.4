@@ -2,15 +2,12 @@
 
 """
 from __future__ import annotations
-from typing import Optional, Union, Callable
+from typing import Union, Callable
 import operator
 
 import srctools.logger
-from precomp.conditions import (
-    make_flag, make_result, make_result_setup,
-    ALL_INST,
-)
-from precomp import instance_traits, instanceLocs, conditions
+from precomp.conditions import make_flag, make_result, make_result_setup
+from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Property, Angle, Vec, Entity, Output, VMF, conv_bool
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
@@ -36,7 +33,7 @@ def flag_has_inst(flag: Property) -> bool:
     return any(
         inst.casefold() in flags
         for inst in
-        ALL_INST
+        conditions.ALL_INST
     )
 
 
@@ -338,7 +335,8 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
     new_ent['targetname'] = inst['targetname']
 
 
-GLOBAL_INPUT_ENTS: dict[Optional[str], Entity] = {}
+GLOBAL_INPUT_ENTS: dict[Union[str, None, object], Entity] = {}
+ON_LOAD = object()
 
 
 @make_result_setup('GlobalInput')
@@ -346,6 +344,8 @@ def res_global_input_setup(res: Property) -> tuple[str, Output]:
     """Pre-parse the global input."""
     if res.has_children():
         name = res['name', '']
+        if not name and res.bool('alsoonload'):
+            name = ON_LOAD
         inp_name, inp_command = Output.parse_name(res['input'])
         return name, Output(
             out=res['output', 'OnTrigger'],
@@ -375,6 +375,7 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
     - `Output`: The name of the output, defaulting to `OnTrigger`. Ignored
         if Name is not set.
     - `Param`: The parameter for the output.
+    - `AlsoOnLoad`: If output is firing on map spawn, also fire it on save load too.
 
     Alternatively pass a string VMF-style output, which only provides
     OnMapSpawn functionality.
@@ -391,13 +392,36 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
     else:
         output.target = inst['targetname']
 
-    relay_name = inst.fixup.substitute(relay_name)
-    output.output = inst.fixup.substitute(output.output)
-    output.inst_in = inst.fixup.substitute(output.inst_in)
-    output.input = inst.fixup.substitute(output.input)
-    output.params = inst.fixup.substitute(output.params)
+    if relay_name is ON_LOAD:
+        relay_name = ''
+        on_load = True
+    else:
+        relay_name = inst.fixup.substitute(relay_name)
+        on_load = False
 
-    global_input(vmf, inst['origin'], output, relay_name)
+    output.output = inst.fixup.substitute(output.output)
+    output.params = inst.fixup.substitute(output.params)
+    if output.inst_in is not None:
+        output.inst_in = inst.fixup.substitute(output.inst_in)
+    if output.inst_out is not None:
+        output.input = inst.fixup.substitute(output.input)
+
+    if on_load:
+        try:
+            ent = GLOBAL_INPUT_ENTS[ON_LOAD]
+        except KeyError:
+            ent = GLOBAL_INPUT_ENTS[ON_LOAD] = vmf.create_ent(
+                'logic_auto',
+                origin=options.get(Vec, 'global_ents_loc'),
+                spawnflags='0',  # Don't remove on fire.
+            )
+        load_out = output.copy()
+        output.output = 'OnMapSpawn'
+        load_out.output = 'OnLoadGame'
+        output.only_once = True
+        ent.add_out(output, load_out)
+    else:
+        global_input(vmf, inst['origin'], output, relay_name)
 
 
 def global_input(
@@ -408,16 +432,17 @@ def global_input(
 ) -> None:
     """Create a global input, either from a relay or logic_auto.
 
-    The position is used to place the relay if this is the first time.
+    If the name is empty, a logic_auto is created.
+    The position is used to place the entity if this is the first time.
     """
     try:
         glob_ent = GLOBAL_INPUT_ENTS[relay_name]
     except KeyError:
-        if relay_name == '':
+        if not relay_name:
             glob_ent = GLOBAL_INPUT_ENTS[''] = vmf.create_ent(
                 classname='logic_auto',
                 spawnflags='1',  # Remove on fire
-                origin=pos,
+                origin=options.get(Vec, 'global_ents_loc'),
             )
         else:
             glob_ent = GLOBAL_INPUT_ENTS[relay_name] = vmf.create_ent(
