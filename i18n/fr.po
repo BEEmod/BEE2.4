@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-05-26 13:50+1000\n"
+"POT-Creation-Date: 2021-05-26 15:03+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -138,7 +138,7 @@ msgstr ""
 msgid "Corridor"
 msgstr "Couloir"
 
-#: app/CompilerPane.py:308
+#: app/CompilerPane.py:309
 msgid ""
 "Randomly choose a corridor. This is saved in the puzzle data and will not"
 " change."
@@ -146,15 +146,15 @@ msgstr ""
 "Choisit un couloir aléatoire. Ceci est sauvegardé dans le data du puzzle "
 "et ne va pas changer."
 
-#: app/CompilerPane.py:314 app/UI.py:642
+#: app/CompilerPane.py:315 app/UI.py:642
 msgid "Random"
 msgstr "Aléatoire"
 
-#: app/CompilerPane.py:417
+#: app/CompilerPane.py:418
 msgid "Image Files"
 msgstr "Fichiers image"
 
-#: app/CompilerPane.py:489
+#: app/CompilerPane.py:490
 msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
@@ -162,35 +162,35 @@ msgstr ""
 "Les options de ce panneau peuvent être modifiées sans exporter ou "
 "redémarrer le jeu."
 
-#: app/CompilerPane.py:504
+#: app/CompilerPane.py:505
 msgid "Map Settings"
 msgstr "Paramètres de carte"
 
-#: app/CompilerPane.py:509
+#: app/CompilerPane.py:510
 msgid "Compile Settings"
 msgstr "Paramètres de compilation"
 
-#: app/CompilerPane.py:523
+#: app/CompilerPane.py:524
 msgid "Thumbnail"
 msgstr "Miniature"
 
-#: app/CompilerPane.py:531
+#: app/CompilerPane.py:532
 msgid "Auto"
 msgstr "Auto"
 
-#: app/CompilerPane.py:539
+#: app/CompilerPane.py:540
 msgid "PeTI"
 msgstr "PeTI"
 
-#: app/CompilerPane.py:547
+#: app/CompilerPane.py:548
 msgid "Custom:"
 msgstr "Personnalisée:"
 
-#: app/CompilerPane.py:565
+#: app/CompilerPane.py:566
 msgid "Cleanup old screenshots"
 msgstr "Supprimer les anciens screenshots"
 
-#: app/CompilerPane.py:575
+#: app/CompilerPane.py:576
 msgid ""
 "Override the map image to use a screenshot automatically taken from the "
 "beginning of a chamber. Press F5 to take a new screenshot. If the map has"
@@ -202,11 +202,11 @@ msgstr ""
 "la carte n'a pas été prévisualisée récemment (dans les dernières heures),"
 " le screenshot PeTI par défaut sera utilisé à la place."
 
-#: app/CompilerPane.py:583
+#: app/CompilerPane.py:584
 msgid "Use the normal editor view for the map preview image."
 msgstr "Utilise la vue normale de l'éditeur pour l'image de prévisualisation."
 
-#: app/CompilerPane.py:585
+#: app/CompilerPane.py:586
 msgid ""
 "Use a custom image for the map preview image. Click the screenshot to "
 "select.\n"
@@ -216,7 +216,7 @@ msgstr ""
 "l'image pour la choisir.\n"
 "Les images seront converties en JPEG si besoin."
 
-#: app/CompilerPane.py:602
+#: app/CompilerPane.py:603
 msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
@@ -224,19 +224,19 @@ msgstr ""
 "Supprimer automatiquement les screenshots Autos non utilisés. Décochez si"
 " vous souhaitez garder des images dans \"portal2/screenshots\"."
 
-#: app/CompilerPane.py:613
+#: app/CompilerPane.py:614
 msgid "Lighting:"
 msgstr "Lumière:"
 
-#: app/CompilerPane.py:620
+#: app/CompilerPane.py:621
 msgid "Fast"
 msgstr "Rapide"
 
-#: app/CompilerPane.py:627
+#: app/CompilerPane.py:628
 msgid "Full"
 msgstr "Complète"
 
-#: app/CompilerPane.py:635
+#: app/CompilerPane.py:636
 msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
@@ -247,7 +247,7 @@ msgstr ""
 "incorrectes.\n"
 "À la publication, ce n'est pas utilisé."
 
-#: app/CompilerPane.py:642
+#: app/CompilerPane.py:643
 #, fuzzy
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
@@ -258,11 +258,11 @@ msgstr ""
 "c'est plus beau. À utiliser si vous arrangez les lumières.\n"
 "À la publication, ceci est toujours utilisé."
 
-#: app/CompilerPane.py:649
+#: app/CompilerPane.py:650
 msgid "Dump packed files to:"
 msgstr "Vider les fichiers enpaquetés vers :"
 
-#: app/CompilerPane.py:674
+#: app/CompilerPane.py:675
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -270,19 +270,19 @@ msgstr ""
 "Lors de la compilation, vide tous les fichiers venant d'être compilés "
 "dans la carte. Utile si vous prévoyez d'éditer la carte sous Hammer."
 
-#: app/CompilerPane.py:680
+#: app/CompilerPane.py:681
 msgid "Last Compile:"
 msgstr "Dernière compilation:"
 
-#: app/CompilerPane.py:690
+#: app/CompilerPane.py:691
 msgid "Entity"
 msgstr "Entités"
 
-#: app/CompilerPane.py:710
+#: app/CompilerPane.py:711
 msgid "Overlay"
 msgstr "Overlays"
 
-#: app/CompilerPane.py:729
+#: app/CompilerPane.py:730
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
@@ -290,19 +290,19 @@ msgstr ""
 "Rafraîchir les barres de progression. Cliquez après une compilation pour "
 "actualiser les valeurs."
 
-#: app/CompilerPane.py:735
+#: app/CompilerPane.py:736
 msgid "Brush"
 msgstr "Brushes"
 
-#: app/CompilerPane.py:763
+#: app/CompilerPane.py:764
 msgid "Voicelines:"
 msgstr "Répliques:"
 
-#: app/CompilerPane.py:770
+#: app/CompilerPane.py:771
 msgid "Use voiceline priorities"
 msgstr "Utiliser les priorités des répliques"
 
-#: app/CompilerPane.py:776
+#: app/CompilerPane.py:777
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
@@ -313,19 +313,19 @@ msgstr ""
 "d'éléments de test dans la carte. Si décoché, toute réplique applicable "
 "sera utilisée."
 
-#: app/CompilerPane.py:783
+#: app/CompilerPane.py:784
 msgid "Spawn at:"
 msgstr "Apparaître à:"
 
-#: app/CompilerPane.py:793
+#: app/CompilerPane.py:794
 msgid "Entry Door"
 msgstr "Porte d'entrée"
 
-#: app/CompilerPane.py:799
+#: app/CompilerPane.py:800
 msgid "Elevator"
 msgstr "Ascenseur"
 
-#: app/CompilerPane.py:809
+#: app/CompilerPane.py:810
 #, fuzzy
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
@@ -336,38 +336,50 @@ msgstr ""
 "atteignez la sortie. Utilisez ceci pour vérifier les couloirs d'entrée et"
 " de sortie."
 
-#: app/CompilerPane.py:814
+#: app/CompilerPane.py:815
 #, fuzzy
 msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
 "Lors d'une prévisualisation en solo, cela fait apparaître derrière la "
 "porte d'entrée. Quand vous atteindrez la sortie, la carte redémarrera."
 
-#: app/CompilerPane.py:820
+#: app/CompilerPane.py:821
 msgid "Corridor:"
 msgstr "Couloir:"
 
-#: app/CompilerPane.py:838
+#: app/CompilerPane.py:827
+msgid "Singleplayer Entry Corridor"
+msgstr ""
+
+#: app/CompilerPane.py:828
+msgid "Singleplayer Exit Corridor"
+msgstr ""
+
+#: app/CompilerPane.py:829
+msgid "Coop Exit Corridor"
+msgstr ""
+
+#: app/CompilerPane.py:839
 msgid "SP Entry:"
 msgstr "Entrée solo:"
 
-#: app/CompilerPane.py:843
+#: app/CompilerPane.py:844
 msgid "SP Exit:"
 msgstr "Sortie solo:"
 
-#: app/CompilerPane.py:848
+#: app/CompilerPane.py:849
 msgid "Coop Exit:"
 msgstr ""
 
-#: app/CompilerPane.py:854
+#: app/CompilerPane.py:855
 msgid "Player Model (SP):"
 msgstr "Modèle de joueur (Solo):"
 
-#: app/CompilerPane.py:885
+#: app/CompilerPane.py:886
 msgid "Compile Options"
 msgstr "Options de compilation"
 
-#: app/CompilerPane.py:903
+#: app/CompilerPane.py:904
 msgid "Compiler Options - {}"
 msgstr "Options de compilateur - {}"
 

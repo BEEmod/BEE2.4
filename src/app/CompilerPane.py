@@ -292,7 +292,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
     COMPILE_CFG.save_check()
 
 
-def make_corr_wid(corr_name: str) -> None:
+def make_corr_wid(corr_name: str, title: str) -> None:
     """Create the corridor widget and items."""
     length = CORRIDOR_COUNTS[corr_name]
 
@@ -305,6 +305,7 @@ def make_corr_wid(corr_name: str) -> None:
             )
             for i in range(1, length + 1)
         ],
+        title=title,
         none_desc=_(
             'Randomly choose a corridor. '
             'This is saved in the puzzle data '
@@ -823,9 +824,9 @@ def make_map_widgets(frame: ttk.Frame):
     corr_frame.grid(row=3, column=0, sticky='ew')
     corr_frame.columnconfigure(1, weight=1)
 
-    make_corr_wid('sp_entry')
-    make_corr_wid('sp_exit')
-    make_corr_wid('coop')
+    make_corr_wid('sp_entry', _('Singleplayer Entry Corridor'))  # i18n: corridor selector window title.
+    make_corr_wid('sp_exit', _('Singleplayer Exit Corridor'))  # i18n: corridor selector window title.
+    make_corr_wid('coop', _('Coop Exit Corridor'))  # i18n: corridor selector window title.
 
     load_corridors()
 
