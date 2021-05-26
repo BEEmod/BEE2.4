@@ -1,9 +1,12 @@
 """Customizable configuration for specific items or groups of them."""
+from __future__ import annotations
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 from functools import lru_cache
 import math
+import attr
 
 from srctools import Property, Vec, conv_int, conv_bool
 from packages import PakObject, ExportData, ParseData, desc_parse
@@ -60,8 +63,8 @@ def save_load_itemvar(prop: Property=None) -> Optional[Property]:
         prop = Property('', [])
         for group in CONFIG_ORDER:
             conf = Property(group.id, [])
-            for widget in group.widgets:  # ItemVariant special case.
-                if widget.values is not None:
+            for widget in group.widgets:
+                if widget.has_values:
                     conf.append(Property(widget.id, widget.values.get()))
             for widget in group.multi_widgets:
                 conf.append(Property(widget.id, [
@@ -76,7 +79,7 @@ def save_load_itemvar(prop: Property=None) -> Optional[Property]:
         for group in CONFIG_ORDER:
             conf = prop.find_key(group.id, [])
             for widget in group.widgets:
-                if widget.values is not None:  # ItemVariants
+                if widget.has_values:
                     try:
                         widget.values.set(conf[widget.id])
                     except LookupError:
@@ -92,29 +95,23 @@ def save_load_itemvar(prop: Property=None) -> Optional[Property]:
         return None
 
 
+@attr.define
 class Widget:
     """Represents a widget that can appear on a ConfigGroup."""
-    def __init__(
-        self,
-        wid_id: str,
-        name: str,
-        tooltip: str,
-        create_func: Callable[[tk.Frame, tk.StringVar, Property], None],
-        multi_func: Callable[[tk.Frame, List[Tuple[str, tk.StringVar]], Property], None],
-        config: Property,
-        values: Union[tk.StringVar, List[Tuple[Union[int, str], tk.StringVar]]],
-        is_timer: bool,
-        use_inf: bool,
-    ):
-        self.id = wid_id
-        self.name = name
-        self.tooltip = tooltip
-        self.values = values
-        self.config = config
-        self.create_func = create_func
-        self.multi_func = multi_func
-        self.is_timer = is_timer
-        self.use_inf = use_inf  # For timer, is infinite valid?
+    id: str
+    name: str
+    tooltip: str
+    create_func: Callable[[tk.Frame, tk.StringVar, Property], tk.Widget]
+    multi_func: Callable[[tk.Frame, list[tuple[str, tk.StringVar]], Property], None]
+    config: Property
+    values: Union[tk.StringVar, list[tuple[Union[int, str], tk.StringVar]]]
+    is_timer: bool
+    use_inf: bool  # For timer, is infinite valid?
+
+    @property
+    def has_values(self) -> bool:
+        """Item variant widgets don't have configuration, all others do."""
+        return self.create_func is not widget_item_variant
 
 
 class ConfigGroup(PakObject, allow_mult=True):
@@ -124,9 +121,9 @@ class ConfigGroup(PakObject, allow_mult=True):
         conf_id: str,
         group_name: str,
         desc,
-        widgets: List['Widget'],
-        multi_widgets: List['Widget'],
-    ):
+        widgets: list[Widget],
+        multi_widgets: list[Widget],
+    ) -> None:
         self.id = conf_id
         self.name = group_name
         self.desc = desc
@@ -170,14 +167,15 @@ class ConfigGroup(PakObject, allow_mult=True):
             name = wid['Label']
             tooltip = wid['Tooltip', '']
             default = wid.find_key('Default', '')
-            values = None  # type: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
+            values: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:
                 if is_timer:
                     LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
                     is_timer = use_inf = False
-                # Values remains a dummy None value, we don't use it.
+                # Values isn't used, set to a dummy value.
+                values = []
             elif is_timer:
                 if default.has_children():
                     defaults = {
@@ -270,9 +268,7 @@ class ConfigGroup(PakObject, allow_mult=True):
         for conf in CONFIG_ORDER:
             config_section = CONFIG[conf.id]
             for wid in conf.widgets:
-                # Item_variant doesn't have an output value.
-                # Skip it.
-                if wid.create_func is not widget_item_variant:
+                if wid.has_values:
                     config_section[wid.id] = wid.values.get()
             for wid in conf.multi_widgets:
                 for num, var in wid.values:
@@ -307,7 +303,8 @@ def make_pane(parent: ttk.Frame):
     canvas_frame.rowconfigure(0, weight=1)
 
     sign_button = signage_ui.init_widgets(canvas_frame)
-    sign_button.grid(row=0, column=0, sticky='ew')
+    if sign_button is not None:
+        sign_button.grid(row=0, column=0, sticky='ew')
 
     for conf_row, config in enumerate(CONFIG_ORDER, start=1):
         frame = ttk.LabelFrame(canvas_frame, text=config.name)
@@ -472,7 +469,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
 
 
 @WidgetLookup('string', 'str')
-def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
     """Simple textbox for entering text."""
     return ttk.Entry(
         parent,
@@ -481,7 +478,7 @@ def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Mis
 
 
 @WidgetLookup('boolean', 'bool', 'checkbox')
-def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property):
+def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
     """Allows ticking a box."""
     # Ensure it's a bool value.
     if conv_bool(var.get()):
