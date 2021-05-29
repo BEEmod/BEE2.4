@@ -96,6 +96,11 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
     vtf = VTF(LEGEND_SIZE, LEGEND_SIZE, fmt=ImageFormats.DXT1)
     vtf.get().copy_from(img.tobytes(), ImageFormats.RGB888)
     vtf.clear_mipmaps()
+    # Fill the small mipmaps with pure white, so when retracted
+    # you don't see anything.
+    for i in range(3, vtf.mipmap_count+1):
+        frame = vtf.get(mipmap=i)
+        frame.copy_from(b'\xFF' * (frame.width*frame.height), ImageFormats.I8)
 
     vtf_loc = bee2_loc / 'materials/BEE2/models/props_map_editor/cube_coloriser_legend.vtf'
     vtf_loc.parent.mkdir(parents=True, exist_ok=True)
