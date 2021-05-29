@@ -88,8 +88,8 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
 
         # Check brightness, if dim, switch to white.
         r, g, b = colors[tim]
-        hue, lum, sat = colorsys.rgb_to_hls(r/255, g/255, b/255)
-        txt_color = (255, 255, 255) if lum < 0.25 else (0, 0, 0)
+        bright, i, q = colorsys.rgb_to_yiq(r/255, g/255, b/255)
+        txt_color = (255, 255, 255) if bright < 0.5 else (0, 0, 0)
 
         draw.text((x, y), str(tim), fill=txt_color, font=font, anchor='mm')
 
