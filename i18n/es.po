@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-05-26 15:10+1000\n"
+"POT-Creation-Date: 2021-05-29 12:03+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -359,11 +359,12 @@ msgstr "Pasillo:"
 msgid "Singleplayer Entry Corridor"
 msgstr ""
 
+#. i18n: corridor selector window title.
 #: app/CompilerPane.py:828
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
-#. i18n: window title
+#. i18n: corridor selector window title.
 #: app/CompilerPane.py:829
 msgid "Coop Exit Corridor"
 msgstr ""
@@ -690,7 +691,7 @@ msgstr "Introduzca un nombre:"
 msgid "This palette already exists. Overwrite?"
 msgstr "Esta paleta ya existe. ¿Desea reemplazarla?"
 
-#: app/UI.py:1247 app/gameMan.py:1347
+#: app/UI.py:1247 app/gameMan.py:1351
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "¿Estas seguro que deseas borrar \"{}\"?"
 
@@ -783,7 +784,7 @@ msgstr "Administrar Paquetes..."
 msgid "Options"
 msgstr "Ociones"
 
-#: app/UI.py:1719 app/gameMan.py:1095
+#: app/UI.py:1719 app/gameMan.py:1099
 msgid "Quit"
 msgstr "Salir"
 
@@ -1104,11 +1105,11 @@ msgstr ""
 "Cambia la configuración predeterminada de este elemento cuando es "
 "colocado en el mapa."
 
-#: app/gameMan.py:764 app/gameMan.py:856
+#: app/gameMan.py:765 app/gameMan.py:857
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - ¡Exportación Fallida!"
 
-#: app/gameMan.py:765
+#: app/gameMan.py:766
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
@@ -1117,14 +1118,14 @@ msgstr ""
 " pulse OK para verificar la integridad de los archivos. Después, podrás "
 "exportar de nuevo."
 
-#: app/gameMan.py:857
+#: app/gameMan.py:858
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
 "Fallo a la hora de copiar el archivo de compilador {file}. Asegurese de "
 "que {game} no esta abierto.\n"
 
-#: app/gameMan.py:1152
+#: app/gameMan.py:1156
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1133,50 +1134,50 @@ msgstr ""
 "Las pistolas del Coop no funcionarán. Verifique la integridad de los "
 "archivos para reparar el error."
 
-#: app/gameMan.py:1156
+#: app/gameMan.py:1160
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - Falta de archivos de Aperture Tag"
 
-#: app/gameMan.py:1270
+#: app/gameMan.py:1274
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 "Selecciona el directorio donde se encuentre el ejecutable del juego "
 "({appname})..."
 
-#: app/gameMan.py:1273 app/gameMan.py:1288 app/gameMan.py:1298
-#: app/gameMan.py:1305 app/gameMan.py:1314 app/gameMan.py:1323
+#: app/gameMan.py:1277 app/gameMan.py:1292 app/gameMan.py:1302
+#: app/gameMan.py:1309 app/gameMan.py:1318 app/gameMan.py:1327
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - Añadir juego"
 
-#: app/gameMan.py:1276
+#: app/gameMan.py:1280
 msgid "Find Game Exe"
 msgstr "Encontrar Ejecutable del Juego"
 
-#: app/gameMan.py:1277
+#: app/gameMan.py:1281
 msgid "Executable"
 msgstr "Ejecutable"
 
-#: app/gameMan.py:1285
+#: app/gameMan.py:1289
 msgid "This does not appear to be a valid game folder!"
 msgstr "¡Eso no parece ser un directorio de juego valido!"
 
-#: app/gameMan.py:1295
+#: app/gameMan.py:1299
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "¡Portal Stories: Mel no tiene un editor!"
 
-#: app/gameMan.py:1306
+#: app/gameMan.py:1310
 msgid "Enter the name of this game:"
 msgstr "Inserte el nombre de este juego:"
 
-#: app/gameMan.py:1313
+#: app/gameMan.py:1317
 msgid "This name is already taken!"
 msgstr "¡Este nombre ya está en uso!"
 
-#: app/gameMan.py:1322
+#: app/gameMan.py:1326
 msgid "Please enter a name for this game!"
 msgstr "¡Por favor introduzca un nombre a este juego!"
 
-#: app/gameMan.py:1341
+#: app/gameMan.py:1345
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1275,7 +1276,7 @@ msgstr "¡No hay propiedades disponibles!"
 msgid "Search:"
 msgstr ""
 
-#: app/itemconfig.py:616
+#: app/itemconfig.py:612
 msgid "Choose a Color"
 msgstr "Seleccione un color"
 

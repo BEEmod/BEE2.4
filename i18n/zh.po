@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-05-26 15:10+1000\n"
+"POT-Creation-Date: 2021-05-29 12:03+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -338,11 +338,12 @@ msgstr "走廊样式"
 msgid "Singleplayer Entry Corridor"
 msgstr ""
 
+#. i18n: corridor selector window title.
 #: app/CompilerPane.py:828
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
-#. i18n: window title
+#. i18n: corridor selector window title.
 #: app/CompilerPane.py:829
 msgid "Coop Exit Corridor"
 msgstr ""
@@ -640,7 +641,7 @@ msgstr "键入模板名称："
 msgid "This palette already exists. Overwrite?"
 msgstr "已经存在同名模板，是否覆盖？"
 
-#: app/UI.py:1247 app/gameMan.py:1347
+#: app/UI.py:1247 app/gameMan.py:1351
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
@@ -730,7 +731,7 @@ msgstr "管理资源包..."
 msgid "Options"
 msgstr "设置"
 
-#: app/UI.py:1719 app/gameMan.py:1095
+#: app/UI.py:1719 app/gameMan.py:1099
 msgid "Quit"
 msgstr "退出"
 
@@ -1033,22 +1034,22 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: app/gameMan.py:764 app/gameMan.py:856
+#: app/gameMan.py:765 app/gameMan.py:857
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
-#: app/gameMan.py:765
+#: app/gameMan.py:766
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
 
-#: app/gameMan.py:857
+#: app/gameMan.py:858
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
-#: app/gameMan.py:1152
+#: app/gameMan.py:1156
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1056,48 +1057,48 @@ msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
 
-#: app/gameMan.py:1156
+#: app/gameMan.py:1160
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: app/gameMan.py:1270
+#: app/gameMan.py:1274
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件的路径 {appname}"
 
-#: app/gameMan.py:1273 app/gameMan.py:1288 app/gameMan.py:1298
-#: app/gameMan.py:1305 app/gameMan.py:1314 app/gameMan.py:1323
+#: app/gameMan.py:1277 app/gameMan.py:1292 app/gameMan.py:1302
+#: app/gameMan.py:1309 app/gameMan.py:1318 app/gameMan.py:1327
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: app/gameMan.py:1276
+#: app/gameMan.py:1280
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: app/gameMan.py:1277
+#: app/gameMan.py:1281
 msgid "Executable"
 msgstr "可执行文件"
 
-#: app/gameMan.py:1285
+#: app/gameMan.py:1289
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: app/gameMan.py:1295
+#: app/gameMan.py:1299
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: app/gameMan.py:1306
+#: app/gameMan.py:1310
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: app/gameMan.py:1313
+#: app/gameMan.py:1317
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: app/gameMan.py:1322
+#: app/gameMan.py:1326
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: app/gameMan.py:1341
+#: app/gameMan.py:1345
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1196,7 +1197,7 @@ msgstr "没有可用的属性！"
 msgid "Search:"
 msgstr ""
 
-#: app/itemconfig.py:616
+#: app/itemconfig.py:612
 msgid "Choose a Color"
 msgstr "选择一种颜色"
 

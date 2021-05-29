@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-05-26 15:10+1000\n"
+"POT-Creation-Date: 2021-05-29 12:03+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -301,11 +301,12 @@ msgstr ""
 msgid "Singleplayer Entry Corridor"
 msgstr ""
 
+#. i18n: corridor selector window title.
 #: app/CompilerPane.py
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
-#. i18n: window title
+#. i18n: corridor selector window title.
 #: app/CompilerPane.py
 msgid "Coop Exit Corridor"
 msgstr ""
