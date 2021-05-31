@@ -8,12 +8,13 @@ they were attached to the original brushes.
 """
 from __future__ import annotations
 
-from collections.abc import Set, Iterable, Iterator, MutableMapping
+from collections.abc import Iterable, Iterator, MutableMapping
 from collections import defaultdict, Counter
 import math
 from enum import Enum
 from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
+import attr
 
 from srctools import Vec, VMF, Entity, Side, Solid, Output, Angle, Matrix
 import srctools.logger
@@ -1195,7 +1196,7 @@ class TileDef:
         vmf: VMF,
         pattern: dict[tuple[int, int], TileType],
         is_wall: bool,
-        bevels: Set[tuple[int, int]],
+        bevels: set[tuple[int, int]],
         normal: Vec,
         offset: int=64,
         thickness: int=4,
@@ -2145,6 +2146,9 @@ def generate_brushes(vmf: VMF) -> None:
                     for v in range(min_v, max_v + 1):
                         tile_pos[u, v].brush_faces.append(front)
 
+    LOGGER.info('Generating goop...')
+    generate_goo(vmf)
+
     for over, over_tiles in OVERLAY_BINDS.items():
         faces = set(over['sides', ''].split())
         for tile in over_tiles:
@@ -2155,8 +2159,14 @@ def generate_brushes(vmf: VMF) -> None:
         else:
             over.remove()
 
-    LOGGER.info('Generating goop...')
-    generate_goo(vmf)
+
+@attr.define(frozen=False)
+class Tideline:
+    """Temporary data used to hold the in-progress tideline overlays."""
+    over: Entity
+    mid: float
+    min: float
+    max: float
 
 
 def generate_goo(vmf: VMF) -> None:
@@ -2174,21 +2184,68 @@ def generate_goo(vmf: VMF) -> None:
     # Valve just does it semi-randomly.
     goo_heights: dict[float, int] = Counter()
 
-    pos = None
+    # If enabled, generate tideline overlays.
+    use_tidelines = options.get(bool, 'generate_tidelines')
+    # Z, x-norm, y-norm = overlay ent.
+    tideline_over: dict[tuple[float, int, int], Tideline] = {}
 
+    pos: Optional[Vec] = None
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
             goo_pos[pos.z, pos.z][pos.x, pos.y] = True
-            trig_pos[pos.z][pos.x, pos.y] = True
-
-            goo_heights[pos.z] += 1
         elif block_type is Block.GOO_TOP:
-            goo_heights[pos.z] += 1
             # Multi-layer..
             lower_pos = BLOCK_POS.raycast(pos, Vec(0, 0, -1))
 
             goo_pos[lower_pos.z, pos.z][pos.x, pos.y] = True
-            trig_pos[pos.z][pos.x, pos.y] = True
+        else:  # Not goo.
+            continue
+        goo_heights[pos.z] += 1
+        trig_pos[pos.z][pos.x, pos.y] = True
+        if use_tidelines:
+            voxel_center = 128 * pos + 64
+            for x, y in [(-1, 0), (0, -1), (1, 0), (0, 1)]:
+                norm = Vec(x, y)
+                try:
+                    tile = TILES[(voxel_center - 128*norm).as_tuple(), (x, y, 0)]
+                except KeyError:
+                    continue
+                side = Vec.cross(norm, (0.0, 0.0, -1.0))
+                off = Vec.dot(voxel_center, side)
+                try:
+                    tideline = tideline_over[pos.z, x, y]
+                except KeyError:
+                    tideline = tideline_over[pos.z, x, y] = Tideline(
+                        vmf.create_ent(
+                            'info_overlay',
+                            material='overlays/tideline01b',
+                            angles='0 0 0',
+                            origin=voxel_center + (0, 0, 32),
+                            basisOrigin=voxel_center + (0, 0, 32),
+                            basisNormal=f'{x} {y} 0',
+                            basisU=side,
+                            basisV='0 0 1',
+                            startU='0',
+                            startV='1',
+                            endU='1',
+                            endV='0',
+                        ),
+                        off, off, off,
+                    )
+                    OVERLAY_BINDS[tideline.over] = [tile]
+                else:
+                    tideline.min = min(tideline.min, off)
+                    tideline.max = max(tideline.max, off)
+                    OVERLAY_BINDS[tideline.over].append(tile)
+
+    for tideline in tideline_over.values():
+        tide_min = tideline.min - tideline.mid - 64
+        tide_max = tideline.max - tideline.mid + 64
+        tideline.over['endu'] = (tide_max - tide_min) / 128.0
+        tideline.over['uv0'] = f'{tide_min} -32 0'
+        tideline.over['uv1'] = f'{tide_min} 32 0'
+        tideline.over['uv2'] = f'{tide_max} 32 0'
+        tideline.over['uv3'] = f'{tide_max} -32 0'
 
     # No goo.
     if not goo_pos or pos is None:

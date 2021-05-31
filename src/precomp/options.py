@@ -481,6 +481,9 @@ DEFAULTS = [
         It should be a single brush cube - the wall is set to the same
         rotation as the matching side. (The bottom is ignored).
         """),
+    Opt('generate_tidelines', False,
+        """Generate tideline overlays around the outside of goo pits.
+        """),
 
     Opt('glass_floorbeam_temp', TYPE.STR,
         """Template for beams in the middle of large glass floors.
