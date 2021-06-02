@@ -15,6 +15,7 @@ from enum import Enum
 from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
 import attr
+import random
 
 from srctools import Vec, VMF, Entity, Side, Solid, Output, Angle, Matrix
 import srctools.logger
@@ -2186,8 +2187,8 @@ def generate_goo(vmf: VMF) -> None:
 
     # If enabled, generate tideline overlays.
     use_tidelines = options.get(bool, 'generate_tidelines')
-    # Z, x-norm, y-norm = overlay ent.
-    tideline_over: dict[tuple[float, int, int], Tideline] = {}
+    # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
+    tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
     pos: Optional[Vec] = None
     for pos, block_type in BLOCK_POS.items():
@@ -2212,10 +2213,14 @@ def generate_goo(vmf: VMF) -> None:
                     continue
                 side = Vec.cross(norm, (0.0, 0.0, -1.0))
                 off = Vec.dot(voxel_center, side)
+
+                # Divide the x/y into sections, so we don't extend the overlay
+                # too much over too many faces.
+                key = pos.z, pos.x//8, pos.y//8, x, y
                 try:
-                    tideline = tideline_over[pos.z, x, y]
+                    tideline = tideline_over[key]
                 except KeyError:
-                    tideline = tideline_over[pos.z, x, y] = Tideline(
+                    tideline = tideline_over[key] = Tideline(
                         vmf.create_ent(
                             'info_overlay',
                             material='overlays/tideline01b',
@@ -2238,14 +2243,26 @@ def generate_goo(vmf: VMF) -> None:
                     tideline.max = max(tideline.max, off)
                     OVERLAY_BINDS[tideline.over].append(tile)
 
+    tideline_rand = random.Random()
     for tideline in tideline_over.values():
         tide_min = tideline.min - tideline.mid - 64
         tide_max = tideline.max - tideline.mid + 64
-        tideline.over['endu'] = (tide_max - tide_min) / 128.0
-        tideline.over['uv0'] = f'{tide_min} -32 0'
-        tideline.over['uv1'] = f'{tide_min} 32 0'
-        tideline.over['uv2'] = f'{tide_max} 32 0'
-        tideline.over['uv3'] = f'{tide_max} -32 0'
+        tideline_rand.seed(f'{tideline.over["origin"]}:{tide_min}:{tide_max}')
+
+        width = (tide_max - tide_min) / 128.0
+        # Randomly flip around
+        if tideline_rand.choice((False, True)):
+            tideline.over['startu'] = 0
+            tideline.over['endu'] = width
+        else:
+            tideline.over['endu'] = 0
+            tideline.over['startu'] = width
+
+        # Vary the ends up/down from 32, to distort a little.
+        tideline.over['uv0'] = f'{tide_min} {random.randint(-36, -28)} 0'
+        tideline.over['uv1'] = f'{tide_min} {random.randint(28, 32)} 0'
+        tideline.over['uv2'] = f'{tide_max} {random.randint(28, 32)} 0'
+        tideline.over['uv3'] = f'{tide_max} {random.randint(-36, -28)} 0'
 
     # No goo.
     if not goo_pos or pos is None:
