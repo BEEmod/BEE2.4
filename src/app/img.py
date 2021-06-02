@@ -431,20 +431,33 @@ class Handle(Generic[ArgT]):
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
             elif special_name in ('color', 'colour', 'rgb'):
-                # color:RGB or color:RRGGBB
+                # <color>:#RGB, <color>:#RRGGBB, <color>:R,G,B
+                color = uri.path
+                if color.startswith('#'):
+                    color = color[1:]
                 try:
-                    if len(uri.path) == 3:
+                    if ',' in color:
+                        r, g, b = map(int, color.split(','))
+                    elif len(color) == 3:
                         r = int(uri.path[0] * 2, 16)
                         g = int(uri.path[1] * 2, 16)
                         b = int(uri.path[2] * 2, 16)
-                    elif len(uri.path) == 6:
+                    elif len(color) == 6:
                         r = int(uri.path[0:2], 16)
                         g = int(uri.path[2:4], 16)
                         b = int(uri.path[4:6], 16)
                     else:
                         raise ValueError
                 except (ValueError, TypeError, OverflowError):
-                    raise ValueError('Colors must be RGB or RRGGBB hex values!') from None
+                    # Try to grab from TK's colour list.
+                    try:
+                        r, g, b = TK_ROOT.winfo_rgb(uri.path)
+                        # They're full 16-bit colors, we don't want that.
+                        r >>= 8
+                        g >>= 8
+                        b >>= 8
+                    except tk.TclError:
+                        raise ValueError(f'Colors must be RGB, RRGGBB hex values, or R,G,B decimal!, not {uri}') from None
                 typ = TYP_COLOR
                 args = (r, g, b)
             elif special_name in ('bee', 'bee2'):  # Builtin resources.
