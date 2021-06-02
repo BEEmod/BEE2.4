@@ -377,14 +377,16 @@ class Handle(Generic[ArgT]):
             except LookupError:
                 return cls.error(width, height)
         if prop.has_children():
-            return cls.composite([
-                cls.parse_uri(
-                    PackagePath.parse(child.value, pack),
+            children = []
+            for child in prop:
+                if child.name not in ('image', 'img', 'layer'):
+                    raise ValueError(f'Unknown compound type "{child.real_name}"!')
+                children.append(cls.parse(
+                    child, pack,
                     width, height,
-                    subfolder=subfolder,
-                )  # iter_tree to collapse any sub-composite definitions.
-                for child in prop.iter_tree()
-            ], width, height)
+                    subfolder=subfolder
+                ))
+            return cls.composite(children, width, height)
 
         return cls.parse_uri(PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
 
