@@ -1163,17 +1163,10 @@ def res_timed_relay(vmf: VMF, inst: Entity, res: Property) -> None:
         relay.add_out(new_out)
 
 
-@make_result_setup('condition')
-def res_sub_condition_setup(vmf: VMF, res: Property):
-    """Setup the sub-condition."""
-    cond = Condition.parse(res)
-    return cond
-
-
 @make_result('condition')
-def res_sub_condition(base_inst: Entity, res: Property):
+def res_sub_condition(res: Property):
     """Check a different condition if the outer block is true."""
-    res.value.test(base_inst)
+    return Condition.parse(res).test
 
 
 @make_result('nextInstance')
@@ -1194,9 +1187,20 @@ def res_end_condition() -> None:
     raise EndCondition
 
 
-@make_result_setup('switch')
-def res_switch_setup(vmf: VMF, res: Property):
-    flag = None
+@make_result('switch')
+def res_switch_setup(res: Property):
+    """Run the same flag multiple times with different arguments.
+
+    'method' is the way the search is done - first, last, random, or all.
+    'flag' is the name of the flag.
+    'seed' sets the randomisation seed for this block, for the random mode.
+    Each property group is a case to check - the property name is the flag
+    argument, and the contents are the results to execute in that case.
+    The special group "<default>" is only run if no other flag is valid.
+    For 'random' mode, you can omit the flag to choose from all objects. In
+    this case the flag arguments are ignored.
+    """
+    flag_name = ''
     method = SWITCH_TYPE.FIRST
     cases = []
     default = []
@@ -1209,7 +1213,7 @@ def res_switch_setup(vmf: VMF, res: Property):
                 cases.append(prop)
         else:
             if prop.name == 'flag':
-                flag = prop.value
+                flag_name = prop.value
                 continue
             if prop.name == 'method':
                 try:
@@ -1222,51 +1226,29 @@ def res_switch_setup(vmf: VMF, res: Property):
     if method is SWITCH_TYPE.LAST:
         cases[:] = cases[::-1]
 
-    return (
-        flag,
-        cases,
-        default,
-        method,
-        rand_seed,
-    )
+    def apply_switch(inst: Entity) -> None:
+        """Execute a switch."""
+        if method is SWITCH_TYPE.RANDOM:
+            set_random_seed(inst, rand_seed)
+            random.shuffle(cases)
 
+        run_default = True
 
-@make_result('switch')
-def res_switch(vmf: VMF, inst: Entity, res: Property):
-    """Run the same flag multiple times with different arguments.
-
-    'method' is the way the search is done - first, last, random, or all.
-    'flag' is the name of the flag.
-    'seed' sets the randomisation seed for this block, for the random mode.
-    Each property group is a case to check - the property name is the flag
-    argument, and the contents are the results to execute in that case.
-    The special group "<default>" is only run if no other flag is valid.
-    For 'random' mode, you can omit the flag to choose from all objects. In
-    this case the flag arguments are ignored.
-    """
-    flag_name, cases, default, method, rand_seed = res.value
-
-    if method is SWITCH_TYPE.RANDOM:
-        cases = cases[:]
-        set_random_seed(inst, rand_seed)
-        random.shuffle(cases)
-
-    run_case = False
-
-    for case in cases:
-        if flag_name is not None:
-            flag = Property(flag_name, case.real_name)
-            if not check_flag(vmf, flag, inst):
-                continue
-        for res in case:
-            Condition.test_result(inst, res)
-        run_case = True
-        if method is not SWITCH_TYPE.ALL:
-            # All does them all, otherwise we quit now.
-            break
-    if not run_case:
-        for res in default:
-            Condition.test_result(inst, res)
+        for case in cases:
+            if flag_name:
+                flag = Property(flag_name, case.real_name)
+                if not check_flag(inst.map, flag, inst):
+                    continue
+            for sub_res in case:
+                Condition.test_result(inst, sub_res)
+            run_default = False
+            if method is not SWITCH_TYPE.ALL:
+                # All does them all, otherwise we quit now.
+                break
+        if run_default:
+            for sub_res in default:
+                Condition.test_result(inst, sub_res)
+    return apply_switch
 
 
 @make_result_setup('staticPiston')
