@@ -56,14 +56,6 @@ def res_random_setup(vmf: VMF, res: Property) -> object:
 
     weight = conditions.weighted_random(len(results), weight)
 
-    # We also need to execute result setups on all child properties!
-    for prop in results[:]:
-        if prop.name == 'group':
-            for sub_prop in list(prop):
-                Condition.setup_result(vmf, prop.value, sub_prop)
-        else:
-            Condition.setup_result(vmf, results, prop)
-
     return seed, chance, weight, results
 
 
