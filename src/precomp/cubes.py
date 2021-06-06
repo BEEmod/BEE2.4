@@ -1514,7 +1514,7 @@ def make_cube(
                         'OnUser4',
                         '!self',
                         'Skin',
-                        CUBE_SKINS[CubePaintType.BOUNCE, pair.cube_type.type],
+                        CUBE_SKINS[pair.cube_type.type].spawn_skin(CubePaintType.BOUNCE),
                         only_once=True,
                     )
                 )
