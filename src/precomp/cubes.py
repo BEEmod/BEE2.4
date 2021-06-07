@@ -145,6 +145,13 @@ class CubeOutputs(Enum):
     ON_DROP = 'OnDrop'
 
 
+class AddonFixups(Enum):
+    """Special fixup variables usable in cube addons."""
+    DROPPER = 'dropper'
+    CUBE = 'cube'
+    LINKED = 'linked'
+
+
 class ModelSwapMeth(Enum):
     """Method to use to swap to custom cube models."""
     SETMODEL = 'SETMODEL'  # self.SetModel()
@@ -233,13 +240,16 @@ class CubeAddon:
         pack: str='',
         vscript: str='',
         outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
+        fixups: Optional[List[Tuple[str, Union[str, AddonFixups]]]]=None,
     ):
         self.id = id
         self.inst = inst
         self.pack = pack
         self.vscript = vscript  # Entity script(s)s to add to the cube.
         self.outputs = {}  # type: Dict[CubeOutputs, List[Output]]
-
+        # None means not defined at all, so fallback to copying everything.
+        # "fixups" {} on the other hand would not copy any fixups.
+        self.fixups = fixups
 
         for out_type in CubeOutputs:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
@@ -253,6 +263,7 @@ class CubeAddon:
             props['packlist', ''],
             props['vscript', ''],
             cls._parse_outputs(props),
+            cls._parse_fixups(props),
         )
         return addon
 
@@ -263,8 +274,9 @@ class CubeAddon:
         pack = props['overlay_pack', '']
         script = props['vscript', '']
         outputs = cls._parse_outputs(props)
-        if inst or pack or script or any(outputs.values()):
-            return cls(cube_id, inst, pack, script, outputs)
+        fixups = cls._parse_fixups(props)
+        if inst or pack or script or any(outputs.values()) or fixups:
+            return cls(cube_id, inst, pack, script, outputs, fixups)
         else:
             return None
 
@@ -278,6 +290,20 @@ class CubeAddon:
                 out_list.append(Output.parse(prop))
 
         return outputs
+
+    @staticmethod
+    def _parse_fixups(props: Property) -> Optional[List[Tuple[str, Union[str, AddonFixups]]]]:
+        fixups = []
+        found = False
+        for parent in props.find_all('Fixups'):
+            found = True
+            for prop in parent:
+                if prop.value.startswith('<') and prop.value.endswith('>'):
+                    src = AddonFixups(prop.value[1:-1].casefold())
+                else:
+                    src = prop.value
+                fixups.append((prop.real_name, src))
+        return fixups if found else None
 
 
 class DropperType:
@@ -1527,8 +1553,18 @@ def make_cube(
                 ),
                 file=addon.inst,
             )
-            # Copy the cube stuff to the addon, since it's specific to the cube.
-            inst.fixup.update(pair.cube_fixup)
+            if addon.fixups is not None:
+                for fixup_var, fixup_src in addon.fixups:
+                    if fixup_src is AddonFixups.CUBE:
+                        inst.fixup[fixup_var] = not in_dropper
+                    elif fixup_src is AddonFixups.DROPPER:
+                        inst.fixup[fixup_var] = in_dropper
+                    elif fixup_src is AddonFixups.LINKED:
+                        inst.fixup[fixup_var] = pair.dropper is not None and pair.cube is not None
+                    else:
+                        inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_src)
+            else:
+                inst.fixup.update(pair.cube_fixup)
         packing.pack_list(vmf, addon.pack)
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
