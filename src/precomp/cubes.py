@@ -77,9 +77,6 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
 
-ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
-
-
 class CubeEntType(Enum):
     """Cube types, as set on prop_weighted_cube.
 
@@ -235,7 +232,6 @@ class CubeAddon:
         inst: str='',
         pack: str='',
         vscript: str='',
-        script_vars: Iterable[ScriptVar]=(),
         outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
     ):
         self.id = id
@@ -244,8 +240,6 @@ class CubeAddon:
         self.vscript = vscript  # Entity script(s)s to add to the cube.
         self.outputs = {}  # type: Dict[CubeOutputs, List[Output]]
 
-        # Fire inputs to functions with instance vars.
-        self.script_vars = list(script_vars)
 
         for out_type in CubeOutputs:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
@@ -258,7 +252,6 @@ class CubeAddon:
             props['instance', ''],
             props['packlist', ''],
             props['vscript', ''],
-            cls._parse_scriptvar(props),
             cls._parse_outputs(props),
         )
         return addon
@@ -270,9 +263,8 @@ class CubeAddon:
         pack = props['overlay_pack', '']
         script = props['vscript', '']
         outputs = cls._parse_outputs(props)
-        script_vars = cls._parse_scriptvar(props)
-        if inst or pack or script or script_vars or any(outputs.values()):
-            return cls(cube_id, inst, pack, script, script_vars, outputs)
+        if inst or pack or script or any(outputs.values()):
+            return cls(cube_id, inst, pack, script, outputs)
         else:
             return None
 
@@ -286,23 +278,6 @@ class CubeAddon:
                 out_list.append(Output.parse(prop))
 
         return outputs
-
-    @staticmethod
-    def _parse_scriptvar(props: Property):
-        script_vars = []
-        for prop in props.find_children('ScriptVars'):
-            func, args = prop.value.split('(')
-
-            # Allow this to be used.
-            if prop.name == '!self':
-                prop.name = 'box'
-
-            script_vars.append(ScriptVar(
-                prop.real_name,
-                func,
-                list(map(str.strip, args.rstrip(')').split(','))),
-            ))
-        return script_vars
 
 
 class DropperType:
@@ -1391,38 +1366,6 @@ def setup_output(
     return out
 
 
-def add_scriptvar(
-    out_name: str,
-    fixup: EntityFixup,
-    inst: Entity,
-    vars: List[ScriptVar],
-) -> List[Output]:
-    """Apply "scriptvars" to a cube.
-
-    If blank or invalid Null will be used.
-    """
-    out = []
-    for var in vars:
-        args = []
-        for arg in var.vars:
-            value = fixup[arg]
-            if value:
-                try:
-                    value = format(float(value), 'g')
-                except ValueError:
-                    value = '`' + value + '`'
-            else:
-                value = 'null'
-            args.append(value)
-        out.append(Output(
-            out_name,
-            conditions.local_name(inst, var.local_name),
-            'RunScriptCode',
-            '{}({})'.format(var.function, ', '.join(args)),
-        ))
-    return out
-
-
 def make_cube(
     vmf: VMF,
     pair: CubePair,
@@ -1800,13 +1743,6 @@ def generate_cubes(vmf: VMF):
                 out.only_once = True
                 drop_cube.add_out(out)
 
-            drop_cube.add_out(*add_scriptvar(
-                'OnUser4',
-                pair.cube_fixup,
-                pair.dropper,
-                script_vars,
-            ))
-
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,
             # etc.
@@ -1898,14 +1834,6 @@ def generate_cubes(vmf: VMF):
             # For consistency with the dropped cube, add a User1 output
             # that fizzles it.
             cube.add_out(Output('OnUser1', '!self', 'Dissolve'))
-
-            # Add script-var setup inputs.
-            cube_temp.add_out(*add_scriptvar(
-                'OnEntitySpawned',
-                pair.cube_fixup,
-                pair.cube,
-                script_vars,
-            ))
 
             for temp_out in pair.outputs[CubeOutputs.SPAWN]:
                 cube_temp.add_out(setup_output(
