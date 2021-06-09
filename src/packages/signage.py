@@ -1,12 +1,20 @@
-from typing import Dict, List, Tuple, NamedTuple
+"""Implements a dynamic item allowing placing the various test chamber signages."""
+from __future__ import annotations
+from pathlib import Path
+from typing import Dict, List, Tuple, NamedTuple, Optional, TYPE_CHECKING
 
+from PIL import Image
 import utils
 from packages import PakObject, ParseData, ExportData, Style
 from app.img import Handle as ImgHandle
+from srctools.vtf import ImageFormats, VTF
 from srctools import Property
 import srctools.logger
 
+
 LOGGER = srctools.logger.get_logger(__name__)
+if TYPE_CHECKING:
+    from app import gameMan  # Prevent circular import
 
 
 class SignStyle(NamedTuple):
@@ -15,6 +23,26 @@ class SignStyle(NamedTuple):
     overlay: str
     icon: ImgHandle
     type: str
+
+
+class SignageLegend(PakObject):
+    """Allows specifying image resources used to construct the legend texture."""
+
+    def __init__(self, sty_id: str, blank: ImgHandle, overlay: ImgHandle) -> None:
+        self.id = sty_id
+        self.blank = blank
+        self.overlay = overlay
+
+    @classmethod
+    def parse(cls, data: ParseData) -> 'SignageLegend':
+        return SignageLegend(
+            data.id,
+            ImgHandle.parse(data.info, data.pak_id, 51, 51, subkey='blank'),
+            ImgHandle.parse(data.info, data.pak_id, 256, 512, subkey='overlay'),
+        )
+    @staticmethod
+    def export(exp_data: ExportData) -> None:
+        """This is all performed in Signage."""
 
 
 class Signage(PakObject, allow_mult=True):
@@ -41,7 +69,7 @@ class Signage(PakObject, allow_mult=True):
         self.dnd_icon = None
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'Signage':
+    def parse(cls, data: ParseData) -> Signage:
         styles: Dict[str, SignStyle] = {}
         for prop in data.info.find_children('styles'):
             sty_id = prop.name.upper()
@@ -95,7 +123,7 @@ class Signage(PakObject, allow_mult=True):
             data.info.bool('hidden'),
         )
 
-    def add_over(self, override: 'Signage') -> None:
+    def add_over(self, override: Signage) -> None:
         """Append additional styles to the signage."""
         for sty_id, opts in override.styles.items():
             if sty_id in self.styles:
@@ -115,12 +143,14 @@ class Signage(PakObject, allow_mult=True):
 
     @staticmethod
     def export(exp_data: ExportData) -> None:
-        """Export the selected signage to the config."""
+        """Export the selected signage to the config, and produce the legend."""
         # Timer value -> sign ID.
         sel_ids: List[Tuple[str, str]] = exp_data.selected
 
         # Special case, arrow is never selectable.
         sel_ids.append(('arrow', 'SIGN_ARROW'))
+
+        sel_icons: dict[int, ImgHandle] = {}
 
         conf = Property('Signage', [])
 
@@ -132,7 +162,7 @@ class Signage(PakObject, allow_mult=True):
                 continue
             prop_block = Property(str(tim_id), [])
 
-            sign._serialise(prop_block, exp_data.selected_style)
+            sty_sign = sign._serialise(prop_block, exp_data.selected_style)
 
             for sub_name, sub_id in [
                 ('primary', sign.prim_id),
@@ -154,9 +184,14 @@ class Signage(PakObject, allow_mult=True):
             if prop_block:
                 conf.append(prop_block)
 
-        exp_data.vbsp_conf.append(conf)
+            # Valid timer number, store to be placed on the texture.
+            if tim_id.isdigit() and sty_sign is not None:
+                sel_icons[int(tim_id)] = sty_sign.icon
 
-    def _serialise(self, parent: Property, style: Style) -> None:
+        exp_data.vbsp_conf.append(conf)
+        build_texture(exp_data.game, exp_data.selected_style, sel_icons)
+
+    def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
         """Write this sign's data for the style to the provided property."""
         for potential_style in style.bases:
             try:
@@ -173,7 +208,56 @@ class Signage(PakObject, allow_mult=True):
             try:
                 data = self.styles['BEE2_CLEAN']
             except KeyError:
-                return
+                return None
         parent.append(Property('world', data.world))
         parent.append(Property('overlay', data.overlay))
         parent.append(Property('type', data.type))
+        return data
+
+
+def build_texture(
+    game: gameMan.Game,
+    sel_style: Style,
+    icons: Dict[int, ImgHandle],
+) -> None:
+    """Construct the legend texture for the signage."""
+    legend = Image.new('RGBA', (256, 512), (0, 0, 0, 0))
+
+    for style in sel_style.bases:
+        try:
+            legend_info = SignageLegend.by_id(style.id)
+        except KeyError:
+            pass
+        else:
+            blank = legend_info.blank.get_pil().convert('RGB')
+            overlay = legend_info.overlay.get_pil()
+            break
+    else:
+        LOGGER.warning('No Signage style overlay defined.')
+        blank = Image.new('RGBA', (51, 51), (0, 0, 0, 0))
+        overlay = None
+
+    for i in range(28):
+        y, x = divmod(i, 5)
+        if y == 5:  # Last row is shifted over to center.
+            x += 1
+        try:
+            ico = icons[i + 3].get_pil().resize((51, 51), Image.ANTIALIAS).convert('RGB')
+        except KeyError:
+            ico = blank
+        legend.paste(ico, (x * 51, y * 51))
+
+    if overlay is not None:
+        legend = Image.alpha_composite(legend, overlay)
+
+    vtf = VTF(256, 512, fmt=ImageFormats.DXT5)
+    vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
+    vtf.clear_mipmaps()
+    vtf_loc = game.abs_path(
+        'bee2/materials/BEE2/models/'
+        'props_map_editor/signage/signage.vtf'
+    )
+    Path(vtf_loc).parent.mkdir(parents=True, exist_ok=True)
+    with open(vtf_loc, 'wb') as f:
+        LOGGER.info('Exporting "{}"...', vtf_loc)
+        vtf.save(f)
