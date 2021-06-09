@@ -247,12 +247,12 @@ def _pil_from_package(uri: PackagePath, width: int, height: int) -> Image.Image:
         LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
         return Handle.error(width, height).load_pil()
 
-    return _load_file(fsys, uri, width, height, Image.BILINEAR, True)
+    return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
 
 
 def _pil_load_builtin(uri: PackagePath, width: int, height: int) -> Image.Image:
     """Load from the builtin UI resources."""
-    return _load_file(FSYS_BUILTIN, uri, width, height, Image.BILINEAR)
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.ANTIALIAS)
 
 
 def _pil_load_builtin_sprite(uri: PackagePath, width: int, height: int) -> Image.Image:
@@ -380,7 +380,7 @@ class Handle(Generic[ArgT]):
             children = []
             for child in prop:
                 if child.name not in ('image', 'img', 'layer'):
-                    raise ValueError(f'Unknown compound type "{child.real_name}"!')
+                    raise ValueError(f'Unknown compound type "{child}"!')
                 children.append(cls.parse(
                     child, pack,
                     width, height,
@@ -537,15 +537,15 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_COLOR, color, width, height)
 
     def get_pil(self) -> Image.Image:
-        """Load the PIL image if required, then return it.
-
-        Only available on BUILTIN type images since they cannot then be
-        reloaded.
-        """
-        if not self.type.allow_raw:
-            raise ValueError('Cannot use get_tk() on non-builtin types!')
-        self._force_loaded = True
-        return self._load_pil()
+        """Load the PIL image if required, then return it."""
+        with self.lock:
+            if self.type.allow_raw:
+                # Force load, so it's always ready.
+                self._force_loaded = True
+            elif not self._users:
+                # Loading something unused, schedule it to be cleaned.
+                _pending_cleanup[id(self)] = (self, time.monotonic())
+            return self._load_pil()
 
     def get_tk(self) -> tkImage:
         """Load the TK image if required, then return it.
