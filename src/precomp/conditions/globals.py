@@ -177,7 +177,7 @@ def res_set_voice_attr(res: Property) -> object:
     be present for syntax reasons.
     """
     if res.has_children():
-        for opt in res.value:
+        for opt in res:
             vbsp.settings['has_attr'][opt.name] = True
     else:
         vbsp.settings['has_attr'][res.value.casefold()] = True
