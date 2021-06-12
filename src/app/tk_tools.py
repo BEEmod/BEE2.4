@@ -82,6 +82,27 @@ else:  # Linux
     LISTBOX_BG_COLOR = 'white'
 
 
+# Some events differ on different systems, so define them here.
+if utils.MAC:
+    KEY_EXPORT = '<Command-e>'
+    KEY_SAVE = '<Command-s>'
+    KEY_SAVE_AS = '<Command-Shift-s>'
+
+    # tkinter replaces Command- with the special symbol automatically.
+    ACCEL_EXPORT = 'Command-E'
+    ACCEL_SAVE = 'Command-S'
+    ACCEL_SAVE_AS = 'Command-Shift-S'
+else:
+    KEY_EXPORT = '<Control-e>'
+    KEY_SAVE = '<Control-s>'
+    KEY_SAVE_AS = '<Control-Shift-s>'
+
+    # The text used to show shortcuts in menus.
+    ACCEL_EXPORT = 'Ctrl-E'
+    ACCEL_SAVE = 'Ctrl-S'
+    ACCEL_SAVE_AS = 'Ctrl-Shift-S'
+
+
 def event_cancel(*args, **kwargs):
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'

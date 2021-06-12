@@ -1689,8 +1689,8 @@ def init_menu_bar(win: Toplevel) -> Menu:
     file_menu.add_command(
         label=_("Export"),
         command=export_editoritems,
-        accelerator=utils.KEY_ACCEL['KEY_EXPORT'],
-        )
+        accelerator=tk_tools.ACCEL_EXPORT,
+    )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
     file_menu.add_command(
@@ -1754,14 +1754,14 @@ def init_menu_bar(win: Toplevel) -> Menu:
     pal_menu.add_command(
         label=_('Save Palette'),
         command=pal_save,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
-        )
+        accelerator=tk_tools.ACCEL_SAVE,
+    )
     menus['pal_save_ind'] = pal_menu.index('end')
     pal_menu.add_command(
         label=_('Save Palette As...'),
         command=pal_save_as,
-        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
-        )
+        accelerator=tk_tools.ACCEL_SAVE_AS,
+    )
 
     pal_menu.add_separator()
 
@@ -1770,9 +1770,9 @@ def init_menu_bar(win: Toplevel) -> Menu:
     view_menu = Menu(bar)
     bar.add_cascade(menu=view_menu, label=_('View'))
 
-    win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
-    win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
-    win.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
+    win.bind_all(tk_tools.KEY_SAVE, pal_save)
+    win.bind_all(tk_tools.KEY_SAVE_AS, pal_save_as)
+    win.bind_all(tk_tools.KEY_EXPORT, export_editoritems)
 
     helpMenu.make_help_menu(bar)
 
