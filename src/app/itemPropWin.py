@@ -298,7 +298,7 @@ def exit_win(e=None) -> None:
 
     if contextWin.is_open:
         # Restore the context window if we hid it earlier.
-        contextWin.prop_window.deiconify()
+        contextWin.window.deiconify()
 
 
 def can_edit(prop_list):
@@ -612,7 +612,7 @@ def show_window(used_props, parent, item_name):
 
     if contextWin.is_open:
         # Temporarily hide the context window while we're open.
-        contextWin.prop_window.withdraw()
+        contextWin.window.withdraw()
 
 
 # load the window if directly executing this file
