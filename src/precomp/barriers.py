@@ -392,6 +392,12 @@ def make_barriers(vmf: VMF):
                 front_temp,
                 solid_pane_func,
             )
+            # Generate hint brushes, to ensure sorting is done correctly.
+            [hint] = solid_pane_func(0, 4.0, consts.Tools.SKIP)
+            for side in hint:
+                if abs(Vec.dot(side.normal(), normal)) > 0.99:
+                    side.mat = consts.Tools.HINT
+            vmf.add_brush(hint)
 
     if floorbeam_temp:
         LOGGER.info('Adding Glass floor beams...')
@@ -431,10 +437,8 @@ def make_glass_grating(
     # The actual glass/grating brush - 0.5-1.5 units back from the surface.
     main_ent.solids = solid_func(0.5, 1.5, consts.Tools.NODRAW)
 
-    abs_norm = abs(normal)
     for face in main_ent.sides():
-        f_normal = face.normal()
-        if abs(f_normal) == abs_norm:
+        if abs(Vec.dot(normal, face.normal())) > 0.99:
             texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
             front_temp.apply(face, change_mat=False)
 
@@ -526,8 +530,8 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 if our_group is neigh_group:
                     continue
 
-                # Now merge the two lists. We then need to update all dict locs
-                # to point to the new list.
+                # Now merge the two lists. We then need to update all dict
+                # locations to point to the new list.
 
                 if len(neigh_group) > len(our_group):
                     small_group, large_group = our_group, neigh_group
@@ -547,10 +551,8 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     # Side -> u, v or None
 
     for group in groups:
-
         bbox_min, bbox_max = Vec.bbox(group)
         dimensions = bbox_max - bbox_min
-        LOGGER.info('Size = {}', dimensions)
 
         # Our beams align to the smallest axis.
         if dimensions.y > dimensions.x:
@@ -564,7 +566,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
 
         # Build min, max tuples for each axis in the other direction.
         # This tells us where the beams will be.
-        beams: Dict[int, Tuple[int, int]] = {}
+        beams: dict[float, tuple[float, float]] = {}
 
         # Add 128 so the first pos isn't a beam.
         offset = bbox_min[side_ax] + 128
