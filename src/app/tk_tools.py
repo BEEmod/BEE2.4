@@ -161,7 +161,21 @@ elif utils.LINUX:
             frame.bind('<Button-5>', scroll_down, add='+')
 
 
-def _bind_event_handler(bind_func):
+EventFuncT = TypeVar('EventFuncT', bound=Callable[[tk.Event], Any])
+
+
+class _Binder(Protocol):
+    @overload
+    def __call__(self, wid: tk.Misc, add: bool=False) -> Callable[[EventFuncT], EventFuncT]:
+        pass
+    @overload
+    def __call__(self, wid: tk.Misc, func: EventFuncT, add: bool=False) -> str:
+        pass
+    def __call__(self, wid: tk.Misc, func: Optional[EventFuncT]=None, add: bool=False):
+        pass
+
+
+def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFuncT, bool], None]) -> _Binder:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
@@ -178,7 +192,7 @@ def _bind_event_handler(bind_func):
         else:
             # Normally, call directly
             return bind_func(wid, func, add)
-    return functools.update_wrapper(deco, bind_func)
+    return functools.update_wrapper(cast(_Binder, deco), bind_func)
 
 if utils.MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
