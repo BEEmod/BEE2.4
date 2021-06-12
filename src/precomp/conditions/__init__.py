@@ -958,36 +958,15 @@ T = TypeVar('T')
 
 
 def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
-    """If a value starts with '$', lookup the associated var.
+    """If a value contains '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
-    If it starts with '!' (before '$'), invert boolean values.
+    If it starts with '!$', invert boolean values.
     """
     if not isinstance(value, str):
         return value
 
-    if value.startswith('!$'):
-        inverted = True
-        value = value[1:]
-    else:
-        inverted = False
-
-    if value.startswith('$'):
-        if value in inst.fixup:
-            value = inst.fixup[value]
-        else:
-            LOGGER.warning(
-                'Invalid fixup ({}) in the "{}" instance:\n{}',
-                value,
-                inst['targetname'],
-                inst,
-            )
-            value = ''
-
-    if inverted:
-        return srctools.bool_as_int(not srctools.conv_bool(value))
-    else:
-        return value
+    return inst.fixup.substitute(value, allow_invert=True)
 
 
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:

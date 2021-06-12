@@ -210,7 +210,7 @@ def res_set_key(inst: Entity, res: Property):
 
     The name and value should be separated by a space.
     """
-    key, value = inst.fixup.substitute(res.value).split(' ', 1)
+    key, value = inst.fixup.substitute(res.value, allow_invert=True).split(' ', 1)
     inst[key] = value
 
 
@@ -241,7 +241,7 @@ def res_set_inst_var(inst: Entity, res: Property):
     `$out $in` will copy the value of `$in` into `$out`.
     """
     var_name, val = res.value.split(' ', 1)
-    inst.fixup[var_name] = inst.fixup.substitute(val)
+    inst.fixup[var_name] = inst.fixup.substitute(val, allow_invert=True)
 
 
 @make_result_setup('mapInstVar')
