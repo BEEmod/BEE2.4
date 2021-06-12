@@ -2,6 +2,7 @@
 General code used for tkinter portions.
 
 """
+import functools
 from typing import Union, Callable, Optional
 
 from tkinter import ttk
@@ -160,8 +161,75 @@ elif utils.LINUX:
             frame.bind('<Button-5>', scroll_down, add='+')
 
 
+def _bind_event_handler(bind_func):
+    """Decorator for the bind_click functions.
 
-def event_cancel(*args, **kwargs):
+    This allows calling directly, or decorating a function with just wid and add
+    attributes.
+    """
+    def deco(wid, func=None, add=False):
+        """Decorator or normal interface, func is optional to be a decorator."""
+        if func is None:
+            def deco_2(func):
+                """Used as a decorator - must be called second with the function."""
+                bind_func(wid, func, add)
+                return func
+            return deco_2
+        else:
+            # Normally, call directly
+            return bind_func(wid, func, add)
+    return functools.update_wrapper(deco, bind_func)
+
+if utils.MAC:
+    # On OSX, make left-clicks switch to a rightclick when control is held.
+    @_bind_event_handler
+    def bind_leftclick(wid, func, add=False):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held.
+        """
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func(e)
+        wid.bind(EVENTS['LEFT'], event_handler, add=add)
+
+    @_bind_event_handler
+    def bind_leftclick_double(wid, func, add=False):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held."""
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func(e)
+        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
+
+    @_bind_event_handler
+    def bind_rightclick(wid, func, add=False):
+        """On OSX, we need to bind to both rightclick and control-leftclick."""
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
+else:
+    @_bind_event_handler
+    def bind_leftclick(wid, func, add=False):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT'], func, add=add)
+
+    @_bind_event_handler
+    def bind_leftclick_double(wid, func, add=False):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
+
+    @_bind_event_handler
+    def bind_rightclick(wid, func, add=False):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+
+
+def event_cancel(*args, **kwargs) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
 
@@ -331,7 +399,7 @@ class FileField(ttk.Frame):
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)
-        utils.bind_leftclick(self.textbox, self.browse)
+        bind_leftclick(self.textbox, self.browse)
         # The full location is displayed in a tooltip.
         add_tooltip(self.textbox, self._location)
         self.textbox.bind('<Configure>', self._text_configure)

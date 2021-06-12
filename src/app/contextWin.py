@@ -479,11 +479,11 @@ def init_widgets():
         wid['subitem', i] = ttk.Label(sub_frame)
         img.apply(wid['subitem', i], IMG_ALPHA)
         wid['subitem', i].grid(row=0, column=i)
-        utils.bind_leftclick(
+        tk_tools.bind_leftclick(
             wid['subitem', i],
             functools.partial(sub_sel, i),
         )
-        utils.bind_rightclick(
+        tk_tools.bind_rightclick(
             wid['subitem', i],
             functools.partial(sub_open, i),
         )

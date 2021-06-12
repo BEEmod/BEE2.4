@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import tkinter
 import utils
-from app import sound, img, TK_ROOT
+from app import sound, img, TK_ROOT, tk_tools
 from enum import Enum
 from tkinter import ttk, messagebox
 from srctools.logger import get_logger
@@ -407,13 +407,13 @@ class Slot(Generic[ItemT]):
         self._pos_type = None
         self._lbl = tkinter.Label(parent)
         img.apply(self._lbl, man._img_blank)
-        utils.bind_leftclick(self._lbl, self._evt_start)
+        tk_tools.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(utils.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
         self._lbl.bind('<Enter>', self._evt_hover_enter)
         self._lbl.bind('<Leave>', self._evt_hover_exit)
 
         config_event = self._evt_configure
-        utils.bind_rightclick(self._lbl, config_event)
+        tk_tools.bind_rightclick(self._lbl, config_event)
 
         if label:
             self._text_lbl = tkinter.Label(
@@ -433,7 +433,7 @@ class Slot(Generic[ItemT]):
             )
             img.apply(self._info_btn, img.Handle.builtin('icons/gear', 10, 10))
 
-            @utils.bind_leftclick(self._info_btn)
+            @tk_tools.bind_leftclick(self._info_btn)
             def info_button_click(e):
                 """Trigger the callback whenever the gear button was pressed."""
                 config_event(e)
@@ -441,7 +441,7 @@ class Slot(Generic[ItemT]):
                 # window and hide the window again.
                 return 'break'
             # Rightclick does the same as the main icon.
-            utils.bind_rightclick(self._info_btn, config_event)
+            tk_tools.bind_rightclick(self._info_btn, config_event)
         else:
             self._info_btn = None
 

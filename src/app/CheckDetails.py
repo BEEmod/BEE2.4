@@ -123,10 +123,10 @@ class Item:
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
-                wid.bind('<Enter>', self.hover_start, add='+')
-                wid.bind('<Leave>', self.hover_stop, add='+')
-                utils.bind_leftclick(wid, self.row_click, add='+')
-                wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add='+')
+                wid.bind('<Enter>', self.hover_start, add=True)
+                wid.bind('<Leave>', self.hover_stop, add=True)
+                tk_tools.bind_leftclick(wid, self.row_click, add=True)
+                wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add=True)
 
             self.val_widgets.append(wid)
 
@@ -329,7 +329,7 @@ class CheckDetails(ttk.Frame):
 
             header.bind('<Enter>', header_enter)
             header.bind('<Leave>', header_leave)
-            utils.bind_leftclick(label, functools.partial(self.sort, i))
+            tk_tools.bind_leftclick(label, functools.partial(self.sort, i))
 
             # Headers can't become smaller than their initial size -
             # The amount of space to show all the text + arrow

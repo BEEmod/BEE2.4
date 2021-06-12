@@ -13,10 +13,7 @@ from operator import itemgetter
 from enum import Enum
 import functools
 import math
-from typing import (
-    NamedTuple, Optional, List, Dict, Union, Iterable, Mapping,
-    Tuple,
-)
+from typing import NamedTuple, Optional, List, Dict, Union, Iterable, Mapping
 
 from app.richTextBox import tkRichText
 from app.tkMarkdown import MarkdownData
@@ -164,7 +161,7 @@ class GroupHeader(ttk.Frame):
         widgets = self.winfo_children()
         widgets.append(self)
         for wid in widgets:  # type: Widget
-            utils.bind_leftclick(wid, self.toggle)
+            tk_tools.bind_leftclick(wid, self.toggle)
             wid['cursor'] = utils.CURSORS['link']
         self.bind('<Enter>', self.hover_start)
         self.bind('<Leave>', self.hover_end)
@@ -629,7 +626,7 @@ class selWin:
                 system=sound_sys,
             )
             samp_button['command'] = self.sampler.play_sample
-            utils.bind_leftclick(self.prop_icon, self.sampler.play_sample)
+            tk_tools.bind_leftclick(self.prop_icon, self.sampler.play_sample)
             samp_button.state(('disabled',))
         else:
             self.sampler = None
@@ -799,12 +796,12 @@ class selWin:
             textvariable=self.disp_label,
             cursor=utils.CURSORS['regular'],
         )
-        utils.bind_leftclick(
+        tk_tools.bind_leftclick(
             self.display,
             self.open_win,
         )
         self.display.bind("<Key>", self.set_disp)
-        utils.bind_rightclick(
+        tk_tools.bind_rightclick(
             self.display,
             self.open_context,
         )
@@ -882,7 +879,7 @@ class selWin:
                         compound='top',
                     )
 
-                @utils.bind_leftclick(item.button)
+                @tk_tools.bind_leftclick(item.button)
                 def click_item(event=None, *, _self=self, _item=item):
                     """Handle clicking on the item.
 

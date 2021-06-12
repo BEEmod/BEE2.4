@@ -625,7 +625,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
     # Register a function to be called whenever this variable is changed.
     var.trace_add('write', update_image)
 
-    utils.bind_leftclick(swatch, open_win)
+    tk_tools.bind_leftclick(swatch, open_win)
 
     return swatch
 

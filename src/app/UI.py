@@ -310,9 +310,9 @@ class PalItem(Label):
         img.apply(self.info_btn, ICO_GEAR)
 
         click_func = contextWin.open_event(self)
-        utils.bind_rightclick(self, click_func)
+        tk_tools.bind_rightclick(self, click_func)
 
-        @utils.bind_leftclick(self.info_btn)
+        @tk_tools.bind_leftclick(self.info_btn)
         def info_button_click(e):
             click_func(e)
             # Cancel the event sequence, so it doesn't travel up to the main
@@ -320,7 +320,7 @@ class PalItem(Label):
             return 'break'
 
         # Rightclick does the same as the icon.
-        utils.bind_rightclick(self.info_btn, click_func)
+        tk_tools.bind_rightclick(self.info_btn, click_func)
 
     def rollover(self, _):
         """Show the name of a subitem and info button when moused over."""
@@ -1946,11 +1946,11 @@ def init_windows() -> None:
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
-    utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
-    utils.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
-    utils.bind_leftclick(CompilerPane.window, contextWin.hide_context)
-    utils.bind_leftclick(windows['opt'], contextWin.hide_context)
-    utils.bind_leftclick(windows['pal'], contextWin.hide_context)
+    tk_tools.bind_leftclick(TK_ROOT, contextWin.hide_context)
+    tk_tools.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    tk_tools.bind_leftclick(CompilerPane.window, contextWin.hide_context)
+    tk_tools.bind_leftclick(windows['opt'], contextWin.hide_context)
+    tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
 
     backup_win.init_toplevel()
     loader.step('UI')
