@@ -808,7 +808,7 @@ def init() -> None:
         )
         UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
 
-        utils.add_mousewheel(
+        tk_tools.add_mousewheel(
             UI[cat + 'details'].wid_canvas,
             UI[cat + 'frame'],
         )

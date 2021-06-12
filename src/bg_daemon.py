@@ -657,7 +657,7 @@ class LogWindow:
             sel_frame,
             name='level_selector',
             values=translations['level_text'],
-            exportselection=0,
+            exportselection=False,
             # On Mac this defaults to being way too wide!
             width=15 if utils.MAC else None,
         )
@@ -668,7 +668,7 @@ class LogWindow:
         self.level_selector.grid(row=0, column=1, sticky='E')
         sel_frame.columnconfigure(1, weight=1)
 
-        utils.add_mousewheel(self.text, window, sel_frame, button_frame)
+        tk_tools.add_mousewheel(self.text, window, sel_frame, button_frame)
 
         if utils.USE_SIZEGRIP:
             ttk.Sizegrip(button_frame).grid(row=0, column=3)

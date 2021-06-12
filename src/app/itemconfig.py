@@ -14,7 +14,7 @@ import BEE2_config
 from app.tooltip import add_tooltip
 import utils
 import srctools.logger
-from app import signage_ui, UI, tkMarkdown, sound, img
+from app import signage_ui, UI, tkMarkdown, sound, img, tk_tools
 
 from typing import Union, Callable, List, Tuple, Optional
 
@@ -297,7 +297,7 @@ def make_pane(parent: ttk.Frame):
     scrollbar.grid(column=1, row=0, sticky="ns")
     canvas['yscrollcommand'] = scrollbar.set
 
-    utils.add_mousewheel(canvas, canvas, parent)
+    tk_tools.add_mousewheel(canvas, canvas, parent)
     canvas_frame = ttk.Frame(canvas)
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)

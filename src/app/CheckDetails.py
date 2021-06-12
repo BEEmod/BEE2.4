@@ -12,6 +12,7 @@ import tkinter as tk
 import functools
 
 from app.tooltip import add_tooltip, set_tooltip
+from app import tk_tools
 import utils
 
 from typing import List, Iterator, Optional
@@ -129,7 +130,7 @@ class Item:
 
             self.val_widgets.append(wid)
 
-        utils.add_mousewheel(
+        tk_tools.add_mousewheel(
             self.master.wid_canvas,
             self.check,
             *self.val_widgets
@@ -286,7 +287,7 @@ class CheckDetails(ttk.Frame):
 
         self.add_items(*items)
 
-        utils.add_mousewheel(
+        tk_tools.add_mousewheel(
             self.wid_canvas,
 
             self.wid_canvas,
@@ -515,7 +516,7 @@ if __name__ == '__main__':
         ]
     )
     test_inst.grid(sticky='NSEW')
-    utils.add_mousewheel(test_inst.wid_canvas, TK_ROOT)
+    tk_tools.add_mousewheel(test_inst.wid_canvas, TK_ROOT)
 
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)

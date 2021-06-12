@@ -9,7 +9,7 @@ from packages import Signage, Style
 import tkinter as tk
 from srctools import Property
 from tkinter import ttk
-from app.tk_tools import HidingScroll
+from app import tk_tools
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -146,7 +146,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
 
     canv_all = tk.Canvas(window)
 
-    scroll = HidingScroll(window, orient='vertical', command=canv_all.yview)
+    scroll = tk_tools.HidingScroll(window, orient='vertical', command=canv_all.yview)
     canv_all['yscrollcommand'] = scroll.set
 
     name_label = ttk.Label(window, text='', justify='center')
@@ -161,7 +161,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     window.columnconfigure(1, weight=1)
     window.rowconfigure(3, weight=1)
 
-    utils.add_mousewheel(canv_all, canv_all, window)
+    tk_tools.add_mousewheel(canv_all, canv_all, window)
 
     preview_left = ttk.Label(frame_preview, anchor='e')
     preview_right = ttk.Label(frame_preview, anchor='w')

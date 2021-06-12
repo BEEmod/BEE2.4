@@ -9,10 +9,9 @@ from srctools import Property
 from srctools.logger import get_logger
 import packages
 from app.SubPane import SubPane
-from app import tooltip, TK_ROOT, itemconfig, img
+from app import tooltip, TK_ROOT, itemconfig, tk_tools
 import utils
 import BEE2_config
-
 
 
 LOGGER = get_logger(__name__)
@@ -268,7 +267,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
     canvas['yscrollcommand'] = UI['style_scroll'].set
 
-    utils.add_mousewheel(canvas, stylevar_frame)
+    tk_tools.add_mousewheel(canvas, stylevar_frame)
 
     canvas_frame = ttk.Frame(canvas)
 

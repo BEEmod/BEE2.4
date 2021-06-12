@@ -1943,7 +1943,7 @@ def init_windows() -> None:
     )
 
     # Make scrollbar work globally
-    utils.add_mousewheel(pal_canvas, TK_ROOT)
+    tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
     utils.bind_leftclick(TK_ROOT, contextWin.hide_context)

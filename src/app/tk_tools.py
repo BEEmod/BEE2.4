@@ -103,6 +103,64 @@ else:
     ACCEL_SAVE_AS = 'Ctrl-Shift-S'
 
 
+
+
+if utils.WIN:
+    def add_mousewheel(target, *frames, orient='y'):
+        """Add events so scrolling anywhere in a frame will scroll a target.
+
+        frames should be the TK objects to bind to - mainly Frame or
+        Toplevel objects.
+        Set orient to 'x' or 'y'.
+        This is needed since different platforms handle mousewheel events
+        differently - Windows needs the delta value to be divided by 120.
+        """
+        scroll_func = getattr(target, orient + 'view_scroll')
+
+        def mousewheel_handler(event):
+            scroll_func(int(event.delta / -120), "units")
+        for frame in frames:
+            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
+
+elif utils.MAC:
+    def add_mousewheel(target, *frames, orient='y'):
+        """Add events so scrolling anywhere in a frame will scroll a target.
+
+        frame should be a sequence of any TK objects, like a Toplevel or Frame.
+        Set orient to 'x' or 'y'.
+        This is needed since different platforms handle mousewheel events
+        differently - OS X needs the delta value passed unmodified.
+        """
+        scroll_func = getattr(target, orient + 'view_scroll')
+
+        def mousewheel_handler(event):
+            scroll_func(-event.delta, "units")
+        for frame in frames:
+            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
+elif utils.LINUX:
+    def add_mousewheel(target, *frames, orient='y'):
+        """Add events so scrolling anywhere in a frame will scroll a target.
+
+        frame should be a sequence of any TK objects, like a Toplevel or Frame.
+        Set orient to 'x' or 'y'.
+        This is needed since different platforms handle mousewheel events
+        differently - Linux uses Button-4 and Button-5 events instead of
+        a MouseWheel event.
+        """
+        scroll_func = getattr(target, orient + 'view_scroll')
+
+        def scroll_up(_):
+            scroll_func(-1, "units")
+
+        def scroll_down(_):
+            scroll_func(1, "units")
+
+        for frame in frames:
+            frame.bind('<Button-4>', scroll_up, add='+')
+            frame.bind('<Button-5>', scroll_down, add='+')
+
+
+
 def event_cancel(*args, **kwargs):
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'

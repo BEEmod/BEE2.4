@@ -159,18 +159,7 @@ if WIN:
         'RIGHT_SHIFT': '<Shift-Button-3>',
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
-
-        'KEY_EXPORT': '<Control-e>',
-        'KEY_SAVE_AS': '<Control-s>',
-        'KEY_SAVE': '<Control-Shift-s>',
     }
-    # The text used to show shortcuts in menus.
-    KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
-    }
-
     CURSORS = {
         'regular': 'arrow',
         'link': 'hand2',
@@ -181,22 +170,6 @@ if WIN:
         'destroy_item': 'x_cursor',
         'invalid_drag': 'no',
     }
-
-    def add_mousewheel(target, *frames, orient='y'):
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frames should be the TK objects to bind to - mainly Frame or
-        Toplevel objects.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - Windows needs the delta value to be divided by 120.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
-        def mousewheel_handler(event):
-            scroll_func(int(event.delta / -120), "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
 
 elif MAC:
     EVENTS = {
@@ -213,17 +186,6 @@ elif MAC:
         'RIGHT_SHIFT': '<Shift-Button-2>',
         'RIGHT_RELEASE': '<ButtonRelease-2>',
         'RIGHT_MOVE': '<B2-Motion>',
-
-        'KEY_EXPORT': '<Command-e>',
-        'KEY_SAVE_AS': '<Command-s>',
-        'KEY_SAVE': '<Command-Shift-s>',
-    }
-
-    KEY_ACCEL = {
-        # tkinter replaces Command- with the special symbol automatically.
-        'KEY_EXPORT': 'Command-E',
-        'KEY_SAVE': 'Command-S',
-        'KEY_SAVE_AS': 'Command-Shift-S',
     }
 
     CURSORS = {
@@ -237,20 +199,6 @@ elif MAC:
         'invalid_drag': 'notallowed',
     }
 
-    def add_mousewheel(target, *frames, orient='y'):
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frame should be a sequence of any TK objects, like a Toplevel or Frame.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - OS X needs the delta value passed unmodified.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
-        def mousewheel_handler(event):
-            scroll_func(-event.delta, "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
 elif LINUX:
     EVENTS = {
         'LEFT': '<Button-1>',
@@ -266,15 +214,6 @@ elif LINUX:
         'RIGHT_SHIFT': '<Shift-Button-3>',
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
-
-        'KEY_EXPORT': '<Control-e>',
-        'KEY_SAVE_AS': '<Control-s>',
-        'KEY_SAVE': '<Control-Shift-s>',
-    }
-    KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl+E',
-        'KEY_SAVE': 'Ctrl+S',
-        'KEY_SAVE_AS': 'Shift+Ctrl+S',
     }
 
     CURSORS = {
@@ -287,27 +226,6 @@ elif LINUX:
         'destroy_item': 'X_cursor',
         'invalid_drag': 'circle',
     }
-
-    def add_mousewheel(target, *frames, orient='y'):
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frame should be a sequence of any TK objects, like a Toplevel or Frame.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - Linux uses Button-4 and Button-5 events instead of
-        a MouseWheel event.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
-        def scroll_up(_):
-            scroll_func(-1, "units")
-
-        def scroll_down(_):
-            scroll_func(1, "units")
-
-        for frame in frames:
-            frame.bind('<Button-4>', scroll_up, add='+')
-            frame.bind('<Button-5>', scroll_down, add='+')
 
 
 def bind_event_handler(bind_func):
