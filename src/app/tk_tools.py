@@ -3,7 +3,7 @@ General code used for tkinter portions.
 
 """
 import functools
-from typing import Union, Callable, Optional
+from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional
 
 from tkinter import ttk
 from tkinter import font as _tk_font

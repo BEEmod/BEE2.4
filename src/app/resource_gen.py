@@ -1,12 +1,10 @@
 """Generates various resources depending on package options."""
 from __future__ import annotations
 
-from tkinter import font as tk_font
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import colorsys
 
-import utils
 from srctools.vtf import VTF, ImageFormats
 from app.itemconfig import ConfigGroup, parse_color
 import srctools.logger

@@ -177,6 +177,7 @@ def has_sound() -> bool:
     return isinstance(sounds, PygletSound)
 
 
+sounds: NullSound
 try:
     import pyglet.media
     from pyglet.media.codecs import Source

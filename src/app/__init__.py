@@ -88,7 +88,7 @@ def on_error(
     except Exception:
         pass
     try:
-        import sound
+        from . import sound
         sound.sounds = sound.NullSound()
     except Exception:
         pass

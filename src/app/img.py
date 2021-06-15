@@ -405,7 +405,6 @@ class Handle(Generic[ArgT]):
         If subfolder is specified, files will be relative to this folder.
         The width/height may be zero to indicate it should not be resized.
         """
-        uri: PackagePath
         if subfolder:
             uri = uri.in_folder(subfolder)
 
@@ -533,7 +532,7 @@ class Handle(Generic[ArgT]):
         """Shortcut for getting a handle to a solid color."""
         if isinstance(color, Vec):
             # Convert.
-            color = tuple(map(int, color))
+            color = int(color.x), int(color.y), int(color.z)
         return cls._get(TYP_COLOR, color, width, height)
 
     def get_pil(self) -> Image.Image:

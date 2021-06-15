@@ -2,6 +2,7 @@
 """
 import logging
 import multiprocessing, threading
+from typing import Union
 
 import srctools.logger
 from BEE2_config import GEN_OPTS
@@ -38,8 +39,10 @@ class TextHandler(logging.Handler):
         GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(is_visible)
         _PIPE_MAIN_SEND.send(('visible', is_visible, None))
 
-    def setLevel(self, level: str) -> None:
+    def setLevel(self, level: Union[int, str]) -> None:
         """Set the level of the log window."""
+        if isinstance(level, int):
+            level = logging.getLevelName(level)
         super(TextHandler, self).setLevel(level)
         _PIPE_MAIN_SEND.send(('level', level, None))
 
