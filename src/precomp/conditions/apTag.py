@@ -4,7 +4,8 @@ import math
 import os
 from typing import Optional
 
-from srctools import Vec, Property, VMF, Entity, Output
+from precomp.connections import Item
+from srctools import Vec, Property, VMF, Entity, Output, Angle, Matrix
 import srctools.logger
 
 from precomp import instanceLocs, options, connections
@@ -14,7 +15,7 @@ from precomp.conditions import (
     local_name,
 )
 from connections import Config
-from precomp.fizzler import FIZZLERS, FIZZ_TYPES
+from precomp.fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 import utils
 import vbsp
 
@@ -32,7 +33,7 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
     """Create the spawn point for ATLAS in the entry corridor.
 
     It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
-    The two parameters `origin` and `facing` must be set to determine the required position.
+    The two parameters `origin` and `angles` must be set to determine the required position, or `facing` can be set for older files.
     If `global` is set, the spawn point will be absolute instead of relative to the current instance.
     """
     if vbsp.GAME_MODE != 'COOP':
@@ -41,15 +42,18 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
     is_tag = options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
 
     origin = res.vec('origin')
-    normal = res.vec('facing', z=1)
+    if 'angles' in res:
+        angles = Angle.from_str(res['angles'])
+    else:
+        # Older system, specify the forward direction.
+        angles = res.vec('facing', z=1).to_angle()
 
     # Some styles might want to ignore the instance we're running on.
     if not res.bool('global'):
-        origin = origin.rotate_by_str(inst['angles'])
-        normal = normal.rotate_by_str(inst['angles'])
+        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        origin @= orient
+        angles @= orient
         origin += Vec.from_str(inst['origin'])
-
-    angles = normal.to_angle()
 
     if is_tag:
         vmf.create_ent(
@@ -63,6 +67,7 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
         # Blocks ATLAS from having a gun
         vmf.create_ent(
             classname='info_target',
+            # Spelling mistake is correct.
             targetname='supress_blue_portalgun_spawn',
             origin=origin,
             angles='0 0 0',
@@ -165,8 +170,8 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
 
     def make_tag_fizz(inst: Entity) -> None:
         """Create the Tag fizzler."""
-        fizzler = None
-        fizzler_item = None
+        fizzler: Optional[Fizzler] = None
+        fizzler_item: Optional[Item] = None
 
         # Look for the fizzler instance we want to replace.
         sign_item = connections.ITEMS[inst['targetname']]
@@ -203,13 +208,11 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
             fizzler_item.sec_enable_cmd = fizz_conn_conf.sec_enable_cmd
             fizzler_item.sec_disable_cmd = fizz_conn_conf.sec_disable_cmd
 
-        sign_loc = (
-            # The actual location of the sign - on the wall
-            Vec.from_str(inst['origin']) +
-            Vec(0, 0, -64).rotate_by_str(inst['angles'])
-        )
+        inst_orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
-        fizz_norm_axis = fizzler.normal().axis()
+        # The actual location of the sign - on the wall
+        sign_loc = Vec.from_str(inst['origin']) + Vec(0, 0, -64) @ inst_orient
+        fizz_norm_axis = round(fizzler.normal(), 3).axis()
 
         # Now deal with the visual aspect:
         # Blue signs should be on top.
@@ -230,15 +233,13 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
             # Hide the sign in this case!
             inst.remove()
 
-        inst_angle = srctools.parse_vec_str(inst['angles'])
-
-        inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
+        inst_normal = inst_orient.up()
         loc = Vec.from_str(inst['origin'])
 
         if disable_other or (blue_enabled and oran_enabled):
             inst['file'] = inst_frame_double
             # On a wall, and pointing vertically
-            if inst_normal.z == 0 and Vec(y=1).rotate(*inst_angle).z:
+            if abs(inst_normal.z) < 0.01 and abs(inst_orient.left().z) > 0.01:
                 # They're vertical, make sure blue's on top!
                 blue_loc = Vec(loc.x, loc.y, loc.z + sign_offset)
                 oran_loc = Vec(loc.x, loc.y, loc.z - sign_offset)
@@ -246,9 +247,8 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
                 # instead since it's more important
                 if disable_other and oran_enabled:
                     blue_loc, oran_loc = oran_loc, blue_loc
-
             else:
-                offset = Vec(0, sign_offset, 0).rotate(*inst_angle)
+                offset = Vec(0, sign_offset, 0) @ inst_orient
                 blue_loc = loc + offset
                 oran_loc = loc - offset
         else:
@@ -285,17 +285,16 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
                 # Right in line with the fizzler. Point at the closest emitter.
                 if abs(sign_floor_loc[other_axis] - normal) < 32:
                     # Compare to the closest side.
-                    sign_dir = min(
-                        (sign_floor_loc - Vec.with_axes(
+                    sign_dir = min([
+                        sign_floor_loc - Vec.with_axes(
                             fizz_norm_axis, side_min,
                             other_axis, normal,
                         ),
                         sign_floor_loc - Vec.with_axes(
-                            fizz_norm_axis, side_max,
-                            other_axis, normal,
-                        )),
-                        key=Vec.mag,
-                    )
+                             fizz_norm_axis, side_max,
+                             other_axis, normal,
+                        )
+                    ], key=Vec.mag)
                 else:
                     # Align just based on whether we're in front or behind.
                     sign_dir = Vec.with_axes(
@@ -349,10 +348,10 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
 
         # Subtract the sign from the list of connections, but don't go below
         # zero
-        fizzler.base_inst.fixup['$connectioncount'] = str(max(
+        fizzler.base_inst.fixup['$connectioncount'] = max(
             0,
-            srctools.conv_int(fizzler.base_inst.fixup['$connectioncount', '']) - 1
-        ))
+            fizzler.base_inst.fixup.int('$connectioncount') - 1
+        )
 
         # Find the direction the fizzler normal is.
         # Signs will associate with the given side!
@@ -362,10 +361,8 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
         sign_center = (bbox_min[fizz_norm_axis] + bbox_max[fizz_norm_axis]) / 2
 
         # Figure out what the sides will set values to...
-        pos_blue = False
-        pos_oran = False
-        neg_blue = False
-        neg_oran = False
+        pos_blue = pos_oran = False
+        neg_blue = neg_oran = False
 
         if sign_loc[fizz_norm_axis] < sign_center:
             pos_blue = blue_enabled
@@ -378,26 +375,18 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
         fizzler.tag_on_pos = pos_blue or pos_oran
         fizzler.tag_on_neg = neg_blue or neg_oran
 
-        # Now make the trigger ents. We special-case these since they need to swap
+        # Now make the trigger ents. We special-case these since they need to
+        # swap
         # depending on the sign config and position.
 
         if vbsp.GAME_MODE == 'COOP':
-            # We need ATLAS-specific triggers
-            pos_trig = vmf.create_ent(
-                classname='trigger_playerteam',
-            )
-            neg_trig = vmf.create_ent(
-                classname='trigger_playerteam',
-            )
+            # We need ATLAS-specific triggers.
+            pos_trig = vmf.create_ent(classname='trigger_playerteam')
+            neg_trig = vmf.create_ent(classname='trigger_playerteam')
             output = 'OnStartTouchBluePlayer'
         else:
-            pos_trig = vmf.create_ent(
-                classname='trigger_multiple',
-            )
-            neg_trig = vmf.create_ent(
-                classname='trigger_multiple',
-                spawnflags='1',
-            )
+            pos_trig = vmf.create_ent(classname='trigger_multiple')
+            neg_trig = vmf.create_ent(classname='trigger_multiple')
             output = 'OnStartTouch'
 
         pos_trig['origin'] = neg_trig['origin'] = fizzler.base_inst['origin']
@@ -428,13 +417,13 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
                 output,
                 '@BlueIsEnabled',
                 'SetValue',
-                param=srctools.bool_as_int(neg_blue),
+                neg_blue,
             ))
             pos_trig.outputs.append(Output(
                 output,
                 '@BlueIsEnabled',
                 'SetValue',
-                param=srctools.bool_as_int(pos_blue),
+                pos_blue,
             ))
             if blue_enabled:
                 # Add voice attributes - we have the gun and gel!
