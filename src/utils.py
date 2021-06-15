@@ -1,11 +1,12 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 from collections import deque
-from collections.abc import (
+from typing import (
+    TypeVar, Any, NoReturn, Generic, Type,
+    SupportsInt, Union, Callable,
     Sequence, Iterator, Iterable, Mapping,
     KeysView, ValuesView, ItemsView, Generator,
 )
-from typing import TypeVar, Any, NoReturn, Generic, Type, SupportsInt, Union, Callable
 import logging
 import os
 import stat
