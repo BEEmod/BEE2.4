@@ -1562,7 +1562,7 @@ def make_cube(
                     elif fixup_src is AddonFixups.LINKED:
                         inst.fixup[fixup_var] = pair.dropper is not None and pair.cube is not None
                     else:
-                        inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_src)
+                        inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_src, allow_invert=True)
             else:
                 inst.fixup.update(pair.cube_fixup)
         packing.pack_list(vmf, addon.pack)
