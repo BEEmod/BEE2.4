@@ -4,7 +4,7 @@ General code used for tkinter portions.
 """
 import functools
 from enum import Enum
-from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional
+from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Literal
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -194,8 +194,13 @@ else:
     raise AssertionError
 
 
+@overload
+def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: """..."""
+@overload
+def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: """..."""
+
 if utils.WIN:
-    def add_mousewheel(target, *frames, orient='y'):
+    def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
         """Add events so scrolling anywhere in a frame will scroll a target.
 
         frames should be the TK objects to bind to - mainly Frame or
@@ -206,13 +211,13 @@ if utils.WIN:
         """
         scroll_func = getattr(target, orient + 'view_scroll')
 
-        def mousewheel_handler(event):
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
             scroll_func(int(event.delta / -120), "units")
         for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
-
+            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
 elif utils.MAC:
-    def add_mousewheel(target, *frames, orient='y'):
+    def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
         """Add events so scrolling anywhere in a frame will scroll a target.
 
         frame should be a sequence of any TK objects, like a Toplevel or Frame.
@@ -222,12 +227,13 @@ elif utils.MAC:
         """
         scroll_func = getattr(target, orient + 'view_scroll')
 
-        def mousewheel_handler(event):
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
             scroll_func(-event.delta, "units")
         for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
+            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
 elif utils.LINUX:
-    def add_mousewheel(target, *frames, orient='y'):
+    def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
         """Add events so scrolling anywhere in a frame will scroll a target.
 
         frame should be a sequence of any TK objects, like a Toplevel or Frame.
@@ -238,15 +244,17 @@ elif utils.LINUX:
         """
         scroll_func = getattr(target, orient + 'view_scroll')
 
-        def scroll_up(_):
+        def scroll_up(event: tk.Event) -> None:
+            """Handle scrolling up."""
             scroll_func(-1, "units")
 
-        def scroll_down(_):
+        def scroll_down(event: tk.Event) -> None:
+            """Handle scrolling down."""
             scroll_func(1, "units")
 
         for frame in frames:
-            frame.bind('<Button-4>', scroll_up, add='+')
-            frame.bind('<Button-5>', scroll_down, add='+')
+            frame.bind('<Button-4>', scroll_up, add=True)
+            frame.bind('<Button-5>', scroll_down, add=True)
 
 
 EventFuncT = TypeVar('EventFuncT', bound=Callable[[tk.Event], Any])
