@@ -14,7 +14,8 @@ __all__ = [
     'Special', 'Tools',
     'FixupVars',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
-    'COUNTER_OR_ON', 'COUNTER_OR_OFF'
+    'COUNTER_OR_ON', 'COUNTER_OR_OFF',
+    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG',
 ]
 
 
