@@ -104,6 +104,7 @@ else:
     ACCEL_SAVE = 'Ctrl-S'
     ACCEL_SAVE_AS = 'Ctrl-Shift-S'
 
+USE_SIZEGRIP = not utils.MAC  # On Mac, we don't want to use the sizegrip widget.
 
 if utils.WIN:
     EVENTS = {

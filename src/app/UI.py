@@ -1313,7 +1313,7 @@ def init_palette(f) -> None:
     )
     UI['pal_remove'].grid(row=2, sticky="EW")
 
-    if utils.USE_SIZEGRIP:
+    if tk_tools.USE_SIZEGRIP:
         ttk.Sizegrip(f).grid(row=2, column=1)
 
 
@@ -1448,7 +1448,7 @@ def init_option(pane: SubPane) -> None:
 
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
-    if utils.USE_SIZEGRIP:
+    if tk_tools.USE_SIZEGRIP:
         sizegrip = ttk.Sizegrip(props, cursor=tk_tools.Cursors.STRETCH_HORIZ)
         sizegrip.grid(row=2, column=5, rowspan=2, sticky="NS")
 

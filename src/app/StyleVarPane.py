@@ -10,7 +10,6 @@ from srctools.logger import get_logger
 import packages
 from app.SubPane import SubPane
 from app import tooltip, TK_ROOT, itemconfig, tk_tools
-import utils
 import BEE2_config
 
 
@@ -353,7 +352,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         width=canvas_frame.winfo_reqwidth(),
     )
 
-    if utils.USE_SIZEGRIP:
+    if tk_tools.USE_SIZEGRIP:
         ttk.Sizegrip(
             window,
             cursor=tk_tools.Cursors.STRETCH_VERT,

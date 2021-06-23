@@ -670,7 +670,7 @@ class LogWindow:
 
         tk_tools.add_mousewheel(self.text, window, sel_frame, button_frame)
 
-        if utils.USE_SIZEGRIP:
+        if tk_tools.USE_SIZEGRIP:
             ttk.Sizegrip(button_frame).grid(row=0, column=3)
 
     def log(self, level_name: str, text: str) -> None:

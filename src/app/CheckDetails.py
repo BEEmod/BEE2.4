@@ -13,7 +13,6 @@ import functools
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
-import utils
 
 from typing import List, Iterator, Optional
 
@@ -265,7 +264,7 @@ class CheckDetails(ttk.Frame):
 
         self.horiz_scroll.grid(row=2, column=0, columnspan=2, sticky='EWS')
         self.vert_scroll.grid(row=1, column=2, sticky='NSE')
-        if add_sizegrip and utils.USE_SIZEGRIP:
+        if add_sizegrip and tk_tools.USE_SIZEGRIP:
             self.sizegrip = ttk.Sizegrip(self)
             self.sizegrip.grid(row=2, column=2)
         else:

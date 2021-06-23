@@ -141,10 +141,6 @@ def _run_bg_daemon(*args) -> None:
     bg_daemon.run_background(*args)
 
 
-
-USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget.
-
-
 class CONN_TYPES(Enum):
     """Possible connections when joining things together.
 
