@@ -162,7 +162,7 @@ class GroupHeader(ttk.Frame):
         widgets.append(self)
         for wid in widgets:  # type: Widget
             tk_tools.bind_leftclick(wid, self.toggle)
-            wid['cursor'] = utils.CURSORS['link']
+            wid['cursor'] = tk_tools.Cursors.LINK
         self.bind('<Enter>', self.hover_start)
         self.bind('<Leave>', self.hover_end)
 
@@ -794,7 +794,7 @@ class selWin:
         self.display = tk_tools.ReadOnlyEntry(
             frame,
             textvariable=self.disp_label,
-            cursor=utils.CURSORS['regular'],
+            cursor=tk_tools.Cursors.REGULAR,
         )
         tk_tools.bind_leftclick(
             self.display,

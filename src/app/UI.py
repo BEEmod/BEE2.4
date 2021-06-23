@@ -1038,7 +1038,7 @@ def drag_move(e):
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_win.configure(cursor=utils.CURSORS['move_item'])
+        drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
         if not drag_win.passed_over_pal:
             # If we've passed over the palette, replace identical items
@@ -1055,9 +1055,9 @@ def drag_move(e):
         drag_win.passed_over_pal = True
     else:
         if drag_win.from_pal and drag_win.passed_over_pal:
-            drag_win.configure(cursor=utils.CURSORS['destroy_item'])
+            drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
         else:
-            drag_win.configure(cursor=utils.CURSORS['invalid_drag'])
+            drag_win['cursor'] = tk_tools.Cursors.INVALID_DRAG
         UI['pre_sel_line'].place_forget()
 
 
@@ -1449,15 +1449,8 @@ def init_option(pane: SubPane) -> None:
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if utils.USE_SIZEGRIP:
-        ttk.Sizegrip(
-            props,
-            cursor=utils.CURSORS['stretch_horiz'],
-        ).grid(
-            row=2,
-            column=5,
-            rowspan=2,
-            sticky="NS",
-        )
+        sizegrip = ttk.Sizegrip(props, cursor=tk_tools.Cursors.STRETCH_HORIZ)
+        sizegrip.grid(row=2, column=5, rowspan=2, sticky="NS")
 
 
 def flow_preview():

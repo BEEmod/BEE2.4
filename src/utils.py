@@ -141,39 +141,6 @@ def _run_bg_daemon(*args) -> None:
     bg_daemon.run_background(*args)
 
 
-if WIN:
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'hand2',
-        'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
-    }
-elif MAC:
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'pointinghand',
-        'wait': 'spinning',
-        'stretch_vert': 'resizeupdown',
-        'stretch_horiz': 'resizeleftright',
-        'move_item': 'plus',
-        'destroy_item': 'poof',
-        'invalid_drag': 'notallowed',
-    }
-elif LINUX:
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'hand1',
-        'wait': 'watch',
-        'stretch_vert': 'bottom_side',
-        'stretch_horiz': 'right_side',
-        'move_item': 'crosshair',
-        'destroy_item': 'X_cursor',
-        'invalid_drag': 'circle',
-    }
 
 USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget.
 

@@ -3,6 +3,7 @@ General code used for tkinter portions.
 
 """
 import functools
+from enum import Enum
 from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional
 
 from tkinter import ttk
@@ -120,17 +121,6 @@ if utils.WIN:
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
     }
-
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'hand2',
-        'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
-    }
 elif utils.MAC:
     EVENTS = {
         'LEFT': '<Button-1>',
@@ -146,17 +136,6 @@ elif utils.MAC:
         'RIGHT_SHIFT': '<Shift-Button-2>',
         'RIGHT_RELEASE': '<ButtonRelease-2>',
         'RIGHT_MOVE': '<B2-Motion>',
-    }
-
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'pointinghand',
-        'wait': 'spinning',
-        'stretch_vert': 'resizeupdown',
-        'stretch_horiz': 'resizeleftright',
-        'move_item': 'plus',
-        'destroy_item': 'poof',
-        'invalid_drag': 'notallowed',
     }
 elif utils.LINUX:
     EVENTS = {
@@ -174,17 +153,44 @@ elif utils.LINUX:
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
     }
+else:
+    raise AssertionError
 
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'hand1',
-        'wait': 'watch',
-        'stretch_vert': 'bottom_side',
-        'stretch_horiz': 'right_side',
-        'move_item': 'crosshair',
-        'destroy_item': 'X_cursor',
-        'invalid_drag': 'circle',
-    }
+if utils.WIN:
+    class Cursors(str, Enum):
+        """Cursors we use, mapping to the relevant OS cursor."""
+        REGULAR = 'arrow'
+        LINK = 'hand2'
+        WAIT = 'watch'
+        STRETCH_VERT = 'sb_v_double_arrow'
+        STRETCH_HORIZ = 'sb_h_double_arrow'
+        MOVE_ITEM = 'plus'
+        DESTROY_ITEM = 'x_cursor'
+        INVALID_DRAG = 'no'
+elif utils.MAC:
+    class Cursors(str, Enum):
+        """Cursors we use, mapping to the relevant OS cursor."""
+        REGULAR = 'arrow'
+        LINK = 'pointinghand'
+        WAIT = 'spinning'
+        STRETCH_VERT = 'resizeupdown'
+        STRETCH_HORIZ = 'resizeleftright'
+        MOVE_ITEM = 'plus'
+        DESTROY_ITEM = 'poof'
+        INVALID_DRAG = 'notallowed'
+elif utils.LINUX:
+    class Cursors(str, Enum):
+        """Cursors we use, mapping to the relevant OS cursor."""
+        REGULAR = 'arrow'
+        LINK = 'hand1'
+        WAIT = 'watch'
+        STRETCH_VERT = 'bottom_side'
+        STRETCH_HORIZ = 'right_side'
+        MOVE_ITEM = 'crosshair'
+        DESTROY_ITEM = 'X_cursor'
+        INVALID_DRAG = 'circle'
+else:
+    raise AssertionError
 
 
 if utils.WIN:
@@ -490,7 +496,7 @@ class FileField(ttk.Frame):
             self,
             textvariable=self._text_var,
             font=_file_field_font,
-            cursor=utils.CURSORS['regular'],
+            cursor=Cursors.REGULAR,
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)

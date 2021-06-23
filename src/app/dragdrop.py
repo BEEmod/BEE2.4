@@ -341,11 +341,11 @@ class Manager(Generic[ItemT]):
         dest = self._pos_slot(event.x_root, event.y_root)
 
         if dest:
-            self._drag_win.configure(cursor=utils.CURSORS['move_item'])
+            self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
         elif self._cur_prev_slot.is_source:
-            self._drag_win.configure(cursor=utils.CURSORS['invalid_drag'])
+            self._drag_win['cursor'] = tk_tools.Cursors.INVALID_DRAG
         else:
-            self._drag_win.configure(cursor=utils.CURSORS['destroy_item'])
+            self._drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
 
     def _evt_stop(self, event: tkinter.Event) -> None:
         """User released the item."""

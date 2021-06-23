@@ -553,7 +553,7 @@ def make_comp_widgets(frame: ttk.Frame):
     UI['thumb_label'] = ttk.Label(
         thumb_frame,
         anchor=tk.CENTER,
-        cursor=utils.CURSORS['link'],
+        cursor=tk_tools.Cursors.LINK,
     )
     UI['thumb_label'].bind(tk_tools.EVENTS['LEFT'], find_screenshot)
 

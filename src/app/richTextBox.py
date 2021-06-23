@@ -6,7 +6,8 @@ from tkinter.messagebox import askokcancel
 from typing import Union, Tuple, Dict, Callable
 import webbrowser
 
-from app import tkMarkdown, img
+from app import tkMarkdown
+from app.tk_tools import Cursors
 import utils
 import srctools.logger
 
@@ -34,7 +35,7 @@ class tkRichText(tkinter.Text):
             wrap="word",
             font=self.font,
             # We only want the I-beam cursor over text.
-            cursor=utils.CURSORS['regular'],
+            cursor=Cursors.REGULAR,
         )
 
         self.heading_font = {}
@@ -50,7 +51,7 @@ class tkRichText(tkinter.Text):
 
         self.tag_config(
             "underline",
-            underline=1,
+            underline=True,
         )
         self.tag_config(
             "bold",
@@ -101,7 +102,7 @@ class tkRichText(tkinter.Text):
         )
         self.tag_config(
             "link",
-            underline=1,
+            underline=True,
             foreground='blue',
         )
 
@@ -110,12 +111,12 @@ class tkRichText(tkinter.Text):
         self.tag_bind(
             "link",
             "<Enter>",
-            lambda e: self.configure(cursor=utils.CURSORS['link']),
+            lambda e: self.configure(cursor=Cursors.LINK),
         )
         self.tag_bind(
             "link",
             "<Leave>",
-            lambda e: self.configure(cursor=utils.CURSORS['regular']),
+            lambda e: self.configure(cursor=Cursors.REGULAR),
         )
 
         self['state'] = "disabled"

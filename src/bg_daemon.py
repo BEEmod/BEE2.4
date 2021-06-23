@@ -66,7 +66,7 @@ class BaseLoadScreen:
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
         self.win.attributes('-topmost', int(force_ontop))
-        self.win['cursor'] = utils.CURSORS['wait']
+        self.win['cursor'] = tk_tools.Cursors.WAIT
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
 
@@ -98,11 +98,11 @@ class BaseLoadScreen:
         """Record offset of mouse on click."""
         self.drag_x = event.x
         self.drag_y = event.y
-        self.win['cursor'] = utils.CURSORS['move_item']
+        self.win['cursor'] = tk_tools.Cursors.MOVE_ITEM
 
     def move_stop(self, event: tk.Event):
         """Clear values when releasing."""
-        self.win['cursor'] = utils.CURSORS['wait']
+        self.win['cursor'] = tk_tools.Cursors.WAIT
         self.drag_x = self.drag_y = None
 
     def move_motion(self, event: tk.Event):
@@ -172,19 +172,19 @@ class LoadScreen(BaseLoadScreen):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.frame = ttk.Frame(self.win, cursor=utils.CURSORS['wait'])
+        self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
 
         ttk.Label(
             self.frame,
             text=self.title_text + '...',
             font=("Helvetica", 12, "bold"),
-            cursor=utils.CURSORS['wait'],
+            cursor=tk_tools.Cursors.WAIT,
         ).grid(row=0, column=0)
         ttk.Separator(
             self.frame,
             orient=tk.HORIZONTAL,
-            cursor=utils.CURSORS['wait'],
+            cursor=tk_tools.Cursors.WAIT,
         ).grid(row=1, sticky="EW", columnspan=2)
 
         ttk.Button(
@@ -203,7 +203,7 @@ class LoadScreen(BaseLoadScreen):
                 ttk.Label(
                     self.frame,
                     text=stage_name + ':',
-                    cursor=utils.CURSORS['wait'],
+                    cursor=tk_tools.Cursors.WAIT,
                 ).grid(
                     row=ind * 2 + 2,
                     columnspan=2,
@@ -216,12 +216,12 @@ class LoadScreen(BaseLoadScreen):
                 length=210,
                 maximum=1000,
                 variable=self.bar_var[st_id],
-                cursor=utils.CURSORS['wait'],
+                cursor=tk_tools.Cursors.WAIT,
             )
             self.labels[st_id] = ttk.Label(
                 self.frame,
                 text='0/??',
-                cursor=utils.CURSORS['wait'],
+                cursor=tk_tools.Cursors.WAIT,
             )
             self.bars[st_id].grid(row=ind * 2 + 3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind * 2 + 2, column=1, sticky="E")

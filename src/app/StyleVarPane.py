@@ -356,7 +356,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     if utils.USE_SIZEGRIP:
         ttk.Sizegrip(
             window,
-            cursor=utils.CURSORS['stretch_vert'],
+            cursor=tk_tools.Cursors.STRETCH_VERT,
         ).grid(row=1, column=0)
 
     canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))
