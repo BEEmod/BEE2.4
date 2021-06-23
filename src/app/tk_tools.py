@@ -104,6 +104,87 @@ else:
     ACCEL_SAVE_AS = 'Ctrl-Shift-S'
 
 
+if utils.WIN:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'link': 'hand2',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
+    }
+elif utils.MAC:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-2>',
+        'RIGHT_DOUBLE': '<Double-Button-2>',
+        'RIGHT_CTRL': '<Control-Button-2>',
+        'RIGHT_SHIFT': '<Shift-Button-2>',
+        'RIGHT_RELEASE': '<ButtonRelease-2>',
+        'RIGHT_MOVE': '<B2-Motion>',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'link': 'pointinghand',
+        'wait': 'spinning',
+        'stretch_vert': 'resizeupdown',
+        'stretch_horiz': 'resizeleftright',
+        'move_item': 'plus',
+        'destroy_item': 'poof',
+        'invalid_drag': 'notallowed',
+    }
+elif utils.LINUX:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'link': 'hand1',
+        'wait': 'watch',
+        'stretch_vert': 'bottom_side',
+        'stretch_horiz': 'right_side',
+        'move_item': 'crosshair',
+        'destroy_item': 'X_cursor',
+        'invalid_drag': 'circle',
+    }
 
 
 if utils.WIN:

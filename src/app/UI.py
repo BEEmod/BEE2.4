@@ -296,8 +296,8 @@ class PalItem(Label):
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
 
-        self.bind(utils.EVENTS['LEFT'], drag_start)
-        self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
+        self.bind(tk_tools.EVENTS['LEFT'], drag_start)
+        self.bind(tk_tools.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
         self.bind("<Leave>", self.rollout)
 
@@ -978,7 +978,7 @@ def drag_start(e: Event) -> None:
     # NOTE: _global means no other programs can interact, make sure
     # it's released eventually or you won't be able to quit!
     drag_move(e)  # move to correct position
-    drag_win.bind(utils.EVENTS['LEFT_MOVE'], drag_move)
+    drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], drag_move)
     UI['pre_sel_line'].lift()
 
 
@@ -1634,7 +1634,7 @@ def init_drag_icon() -> None:
     drag_win.withdraw()
     drag_win.transient(master=TK_ROOT)
     drag_win.withdraw()  # starts hidden
-    drag_win.bind(utils.EVENTS['LEFT_RELEASE'], drag_stop)
+    drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], drag_stop)
     UI['drag_lbl'] = Label(drag_win)
     img.apply(UI['drag_lbl'], IMG_BLANK)
     UI['drag_lbl'].grid(row=0, column=0)

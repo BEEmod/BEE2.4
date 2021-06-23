@@ -105,7 +105,7 @@ class Manager(Generic[ItemT]):
         self._drag_lbl = drag_lbl = tkinter.Label(drag_win)
         img.apply(drag_lbl, self._img_blank)
         drag_lbl.grid(row=0, column=0)
-        drag_win.bind(utils.EVENTS['LEFT_RELEASE'], self._evt_stop)
+        drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
     def slot(
         self: 'Manager[ItemT]',
@@ -325,7 +325,7 @@ class Manager(Generic[ItemT]):
         # Call this to reposition it.
         self._evt_move(event)
 
-        self._drag_win.bind(utils.EVENTS['LEFT_MOVE'], self._evt_move)
+        self._drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_move)
 
     def _evt_move(self, event: tkinter.Event) -> None:
         """Reposition the item whenever moving."""
@@ -355,7 +355,7 @@ class Manager(Generic[ItemT]):
         sound.fx('config')
         self._drag_win.grab_release()
         self._drag_win.withdraw()
-        self._drag_win.unbind(utils.EVENTS['LEFT_MOVE'])
+        self._drag_win.unbind(tk_tools.EVENTS['LEFT_MOVE'])
 
         dest = self._pos_slot(event.x_root, event.y_root)
 
@@ -408,7 +408,7 @@ class Slot(Generic[ItemT]):
         self._lbl = tkinter.Label(parent)
         img.apply(self._lbl, man._img_blank)
         tk_tools.bind_leftclick(self._lbl, self._evt_start)
-        self._lbl.bind(utils.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
+        self._lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
         self._lbl.bind('<Enter>', self._evt_hover_enter)
         self._lbl.bind('<Leave>', self._evt_hover_exit)
 
@@ -574,7 +574,6 @@ def test() -> None:
     """Test the GUI."""
     from BEE2_config import GEN_OPTS
     from packages import find_packages, PACKAGE_SYS
-    from utils import PackagePath
 
     # Setup images to read from packages.
     print('Loading packages for images.')
@@ -604,10 +603,10 @@ def test() -> None:
             group_icon: str=None,
         ) -> None:
             self.name = name
-            self.dnd_icon = img.Handle.parse_uri(PackagePath(pak_id, ('items/clean/{}.png'.format(icon))), 64, 64)
+            self.dnd_icon = img.Handle.parse_uri(utils.PackagePath(pak_id, ('items/clean/{}.png'.format(icon))), 64, 64)
             self.dnd_group = group
             if group_icon:
-                self.dnd_group_icon = img.Handle.parse_uri(PackagePath(pak_id, 'items/clean/{}.png'.format(group_icon)), 64, 64)
+                self.dnd_group_icon = img.Handle.parse_uri(utils.PackagePath(pak_id, 'items/clean/{}.png'.format(group_icon)), 64, 64)
 
         def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)

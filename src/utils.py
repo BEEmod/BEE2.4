@@ -142,22 +142,6 @@ def _run_bg_daemon(*args) -> None:
 
 
 if WIN:
-    # Some events differ on different systems, so define them here.
-    EVENTS = {
-        'LEFT': '<Button-1>',
-        'LEFT_DOUBLE': '<Double-Button-1>',
-        'LEFT_CTRL': '<Control-Button-1>',
-        'LEFT_SHIFT': '<Shift-Button-1>',
-        'LEFT_RELEASE': '<ButtonRelease-1>',
-        'LEFT_MOVE': '<B1-Motion>',
-
-        'RIGHT': '<Button-3>',
-        'RIGHT_DOUBLE': '<Double-Button-3>',
-        'RIGHT_CTRL': '<Control-Button-3>',
-        'RIGHT_SHIFT': '<Shift-Button-3>',
-        'RIGHT_RELEASE': '<ButtonRelease-3>',
-        'RIGHT_MOVE': '<B3-Motion>',
-    }
     CURSORS = {
         'regular': 'arrow',
         'link': 'hand2',
@@ -168,24 +152,7 @@ if WIN:
         'destroy_item': 'x_cursor',
         'invalid_drag': 'no',
     }
-
 elif MAC:
-    EVENTS = {
-        'LEFT': '<Button-1>',
-        'LEFT_DOUBLE': '<Double-Button-1>',
-        'LEFT_CTRL': '<Control-Button-1>',
-        'LEFT_SHIFT': '<Shift-Button-1>',
-        'LEFT_RELEASE': '<ButtonRelease-1>',
-        'LEFT_MOVE': '<B1-Motion>',
-
-        'RIGHT': '<Button-2>',
-        'RIGHT_DOUBLE': '<Double-Button-2>',
-        'RIGHT_CTRL': '<Control-Button-2>',
-        'RIGHT_SHIFT': '<Shift-Button-2>',
-        'RIGHT_RELEASE': '<ButtonRelease-2>',
-        'RIGHT_MOVE': '<B2-Motion>',
-    }
-
     CURSORS = {
         'regular': 'arrow',
         'link': 'pointinghand',
@@ -196,24 +163,7 @@ elif MAC:
         'destroy_item': 'poof',
         'invalid_drag': 'notallowed',
     }
-
 elif LINUX:
-    EVENTS = {
-        'LEFT': '<Button-1>',
-        'LEFT_DOUBLE': '<Double-Button-1>',
-        'LEFT_CTRL': '<Control-Button-1>',
-        'LEFT_SHIFT': '<Shift-Button-1>',
-        'LEFT_RELEASE': '<ButtonRelease-1>',
-        'LEFT_MOVE': '<B1-Motion>',
-
-        'RIGHT': '<Button-3>',
-        'RIGHT_DOUBLE': '<Double-Button-3>',
-        'RIGHT_CTRL': '<Control-Button-3>',
-        'RIGHT_SHIFT': '<Shift-Button-3>',
-        'RIGHT_RELEASE': '<ButtonRelease-3>',
-        'RIGHT_MOVE': '<B3-Motion>',
-    }
-
     CURSORS = {
         'regular': 'arrow',
         'link': 'hand1',

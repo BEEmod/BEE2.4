@@ -126,7 +126,7 @@ class Item:
                 wid.bind('<Enter>', self.hover_start, add=True)
                 wid.bind('<Leave>', self.hover_stop, add=True)
                 tk_tools.bind_leftclick(wid, self.row_click, add=True)
-                wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add=True)
+                wid.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.row_unclick, add=True)
 
             self.val_widgets.append(wid)
 

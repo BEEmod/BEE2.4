@@ -18,8 +18,7 @@ from srctools.logger import get_logger
 from packages import CORRIDOR_COUNTS, CorrDesc
 from app import selector_win, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
-from app import tkMarkdown, SubPane, img
-from app.tk_tools import FileField
+from app import tkMarkdown, SubPane, img, tk_tools
 from BEE2_config import ConfigFile, option_handler
 import utils
 
@@ -556,10 +555,7 @@ def make_comp_widgets(frame: ttk.Frame):
         anchor=tk.CENTER,
         cursor=utils.CURSORS['link'],
     )
-    UI['thumb_label'].bind(
-        utils.EVENTS['LEFT'],
-        find_screenshot,
-    )
+    UI['thumb_label'].bind(tk_tools.EVENTS['LEFT'], find_screenshot)
 
     UI['thumb_cleanup'] = ttk.Checkbutton(
         thumb_frame,
@@ -658,7 +654,7 @@ def make_comp_widgets(frame: ttk.Frame):
     )
     packfile_frame.grid(row=2, column=0, sticky='ew')
 
-    UI['packfile_filefield'] = packfile_filefield = FileField(
+    UI['packfile_filefield'] = packfile_filefield = tk_tools.FileField(
         packfile_frame,
         is_dir=True,
         loc=COMPILE_CFG.get_val('General', 'packfile_dump_dir', ''),

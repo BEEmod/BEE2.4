@@ -406,7 +406,7 @@ class SplashScreen(BaseLoadScreen):
         for canvas, width, height in self.canvas:
             canvas['width'] = width
             canvas['height'] = height
-            canvas.bind(utils.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
+            canvas.bind(tk_tools.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
 
             canvas.create_rectangle(
                 width-20,
