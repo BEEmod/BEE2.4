@@ -8,7 +8,7 @@ they were attached to the original brushes.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, MutableMapping
+from collections.abc import Iterator, MutableMapping
 from collections import defaultdict, Counter
 import math
 from enum import Enum
@@ -409,7 +409,9 @@ def _make_patterns() -> None:
 _make_patterns()
 
 
+@attr.define(eq=False)
 class Panel:
+    # noinspection PyUnresolvedReferences
     """Represents a potentially dynamic specially positioned part of a tile.
 
     This is used for angled/flip panel items, and things like those.
@@ -432,31 +434,23 @@ class Panel:
         seal: If true, place nodraw tiles behind the panel instead of void.
         offset: Offset the tile by this much (local to the instance).
     """
+    brush_ent: Optional[Entity]
+    inst: Entity
+    pan_type: PanelType
+    thickness: int
+    bevels: set[tuple[int, int]] = attr.ib(converter=set)
 
-    def __init__(
-        self,
-        brush_ent: Optional[Entity],
-        inst: Entity,
-        pan_type: PanelType,
-        thickness: int,
-        bevels: Iterable[tuple[int, int]],
-    ) -> None:
-        self.brush_ent = brush_ent
-        self.inst = inst
-        self.points = {
-            (0, 0), (0, 1), (0, 2), (0, 3),
-            (1, 0), (1, 1), (1, 2), (1, 3),
-            (2, 0), (2, 1), (2, 2), (2, 3),
-            (3, 0), (3, 1), (3, 2), (3, 3),
-        }
-        self.template = ''
-        self.pan_type = pan_type
-        self.thickness = thickness
-        self.bevels = set(bevels)
-        self.nodraw = False
-        self.seal = False
-        self.steals_bullseye = False
-        self.offset = Vec()
+    points: set[tuple[int, int]] = attr.ib(default={
+        (0, 0), (0, 1), (0, 2), (0, 3),
+        (1, 0), (1, 1), (1, 2), (1, 3),
+        (2, 0), (2, 1), (2, 2), (2, 3),
+        (3, 0), (3, 1), (3, 2), (3, 3),
+    }.copy)
+    template: str = ''
+    nodraw: bool = False
+    seal: bool  = False
+    steals_bullseye: bool = False
+    offset: Vec = attr.ib(factory=Vec)
 
     def same_item(self, inst: Entity) -> bool:
         """Check if the two instances come from the same item.
@@ -490,6 +484,8 @@ class Panel:
             # We do use it.
             if self.brush_ent is not None and self.brush_ent not in vmf.entities:
                 vmf.add_ent(self.brush_ent)
+
+        LOGGER.debug('Placing panel at {} @ {}: {}', tile.pos, tile.normal, self)
 
         is_static = (
             self.brush_ent is None or
