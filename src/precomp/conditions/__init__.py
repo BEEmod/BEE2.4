@@ -972,7 +972,7 @@ def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     """Retrieve an offset from an instance var. This allows several special values:
 
-    * $var to read from a variable
+    * Any $replace variables
     * <piston_start> or <piston> to get the unpowered position of a piston plat
     * <piston_end> to get the powered position of a piston plat
     * <piston_top> to get the extended position of a piston plat
@@ -980,7 +980,7 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
 
     If scale is set, read values are multiplied by this, and zoff is added to Z.
     """
-    value = value.casefold()
+    value = inst.fixup.substitute(value).casefold()
     # Offset the overlay by the given distance
     # Some special placeholder values:
     if value == '<piston_start>' or value == '<piston>':
@@ -1004,7 +1004,7 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
         )
     else:
         # Regular vector
-        offset = Vec.from_str(resolve_value(inst, value)) * scale
+        offset = Vec.from_str(value) * scale
     offset.z += zoff
 
     offset.localise(
