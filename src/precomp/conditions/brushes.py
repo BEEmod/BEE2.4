@@ -493,7 +493,7 @@ def res_import_template_setup(res: Property):
         bind_tile_pos,
         ang_override,
         rotation,
-        res.vec('offset'),
+        res['offset', '0 0 0'],
         res['invertVar', ''],
         res['colorVar', ''],
         visgroup_func,
@@ -655,7 +655,7 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
         angles = ang_override
     else:
         angles = rotation @ Angle.from_str(inst['angles', '0 0 0'])
-    origin = (offset @ angles) + Vec.from_str(inst['origin'])
+    origin = conditions.resolve_offset(inst, offset)
 
     temp_data = template_brush.import_template(
         vmf,
