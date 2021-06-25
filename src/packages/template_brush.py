@@ -27,12 +27,12 @@ def parse_template(pak_id: str, file: File) -> None:
         conf_ents = VMF.parse(props).by_class['bee2_template_conf']
         del props
         if len(conf_ents) > 1:
-            raise ValueError('Multiple configuration entities in template!')
+            raise KeyValError(f'Multiple configuration entities in template!', path, None)
         elif not conf_ents:
-            raise ValueError('No configration entity for template!')
+            raise KeyValError(f'No configration entity for template!', path, None)
         temp_id = conf_ents[0]['template_id']
         if not temp_id:
-            raise ValueError('No template ID for template!')
+            raise KeyValError('No template ID for template!', path, None)
     TEMPLATES[temp_id.casefold()] = PackagePath(pak_id, file.path)
 
 
