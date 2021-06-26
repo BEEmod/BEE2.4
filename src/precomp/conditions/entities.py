@@ -16,32 +16,8 @@ COND_MOD_NAME = 'Entities'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
-@make_result_setup('TemplateOverlay')
-def res_import_template_setup(
-    res: Property,
-) -> Tuple[str, Dict[str, List[str]], Vec, Vec, Vec]:
-    temp_id = res['id'].casefold()
-
-    face = Vec.from_str(res['face_pos', '0 0 -64'])
-    norm = Vec.from_str(res['normal', '0 0 1'])
-
-    replace_tex = defaultdict(list)  # type: Dict[str, List[str]]
-    for prop in res.find_key('replace', []):
-        replace_tex[prop.name.replace('\\', '/')].append(prop.value)
-
-    offset = Vec.from_str(res['offset', '0 0 0'])
-
-    return (
-        temp_id,
-        dict(replace_tex),
-        face,
-        norm,
-        offset,
-    )
-
-
 @make_result('TemplateOverlay')
-def res_insert_overlay(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_insert_overlay(vmf: VMF, res: Property):
     """Use a template to insert one or more overlays on a surface.
 
     Options:
@@ -52,81 +28,83 @@ def res_insert_overlay(vmf: VMF, inst: Entity, res: Property) -> None:
     - Normal: The direction of the brush face.
     - Offset: An offset to move the overlays by.
     """
-    (
-        temp_id,
-        replace,
-        face,
-        norm,
-        offset,
-    ) = res.value
+    orig_temp_id = res['id'].casefold()
 
-    if temp_id[:1] == '$':
-        temp_id = inst.fixup[temp_id]
+    face_str = res['face_pos', '0 0 -64']
+    orig_norm = Vec.from_str(res['normal', '0 0 1'])
 
-    origin = Vec.from_str(inst['origin'])  # type: Vec
-    angles = Vec.from_str(inst['angles', '0 0 0'])
+    replace_tex: dict[str, list[str]] = defaultdict(list)
+    for prop in res.find_key('replace', []):
+        replace_tex[prop.name.replace('\\', '/')].append(prop.value)
 
-    face_pos = Vec(face).rotate(*angles)
-    face_pos += origin
-    normal = Vec(norm).rotate(*angles)
+    offset = Vec.from_str(res['offset', '0 0 0'])
 
-    # Don't make offset change the face_pos value..
-    origin += offset.copy().rotate_by_str(
-        inst['angles', '0 0 0']
-    )
-    
-    for axis, norm in enumerate(normal):
-        # Align to the center of the block grid. The normal direction is
-        # already correct.
-        if norm == 0:
-            face_pos[axis] = face_pos[axis] // 128 * 128 + 64
+    def insert_over(inst: Entity) -> None:
+        """Apply the result."""
+        temp_id = inst.fixup.substitute(orig_temp_id)
 
-    # Shift so that the user perceives the position as the pos of the face
-    # itself.
-    face_pos -= 64 * normal
+        origin = Vec.from_str(inst['origin'])
+        angles = Angle.from_str(inst['angles', '0 0 0'])
 
-    try:
-        tiledef = tiling.TILES[face_pos.as_tuple(), normal.as_tuple()]
-    except KeyError:
-        LOGGER.warning(
-            'Overlay brush position is not valid: {}',
-            face_pos,
-        )
-        return
+        face_pos = conditions.resolve_offset(inst, face_str)
+        normal = orig_norm @ angles
 
-    temp = template_brush.import_template(
-        vmf,
-        temp_id,
-        origin,
-        angles,
-        targetname=inst['targetname', ''],
-        force_type=TEMP_TYPES.detail,
-    )
+        # Don't make offset change the face_pos value..
+        origin += offset @ angles
 
-    for over in temp.overlay:  # type: Entity
-        random.seed('TEMP_OVERLAY_' + over['basisorigin'])
-        mat = over['material']
+        for axis, norm in enumerate(normal):
+            # Align to the center of the block grid. The normal direction is
+            # already correct.
+            if norm == 0:
+                face_pos[axis] = face_pos[axis] // 128 * 128 + 64
+
+        # Shift so that the user perceives the position as the pos of the face
+        # itself.
+        face_pos -= 64 * normal
+
         try:
-            mat = random.choice(replace[over['material'].casefold().replace('\\', '/')])
+            tiledef = tiling.TILES[face_pos.as_tuple(), normal.as_tuple()]
         except KeyError:
-            pass
+            LOGGER.warning(
+                'Overlay brush position is not valid: {}',
+                face_pos,
+            )
+            return
 
-        if mat[:1] == '$':
-            mat = inst.fixup[mat]
-        if mat.startswith('<') or mat.endswith('>'):
-            # Lookup in the texture data.
-            gen, mat = texturing.parse_name(mat[1:-1])
-            mat = gen.get(Vec.from_str(over['basisorigin']), mat)
-        over['material'] = mat
-        tiledef.bind_overlay(over)
-
-    # Wipe the brushes from the map.
-    if temp.detail is not None:
-        temp.detail.remove()
-        LOGGER.info(
-            'Overlay template "{}" could set keep_brushes=0.',
+        temp = template_brush.import_template(
+            vmf,
             temp_id,
+            origin,
+            angles,
+            targetname=inst['targetname', ''],
+            force_type=TEMP_TYPES.detail,
         )
+
+        for over in temp.overlay:  # type: Entity
+            random.seed('TEMP_OVERLAY_' + over['basisorigin'])
+            mat = over['material']
+            try:
+                mat = random.choice(replace_tex[over['material'].casefold().replace('\\', '/')])
+            except KeyError:
+                pass
+
+            if mat[:1] == '$':
+                mat = inst.fixup[mat]
+            if mat.startswith('<') or mat.endswith('>'):
+                # Lookup in the texture data.
+                gen, mat = texturing.parse_name(mat[1:-1])
+                mat = gen.get(Vec.from_str(over['basisorigin']), mat)
+            over['material'] = mat
+            tiledef.bind_overlay(over)
+
+        # Wipe the brushes from the map.
+        if temp.detail is not None:
+            temp.detail.remove()
+            LOGGER.info(
+                'Overlay template "{}" could set keep_brushes=0.',
+                temp_id,
+            )
+    return insert_over
 
 
 @make_result('createEntity')

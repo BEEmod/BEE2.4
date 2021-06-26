@@ -1,6 +1,6 @@
 """Conditions related to global properties - stylevars, music, which game, etc."""
 
-from typing import AbstractSet, Collection, Set, Dict, Optional, Tuple
+from typing import Collection, Set, Dict, Tuple
 
 from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
