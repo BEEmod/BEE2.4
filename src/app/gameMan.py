@@ -274,8 +274,9 @@ def should_backup_app(file: str) -> bool:
 
         # Read out the last 4096 bytes, and look for the sig in there.
         f.seek(-SIZE, io.SEEK_END)
-
-        return b'MEI\014\013\012\013\016' not in f.read(SIZE)
+        end_data = f.read(SIZE)
+        # We also look for BenVlodgi, to catch the BEE 1.06 precompiler.
+        return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
 
 
 class Game:
