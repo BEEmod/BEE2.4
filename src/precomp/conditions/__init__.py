@@ -556,7 +556,10 @@ def make_result(orig_name: str, *aliases: str):
 
 def make_result_setup(*names: str):
     """Legacy setup function for results. This is no longer used."""
-    warnings.warn('Use closure system instead.', DeprecationWarning, stacklevel=2)
+    # Users can't do anything about this, don't bother them.
+    if utils.DEV_MODE:
+        warnings.warn('Use closure system instead.', DeprecationWarning, stacklevel=2)
+
     def x(func: Callable[..., Any]):
         for name in names:
             if name.casefold() in RESULT_LOOKUP:
