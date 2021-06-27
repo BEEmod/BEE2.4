@@ -440,11 +440,10 @@ class Panel:
     thickness: int
     bevels: set[tuple[int, int]] = attr.ib(converter=set)
 
-    points: set[tuple[int, int]] = attr.ib(default={
-        (0, 0), (0, 1), (0, 2), (0, 3),
-        (1, 0), (1, 1), (1, 2), (1, 3),
-        (2, 0), (2, 1), (2, 2), (2, 3),
-        (3, 0), (3, 1), (3, 2), (3, 3),
+    points: set[tuple[int, int]] = attr.ib(factory={
+        (x, y)
+        for x in range(4)
+        for y in range(4)
     }.copy)
     template: str = ''
     nodraw: bool = False
