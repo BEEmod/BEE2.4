@@ -1162,21 +1162,15 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         if 'template' in props:
             # We only want the template inserted once. So remove it from all but one.
             if len(panels) == 1:
-                panel.template = conditions.resolve_value(inst, props['template'])
+                panel.template = inst.fixup.substitute(props['template'])
             else:
                 panel.template = ''
         if 'nodraw' in props:
-            panel.nodraw = srctools.conv_bool(
-                conditions.resolve_value(inst, props['nodraw'])
-            )
+            panel.nodraw = srctools.conv_bool(inst.fixup.substitute(props['nodraw'], allow_invert=True))
         if 'seal' in props:
-            panel.seal = srctools.conv_bool(
-                conditions.resolve_value(inst, props['seal'])
-            )
+            panel.seal = srctools.conv_bool(inst.fixup.substitute(props['seal'], allow_invert=True))
         if 'move_bullseye' in props:
-            panel.steals_bullseye = srctools.conv_bool(
-                conditions.resolve_value(inst, props['move_bullseye'])
-            )
+            panel.steals_bullseye = srctools.conv_bool(inst.fixup.substitute(props['move_bullseye'], allow_invert=True))
     if 'keys' in props or 'localkeys' in props:
         # First grab the existing ent, so we can edit it.
         # These should all have the same value, unless they were independently

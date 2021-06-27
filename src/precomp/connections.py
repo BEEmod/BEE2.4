@@ -305,10 +305,8 @@ class Item:
 
         out_name, out_cmd = output
 
-        if not out_name:
-            out_name = ''  # Dump the None.
-
-        out_name = conditions.resolve_value(self.inst, out_name)
+        # Dump the None.
+        out_name = self.inst.fixup.substitute(out_name or '')
 
         if isinstance(target, Entity):
             target = target['targetname']
@@ -327,7 +325,7 @@ class Item:
             )
 
         kv_setter.add_out(Output(
-            conditions.resolve_value(self.inst, out_cmd),
+            self.inst.fixup.substitute(out_cmd),
             target,
             inp_cmd,
             params,
@@ -688,15 +686,8 @@ def do_item_optimisation(vmf: VMF) -> None:
         if item.config is None or not item.config.input_type.is_logic:
             continue
 
-        prim_inverted = conv_bool(conditions.resolve_value(
-            item.inst,
-            item.config.invert_var,
-        ))
-
-        sec_inverted = conv_bool(conditions.resolve_value(
-            item.inst,
-            item.config.sec_invert_var,
-        ))
+        prim_inverted = conv_bool(item.inst.fixup.substitute(item.config.invert_var, allow_invert=True))
+        sec_inverted = conv_bool(item.inst.fixup.substitute(item.config.sec_invert_var, allow_invert=True))
 
         # Don't optimise if inverted.
         if prim_inverted or sec_inverted:
