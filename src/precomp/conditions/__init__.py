@@ -573,7 +573,7 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: Set[str], vmf_file: VMF) -> None:
+def init(seed: str, inst_list: Set[str]) -> None:
     """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED

@@ -1933,11 +1933,7 @@ def main() -> None:
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
 
-        conditions.init(
-            seed=MAP_RAND_SEED,
-            inst_list=all_inst,
-            vmf_file=vmf,
-        )
+        conditions.init(MAP_RAND_SEED, all_inst)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
