@@ -935,15 +935,16 @@ def retexture_template(
         if not color_picker.visgroups.issubset(template_data.visgroups):
             continue
 
-        picker_pos = color_picker.offset @ template_data.orient
-        picker_pos += template_data.origin + sense_offset
-        picker_norm = Vec(color_picker.normal) @ template_data.orient
+        picker_pos = round(
+            color_picker.offset @ template_data.orient
+            + template_data.origin + sense_offset, 6)
+        picker_norm = round(color_picker.normal @ template_data.orient, 6)
 
         if color_picker.grid_snap:
             for axis in 'xyz':
                 # Don't realign things in the normal's axis -
                 # those are already fine.
-                if not picker_norm[axis]:
+                if abs(picker_norm[axis]) < 0.01:
                     picker_pos[axis] = picker_pos[axis] // 128 * 128 + 64
 
         try:
@@ -982,8 +983,8 @@ def retexture_template(
                         for u in (0, 1, 2, 3)
                         for v in (0, 1, 2, 3)
                     },
-                    is_wall=tiledef.normal.z != 0,
-                    bevels=frozenset(),
+                    is_wall=abs(tiledef.normal.z) > 0.01,
+                    bevels=set(),
                     normal=tiledef.normal,
                     face_output=pattern,
                 )
@@ -1009,9 +1010,10 @@ def retexture_template(
         if not voxel_setter.visgroups.issubset(template_data.visgroups):
             continue
 
-        setter_pos = voxel_setter.offset.copy() @ template_data.orient
-        setter_pos += template_data.origin + sense_offset
-        setter_norm = voxel_setter.normal.copy() @ template_data.orient
+        setter_pos = round(
+            voxel_setter.offset @ template_data.orient
+            + template_data.origin + sense_offset, 6)
+        setter_norm = round(voxel_setter.normal @ template_data.orient, 6)
 
         norm_axis = setter_norm.axis()
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
@@ -1030,9 +1032,11 @@ def retexture_template(
         if not tile_setter.visgroups.issubset(template_data.visgroups):
             continue
 
-        setter_pos = Vec(tile_setter.offset) @ template_data.orient
-        setter_pos += template_data.origin + sense_offset
-        setter_norm = Vec(tile_setter.normal) @ template_data.orient
+        setter_pos = round(
+            tile_setter.offset @ template_data.orient
+            + template_data.origin + sense_offset, 6)
+        setter_norm = round(tile_setter.normal @ template_data.orient, 6)
+
         setter_type: TileType = tile_setter.tile_type
 
         if tile_setter.color == 'copy':
