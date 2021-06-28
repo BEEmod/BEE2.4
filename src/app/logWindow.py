@@ -62,6 +62,9 @@ def setting_apply_thread() -> None:
         else:
             raise ValueError(f'Unknown command {cmd}({param})!')
 
-_setting_thread = threading.Thread(target=setting_apply_thread)
-_setting_thread.daemon = True
+_setting_thread = threading.Thread(
+    target=setting_apply_thread,
+    name='logwindow_settings_apply',
+    daemon=True,
+)
 _setting_thread.start()
