@@ -13,7 +13,7 @@ from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
 from srctools.vmt import Material
-from precomp.brushLoc import POS as BLOCK_TYPE, Block
+from precomp.brushLoc import POS as BLOCK_TYPE
 
 import consts
 
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Algorithms to use.
-GEN_CLASSES = utils.FuncLookup('Generators')
+GEN_CLASSES: utils.FuncLookup['Generator'] = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
 SPECIAL: 'Generator'
@@ -54,6 +54,10 @@ class GenCat(Enum):
 
     @property
     def is_tile(self) -> bool:
+        """Check if this is a tile-type generator.
+
+        These have specific configuration for walls/floors/ceiling and white/black.
+        """
         return self.value in ('normal', 'panel', 'bullseye')
 
 
@@ -435,7 +439,7 @@ def load_config(conf: Property):
     """Setup all the generators from the config data."""
     global SPECIAL, OVERLAYS
     global_options = {
-        prop.name: prop.value
+        prop.name or '': prop.value
         for prop in
         conf.find_children('Options')
     }
@@ -482,7 +486,6 @@ def load_config(conf: Property):
         if isinstance(gen_key, GenCat):
             # It's a non-tile generator.
             is_tile = False
-            gen_cat = gen_key
             try:
                 gen_conf = conf_for_gen[gen_key, None, None]
             except KeyError:
@@ -509,7 +512,7 @@ def load_config(conf: Property):
 
         # First parse the options.
         options = parse_options({
-            prop.name: prop.value
+            prop.name or '': prop.value
             for prop in
             gen_conf.find_children('Options')
         }, global_options)
@@ -614,15 +617,15 @@ def load_config(conf: Property):
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = gen = generator(gen_cat, gen_orient, gen_portal, options, textures)
+        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, options, textures)
 
         # Allow it to use the default enums as direct lookups.
-        if isinstance(gen, GenRandom):
+        if isinstance(gentor, GenRandom):
             if gen_portal is None:
-                gen.set_enum(tex_defaults.items())
+                gentor.set_enum(tex_defaults.items())
             else:
                 # Tiles always use TileSize.
-                gen.set_enum((size.value, size) for size in TileSize)
+                gentor.set_enum((size.value, size) for size in TileSize)
 
     SPECIAL = GENERATORS[GenCat.SPECIAL]
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
