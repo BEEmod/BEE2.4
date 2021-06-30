@@ -99,9 +99,8 @@ def dump_files(bsp: BSP, dump_folder: str) -> None:
         else:
             os.remove(name)
 
-    with bsp.packfile() as zipfile:
-        for zipinfo in zipfile.infolist():
-            zipfile.extract(zipinfo, dump_folder)
+    for zipinfo in bsp.pakfile.infolist():
+        bsp.pakfile.extract(zipinfo, dump_folder)
 
 
 def run_vrad(args: List[str]) -> None:
@@ -181,10 +180,8 @@ def main(argv: List[str]) -> None:
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
 
-    bsp_ents = bsp_file.read_ent_data()
-
     # If VBSP marked it as Hammer, trust that.
-    if srctools.conv_bool(bsp_ents.spawn['BEE2_is_peti']):
+    if srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_peti']):
         is_peti = True
         # Detect preview via knowing the bsp name. If we are in preview,
         # check the config file to see what was specified there.
@@ -252,14 +249,14 @@ def main(argv: List[str]) -> None:
 
     if is_peti:
         LOGGER.info('Checking for music:')
-        music.generate(bsp_ents, packlist)
+        music.generate(bsp_file.ents, packlist)
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
+    run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
-    packlist.pack_fgd(bsp_ents, fgd)
+    packlist.pack_fgd(bsp_file.ents, fgd)
     packlist.eval_dependencies()
     LOGGER.info('Done!')
 
@@ -282,8 +279,7 @@ def main(argv: List[str]) -> None:
 
     if '-no_pack' not in args:
         # Cubemap files packed into the map already.
-        with bsp_file.packfile() as zipfile:
-            existing = set(zipfile.namelist())
+        existing = set(bsp_file.pakfile.namelist())
 
         LOGGER.info('Writing to BSP...')
         packlist.pack_into_zip(
@@ -293,10 +289,9 @@ def main(argv: List[str]) -> None:
             blacklist=pack_blacklist,
         )
 
-        with bsp_file.packfile() as zipfile:
-            LOGGER.info('Packed files:\n{}', '\n'.join(
-                set(zipfile.namelist()) - existing
-            ))
+        LOGGER.info('Packed files:\n{}', '\n'.join(
+            set(bsp_file.pakfile.namelist()) - existing
+        ))
 
     if config.get_bool('General', 'packfile_dump_enable'):
         dump_files(bsp_file, config.get_val(
@@ -305,9 +300,7 @@ def main(argv: List[str]) -> None:
             '../dump/'
         ))
 
-    # Copy new entity data.
-    bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
-
+    LOGGER.info('Writing BSP...')
     bsp_file.save()
     LOGGER.info(' - BSP written!')
 
