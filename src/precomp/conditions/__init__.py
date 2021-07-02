@@ -208,9 +208,9 @@ class Condition:
         source = None
         for prop in prop_block:
             if prop.name == 'result':
-                results.extend(prop.value)  # join multiple ones together
+                results.extend(prop)  # join multiple ones together
             elif prop.name == 'else':
-                else_results.extend(prop.value)
+                else_results.extend(prop)
             elif prop.name == '__src__':
                 # Value injected by the BEE2 export, this specifies
                 # the original source of the config.
