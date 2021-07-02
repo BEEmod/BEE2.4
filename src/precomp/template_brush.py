@@ -499,8 +499,6 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     if not srctools.conv_bool(conf['discard_brushes']):
         for brushes, is_detail, vis_ids in yield_world_detail():
-            if force_is_detail is not None:
-                is_detail = force_is_detail
             visgroups = list(map(visgroup_names.__getitem__, vis_ids))
             if len(visgroups) > 1:
                 raise ValueError(
@@ -515,6 +513,12 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
                 visgroup = '__auto_group_{}__'.format(conf_auto_visgroup)
                 # Reuse as the unique index, >0 are True too..
                 conf_auto_visgroup += 1
+
+            # Check this after auto-visgroup, so world/detail can be used to
+            # opt into the grouping, then overridden to be the same.
+            if force_is_detail is not None:
+                is_detail = force_is_detail
+
             if is_detail:
                 detail_ents[visgroup].extend(brushes)
             else:
