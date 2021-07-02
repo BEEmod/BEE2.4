@@ -240,9 +240,6 @@ class Template:
         tile_setters: Iterable[TileSetter]=(),
         voxel_setters: Iterable[VoxelSetter]=(),
     ) -> None:
-        """Make an overlay.
-
-        """
         self.id = temp_id
         self._data = {}
 
@@ -273,6 +270,12 @@ class Template:
         )
         self.tile_setters = list(tile_setters)
         self.voxel_setters = list(voxel_setters)
+
+    def __repr__(self) -> str:
+        return (
+            f'<Template "{self.id}", '
+            f'groups={self._data.keys() - {""}}>'
+        )
 
     @property
     def visgroups(self) -> Iterator[str]:
@@ -372,6 +375,9 @@ class ScalingTemplate(Mapping[
             for norm, (uaxis, vaxis) in
             REALIGN_UVS.items()
         })
+
+    def __repr__(self) -> str:
+        return f'<ScalingTemplate "{self.id}">'
 
     def __len__(self) -> int:
         return 6
