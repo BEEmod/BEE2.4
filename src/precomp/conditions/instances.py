@@ -140,7 +140,7 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
         # For just a name.
         return conv_bool(inst.fixup.substitute(values[0]))
     if '$' not in val_a and '$' not in val_b:
-        # Handle pre-subsititue behaviour, where val_a is always a var.
+        # Handle pre-substitute behaviour, where val_a is always a var.
         LOGGER.warning(
             'Comparison "{}" has no $var, assuming first value. '
             'Please use $ when referencing vars.',
@@ -148,8 +148,8 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
         )
         val_a = '$' + val_a
 
-    val_a = inst.fixup.substitute(val_a)
-    val_b = inst.fixup.substitute(val_b)
+    val_a = inst.fixup.substitute(val_a, default='')
+    val_b = inst.fixup.substitute(val_b, default='')
     try:
         # Convert to floats if possible, otherwise handle both as strings.
         # That ensures we normalise different number formats (1 vs 1.0)
