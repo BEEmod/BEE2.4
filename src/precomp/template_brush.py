@@ -335,42 +335,19 @@ class ScalingTemplate(Mapping[
     ):
         self.id = temp_id
         self._axes = axes
-        # Only keys used....
-        assert set(axes.keys()) == {
+        missing = {
             (0, 0, 1), (0, 0, -1),
             (1, 0, 0), (-1, 0, 0),
             (0, -1, 0), (0, 1, 0),
-        }, axes.keys()
-
-    @classmethod
-    def parse(cls, ent: Entity) -> ScalingTemplate:
-        """Parse a template from a config entity.
-
-        This should be a 'bee2_template_scaling' entity.
-        """
-        axes = {}
-
-        for norm, name in [
-            ((0.0, 0.0, +1.0), 'up'),
-            ((0.0, 0.0, -1.0), 'dn'),
-            ((0.0, +1.0, 0.0), 'n'),
-            ((0.0, -1.0, 0.0), 's'),
-            ((+1.0, 0.0, 0.0), 'e'),
-            ((-1.0, 0.0, 0.0), 'w'),
-        ]:
-            axes[norm] = (
-                ent[name + '_tex'],
-                UVAxis.parse(ent[name + '_uaxis']),
-                UVAxis.parse(ent[name + '_vaxis']),
-                srctools.conv_float(ent[name + '_rotation']),
-            )
-        return cls(ent['template_id'], axes)
+        } - axes.keys()
+        if missing:
+            raise ValueError(f'Missing axes for scaling template {temp_id}: {missing}')
 
     @classmethod
     def world(cls) -> ScalingTemplate:
         """Return a scaling template that produces world-aligned brushes."""
         nd = consts.Tools.NODRAW
-        return cls('', {
+        return cls('<world>', {
             norm: (nd, uaxis, vaxis, 0.0)
             for norm, (uaxis, vaxis) in
             REALIGN_UVS.items()
@@ -650,12 +627,6 @@ def get_template(temp_name: str) -> Template:
     if isinstance(temp, UnparsedTemplate):
         LOGGER.debug('Parsing template {}', temp_name.upper())
         temp = _TEMPLATES[temp_name.casefold()] = _parse_template(temp)
-
-    if isinstance(temp, ScalingTemplate):
-        raise ValueError(
-            'Scaling Template "{}" cannot be used '
-            'as a normal template!'.format(temp_name)
-        )
 
     return temp
 
