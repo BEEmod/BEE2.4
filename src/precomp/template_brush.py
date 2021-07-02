@@ -303,7 +303,7 @@ class Template:
 
         for group in visgroups:
             try:
-                world, detail, over = self._data[group]
+                world, detail, over = self._data[group.casefold()]
             except KeyError:
                 raise ValueError('Unknown visgroup "{}" for "{}"! (valid: {})'.format(
                     group, self.id,
@@ -491,7 +491,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         force_is_detail = None
 
     visgroup_names = {
-        vis.id: vis.name
+        vis.id: vis.name.casefold()
         for vis in
         vmf.vis_tree
     }
