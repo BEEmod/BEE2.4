@@ -14,7 +14,8 @@ __all__ = [
     'Special', 'Tools',
     'FixupVars',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
-    'COUNTER_OR_ON', 'COUNTER_OR_OFF'
+    'COUNTER_OR_ON', 'COUNTER_OR_OFF',
+    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG',
 ]
 
 
@@ -227,3 +228,6 @@ COUNTER_AND_OFF = 'OnChangedFromMax'
 
 COUNTER_OR_ON = 'OnChangedFromMin'
 COUNTER_OR_OFF = 'OnHitMin'
+
+SEL_ICON_SIZE = 96  # Size of the selector win icons
+SEL_ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.

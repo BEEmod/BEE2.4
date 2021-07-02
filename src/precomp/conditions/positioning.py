@@ -382,11 +382,25 @@ def flag_blockpos_type(inst: Entity, flag: Property):
 
 
 @make_result('SetBlock')
-def res_set_block(inst: Entity, res: Property):
-    """Set a block to the given value.
+def res_set_block(inst: Entity, res: Property) -> None:
+    """Set a block to the given value, overwriting the existing value.
 
-    This should be used only if you know what is in the position.
-    The offset is in block increments, with `0 0 0` equal to the mounting surface.
+    - `type` is the type of block to set:
+        * `VOID` (Outside the map)
+        * `SOLID` (Full wall cube)
+        * `EMBED` (Hollow wall cube)
+        * `AIR` (Inside the map, may be occupied by items)
+        * `OCCUPIED` (Known to be occupied by items)
+        * `PIT_SINGLE` (one-high)
+        * `PIT_TOP`
+        * `PIT_MID`
+        * `PIT_BOTTOM`
+        * `GOO_SINGLE` (one-deep goo)
+        * `GOO_TOP` (goo surface)
+        * `GOO_MID`
+        * `GOO_BOTTOM` (floor)
+    - `offset` is in block increments, with `0 0 0` equal to the mounting surface.
+    - If 'offset2' is also provided, all positions in the bounding box will be set.
     """
     try:
         new_vals = brushLoc.BLOCK_LOOKUP[res['type'].casefold()]
@@ -396,10 +410,20 @@ def res_set_block(inst: Entity, res: Property):
     try:
         [new_val] = new_vals
     except ValueError:
-        raise ValueError("Can't use compound block types ({})!".format(res['type']))
+        # TODO: This could spread top/mid/bottom through the bbox...
+        raise ValueError(
+            f'Can\'t use compound block type "{res["type"]}", specify '
+            "_SINGLE/TOP/MID/BOTTOM"
+        )
 
-    pos = resolve_offset(inst, res['offset', '0 0 0'], scale=128, zoff=-128)
-    brushLoc.POS['world': pos] = new_val
+    pos1 = resolve_offset(inst, res['offset', '0 0 0'], scale=128, zoff=-128)
+
+    if 'offset2' in res:
+        pos2 = resolve_offset(inst, res['offset2', '0 0 0'], scale=128, zoff=-128)
+        for pos in Vec.iter_grid(*Vec.bbox(pos1, pos2), stride=128):
+            brushLoc.POS['world': pos] = new_val
+    else:
+        brushLoc.POS['world': pos1] = new_val
 
 
 @make_result('forceUpright')

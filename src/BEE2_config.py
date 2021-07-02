@@ -11,8 +11,10 @@ Most functions are also altered to allow defaults instead of erroring.
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import Any, Mapping, Optional
+from threading import Lock, Event
+from atomicwrites import atomic_write
 
-from srctools import AtomicWriter, Property, KeyValError
+from srctools import Property, KeyValError
 
 import utils
 import srctools.logger
@@ -23,7 +25,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # Functions for saving or loading application settings.
 # Call with a block to load, or with no args to return the current
 # values.
-option_handler = utils.FuncLookup('OptionHandlers')  # type: utils.FuncLookup
+option_handler = utils.FuncLookup('OptionHandlers')
 
 
 def get_curr_settings() -> Property:
@@ -31,7 +33,7 @@ def get_curr_settings() -> Property:
     props = Property('', [])
 
     for opt_id, opt_func in option_handler.items():
-        opt_prop = opt_func()  # type: Property
+        opt_prop: Property = opt_func()
         opt_prop.name = opt_id.title()
         props.append(opt_prop)
 
@@ -73,10 +75,10 @@ def write_settings() -> None:
     """Write the settings to disk."""
     props = get_curr_settings()
     props.name = None
-    with AtomicWriter(
-        str(utils.conf_location('config/config.vdf')),
-        is_bytes=False,
+    with atomic_write(
+        utils.conf_location('config/config.vdf'),
         encoding='utf8',
+        overwrite=True,
     ) as file:
         for line in props.export():
             file.write(line)
@@ -90,9 +92,7 @@ class ConfigFile(ConfigParser):
     get_val, get_bool, and get_int are modified to return defaults instead
     of erroring.
     """
-    has_changed: bool
     filename: Optional[Path]
-    _writer: Optional[AtomicWriter]
 
     def __init__(
         self,
@@ -110,21 +110,18 @@ class ConfigFile(ConfigParser):
         """
         super().__init__()
 
-        self.has_changed = False
+        self.has_changed = Event()
+        self._file_lock = Lock()
 
         if filename is not None:
             if in_conf_folder:
                 self.filename = utils.conf_location('config') / filename
             else:
                 self.filename = Path(filename)
-
-            self._writer = AtomicWriter(self.filename)
-            self.has_changed = False
-
             if auto_load:
                 self.load()
         else:
-            self.filename = self._writer = None
+            self.filename = None
 
     def load(self) -> None:
         """Load config options from disk."""
@@ -132,41 +129,44 @@ class ConfigFile(ConfigParser):
             return
 
         try:
-            with open(self.filename, 'r') as conf:
+            with self._file_lock, open(self.filename, 'r', encoding='utf8') as conf:
                 self.read_file(conf)
-        # If we fail, just continue - we just use the default values
+                # We're not different to the file on disk..
+                self.has_changed.clear()
+        # If missing, just use default values.
         except FileNotFoundError:
             LOGGER.warning(
                 'Config "{}" not found! Using defaults...',
                 self.filename,
             )
-        except (IOError, ParsingError):
+        # But if we fail to read entirely, fall back to defaults.
+        except (IOError, ParsingError, UnicodeDecodeError):
             LOGGER.warning(
                 'Config "{}" cannot be read! Using defaults...',
                 self.filename,
                 exc_info=True,
             )
+            # Try and preserve the bad file with this name,
+            # but if it doesn't work don't worry about it.
             try:
                 self.filename.replace(self.filename.with_suffix('.err.cfg'))
             except IOError:
                 pass
 
-        # We're not different to the file on disk..
-        self.has_changed = False
-
     def save(self) -> None:
         """Write our values out to disk."""
-        LOGGER.info('Saving changes in config "{}"!', self.filename)
-        if self.filename is None or self._writer is None:
-            raise ValueError('No filename provided!')
+        with self._file_lock:
+            LOGGER.info('Saving changes in config "{}"!', self.filename)
+            if self.filename is None:
+                raise ValueError('No filename provided!')
 
-        with self._writer as conf:
-            self.write(conf)
-        self.has_changed = False
+            with atomic_write(self.filename, overwrite=True, encoding='utf8') as conf:
+                self.write(conf)
+            self.has_changed.clear()
 
     def save_check(self) -> None:
         """Check to see if we have different values, and save if needed."""
-        if self.has_changed:
+        if self.has_changed.is_set():
             self.save()
 
     def set_defaults(self, def_settings: Mapping[str, Mapping[str, Any]]) -> None:
@@ -189,7 +189,7 @@ class ConfigFile(ConfigParser):
         if value in self[section]:
             return self[section][value]
         else:
-            self.has_changed = True
+            self.has_changed.set()
             self[section][value] = default
             return default
 
@@ -212,7 +212,7 @@ class ConfigFile(ConfigParser):
             return super().getboolean(section, value)
         except (ValueError, NoOptionError):
             #  Invalid boolean, or not found
-            self.has_changed = True
+            self.has_changed.set()
             self[section][value] = str(int(default))
             return default
 
@@ -228,25 +228,25 @@ class ConfigFile(ConfigParser):
         try:
             return super().getint(section, value)
         except (ValueError, NoOptionError):
-            self.has_changed = True
+            self.has_changed.set()
             self[section][value] = str(int(default))
             return default
 
     get_int = getint
 
     def add_section(self, section: str) -> None:
-        self.has_changed = True
+        self.has_changed.set()
         super().add_section(section)
 
     def remove_section(self, section: str) -> bool:
-        self.has_changed = True
+        self.has_changed.set()
         return super().remove_section(section)
 
     def set(self, section: str, option: str, value: str) -> None:
         orig_val = self.get(section, option, fallback=None)
         value = str(value)
         if orig_val is None or orig_val != value:
-            self.has_changed = True
+            self.has_changed.set()
             super().set(section, option, value)
 
     add_section.__doc__ = ConfigParser.add_section.__doc__

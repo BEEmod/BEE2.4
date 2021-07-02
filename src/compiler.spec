@@ -59,6 +59,9 @@ EXCLUDES = [
     'win32evtlogutil',
     'smtplib',
     'http',
+
+    # Imported in utils, but not required in compiler.
+    'bg_daemon',
 ]
 
 # The modules made available for plugins to use.

@@ -423,6 +423,16 @@ DEFAULTS = [
     Opt('signPack', TYPE.STR,
         """Packlist to use when `signInst` is added.
         """),
+    Opt('signExitInst', TYPE.STR,
+        """Use an instance for a double exit sign instead of overlays.
+        
+        The instance is placed at the midpoint of the two overlays, and two vars
+        are set:
+        - $orient is set to "horizontal" or "vertical" to indicate if the pair
+          is positioned horizontally or vertically.
+        - $arrow is set to "north", "south", "east" or "west" to indicate the 
+          direction the arrow should point relative to the sign.
+        """),
 
     Opt('broken_antline_chance', 0.0,
         """The chance an antline will be 'broken'.
@@ -470,6 +480,9 @@ DEFAULTS = [
 
         It should be a single brush cube - the wall is set to the same
         rotation as the matching side. (The bottom is ignored).
+        """),
+    Opt('generate_tidelines', False,
+        """Generate tideline overlays around the outside of goo pits.
         """),
 
     Opt('glass_floorbeam_temp', TYPE.STR,

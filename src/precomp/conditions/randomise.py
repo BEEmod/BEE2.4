@@ -56,14 +56,6 @@ def res_random_setup(vmf: VMF, res: Property) -> object:
 
     weight = conditions.weighted_random(len(results), weight)
 
-    # We also need to execute result setups on all child properties!
-    for prop in results[:]:
-        if prop.name == 'group':
-            for sub_prop in list(prop):
-                Condition.setup_result(vmf, prop.value, sub_prop)
-        else:
-            Condition.setup_result(vmf, results, prop)
-
     return seed, chance, weight, results
 
 
@@ -110,27 +102,8 @@ def res_random(inst: Entity, res: Property) -> None:
             choice.value = None
 
 
-@make_result_setup('variant')
-def res_add_variant_setup(res: Property) -> object:
-    if res.has_children():
-        count = srctools.conv_int(res['Number', ''], None)
-        if count:
-            return conditions.weighted_random(
-                count,
-                res['weights', ''],
-            )
-        else:
-            return None
-    else:
-        count = srctools.conv_int(res.value, None)
-        if count:
-            return list(range(count))
-        else:
-            return None
-
-
 @make_result('variant')
-def res_add_variant(inst: Entity, res: Property) -> None:
+def res_add_variant(res: Property):
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form `_var4`.
@@ -141,15 +114,36 @@ def res_add_variant(inst: Entity, res: Property) -> None:
 
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of `2, 1, 1` means the first instance has a 2/4 chance of
-    being chosen, and the other 2 have a 1/4 chance of being chosen.  
+    being chosen, and the other 2 have a 1/4 chance of being chosen.
     The chosen variant depends on the position, direction and name of
     the instance.
 
-    Alternatively, you can use `"variant" "number"` to choose from equally-weighted
-    options.
+    Alternatively, you can use `"variant" "number"` to choose from
+    equally-weighted options.
     """
-    set_random_seed(inst, 'variant')
-    conditions.add_suffix(inst, "_var" + str(random.choice(res.value) + 1))
+    if res.has_children():
+        count_val = res['Number']  # or raise an error
+        try:
+            count = int(count_val)
+        except (TypeError, ValueError):
+            raise ValueError(f'Invalid variant count {count_val}!')
+        weighting = conditions.weighted_random(
+            count,
+            res['weights', ''],
+        )
+    else:
+        try:
+            count = int(res.value)
+        except (TypeError, ValueError):
+            raise ValueError(f'Invalid variant count {res.value!r}!')
+        else:
+            weighting = list(range(count))
+
+    def apply_variant(inst: Entity) -> None:
+        """Apply the variant."""
+        set_random_seed(inst, 'variant')
+        conditions.add_suffix(inst, f"_var{str(random.choice(weighting) + 1)}")
+    return apply_variant
 
 
 @make_result('RandomNum')

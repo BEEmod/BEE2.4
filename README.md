@@ -27,7 +27,7 @@ The packages (item, style, etc definitions) are in the [BEE2-Items](https://gith
 As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki article](https://github.com/BEEmod/BEE2-items/wiki/BEE2.4-on-Mac) for more details and how you can still use the mod.
 
 ### Used Libraries ###
-- [Python](https://www.python.org/)
+- [Python](https://www.python.org/) 3.8 or later
 - [TKinter/TTK](https://tcl.tk/)
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
@@ -39,31 +39,21 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 
 ## Building from Source ##
 
-### PyPI list: ###
-* pillow (On Linux this may need to be installed via system package manager with the TK component: `python-pillow`, `python-pillow.imagetk`)
-* mistletoe
-* pyglet
-* PyInstaller
-* cython
-* babel
-
 ### Compilation ###
 First, grab the 3 git repositories you need:
 
 	git clone https://github.com/TeamSpen210/HammerAddons.git
-	git clone https://github.com/TeamSpen210/srctools.git
 	git clone https://github.com/BEEmod/BEE2.4.git
-	
-Switch to the srctools repo, and install the package:
 
-	cd srctools/
-	python setup.py install
+Run `python -m pip install -r requirements.txt` to install the required packages. On Linux, 
+Pillow might need to be installed via the system package manager with the TK component: 
+`python-pillow`, `python-pillow.imagetk`.
 
 Finally, switch to the BEE2.4 repo and build the compiler, then the application:
 
 	cd BEE2.4/src/
-	pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp BEE2.spec
 	pyinstaller --distpath ../dist/BEE2/ --workpath ../build_tmp compiler.spec
+	pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp BEE2.spec
 	
 The built application is found in `BEE2.4/dist/BEE2/`.
 Copy `BEE2.4/dist/64/compiler/` into this folder as well.

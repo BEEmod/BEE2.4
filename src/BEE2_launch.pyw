@@ -16,8 +16,9 @@ if sys.platform == "darwin":
     # Disable here, can't get this to work.
     sys.modules['pyglet'] = None
 
-if not sys.platform.startswith('win'):
+    # Fork breaks on Mac, so override.
     set_start_method('spawn')
+
 freeze_support()
 
 if __name__ == '__main__':
@@ -53,6 +54,10 @@ if __name__ == '__main__':
     elif app_name == 'compilepane':
         from app import CompilerPane
         CompilerPane.init_application()
+    elif app_name.startswith('test_'):
+        import importlib
+        mod = importlib.import_module('app.' + sys.argv[1][5:])
+        mod.test()
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
 

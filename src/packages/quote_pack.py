@@ -44,7 +44,7 @@ class QuotePack(PakObject):
     @classmethod
     def parse(cls, data: ParseData) -> 'QuotePack':
         """Parse a voice line definition."""
-        selitem_data = SelitemData.parse(data.info)
+        selitem_data = SelitemData.parse(data.info, data.pak_id)
         chars = {
             char.strip()
             for char in

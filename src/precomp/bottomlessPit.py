@@ -356,7 +356,7 @@ def make_pit_shell(vmf: VMF):
                 for z in range(0, 10):
                     br_pos = real_pos - (0, 0, 512 * z)
                     vmf.add_brush(
-                        vmf.make_prism(br_pos + 64, br_pos - (64, 64, 512-64), vbsp.BLACK_PAN[1]).solid
+                        vmf.make_prism(br_pos + 64, br_pos - (64, 64, 512-64), "metal/black_wall_metal_002c").solid
                     )
 
     prism = vmf.make_prism(

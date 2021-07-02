@@ -1,6 +1,6 @@
 """Conditions related to global properties - stylevars, music, which game, etc."""
 
-from typing import AbstractSet, Collection, Set, Dict, Optional, Tuple
+from typing import Collection, Set, Dict, Tuple
 
 from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
@@ -177,7 +177,7 @@ def res_set_voice_attr(res: Property) -> object:
     be present for syntax reasons.
     """
     if res.has_children():
-        for opt in res.value:
+        for opt in res:
             vbsp.settings['has_attr'][opt.name] = True
     else:
         vbsp.settings['has_attr'][res.value.casefold()] = True

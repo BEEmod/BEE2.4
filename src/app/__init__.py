@@ -49,7 +49,6 @@ def tk_error(
         msg='Uncaught Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
-    logging.shutdown()
 
     # Since this isn't caught normally, it won't quit the application.
     # Quit ourselves manually. to prevent TK just freezing.
@@ -79,6 +78,18 @@ def on_error(
 
         # Append traceback to the clipboard.
         TK_ROOT.clipboard_append(err)
+    except Exception:
+        pass
+
+    # Try and terminate background operations.
+    try:
+        import loadScreen
+        loadScreen.BG_PROC.kill()
+    except Exception:
+        pass
+    try:
+        from . import sound
+        sound.sounds = sound.NullSound()
     except Exception:
         pass
 

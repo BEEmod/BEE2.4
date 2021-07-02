@@ -77,9 +77,6 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
 
-ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
-
-
 class CubeEntType(Enum):
     """Cube types, as set on prop_weighted_cube.
 
@@ -146,6 +143,13 @@ class CubeOutputs(Enum):
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
     ON_PICKUP = 'OnPickup'
     ON_DROP = 'OnDrop'
+
+
+class AddonFixups(Enum):
+    """Special fixup variables usable in cube addons."""
+    DROPPER = 'dropper'
+    CUBE = 'cube'
+    LINKED = 'linked'
 
 
 class ModelSwapMeth(Enum):
@@ -235,17 +239,17 @@ class CubeAddon:
         inst: str='',
         pack: str='',
         vscript: str='',
-        script_vars: Iterable[ScriptVar]=(),
         outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
+        fixups: Optional[List[Tuple[str, Union[str, AddonFixups]]]]=None,
     ):
         self.id = id
         self.inst = inst
         self.pack = pack
         self.vscript = vscript  # Entity script(s)s to add to the cube.
         self.outputs = {}  # type: Dict[CubeOutputs, List[Output]]
-
-        # Fire inputs to functions with instance vars.
-        self.script_vars = list(script_vars)
+        # None means not defined at all, so fallback to copying everything.
+        # "fixups" {} on the other hand would not copy any fixups.
+        self.fixups = fixups
 
         for out_type in CubeOutputs:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
@@ -258,8 +262,8 @@ class CubeAddon:
             props['instance', ''],
             props['packlist', ''],
             props['vscript', ''],
-            cls._parse_scriptvar(props),
             cls._parse_outputs(props),
+            cls._parse_fixups(props),
         )
         return addon
 
@@ -270,9 +274,9 @@ class CubeAddon:
         pack = props['overlay_pack', '']
         script = props['vscript', '']
         outputs = cls._parse_outputs(props)
-        script_vars = cls._parse_scriptvar(props)
-        if inst or pack or script or script_vars or any(outputs.values()):
-            return cls(cube_id, inst, pack, script, script_vars, outputs)
+        fixups = cls._parse_fixups(props)
+        if inst or pack or script or any(outputs.values()) or fixups:
+            return cls(cube_id, inst, pack, script, outputs, fixups)
         else:
             return None
 
@@ -288,21 +292,18 @@ class CubeAddon:
         return outputs
 
     @staticmethod
-    def _parse_scriptvar(props: Property):
-        script_vars = []
-        for prop in props.find_children('ScriptVars'):
-            func, args = prop.value.split('(')
-
-            # Allow this to be used.
-            if prop.name == '!self':
-                prop.name = 'box'
-
-            script_vars.append(ScriptVar(
-                prop.real_name,
-                func,
-                list(map(str.strip, args.rstrip(')').split(','))),
-            ))
-        return script_vars
+    def _parse_fixups(props: Property) -> Optional[List[Tuple[str, Union[str, AddonFixups]]]]:
+        fixups = []
+        found = False
+        for parent in props.find_all('Fixups'):
+            found = True
+            for prop in parent:
+                if prop.value.startswith('<') and prop.value.endswith('>'):
+                    src = AddonFixups(prop.value[1:-1].casefold())
+                else:
+                    src = prop.value
+                fixups.append((prop.real_name, src))
+        return fixups if found else None
 
 
 class DropperType:
@@ -929,6 +930,8 @@ def flag_cube_type(inst: Entity, res: Property):
     * `<any>`: Any kind of cube item
     * `<none>`: Not a cube item
     * `<companion>`: A cube marked as companion-like.
+    * `<sphere>` or `<ball>`: A sphere-type cube.
+    * `<reflection>` or `<reflect>`: A reflection-type cube.
     * `<dropper>`: The dropper half of a pair.
     * `<cube>`: The cube half of a pair.
     """
@@ -955,6 +958,10 @@ def flag_cube_type(inst: Entity, res: Property):
             return False
         elif cube_type == 'companion':
             return pair.cube_type.is_companion
+        elif cube_type in ('sphere', 'ball'):
+            return pair.cube_type.type is CubeEntType.sphere
+        elif cube_type in ('reflect', 'reflection'):
+            return pair.cube_type.type is CubeEntType.reflect
         elif cube_type == 'dropper':
             return inst is pair.dropper
         elif cube_type == 'cube':
@@ -1385,38 +1392,6 @@ def setup_output(
     return out
 
 
-def add_scriptvar(
-    out_name: str,
-    fixup: EntityFixup,
-    inst: Entity,
-    vars: List[ScriptVar],
-) -> List[Output]:
-    """Apply "scriptvars" to a cube.
-
-    If blank or invalid Null will be used.
-    """
-    out = []
-    for var in vars:
-        args = []
-        for arg in var.vars:
-            value = fixup[arg]
-            if value:
-                try:
-                    value = format(float(value), 'g')
-                except ValueError:
-                    value = '`' + value + '`'
-            else:
-                value = 'null'
-            args.append(value)
-        out.append(Output(
-            out_name,
-            conditions.local_name(inst, var.local_name),
-            'RunScriptCode',
-            '{}({})'.format(var.function, ', '.join(args)),
-        ))
-    return out
-
-
 def make_cube(
     vmf: VMF,
     pair: CubePair,
@@ -1508,7 +1483,7 @@ def make_cube(
                         'OnUser4',
                         '!self',
                         'Skin',
-                        CUBE_SKINS[CubePaintType.BOUNCE, pair.cube_type.type],
+                        CUBE_SKINS[pair.cube_type.type].spawn_skin(CubePaintType.BOUNCE),
                         only_once=True,
                     )
                 )
@@ -1578,8 +1553,18 @@ def make_cube(
                 ),
                 file=addon.inst,
             )
-            # Copy the cube stuff to the addon, since it's specific to the cube.
-            inst.fixup.update(pair.cube_fixup)
+            if addon.fixups is not None:
+                for fixup_var, fixup_src in addon.fixups:
+                    if fixup_src is AddonFixups.CUBE:
+                        inst.fixup[fixup_var] = not in_dropper
+                    elif fixup_src is AddonFixups.DROPPER:
+                        inst.fixup[fixup_var] = in_dropper
+                    elif fixup_src is AddonFixups.LINKED:
+                        inst.fixup[fixup_var] = pair.dropper is not None and pair.cube is not None
+                    else:
+                        inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_src, allow_invert=True)
+            else:
+                inst.fixup.update(pair.cube_fixup)
         packing.pack_list(vmf, addon.pack)
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
@@ -1726,13 +1711,10 @@ def generate_cubes(vmf: VMF):
         # One or both of the cube ents we make.
         cubes = []  # type: List[Entity]
 
-        # Transfer addon outputs to the pair data, and accumulate all the script
-        # vars.
-        script_vars = []
+        # Transfer addon outputs to the pair data.
         for addon in pair.addons:
             for out_type, out_list in addon.outputs.items():
                 pair.outputs[out_type].extend(out_list)
-            script_vars.extend(addon.script_vars)
 
         # Generate the outputs to paint the cubes.
         if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not None:
@@ -1793,13 +1775,6 @@ def generate_cubes(vmf: VMF):
                 # After first firing, it deletes so it doesn't trigger after.
                 out.only_once = True
                 drop_cube.add_out(out)
-
-            drop_cube.add_out(*add_scriptvar(
-                'OnUser4',
-                pair.cube_fixup,
-                pair.dropper,
-                script_vars,
-            ))
 
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,
@@ -1892,14 +1867,6 @@ def generate_cubes(vmf: VMF):
             # For consistency with the dropped cube, add a User1 output
             # that fizzles it.
             cube.add_out(Output('OnUser1', '!self', 'Dissolve'))
-
-            # Add script-var setup inputs.
-            cube_temp.add_out(*add_scriptvar(
-                'OnEntitySpawned',
-                pair.cube_fixup,
-                pair.cube,
-                script_vars,
-            ))
 
             for temp_out in pair.outputs[CubeOutputs.SPAWN]:
                 cube_temp.add_out(setup_output(

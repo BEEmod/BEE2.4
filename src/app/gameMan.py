@@ -5,7 +5,9 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
+from __future__ import annotations
 from pathlib import Path
+from collections.abc import Iterable, Iterator
 
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
@@ -19,24 +21,25 @@ import io
 import pickle
 import pickletools
 import copy
+import webbrowser
+from atomicwrites import atomic_write
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from srctools import (
-    Vec, VPK,
+    Vec, VPK, Vec_tuple,
     Property,
     VMF, Output,
     FileSystem, FileSystemChain,
 )
 import srctools.logger
-from app import backup, optionWindow, tk_tools, TK_ROOT
+from app import backup, optionWindow, tk_tools, TK_ROOT, resource_gen
 import loadScreen
-import packages
+import packages.template_brush
 import editoritems
 import utils
 import srctools
-import webbrowser
 
-from typing import List, Tuple, Set, Iterable, Iterator, Dict, Union
+from typing import Optional, Union, Any, Type, IO
 
 
 try:
@@ -48,10 +51,10 @@ except ImportError:
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-all_games = []  # type: List[Game]
-selected_game = None  # type: Game
+all_games: list[Game] = []
+selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
-game_menu = None  # type: Menu
+game_menu: Optional[Menu] = None
 
 # Translated text from basemodui.txt.
 TRANS_DATA = {}
@@ -144,9 +147,9 @@ res_system = FileSystemChain()
 
 # We search for Tag and Mel's music files, and copy them to games on export.
 # That way they can use the files.
-MUSIC_MEL_VPK = None  # type: VPK
-MUSIC_TAG_LOC = None  # type: str
-TAG_COOP_INST_VMF = None  # type: VMF
+MUSIC_MEL_VPK: Optional[VPK] = None
+MUSIC_TAG_LOC: Optional[str] = None
+TAG_COOP_INST_VMF: Optional[VMF] = None
 
 # The folder with the file...
 MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
@@ -271,8 +274,9 @@ def should_backup_app(file: str) -> bool:
 
         # Read out the last 4096 bytes, and look for the sig in there.
         f.seek(-SIZE, io.SEEK_END)
-
-        return b'MEI\014\013\012\013\016' not in f.read(SIZE)
+        end_data = f.read(SIZE)
+        # We also look for BenVlodgi, to catch the BEE 1.06 precompiler.
+        return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
 
 
 class Game:
@@ -281,7 +285,7 @@ class Game:
         name: str,
         steam_id: str,
         folder: str,
-        mod_times: Dict[str, int],
+        mod_times: dict[str, int],
     ) -> None:
         self.name = name
         self.steamID = steam_id
@@ -372,8 +376,8 @@ class Game:
                 'game_sounds_editor.txt',
             ))
         try:
-            with open(file, encoding='utf8') as f:
-                file_data = list(f)
+            with open(file, encoding='utf8') as f1:
+                file_data = list(f1)
         except FileNotFoundError:
             # If the file doesn't exist, we'll just write our stuff in.
             file_data = []
@@ -384,7 +388,7 @@ class Game:
                 break
 
         # Then add our stuff!
-        with srctools.AtomicWriter(file) as f:
+        with atomic_write(file, overwrite=True, encoding='utf8') as f:
             f.writelines(file_data)
             f.write(EDITOR_SOUND_LINE + '\n')
             for sound in sounds:
@@ -435,7 +439,7 @@ class Game:
                         )
                     continue
 
-                with srctools.AtomicWriter(info_path) as file:
+                with atomic_write(info_path, overwrite=True, encoding='utf8') as file:
                     for line in data:
                         file.write(line)
         if not add_line:
@@ -460,6 +464,7 @@ class Game:
         if they're in instances.
         Add_line determines if we are adding or removing it.
         """
+        file: IO[bytes]
         # We do this in binary to ensure non-ASCII characters pass though
         # untouched.
 
@@ -485,7 +490,7 @@ class Game:
                 del data[i:]
                 break
 
-        with srctools.AtomicWriter(fgd_path, is_bytes=True) as file:
+        with atomic_write(fgd_path, overwrite=True, mode='wb') as file:
             for line in data:
                 file.write(line)
             if add_lines:
@@ -517,7 +522,7 @@ class Game:
         ):
             return True
 
-    def refresh_cache(self, already_copied: Set[str]) -> None:
+    def refresh_cache(self, already_copied: set[str]) -> None:
         """Copy over the resource files into this game.
 
         already_copied is passed from copy_mod_music(), to
@@ -593,9 +598,9 @@ class Game:
     def export(
         self,
         style: packages.Style,
-        selected_objects: dict,
+        selected_objects: dict[Type[packages.PakObject], Any],
         should_refresh=False,
-    ) -> Tuple[bool, bool]:
+    ) -> tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -608,11 +613,11 @@ class Game:
         LOGGER.info('Exporting Items and Style for "{}"!', self.name)
 
         LOGGER.info('Style = {}', style.id)
-        for obj, selected in selected_objects.items():
+        for obj_type, selected in selected_objects.items():
             # Skip the massive dict in items
-            if obj == 'Item':
+            if obj_type is packages.Item:
                 selected = selected[0]
-            LOGGER.info('{} = {}', obj, selected)
+            LOGGER.info('{} = {}', obj_type, selected)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
@@ -645,10 +650,12 @@ class Game:
         # Editoritems
         # VBSP_config
         # Instance list
-        # Editor models.
+        # Editor models
+        # Template file
         # FGD file
         # Gameinfo
-        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 6)
+        # Misc resources
+        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 8)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -680,17 +687,16 @@ class Game:
             vpk_success = True
 
             # Export each object type.
-            for obj_name, obj_data in packages.OBJ_TYPES.items():
-                if obj_name == 'Style':
+            for obj_type in packages.OBJ_TYPES.values():
+                if obj_type is packages.Style:
                     continue  # Done above already
 
-                LOGGER.info('Exporting "{}"', obj_name)
-                selected = selected_objects.get(obj_name, None)
+                LOGGER.info('Exporting "{}"', obj_type.__name__)
 
                 try:
-                    obj_data.cls.export(packages.ExportData(
+                    obj_type.export(packages.ExportData(
                         game=self,
-                        selected=selected,
+                        selected=selected_objects.get(obj_type, None),
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
@@ -701,6 +707,9 @@ class Game:
                     vpk_success = False
 
                 export_screen.step('EXP')
+
+            packages.template_brush.write_templates(self)
+            export_screen.step('EXP')
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(optionWindow.DEV_MODE.get()))
@@ -778,7 +787,7 @@ class Game:
 
             # Special-case: implement the UnlockDefault stlylevar here,
             # so all items are modified.
-            if selected_objects['StyleVar']['UnlockDefault']:
+            if selected_objects[packages.StyleVar]['UnlockDefault']:
                 LOGGER.info('Unlocking Items!')
                 for i, item in enumerate(all_items):
                     # If the Unlock Default Items stylevar is enabled, we
@@ -799,10 +808,10 @@ class Game:
                 self.edit_fgd(True)
             export_screen.step('EXP')
 
-            # AtomicWriter writes to a temporary file, then renames in one step.
+            # atomicwrites writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
-            with srctools.AtomicWriter(self.abs_path('portal2_dlc2/scripts/editoritems.txt')) as editor_file:
+            with atomic_write(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), overwrite=True, encoding='utf8') as editor_file:
                 editoritems.Item.export(editor_file, all_items, renderables)
             export_screen.step('EXP')
 
@@ -866,7 +875,10 @@ class Game:
             self.clean_editor_models(all_items)
             export_screen.step('EXP')
 
+            LOGGER.info('Writing fizzler sides...')
             self.generate_fizzler_sides(vbsp_config)
+            resource_gen.make_cube_colourizer_legend(Path(self.abs_path('bee2')))
+            export_screen.step('EXP')
 
             if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
                 os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
@@ -937,7 +949,7 @@ class Game:
 
     def generate_fizzler_sides(self, conf: Property):
         """Create the VMTs used for fizzler sides."""
-        fizz_colors = {}
+        fizz_colors: dict[Vec_tuple, tuple[float, str]] = {}
         mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_color', '']
@@ -965,7 +977,7 @@ class Game:
         """Try and launch the game."""
         webbrowser.open('steam://rungameid/' + str(self.steamID))
 
-    def copy_mod_music(self) -> Set[str]:
+    def copy_mod_music(self) -> set[str]:
         """Copy music files from Tag and PS:Mel.
 
         This returns a list of all the paths it copied to.

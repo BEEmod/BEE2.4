@@ -14,7 +14,7 @@ from srctools import FileSystem, Property, EmptyMapping
 from pathlib import PurePosixPath as FSPath
 import srctools.logger
 
-from app import tkMarkdown
+from app import tkMarkdown, img
 from packages import (
     PakObject, ParseData, ExportData,
     sep_values, desc_parse,
@@ -38,6 +38,7 @@ CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
 
 class UnParsedItemVariant(NamedTuple):
     """The desired variant for an item, before we've figured out the dependencies."""
+    pak_id: str  # The package that defined this variant.
     filesys: FileSystem  # The original filesystem.
     folder: Optional[str]  # If set, use the given folder from our package.
     style: Optional[str]  # Inherit from a specific style (implies folder is None)
@@ -55,7 +56,7 @@ class ItemVariant:
         authors: List[str],
         tags: List[str],
         desc: tkMarkdown.MarkdownData,
-        icons: Dict[str, str],
+        icons: Dict[str, img.Handle],
         ent_count: str='',
         url: str = None,
         all_name: str=None,
@@ -109,7 +110,7 @@ class ItemVariant:
         self.vbsp_config += other.vbsp_config
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    def modify(self, fsys: FileSystem, props: Property, source: str) -> 'ItemVariant':
+    def modify(self, fsys: FileSystem, pak_id: str, props: Property, source: str) -> 'ItemVariant':
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -121,7 +122,7 @@ class ItemVariant:
                 props,
                 fsys,
                 'items',
-                pak_id=fsys.path,
+                pak_id,
             )
         else:
             vbsp_config = self.vbsp_config.copy()
@@ -142,19 +143,19 @@ class ItemVariant:
             props,
             fsys,
             'items',
+            pak_id,
             prop_name='append',
-            pak_id=fsys.path,
         ))
 
         if 'description' in props:
-            desc = desc_parse(props, source)
+            desc = desc_parse(props, source, pak_id)
         else:
             desc = self.desc.copy()
 
         if 'appenddesc' in props:
             desc = tkMarkdown.join(
                 desc,
-                desc_parse(props, source, prop_name='appenddesc'),
+                desc_parse(props, source, pak_id, prop_name='appenddesc'),
             )
 
         if 'authors' in props:
@@ -184,6 +185,7 @@ class ItemVariant:
         [variant.editor] = variant._modify_editoritems(
             props,
             [variant.editor],
+            pak_id,
             source,
             is_extra=False,
         )
@@ -192,6 +194,7 @@ class ItemVariant:
             variant.editor_extra = variant._modify_editoritems(
                 props.find_key('extra'),
                 variant.editor_extra,
+                pak_id,
                 source,
                 is_extra=True
             )
@@ -202,6 +205,7 @@ class ItemVariant:
         self,
         props: Property,
         editor: List[EditorItem],
+        pak_id: str,
         source: str,
         is_extra: bool,
     ) -> List[EditorItem]:
@@ -224,7 +228,10 @@ class ItemVariant:
             except LookupError:
                 pal_icon = None
             pal_name = item['pal_name', None]  # Name for the palette icon
-            bee2_icon = item['bee2', None]
+            try:
+                bee2_icon = img.Handle.parse(item.find_key('BEE2'), pak_id, 64, 64, subfolder='items')
+            except LookupError:
+                bee2_icon = None
 
             if item.name == 'all':
                 if is_extra:
@@ -309,7 +316,10 @@ class ItemVariant:
                     ) from None
                 editor[0].set_inst(ind, inst_data)
             else:  # BEE2 named instance
-                editor[0].cust_instances[inst.name] = inst_data.inst
+                inst_name = inst.name
+                if inst_name.startswith('bee2_'):
+                    inst_name = inst_name[5:]
+                editor[0].cust_instances[inst_name] = inst_data.inst
 
         # Override IO commands.
         try:
@@ -342,14 +352,14 @@ class Version:
     __slots__ = ['name', 'id', 'isolate', 'styles', 'def_style']
     def __init__(
         self,
-        id: str,
+        vers_id: str,
         name: str,
         isolate: bool,
         styles: Dict[str, ItemVariant],
         def_style: Union[ItemVariant, Union[str, ItemVariant]],
     ) -> None:
         self.name = name
-        self.id = id
+        self.id = vers_id
         self.isolate = isolate
         self.styles = styles
         self.def_style = def_style
@@ -399,7 +409,7 @@ class Item(PakObject):
         folders_to_parse: Set[str] = set()
         unstyled = data.info.bool('unstyled')
 
-        glob_desc = desc_parse(data.info, 'global:' + data.id)
+        glob_desc = desc_parse(data.info, 'global:' + data.id, data.pak_id)
         desc_last = data.info.bool('AllDescLast')
 
         all_config = get_config(
@@ -423,6 +433,7 @@ class Item(PakObject):
             for style in ver.find_children('styles'):
                 if style.has_children():
                     folder = UnParsedItemVariant(
+                        data.pak_id,
                         data.fsys,
                         folder=style['folder', None],
                         style=style['Base', ''],
@@ -432,6 +443,7 @@ class Item(PakObject):
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
                     folder = UnParsedItemVariant(
+                        data.pak_id,
                         data.fsys,
                         style=style.value[1:-1],
                         folder=None,
@@ -440,6 +452,7 @@ class Item(PakObject):
                 else:
                     # Reference to the actual folder...
                     folder = UnParsedItemVariant(
+                        data.pak_id,
                         data.fsys,
                         folder=style.value,
                         style=None,
@@ -666,7 +679,7 @@ class Item(PakObject):
         )
 
 
-class ItemConfig(PakObject, allow_mult=True, has_img=False):
+class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.
 
     The ID should match an item ID.
@@ -684,7 +697,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse from config files."""
-        filesystem = data.fsys  # type: FileSystem
+        filesystem = data.fsys
         vers = {}
 
         all_config = get_config(
@@ -763,7 +776,7 @@ def parse_item_folder(
                 f = filesystem[editor_path].open_str()
             except FileNotFoundError as err:
                 raise IOError(
-                    '"' + pak_id + ':items/' + fold + '" not valid!'
+                    '"' + pak_id + ':items/' + fold + '" not valid! '
                     'Folder likely missing! '
                 ) from err
             with f:
@@ -797,8 +810,9 @@ def parse_item_folder(
                     )
                     subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
 
+        # In files this is specificed as PNG, but it's always really VTF.
         try:
-            all_icon = FSPath(props['all_icon'])
+            all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
         except LookupError:
             all_icon = None
 
@@ -808,18 +822,18 @@ def parse_item_folder(
 
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
-            source='<{}>/items/{}'.format(pak_id, fold),
+            source=f'<{pak_id}>/items/{fold}',
             vbsp_config=Property(None, []),
 
             authors=sep_values(props['authors', '']),
             tags=sep_values(props['tags', '']),
-            desc=desc_parse(props, pak_id + ':' + prop_path),
+            desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
             ent_count=props['ent_count', ''],
             url=props['infoURL', None],
             icons={
-                p.name: p.value
-                for p in
-                props['icon', []]
+                prop.name: img.Handle.parse(prop, pak_id, 64, 64, subfolder='items')
+                for prop in
+                props.find_children('icon')
             },
             all_name=props['all_name', None],
             all_icon=all_icon,
@@ -832,14 +846,11 @@ def parse_item_folder(
                 path=prop_path,
             )
 
-        # If we have at least 1, but not all of the grouping icon
-        # definitions then notify the author.
-        num_group_parts = (
-            (folders[fold].all_name is not None)
-            + (folders[fold].all_icon is not None)
-            + ('all' in folders[fold].icons)
-        )
-        if 0 < num_group_parts < 3:
+        # If we have one of the grouping icon definitions but not both required
+        # ones then notify the author.
+        has_name = folders[fold].all_name is not None
+        has_icon = folders[fold].all_icon is not None
+        if (has_name or has_icon or 'all' in folders[fold].icons) and (not has_name or not has_icon):
             LOGGER.warning(
                 'Warning: "{id}:{path}" has incomplete grouping icon '
                 'definition!',
@@ -987,6 +998,7 @@ def assign_styled_items(
                     else:
                         styles[sty_id] = start_data.modify(
                             conf.filesys,
+                            conf.pak_id,
                             conf.config,
                             '<{}:{}.{}>'.format(item.id, vers.id, sty_id),
                         )

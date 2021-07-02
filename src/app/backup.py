@@ -638,6 +638,7 @@ def ui_save_backup_as() -> None:
 
 def ui_refresh_game() -> None:
     """Reload the game maps list."""
+    from app import gameMan
     if gameMan.selected_game is not None:
         load_game(gameMan.selected_game)
 
@@ -807,21 +808,21 @@ def init() -> None:
         )
         UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
 
-        utils.add_mousewheel(
+        tk_tools.add_mousewheel(
             UI[cat + 'details'].wid_canvas,
             UI[cat + 'frame'],
         )
 
-    UI['game_refresh'] = ttk.Button(
+    game_refresh = ttk.Button(
         UI['game_title_frame'],
-        image=img.png('icons/tool_sub'),
         command=ui_refresh_game,
     )
-    UI['game_refresh'].grid(row=0, column=1, sticky='E')
+    game_refresh.grid(row=0, column=1, sticky='E')
     add_tooltip(
-        UI['game_refresh'],
+        game_refresh,
         "Reload the map list.",
     )
+    img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
 
     UI['game_title']['textvariable'] = game_name
     UI['back_title']['textvariable'] = backup_name
@@ -848,6 +849,7 @@ def init() -> None:
 
 def init_application() -> None:
     """Initialise the standalone application."""
+    from app import gameMan
     global window
     window = TK_ROOT
     TK_ROOT.title(

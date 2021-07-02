@@ -452,7 +452,7 @@ class OccupiedVoxel(NamedTuple):
     If subpos is not None, this is a 32x32 cube and not a full voxel.
     """
     type: CollType
-    against: CollType
+    against: Optional[CollType]  # TODO: Don't know what the default is.
     pos: Coord
     subpos: Optional[Coord]
     normal: Optional[Coord]
@@ -704,7 +704,8 @@ class SubType:
                     if subkey == 'tooltip':
                         subtype.pal_name = tok.expect(Token.STRING)
                     elif subkey == 'image':
-                        subtype.pal_icon = FSPath(tok.expect(Token.STRING))
+                        # Usually defined in file as PNG, but actually VTF.
+                        subtype.pal_icon = FSPath(tok.expect(Token.STRING)).with_suffix('.vtf')
                     elif subkey == 'position':
                         points = tok.expect(Token.STRING).split()
                         if len(points) in (2, 3):
@@ -760,7 +761,7 @@ class SubType:
                 f.write(f'\t\t\t\t"{snd_type.value}" "{sndscript}"\n')
             f.write('\t\t\t\t}\n')
         if self.anims:
-            f.write('\t\t\t"Sounds"\n\t\t\t\t{\n')
+            f.write('\t\t\t"Animations"\n\t\t\t\t{\n')
             for anim_name, anim_ind in sorted(self.anims.items(), key=lambda t: t[1]):
                 f.write(f'\t\t\t\t"{anim_name.value}" "{anim_ind}"\n')
             f.write('\t\t\t\t}\n')
@@ -1216,6 +1217,7 @@ class Item:
     def _finalise_connections(self) -> None:
         """Apply legacy outputs to the config, and do some verification."""
         conf = self.conn_config
+        assert conf is not None
         # If regular inputs or outputs are defined, convert to the new style.
         if ConnTypes.NORMAL in self.conn_inputs:
             conn = self.conn_inputs.pop(ConnTypes.NORMAL)
@@ -1323,7 +1325,7 @@ class Item:
         """Parse occupied voxel definitions. We add on the volume variant for convienience."""
         for occu_key in tok.block('OccupiedVoxels'):
             collide_type = CollType.DEFAULT
-            collide_against = CollType.NOTHING
+            collide_against: Optional[CollType] = None
             pos1 = Coord(0, 0, 0)
             pos2: Optional[Coord] = None
             normal: Optional[Coord] = None
@@ -1557,7 +1559,9 @@ class Item:
 
         has_prim_input = self.has_prim_input()
         has_sec_input = self.has_sec_input()
-        has_output = self.has_output()
+        # Fizzlers don't output correctly, so don't allow them to output
+        # in editoritems.
+        has_output = self.has_output() and self.cls is not ItemClass.FIZZLER
         if has_prim_input or has_sec_input or self.conn_inputs:
             f.write('\t\t"Inputs"\n\t\t\t{\n')
             if has_prim_input:
@@ -1662,12 +1666,12 @@ class Item:
         for (pos, typ, against), voxels in voxel_groups.items():
             f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
             f.write(f'\t\t\t\t"Pos" "{pos}"\n')
-            if typ is not CollType.DEFAULT and against is not CollType.NOTHING:
+            if typ is not CollType.DEFAULT and against is not None:
                 f.write(f'\t\t\t\t"CollideType"    "{typ}"\n')
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
             elif typ is not CollType.DEFAULT:
                 f.write(f'\t\t\t\t"CollideType" "{typ}"\n')
-            elif against is not CollType.NOTHING:
+            elif against is not None:
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
             # Special case - single full voxel has no surface sections.
             if len(voxels) != 1 or voxels[0].subpos is not None or voxels[0].normal is not None:

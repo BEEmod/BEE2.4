@@ -1,77 +1,5 @@
 // This is injected at the end of Portal2.fgd.
  
-@BaseClass = BEETemplateEnt
-	[
-	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
-	visgroup(string): "Visgroup" : "" : "The visgroup this brush/overlay was contained in (in the combined file)."
-	]
-
-@SolidClass base(BEETemplateEnt) = bee2_template_world: "A set of world brushes which will be templated into a map."
-	[
-	]
-
-@SolidClass base(BEETemplateEnt) = bee2_template_detail: "A set of detail brushes which will be templated into a map."
-	[
-	]
-
-@PointClass base(BEETemplateEnt, info_overlay) 
-	size(-1 -1 0, 1 1 1)
-	color(80 150 225)
-	studio("models/editor/overlay_helper.mdl")
-	iconsprite("BEE2/editor/bee2_icon.vmt")
-	sphere(fademindist)
-	sphere(fademaxdist)
-	overlay()
-	= bee2_template_overlay : 
-	"An overlay which will be templated into a map." 
-	[
-	]
-	
-@PointClass base(BEETemplateEnt) iconsprite("BEE2/editor/bee2_icon.vmt") = bee2_template_scaling:
-	"Used to store the values for a scaling template."
-	[
-	up_tex(material): "Up Texture" : "" : "Texture for the upward-pointing face."
-	up_uaxis(string): "Up (U)" : "" : "Uaxis data for the upward-pointing face."
-	up_vaxis(string): "Up (V)" : "" : "Vaxis data for the upward-pointing face."
-	up_rotation(float): "Up Rotation" : 0 : "Rotation value fo the upward-pointing face."
-	
-	// Divider in the Hammer display, doesn't do anything.
-	_sep1(string) readonly: "---------" : ""
-	
-	dn_tex(material): "Down Texture" : "" : "Texture for the downward-pointing face."
-	dn_uaxis(string): "Down (U)" : "" : "Uaxis data for the downward-pointing face."
-	dn_vaxis(string): "Down (V)" : "" : "Vaxis data for the downward-pointing face."
-	dn_rotation(float): "Up Rotation" : 0 : "Rotation value for the downward-pointing face."
-	
-	_sep2(string) readonly: "---------" : ""
-	
-	n_tex(material): "North Texture" : "" : "Texture for the north-pointing face."
-	n_uaxis(string): "North (U)"  : "" : "Uaxis data for the north-pointing face."
-	n_vaxis(string): "North (V)"  : "" : "Vaxis data for the north-pointing face."
-	n_rotation(float): "North Rotation" : 0 : "Rotation value for the north-pointing face."
-	
-	_sep3(string) readonly: "---------" : ""
-	
-	s_tex(material): "South Texture" : "" : "Texture for the south-pointing face."
-	s_uaxis(string): "South (U)"  : "" : "Uaxis data for the south-pointing face."
-	s_vaxis(string): "South (V)"  : "" : "Vaxis data for the south-pointing face."
-	s_rotation(float): "South Rotation" : 0 : "Rotation value for the south-pointing face."
-	
-	_sep3(string) readonly: "---------" : ""
-	
-	e_tex(material): "East Texture" : "" : "Texture for the east-pointing face."
-	e_uaxis(string): "East (U)"  : "" : "Uaxis data for the east-pointing face."
-	e_vaxis(string): "East (V)"  : "" : "Vaxis data for the east-pointing face."
-	e_rotation(float): "East Rotation" : 0 : "Rotation value for the north-pointing face."
-	
-	_sep4(string) readonly: "---------" : ""
-	
-	w_tex(material): "West Texture" : "" : "Texture for the west-pointing face."
-	w_uaxis(string): "West (U)"  : "" : "Uaxis data for the west-pointing face."
-	w_vaxis(string): "West (V)"  : "" : "Vaxis data for the west-pointing face."
-	w_rotation(float): "West Rotation" : 0 : "Rotation value for the north-pointing face."
-	]
-
 @PointClass 
 	iconsprite("BEE2/editor/bee2_icon.vmt")
 	sidelist(realign_faces)
@@ -94,8 +22,6 @@
 		"detail" : "func_detail"
 		]
 	
-	is_scaling(boolean): "Save as Scaling Template" : 0 : "Scaling templates are a world-aligned cube for texturing brush sides in specific orientations. " +
-	"Set this to discard excess data."
 	discard_brushes(boolean): "Discard Brushes" : 0 : "Don't keep brushes, for templates used to position overlays only."
 	detail_auto_visgroup(boolean): "Group Detail Entities" : 0 : "If True, each func_detail entity will be put into a auto_xx visgroup. Otherwise, all func_detail will be ungrouped. World brushes stay ungrouped regardless."
 	]
@@ -109,8 +35,6 @@
 	"Applies the color of a surface at a position to template faces. The arrow should point out of the surface."
 	[
 	targetname(target_source): "Name" : "": "Set the name for reference from other entities."
-	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
-
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
 
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
@@ -138,7 +62,6 @@
 	= bee2_template_tilesetter:
 	"Applies a tile type to a surface."
 	[
-	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
 	color_picker(target_destination): "Color Picker": "" : "If set, use this colorpicker to reuse existing textures."
 
 	force(boolean) : "Force Place" : 0 : "If enabled, place the tile regardless of what's already in this position."
@@ -163,6 +86,28 @@
 		7: "Cutout Tile (Partial)"
 		]
 	]
+
+@PointClass
+	base(Angles)
+	studioprop("models/BEE2/editor/voxel_setter.mdl")
+	= bee2_template_voxelsetter:
+	"Applies a tile type to all the tiles on a voxel side."
+	[
+	force(boolean) : "Force Place" : 0 : "If enabled, place the tiles regardless of what's already in this position."
+	
+	skin(choices): "Tile Type" : "4": "The tile type to apply." = 
+		[
+		0: "Black"
+		1: "4x4 Black"
+		2: "White"
+		3: "4x4 White"
+		4: "Nodraw"
+		5: "Void (remove tile)"
+		6: "Cutout Tile (Broken)"
+		7: "Cutout Tile (Partial)"
+		]
+	]
+
 
 // --------
 // Entities used with editoritems_gen.py to make editoritems configs.
@@ -329,22 +274,6 @@
 
 @AutoVisGroup = "Templates"
 	[
-	"World"
-		[
-		"bee2_template_world"
-		]
-	"Detail"
-		[
-		"bee2_template_detail"
-		]
-	"Overlay"
-		[
-		"bee2_template_overlay"
-		]
-	"Scaling Temp"
-		[
-		"bee2_template_scaling"
-		]
 	"Configuration"
 		[
 		"bee2_template_conf"

@@ -3,7 +3,7 @@ import functools
 import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, Dict
+from typing import Iterator, List, Tuple, Dict, Optional
 
 from tkinter import *
 from tkinter import font
@@ -29,21 +29,20 @@ TABS = {}
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
 
-IMG_TEXT = {
-    'sp': _('Singleplayer'),
-    'coop': _('Cooperative'),
-    'atlas': _('ATLAS (SP/Coop)'),
-    'pbody': _('P-Body (SP/Coop)'),
-    'bendy': _('Bendy'),
-    'chell': _('Chell'),
-    'human': _('Human characters (Bendy and Chell)'),
-    'robot': _('AI characters (ATLAS, P-Body, or Coop)'),
-}
 
-IMG = {
-    spr: (img.png('icons/quote_' + spr), ctx)
-    for spr, ctx in IMG_TEXT.items()
-}  # type: Dict[str, Tuple[PhotoImage, str]]
+IMG: Dict[str, Tuple[img.Handle, str]] = {
+    spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
+    for spr, ctx in [
+        ('sp', _('Singleplayer')),
+        ('coop', _('Cooperative')),
+        ('atlas', _('ATLAS (SP/Coop)')),
+        ('pbody', _('P-Body (SP/Coop)')),
+        ('bendy', _('Bendy')),
+        ('chell', _('Chell')),
+        ('human', _('Human characters (Bendy and Chell)')),
+        ('robot', _('AI characters (ATLAS, P-Body, or Coop)')),
+    ]
+}
 
 
 # Friendly names given to certain response channels.
@@ -54,7 +53,9 @@ RESPONSE_NAMES = {
     'death_laserfield': _('Death - LaserField'),
 }
 
-config = config_mid = config_resp = None  # type: ConfigFile
+config: Optional[ConfigFile] = None
+config_mid: Optional[ConfigFile] = None
+config_resp: Optional[ConfigFile] = None
 
 
 class TabTypes(Enum):
@@ -156,7 +157,7 @@ def quote_sort_func(quote):
     # Use Decimal so any number of decimal points can be used.
     try:
         return Decimal(quote['priority', '0'])
-    except ValueError:
+    except ArithmeticError:
         return Decimal('0')
 
 
@@ -208,13 +209,13 @@ def add_tabs():
             notebook.tab(
                 tab,
                 compound='image',
-                image=img.png('icons/mid_quote'),
+                image=img.Handle.builtin('icons/mid_quote', 32, 16).get_tk(),
                 )
         if tab.nb_type is TabTypes.RESPONSE:
             notebook.tab(
                 tab,
                 compound=RIGHT,
-                image=img.png('icons/resp_quote'),
+                image=img.Handle.builtin('icons/resp_quote', 16, 16),
                 #Note: 'response' tab name, should be short.
                 text=_('Resp')
                 )
@@ -443,8 +444,9 @@ def make_tab(group, config: ConfigFile, tab_type):
                 padx=(10, 0),
                 sticky=W,
             )
-            for x, (img, ctx) in enumerate(badges):
-                label = ttk.Label(line_frame, image=img, padding=0)
+            for x, (img_handle, ctx) in enumerate(badges):
+                label = ttk.Label(line_frame, padding=0)
+                img.apply(label, img_handle)
                 label.grid(row=0, column=x)
                 add_tooltip(label, ctx)
 
@@ -491,7 +493,7 @@ def make_tab(group, config: ConfigFile, tab_type):
 
 
 def find_lines(quote_block: Property) -> Iterator[Tuple[
-    List[Tuple[PhotoImage, str]],
+    List[Tuple[img.Handle, str]],
     Property,
     str,
 ]]:
@@ -521,7 +523,7 @@ def find_lines(quote_block: Property) -> Iterator[Tuple[
 
 
 def find_resp_lines(quote_block: Property) -> Iterator[Tuple[
-    List[Tuple[PhotoImage, str]],
+    List[Tuple[img.Handle, str]],
     Property,
     str,
 ]]:
@@ -539,15 +541,3 @@ def get_trans_lines(trans_block):
             else:
                 yield '', '"' + prop.value + '"'
 
-if __name__ == '__main__':
-    import packages
-    data = packages.load_packages('packages\\', False)
-
-    TK_ROOT = Tk()
-    lab = ttk.Label(TK_ROOT, text='Root Window')
-    lab.bind(utils.EVENTS['LEFT'], lambda e: show(d['BEE2_CAVE_50s']))
-    lab.grid()
-    init_widgets()
-    d = {quote.id: quote for quote in data['QuotePack']}
-    print(d)
-    show(d['BEE2_GLADOS_CLEAN'])

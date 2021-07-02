@@ -9,10 +9,8 @@ from srctools import Property
 from srctools.logger import get_logger
 import packages
 from app.SubPane import SubPane
-from app import tooltip, TK_ROOT, itemconfig, img
-import utils
+from app import tooltip, TK_ROOT, itemconfig, tk_tools
 import BEE2_config
-
 
 
 LOGGER = get_logger(__name__)
@@ -100,6 +98,14 @@ UI = {}
 # Callback triggered whenever we reload vars. This is used to update items
 # to show/hide the defaults.
 _load_cback: Optional[Callable[[], None]] = None
+
+
+def mandatory_unlocked() -> bool:
+    """Return whether mandatory items are unlocked currently."""
+    try:
+        return tk_vars['UnlockDefault'].get()
+    except KeyError:  # Not loaded yet
+        return False
 
 
 def add_vars(style_vars, styles):
@@ -231,7 +237,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         menu_bar=menu_bar,
         resize_y=True,
         tool_frame=tool_frame,
-        tool_img=img.png('icons/win_stylevar'),
+        tool_img='icons/win_stylevar',
         tool_col=3,
     )
 
@@ -260,7 +266,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
     canvas['yscrollcommand'] = UI['style_scroll'].set
 
-    utils.add_mousewheel(canvas, stylevar_frame)
+    tk_tools.add_mousewheel(canvas, stylevar_frame)
 
     canvas_frame = ttk.Frame(canvas)
 
@@ -346,10 +352,10 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         width=canvas_frame.winfo_reqwidth(),
     )
 
-    if utils.USE_SIZEGRIP:
+    if tk_tools.USE_SIZEGRIP:
         ttk.Sizegrip(
             window,
-            cursor=utils.CURSORS['stretch_vert'],
+            cursor=tk_tools.Cursors.STRETCH_VERT,
         ).grid(row=1, column=0)
 
     canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))

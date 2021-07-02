@@ -1368,13 +1368,12 @@ def generate_fizzlers(vmf: VMF):
                     brush_ent = vmf.create_ent(classname='func_brush')
 
                     for key_name, key_value in brush_type.keys.items():
-                        brush_ent[key_name] = conditions.resolve_value(fizz.base_inst, key_value)
+                        brush_ent[key_name] = fizz.base_inst.fixup.substitute(key_value, allow_invert=True)
 
                     for key_name, key_value in brush_type.local_keys.items():
                         brush_ent[key_name] = conditions.local_name(
-                            fizz.base_inst, conditions.resolve_value(
-                                fizz.base_inst, key_value,
-                            )
+                            fizz.base_inst,
+                            fizz.base_inst.fixup.substitute(key_value, allow_invert=True),
                         )
 
                     brush_ent['targetname'] = conditions.local_name(

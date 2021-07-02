@@ -3,7 +3,7 @@ import tkinter as tk
 
 from collections import defaultdict
 
-from app import UI
+from app import UI, TK_ROOT
 
 from marisa_trie import Trie
 from typing import Dict, Optional, Set, Callable, Tuple
@@ -23,9 +23,12 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
     the visible items.
     """
     global _type_cback
+    refresh_tim: Optional[str] = None
+    result: Optional[Set[Tuple[str, int]]] = None
 
-    def on_type(*args):
+    def on_type(*args) -> None:
         """Re-search whenever text is typed."""
+        nonlocal refresh_tim, result
         text = search_var.get().casefold()
         words = text.split()
         if not words:
@@ -43,14 +46,19 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
             for match in database.iterkeys(last):
                 found |= word_to_ids[match]
 
-        # Calling the callback deselects us, so save and restore.
-        insert = searchbar.index('insert')
-        refresh_cback(found)
+        # The callback causes us to be deselected, so delay it until the user
+        # stops typing.
+        result = found
+        if refresh_tim is not None:
+            TK_ROOT.after_cancel(refresh_tim)
+        refresh_tim = TK_ROOT.after(500, trigger_cback)
 
-        def later():
-            searchbar.focus_set()
-            searchbar.icursor(insert)
-        searchbar.after_idle(later)
+    def trigger_cback() -> None:
+        """Trigger the callback, after the user paused the UI."""
+        nonlocal refresh_tim, result
+        refresh_tim = None
+        refresh_cback(result)
+        result = None
 
     frm.columnconfigure(1, weight=1)
 

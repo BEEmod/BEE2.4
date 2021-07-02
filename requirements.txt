@@ -1,10 +1,8 @@
-srctools==1.2.0
-aenum==2.1.2
-importlib-resources==1.0.1
-mistletoe==0.7.2
-Pillow==7.2.0
-pyglet==1.5.7
-PyInstaller==4.0
-typing==3.7.4.1
-typing-extensions==3.7.4.2
-marisa-trie-m==0.7.6
+attrs>=20.3.0
+mistletoe>=0.7.2
+Pillow>=8.1.1
+pyglet>=1.5.7
+PyInstaller>=4.2
+marisa-trie-m>=0.7.6
+atomicwrites>=1.4.0
+srctools @ git+https://github.com/TeamSpen210/srctools.git

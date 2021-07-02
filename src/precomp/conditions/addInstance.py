@@ -2,7 +2,7 @@
 
 """
 from typing import Optional
-from srctools import Vec, Entity, Property, VMF
+from srctools import Vec, Entity, Property, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, conditions
@@ -77,8 +77,8 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         `<piston_start>` will set it to the starting position, and
         `<piston_end>` will set it to the ending position of the Piston
         Platform's handles.
-    - `angles`: If set, overrides the base instance angles. This does
-            not affect the offset property.
+    - `rotation`: Rotate the instance by this amount.
+    - `angles`: If set, overrides `rotation` and the instance angles entirely.
     - `fixup`/`localfixup`: Keyvalues in this block will be copied to the
             overlay entity.
         - If the value starts with `$`, the variable will be copied over.
@@ -91,7 +91,13 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
             Property('File', res.value)
         ])
 
-    angle = res['angles', inst['angles', '0 0 0']]
+    if 'angles' in res:
+        angles = Angle.from_str(res['angles'])
+        if 'rotation' in res:
+            LOGGER.warning('"angles" option overrides "rotation"!')
+    else:
+        angles = Angle.from_str(res['rotation', '0 0 0'])
+        angles @= Angle.from_str(inst['angles', '0 0 0'])
 
     orig_name = conditions.resolve_value(inst, res['file', ''])
     filename = instanceLocs.resolve_one(orig_name)
@@ -106,7 +112,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         classname='func_instance',
         targetname=inst['targetname', ''],
         file=filename,
-        angles=angle,
+        angles=angles,
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
