@@ -493,9 +493,10 @@ class Panel:
         use_bullseye = tile.use_bullseye()
 
         angles = Angle.from_str(self.inst['angles'])
-        orient = Matrix.from_angle(angles)
+        inst_orient = orient = Matrix.from_angle(angles)
         if orient.up() != tile.normal:
-            # It's not aligned to ourselves, so dump the rotation.
+            # It's not aligned to ourselves, so dump the rotation for our
+            # logic.
             angles = Angle.from_str(
                 conditions.PETI_INST_ANGLE[tile.normal.as_tuple()])
             orient = Matrix.from_angle(angles)
@@ -596,9 +597,9 @@ class Panel:
                 vmf,
                 self.template,
                 # Don't offset these at all. Assume the user knows
-                # where it should go.
+                # where it should go. Similarly always use the instance orient.
                 Vec.from_str(self.inst['origin']),
-                orient,
+                inst_orient,
                 self.inst['targetname'],
                 force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
