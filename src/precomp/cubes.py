@@ -1711,13 +1711,10 @@ def generate_cubes(vmf: VMF):
         # One or both of the cube ents we make.
         cubes = []  # type: List[Entity]
 
-        # Transfer addon outputs to the pair data, and accumulate all the script
-        # vars.
-        script_vars = []
+        # Transfer addon outputs to the pair data.
         for addon in pair.addons:
             for out_type, out_list in addon.outputs.items():
                 pair.outputs[out_type].extend(out_list)
-            script_vars.extend(addon.script_vars)
 
         # Generate the outputs to paint the cubes.
         if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not None:
