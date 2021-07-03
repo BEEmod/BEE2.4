@@ -33,9 +33,9 @@ def res_insert_overlay(vmf: VMF, res: Property):
     face_str = res['face_pos', '0 0 -64']
     orig_norm = Vec.from_str(res['normal', '0 0 1'])
 
-    replace_tex: dict[str, list[str]] = defaultdict(list)
+    replace_tex: dict[str, list[str]] = {}
     for prop in res.find_key('replace', []):
-        replace_tex[prop.name.replace('\\', '/')].append(prop.value)
+        replace_tex.setdefault(prop.name.replace('\\', '/'), []).append(prop.value)
 
     offset = Vec.from_str(res['offset', '0 0 0'])
 
@@ -84,7 +84,7 @@ def res_insert_overlay(vmf: VMF, res: Property):
             random.seed('TEMP_OVERLAY_' + over['basisorigin'])
             mat = over['material']
             try:
-                mat = random.choice(replace_tex[over['material'].casefold().replace('\\', '/')])
+                mat = random.choice(replace_tex[mat.casefold().replace('\\', '/')])
             except KeyError:
                 pass
 
