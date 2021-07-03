@@ -315,7 +315,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
     origin = Vec.from_str(inst['origin'])
     angles = Angle.from_str(inst['angles'])
 
-    if res.bool('keep_instance'):
+    if not res.bool('keep_instance'):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
