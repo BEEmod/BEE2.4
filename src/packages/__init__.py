@@ -604,9 +604,19 @@ def parse_package(
             )
             return
 
+    desc: list[str] = []
+
     for obj in pack.info:
-        if obj.name in ('prerequisites', 'id', 'name', 'desc'):
+        if obj.name in ['prerequisites', 'id', 'name']:
             # Not object IDs.
+            continue
+        if obj.name in ['desc', 'description']:
+            desc.extend(obj.as_array())
+        if not obj.has_children():
+            LOGGER.warning(
+                'Unknown package option "{}" with value "{}"!',
+                obj.real_name, obj.value,
+            )
             continue
         if obj.name in ('templatebrush', 'brushtemplate'):
             LOGGER.warning(
@@ -661,6 +671,8 @@ def parse_package(
                 pack.disp_name,
             )
 
+    pack.desc = '\n'.join(desc)
+
     for template in pack.fsys.walk_folder('templates'):
         if template.path.casefold().endswith('.vmf'):
             template_brush.parse_template(pack.id, template)
@@ -685,7 +697,7 @@ class Package:
         self.info = info
         self.name = name
         self.disp_name = disp_name
-        self.desc = info['desc', '']
+        self.desc = ''  # Filled in by parse_package.
 
     @property
     def enabled(self) -> bool:
