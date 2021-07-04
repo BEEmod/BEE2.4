@@ -612,6 +612,7 @@ def parse_package(
             continue
         if obj.name in ['desc', 'description']:
             desc.extend(obj.as_array())
+            continue
         if not obj.has_children():
             LOGGER.warning(
                 'Unknown package option "{}" with value "{}"!',
