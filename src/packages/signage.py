@@ -1,5 +1,7 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
+
+from io import BytesIO
 from pathlib import Path
 from typing import NamedTuple, Optional, TYPE_CHECKING
 
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
 LOGGER = srctools.logger.get_logger(__name__)
 LEGEND_SIZE = (512, 1024)
 CELL_SIZE = 102
+SIGN_LOC = 'bee2/materials/BEE2/models/props_map_editor/signage/signage.vtf'
 
 
 class SignStyle(NamedTuple):
@@ -215,7 +218,10 @@ class Signage(PakObject, allow_mult=True):
                 sel_icons[int(tim_id)] = sty_sign.icon
 
         exp_data.vbsp_conf.append(conf)
-        build_texture(exp_data.game, exp_data.selected_style, sel_icons)
+        exp_data.resources[SIGN_LOC] = build_texture(
+            exp_data.game, exp_data.selected_style,
+            sel_icons,
+        )
 
     def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
         """Write this sign's data for the style to the provided property."""
@@ -245,7 +251,7 @@ def build_texture(
     game: gameMan.Game,
     sel_style: Style,
     icons: dict[int, ImgHandle],
-) -> None:
+) -> bytes:
     """Construct the legend texture for the signage."""
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
@@ -285,11 +291,7 @@ def build_texture(
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
     vtf.flags |= vtf.flags.ANISOTROPIC
-    vtf_loc = game.abs_path(
-        'bee2/materials/BEE2/models/'
-        'props_map_editor/signage/signage.vtf'
-    )
-    Path(vtf_loc).parent.mkdir(parents=True, exist_ok=True)
-    with open(vtf_loc, 'wb') as f:
-        LOGGER.info('Exporting "{}"...', vtf_loc)
-        vtf.save(f)
+    with BytesIO() as buf:
+        vtf.save(buf)
+        return buf.getvalue()
+

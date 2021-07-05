@@ -144,6 +144,10 @@ class ExportData:
     renderables: dict[RenderableType, Renderable]  # The error/connection icons
     vbsp_conf: Property
     game: Game
+    # As objects export, they may fill this to include additional resources
+    # to be written to the game folder. This way it can be deferred until
+    # after regular resources are copied.
+    resources: dict[str, bytes]
 
 
 @attr.define

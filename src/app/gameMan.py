@@ -666,7 +666,7 @@ class Game:
                 # Count the files.
                 export_screen.set_length(
                     'RES',
-                    sum(1 for file in res_system.walk_folder_repeat()),
+                    sum(1 for _ in res_system.walk_folder_repeat()),
                 )
             else:
                 export_screen.skip_stage('RES')
@@ -681,6 +681,7 @@ class Game:
 
             all_items = style.items.copy()
             renderables = style.renderables.copy()
+            resources: dict[str, bytes] = {}
 
             export_screen.step('EXP')
 
@@ -701,6 +702,7 @@ class Game:
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
                         selected_style=style,
+                        resources=resources,
                     ))
                 except packages.NoVPKExport:
                     # Raised by StyleVPK to indicate it failed to copy.
@@ -879,6 +881,14 @@ class Game:
             self.generate_fizzler_sides(vbsp_config)
             resource_gen.make_cube_colourizer_legend(Path(self.abs_path('bee2')))
             export_screen.step('EXP')
+
+            # Write generated resources, after the regular ones have been copied.
+            for filename, data in resources.items():
+                LOGGER.info('Writing {}...')
+                loc = Path(self.abs_path(filename))
+                loc.parent.mkdir(parents=True, exist_ok=True)
+                with loc.open('wb') as f:
+                    f.write(data)
 
             if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
                 os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
