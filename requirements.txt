@@ -3,6 +3,6 @@ mistletoe>=0.7.2
 Pillow>=8.1.1
 pyglet>=1.5.7
 PyInstaller>=4.2
-marisa-trie-m>=0.7.6
+pygtrie>=2.4.0
 atomicwrites>=1.4.0
 srctools @ git+https://github.com/TeamSpen210/srctools.git
