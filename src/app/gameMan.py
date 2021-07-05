@@ -884,7 +884,7 @@ class Game:
 
             # Write generated resources, after the regular ones have been copied.
             for filename, data in resources.items():
-                LOGGER.info('Writing {}...')
+                LOGGER.info('Writing {}...', filename)
                 loc = Path(self.abs_path(filename))
                 loc.parent.mkdir(parents=True, exist_ok=True)
                 with loc.open('wb') as f:
