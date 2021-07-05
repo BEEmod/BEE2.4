@@ -415,7 +415,7 @@ def parse_temp_name(name) -> tuple[str, set[str]]:
 def load_templates(path: str) -> None:
     """Load in the template file, used for import_template()."""
     with open(path, 'rb') as f:
-        dmx, fmt_name, fmt_ver = DMElement.parse(f)
+        dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
     if fmt_name != 'bee_templates' or fmt_ver not in [1]:
         raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
     temp_list = dmx['temp']
