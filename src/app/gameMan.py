@@ -797,7 +797,7 @@ class Game:
                     # deletable and copyable
                     # Also add DESIRES_UP, so they place in the correct orientation
                     if item.id in _UNLOCK_ITEMS:
-                        all_items[i] = copy.copy(item)
+                        all_items[i] = item = copy.copy(item)
                         item.deletable = item.copiable = True
                         item.facing = editoritems.DesiredFacing.UP
 
