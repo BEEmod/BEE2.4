@@ -94,4 +94,4 @@ def write_templates(game: gameMan.Game) -> None:
         template_list.append(temp_el)
 
     with atomic_write(game.abs_path('bin/bee2/templates.lst'), mode='wb', overwrite=True) as f:
-        root.export_binary(f, fmt_name='bee_templates')
+        root.export_binary(f, fmt_name='bee_templates', unicode='format')

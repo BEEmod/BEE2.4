@@ -2,7 +2,7 @@
 
 """
 from __future__ import annotations
-from typing import Union, Callable
+from typing import Union, Callable, Tuple, Dict
 import operator
 
 import srctools.logger
@@ -245,7 +245,7 @@ def res_set_inst_var(inst: Entity, res: Property):
 
 
 @make_result_setup('mapInstVar')
-def res_map_inst_var_setup(res: Property) -> tuple[str, str, dict[str, str]]:
+def res_map_inst_var_setup(res: Property) -> Tuple[str, str, Dict[str, str]]:
     """Pre-parse the variable table."""
     table: dict[str, str] = {}
     res_iter = iter(res)
@@ -315,7 +315,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
     origin = Vec.from_str(inst['origin'])
     angles = Angle.from_str(inst['angles'])
 
-    if res.bool('keep_instance'):
+    if not res.bool('keep_instance'):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 

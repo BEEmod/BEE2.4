@@ -1,18 +1,16 @@
+"""Implement the item searchbar for filtering items by various keywords.
+"""
 from tkinter import ttk
 import tkinter as tk
+from typing import Optional, Set, Callable, Tuple
 
-from collections import defaultdict
+import srctools.logger
+from pygtrie import CharTrie
 
 from app import UI, TK_ROOT
 
-from marisa_trie import Trie
-from typing import Dict, Optional, Set, Callable, Tuple
-import srctools.logger
-
-
 LOGGER = srctools.logger.get_logger(__name__)
-database = Trie()
-word_to_ids: Dict[str,  Set[Tuple[str, int]]] = defaultdict(set)
+word_to_ids: 'CharTrie[Set[Tuple[str, int]]]' = CharTrie()
 _type_cback: Optional[Callable[[], None]] = None
 
 
@@ -20,11 +18,11 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along
-    the visible items.
+    the visible items or None if no filter is specified.
     """
     global _type_cback
     refresh_tim: Optional[str] = None
-    result: Optional[Set[Tuple[str, int]]] = None
+    result: Optional[set[tuple[str, int]]] = None
 
     def on_type(*args) -> None:
         """Re-search whenever text is typed."""
@@ -35,7 +33,7 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
             refresh_cback(None)
             return
 
-        found: Set[Tuple[str, int]] = set()
+        found: set[tuple[str, int]] = set()
         *words, last = words
         for word in words:
             try:
@@ -43,8 +41,11 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
             except KeyError:
                 pass
         if last:
-            for match in database.iterkeys(last):
-                found |= word_to_ids[match]
+            try:
+                for group in word_to_ids.itervalues(last):
+                    found |= group
+            except KeyError:
+                pass
 
         # The callback causes us to be deselected, so delay it until the user
         # stops typing.
@@ -78,16 +79,17 @@ def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]]
 
 def rebuild_database() -> None:
     """Rebuild the search database."""
-    global database
     LOGGER.info('Updating search database...')
     # Clear and reset.
+    word_set: set[tuple[str, int]]
     word_to_ids.clear()
 
     for item in UI.item_list.values():
         for subtype_ind in item.visual_subtypes:
             for tag in item.get_tags(subtype_ind):
                 for word in tag.split():
-                    word_to_ids[word.casefold()].add((item.id, subtype_ind))
-    database = Trie(word_to_ids.keys())
-    LOGGER.debug('Tags: {}', database.keys())
+                    word_set = word_to_ids.setdefault(word.casefold(), set())
+                    word_set.add((item.id, subtype_ind))
+
+    LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
     _type_cback()

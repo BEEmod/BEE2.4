@@ -5,8 +5,7 @@ import itertools
 import os
 import random
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Mapping
-from typing import Union, Callable, Optional
+from typing import Union, Callable, Optional, Tuple, Mapping, Iterable, Iterator
 
 from decimal import Decimal
 from enum import Enum
@@ -317,8 +316,8 @@ class Template:
 
 
 class ScalingTemplate(Mapping[
-    Union[Vec, tuple[float, float, float]],
-    tuple[str, UVAxis, UVAxis, float]
+    Union[Vec, Tuple[float, float, float]],
+    Tuple[str, UVAxis, UVAxis, float]
 ]):
     """Represents a special version of templates, used for texturing brushes.
 
@@ -416,7 +415,7 @@ def parse_temp_name(name) -> tuple[str, set[str]]:
 def load_templates(path: str) -> None:
     """Load in the template file, used for import_template()."""
     with open(path, 'rb') as f:
-        dmx, fmt_name, fmt_ver = DMElement.parse(f)
+        dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
     if fmt_name != 'bee_templates' or fmt_ver not in [1]:
         raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
     temp_list = dmx['temp']

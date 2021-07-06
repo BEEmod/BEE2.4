@@ -375,8 +375,10 @@ class PackagePath:
         self.path = path.replace('\\', '/')
 
     @classmethod
-    def parse(cls, uri: str, def_package: str) -> PackagePath:
+    def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
         """Parse a string into a path. If a package isn't provided, the default is used."""
+        if isinstance(uri, PackagePath):
+            return uri
         if ':' in uri:
             return cls(*uri.split(':', 1))
         else:

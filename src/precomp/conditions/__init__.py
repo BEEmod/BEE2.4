@@ -33,6 +33,7 @@ import io
 import itertools
 import math
 import random
+import sys
 import typing
 import warnings
 from collections import defaultdict
@@ -300,7 +301,25 @@ def annotation_caller(
     ]
 
     # For forward references and 3.7+ stringified arguments.
-    hints = typing.get_type_hints(func)
+
+    # Remove 'return' temporarily so we don't parse that, since we don't care.
+    ann = getattr(func, '__annotations__', None)
+    if ann is not None:
+        return_val = ann.pop('return', allowed_kinds)  # Sentinel
+    else:
+        return_val = None
+    try:
+        hints = typing.get_type_hints(func)
+    except Exception:
+        LOGGER.exception(
+            'Could not compute type hints for function {}.{}!',
+            getattr(func, '__module__', '<no module>'),
+            func.__qualname__,
+        )
+        sys.exit(1)  # Suppress duplicate exception capture.
+    finally:
+        if ann is not None and return_val is not allowed_kinds:
+            ann['return'] = return_val
 
     ann_order: list[type] = []
 
