@@ -48,17 +48,6 @@ TILE_TEMP: dict[
     dict[Union[str, tuple[int, int, int, bool]], Side]
 ] = {}
 
-# Maps normals to the index in PrismFace.
-PRISM_NORMALS: dict[tuple[float, float, float], int] = {
-    # 0 = solid
-    Vec.top: 1,
-    Vec.bottom: 2,
-    Vec.north: 3,
-    Vec.south: 4,
-    Vec.east: 5,
-    Vec.west: 6,
-}
-
 NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
 # Specific angles, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
@@ -626,12 +615,6 @@ class Panel:
             # so it doesn't do that.
             # We can just produce any plane that is the correct
             # orientation and let VBSP sort out the geometry.
-
-            # So construct a box, and grab the side pointing "down".
-            clip_template: Side = vmf.make_prism(
-                tile.pos + 64 + 128 * tile.normal,
-                tile.pos - 64 + 128 * tile.normal,
-            )[PRISM_NORMALS[(-tile.normal).as_tuple()]]
 
             front_normal = orient.forward()
             for brush in all_brushes:
