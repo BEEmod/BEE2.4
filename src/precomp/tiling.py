@@ -17,7 +17,8 @@ from weakref import WeakKeyDictionary
 import attr
 import random
 
-from srctools import Vec, VMF, Entity, Side, Solid, Output, Angle, Matrix
+from srctools import Vec, Angle, Matrix
+from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
@@ -127,40 +128,40 @@ class TileType(Enum):
     BLACK_4x4 = 3
 
     GOO_SIDE = 4  # Black sides of goo pits.
-     
+
     NODRAW = 10  # Covered, so it should be set to nodraw
 
     # Air - used for embedFace sections.
     VOID = 11
 
-    # 3 unit recess,  with backpanels or props/plastic behind. 
-    # _BROKEN is ignored when allocating patterns - it wasn't there when the 
-    #  tiles were installed. 
+    # 3 unit recess,  with backpanels or props/plastic behind.
+    # _BROKEN is ignored when allocating patterns - it wasn't there when the
+    #  tiles were installed.
     # _PARTIAL is not, it's for WIP chambers.
     # If the skybox is 3D, _PARTIAL uses tools/skybox.
     CUTOUT_TILE_BROKEN = 22
     CUTOUT_TILE_PARTIAL = 23
-    
+
     @property
     def is_recess(self) -> bool:
         """Should this recess the surface?"""
         return self.name.startswith('CUTOUT_TILE')
-     
-    @property   
+
+    @property
     def is_nodraw(self) -> bool:
         """Should this swap to nodraw?"""
         return self is self.NODRAW
-        
+
     @property
     def blocks_pattern(self) -> bool:
         """Does this affect patterns?"""
         return self is not self.CUTOUT_TILE_BROKEN
-        
+
     @property
     def is_tile(self) -> bool:
         """Is this a regular tile (white/black)."""
         return self.value < 10
-        
+
     @property
     def is_white(self) -> bool:
         """Is this portalable?"""
@@ -312,7 +313,7 @@ class Pattern:
             assert 0 <= vmin < vmax <= 4, tile_tex
             assert (umax - umin) % tile_u == 0, tile_tex
             assert (vmax - vmin) % tile_v == 0, tile_tex
-            
+
     def __repr__(self) -> str:
         return 'Pattern({!r}, {}{}'.format(
             self.tex,
@@ -632,13 +633,15 @@ class Panel:
                 tile.pos - 64 + 128 * tile.normal,
             )[PRISM_NORMALS[(-tile.normal).as_tuple()]]
 
-            front_normal: Vec = round(orient.forward(), 6)
-
+            front_normal = orient.forward()
             for brush in all_brushes:
                 clip_face = None
+                # Find the face at the edge pointing in the front normal direction.
+                # That's the face we're replacing. There should be only one in
+                # each brush, but it could be not there - if it's split for tiles.
                 for face in brush:
                     if (
-                        face.normal() == front_normal
+                        Vec.dot(face.normal(), front_normal) > 0.99
                         and math.isclose(
                             face.get_origin().dot(front_normal),
                             panel_offset.dot(front_normal)
@@ -646,12 +649,19 @@ class Panel:
                     ):
                         clip_face = face
                         break
+                # Move to put 0 0 0 at the hinge point, then rotate and return.
                 brush.localise(-panel_offset)
                 brush.localise(panel_offset, rotation)
                 if clip_face is not None:
-                    clip_face.uaxis = clip_template.uaxis.copy()
-                    clip_face.vaxis = clip_template.vaxis.copy()
-                    clip_face.planes = [p.copy() for p in clip_template.planes]
+                    # Figure out the appropriate face info. We don't really
+                    # care about texture scaling etc.
+                    clip_face.uaxis = UVAxis(*orient.left())
+                    clip_face.vaxis = UVAxis(*orient.up())
+                    clip_face.planes = [
+                        panel_offset + Vec(0, 64, -64) @ orient,
+                        panel_offset + Vec(0, 64, 64) @ orient,
+                        panel_offset + Vec(0, -64, 64) @ orient,
+                    ]
                     clip_face.mat = consts.Tools.NODRAW
 
             # Helpfully the angled surfaces are always going to be forced
@@ -755,7 +765,7 @@ class Panel:
 
 class TileDef:
     """Represents one 128 block side.
-    
+
     Attributes:
         pos: Vec for the center of the block.
         normal: The direction out of the block, towards the face.
@@ -804,7 +814,7 @@ class TileDef:
 
     def __init__(
         self,
-        pos: Vec, 
+        pos: Vec,
         normal: Vec,
         base_type: TileType,
         subtiles: dict[tuple[int, int], TileType]=None,
@@ -893,7 +903,7 @@ class TileDef:
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
             raise IndexError(u, v)
-        
+
         if self._sub_tiles is None:
             return self.base_type
         else:
@@ -904,7 +914,7 @@ class TileDef:
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
             raise IndexError(u, v)
-        
+
         if self._sub_tiles is None:
             self._sub_tiles = {
                 (x, y): value if u == x and v == y else self.base_type
@@ -1211,7 +1221,7 @@ class TileDef:
         The specified bevels are a set of UV points around the tile. If a tile
         neighbours one of these points, it will be bevelled. If interior_bevel
         is true, VOID tiles also are treated as this.
-        
+
         If face_output is set, it will be filled with (u, v) -> top face.
         """
         brushes = []
@@ -1478,8 +1488,8 @@ def edit_quarter_tile(
 
 def make_tile(
     vmf: VMF,
-    origin: Vec, 
-    normal: Vec, 
+    origin: Vec,
+    normal: Vec,
     top_surf: str,
     back_surf: str=consts.Tools.NODRAW.value,
     *,
@@ -1493,10 +1503,10 @@ def make_tile(
     v_align: int=512,
     antigel: Optional[bool] = None,
 ) -> tuple[Solid, Side]:
-    """Generate a tile. 
-    
+    """Generate a tile.
+
     This uses UV coordinates, which equal xy, xz, or yz depending on normal.
-    
+
     Parameters:
         vmf: The map to add the tile to.
         origin: Location of the center of the tile, on the block surface.
