@@ -2,8 +2,28 @@
 from srctools import Vec
 from editoritems import (
     Item, ItemClass, OccupiedVoxel,
-    CollType, DesiredFacing, FSPath, Sound, Handle, ConnSide)
+    CollType, DesiredFacing, FSPath,
+    Sound, Handle, ConnSide, InstCount,
+)
 import pytest
+
+
+# Definition for a simple item, with 'exporting' open.
+START_EXPORTING = '''
+Item
+{
+    "Type"		"SOME_ITEM"
+    "Editor"
+    {
+        "SubType"
+        {
+            "Name"		"instance item"
+        }
+    }
+    "Exporting"
+    {
+    "TargetName"		"goo"
+'''
 
 
 def test_parse_goo() -> None:
@@ -128,3 +148,48 @@ def test_parse_goo() -> None:
     assert item.conn_inputs == {}
     assert item.conn_outputs == {}
     assert item.conn_config is None
+
+
+def test_instances() -> None:
+    """Test instance definitions."""
+    [[item], renderables] = Item.parse(START_EXPORTING + '''
+    "Instances"
+        {
+        "0" // Full PeTI style definition
+            {
+            "Name"				"instances/p2editor/something.vmf"
+            "EntityCount"		"30" 
+            "BrushCount"		"28"
+            "BrushSideCount"	"4892"
+            }
+        "another_name" "instances/more_custom.vmf"
+        "bee2_second_CUst" "instances/even_more.vmf"
+        "1" 
+            {
+            "Name" "instances/somewhere_else/item.vmf"
+            }
+        "5" "instances/skipping_indexes.vmf"
+        "2" "instances/direct_path.vmf"
+        "cust_name"
+            {
+            "Name" "instances/a_custom_item.vmf"
+            "EntityCount"		"327" 
+            "BrushCount"		"1"
+            "BrushSideCount"	"32"
+            }
+        }
+    }} // End exporting + item
+    ''')
+    assert len(item.instances) == 6
+    assert item.instances[0] == InstCount(FSPath("instances/p2editor/something.vmf"), 30, 28, 4892)
+    assert item.instances[1] == InstCount(FSPath("instances/somewhere_else/item.vmf"), 0, 0, 0)
+    assert item.instances[2] == InstCount(FSPath("instances/direct_path.vmf"), 0, 0, 0)
+    assert item.instances[3] == InstCount(FSPath(), 0, 0, 0)
+    assert item.instances[4] == InstCount(FSPath(), 0, 0, 0)
+    assert item.instances[5] == InstCount(FSPath("instances/skipping_indexes.vmf"), 0, 0, 0)
+    # Counts discarded for custom items, and casefolded.
+    assert item.cust_instances == {
+        "another_name": FSPath("instances/more_custom.vmf"),
+        "second_cust": FSPath("instances/even_more.vmf"),
+        "cust_name": FSPath("instances/a_custom_item.vmf"),
+    }
