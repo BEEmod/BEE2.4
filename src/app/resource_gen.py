@@ -104,4 +104,12 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
     vtf_loc.parent.mkdir(parents=True, exist_ok=True)
     with vtf_loc.open('wb') as f:
         LOGGER.info('Exporting "{}"...', f.name)
-        vtf.save(f)
+        try:
+            vtf.save(f)
+        except NotImplementedError:
+            LOGGER.warning('No DXT compressor, using RGB888.')
+            # No libsquish, so DXT compression doesn't work.
+            vtf.format = vtf.low_format = ImageFormats.RGB888
+            f.truncate(0)
+            f.seek(0)
+            vtf.save(f)

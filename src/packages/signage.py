@@ -38,7 +38,7 @@ class SignageLegend(PakObject):
     The background texture if specified is added to the upper-left of the image.
     It is useful to provide a backing, or to fill in unset signages.
     If provided, the blank image is inserted instead of unset signage.
-    
+
     Finally the overlay is composited on top, to allow setting the unwrapped
     model parts.
     """
@@ -291,7 +291,16 @@ def build_texture(
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
     vtf.flags |= vtf.flags.ANISOTROPIC
-    with BytesIO() as buf:
-        vtf.save(buf)
-        return buf.getvalue()
 
+    buf = BytesIO()
+    try:
+        vtf.save(buf)
+    except NotImplementedError:
+        LOGGER.warning('No DXT compressor, using BGRA8888.')
+        # No libsquish, so DXT compression doesn't work.
+        vtf.format = vtf.low_format = ImageFormats.BGRA4444
+
+        buf = BytesIO()
+        vtf.save(buf)
+
+    return buf.getvalue()
