@@ -447,7 +447,10 @@ def res_import_template_setup(res: Property):
         """none = don't add any visgroups."""
         return ()
 
-    visgroup_prop = res.find_key('visgroup', 'none')
+    try:  # allow both spellings.
+        visgroup_prop = res.find_key('visgroups')
+    except NoKeyError:
+        visgroup_prop = res.find_key('visgroup', 'none')
     if visgroup_prop.has_children():
         visgroup_vars = list(visgroup_prop)
     else:
@@ -591,7 +594,7 @@ def res_import_template(vmf: VMF, inst: Entity, res: Property):
     ) = res.value
 
     temp_id = inst.fixup.substitute(orig_temp_id)
-    
+
     if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
         def visgroup_func(group):
             """Use all the groups."""
