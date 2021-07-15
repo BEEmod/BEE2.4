@@ -4,7 +4,7 @@
 from collections import deque
 
 import editoritems
-from srctools import Vec, Vec_tuple, VMF
+from srctools import Vec, Vec_tuple, Matrix, Angle, VMF
 from enum import Enum
 
 import srctools.logger
@@ -276,23 +276,34 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
             # Exclude entities outside the main area - elevators mainly.
             # The border should never be set to air!
-            if (0, 0, 0) <= pos <= (25, 25, 25):
-                air_search_locs.append((Vec(pos.x, pos.y, pos.z), False))
+            if not ((0, 0, 0) <= pos <= (25, 25, 25)):
+                continue
 
             # We need to manually set EmbeddedVoxel locations.
             # These might not be detected for items where there's a block
             # which is entirely empty - corridors and obs rooms for example.
+            # We also need to check occupy locations, so that it can seed search
+            # locs.
             item_id = get_item_id(ent)
+            seeded = False
             if item_id:
                 try:
-                    item = items[item_id]
+                    item = items[item_id.casefold()]
                 except KeyError:
-                    continue
-                angles = Vec.from_str(ent['angles'])
-                for local_pos in item.embed_voxels:
-                    world_pos = Vec(local_pos) - (0, 0, 1)
-                    world_pos.localise(pos, angles)
-                    self[world_pos] = Block.EMBED
+                    pass
+                else:
+                    orient = Matrix.from_angle(Angle.from_str(ent['angles']))
+                    for local_pos in item.embed_voxels:
+                        # Offset down because 0 0 0 is the floor voxel.
+                        world_pos = (Vec(local_pos) - (0, 0, 1)) @ orient + pos
+                        self[round(world_pos, 0)] = Block.EMBED
+                    for occu in item.occupy_voxels:
+                        world_pos = Vec(occu.pos) @ orient + pos
+                        air_search_locs.append((round(world_pos, 0), False))
+                        seeded = True
+            if not seeded:
+                # Assume origin is its location.
+                air_search_locs.append((pos.copy(), False))
 
         can_have_pit = bottomlessPit.pits_allowed()
 
