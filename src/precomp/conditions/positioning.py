@@ -433,11 +433,27 @@ def res_force_upright(inst: Entity):
     The result angle will have pitch and roll set to 0. Vertical
     instances are unaffected.
     """
-    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
     if normal.z != 0:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
     inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
+
+
+@make_result('switchOrientation')
+def res_alt_orientation(inst: Entity, res: Property) -> None:
+    """Apply an alternate orientation.
+
+    "wall" makes the attaching surface in the -X direction, making obs rooms,
+    corridors etc easier to place.
+    """
+    val = res.value.casefold()
+    if val == 'wall':
+        pose = Angle(-90, 180, 0)
+    else:
+        raise ValueError(f'Unknown orientation type "{res.value}"!')
+    pose @= Angle.from_str(inst['angles'])
+    inst['angles'] = pose
 
 
 @make_result('setAngles')
