@@ -1,24 +1,18 @@
 """Holds data about the contents of each grid position in the map.
 
 """
-from collections import deque
+from __future__ import annotations
 
-import editoritems
-from srctools import Vec, Vec_tuple, Matrix, Angle, VMF
+from collections.abc import Iterable, Iterator
+from collections import deque
+from typing import Union, Any, Tuple, ItemsView, MutableMapping
 from enum import Enum
+
+from srctools import Vec, Matrix, Angle, VMF
 
 import srctools.logger
 import utils
-from typing import (
-    Union, Any, Tuple,
-    Iterable, Iterator,
-    Dict, ItemsView, MutableMapping,
-    List,
-)
-try:
-    from typing import Deque
-except ImportError:
-    from typing_extensions import Deque
+import editoritems
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -134,7 +128,7 @@ BLOCK_LOOKUP['pit'] = {
 _grid_keys = Union[Vec, Tuple[float, float, float], slice]
 
 
-def _conv_key(pos: _grid_keys) -> Tuple[float, float, float]:
+def _conv_key(pos: _grid_keys) -> tuple[float, float, float]:
     """Convert the key given in [] to a grid-position, as a x,y,z tuple."""
     # TODO: Slices are assumed to be int by typeshed.
     # type: ignore
@@ -150,21 +144,20 @@ def _conv_key(pos: _grid_keys) -> Tuple[float, float, float]:
 
 class _GridItemsView(ItemsView[Vec, Block]):
     """Implements the Grid.items() view, providing a view over the pos, block pairs."""
-    def __init__(self, grid: Dict[Vec_tuple, Block]):
-        self._grid = grid
-
-    def __len__(self) -> int:
-        return len(self._grid)
+    # Initialised by superclass.
+    _mapping: dict[tuple[float, float, float], Block]
+    def __init__(self, grid: dict[tuple[float, float, float], Block]):
+        super().__init__(grid)
 
     def __contains__(self, item: Any) -> bool:
         pos, block = item
         try:
-            return block is self._grid[_conv_key(pos)]
+            return block is self._mapping[_conv_key(pos)]
         except KeyError:
             return False
 
-    def __iter__(self) -> Iterator[Tuple[Vec, Block]]:
-        for pos, block in self._grid.items():
+    def __iter__(self) -> Iterator[tuple[Vec, Block]]:
+        for pos, block in self._mapping.items():
             yield (Vec(pos), block)
 
 
@@ -175,7 +168,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     as a world position.
     """
     def __init__(self) -> None:
-        self._grid: Dict[Vec_tuple, Block] = {}
+        self._grid: dict[tuple[float, float, float], Block] = {}
 
     def raycast(
         self,
@@ -246,7 +239,11 @@ class Grid(MutableMapping[_grid_keys, Block]):
         del self._grid[_conv_key(pos)]
 
     def __contains__(self, pos: object) -> bool:
-        return _conv_key(pos) in self._grid
+        try:
+            coords = _conv_key(pos)  # type: ignore
+        except (TypeError, ValueError):
+            return False
+        return coords in self._grid
 
     def __iter__(self) -> Iterator[Vec]:
         yield from map(Vec, self._grid)
@@ -254,18 +251,19 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def __len__(self) -> int:
         return len(self._grid)
 
-    def items(self) -> '_GridItemsView':
+    def items(self) -> _GridItemsView:
+        """Return a view over the grid items."""
         return _GridItemsView(self._grid)
 
-    def read_from_map(self, vmf: VMF, has_attr: Dict[str, bool], items: Dict[str, editoritems.Item]) -> None:
+    def read_from_map(self, vmf: VMF, has_attr: dict[str, bool], items: dict[str, editoritems.Item]) -> None:
         """Given the map file, set blocks."""
         from precomp.instance_traits import get_item_id
         from precomp import bottomlessPit
 
         # Starting points to fill air and goo.
         # We want to fill goo first...
-        air_search_locs: List[Tuple[Vec, bool]] = []
-        goo_search_locs: List[Tuple[Vec, bool]] = []
+        air_search_locs: list[tuple[Vec, bool]] = []
+        goo_search_locs: list[tuple[Vec, bool]] = []
 
         for ent in vmf.entities:
             str_pos = ent['origin', None]
@@ -373,7 +371,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         self.fill_air(goo_search_locs + air_search_locs)
         LOGGER.info('Air filled!')
 
-    def fill_air(self, search_locs: Iterable[Tuple[Vec, bool]]) -> None:
+    def fill_air(self, search_locs: Iterable[tuple[Vec, bool]]) -> None:
         """Flood-fill the area, making all inside spaces air or goo.
 
         This assumes the map is sealed.
@@ -383,9 +381,9 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
         This will also fill the submerged tunnels with goo.
         """
-        queue: Deque[Tuple[Vec, bool]] = deque(search_locs)
+        queue: deque[tuple[Vec, bool]] = deque(search_locs)
 
-        def iterdel() -> Iterator[Tuple[Vec, bool]]:
+        def iterdel() -> Iterator[tuple[Vec, bool]]:
             """Iterate as FIFO queue, deleting as we go."""
             try:
                 while True:
@@ -469,7 +467,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
             Block.PIT_MID: 'logic_autosave',
             Block.PIT_BOTTOM: 'logic_autosave',
         }
-        for pos, block in self.items():  # type: Vec, Block
+        for pos, block in self.items():
             vmf.create_ent(
                 targetname=block.name.title(),
                 classname=block_icons[block],
