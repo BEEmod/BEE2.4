@@ -848,6 +848,8 @@ def get_map_info(vmf: VMF) -> Set[str]:
     # The door frame instances
     entry_door_frame = exit_door_frame = None
 
+    filenames = Counter()
+
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
         # doors.
@@ -861,7 +863,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
         # later
 
         file = item['file'].casefold()
-        LOGGER.debug('File: "{}"', file)
+        filenames[file] += 1
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
             # In SP mode the same instance is used for entry and exit door
@@ -938,6 +940,11 @@ def get_map_info(vmf: VMF) -> Set[str]:
             exit_door_frame = item
 
         inst_files.add(item['file'])
+
+    LOGGER.debug('Instances present:\n{}', '\n'.join([
+        f'- "{file}": {count}'
+        for file, count in filenames.most_common()
+    ]))
 
     LOGGER.info("Game Mode: " + GAME_MODE)
     LOGGER.info("Is Preview: " + str(IS_PREVIEW))
