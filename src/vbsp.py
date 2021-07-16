@@ -44,7 +44,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, List, Set, Iterable, Optional
+from typing import Any, Dict, Tuple, Set, Iterable, Optional
 
 
 COND_MOD_NAME = 'VBSP'
@@ -1198,59 +1198,6 @@ def fit_goo_mist(
             )
             for (x, y) in utils.iter_grid(grid_x, grid_y, stride=128):
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
-
-
-@conditions.meta_cond(priority=-50)
-def set_barrier_frame_type(vmf: VMF) -> None:
-    """Set a $type instvar on glass frame.
-
-    This allows using different instances on glass and grating.
-    """
-    barrier_types = {}  # origin, normal -> 'glass' / 'grating'
-    barrier_pos: List[Tuple[Vec, str]] = []
-
-    # Find glass and grating brushes..
-    for brush in vmf.iter_wbrushes(world=False, detail=True):
-        for side in brush:
-            if side.mat == consts.Special.GLASS:
-                break
-        else:
-            # Not glass..
-            continue
-        barrier_pos.append((brush.get_origin(), 'glass'))
-
-    for brush_ent in vmf.by_class['func_brush']:
-        for side in brush_ent.sides():
-            if side.mat == consts.Special.GRATING:
-                break
-        else:
-            # Not grating..
-            continue
-        barrier_pos.append((brush_ent.get_origin(), 'grating'))
-
-    # The origins are at weird offsets, calc a grid pos + normal instead
-    for pos, barrier_type in barrier_pos:
-        grid_pos = pos // 128 * 128 + (64, 64, 64)
-        barrier_types[
-            grid_pos.as_tuple(),
-            (pos - grid_pos).norm().as_tuple()
-        ] = barrier_type
-
-    barrier_files = instanceLocs.resolve('<ITEM_BARRIER>')
-    glass_file = instanceLocs.resolve('[glass_128]')
-    for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in barrier_files:
-            continue
-        if inst['file'].casefold() in glass_file:
-            # The glass instance faces a different way to the frames..
-            norm = Vec(-1, 0, 0) @ Angle.from_str(inst['angles'])
-        else:
-            norm = Vec(0, 0, -1) @ Angle.from_str(inst['angles'])
-        origin = Vec.from_str(inst['origin'])
-        try:
-            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), round(norm).as_tuple()]
-        except KeyError:
-            pass
 
 
 def change_brush(vmf: VMF) -> None:

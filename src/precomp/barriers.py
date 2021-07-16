@@ -11,7 +11,7 @@ import consts
 import srctools.logger
 from precomp.conditions import make_result
 from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_one
+from precomp.instanceLocs import resolve_one, resolve
 from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 
 
@@ -43,14 +43,19 @@ HOLES: Dict[
 ] = {}
 
 
-def get_pos_norm(origin: Vec):
+def get_pos_norm(origin: Vec) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
 def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
-    """Remove instances from the map, and store off the positions."""
+    """Find all glass/grating in the map.
+
+    This removes the per-tile instances, and all original brushwork.
+    The frames are updated with a fixup var, as appropriate.
+    """
+    frame_inst = resolve('[glass_frames]', silent=True)
     glass_inst = resolve_one('[glass_128]')
 
     pos = None
@@ -82,6 +87,14 @@ def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
         filename = inst['file'].casefold()
         if filename == glass_inst:
             inst.remove()
+        elif filename in frame_inst:
+            # Add a fixup to allow distinguishing the type.
+            pos = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm = Vec(z=-1) @ Angle.from_str(inst['angles'])
+            try:
+                inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = BARRIERS[pos.as_tuple(), norm.as_tuple()].value
+            except KeyError:
+                LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
     if options.get(str, 'glass_pack') and has_attr['glass']:
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
