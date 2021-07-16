@@ -1,14 +1,18 @@
 """Manages parsing and regenerating antlines."""
-import random
-from collections import namedtuple
-
-from srctools import Vec, Property, conv_float, VMF, logger
-from srctools.vmf import overlay_bounds, make_overlay
-import consts
+from __future__ import annotations
 from collections import defaultdict
-from typing import List, Dict, Tuple, TYPE_CHECKING, Iterator, Optional, Set
-
+from collections.abc import Iterator
 from enum import Enum
+import math
+import random
+
+import attr
+
+from srctools import Vec, Angle, Matrix, Property, conv_float, logger
+from srctools.vmf import VMF, overlay_bounds, make_overlay
+
+from precomp import tiling
+import consts
 
 
 LOGGER = logger.get_logger(__name__)
@@ -20,8 +24,13 @@ class SegType(Enum):
     CORNER = 1
 
 
-class AntTex(namedtuple('AntTex', ['texture', 'scale', 'static'])):
+@attr.define
+class AntTex:
     """Represents a single texture, and the parameters it has."""
+    texture: str
+    scale: float
+    static: bool
+
     @staticmethod
     def parse(prop: Property):
         """Parse from property values.
@@ -59,6 +68,7 @@ class AntTex(namedtuple('AntTex', ['texture', 'scale', 'static'])):
         return AntTex(tex, scale, static)
 
 
+@attr.define(eq=False)
 class AntType:
     """Defines the style of antline to use.
 
@@ -67,43 +77,43 @@ class AntType:
 
     Corners can be omitted, if corner/straight antlines are the same.
     """
-    def __init__(
-        self,
-        tex_straight: List[AntTex],
-        tex_corner: List[AntTex],
-        broken_straight: List[AntTex],
-        broken_corner: List[AntTex],
-        broken_chance: float,
-    ) -> None:
-        self.tex_straight = tex_straight
-        self.tex_corner = tex_corner
+    tex_straight: list[AntTex] = attr.ib()
+    tex_corner: list[AntTex] = attr.ib()
 
-        if broken_chance == 0:
-            broken_corner: List[AntTex] = []
-            broken_straight: List[AntTex] = []
-
-        # Cannot have broken corners if corners/straights are the same.
-        if not tex_corner:
-            broken_corner: List[AntTex] = []
-
-        self.broken_corner = broken_corner
-        self.broken_straight = broken_straight
-        self.broken_chance = broken_chance
+    broken_straight: list[AntTex] = attr.ib()
+    broken_corner: list[AntTex] = attr.ib()
+    broken_chance: float
 
     @classmethod
-    def parse(cls, prop: Property) -> 'AntType':
+    def parse(cls, prop: Property) -> AntType:
         """Parse this from a property block."""
         broken_chance = prop.float('broken_chance')
-        tex_straight: List[AntTex] = []
-        tex_corner: List[AntTex] = []
-        brok_straight: List[AntTex] = []
-        brok_corner: List[AntTex] = []
+        tex_straight: list[AntTex] = []
+        tex_corner: list[AntTex] = []
+        brok_straight: list[AntTex] = []
+        brok_corner: list[AntTex] = []
         for ant_list, name in zip(
             [tex_straight, tex_corner, brok_straight, brok_corner],
             ('straight', 'corner', 'broken_straight', 'broken_corner'),
         ):
             for sub_prop in prop.find_all(name):
                 ant_list.append(AntTex.parse(sub_prop))
+
+        if broken_chance < 0.0:
+            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', prop['broken_chance'])
+            broken_chance = 0.0
+        if broken_chance > 100.0:
+            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', prop['broken_chance'])
+            broken_chance = 100.0
+
+        if broken_chance == 0.0:
+            brok_straight.clear()
+            brok_corner.clear()
+
+        # Cannot have broken corners if corners/straights are the same.
+        if not tex_corner:
+            brok_corner.clear()
+
         return cls(
             tex_straight,
             tex_corner,
@@ -113,46 +123,37 @@ class AntType:
         )
 
     @classmethod
-    def default(cls) -> 'AntType':
+    def default(cls) -> AntType:
         """Make a copy of the original PeTI antline config."""
-        return cls(
+        return AntType(
             [AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
             [AntTex(consts.Antlines.CORNER, 1, False)],
             [], [], 0,
         )
 
 
+@attr.define(eq=False)
 class Segment:
     """A single section of an antline - a straight section or corner.
 
     For corners, start == end.
     """
-    __slots__ = ['type', 'normal', 'start', 'end', 'tiles']
-
-    def __init__(
-        self,
-        typ: SegType,
-        normal: Vec,
-        start: Vec,
-        end: Vec,
-    ):
-        self.type = typ
-        self.normal = normal
-        # Note, start is end for corners.
-        self.start = start
-        self.end = end
-        # The brushes this segment is attached to.
-        self.tiles = set()  # type: Set['TileDef']
+    type: SegType
+    normal: Vec
+    start: Vec
+    end: Vec
+    # The brushes this segment is attached to.
+    tiles: set[tiling.TileDef] = attr.ib(factory=set)
 
     @property
     def on_floor(self) -> bool:
         """Return if this segment is on the floor/wall."""
-        return self.normal.z != 0
+        return abs(self.normal.z) < 1e-6
 
     def broken_iter(
         self,
         chance: float,
-    ) -> Iterator[Tuple[Vec, Vec, bool]]:
+    ) -> Iterator[tuple[Vec, Vec, bool]]:
         """Iterator to compute positions for straight segments.
 
         This produces point pairs which fill the space from 0-dist.
@@ -178,15 +179,11 @@ class Segment:
             yield run_start, self.end, last_type
 
 
+@attr.define(eq=False)
 class Antline:
     """A complete antline."""
-    def __init__(
-        self,
-        name: str,
-        line: List[Segment],
-    ):
-        self.line = line
-        self.name = name
+    name: str
+    line: list[Segment]
 
     def export(self, vmf: VMF, wall_conf: AntType, floor_conf: AntType) -> None:
         """Add the antlines into the map."""
@@ -195,8 +192,9 @@ class Antline:
         # optimise those antlines out by merging the straight segment
         # before/after it into the corners.
 
+        collapse_line: list[Segment | None]
         if not wall_conf.tex_corner or not floor_conf.tex_corner:
-            collapse_line = list(self.line)  # type: List[Optional[Segment]]
+            collapse_line = list(self.line)
             for i, seg in enumerate(collapse_line):
                 if seg is None or seg.type is not SegType.STRAIGHT:
                     continue
@@ -246,7 +244,7 @@ class Antline:
                 else:
                     mat = random.choice(conf.tex_corner or conf.tex_straight)
 
-                axis_u, axis_v = Vec.INV_AXIS[seg.normal.axis()]
+                axis_u, _ = Vec.INV_AXIS[seg.normal.axis()]
                 self._make_overlay(
                     vmf,
                     seg,
@@ -324,9 +322,9 @@ class Antline:
         )
 
 
-def parse_antlines(vmf: VMF) -> Tuple[
-    Dict[str, List[Antline]],
-    Dict[int, List[Segment]]
+def parse_antlines(vmf: VMF) -> tuple[
+    dict[str, list[Antline]],
+    dict[int, list[Segment]]
 ]:
     """Convert overlays in the map into Antline objects.
 
@@ -339,25 +337,26 @@ def parse_antlines(vmf: VMF) -> Tuple[
     LOGGER.info('Parsing antlines...')
 
     # segment -> found neighbours of it.
-    overlay_joins = defaultdict(set)  # type: Dict[Segment, Set[Segment]]
+    overlay_joins: defaultdict[Segment, set[Segment]] = defaultdict(set)
 
-    segment_to_name = {}  # type: Dict[Segment, str]
+    segment_to_name: dict[Segment, str] = {}
 
     # Points on antlines where two can connect. For corners that's each side,
     # for straight it's each end. Combine that with the targetname
     # so we only join related antlines.
-    join_points = {}  # type: Dict[Tuple[str, float, float, float], Segment]
+    join_points: dict[tuple[str, float, float, float], Segment] = {}
 
     mat_straight = consts.Antlines.STRAIGHT
     mat_corner = consts.Antlines.CORNER
 
-    side_to_seg = {}  # type: Dict[int, List[Segment]]
-    antlines = {}  # type: Dict[str, List[Antline]]
+    side_to_seg: dict[int, list[Segment]] = {}
+    antlines: dict[str, list[Antline]] = {}
 
     for over in vmf.by_class['info_overlay']:
         mat = over['material']
         origin = Vec.from_str(over['basisorigin'])
         normal = Vec.from_str(over['basisnormal'])
+        orient = Matrix.from_angle(Angle.from_str(over['angles']))
         u, v = Vec.INV_AXIS[normal.axis()]
 
         if mat == mat_corner:
@@ -375,18 +374,18 @@ def parse_antlines(vmf: VMF) -> Tuple[
             seg_type = SegType.STRAIGHT
 
             # We want to determine the length first.
-            long_axis = Vec(y=1).rotate_by_str(over['angles']).axis()
-            side_axis = Vec(x=1).rotate_by_str(over['angles']).axis()
+            long_axis = orient.left()
+            side_axis = orient.forward()
 
             # The order of these isn't correct, but we need the neighbours to
             # fix that.
             start, end = overlay_bounds(over)
             # For whatever reason, Valve sometimes generates antlines which are
             # shortened by 1 unit. So snap those to grid.
-            start = round(start / 16) * 16
-            end = round(end / 16) * 16
+            start = round(start / 16, 0) * 16
+            end = round(end / 16, 0) * 16
 
-            if end[long_axis] - start[long_axis] == 16:
+            if math.isclose(Vec.dot(end - start, long_axis), 16.0):
                 # Special case.
                 # 1-wide antlines don't have the correct
                 # rotation, pointing always in the U axis.
@@ -395,7 +394,7 @@ def parse_antlines(vmf: VMF) -> Tuple[
                 start = end = origin
                 points = []
             else:
-                offset = Vec.with_axes(side_axis, 8)
+                offset: Vec = round(abs(8 * side_axis), 0)
                 start += offset
                 end -= offset
 
@@ -432,16 +431,16 @@ def parse_antlines(vmf: VMF) -> Tuple[
             fix_single_straight(seg, over_name, join_points, overlay_joins)
 
     # Now, finally compute each continuous section.
-    for segment, over_name in segment_to_name.items():
+    for start_seg, over_name in segment_to_name.items():
         try:
-            neighbours = overlay_joins[segment]
+            neighbours = overlay_joins[start_seg]
         except KeyError:
             continue  # Done already.
 
         if len(neighbours) != 1:
             continue
         # Found a start point!
-        segments = [segment]
+        segments = [start_seg]
 
         for segment in segments:
             neighbours = overlay_joins.pop(segment)
@@ -459,8 +458,8 @@ def parse_antlines(vmf: VMF) -> Tuple[
 def fix_single_straight(
     seg: Segment,
     over_name: str,
-    join_points: Dict[Tuple[str, float, float, float], Segment],
-    overlay_joins: Dict[Segment, Set[Segment]],
+    join_points: dict[tuple[str, float, float, float], Segment],
+    overlay_joins: dict[Segment, set[Segment]],
 ) -> None:
     """Figure out the correct rotation for 1-long straight antlines."""
     # Check the U and V axis, to see if there's another antline on both
