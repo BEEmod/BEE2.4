@@ -90,7 +90,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
-    texturing.load_config(conf.find_key('textures', []))
+    texturing.load_config(conf.find_block('textures', or_blank=True))
 
     # Antline texturing settings.
     # We optionally allow different ones for floors.
@@ -126,7 +126,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     template_brush.load_templates('bee2/templates.lst')
 
     # Load a copy of the item configuration.
-    id_to_item: Dict[str, editoritems.Item] = {}
+    id_to_item: dict[str, editoritems.Item] = {}
     item: editoritems.Item
     with open('bee2/editor.bin', 'rb') as inst:
         for item in pickle.load(inst):
@@ -159,7 +159,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     load_signs(conf)
 
     # Get configuration for the elevator, defaulting to ''.
-    elev = conf.find_key('elevator', [])
+    elev = conf.find_block('elevator', or_blank=True)
     settings['elevator'] = {
         key: elev[key, '']
         for key in
@@ -169,14 +169,13 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
         )
     }
 
-    settings['music_conf'] = conf.find_key('MusicScript', [])
+    settings['music_conf'] = conf.find_block('MusicScript', or_blank=True)
 
     # Bottomless pit configuration
-    pit = conf.find_key("bottomless_pit", [])
-    bottomlessPit.load_settings(pit)
+    bottomlessPit.load_settings(conf.find_block("bottomless_pit", or_blank=True))
 
     # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
-    fog_config = conf.find_key("fog", [])
+    fog_config = conf.find_block("fog", or_blank=True)
     # Update inplace so imports get the settings
     settings['fog'].update({
         # These defaults are from Clean Style.
@@ -449,7 +448,7 @@ def set_player_portalgun(vmf: VMF) -> None:
         has['spawn_nogun'] = True
 
     ent_pos = options.get(Vec, 'global_pti_ents_loc')
-    
+
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
 
     if not blue_portal or not oran_portal or force_portal_man:
@@ -1165,7 +1164,7 @@ def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
 def fit_goo_mist(
     vmf: VMF,
     sides: Iterable[Vec_tuple],
-    needs_mist: Set[Vec_tuple],
+    needs_mist: Set[Tuple[float, float, float]],
     grid_x: int,
     grid_y: int,
     particle: str,

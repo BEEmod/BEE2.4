@@ -82,7 +82,7 @@ else:
     # Defer the error until used, so it goes in logs and whatnot.
     # Utils is early, so it'll get lost in stderr.
     _SETTINGS_ROOT = None  # type: ignore
-    
+
 # We always go in a BEE2 subfolder
 if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
@@ -103,7 +103,7 @@ def install_path(path: str) -> Path:
 
 def conf_location(path: str) -> Path:
     """Return the full path to save settings to.
-    
+
     The passed-in path is relative to the settings folder.
     Any additional subfolders will be created if necessary.
     If it ends with a '/' or '\', it is treated as a folder.
@@ -112,7 +112,7 @@ def conf_location(path: str) -> Path:
         raise FileNotFoundError("Don't know a good config directory!")
 
     loc = _SETTINGS_ROOT / path
-    
+
     if path.endswith(('\\', '/')) and not loc.suffix:
         folder = loc
     else:
@@ -218,7 +218,7 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
                 data[enum] = res
         if data_exc:
             func = _exc_freeze(data, data_exc)
-        else: # If we don't raise, we can use the C-func
+        else:  # If we don't raise, we can use the C-func
             func = data.get
         setattr(cls, name, property(fget=func, doc=value.__doc__))
     return cls
