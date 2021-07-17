@@ -82,10 +82,10 @@ def res_unst_scaffold_setup(res: Property):
 
     if group not in SCAFFOLD_CONFIGS:
         # Store our values in the CONFIGS dictionary
-        targ_inst, links = SCAFFOLD_CONFIGS[group] = {}, {}
+        targ_inst = SCAFFOLD_CONFIGS[group] = {}
     else:
         # Grab the already-filled values, and add to them
-        targ_inst, links = SCAFFOLD_CONFIGS[group]
+        targ_inst = SCAFFOLD_CONFIGS[group]
 
     for block in res.find_all("Instance"):
         conf = {
@@ -118,21 +118,6 @@ def res_unst_scaffold_setup(res: Property):
         for inst in instanceLocs.resolve(block['file']):
             targ_inst[inst] = conf
 
-    # We need to provide vars to link the tracks and beams.
-    for block in res.find_all('LinkEnt'):
-        # The name for this set of entities.
-        # It must be a '@' name, or the name will be fixed-up incorrectly!
-        loc_name = block['name']
-        if not loc_name.startswith('@'):
-            loc_name = '@' + loc_name
-        links[block['nameVar']] = {
-            'name': loc_name,
-            # The next entity (not set in end logic)
-            'next': block['nextVar'],
-            # A '*' name to reference all the ents (set on the start logic)
-            'all': block['allVar', None],
-        }
-
     return group  # We look up the group name to find the values.
 
 
@@ -151,7 +136,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
         'Running Scaffold Generator ({})...',
         res.value
     )
-    inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
+    inst_to_config = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
     chains = item_chain.chain(vmf, inst_to_config.keys(), allow_loop=False)
@@ -162,13 +147,6 @@ def res_unst_scaffold(vmf: VMF, res: Property):
     for group_counter, node_list in enumerate(chains):
         # Set all the instances and properties
         start_inst = node_list[0].item.inst
-        for vals in LINKS.values():
-            if vals['all'] is not None:
-                start_inst.fixup[vals['all']] = SCAFF_PATTERN.format(
-                    name=vals['name'],
-                    group=group_counter,
-                    index='*',
-                )
 
         should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
 
@@ -181,6 +159,11 @@ def res_unst_scaffold(vmf: VMF, res: Property):
         for index, node in enumerate(node_list):
             conf = node.conf
             orient, offset = get_config(node)
+
+            # Add the link-values.
+            node.inst.fixup['$group'] = group_counter
+            node.inst.fixup['$ind'] = index
+            node.inst.fixup['$next'] = index + 1
 
             new_file = conf.get('inst_' + orient, '')
             if new_file:
@@ -275,19 +258,6 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                 ),
             )
 
-            # Add the link-values
-            for linkVar, link in LINKS.items():
-                node.inst.fixup[linkVar] = SCAFF_PATTERN.format(
-                    name=link['name'],
-                    group=group_counter,
-                    index=index,
-                )
-                if node.next is not None:
-                    node.inst.fixup[link['next']] = SCAFF_PATTERN.format(
-                        name=link['name'],
-                        group=group_counter,
-                        index=index + 1,
-                    )
 
             for key, val in node.inst.fixup.items():
                 # Copy over fixup values
