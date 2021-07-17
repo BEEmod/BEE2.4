@@ -175,13 +175,14 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     # No connections in either direction, just skip.
                     # Generate the piston tip if we would have.
                     if conf['inst_offset'] is not None:
-                        vmf.create_ent(
+                        inst_offset = vmf.create_ent(
                             classname='func_instance',
                             targetname=node.inst['targetname'],
                             file=conf['inst_offset'],
                             origin=offset,
                             angles=node.inst['angles'],
                         )
+                        inst_offset.fixup.update(node.inst.fixup)
                     continue
             elif node.next is None:
                 link_type = LinkType.END
@@ -218,13 +219,14 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                         # Round to nearest 90 degrees
                         # Add 45 so the switchover point is at the diagonals
                         link_ang = (link_ang + 45) // 90 * 90
-                    vmf.create_ent(
+                    inst_end = vmf.create_ent(
                         classname='func_instance',
                         targetname=node.inst['targetname'],
                         file=conf['inst_end'],
                         origin=offset,
                         angles='0 {:.0f} 0'.format(link_ang),
                     )
+                    inst_end.fixup.update(node.inst.fixup)
                     # Don't place the offset instance, this replaces that!
                     placed_endcap = True
 
@@ -239,7 +241,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     angles=node.inst['angles'],
                 )
 
-            logic_inst = vmf.create_ent(
+            inst_logic = vmf.create_ent(
                 classname='func_instance',
                 targetname=node.inst['targetname'],
                 file=conf.get(
@@ -257,11 +259,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     else node.inst['angles']
                 ),
             )
-
-
-            for key, val in node.inst.fixup.items():
-                # Copy over fixup values
-                logic_inst.fixup[key] = val
+            inst_logic.fixup.update(node.inst.fixup)
 
     LOGGER.info('Finished Scaffold generation!')
     return RES_EXHAUSTED
