@@ -1,5 +1,5 @@
 """The result used to generate unstationary scaffolds."""
-from typing import Tuple, Optional
+from __future__ import annotations
 from enum import Enum
 import math
 
@@ -32,9 +32,7 @@ def scaff_scan(inst_list, start_ent):
             return
 
 
-def get_config(
-    node: item_chain.Node,
-) -> Tuple[str, Vec]:
+def get_config(node: item_chain.Node) -> tuple[str, Vec]:
     """Compute the config values for a node."""
 
     orient = (
@@ -59,7 +57,7 @@ def get_config(
     return orient, offset
 
 
-def resolve_optional(prop: Property, key: str) -> Optional[str]:
+def resolve_optional(prop: Property, key: str) -> str | None:
     """Resolve the given instance, or return None if not defined."""
     try:
         file = prop[key]
@@ -73,7 +71,8 @@ SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
 # Store the configs for scaffold items so we can
 # join them up later
-SCAFFOLD_CONFIGS = {}
+# group -> inst -> config
+SCAFFOLD_CONFIGS: dict[str, dict[str, dict]] = {}
 
 
 @make_result_setup('UnstScaffold')
