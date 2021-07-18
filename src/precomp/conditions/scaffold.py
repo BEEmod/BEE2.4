@@ -1,6 +1,5 @@
 """The result used to generate unstationary scaffolds."""
 from __future__ import annotations
-from enum import Enum
 from typing import Optional, Callable
 import math
 import attr
@@ -15,23 +14,12 @@ COND_MOD_NAME = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.scaffold')
 
 
-class LinkType(Enum):
-    """Type of node."""
-    START = 'start'
-    MID = 'mid'
-    END = 'end'
-
-
 @attr.define
 class ScaffoldConf:
     """Configuration for scaffolds."""
     logic_start: Optional[str]
     logic_mid: Optional[str]
     logic_end: Optional[str]
-
-    logic_start_rev: Optional[str]
-    logic_mid_rev: Optional[str]
-    logic_end_rev: Optional[str]
 
     # Specially rotated to face the next track!
     inst_end: Optional[str]
@@ -74,17 +62,10 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
     except KeyError:
         group_list = SCAFFOLD_GROUPS[group] = []
 
-    log_start = resolve_optional(res, 'startlogic')
-    log_end = resolve_optional(res, 'endLogic')
-    log_mid = resolve_optional(res, 'midLogic')
     conf = ScaffoldConf(
-        logic_start=log_start,
-        logic_mid=log_mid,
-        logic_end=log_end,
-
-        logic_start_rev=resolve_optional(res, 'StartLogicRev') or log_start,
-        logic_mid_rev=resolve_optional(res, 'EndLogicRev') or log_mid,
-        logic_end_rev=resolve_optional(res, 'EndLogicRev') or log_end,
+        logic_start= resolve_optional(res, 'startlogic'),
+        logic_mid=resolve_optional(res, 'midLogic'),
+        logic_end=resolve_optional(res, 'endLogic'),
 
         # Specially rotated to face the next track!
         inst_end=resolve_optional(res, 'endInst'),
@@ -113,47 +94,38 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
     """Link together a single scaffold group."""
     chains = item_chain.chain(group, allow_loop=False)
     for group_counter, node_list in enumerate(chains):
-        # Set all the instances and properties
-        start_inst = node_list[0].item.inst
-
-        should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
-
-        # Now set each instance in the chain, including first and last
         for index, node in enumerate(node_list):
             conf: ScaffoldConf = node.conf
             is_floor = node.orient.up().z > 0.99
 
+            if node.next is None and node.prev is None:
+                # No connections in either direction, just skip.
+                continue
+
+            # If start/end, the other node.
+            other_node: Optional[item_chain.Node[ScaffoldConf]] = None
             if node.prev is None:
-                link_type = LinkType.START
-                if node.next is None:
-                    # No connections in either direction, just skip.
-                    continue
+                node.inst.fixup['$type'] = 'start'
+                logic_fname = conf.logic_start
+                other_node = node.next
             elif node.next is None:
-                link_type = LinkType.END
+                node.inst.fixup['$type'] = 'end'
+                logic_fname = conf.logic_end
+                other_node = node.prev
             else:
-                link_type = LinkType.MID
+                node.inst.fixup['$type'] = 'mid'
+                logic_fname = conf.logic_mid
 
             # Add values indicating the group, position, and next item.
             node.inst.fixup['$group'] = group_counter
             node.inst.fixup['$ind'] = index
             if node.next is not None:
                 node.inst.fixup['$next'] = index + 1
-            node.inst.fixup['$type'] = link_type.value
 
             # Special case - change to an instance for the ends, pointing
             # in the direction of the connected track. This would be the
             # endcap model.
-            if (
-                is_floor and
-                link_type is not LinkType.MID and
-                conf.inst_end
-            ):
-                if link_type is LinkType.START:
-                    other_node = node.next
-                else:
-                    other_node = node.prev
-
-                assert other_node is not None  # Otherwise link type would be wrong...
+            if other_node is not None and is_floor and conf.inst_end:
                 link_dir = other_node.pos - node.pos
 
                 # Compute the horizontal gradient (z / xy dist).
@@ -170,19 +142,12 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                     node.inst['angles'] = '0 {:.0f} 0'.format(link_ang)
                     # Don't place the offset instance, this replaces that!
 
-            inst_logic = vmf.create_ent(
-                classname='func_instance',
-                targetname=node.inst['targetname'],
-                file=getattr(
-                    conf,
-                    'logic_' + link_type.value + (
-                        '_rev' if
-                        should_reverse
-                        else ''
-                    ),
-                    '',
-                ),
-                origin=node.pos,
-                angles=node.inst['angles'],
-            )
-            inst_logic.fixup.update(node.inst.fixup)
+            if logic_fname:
+                inst_logic = vmf.create_ent(
+                    classname='func_instance',
+                    targetname=node.inst['targetname'],
+                    file=logic_fname,
+                    origin=node.pos,
+                    angles=node.inst['angles'],
+                )
+                inst_logic.fixup.update(node.inst.fixup)
