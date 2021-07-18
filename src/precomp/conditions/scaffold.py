@@ -138,7 +138,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
     inst_to_config = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
-    chains = item_chain.chain(vmf, inst_to_config.keys(), allow_loop=False)
+    chains = item_chain.chain(vmf, inst_to_config, allow_loop=False)
 
     # We need to make the link entities unique for each scaffold set,
     # otherwise the AllVar property won't work.

@@ -2,23 +2,32 @@
 
 This includes Unstationary Scaffolds and Vactubes.
 """
-from typing import Any, Dict, Container, List, Optional, Iterator
+from __future__ import annotations
+from typing import Container, Optional, Iterator, TypeVar, Generic
+
+import attr
 
 from precomp import connections
-from srctools import Entity, VMF
+from srctools import Entity, VMF, Matrix, Angle
 from precomp.connections import Item
 
 __all__ = ['Node', 'chain']
+ConfT = TypeVar('ConfT')
 
 
-class Node:
+@attr.define
+class Node(Generic[ConfT]):
     """Represents a single node in the chain."""
-    __slots__ = ['item', 'prev', 'next', 'conf']
-    def __init__(self, item: Item):
-        self.item = item
-        self.conf = None  # type: Any
-        self.prev = None  # type: Optional[Node]
-        self.next = None  # type: Optional[Node]
+    item: Item
+    conf: ConfT
+    orient = attr.ib(init=False)
+    prev: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
+    next: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
+
+    @orient.default
+    def _set_orient(self) -> None:
+        """Set the orient value."""
+        self.orient = Matrix.from_angle(Angle.from_str(self.item.inst['angles']))
 
     @property
     def inst(self) -> Entity:
@@ -27,23 +36,25 @@ class Node:
 
 def chain(
     vmf: VMF,
-    inst_files: Container[str],
+    inst_files: dict[str, ConfT],
     allow_loop: bool,
-) -> Iterator[List[Node]]:
+) -> Iterator[list[Node[ConfT]]]:
     """Evaluate the chain of items.
 
-    inst is the instances that are part of this chain.
+    inst_files maps an instance to the configuration to store.
     Lists of nodes are yielded, for each separate track.
     """
     # Name -> node
-    nodes = {}  # type: Dict[str, Node]
+    nodes: dict[str, Node[ConfT]] = {}
 
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in inst_files:
+        try:
+            conf = inst_files[inst['file'].casefold()]
+        except KeyError:
             continue
         name = inst['targetname']
         try:
-            nodes[name] = Node(connections.ITEMS[name])
+            nodes[name] = Node(connections.ITEMS[name], conf)
         except KeyError:
             raise ValueError('No item for "{}"?'.format(name)) from None
 
@@ -54,8 +65,7 @@ def chain(
             try:
                 next_node = nodes[conn.to_item.name]
             except KeyError:
-                # Not one of our instances - fine, it's just actual
-                # IO.
+                # Not one of our instances - fine, it's just actual IO.
                 has_other_io = True
                 continue
             conn.remove()
