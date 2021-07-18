@@ -3,7 +3,7 @@
 This includes Unstationary Scaffolds and Vactubes.
 """
 from __future__ import annotations
-from typing import Container, Optional, Iterator, TypeVar, Generic
+from typing import Optional, Iterator, TypeVar, Generic
 
 import attr
 
@@ -15,19 +15,19 @@ __all__ = ['Node', 'chain']
 ConfT = TypeVar('ConfT')
 
 
-@attr.define
+@attr.define(eq=False)
 class Node(Generic[ConfT]):
     """Represents a single node in the chain."""
-    item: Item
-    conf: ConfT
+    item: Item = attr.ib(init=True)
+    conf: ConfT = attr.ib(init=True)
     orient = attr.ib(init=False)
     prev: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
     next: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
 
     @orient.default
-    def _set_orient(self) -> None:
+    def _orient_default(self) -> Matrix:
         """Set the orient value."""
-        self.orient = Matrix.from_angle(Angle.from_str(self.item.inst['angles']))
+        return Matrix.from_angle(Angle.from_str(self.item.inst['angles']))
 
     @property
     def inst(self) -> Entity:
