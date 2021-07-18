@@ -88,7 +88,11 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
 
     Must be done before priority level -300.
     """
-    group = res['group', 'DEFAULT_GROUP'].casefold()
+    try:
+        group = res['group'].casefold()
+    except LookupError:
+        # No group defined, make it specific to this result.
+        group = format(id(res), '016X')
 
     try:
         group_list = SCAFFOLD_GROUPS[group]
