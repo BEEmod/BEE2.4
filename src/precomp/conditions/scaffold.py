@@ -75,7 +75,7 @@ def get_config(node: item_chain.Node[ScaffoldConf]) -> tuple[bool, Vec]:
                 else '$bottom_level'
             ]
         )
-    offset @ node.orient + Vec.from_str(node.inst['origin'])
+    offset.localise(Vec.from_str(node.inst['origin']), node.orient)
     return is_floor, offset
 
 
