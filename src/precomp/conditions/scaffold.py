@@ -33,16 +33,13 @@ class ScaffoldConf:
     off_wall: Vec
 
     logic_start: Optional[str]
-    logic_end: Optional[str]
     logic_mid: Optional[str]
+    logic_end: Optional[str]
 
     logic_start_rev: Optional[str]
-    logic_end_rev: Optional[str]
     logic_mid_rev: Optional[str]
+    logic_end_rev: Optional[str]
 
-    inst_wall: Optional[str]
-    inst_floor: Optional[str]
-    inst_offset: Optional[str]
     # Specially rotated to face the next track!
     inst_end: Optional[str]
     # If it's allowed to point any direction, not just 90 degrees.
@@ -115,10 +112,6 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
         logic_mid_rev=resolve_optional(res, 'EndLogicRev') or log_mid,
         logic_end_rev=resolve_optional(res, 'EndLogicRev') or log_end,
 
-        inst_wall=resolve_optional(res, 'wallInst'),
-        inst_floor=resolve_optional(res, 'floorInst'),
-
-        inst_offset=resolve_optional(res, 'offsetInst'),
         # Specially rotated to face the next track!
         inst_end=resolve_optional(res, 'endInst'),
         # If it's allowed to point any direction, not just 90 degrees.
@@ -153,27 +146,13 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
 
         # Now set each instance in the chain, including first and last
         for index, node in enumerate(node_list):
-            conf = node.conf
+            conf: ScaffoldConf = node.conf
             is_floor, offset = get_config(node)
-
-            new_file = conf.inst_floor if is_floor else conf.inst_wall
-            if new_file:
-                node.inst['file'] = new_file
 
             if node.prev is None:
                 link_type = LinkType.START
                 if node.next is None:
                     # No connections in either direction, just skip.
-                    # Generate the piston tip if we would have.
-                    if conf.inst_offset:
-                        inst_offset = vmf.create_ent(
-                            classname='func_instance',
-                            targetname=node.inst['targetname'],
-                            file=conf.inst_offset,
-                            origin=offset,
-                            angles=node.inst['angles'],
-                        )
-                        inst_offset.fixup.update(node.inst.fixup)
                     continue
             elif node.next is None:
                 link_type = LinkType.END
@@ -187,11 +166,9 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                 node.inst.fixup['$next'] = index + 1
             node.inst.fixup['$type'] = link_type.value
 
-            # Special case - add an extra instance for the ends, pointing
-            # in the direction
-            # of the connected track. This would be the endcap
-            # model.
-            placed_endcap = False
+            # Special case - change to an instance for the ends, pointing
+            # in the direction of the connected track. This would be the
+            # endcap model.
             if (
                 is_floor and
                 link_type is not LinkType.MID and
@@ -219,18 +196,6 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                     node.inst['file'] = conf.inst_end
                     node.inst['angles'] = '0 {:.0f} 0'.format(link_ang)
                     # Don't place the offset instance, this replaces that!
-                    placed_endcap = True
-
-            if not placed_endcap and conf.inst_offset:
-                # Add an additional rotated entity at the offset.
-                # This is useful for the piston item.
-                vmf.create_ent(
-                    classname='func_instance',
-                    targetname=node.inst['targetname'],
-                    file=conf.inst_offset,
-                    origin=offset,
-                    angles=node.inst['angles'],
-                )
 
             inst_logic = vmf.create_ent(
                 classname='func_instance',
