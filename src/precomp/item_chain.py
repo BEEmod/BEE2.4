@@ -3,7 +3,7 @@
 This includes Unstationary Scaffolds and Vactubes.
 """
 from __future__ import annotations
-from typing import Optional, Iterator, TypeVar, Generic
+from typing import Optional, Iterator, TypeVar, Generic, Iterable
 
 import attr
 
@@ -33,10 +33,18 @@ class Node(Generic[ConfT]):
     def inst(self) -> Entity:
         return self.item.inst
 
+    @classmethod
+    def from_inst(cls, inst: Entity, conf: ConfT) -> Node[ConfT]:
+        """Find the item for this instance, and return the node."""
+        name = inst['targetname']
+        try:
+            return Node(connections.ITEMS[name], conf)
+        except KeyError:
+            raise ValueError('No item for "{}"?'.format(name)) from None
+
 
 def chain(
-    vmf: VMF,
-    inst_files: dict[str, ConfT],
+    node_list: Iterable[Node[ConfT]],
     allow_loop: bool,
 ) -> Iterator[list[Node[ConfT]]]:
     """Evaluate the chain of items.
@@ -45,21 +53,13 @@ def chain(
     Lists of nodes are yielded, for each separate track.
     """
     # Name -> node
-    nodes: dict[str, Node[ConfT]] = {}
-
-    for inst in vmf.by_class['func_instance']:
-        try:
-            conf = inst_files[inst['file'].casefold()]
-        except KeyError:
-            continue
-        name = inst['targetname']
-        try:
-            nodes[name] = Node(connections.ITEMS[name], conf)
-        except KeyError:
-            raise ValueError('No item for "{}"?'.format(name)) from None
+    nodes: dict[str, Node[ConfT]] = {
+        node.item.name: node
+        for node in node_list
+    }
 
     # Now compute the links, and check for double-links.
-    for name, node in nodes.items():
+    for node in nodes.values():
         has_other_io = False
         for conn in list(node.item.outputs):
             try:
