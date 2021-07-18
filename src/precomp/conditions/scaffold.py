@@ -1,13 +1,20 @@
 """The result used to generate unstationary scaffolds."""
 from __future__ import annotations
 from enum import Enum
+from typing import Optional, Iterator
 import math
+import attr
 
-from srctools import Vec, Property, VMF
+from srctools import Vec, Property
+from srctools.vmf import VMF, Entity
 import srctools.logger
 
 from precomp import instanceLocs, item_chain
 from precomp.conditions import make_result, make_result_setup, RES_EXHAUSTED
+
+
+COND_MOD_NAME = None
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.scaffold')
 
 
 class LinkType(Enum):
@@ -17,12 +24,33 @@ class LinkType(Enum):
     END = 'end'
 
 
-COND_MOD_NAME = None
+@attr.define
+class ScaffoldConf:
+    """Configuration for scaffolds."""
+    # If set, adjusts the offset appropriately
+    is_piston: bool
+    rotate_logic: bool
+    off_floor: Vec
+    off_wall: Vec
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.scaffold')
+    logic_start: Optional[str]
+    logic_end: Optional[str]
+    logic_mid: Optional[str]
+
+    logic_start_rev: Optional[str]
+    logic_end_rev: Optional[str]
+    logic_mid_rev: Optional[str]
+
+    inst_wall: Optional[str]
+    inst_floor: Optional[str]
+    inst_offset: Optional[str]
+    # Specially rotated to face the next track!
+    inst_end: Optional[str]
+    # If it's allowed to point any direction, not just 90 degrees.
+    free_rotation: bool
 
 
-def scaff_scan(inst_list, start_ent):
+def scaff_scan(inst_list: dict[str, Entity], start_ent: Entity) -> Iterator[Entity]:
     """Given the start item and instance list, follow the programmed path."""
     cur_ent = start_ent
     while True:
@@ -32,32 +60,26 @@ def scaff_scan(inst_list, start_ent):
             return
 
 
-def get_config(node: item_chain.Node) -> tuple[str, Vec]:
+def get_config(node: item_chain.Node[ScaffoldConf]) -> tuple[bool, Vec]:
     """Compute the config values for a node."""
 
-    orient = (
-        'floor' if
-        Vec(0, 0, 1).rotate_by_str(node.inst['angles']) == (0, 0, 1)
-        else 'wall'
-    )
+    is_floor = node.orient.up().z > 0.99
     # Find the offset used for the platform.
-    offset = (node.conf['off_' + orient]).copy()  # type: Vec
-    if node.conf['is_piston']:
+    offset = Vec(node.conf.off_floor if is_floor else node.conf.off_wall)
+    if node.conf.is_piston:
         # Adjust based on the piston position
         offset.z += 128 * srctools.conv_int(
             node.inst.fixup[
                 '$top_level' if
-                node.inst.fixup[
-                    '$start_up'] == '1'
+                node.inst.fixup['$start_up'] == '1'
                 else '$bottom_level'
             ]
         )
-    offset = offset.rotate_by_str(node.inst['angles'])
-    offset += Vec.from_str(node.inst['origin'])
-    return orient, offset
+    offset @ node.orient + Vec.from_str(node.inst['origin'])
+    return is_floor, offset
 
 
-def resolve_optional(prop: Property, key: str) -> str | None:
+def resolve_optional(prop: Property, key: str) -> Optional[str]:
     """Resolve the given instance, or return None if not defined."""
     try:
         file = prop[key]
@@ -72,48 +94,45 @@ SCAFF_PATTERN = '{name}_group{group}_part{index}'
 # Store the configs for scaffold items so we can
 # join them up later
 # group -> inst -> config
-SCAFFOLD_CONFIGS: dict[str, dict[str, dict]] = {}
+SCAFFOLD_CONFIGS: dict[str, dict[str, ScaffoldConf]] = {}
 
 
 @make_result_setup('UnstScaffold')
 def res_unst_scaffold_setup(res: Property):
-    group = res['group', 'DEFAULT_GROUP']
+    group = res['group', 'DEFAULT_GROUP'].casefold()
 
-    if group not in SCAFFOLD_CONFIGS:
-        # Store our values in the CONFIGS dictionary
-        targ_inst = SCAFFOLD_CONFIGS[group] = {}
-    else:
-        # Grab the already-filled values, and add to them
+    try:
         targ_inst = SCAFFOLD_CONFIGS[group]
+    except KeyError:
+        targ_inst = SCAFFOLD_CONFIGS[group] = {}
 
     for block in res.find_all("Instance"):
-        conf = {
-            # If set, adjusts the offset appropriately
-            'is_piston': srctools.conv_bool(block['isPiston', '0']),
-            'rotate_logic': srctools.conv_bool(block['AlterAng', '1'], True),
-            'off_floor': Vec.from_str(block['FloorOff', '0 0 0']),
-            'off_wall': Vec.from_str(block['WallOff', '0 0 0']),
+        log_start = resolve_optional(block, 'startlogic')
+        log_end = resolve_optional(block, 'endLogic')
+        log_mid = resolve_optional(block, 'midLogic')
+        conf = ScaffoldConf(
+            is_piston=srctools.conv_bool(block['isPiston', '0']),
+            rotate_logic=srctools.conv_bool(block['AlterAng', '1'], True),
+            off_floor=Vec.from_str(block['FloorOff', '0 0 0']),
+            off_wall=Vec.from_str(block['WallOff', '0 0 0']),
 
-            'logic_start': resolve_optional(block, 'startlogic'),
-            'logic_end': resolve_optional(block, 'endLogic'),
-            'logic_mid': resolve_optional(block, 'midLogic'),
+            logic_start=log_start,
+            logic_mid=log_mid,
+            logic_end=log_end,
 
-            'logic_start_rev': resolve_optional(block, 'StartLogicRev'),
-            'logic_end_rev': resolve_optional(block, 'EndLogicRev'),
-            'logic_mid_rev': resolve_optional(block, 'EndLogicRev'),
+            logic_start_rev=resolve_optional(block, 'StartLogicRev') or log_start,
+            logic_mid_rev=resolve_optional(block, 'EndLogicRev') or log_mid,
+            logic_end_rev=resolve_optional(block, 'EndLogicRev') or log_end,
 
-            'inst_wall': resolve_optional(block, 'wallInst'),
-            'inst_floor': resolve_optional(block, 'floorInst'),
-            'inst_offset': resolve_optional(block, 'offsetInst'),
+            inst_wall=resolve_optional(block, 'wallInst'),
+            inst_floor=resolve_optional(block, 'floorInst'),
+
+            inst_offset=resolve_optional(block, 'offsetInst'),
             # Specially rotated to face the next track!
-            'inst_end': resolve_optional(block, 'endInst'),
+            inst_end=resolve_optional(block, 'endInst'),
             # If it's allowed to point any direction, not just 90 degrees.
-            'free_rotation': block.bool('free_rotate_end'),
-        }
-        for logic_type in ('logic_start', 'logic_mid', 'logic_end'):
-            if conf[logic_type + '_rev'] is None:
-                conf[logic_type + '_rev'] = conf[logic_type]
-
+            free_rotation=block.bool('free_rotate_end'),
+        )
         for inst in instanceLocs.resolve(block['file']):
             targ_inst[inst] = conf
 
@@ -127,14 +146,12 @@ def res_unst_scaffold(vmf: VMF, res: Property):
     This is executed once to modify all instances.
     """
     # The instance types we're modifying
+    # TODO: Broken with the new just-in-time setup calls.
     if res.value not in SCAFFOLD_CONFIGS:
         # We've already executed this config group
         return RES_EXHAUSTED
 
-    LOGGER.info(
-        'Running Scaffold Generator ({})...',
-        res.value
-    )
+    LOGGER.info('Running Scaffold Generator ({})...', res.value)
     inst_to_config = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
@@ -149,22 +166,17 @@ def res_unst_scaffold(vmf: VMF, res: Property):
 
         should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
 
-        # Stash this off to start, so we can find this after items are processed
-        # and the instance names change.
-        for node in node_list:
-            node.conf = inst_to_config[node.inst['file'].casefold()]
-
         # Now set each instance in the chain, including first and last
         for index, node in enumerate(node_list):
             conf = node.conf
-            orient, offset = get_config(node)
+            is_floor, offset = get_config(node)
 
             # Add the link-values.
             node.inst.fixup['$group'] = group_counter
             node.inst.fixup['$ind'] = index
             node.inst.fixup['$next'] = index + 1
 
-            new_file = conf.get('inst_' + orient, '')
+            new_file = conf.inst_floor if is_floor else conf.inst_wall
             if new_file:
                 node.inst['file'] = new_file
 
@@ -173,11 +185,11 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                 if node.next is None:
                     # No connections in either direction, just skip.
                     # Generate the piston tip if we would have.
-                    if conf['inst_offset'] is not None:
+                    if conf.inst_offset is not None:
                         inst_offset = vmf.create_ent(
                             classname='func_instance',
                             targetname=node.inst['targetname'],
-                            file=conf['inst_offset'],
+                            file=conf.inst_offset,
                             origin=offset,
                             angles=node.inst['angles'],
                         )
@@ -194,9 +206,9 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             # model.
             placed_endcap = False
             if (
-                orient == 'floor' and
+                is_floor and
                 link_type is not LinkType.MID and
-                conf['inst_end'] is not None
+                conf.inst_end is not None
             ):
                 if link_type is LinkType.START:
                     other_node = node.next
@@ -211,17 +223,15 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                 # more than ~12 degrees.
                 horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
                 if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
-                    link_ang = math.degrees(
-                        math.atan2(link_dir.y, link_dir.x)
-                    )
-                    if not conf['free_rotation']:
+                    link_ang = math.degrees(math.atan2(link_dir.y, link_dir.x))
+                    if not conf.free_rotation:
                         # Round to nearest 90 degrees
                         # Add 45 so the switchover point is at the diagonals
                         link_ang = (link_ang + 45) // 90 * 90
                     inst_end = vmf.create_ent(
                         classname='func_instance',
                         targetname=node.inst['targetname'],
-                        file=conf['inst_end'],
+                        file=conf.inst_end,
                         origin=offset,
                         angles='0 {:.0f} 0'.format(link_ang),
                     )
@@ -229,13 +239,13 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     # Don't place the offset instance, this replaces that!
                     placed_endcap = True
 
-            if not placed_endcap and conf['inst_offset'] is not None:
+            if not placed_endcap and conf.inst_offset is not None:
                 # Add an additional rotated entity at the offset.
                 # This is useful for the piston item.
                 vmf.create_ent(
                     classname='func_instance',
                     targetname=node.inst['targetname'],
-                    file=conf['inst_offset'],
+                    file=conf.inst_offset,
                     origin=offset,
                     angles=node.inst['angles'],
                 )
@@ -243,7 +253,8 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             inst_logic = vmf.create_ent(
                 classname='func_instance',
                 targetname=node.inst['targetname'],
-                file=conf.get(
+                file=getattr(
+                    conf,
                     'logic_' + link_type.value + (
                         '_rev' if
                         should_reverse
@@ -252,11 +263,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     '',
                 ),
                 origin=offset,
-                angles=(
-                    '0 0 0' if
-                    conf['rotate_logic']
-                    else node.inst['angles']
-                ),
+                angles='0 0 0' if conf.rotate_logic else node.inst['angles'],
             )
             inst_logic.fixup.update(node.inst.fixup)
 
