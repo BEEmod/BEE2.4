@@ -5,8 +5,7 @@ from typing import Optional, Callable
 import math
 import attr
 
-from srctools import Vec, Property
-from srctools.vmf import VMF, Entity
+from srctools import Property, VMF, Entity
 import srctools.logger
 
 from precomp import instanceLocs, item_chain, conditions
@@ -26,12 +25,6 @@ class LinkType(Enum):
 @attr.define
 class ScaffoldConf:
     """Configuration for scaffolds."""
-    # If set, adjusts the offset appropriately
-    is_piston: bool
-    rotate_logic: bool
-    off_floor: Vec
-    off_wall: Vec
-
     logic_start: Optional[str]
     logic_mid: Optional[str]
     logic_end: Optional[str]
@@ -46,25 +39,6 @@ class ScaffoldConf:
     free_rotation: bool
 
 
-def get_config(node: item_chain.Node[ScaffoldConf]) -> tuple[bool, Vec]:
-    """Compute the config values for a node."""
-
-    is_floor = node.orient.up().z > 0.99
-    # Find the offset used for the platform.
-    offset = Vec(node.conf.off_floor if is_floor else node.conf.off_wall)
-    if node.conf.is_piston:
-        # Adjust based on the piston position
-        offset.z += 128 * srctools.conv_int(
-            node.inst.fixup[
-                '$top_level' if
-                node.inst.fixup['$start_up'] == '1'
-                else '$bottom_level'
-            ]
-        )
-    offset.localise(Vec.from_str(node.inst['origin']), node.orient)
-    return is_floor, offset
-
-
 def resolve_optional(prop: Property, key: str) -> str:
     """Resolve the given instance, or return '' if not defined."""
     try:
@@ -72,10 +46,6 @@ def resolve_optional(prop: Property, key: str) -> str:
     except LookupError:
         return ''
     return instanceLocs.resolve_one(file) or ''
-
-
-# The name we give to instances and other parts.
-SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
 # Store the nodes for scaffold items so we can join them up later.
 SCAFFOLD_GROUPS: dict[str, list[item_chain.Node[ScaffoldConf]]] = {}
@@ -86,7 +56,12 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
     """Marks the current instance as a scaffold, making it capable of being
     linked together.
 
-    Must be done before priority level -300.
+    Must be done before priority level -300. Parameters:
+    * Group: Should be set to a unique name. All calls with this name can be
+      linked together.
+    * StartLogic/MidLogic/EndLogic: These instances will be overlaid on the
+      instance, depending on whether it starts/ends or is in the middle of the
+      path.
     """
     try:
         group = res['group'].casefold()
@@ -103,11 +78,6 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
     log_end = resolve_optional(res, 'endLogic')
     log_mid = resolve_optional(res, 'midLogic')
     conf = ScaffoldConf(
-        is_piston=srctools.conv_bool(res['isPiston', '0']),
-        rotate_logic=srctools.conv_bool(res['AlterAng', '1'], True),
-        off_floor=Vec.from_str(res['FloorOff', '0 0 0']),
-        off_wall=Vec.from_str(res['WallOff', '0 0 0']),
-
         logic_start=log_start,
         logic_mid=log_mid,
         logic_end=log_end,
@@ -151,7 +121,7 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
         # Now set each instance in the chain, including first and last
         for index, node in enumerate(node_list):
             conf: ScaffoldConf = node.conf
-            is_floor, offset = get_config(node)
+            is_floor = node.orient.up().z > 0.99
 
             if node.prev is None:
                 link_type = LinkType.START
@@ -184,8 +154,7 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                     other_node = node.prev
 
                 assert other_node is not None  # Otherwise link type would be wrong...
-                other_offset = get_config(other_node)[1]
-                link_dir = other_offset - offset
+                link_dir = other_node.pos - node.pos
 
                 # Compute the horizontal gradient (z / xy dist).
                 # Don't use endcap if rising more than ~45 degrees, or lowering
@@ -213,7 +182,7 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                     ),
                     '',
                 ),
-                origin=offset,
-                angles='0 0 0' if conf.rotate_logic else node.inst['angles'],
+                origin=node.pos,
+                angles=node.inst['angles'],
             )
             inst_logic.fixup.update(node.inst.fixup)
