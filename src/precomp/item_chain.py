@@ -8,7 +8,7 @@ from typing import Optional, Iterator, TypeVar, Generic, Iterable
 import attr
 
 from precomp import connections
-from srctools import Entity, VMF, Matrix, Angle
+from srctools import Entity, VMF, Matrix, Angle, Vec
 from precomp.connections import Item
 
 __all__ = ['Node', 'chain']
@@ -20,17 +20,23 @@ class Node(Generic[ConfT]):
     """Represents a single node in the chain."""
     item: Item = attr.ib(init=True)
     conf: ConfT = attr.ib(init=True)
-    orient = attr.ib(init=False)
+
+    # Origin and angles of the instance.
+    pos = attr.ib(init=False, default=attr.Factory(
+        lambda self: Vec.from_str(self.item.inst['origin']), takes_self=True,
+    ))
+    orient = attr.ib(init=False, default=attr.Factory(
+        lambda self: Matrix.from_angle(Angle.from_str(self.item.inst['angles'])),
+        takes_self=True,
+    ))
+
+    # The links between nodes
     prev: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
     next: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
 
-    @orient.default
-    def _orient_default(self) -> Matrix:
-        """Set the orient value."""
-        return Matrix.from_angle(Angle.from_str(self.item.inst['angles']))
-
     @property
     def inst(self) -> Entity:
+        """Return the relevant instance."""
         return self.item.inst
 
     @classmethod
