@@ -22,9 +22,9 @@ class ScaffoldConf:
     logic_end: Optional[str]
 
     # Specially rotated to face the next track!
-    inst_end: Optional[str]
+    scaff_endcap: Optional[str]
     # If it's allowed to point any direction, not just 90 degrees.
-    free_rotation: bool
+    scaff_endcap_free_rot: bool
 
 
 def resolve_optional(prop: Property, key: str) -> str:
@@ -50,6 +50,11 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
     * StartLogic/MidLogic/EndLogic: These instances will be overlaid on the
       instance, depending on whether it starts/ends or is in the middle of the
       path.
+    * EndcapInst: Special instance for Unstationary Scaffolds. If the item is
+      facing upwards, and is the end for a mostly horizontal beam it is switched
+      to this instance, and rotated to face towards the previous track.
+    * endcap_free_rotate: If true, the endcap can point in any angle, otherwise
+      it points in the nearest 90 degree angle.
     """
     try:
         group = res['group'].casefold()
@@ -68,9 +73,9 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
         logic_end=resolve_optional(res, 'endLogic'),
 
         # Specially rotated to face the next track!
-        inst_end=resolve_optional(res, 'endInst'),
+        scaff_endcap=resolve_optional(res, 'EndcapInst'),
         # If it's allowed to point any direction, not just 90 degrees.
-        free_rotation=res.bool('free_rotate_end'),
+        scaff_endcap_free_rot=res.bool('endcap_free_rotate'),
     )
 
     def applier(inst: Entity) -> None:
@@ -122,26 +127,6 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
             if node.next is not None:
                 node.inst.fixup['$next'] = index + 1
 
-            # Special case - change to an instance for the ends, pointing
-            # in the direction of the connected track. This would be the
-            # endcap model.
-            if other_node is not None and is_floor and conf.inst_end:
-                link_dir = other_node.pos - node.pos
-
-                # Compute the horizontal gradient (z / xy dist).
-                # Don't use endcap if rising more than ~45 degrees, or lowering
-                # more than ~12 degrees.
-                horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
-                if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
-                    link_ang = math.degrees(math.atan2(link_dir.y, link_dir.x))
-                    if not conf.free_rotation:
-                        # Round to nearest 90 degrees
-                        # Add 45 so the switchover point is at the diagonals
-                        link_ang = (link_ang + 45) // 90 * 90
-                    node.inst['file'] = conf.inst_end
-                    node.inst['angles'] = '0 {:.0f} 0'.format(link_ang)
-                    # Don't place the offset instance, this replaces that!
-
             if logic_fname:
                 inst_logic = vmf.create_ent(
                     classname='func_instance',
@@ -151,3 +136,22 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                     angles=node.inst['angles'],
                 )
                 inst_logic.fixup.update(node.inst.fixup)
+
+            # Special case - change to an instance for the ends, pointing
+            # in the direction of the connected track. This would be the
+            # endcap model.
+            if other_node is not None and is_floor and conf.scaff_endcap:
+                link_dir = other_node.pos - node.pos
+
+                # Compute the horizontal gradient (z / xy dist).
+                # Don't use endcap if rising more than ~45 degrees, or lowering
+                # more than ~12 degrees.
+                horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
+                if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
+                    link_ang = math.degrees(math.atan2(link_dir.y, link_dir.x))
+                    if not conf.scaff_endcap_free_rot:
+                        # Round to nearest 90 degrees
+                        # Add 45 so the switchover point is at the diagonals
+                        link_ang = (link_ang + 45) // 90 * 90
+                    node.inst['file'] = conf.scaff_endcap
+                    node.inst['angles'] = '0 {:.0f} 0'.format(link_ang)
