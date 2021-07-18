@@ -1,4 +1,4 @@
-"""The result used to generate unstationary scaffolds."""
+"""Implements a condition which allows linking items into a sequence."""
 from __future__ import annotations
 from typing import Optional, Callable
 import math
@@ -10,18 +10,19 @@ import srctools.logger
 from precomp import instanceLocs, item_chain, conditions
 
 
-COND_MOD_NAME = None
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.scaffold')
+COND_MOD_NAME = 'Item Linkage'
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.linkedItem')
 
 
 @attr.define
-class ScaffoldConf:
-    """Configuration for scaffolds."""
+class Config:
+    """Configuration for linked items."""
     logic_start: Optional[str]
     logic_mid: Optional[str]
     logic_end: Optional[str]
 
-    # Specially rotated to face the next track!
+    # Special feature for unstationary scaffolds. This is rotated to face
+    # the next track!
     scaff_endcap: Optional[str]
     # If it's allowed to point any direction, not just 90 degrees.
     scaff_endcap_free_rot: bool
@@ -35,18 +36,20 @@ def resolve_optional(prop: Property, key: str) -> str:
         return ''
     return instanceLocs.resolve_one(file) or ''
 
-# Store the nodes for scaffold items so we can join them up later.
-SCAFFOLD_GROUPS: dict[str, list[item_chain.Node[ScaffoldConf]]] = {}
+# Store the nodes for items so we can join them up later.
+ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
 
 
-@conditions.make_result('UnstScaffold')
-def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
-    """Marks the current instance as a scaffold, making it capable of being
-    linked together.
+@conditions.make_result('LinkedItem')
+def res_linked_item(res: Property) -> Callable[[Entity], None]:
+    """Marks the current instance for linkage with similar items for linkage.
 
-    Must be done before priority level -300. Parameters:
+    At priority level -300, the sequence of similarly-marked items this links
+    to is grouped together, and given fixup values to allow linking them.
+
+    Parameters:
     * Group: Should be set to a unique name. All calls with this name can be
-      linked together.
+      linked together. If not used, only this specific result call will link.
     * StartLogic/MidLogic/EndLogic: These instances will be overlaid on the
       instance, depending on whether it starts/ends or is in the middle of the
       path.
@@ -63,12 +66,12 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
         group = format(id(res), '016X')
 
     try:
-        group_list = SCAFFOLD_GROUPS[group]
+        group_list = ITEMS_TO_LINK[group]
     except KeyError:
-        group_list = SCAFFOLD_GROUPS[group] = []
+        group_list = ITEMS_TO_LINK[group] = []
 
-    conf = ScaffoldConf(
-        logic_start= resolve_optional(res, 'startlogic'),
+    conf = Config(
+        logic_start=resolve_optional(res, 'startlogic'),
         logic_mid=resolve_optional(res, 'midLogic'),
         logic_end=resolve_optional(res, 'endLogic'),
 
@@ -85,22 +88,20 @@ def res_unst_scaffold(res: Property) -> Callable[[Entity], None]:
 
 
 @conditions.meta_cond(-300)
-def link_scaffolds(vmf: VMF) -> None:
-    """Take the defined scaffolds, and link them together."""
-    if SCAFFOLD_GROUPS:
-        for name, group in SCAFFOLD_GROUPS.items():
-            LOGGER.info('Running Scaffold Generator {} ...', name)
-            link_scaffold(vmf, group)
-
-        LOGGER.info('Finished Scaffold generation!')
+def link_items(vmf: VMF) -> None:
+    """Take the defined linked items, and actually link them together."""
+    if ITEMS_TO_LINK:
+        for name, group in ITEMS_TO_LINK.items():
+            LOGGER.info('Linking {} items...', name)
+            link_item(vmf, group)
 
 
-def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
-    """Link together a single scaffold group."""
+def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
+    """Link together a single group of items."""
     chains = item_chain.chain(group, allow_loop=False)
     for group_counter, node_list in enumerate(chains):
         for index, node in enumerate(node_list):
-            conf: ScaffoldConf = node.conf
+            conf = node.conf
             is_floor = node.orient.up().z > 0.99
 
             if node.next is None and node.prev is None:
@@ -108,7 +109,7 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                 continue
 
             # If start/end, the other node.
-            other_node: Optional[item_chain.Node[ScaffoldConf]] = None
+            other_node: Optional[item_chain.Node[Config]] = None
             if node.prev is None:
                 node.inst.fixup['$type'] = 'start'
                 logic_fname = conf.logic_start
@@ -137,9 +138,8 @@ def link_scaffold(vmf: VMF, group: list[item_chain.Node[ScaffoldConf]]) -> None:
                 )
                 inst_logic.fixup.update(node.inst.fixup)
 
-            # Special case - change to an instance for the ends, pointing
-            # in the direction of the connected track. This would be the
-            # endcap model.
+            # Special case for Unstationary Scaffolds - change to an instance
+            # for the ends, pointing in the direction of the connected track.
             if other_node is not None and is_floor and conf.scaff_endcap:
                 link_dir = other_node.pos - node.pos
 
