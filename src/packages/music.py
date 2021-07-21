@@ -47,7 +47,7 @@ class Music(PakObject):
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
-        sound = data.info.find_key('soundscript', [])  # type: Property
+        sound = data.info.find_block('soundscript', or_blank=True)
 
         if sound.has_children():
             sounds = {}
@@ -110,7 +110,7 @@ class Music(PakObject):
             data.info.find_all('pack')
         ]
 
-        children_prop = data.info.find_key('children', [])
+        children_prop = data.info.find_block('children', or_blank=True)
         children = {
             channel: children_prop[channel.value, '']
             for channel in MusicChannel
@@ -136,15 +136,15 @@ class Music(PakObject):
             synch_tbeam=synch_tbeam,
         )
 
-    def add_over(self, override: 'Music'):
+    def add_over(self, override: 'Music') -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.config.append(override.config)
         self.selitem_data += override.selitem_data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Music ' + self.id + '>'
 
-    def provides_channel(self, channel: MusicChannel):
+    def provides_channel(self, channel: MusicChannel) -> bool:
         """Check if this music has this channel."""
         if self.sound[channel]:
             return True
@@ -153,7 +153,7 @@ class Music(PakObject):
             return True
         return False
 
-    def has_channel(self, channel: MusicChannel):
+    def has_channel(self, channel: MusicChannel) -> bool:
         """Check if this track or its children has a channel."""
         if self.sound[channel]:
             return True
@@ -164,7 +164,7 @@ class Music(PakObject):
             children = Music.by_id(self.children[channel])
         except KeyError:
             return False
-        return children.sound[channel]
+        return bool(children.sound[channel])
 
     def get_attrs(self) -> Dict[str, bool]:
         """Generate attributes for SelectorWin."""
@@ -176,7 +176,7 @@ class Music(PakObject):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, channel: MusicChannel):
+    def get_suggestion(self, channel: MusicChannel) -> Optional[str]:
         """Get the ID we want to suggest for a channel."""
         try:
             child = Music.by_id(self.children[channel])
@@ -199,7 +199,7 @@ class Music(PakObject):
     @staticmethod
     def export(exp_data: ExportData):
         """Export the selected music."""
-        selected = exp_data.selected  # type: Dict[MusicChannel, Optional[Music]]
+        selected: dict[MusicChannel, Optional[Music]] = exp_data.selected
 
         base_music = selected[MusicChannel.BASE]
 
