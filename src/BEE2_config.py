@@ -160,6 +160,8 @@ class ConfigFile(ConfigParser):
             if self.filename is None:
                 raise ValueError('No filename provided!')
 
+            # Create the parent if it hasn't already.
+            self.filename.parent.mkdir(parents=True, exist_ok=True)
             with atomic_write(self.filename, overwrite=True, encoding='utf8') as conf:
                 self.write(conf)
             self.has_changed.clear()
