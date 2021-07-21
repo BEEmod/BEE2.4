@@ -327,7 +327,7 @@ class Item:
         else:
             self.button.place(x=x, y=y)
             self.button.lift()  # Force a particular stacking order for widgets
-        
+
     def copy(self) -> 'Item':
         """Duplicate an item."""
         item = Item.__new__(Item)
@@ -472,7 +472,7 @@ class selWin:
             # least this works.
             self.item_list = [self.noneItem]
             self.selected = self.noneItem
-            
+
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
@@ -864,6 +864,7 @@ class selWin:
         self.context_menu.delete(0, 'end')
 
         for ind, item in enumerate(self.item_list):
+            # noinspection PyProtectedMember
             if item._selector is not None and item._selector is not self:
                 raise ValueError(f'Item {item} reused on a different selector!')
             item._selector = self
@@ -910,7 +911,7 @@ class selWin:
             menu.add_radiobutton(
                 label=item.context_lbl,
                 command=functools.partial(self.sel_item_id, item.name),
-                var=self.context_var,
+                variable=self.context_var,
                 value=item.name,
             )
             item._context_ind = len(grouped_items[group_key]) - 1
@@ -922,17 +923,7 @@ class selWin:
         # Note - empty string should sort to the beginning!
         self.group_order[:] = sorted(self.grouped_items.keys())
 
-        # We start with the ungrouped items, so increase the index
-        # appropriately.
-        if '' in grouped_items:
-            start = len(self.grouped_items[''])
-        else:
-            start = 0
-
-        for index, (key, menu) in enumerate(
-            sorted(self.context_menus.items(), key=itemgetter(0)),
-            start=start,
-        ):
+        for (key, menu) in sorted(self.context_menus.items(), key=itemgetter(0)):
             if key == '':
                 # Don't add the ungrouped menu to itself!
                 continue
@@ -941,7 +932,8 @@ class selWin:
                 label=self.group_names[key],
             )
             # Set a custom attribute to keep track of the menu's index.
-            menu._context_index = index
+            # The one at the end is the one we just added.
+            menu._context_index = self.context_menu.index('end')
         self.flow_items()
 
     def exit(self, event: Event = None) -> None:
