@@ -145,6 +145,12 @@ def add(
                 bounce.as_array(),
             )
 
+        packfiles = conf.find_block('pack', or_blank=True).as_array()
+        if packfiles:
+            packer = vmf.create_ent('comp_pack', origin=loc)
+            for i, fname in enumerate(packfiles, 1):
+                packer[f'generic{i:02}'] = fname
+
     if inst:
         # We assume the instance is setup correct.
         vmf.create_ent(

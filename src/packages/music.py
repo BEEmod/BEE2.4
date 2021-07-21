@@ -54,14 +54,7 @@ class Music(PakObject):
             for channel in MusicChannel:
                 sounds[channel] = channel_snd = []
                 for prop in sound.find_all(channel.value):
-                    if prop.has_children():
-                        channel_snd += [
-                            subprop.value
-                            for subprop in
-                            prop
-                        ]
-                    else:
-                        channel_snd.append(prop.value)
+                    channel_snd.extend(prop.as_array())
 
             synch_tbeam = sound.bool('sync_funnel')
         else:
@@ -234,6 +227,14 @@ class Music(PakObject):
 
             to_pack.update(music.packfiles)
 
+        # If we need to pack, add the files to be unconditionally
+        # packed.
+        if to_pack:
+            music_conf.append(Property('pack', [
+                Property('file', filename)
+                for filename in to_pack
+            ]))
+
         if base_music is not None:
             vbsp_config.set_key(
                 ('Options', 'music_looplen'),
@@ -247,17 +248,6 @@ class Music(PakObject):
             vbsp_config.set_key(
                 ('Options', 'music_instance'),
                 base_music.inst or '',
-            )
-
-        # If we need to pack, add the files to be unconditionally
-        # packed.
-        if to_pack:
-            vbsp_config.set_key(
-                ('PackTriggers', 'Forced'),
-                [
-                    Property('File', file)
-                    for file in to_pack
-                ],
             )
 
     @classmethod
