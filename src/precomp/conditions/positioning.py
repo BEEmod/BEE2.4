@@ -459,7 +459,7 @@ def res_alt_orientation(inst: Entity, res: Property) -> None:
 @make_result('setAngles')
 def res_set_angles(inst: Entity, res: Property):
     """Set the orientation of an instance to a certain angle."""
-    inst['angles'] = res.value
+    inst['angles'] = inst.fixup.substitute(res.value)
 
 
 @make_result('OffsetInst', 'offsetinstance')
