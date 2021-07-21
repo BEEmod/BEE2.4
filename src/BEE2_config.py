@@ -203,7 +203,7 @@ class ConfigFile(ConfigParser):
             self[section] = {}
             return super().__getitem__(section)
 
-    def getboolean(self, section: str, value: str, default: bool=False) -> bool:
+    def getboolean(self, section: str, value: str, default: bool=False, **kwargs) -> bool:
         """Get the value in the specified section, coercing to a Boolean.
 
             If either does not exist, set to the default and return it.
@@ -211,7 +211,7 @@ class ConfigFile(ConfigParser):
         if section not in self:
             self[section] = {}
         try:
-            return super().getboolean(section, value)
+            return super().getboolean(section, value, **kwargs)
         except (ValueError, NoOptionError):
             #  Invalid boolean, or not found
             self.has_changed.set()
@@ -220,7 +220,7 @@ class ConfigFile(ConfigParser):
 
     get_bool = getboolean
 
-    def getint(self, section: str, value: str, default: int=0) -> int:
+    def getint(self, section: str, value: str, default: int=0, **kwargs) -> int:
         """Get the value in the specified section, coercing to a Integer.
 
             If either does not exist, set to the default and return it.
@@ -228,7 +228,7 @@ class ConfigFile(ConfigParser):
         if section not in self:
             self[section] = {}
         try:
-            return super().getint(section, value)
+            return super().getint(section, value, **kwargs)
         except (ValueError, NoOptionError):
             self.has_changed.set()
             self[section][value] = str(int(default))
@@ -237,23 +237,22 @@ class ConfigFile(ConfigParser):
     get_int = getint
 
     def add_section(self, section: str) -> None:
+        """Add a file section."""
         self.has_changed.set()
         super().add_section(section)
 
     def remove_section(self, section: str) -> bool:
+        """Remove a file section."""
         self.has_changed.set()
         return super().remove_section(section)
 
-    def set(self, section: str, option: str, value: str) -> None:
+    def set(self, section: str, option: str, value: Any=None) -> None:
+        """Set an option, marking the file dirty if this changed it."""
         orig_val = self.get(section, option, fallback=None)
         value = str(value)
         if orig_val is None or orig_val != value:
             self.has_changed.set()
             super().set(section, option, value)
-
-    add_section.__doc__ = ConfigParser.add_section.__doc__
-    remove_section.__doc__ = ConfigParser.remove_section.__doc__
-    set.__doc__ = ConfigParser.set.__doc__
 
 
 # Define this here so app modules can easily access the config
