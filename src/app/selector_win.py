@@ -319,7 +319,17 @@ class Item:
             attributes=attrs,
         )
 
-    def set_pos(self, x=None, y=None):
+    def _on_click(self, _: Event = None) -> None:
+        """Handle clicking on the item.
+
+        If it's already selected, save and close the window.
+        """
+        if self._selector.selected is self:
+            self._selector.save()
+        else:
+            self._selector.sel_item(self)
+
+    def set_pos(self, x: int = None, y: int = None) -> None:
         """Place the item on the palette."""
         if x is None or y is None:
             # Remove from the window.
@@ -880,18 +890,8 @@ class selWin:
                         compound='top',
                     )
 
-                @tk_tools.bind_leftclick(item.button)
-                def click_item(event=None, *, _self=self, _item=item):
-                    """Handle clicking on the item.
-
-                    If it's already selected, save and close the window.
-                    """
-                    # We need to capture the item in a default, since it's
-                    # the same variable in different iterations
-                    if _item is self.selected:
-                        _self.save()
-                    else:
-                        _self.sel_item(_item)
+                # noinspection PyProtectedMember
+                tk_tools.bind_leftclick(item.button, item._on_click)
 
             group_key = item.group.strip().casefold()
             grouped_items[group_key].append(item)
