@@ -15,6 +15,8 @@ import functools
 import math
 from typing import NamedTuple, Optional, List, Dict, Union, Iterable, Mapping
 
+import attr
+
 from app.richTextBox import tkRichText
 from app.tkMarkdown import MarkdownData
 from app.tooltip import add_tooltip, set_tooltip
@@ -82,45 +84,49 @@ class AttrTypes(Enum):
     BOOL = 'bool'  # A yes/no checkmark
     COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
 
+
 AttrValues =  Union[str, list, bool, Vec]
 
-class AttrDef(NamedTuple):
+
+@attr.define
+class AttrDef:
+    """Configuration for attributes shown on selector labels."""
     id: str
     desc: str
     default: AttrValues
     type: AttrTypes
 
     @classmethod
-    def string(cls, id: str, desc='', default: str='') -> 'AttrDef':
+    def string(cls, attr_id: str, desc='', default: str='') -> AttrDef:
         """Alternative constructor for string-type attrs."""
         if desc != '' and not desc.endswith(': '):
             desc += ': '
-        return cls(id, desc, default, AttrTypes.STRING)
+        return AttrDef(attr_id, desc, default, AttrTypes.STRING)
 
     @classmethod
-    def list(cls, id: str, desc='', default: list=None) -> 'AttrDef':
+    def list(cls, attr_id: str, desc='', default: list=None) -> AttrDef:
         """Alternative constructor for list-type attrs."""
         if default is None:
             default = []
         if desc != '' and not desc.endswith(': '):
             desc += ': '
-        return cls(id, desc, default, AttrTypes.LIST)
+        return AttrDef(attr_id, desc, default, AttrTypes.LIST)
 
     @classmethod
-    def bool(cls, id: str, desc='', default: bool=False) -> 'AttrDef':
+    def bool(cls, attr_id: str, desc='', default: bool=False) -> AttrDef:
         """Alternative constructor for bool-type attrs."""
         if desc != '' and not desc.endswith(': '):
             desc += ': '
-        return cls(id, desc, default, AttrTypes.BOOL)
+        return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
 
     @classmethod
-    def color(cls, id: str, desc='', default: Vec=None) -> 'AttrDef':
-        """Alternative constructor for String-type attrs."""
+    def color(cls, attr_id: str, desc='', default: Vec=None) -> AttrDef:
+        """Alternative constructor for color-type attrs."""
         if default is None:
             default = Vec(255, 255, 255)
         if desc != '' and not desc.endswith(': '):
             desc += ': '
-        return cls(id, desc, default, AttrTypes.COLOR)
+        return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
 class GroupHeader(ttk.Frame):
@@ -160,7 +166,7 @@ class GroupHeader(ttk.Frame):
         # For the mouse events to work, we need to bind on all the children too.
         widgets = self.winfo_children()
         widgets.append(self)
-        for wid in widgets:  # type: Widget
+        for wid in widgets:
             tk_tools.bind_leftclick(wid, self.toggle)
             wid['cursor'] = tk_tools.Cursors.LINK
         self.bind('<Enter>', self.hover_start)
@@ -168,10 +174,12 @@ class GroupHeader(ttk.Frame):
 
     @property
     def visible(self) -> bool:
+        """Check if the contents are visible."""
         return self._visible
 
     @visible.setter
     def visible(self, value: bool) -> None:
+        """Set if the contents are visible."""
         value = bool(value)
         if value == self._visible:
             return  # Don't do anything..
@@ -180,11 +188,11 @@ class GroupHeader(ttk.Frame):
         self.hover_start()  # Update arrow icon
         self.parent.flow_items()
 
-    def toggle(self, e: Event = None) -> None:
+    def toggle(self, _: Event = None) -> None:
         """Toggle the header on or off."""
         self.visible = not self._visible
 
-    def hover_start(self, e: Event = None) -> None:
+    def hover_start(self, _: Event = None) -> None:
         """When hovered over, fill in the triangle."""
         self.arrow['text'] = (
             GRP_EXP_HOVER
@@ -192,7 +200,7 @@ class GroupHeader(ttk.Frame):
             GRP_COLL_HOVER
         )
 
-    def hover_end(self, e: Event = None) -> None:
+    def hover_end(self, _: Event = None) -> None:
         """When leaving, hollow the triangle."""
         self.arrow['text'] = (
             GRP_EXP
