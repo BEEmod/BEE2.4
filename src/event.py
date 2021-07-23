@@ -11,7 +11,6 @@ A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
 from __future__ import annotations
-from abc import abstractmethod
 from reprlib import recursive_repr
 from collections.abc import (
     KeysView, ValuesView, ItemsView, Mapping, Iterable, Iterator, Hashable,
@@ -288,24 +287,27 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         return len(self._data)
 
     @overload
-    @abstractmethod
     def __getitem__(self, i: int) -> ValueT: ...
-
     @overload
-    @abstractmethod
     def __getitem__(self, s: slice) -> List[ValueT]: ...
 
     def __getitem__(self, index: Union[int, slice]) -> Union[List[ValueT], ValueT]:
-        """Indexing a ObsSeq will return the individual item, or a list of items."""
+        """Indexing a ObsSeq will return the individual item, or a regular list of items.
+
+        It does not produce another ObsList.
+        """
         return self._data[index]
 
     def __iter__(self) -> Iterator[ValueT]:
+        """Iterate through the contents of the list."""
         return iter(self._data)
 
     def __contains__(self, value: Any) -> bool:
+        """Check if the value is present in the list."""
         return value in self._data
 
     def __reversed__(self) -> Iterator[ValueT]:
+        """Iterate through the contents of the list, in reverse."""
         return reversed(self._data)
 
     def index(self, value: ValueT, start: int = 0, stop: int = None) -> int:
@@ -313,22 +315,21 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
            Raises ValueError if the value is not present.
         """
         if stop is None:
-            stop = len(self._data)
-        return self._data.index(value, start, stop)
+            return self._data.index(value, start)
+        else:
+            return self._data.index(value, start, stop)
 
     def count(self, value: Any) -> int:
         """S.count(value) -> integer -- return number of occurrences of value"""
         return self._data.count(value)
 
     @overload
-    @abstractmethod
     def __setitem__(self, index: int, item: ValueT) -> None: ...
-
     @overload
-    @abstractmethod
     def __setitem__(self, index: slice, item: Iterable[ValueT]) -> None: ...
 
     def __setitem__(self, index: Union[int, slice], item: Union[ValueT, Iterable[ValueT]]) -> None:
+        """Set the specified index or slice to a new value, firing events."""
         if isinstance(index, slice):
             # Find the smallest index we change.
             start = min(range(*index.indices(len(self._data))), default=0)
@@ -342,14 +343,12 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
             self._fire(index, old, item)
 
     @overload
-    @abstractmethod
     def __delitem__(self, index: int) -> None: ...
-
     @overload
-    @abstractmethod
     def __delitem__(self, index: slice) -> None: ...
 
     def __delitem__(self, index: Union[int, slice]) -> None:
+        """Remove the specified index or slice, firing events."""
         if isinstance(index, slice):
             start, stop, step = index.indices(len(self._data))
             start = min(start, stop)
@@ -368,10 +367,10 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
                 new = None
             self._fire(pos, orig, new)
 
-    def insert(self, index: int, object: ValueT) -> None:
+    def insert(self, index: int, value: ValueT) -> None:
         """Inserting an item changes the index, plus everything after it."""
         size = len(self._data)
-        self._data.insert(index, object)
+        self._data.insert(index, value)
         for pos in range(index, size):
             self._fire(pos, self._data[pos + 1], self._data[pos])
         self._fire(size, None, self._data[-1])
