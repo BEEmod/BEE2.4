@@ -35,6 +35,7 @@ CtxT = TypeVar('CtxT')
 # TODO: MyPy doesn't think isinstance(None, Hashable) is true.
 KeyT = TypeVar('KeyT', bound=Optional[Hashable])
 ValueT = TypeVar('ValueT')
+Value2T = TypeVar('Value2T')
 NoneType = Type[None]
 _UNSET: Any = object()
 
@@ -184,11 +185,19 @@ class ValueChange(Generic[KeyT, ValueT]):
     key: KeyT
 
     @overload
-    def __init__(self, old: ValueT, new: ValueT, key: KeyT) -> None: ...
+    def __init__(
+        self: ValueChange[KeyT, Union[ValueT, Value2T]],
+        old: ValueT, new: Value2T,
+        key: KeyT,
+    ) -> None: ...
     @overload
-    def __init__(self, old: ValueT, new: ValueT, ind: KeyT) -> None: ...
+    def __init__(
+        self: ValueChange[KeyT, Union[ValueT, Value2T]],
+        old: ValueT, new: Value2T,
+        ind: KeyT,
+    ) -> None: ...
 
-    def __init__(self, old: ValueT, new: ValueT, key: KeyT=_UNSET, *, ind: KeyT=_UNSET) -> None:
+    def __init__(self, old: ValueT, new: Value2T, key: KeyT=_UNSET, *, ind: KeyT=_UNSET) -> None:
         """Create new instance of ValueChange(old, new, key/ind)"""
         if key is _UNSET:
             if ind is _UNSET:
