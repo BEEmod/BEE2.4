@@ -10,16 +10,17 @@ context, and the same type of argument will be called with the arg.
 A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
+from __future__ import annotations
 from abc import abstractmethod
 from reprlib import recursive_repr
+from collections.abc import (
+    KeysView, ValuesView, ItemsView, Mapping, Iterable, Iterator, Hashable,
+)
 from typing import (
     overload, cast,
     TypeVar, Any, Type,
-    Optional, Union, Generic, Callable,
-    Dict, List, Tuple,
-    Hashable, Iterable, Iterator,
-    MutableSequence, MutableMapping, Mapping,
-    KeysView, ValuesView, ItemsView,
+    Optional, Union, Generic, Callable, List,
+    MutableSequence, MutableMapping
 )
 
 __all__ = [
@@ -30,7 +31,8 @@ __all__ = [
 
 ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
-KeyT = TypeVar('KeyT', bound=Hashable)
+# TODO: MyPy doesn't think isinstance(None, Hashable) is true.
+KeyT = TypeVar('KeyT', bound=Optional[Hashable])
 ValueT = TypeVar('ValueT')
 NoneType = Type[None]
 _UNSET: Any = object()
@@ -56,7 +58,8 @@ class EventSpec(Generic[ArgT], List[Callable[[ArgT], Any]]):
 
 class EventManager:
     """Manages a set of events, and the associated callbacks."""
-    _events: Dict[Tuple[int, Type[ArgT]], EventSpec[ArgT]]
+    # Type[ArgT] -> EventSpec[ArgT], but can't specify that.
+    _events: dict[tuple[int, type[Any]], EventSpec[Any]]
 
     def __init__(self) -> None:
         self._events = {}
@@ -182,12 +185,12 @@ class ValueChange(tuple, Generic[KeyT, ValueT]):
     _fields = ('old', 'new', 'key')
 
     @overload
-    def __new__(cls, old: ValueT, new: ValueT, key: KeyT) -> 'ValueChange': ...
+    def __new__(cls, old: ValueT, new: ValueT, key: KeyT) -> ValueChange: ...
 
     @overload
-    def __new__(cls, old: ValueT, new: ValueT, ind: KeyT) -> 'ValueChange': ...
+    def __new__(cls, old: ValueT, new: ValueT, ind: KeyT) -> ValueChange: ...
 
-    def __new__(cls, old: ValueT, new: ValueT, key: KeyT=_UNSET, *, ind: KeyT=_UNSET) -> 'ValueChange':
+    def __new__(cls, old: ValueT, new: ValueT, key: KeyT=_UNSET, *, ind: KeyT=_UNSET) -> ValueChange:
         """Create new instance of ValueChange(old, new, key)"""
         if key is _UNSET:
             if ind is _UNSET:
@@ -198,7 +201,7 @@ class ValueChange(tuple, Generic[KeyT, ValueT]):
         return tuple.__new__(cls, (old, new, key))
 
     @classmethod
-    def _make(cls, iterable: Iterable[Union[KeyT, ValueT]]) -> 'ValueChange':
+    def _make(cls, iterable: Iterable[Union[KeyT, ValueT]]) -> ValueChange:
         """Make a new ValueChange object from a sequence or iterable."""
         result = tuple.__new__(cls, iterable)
         if len(result) != 3:
@@ -211,7 +214,7 @@ class ValueChange(tuple, Generic[KeyT, ValueT]):
         old: ValueT=...,
         new: ValueT=...,
         ind: KeyT=...,
-    ) -> 'ValueChange':
+    ) -> ValueChange:
         pass
 
     @overload
@@ -220,10 +223,10 @@ class ValueChange(tuple, Generic[KeyT, ValueT]):
         old: ValueT=...,
         new: ValueT=...,
         key: KeyT=...,
-    ) -> 'ValueChange':
+    ) -> ValueChange:
         pass
 
-    def _replace(self, **kwds) -> 'ValueChange':
+    def _replace(self, **kwds) -> ValueChange:
         """Return a new ValueChange object replacing specified fields with
         new values"""
         old = kwds.pop('old', self[0])
@@ -288,8 +291,7 @@ class ObsValue(Generic[ValueT]):
         # Note: fire the event AFTER we change the contents.
         old = self._value
         self._value = new
-        # TODO: MyPy doesn't think isinstance(None, Hashable) is true.
-        self.man(self, ValueChange(old, new, None))  # type: ignore
+        self.man(self, ValueChange(old, new, None))
 
     def __repr__(self) -> str:
         return f'ObsValue({self.man!r}, {self._value!r})'
@@ -509,7 +511,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
             return other._data + self._data
         return list(other) + self._data
 
-    def __iadd__(self, other: Iterable[ValueT]) -> 'ObsList[ValueT]':
+    def __iadd__(self, other: Iterable[ValueT]) -> ObsList[ValueT]:
         """Append another sequence to this one."""
         self.extend(other)
         return self
@@ -522,7 +524,7 @@ class ObsList(Generic[ValueT], MutableSequence[ValueT]):
         """Repeat the contents the given number of times."""
         return count * self._data
 
-    def __imul__(self, count: int) -> 'ObsList[ValueT]':
+    def __imul__(self, count: int) -> ObsList[ValueT]:
         """Repeat the contents the given number of times."""
         pos_start = len(self._data)
         self._data *= count
@@ -554,12 +556,12 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
     If a key is added or removed, None will be substituted as appropriate.
     """
     man: EventManager
-    _data: Dict[KeyT, ValueT]
+    _data: dict[KeyT, ValueT]
 
     def __init__(
         self,
         man: EventManager,
-        initial: Union[Mapping[KeyT, ValueT], Iterable[Tuple[KeyT, ValueT]]] = (),
+        initial: Union[Mapping[KeyT, ValueT], Iterable[tuple[KeyT, ValueT]]] = (),
     ) -> None:
         self.man = man
         self._data = dict(initial)
@@ -584,18 +586,18 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
     def __contains__(self, key: object) -> bool:
         return key in self._data
 
-    def copy(self) -> 'ObsMap[KeyT, ValueT]':
+    def copy(self) -> ObsMap[KeyT, ValueT]:
         """Return a duplicate of this map, with the same manager."""
         return ObsMap(self.man, self._data)
 
     @overload
-    def get(self, k: KeyT) -> Optional[ValueT]: ...
+    def get(self, key: KeyT) -> Optional[ValueT]: ...
     @overload
-    def get(self, k: KeyT, default: Union[ValueT, ArgT]) -> Union[ValueT, ArgT]: ...
+    def get(self, key: KeyT, default: Union[ValueT, ArgT]) -> Union[ValueT, ArgT]: ...
 
-    def get(self, k: KeyT, default: Union[ValueT, ArgT] = None) -> Union[ValueT, ArgT, None]:
+    def get(self, key: KeyT, default: Union[ValueT, ArgT] = None) -> Union[ValueT, ArgT, None]:
         """Return map[k], or default if key is not present."""
-        return self._data.get(k, default)
+        return self._data.get(key, default)
 
     def keys(self) -> KeysView[KeyT]:
         """Return a view over the mapping's keys."""
@@ -647,7 +649,7 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
         self._fire(k, old, None)
         return old
 
-    def popitem(self) -> Tuple[KeyT, ValueT]:
+    def popitem(self) -> tuple[KeyT, ValueT]:
         """Remove and return some (key, value) pair as a 2-tuple; but raise KeyError if D is empty."""
         keyvalue = key, value = self._data.popitem()
         self._fire(key, value, None)
