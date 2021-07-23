@@ -190,12 +190,37 @@ def test_valuechange() -> None:
     assert ValueChange(ind=5, old=2, new=3) == ValueChange(2, 3, 5)
     assert ValueChange(key=5, old=2, new=3) == ValueChange(2, 3, 5)
     assert ValueChange(ind=5, old=2, new=3) == ValueChange(2, 3, 5)
+
+
+def test_valuechange_attrs() -> None:
+    """Check the attributes act correctly."""
     examp = ValueChange(0, 1, 'hi')
     assert examp.ind is examp.key == 'hi'
     assert examp.old == 0
     assert examp.new == 1
-    assert examp == ValueChange(0, 1, 'hi')
-    assert hash(examp) == hash(ValueChange(0.0, 1.0, 'hi'))
+    # Readonly.
+    with pytest.raises(AttributeError):
+        examp.key = ()
+    with pytest.raises(AttributeError):
+        examp.ind = ()
+    with pytest.raises(AttributeError):
+        examp.old = ()
+    with pytest.raises(AttributeError):
+        examp.new = ()
+
+
+def test_valuechange_hash() -> None:
+    """Check ValueChange() can be hashed and put in a dict key."""
+    key = ValueChange(45, 38, 'blank')
+    assert hash(key) == hash(ValueChange(45.0, 38.0, 'blank'))
+    dct: dict[ValueChange, object] = {
+        key: 45,
+        ValueChange('text', 12, 3): sum,
+    }
+    assert dct[key] == 45
+    assert dct[ValueChange(45.0, 38, 'blank')] == 45
+    assert ValueChange('text', 12, 3) in dct
+    assert ValueChange(12, 'text', 3) not in dct
 
 
 def test_obsval_getset() -> None:
@@ -284,9 +309,10 @@ except ImportError:
     # No test package installed, can only run the ones here.
     from unittest import TestCase as CPyListTest, TestCase as CPyMapTest
 
-    def test_no_cpython():
+    def test_no_cpython() -> None:
         """Log that the tests aren't importable."""
         pytest.fail("No test.list_tests and test.mapping_tests to import!")
+
 
 class CPythonObsListTests(CPyListTest):
     """Use CPython's own tests.
@@ -461,6 +487,55 @@ def test_obslist_reading() -> None:
 
     with pytest.raises(ValueError):
         seq.index(95)
+
+
+def test_obslist_reverse_iter() -> None:
+    """Test reversed(ObsList)."""
+    man = EventManager()
+    lst = ObsList(man, 'abcd')
+    rev = reversed(lst)
+    assert iter(rev) is rev
+    assert next(rev) == 'd'
+    assert next(rev) == 'c'
+    assert next(rev) == 'b'
+    assert next(rev) == 'a'
+    with pytest.raises(StopIteration):
+        next(rev)
+
+
+def test_obslist_setitem() -> None:
+    """Test setting values fires events."""
+    man = EventManager()
+    func = create_autospec(event_func, name='func')
+    lst = ObsList(man, [1, 2, 3, 4, 5, 6, 7])
+    man.register(lst, ValueChange, func)
+    func.assert_not_called()
+
+    lst[0] = 45
+    func.assert_called_once_with(ValueChange(1, 45, 0))
+    func.reset_mock()
+
+    lst[3] = 12
+    func.assert_called_once_with(ValueChange(4, 12, 3))
+    func.reset_mock()
+
+    lst[1:3] = [10, 11]
+    func.assert_has_calls([
+        call(ValueChange(2, 10, 1)),
+        call(ValueChange(3, 11, 2)),
+    ])
+    func.reset_mock()
+    #  0  1  2  3 4 5 6
+    # 45 10 11 12 5 6 7
+    # ->    50  6 7
+    lst[2:5] = [50]
+    func.assert_has_calls([
+        call(ValueChange(11, 50, 2)),
+        call(ValueChange(12, 6, 3)),
+        call(ValueChange(5, 7, 4)),
+        call(ValueChange(6, None, ind=5)),
+        call(ValueChange(7, None, ind=6)),
+    ])
 
 
 def test_obslist_deletion() -> None:
