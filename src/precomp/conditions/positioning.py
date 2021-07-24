@@ -522,7 +522,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
     inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
 
 
-@make_result('RotateInst')
+@make_result('RotateInst', 'RotateInstance')
 def res_rotate_inst(inst: Entity, res: Property) -> None:
     """Rotate the instance around an axis.
 
@@ -542,7 +542,7 @@ def res_rotate_inst(inst: Entity, res: Property) -> None:
 
     try:
         offset = Vec.from_str(inst.fixup.substitute(res['around']))
-    except NoKeyError:
+    except LookupError:
         pass
     else:
         origin = Vec.from_str(inst['origin'])
