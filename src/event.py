@@ -560,8 +560,8 @@ class ObsMap(Generic[KeyT, ValueT], MutableMapping[KeyT, ValueT]):
 
     def __delitem__(self, key: KeyT) -> None:
         """Remove the given key."""
-        old = self._data.pop(key)
         # Raises the KeyError for us.
+        old = self._data.pop(key)
         self._fire(key, old, None)
 
     def clear(self) -> None:
