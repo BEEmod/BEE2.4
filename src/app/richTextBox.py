@@ -26,7 +26,7 @@ class tkRichText(tkinter.Text):
         self.italic_font['slant'] = 'italic'
 
         # URL -> tag name and callback ID.
-        self._link_commands: Dict[str, Tuple[str, int]] = {}
+        self._link_commands: Dict[str, Tuple[str, str]] = {}
 
         super().__init__(
             parent,
@@ -39,7 +39,7 @@ class tkRichText(tkinter.Text):
         )
 
         self.heading_font = {}
-        cur_size = self.font['size']
+        cur_size: float = self.font['size']
         for size in range(6, 0, -1):
             self.heading_font[size] = font = self.font.copy()
             cur_size /= 0.8735
@@ -111,12 +111,12 @@ class tkRichText(tkinter.Text):
         self.tag_bind(
             "link",
             "<Enter>",
-            lambda e: self.configure(cursor=Cursors.LINK),
+            lambda e: self.__setitem__('cursor', Cursors.LINK),
         )
         self.tag_bind(
             "link",
             "<Leave>",
-            lambda e: self.configure(cursor=Cursors.REGULAR),
+            lambda e: self.__setitem__('cursor', Cursors.REGULAR),
         )
 
         self['state'] = "disabled"
