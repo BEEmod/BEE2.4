@@ -774,6 +774,7 @@ class Item:
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass
     subtype_prop: Optional[Type[ItemProp]]
+
     # Movement handle
     handle: Handle
     facing: DesiredFacing
@@ -814,7 +815,7 @@ class Item:
         self.occupies_voxel = occupies_voxel
         self.copiable = True
         self.deletable = True
-        self.pseduo_handle = False
+        self.pseudo_handle = False
         # The default is 0 0 0, but this isn't useful since the rotation point
         # is wrong. So just make it the useful default, users can override.
         self.offset = Vec(64, 64, 64)
@@ -1523,7 +1524,7 @@ class Item:
             f.write(f'\t\t"Copyable"  "0"\n')
         if not self.deletable:
             f.write(f'\t\t"Deletable" "0"\n')
-        if self.pseduo_handle:
+        if self.pseudo_handle:
             f.write(f'\t\t"PseudoHandle" "1"\n')
         f.write('\t\t}\n')
 
@@ -1710,7 +1711,7 @@ class Item:
             self.occupies_voxel,
             self.copiable,
             self.deletable,
-            self.pseduo_handle,
+            self.pseudo_handle,
             self.offset,
             self.targetname,
             self.instances,
@@ -1743,7 +1744,7 @@ class Item:
             self.occupies_voxel,
             self.copiable,
             self.deletable,
-            self.pseduo_handle,
+            self.pseudo_handle,
             self.offset,
             self.targetname,
             self.instances,
