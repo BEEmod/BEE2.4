@@ -625,7 +625,9 @@ def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
     """
     try:
         handle = _wid_tk.pop(ref)
-    except (KeyError, TypeError):
+    except (KeyError, TypeError, NameError):
+        # Interpreter could be shutting down and deleted globals, or we were
+        # called twice, etc. Just ignore.
         pass
     else:
         handle._decref(ref)
@@ -675,7 +677,13 @@ def _ui_task() -> None:
             if isinstance(label_ref, WeakRef):
                 label: Optional[tkImgWidgets] = label_ref()
                 if label is not None:
-                    label['image'] = tk_ico
+                    try:
+                        label['image'] = tk_ico
+                    except tk.TclError:
+                        # Can occur if the image has been removed/destroyed, but
+                        # the Python object still exists. Ignore, should be
+                        # cleaned up shortly.
+                        pass
 
     for handle, use_time in list(_pending_cleanup.values()):
         with handle.lock:
