@@ -1306,25 +1306,33 @@ class selWin:
         # Hide suggestion indicator if the item's not visible.
         self.sugg_lbl.place_forget()
 
+        # If only the '' group is present, force it to be visible, and hide
+        # the header.
+        no_groups = self.group_order == ['']
+
         for group_key in self.group_order:
             items = self.grouped_items[group_key]
-            group_wid = self.group_widgets[group_key]  # type: GroupHeader
-            group_wid.place(
-                x=0,
-                y=y_off,
-                width=width * ITEM_WIDTH,
-            )
-            group_wid.update_idletasks()
-            y_off += group_wid.winfo_reqheight()
+            group_wid = self.group_widgets[group_key]
 
-            if not group_wid.visible:
-                # Hide everything!
-                for item in items:  # type: Item
-                    item.set_pos()
-                continue
+            if no_groups:
+                group_wid.place_forget()
+            else:
+                group_wid.place(
+                    x=0,
+                    y=y_off,
+                    width=width * ITEM_WIDTH,
+                )
+                group_wid.update_idletasks()
+                y_off += group_wid.winfo_reqheight()
+
+                if not group_wid.visible:
+                    # Hide everything!
+                    for item in items:
+                        item.set_pos()
+                    continue
 
             # Place each item
-            for i, item in enumerate(items):  # type: int, Item
+            for i, item in enumerate(items):
                 if item == self.suggested:
                     self.sugg_lbl.place(
                         x=(i % width) * ITEM_WIDTH + 1,
