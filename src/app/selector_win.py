@@ -23,12 +23,13 @@ from app.richTextBox import tkRichText
 from app.tkMarkdown import MarkdownData
 from app.tooltip import add_tooltip, set_tooltip
 from packages import SelitemData
-from srctools import Vec, EmptyMapping
+from srctools import Vec, Property, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 from consts import SEL_ICON_SIZE as ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
 import utils
+import BEE2_config
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -88,6 +89,61 @@ class AttrTypes(Enum):
 
 
 AttrValues =  Union[str, list, bool, Vec]
+
+
+@attr.define
+class WindowState:
+    """The window state stored in config files for restoration next launch."""
+    open_groups: dict[str, bool]
+    width: int
+    height: int
+
+    @classmethod
+    def parse(cls, props: Property) -> WindowState:
+        """Parse from keyvalues."""
+        open_groups = {
+            prop.name: srctools.conv_bool(prop.value)
+            for prop in props.find_children('Groups')
+        }
+        return WindowState(
+            open_groups,
+            props.int('width', -1), props.int('height', -1),
+        )
+
+    def export(self) -> Property:
+        """Generate keyvalues."""
+        props = Property('', [
+            Property('width', str(self.width)),
+            Property('height', str(self.height)),
+        ])
+        with props.build() as builder:
+            with builder.Groups:
+                for name, is_open in self.open_groups.items():
+                    builder[name](srctools.bool_as_int(is_open))
+        return props
+
+
+# The saved window states. When windows open they read from here, then write
+# when closing.
+SAVED_STATE: dict[str, WindowState] = {}
+
+
+@BEE2_config.OPTION_SAVE('SelectorWindow', to_palette=False)
+def save_handler() -> Property:
+    """Save properties to the config for next launch."""
+    props = Property('', [])
+    for save_id, state in SAVED_STATE.items():
+        prop = state.export()
+        prop.name = save_id
+        props.append(prop)
+    return props
+
+
+@BEE2_config.OPTION_LOAD('SelectorWindow', from_palette=False)
+def load_handler(props: Property) -> None:
+    """Load properties to the config from last launch."""
+    for prop in props:
+        SAVED_STATE[prop.name] = WindowState.parse(prop)
 
 
 @attr.define
@@ -529,6 +585,11 @@ class SelectorWin:
         # The maximum number of items that fits per row (set in flow_items)
         self.item_width = 1
 
+        # The ID used to persist our window state across sessions.
+        self.save_id = save_id.casefold()
+        # Indicate that flow_items() should restore state.
+        self.first_open = True
+
         if desc:
             self.desc_label = ttk.Label(
                 self.win,
@@ -963,6 +1024,15 @@ class SelectorWin:
             if item.button is not None:
                 img.apply(item.button, None)
 
+        SAVED_STATE[self.save_id] = WindowState(
+            open_groups={
+                grp_id: grp.visible
+                for grp_id, grp in self.group_widgets.items()
+            },
+            width=self.win.winfo_width(),
+            height=self.win.winfo_height(),
+        )
+
         if self.modal:
             self.win.grab_release()
         self.win.withdraw()
@@ -1009,8 +1079,30 @@ class SelectorWin:
             if item.button is not None:
                 img.apply(item.button, item.icon)
 
+        # Restore configured states.
+        if self.first_open:
+            self.first_open = False
+            try:
+                state = SAVED_STATE[self.save_id]
+            except KeyError:
+                pass
+            else:
+                for grp_id, is_open in state.open_groups.items():
+                    try:
+                        self.group_widgets[grp_id].visible = is_open
+                    except KeyError:  # Stale config, ignore.
+                        LOGGER.warning(
+                            '({}): invalid selectorwin group: "{}"',
+                            self.save_id, grp_id,
+                        )
+                if state.width > 0 or state.height > 0:
+                    width = state.width if state.width > 0 else self.win.winfo_reqwidth()
+                    height = state.height if state.height > 0 else self.win.winfo_reqheight()
+                    self.win.geometry(f'{width}x{height}')
+
         self.win.deiconify()
         self.win.lift(self.parent)
+
         if self.modal:
             self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox

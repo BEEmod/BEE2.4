@@ -28,29 +28,33 @@ OPTION_LOAD: utils.FuncLookup[Callable[[Property], None]] = utils.FuncLookup('Lo
 OPTION_SAVE: utils.FuncLookup[Callable[[], Property]] = utils.FuncLookup('SaveHandler', attrs=['to_palette'])
 
 
-def get_curr_settings() -> Property:
+def get_curr_settings(*, is_palette: bool) -> Property:
     """Return a property tree defining the current options."""
     props = Property('', [])
 
     for opt_id, opt_func in OPTION_SAVE.items():
-        if getattr(opt_func, 'to_palette', True):
-            opt_prop = opt_func()
-            opt_prop.name = opt_id.title()
-            props.append(opt_prop)
+        # Skip if it opts out of being on the palette.
+        if is_palette and not getattr(opt_func, 'to_palette', True):
+            continue
+        opt_prop = opt_func()
+        opt_prop.name = opt_id.title()
+        props.append(opt_prop)
 
     return props
 
 
-def apply_settings(props: Property) -> None:
+def apply_settings(props: Property, *, is_palette: bool) -> None:
     """Given a property tree, apply it to the widgets."""
     for opt_prop in props:
         try:
             func = OPTION_LOAD[opt_prop.name]
         except KeyError:
             LOGGER.warning('No handler for option type "{}"!', opt_prop.real_name)
-        else:
-            if getattr(func, 'from_palette', True):
-                func(opt_prop)
+            continue
+        # Skip if it opts out of being on the palette.
+        if is_palette and not getattr(func, 'from_palette', True):
+            continue
+        func(opt_prop)
 
 
 def read_settings() -> None:
@@ -70,12 +74,12 @@ def read_settings() -> None:
             path.replace(path.with_suffix('.err.vdf'))
         except IOError:
             pass
-    apply_settings(props)
+    apply_settings(props, is_palette=False)
 
 
 def write_settings() -> None:
     """Write the settings to disk."""
-    props = get_curr_settings()
+    props = get_curr_settings(is_palette=False)
     props.name = None
     with atomic_write(
         utils.conf_location('config/config.vdf'),

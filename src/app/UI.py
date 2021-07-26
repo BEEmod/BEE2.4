@@ -1148,7 +1148,7 @@ def set_palette(e=None):
         ))
 
     if chosen_pal.settings is not None:
-        BEE2_config.apply_settings(chosen_pal.settings)
+        BEE2_config.apply_settings(chosen_pal.settings, is_palette=True)
 
     if len(paletteLoader.pal_list) < 2 or paletteLoader.pal_list[selectedPalette].prevent_overwrite:
         UI['pal_remove'].state(('disabled',))
