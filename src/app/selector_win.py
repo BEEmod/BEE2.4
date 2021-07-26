@@ -133,14 +133,14 @@ class AttrDef:
 
 class GroupHeader(ttk.Frame):
     """The widget used for group headers."""
-    def __init__(self, win: selWin, title: str) -> None:
+    def __init__(self, win: SelectorWin, title: str) -> None:
         self.parent = win
         super().__init__(
             win.pal_frame,
         )
 
-        self.sep_left = ttk.Separator(self)
-        self.sep_left.grid(row=0, column=0, sticky=EW)
+        sep_left = ttk.Separator(self)
+        sep_left.grid(row=0, column=0, sticky=EW)
         self.columnconfigure(0, weight=1)
 
         self.title = ttk.Label(
@@ -152,8 +152,8 @@ class GroupHeader(ttk.Frame):
         )
         self.title.grid(row=0, column=1)
 
-        self.sep_right = ttk.Separator(self)
-        self.sep_right.grid(row=0, column=2, sticky=EW)
+        sep_right = ttk.Separator(self)
+        sep_right.grid(row=0, column=2, sticky=EW)
         self.columnconfigure(2, weight=1)
 
         self.arrow = ttk.Label(
@@ -290,7 +290,7 @@ class Item:
         # The button widget for this item.
         self.button: Optional[ttk.Button] = None
         # The selector window we belong to.
-        self._selector: Optional[selWin] = None
+        self._selector: Optional[SelectorWin] = None
         # The position on the menu this item is located at.
         # This is needed to change the font.
         self._context_ind: Optional[int] = None
@@ -368,7 +368,7 @@ class Item:
         return item
 
 
-class selWin:
+class SelectorWin:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates
@@ -390,6 +390,7 @@ class selWin:
         tk,
         lst: list[Item],
         *,  # Make all keyword-only for readability
+        save_id: str,  # Required!
         has_none=True,
         has_def=True,
         sound_sys: FileSystemChain=None,
@@ -414,6 +415,7 @@ class selWin:
         Args:
         - tk: Must be a Toplevel window, either the tk() root or another
         window if needed.
+        - save_id: The ID used to save/load the window state.
         - lst: A list of Item objects, defining the visible items.
         - If has_none is True, a <none> item will be added to the beginning
           of the list.
@@ -485,7 +487,7 @@ class selWin:
         else:
             self.item_list = lst
         try:
-            self.selected = self.item_list[0]  # type: Item
+            self.selected = self.item_list[0]
         except IndexError:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
@@ -521,7 +523,7 @@ class selWin:
         # A map from folded name -> display name
         self.group_names = {}
         self.grouped_items: dict[str, list[Item]] = {}
-        # A list of folded group names in the display order.
+        # A list of casefolded group names in the display order.
         self.group_order: list[str] = []
 
         # The maximum number of items that fits per row (set in flow_items)
@@ -1501,9 +1503,10 @@ def test() -> None:
         ),
     ]
 
-    window = selWin(
+    window = SelectorWin(
         TK_ROOT,
         test_list,
+        save_id='_test_window',
         has_none=True,
         has_def=True,
         callback=functools.partial(

@@ -11,7 +11,7 @@ from srctools import Property
 from app import music_conf, TK_ROOT
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-from app.selector_win import selWin, Item as selWinItem, AttrDef as SelAttr
+from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 import srctools.logger
 from app import sound as snd
@@ -580,9 +580,10 @@ def load_packages() -> None:
             pass
         suggested_refresh()
 
-    skybox_win = selWin(
+    skybox_win = SelectorWin(
         TK_ROOT,
         sky_list,
+        save_id='skyboxes',
         title=_('Select Skyboxes'),
         desc=_('The skybox decides what the area outside the chamber is like.'
                ' It chooses the colour of sky (seen in some items), the style'
@@ -597,9 +598,10 @@ def load_packages() -> None:
         ],
     )
 
-    voice_win = selWin(
+    voice_win = SelectorWin(
         TK_ROOT,
         voice_list,
+        save_id='voicelines',
         title=_('Select Additional Voice Lines'),
         desc=_('Voice lines choose which extra voices play as the player enters'
                ' or exits a chamber. They are chosen based on which items are'
@@ -618,9 +620,10 @@ def load_packages() -> None:
         ],
     )
 
-    style_win = selWin(
+    style_win = SelectorWin(
         TK_ROOT,
         style_list,
+        save_id='styles',
         title=_('Select Style'),
         desc=_('The Style controls many aspects of the map. It decides the '
                'materials used for walls, the appearance of entrances and '
@@ -637,9 +640,10 @@ def load_packages() -> None:
         ]
     )
 
-    elev_win = selWin(
+    elev_win = SelectorWin(
         TK_ROOT,
         elev_list,
+        save_id='elevators',
         title=_('Select Elevator Video'),
         desc=_('Set the video played on the video screens in modern Aperture '
                'elevator rooms. Not all styles feature these. If set to '
