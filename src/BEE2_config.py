@@ -10,7 +10,7 @@ Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Callable
 from threading import Lock, Event
 from atomicwrites import atomic_write
 
@@ -23,19 +23,20 @@ import srctools.logger
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Functions for saving or loading application settings.
-# Call with a block to load, or with no args to return the current
-# values.
-option_handler = utils.FuncLookup('OptionHandlers')
+# The palette attribute indicates if this will be persisted in palettes.
+OPTION_LOAD: utils.FuncLookup[Callable[[Property], None]] = utils.FuncLookup('LoadHandler', attrs=['from_palette'])
+OPTION_SAVE: utils.FuncLookup[Callable[[], Property]] = utils.FuncLookup('SaveHandler', attrs=['to_palette'])
 
 
 def get_curr_settings() -> Property:
     """Return a property tree defining the current options."""
     props = Property('', [])
 
-    for opt_id, opt_func in option_handler.items():
-        opt_prop: Property = opt_func()
-        opt_prop.name = opt_id.title()
-        props.append(opt_prop)
+    for opt_id, opt_func in OPTION_SAVE.items():
+        if getattr(opt_func, 'to_palette', True):
+            opt_prop = opt_func()
+            opt_prop.name = opt_id.title()
+            props.append(opt_prop)
 
     return props
 
@@ -44,11 +45,12 @@ def apply_settings(props: Property) -> None:
     """Given a property tree, apply it to the widgets."""
     for opt_prop in props:
         try:
-            func = option_handler[opt_prop.name]
+            func = OPTION_LOAD[opt_prop.name]
         except KeyError:
             LOGGER.warning('No handler for option type "{}"!', opt_prop.real_name)
         else:
-            func(opt_prop)
+            if getattr(func, 'from_palette', True):
+                func(opt_prop)
 
 
 def read_settings() -> None:

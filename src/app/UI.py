@@ -456,9 +456,9 @@ def load_settings():
     optionWindow.load()
 
 
-@BEE2_config.option_handler('LastSelected')
-def save_load_selector_win(props: Property=None):
-    """Save and load options on the selector window."""
+@BEE2_config.OPTION_SAVE('LastSelected')
+def save_last_selected() -> Property:
+    """Save the last selected objects."""
     sel_win = [
         ('Style', style_win),
         ('Skybox', skybox_win),
@@ -468,14 +468,24 @@ def save_load_selector_win(props: Property=None):
     for channel, win in music_conf.WINDOWS.items():
         sel_win.append(('Music_' + channel.name.title(), win))
 
-    # Saving
-    if props is None:
-        props = Property('', [])
-        for win_name, win in sel_win:
-            props.append(Property(win_name, win.chosen_id or '<NONE>'))
-        return props
+    props = Property('', [])
+    for win_name, win in sel_win:
+        props.append(Property(win_name, win.chosen_id or '<NONE>'))
+    return props
 
-    # Loading
+
+@BEE2_config.OPTION_LOAD('LastSelected')
+def load_last_selected(props: Property) -> None:
+    """Load the last selected objects."""
+    sel_win = [
+        ('Style', style_win),
+        ('Skybox', skybox_win),
+        ('Voice', voice_win),
+        ('Elevator', elev_win),
+    ]
+    for channel, win in music_conf.WINDOWS.items():
+        sel_win.append(('Music_' + channel.name.title(), win))
+
     for win_name, win in sel_win:
         try:
             win.sel_item_id(props[win_name])
@@ -1160,7 +1170,7 @@ def pal_clear() -> None:
 def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
     mandatory_unlocked = StyleVarPane.mandatory_unlocked()
-    
+
     if len(pal_picked) == 32:
         return
 
@@ -1430,7 +1440,7 @@ def init_option(pane: SubPane) -> None:
         _('Enable or disable particular voice lines, to prevent them from '
           'being added.'),
     )
-    
+
     if utils.WIN:
         # On windows, the buttons get inset on the left a bit. Inset everything
         # else to adjust.

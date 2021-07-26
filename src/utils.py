@@ -239,7 +239,7 @@ def _exc_freeze(
     return getter
 
 
-class FuncLookup(Generic[FuncT], Mapping[str, Callable[..., FuncT]]):
+class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
     """A dict for holding callback functions.
 
     Functions are added by using this as a decorator. Positional arguments
@@ -267,7 +267,10 @@ class FuncLookup(Generic[FuncT], Mapping[str, Callable[..., FuncT]]):
 
         bad_keywords = kwargs.keys() - self.allowed_attrs
         if bad_keywords:
-            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+            raise TypeError(
+                f'Invalid keywords: {", ".join(bad_keywords)}. '
+                f'Allowed: {", ".join(self.allowed_attrs)}'
+            )
 
         def callback(func: FuncT) -> FuncT:
             """Decorator to do the work of adding the function."""

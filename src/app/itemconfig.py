@@ -56,43 +56,45 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     return r, g, b
 
 
-@BEE2_config.option_handler('ItemVar')
-def save_load_itemvar(prop: Property=None) -> Optional[Property]:
-    """Save or load item variables into the palette."""
-    if prop is None:
-        prop = Property('', [])
-        for group in CONFIG_ORDER:
-            conf = Property(group.id, [])
-            for widget in group.widgets:
-                if widget.has_values:
-                    conf.append(Property(widget.id, widget.values.get()))
-            for widget in group.multi_widgets:
-                conf.append(Property(widget.id, [
-                    Property(str(tim_val), var.get())
-                    for tim_val, var in
-                    widget.values
-                ]))
-            prop.append(conf)
-        return prop
-    else:
-        # Loading.
-        for group in CONFIG_ORDER:
-            conf = prop.find_key(group.id, [])
-            for widget in group.widgets:
-                if widget.has_values:
-                    try:
-                        widget.values.set(conf[widget.id])
-                    except LookupError:
-                        pass
+@BEE2_config.OPTION_SAVE('ItemVar')
+def save_itemvar() -> Property:
+    """Save item variables into the palette."""
+    prop = Property('', [])
+    for group in CONFIG_ORDER:
+        conf = Property(group.id, [])
+        for widget in group.widgets:
+            if widget.has_values:
+                conf.append(Property(widget.id, widget.values.get()))
+        for widget in group.multi_widgets:
+            conf.append(Property(widget.id, [
+                Property(str(tim_val), var.get())
+                for tim_val, var in
+                widget.values
+            ]))
+        prop.append(conf)
+    return prop
 
-            for widget in group.multi_widgets:
-                time_conf = conf.find_key(widget.id, [])
-                for tim_val, var in widget.values:
-                    try:
-                        var.set(time_conf[str(tim_val)])
-                    except LookupError:
-                        pass
-        return None
+
+@BEE2_config.OPTION_LOAD('ItemVar')
+def load_itemvar(prop: Property) -> None:
+    """Load item variables into the palette."""
+    for group in CONFIG_ORDER:
+        conf = prop.find_block(group.id, or_blank=True)
+        for widget in group.widgets:
+            if widget.has_values:
+                try:
+                    widget.values.set(conf[widget.id])
+                except LookupError:
+                    pass
+
+        for widget in group.multi_widgets:
+            time_conf = conf.find_block(widget.id, or_blank=True)
+            for tim_val, var in widget.values:
+                try:
+                    var.set(time_conf[str(tim_val)])
+                except LookupError:
+                    pass
+    return None
 
 
 @attr.define

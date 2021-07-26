@@ -53,43 +53,39 @@ def export_data() -> List[Tuple[str, str]]:
     ]
 
 
-@overload
-def save_load_signage() -> Property: ...
-@overload
-def save_load_signage(props: Property) -> None: ...
+@BEE2_config.OPTION_SAVE('Signage')
+def save_signage() -> Property:
+    """Save the signage info to settings or a palette."""
+    props = Property('Signage', [])
+    for timer, slot in SLOTS_SELECTED.items():
+        props.append(Property(
+            str(timer),
+            '' if slot.contents is None
+            else slot.contents.id,
+        ))
+    return props
 
 
-@BEE2_config.option_handler('Signage')
-def save_load_signage(props: Property=None) -> Optional[Property]:
-    """Save or load the signage info."""
-    if props is None:  # Save to properties.
-        props = Property('Signage', [])
-        for timer, slot in SLOTS_SELECTED.items():
-            props.append(Property(
-                str(timer),
-                '' if slot.contents is None
-                else slot.contents.id,
-            ))
-        return props
-    else:  # Load from provided properties.
-        for child in props:
+@BEE2_config.OPTION_LOAD('Signage')
+def load_signage(props: Property) -> None:
+    """Load the signage info from settings or a palette."""
+    for child in props:
+        try:
+            slot = SLOTS_SELECTED[int(child.name)]
+        except (ValueError, TypeError):
+            LOGGER.warning('Non-numeric timer value "{}"!', child.name)
+            continue
+        except KeyError:
+            LOGGER.warning('Invalid timer value {}!', child.name)
+            continue
+
+        if child.value:
             try:
-                slot = SLOTS_SELECTED[int(child.name)]
-            except (ValueError, TypeError):
-                LOGGER.warning('Non-numeric timer value "{}"!', child.name)
-                continue
+                slot.contents = Signage.by_id(child.value)
             except KeyError:
-                LOGGER.warning('Invalid timer value {}!', child.name)
-                continue
-
-            if child.value:
-                try:
-                    slot.contents = Signage.by_id(child.value)
-                except KeyError:
-                    LOGGER.warning('No signage with id "{}"!', child.value)
-            else:
-                slot.contents = None
-        return None
+                LOGGER.warning('No signage with id "{}"!', child.value)
+        else:
+            slot.contents = None
 
 
 def style_changed(new_style: Style) -> None:

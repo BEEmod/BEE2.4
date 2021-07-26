@@ -125,23 +125,25 @@ def add_vars(style_vars, styles):
         STYLES[style.id] = style
 
 
-@BEE2_config.option_handler('StyleVar')
-def save_load_stylevars(props: Property=None):
-    """Save and load variables from configs."""
-    if props is None:
-        props = Property('', [])
-        for var_id, var in sorted(tk_vars.items()):
-            props[var_id] = str(int(var.get()))
-        return props
-    else:
-        # Loading
-        for prop in props:
-            try:
-                tk_vars[prop.real_name].set(prop.value)
-            except KeyError:
-                LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
-        if _load_cback is not None:
-            _load_cback()
+@BEE2_config.OPTION_SAVE('StyleVar')
+def save_handler() -> Property:
+    """Save variables to configs."""
+    props = Property('', [])
+    for var_id, var in sorted(tk_vars.items()):
+        props[var_id] = str(int(var.get()))
+    return props
+
+
+@BEE2_config.OPTION_LOAD('StyleVar')
+def load_handler(props: Property) -> None:
+    """Load variables from configs."""
+    for prop in props:
+        try:
+            tk_vars[prop.real_name].set(prop.value)
+        except KeyError:
+            LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
+    if _load_cback is not None:
+        _load_cback()
 
 
 def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
