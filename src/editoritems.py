@@ -4,9 +4,9 @@ import sys
 from collections import defaultdict
 from enum import Enum, Flag
 from typing import (
-    Optional, Type, Callable, NamedTuple,
+    Optional, Type, Callable, NamedTuple, Union, ClassVar,
     List, Dict, Tuple, Set,
-    Iterable, IO, Iterator, Mapping, ClassVar,
+    Iterable, IO, Iterator, Mapping
 )
 from pathlib import PurePosixPath as FSPath
 
@@ -16,7 +16,7 @@ from srctools import Vec, logger, conv_int, conv_bool, Property, Output
 from srctools.tokenizer import Tokenizer, Token
 
 from connections import Config as ConnConfig, InputType, OutNames
-from editoritems_props import ItemProp, PROP_TYPES
+from editoritems_props import ItemProp, UnknownProp, PROP_TYPES
 
 
 LOGGER = logger.get_logger(__name__)
@@ -759,7 +759,8 @@ class Item:
     id: str  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
-    subtype_prop: Optional[Type[ItemProp]] = None
+    # Type if known, or string if unknown property.
+    subtype_prop: Union[Type[ItemProp], str] = None
     subtypes: List[SubType] = attr.Factory(list)  # Each subtype in order.
     # Movement handle
     handle: Handle = Handle.NONE
@@ -1002,7 +1003,8 @@ class Item:
                 try:
                     self.subtype_prop = PROP_TYPES[subtype_prop.casefold()]
                 except ValueError:
-                    raise tok.error('Unknown property {}', subtype_prop)
+                    LOGGER.warning('Unknown subtype property "{}"!', subtype_prop)
+                    self.subtype_prop = subtype_prop
             elif folded_key == 'desiredfacing':
                 desired_facing = tok.expect(Token.STRING)
                 try:
@@ -1026,7 +1028,8 @@ class Item:
             try:
                 prop_type = PROP_TYPES[prop_str.casefold()]
             except KeyError:
-                raise tok.error(f'Unknown property "{prop_str}"!')
+                LOGGER.warning('Unknown property "{}"!', prop_str)
+                prop_type = UnknownProp
 
             default = ''
             index = 0
@@ -1039,12 +1042,25 @@ class Item:
                     index = conv_int(tok.expect(Token.STRING))
                 elif prop_value == 'bee2_ignore':
                     user_default = conv_bool(tok.expect(Token.STRING), user_default)
+                    if prop_type is UnknownProp:
+                        LOGGER.warning('Unknown properties cannot have defaults set!')
                 else:
                     raise tok.error('Unknown property option "{}"!', prop_value)
-            try:
-                self.properties[prop_type.id.casefold()] = prop_type(default, index, user_default)
-            except ValueError:
-                raise tok.error('Default value {} is not valid for {} properties!', default, prop_type.id)
+            if prop_type is UnknownProp:
+                self.properties[prop_str.casefold()] = UnknownProp(
+                    prop_str, default, index,
+                )
+                LOGGER.info('Unknown: {}', self.properties)
+            else:
+                try:
+                    self.properties[prop_type.id.casefold()] = prop_type(
+                        default, index, user_default,
+                    )
+                except ValueError:
+                    raise tok.error(
+                        'Default value {} is not valid for {} properties!',
+                        default, prop_type.id,
+                    )
 
     def _parse_export_block(self, tok: Tokenizer) -> Property:
         """Parse the export block of the item definitions. This returns the parsed connections info."""
@@ -1466,7 +1482,10 @@ class Item:
             f.write(f'\t"Type" "{self.id}"\n')
         f.write('\t"Editor"\n\t\t{\n')
         if self.subtype_prop is not None:
-            f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
+            if isinstance(self.subtype_prop, str):
+                f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop}"\n')
+            else:
+                f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
         for subtype in self.subtypes:
             subtype.export(f)
         f.write(f'\t\t"MovementHandle" "{self.handle.value}"\n')
