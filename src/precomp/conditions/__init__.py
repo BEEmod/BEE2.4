@@ -1189,7 +1189,7 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch_setup(res: Property):
+def res_switch(res: Property):
     """Run the same flag multiple times with different arguments.
 
     'method' is the way the search is done - first, last, random, or all.
