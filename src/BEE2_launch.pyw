@@ -3,7 +3,7 @@ from multiprocessing import freeze_support, set_start_method
 import os
 import sys
 
-# We need to add dummy files if these are None - MultiProccessing tries to flush
+# We need to add dummy files if these are None - multiprocessing tries to flush
 # them.
 if sys.stdout is None:
     sys.stdout = open(os.devnull, 'w')
@@ -12,16 +12,16 @@ if sys.stderr is None:
 if sys.stdin is None:
     sys.stdin = open(os.devnull, 'r')
 
-if sys.platform == "darwin":
-    # Disable here, can't get this to work.
-    sys.modules['pyglet'] = None
-
-    # Fork breaks on Mac, so override.
-    set_start_method('spawn')
-
 freeze_support()
 
 if __name__ == '__main__':
+    if sys.platform == "darwin":
+        # Disable here, can't get this to work.
+        sys.modules['pyglet'] = None  # type: ignore
+
+        # Fork breaks on Mac, so override.
+        set_start_method('spawn')
+
     import srctools.logger
     from app import on_error, TK_ROOT
     import utils
@@ -57,10 +57,9 @@ if __name__ == '__main__':
     elif app_name.startswith('test_'):
         import importlib
         mod = importlib.import_module('app.' + sys.argv[1][5:])
-        mod.test()
+        mod.test()  # type: ignore
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
 
     # Run the TK loop forever.
     TK_ROOT.mainloop()
-
