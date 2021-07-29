@@ -544,15 +544,16 @@ class Game:
                     dest = self.abs_path(INST_PATH + '/' + path)
                 elif start_folder in ('bee2', 'music_samp'):
                     screen_func('RES')
-                    continue  # Skip app icons
+                    continue  # Skip app icons and music samples.
                 else:
-                    dest = self.abs_path(os.path.join('bee2', start_folder, path))
+                    # Preserve original casing.
+                    dest = self.abs_path(os.path.join('bee2', file.path))
 
                 # Already copied from another package.
                 if dest in already_copied:
                     screen_func('RES')
                     continue
-                already_copied.add(dest.casefold())
+                already_copied.add(dest)
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
@@ -569,9 +570,9 @@ class Game:
                     # gun instance.
                     if file.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
                         continue
-                    path = os.path.join(dirpath, file).casefold()
+                    path = os.path.join(dirpath, file)
 
-                    if path not in already_copied:
+                    if path.casefold() not in already_copied:
                         LOGGER.info('Deleting: {}', path)
                         os.remove(path)
 
