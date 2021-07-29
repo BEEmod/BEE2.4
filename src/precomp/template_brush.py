@@ -151,7 +151,7 @@ TEMPLATE_RETEXTURE: dict[str, Union[
     'tile/white_wall_tile003f': (GenCat.NORMAL, TileSize.TILE_4x4, W),
 
     'tile/white_wall_tile004j': (GenCat.PANEL, TileSize.TILE_1x1, W),
-    
+
     # No black portal-placement texture, so use the bullseye instead
     'metal/black_floor_metal_bullseye_001': (GenCat.PANEL, TileSize.TILE_1x1, B),
     'tile/white_wall_tile_bullseye': (GenCat.PANEL, TileSize.TILE_1x1, W),
@@ -228,6 +228,7 @@ class Template:
     def __init__(
         self,
         temp_id: str,
+        visgroup_names: set[str],
         world: dict[str, list[Solid]],
         detail: dict[str, list[Solid]],
         overlays: dict[str, list[Entity]],
@@ -243,14 +244,14 @@ class Template:
         self._data = {}
 
         # We ensure the '' group is always present.
-        all_groups = {''}
-        all_groups.update(world)
-        all_groups.update(detail)
-        all_groups.update(overlays)
+        visgroup_names.add('')
+        visgroup_names.update(world)
+        visgroup_names.update(detail)
+        visgroup_names.update(overlays)
         for ent in itertools.chain(color_pickers, tile_setters, voxel_setters):
-            all_groups.update(ent.visgroups)
+            visgroup_names.update(ent.visgroups)
 
-        for group in all_groups:
+        for group in visgroup_names:
             self._data[group] = (
                 world.get(group, []),
                 detail.get(group, []),
@@ -607,6 +608,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     return Template(
         loc.id,
+        set(visgroup_names.values()),
         world_ents,
         detail_ents,
         overlay_ents,
