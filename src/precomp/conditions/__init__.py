@@ -1232,40 +1232,8 @@ def res_switch(res: Property):
     return apply_switch
 
 
-@make_result_setup('staticPiston')
-def make_static_pist_setup(res: Property):
-    instances = (
-        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
-        'logic_0', 'logic_1', 'logic_2', 'logic_3',
-        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
-        'grate_low', 'grate_high',
-    )
-
-    if res.has_children():
-        # Pull from config
-        return {
-            name: instanceLocs.resolve_one(
-                res[name, ''],
-                error=False,
-            ) for name in instances
-        }
-    else:
-        # Pull from editoritems
-        if ':' in res.value:
-            from_item, prefix = res.value.split(':', 1)
-        else:
-            from_item = res.value
-            prefix = ''
-        return {
-            name: instanceLocs.resolve_one(
-                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
-                error=False,
-            ) for name in instances
-        }
-
-
 @make_result('staticPiston')
-def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
+def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], None]:
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1277,56 +1245,87 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     Alternatively, specify all instances via editoritems, by setting the value
     to the item ID optionally followed by a :prefix.
     """
+    inst_keys = (
+        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
+        'logic_0', 'logic_1', 'logic_2', 'logic_3',
+        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        'grate_low', 'grate_high',
+    )
 
-    bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
-
-    if (
-        ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
-        ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
-    ):  # can it move?
-        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
-
-        # Use instances based on the height of the bottom position.
-        val = res.value['bottom_' + str(bottom_pos)]
-        if val:  # Only if defined
-            ent['file'] = val
-
-        logic_file = res.value['logic_' + str(bottom_pos)]
-        if logic_file:
-            # Overlay an additional logic file on top of the original
-            # piston. This allows easily splitting the piston logic
-            # from the styled components
-            logic_ent = ent.copy()
-            logic_ent['file'] = logic_file
-            vmf.add_ent(logic_ent)
-            # If no connections are present, set the 'enable' value in
-            # the logic to True so the piston can function
-            logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
-                ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
-            )
-    else:  # we are static
-        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
-        if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
-            pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
+    if res.has_children():
+        # Pull from config
+        instances = {
+            name: instanceLocs.resolve_one(
+                res[name, ''],
+                error=False,
+            ) for name in inst_keys
+        }
+    else:
+        # Pull from editoritems
+        if ':' in res.value:
+            from_item, prefix = res.value.split(':', 1)
         else:
-            pos = bottom_pos
-        ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
+            from_item = res.value
+            prefix = ''
+        instances = {
+            name: instanceLocs.resolve_one(
+                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
+                error=False,
+            ) for name in inst_keys
+        }
 
-        val = res.value['static_' + str(pos)]
-        if val:
-            ent['file'] = val
+    def make_static(ent: Entity) -> None:
+        """Make a piston static."""
+        bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
 
-    # Add in the grating for the bottom as an overlay.
-    # It's low to fit the piston at minimum, or higher if needed.
-    grate = res.value[
-        'grate_high'
-        if bottom_pos > 0 else
-        'grate_low'
-    ]
-    if grate:
-        grate_ent = ent.copy()
-        grate_ent['file'] = grate
-        vmf.add_ent(grate_ent)
+        if (
+            ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
+            ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
+        ):  # can it move?
+            ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
+
+            # Use instances based on the height of the bottom position.
+            val = instances['bottom_' + str(bottom_pos)]
+            if val:  # Only if defined
+                ent['file'] = val
+
+            logic_file = instances['logic_' + str(bottom_pos)]
+            if logic_file:
+                # Overlay an additional logic file on top of the original
+                # piston. This allows easily splitting the piston logic
+                # from the styled components
+                logic_ent = ent.copy()
+                logic_ent['file'] = logic_file
+                vmf.add_ent(logic_ent)
+                # If no connections are present, set the 'enable' value in
+                # the logic to True so the piston can function
+                logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
+                    ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
+                )
+        else:  # we are static
+            ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
+            if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
+                pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
+            else:
+                pos = bottom_pos
+            ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
+
+            val = instances['static_' + str(pos)]
+            if val:
+                ent['file'] = val
+
+        # Add in the grating for the bottom as an overlay.
+        # It's low to fit the piston at minimum, or higher if needed.
+        grate = instances[
+            'grate_high'
+            if bottom_pos > 0 else
+            'grate_low'
+        ]
+        if grate:
+            grate_ent = ent.copy()
+            grate_ent['file'] = grate
+            vmf.add_ent(grate_ent)
+    return make_static
 
 
 @make_result('GooDebris')
