@@ -296,7 +296,7 @@ def exit_win(e=None) -> None:
                 out[key] = out_val
     callback(out)
 
-    if contextWin.is_open:
+    if contextWin.is_visible():
         # Restore the context window if we hid it earlier.
         contextWin.window.deiconify()
 
@@ -610,7 +610,7 @@ def show_window(used_props, parent, item_name):
         '+' + str(parent.winfo_rooty() - win.winfo_reqheight() - 30)
         )
 
-    if contextWin.is_open:
+    if contextWin.is_visible():
         # Temporarily hide the context window while we're open.
         contextWin.window.withdraw()
 
