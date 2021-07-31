@@ -1,5 +1,5 @@
 """Wraps gettext, to localise all UI text."""
-import gettext
+import gettext as gettext_mod
 import locale
 import logging
 import sys
@@ -7,8 +7,10 @@ import sys
 from srctools.property_parser import PROP_FLAGS_DEFAULT
 import utils
 
+_TRANSLATOR = gettext_mod.NullTranslations()
 
-class DummyTranslations(gettext.NullTranslations):
+
+class DummyTranslations(gettext_mod.NullTranslations):
     """Dummy form for identifying missing translation entries."""
 
     def gettext(self, message: str) -> str:
@@ -27,8 +29,19 @@ class DummyTranslations(gettext.NullTranslations):
     lngettext = ngettext
 
 
+def gettext(message: str) -> str:
+    """Translate the given string."""
+    return _TRANSLATOR.gettext(message)
+
+
+def ngettext(msg_sing: str, msg_plural: str, count: int) -> str:
+    """Translate the given string, with the count to allow plural forms."""
+    return _TRANSLATOR.ngettext(msg_sing, msg_plural, count)
+
+
 def setup(logger: logging.Logger) -> None:
     """Setup gettext localisations."""
+    global _TRANSLATOR
     # Get the 'en_US' style language code
     lang_code = locale.getdefaultlocale()[0]
 
@@ -40,7 +53,7 @@ def setup(logger: logging.Logger) -> None:
                 break
 
     # Expands single code to parent categories.
-    expanded_langs = gettext._expand_lang(lang_code)
+    expanded_langs = gettext_mod._expand_lang(lang_code)
 
     logger.info('Language: {!r}', lang_code)
     logger.debug('Language codes: {!r}', expanded_langs)
@@ -52,7 +65,6 @@ def setup(logger: logging.Logger) -> None:
 
     lang_folder = utils.install_path('i18n')
 
-    trans: gettext.NullTranslations
 
     for lang in expanded_langs:
         try:
@@ -60,13 +72,13 @@ def setup(logger: logging.Logger) -> None:
         except FileNotFoundError:
             continue
         with file:
-            trans = gettext.GNUTranslations(file)
+            _TRANSLATOR = gettext_mod.GNUTranslations(file)
             break
     else:
         # To help identify missing translations, replace everything with
         # something noticeable.
         if lang_code == 'dummy':
-            trans = DummyTranslations()
+            _TRANSLATOR = DummyTranslations()
         # No translations, fallback to English.
         # That's fine if the user's language is actually English.
         else:
@@ -75,14 +87,19 @@ def setup(logger: logging.Logger) -> None:
                     "Can't find translation for codes: {!r}!",
                     expanded_langs,
                 )
-            trans = gettext.NullTranslations()
+            _TRANSLATOR = gettext_mod.NullTranslations()
 
     # Add these functions to builtins, plus _=gettext
-    trans.install(['gettext', 'ngettext'])
+    _TRANSLATOR.install(['gettext', 'ngettext'])
+
+    # Override the global funcs, to more efficiently delegate if people import
+    # later.
+    globals()['gettext'] = _TRANSLATOR.gettext
+    globals()['ngettext'] = _TRANSLATOR.ngettext
 
     # Some lang-specific overrides..
 
-    if trans.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
+    if gettext('__LANG_USE_SANS_SERIF__') == 'YES':
         # For Japanese/Chinese, we want a 'sans-serif' / gothic font
         # style.
         try:

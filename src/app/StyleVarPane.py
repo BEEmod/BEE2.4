@@ -10,6 +10,7 @@ from srctools.logger import get_logger
 import packages
 from app.SubPane import SubPane
 from app import tooltip, TK_ROOT, itemconfig, tk_tools
+from localisation import ngettext, gettext
 import BEE2_config
 
 
@@ -25,69 +26,78 @@ styleOptions = [
     # ID, Name, default value
     stylevar(
         id='MultiverseCave',
-        name=_('Multiverse Cave'),
+        name=gettext('Multiverse Cave'),
         default=1,
-        desc=_('Play the Workshop Cave Johnson lines on map start.')
+        desc=gettext('Play the Workshop Cave Johnson lines on map start.')
     ),
 
     stylevar(
         id='FixFizzlerBump',
-        name=_('Prevent Portal Bump (fizzler)'),
+        name=gettext('Prevent Portal Bump (fizzler)'),
         default=0,
-        desc=_('Add portal bumpers to make it more difficult to portal across '
-               'fizzler edges. This can prevent placing portals in tight '
-               'spaces near fizzlers, or fizzle portals on activation.')
+        desc=gettext(
+            'Add portal bumpers to make it more difficult to portal across '
+            'fizzler edges. This can prevent placing portals in tight spaces '
+            'near fizzlers, or fizzle portals on activation.'
+        ),
     ),
 
     stylevar(
         id='NoMidVoices',
         name=_('Suppress Mid-Chamber Dialogue'),
         default=0,
-        desc=_('Disable all voicelines other than entry and exit lines.')
+        desc=gettext('Disable all voicelines other than entry and exit lines.'),
     ),
 
     stylevar(
         id='UnlockDefault',
         name=_('Unlock Default Items'),
         default=0,
-        desc=_('Allow placing and deleting the mandatory Entry/Exit Doors and '
-               'Large Observation Room. Use with caution, this can have weird '
-               'results!')
+        desc=gettext(
+            'Allow placing and deleting the mandatory Entry/Exit Doors and '
+            'Large Observation Room. Use with caution, this can have weird '
+            'results!'
+        ),
     ),
 
     stylevar(
         id='AllowGooMist',
         name=_('Allow Adding Goo Mist'),
         default=1,
-        desc=_('Add mist particles above Toxic Goo in certain styles. This can '
-               'increase the entity count significantly with large, complex '
-               'goo pits, so disable if needed.')
+        desc=gettext(
+            'Add mist particles above Toxic Goo in certain styles. This can '
+            'increase the entity count significantly with large, complex goo '
+            'pits, so disable if needed.'
+        ),
     ),
 
     stylevar(
         id='FunnelAllowSwitchedLights',
         name=_('Light Reversible Excursion Funnels'),
         default=1,
-        desc=_('Funnels emit a small amount of light. However, if multiple funnels '
-               'are near each other and can reverse polarity, this can cause '
-               'lighting issues. Disable this to prevent that by disabling '
-               'lights. Non-reversible Funnels do not have this issue.'),
+        desc=gettext(
+            'Funnels emit a small amount of light. However, if multiple funnels '
+            'are near each other and can reverse polarity, this can cause '
+            'lighting issues. Disable this to prevent that by disabling '
+            'lights. Non-reversible Funnels do not have this issue.'
+        ),
     ),
 
     stylevar(
         id='EnableShapeSignageFrame',
         name=_('Enable Shape Framing'),
         default=1,
-        desc=_('After 10 shape-type antlines are used, the signs repeat. '
-               'With this enabled, colored frames will be added to '
-               'distinguish them.'),
+        desc=gettext(
+            'After 10 shape-type antlines are used, the signs repeat. With this'
+            ' enabled, colored frames will be added to distinguish them.'
+        ),
     ),
 ]
 
 checkbox_all = {}
 checkbox_chosen = {}
 checkbox_other = {}
-tk_vars = {}  # type: Dict[str, IntVar]
+tk_vars: Dict[str, IntVar] = {}
 
 VAR_LIST: List[packages.StyleVar] = []
 STYLES = {}
@@ -103,7 +113,7 @@ _load_cback: Optional[Callable[[], None]] = None
 def mandatory_unlocked() -> bool:
     """Return whether mandatory items are unlocked currently."""
     try:
-        return tk_vars['UnlockDefault'].get()
+        return tk_vars['UnlockDefault'].get() != 0
     except KeyError:  # Not loaded yet
         return False
 
@@ -180,8 +190,8 @@ def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
                 for style in
                 app_styles
             )
-            desc.append(
-                ngettext('Style: {}', 'Styles: {}', len(style_list)
+            desc.append(ngettext(
+                'Style: {}', 'Styles: {}', len(style_list),
             ).format(', '.join(style_list)))
 
     return '\n'.join(desc)
