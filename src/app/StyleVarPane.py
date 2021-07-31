@@ -1,13 +1,13 @@
+"""The Style Properties tab, for configuring style-specific properties."""
 from tkinter import *
 from tkinter import ttk
 
-from typing import Union, List, Dict, Callable, Optional
-from collections import namedtuple
+from typing import List, Dict, Callable, Optional
 import operator
 
 from srctools import Property
 from srctools.logger import get_logger
-import packages
+from packages.stylevar import StyleVar
 from app.SubPane import SubPane
 from app import tooltip, TK_ROOT, itemconfig, tk_tools
 from localisation import ngettext, gettext
@@ -16,25 +16,21 @@ import BEE2_config
 
 LOGGER = get_logger(__name__)
 
-
-stylevar = namedtuple('stylevar', 'id name default desc')
-
-# Special StyleVars that are hardcoded into the BEE2
+# Special StyleVars that are hardcoded into the BEE2.
 # These are effectively attributes of Portal 2 itself, and always work
 # in every style.
 styleOptions = [
-    # ID, Name, default value
-    stylevar(
+    StyleVar.unstyled(
         id='MultiverseCave',
         name=gettext('Multiverse Cave'),
-        default=1,
-        desc=gettext('Play the Workshop Cave Johnson lines on map start.')
+        default=True,
+        desc=gettext('Play the Workshop Cave Johnson lines on map start.'),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='FixFizzlerBump',
         name=gettext('Prevent Portal Bump (fizzler)'),
-        default=0,
+        default=False,
         desc=gettext(
             'Add portal bumpers to make it more difficult to portal across '
             'fizzler edges. This can prevent placing portals in tight spaces '
@@ -42,17 +38,17 @@ styleOptions = [
         ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='NoMidVoices',
         name=_('Suppress Mid-Chamber Dialogue'),
-        default=0,
+        default=False,
         desc=gettext('Disable all voicelines other than entry and exit lines.'),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='UnlockDefault',
         name=_('Unlock Default Items'),
-        default=0,
+        default=False,
         desc=gettext(
             'Allow placing and deleting the mandatory Entry/Exit Doors and '
             'Large Observation Room. Use with caution, this can have weird '
@@ -60,10 +56,10 @@ styleOptions = [
         ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='AllowGooMist',
         name=_('Allow Adding Goo Mist'),
-        default=1,
+        default=True,
         desc=gettext(
             'Add mist particles above Toxic Goo in certain styles. This can '
             'increase the entity count significantly with large, complex goo '
@@ -71,10 +67,10 @@ styleOptions = [
         ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='FunnelAllowSwitchedLights',
         name=_('Light Reversible Excursion Funnels'),
-        default=1,
+        default=True,
         desc=gettext(
             'Funnels emit a small amount of light. However, if multiple funnels '
             'are near each other and can reverse polarity, this can cause '
@@ -83,10 +79,10 @@ styleOptions = [
         ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='EnableShapeSignageFrame',
         name=_('Enable Shape Framing'),
-        default=1,
+        default=True,
         desc=gettext(
             'After 10 shape-type antlines are used, the signs repeat. With this'
             ' enabled, colored frames will be added to distinguish them.'
@@ -99,7 +95,7 @@ checkbox_chosen = {}
 checkbox_other = {}
 tk_vars: Dict[str, IntVar] = {}
 
-VAR_LIST: List[packages.StyleVar] = []
+VAR_LIST: List[StyleVar] = []
 STYLES = {}
 
 window = None
@@ -156,7 +152,7 @@ def load_handler(props: Property) -> None:
         _load_cback()
 
 
-def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
+def make_desc(var: StyleVar) -> str:
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.
@@ -172,7 +168,7 @@ def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
         _('Default: Off')
     )
 
-    if is_hardcoded or var.styles is None:
+    if var.styles is None:
         desc.append(_('Styles: Unstyled'))
     else:
         app_styles = [
@@ -325,17 +321,14 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         if var.id == 'UnlockDefault':
             checkbox_all[var.id]['command'] = lambda: update_item_vis()
 
-        tooltip.add_tooltip(
-            checkbox_all[var.id],
-            make_desc(var, is_hardcoded=True),
-        )
+        tooltip.add_tooltip(checkbox_all[var.id], make_desc(var))
 
     for var in VAR_LIST:
         tk_vars[var.id] = IntVar(value=var.enabled)
         args = {
             'variable': tk_vars[var.id],
             'text': var.name,
-            }
+        }
         desc = make_desc(var)
         if var.applies_to_all():
             # Available in all styles - put with the hardcoded variables.
@@ -348,14 +341,9 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
             # Swap between checkboxes depending on style.
             checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
             checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
-            tooltip.add_tooltip(
-                checkbox_chosen[var.id],
-                desc,
-            )
-            tooltip.add_tooltip(
-                checkbox_other[var.id],
-                desc,
-            )
+
+            tooltip.add_tooltip(checkbox_chosen[var.id], desc)
+            tooltip.add_tooltip(checkbox_other[var.id], desc)
 
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas.update_idletasks()

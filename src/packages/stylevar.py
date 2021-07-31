@@ -25,6 +25,11 @@ class StyleVar(PakObject, allow_mult=True):
         self.inherit = inherit
         self.styles = None if unstyled else styles
 
+    @classmethod
+    def unstyled(cls, id: str, name: str, default: bool, desc: str) -> StyleVar:
+        """For builtin variables, define it as fully unstyled."""
+        return cls(id, name, [], True, False, default, desc)
+
     @property
     def is_unstyled(self) -> bool:
         """check if the variable is unstyled."""
