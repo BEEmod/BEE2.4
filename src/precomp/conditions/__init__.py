@@ -39,11 +39,8 @@ import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
+from typing import Generic, TypeVar, Any, Callable, TextIO
 
-from typing import (
-    Union, Generic, TypeVar, Any, Callable,
-    Iterable, Optional, Dict, List, Tuple, Set, TextIO,
-)
 import attr
 
 from precomp import instanceLocs
@@ -62,8 +59,8 @@ COND_MOD_NAME = 'Main Conditions'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
-GLOBAL_INSTANCES = set()  # type: Set[str]
-ALL_INST = set()  # type: Set[str]
+GLOBAL_INSTANCES: set[str] = set()
+ALL_INST: set[str] = set()
 
 conditions: list[Condition] = []
 FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
@@ -73,8 +70,8 @@ RESULT_LOOKUP: dict[str, CondCall[object]] = {}
 RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
 # Used to dump a list of the flags, results, meta-conditions
-ALL_FLAGS: list[tuple[str, Iterable[str], CondCall[bool]]] = []
-ALL_RESULTS: list[tuple[str, Iterable[str], CondCall[bool]]] = []
+ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
 
 
@@ -214,7 +211,7 @@ class Condition:
             else:
                 flags.append(prop)
 
-        return cls(
+        return Condition(
             flags,
             results,
             else_results,
@@ -223,7 +220,7 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(inst: Entity, res: Property) -> Union[bool, object]:
+    def test_result(inst: Entity, res: Property) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -261,7 +258,7 @@ AnnCallT = TypeVar('AnnCallT')
 def annotation_caller(
     func: Callable[..., AnnCallT],
     *parms: type,
-) -> Tuple[Callable[..., AnnCallT], List[type]]:
+) -> tuple[Callable[..., AnnCallT], list[type]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
@@ -304,7 +301,7 @@ def annotation_caller(
     ann_order: list[type] = []
 
     # type -> parameter name.
-    type_to_parm: dict[type, Optional[str]] = dict.fromkeys(parms, None)
+    type_to_parm: dict[type, str | None] = dict.fromkeys(parms, None)
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
         ann = parm.annotation
@@ -409,14 +406,11 @@ class CondCall(Generic[CallResultT]):
     This should be called to execute it.
     """
     __slots__ = ['func', 'group', '_cback', '_setup_data']
-    _setup_data: Optional[dict[int, Callable[[Entity], CallResultT]]]
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
 
     def __init__(
         self,
-        func: Callable[..., Union[
-            CallResultT,
-            Callable[[Entity], CallResultT],
-        ]],
+        func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
         group: str,
     ):
         self.func = func
@@ -455,7 +449,7 @@ class CondCall(Generic[CallResultT]):
             return cback(ent)
 
     @property
-    def __doc__(self) -> Optional[str]:
+    def __doc__(self) -> str | None:
         """Description of the callback's behaviour."""
         return self.func.__doc__
 
@@ -470,7 +464,7 @@ def _get_cond_group(func: Any) -> str:
         return group
 
 
-def add_meta(func, priority: Union[Decimal, int], only_once=True):
+def add_meta(func, priority: Decimal | int, only_once=True):
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -575,7 +569,7 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: Set[str]) -> None:
+def init(seed: str, inst_list: set[str]) -> None:
     """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED
@@ -667,6 +661,7 @@ def import_conditions() -> None:
     # Find the modules in the conditions package.
     # PyInstaller messes this up a bit.
 
+    modules: list[str]
     if utils.FROZEN:
         # This is the PyInstaller loader injected during bootstrap.
         # See PyInstaller/loader/pyimod03_importers.py
@@ -675,9 +670,9 @@ def import_conditions() -> None:
         loader = pkgutil.get_loader('precomp.conditions')
         modules = [
             module
-            for module in loader.toc
+            for module in loader.toc  # type: ignore
             if module.startswith('precomp.conditions.')
-        ]  # type: List[str]
+        ]
     else:
         # We can grab them properly.
         modules = [
@@ -747,19 +742,21 @@ def dump_conditions(file: TextIO) -> None:
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
-        file.write('#### `{}` ({}):\n\n'.format(flag_key, priority))
+        file.write(f'#### `{flag_key}` ({priority}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 
     for lookup, name in [
-            (ALL_FLAGS, 'Flags'),
-            (ALL_RESULTS, 'Results'),
-            ]:
+        (ALL_FLAGS, 'Flags'),
+        (ALL_RESULTS, 'Results'),
+    ]:
         print('<!------->', file=file)
-        print('# ' + name, file=file)
+        print(f'# {name}', file=file)
         print('<!------->', file=file)
 
-        lookup_grouped = defaultdict(list)  # type: Dict[str, List[Tuple[str, Tuple[str, ...], CondCall]]]
+        lookup_grouped: dict[str, list[
+            tuple[str, tuple[str, ...], CondCall]
+        ]] = defaultdict(list)
 
         for flag_key, aliases, func in lookup:
             group = getattr(func, 'group', 'ERROR')
@@ -787,14 +784,14 @@ def dump_conditions(file: TextIO) -> None:
             if group == '00special':
                 print(DOC_SPECIAL_GROUP, file=file)
             else:
-                print('### ' + group + '\n', file=file)
+                print(f'### {group}\n', file=file)
 
             LOGGER.info('Doing {} group...', group)
 
             for flag_key, aliases, func in funcs:
-                print('#### `{}`:\n'.format(flag_key), file=file)
+                print(f'#### `{flag_key}`:\n', file=file)
                 if aliases:
-                    print('**Aliases:** `' + '`, `'.join(aliases) + '`' + '  \n', file=file)
+                    print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
                 dump_func_docs(file, func)
                 file.write('\n')
 
@@ -808,7 +805,7 @@ def dump_func_docs(file: TextIO, func: Callable):
         print('**No documentation!**', file=file)
 
 
-def weighted_random(count: int, weights: str) -> List[int]:
+def weighted_random(count: int, weights: str) -> list[int]:
     """Generate random indexes with weights.
 
     This produces a list intended to be fed to random.choice(), with
@@ -862,7 +859,7 @@ def add_suffix(inst: Entity, suff: str) -> None:
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
-def local_name(inst: Entity, name: Union[str, Entity]) -> str:
+def local_name(inst: Entity, name: str | Entity) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
@@ -894,7 +891,7 @@ def local_name(inst: Entity, name: Union[str, Entity]) -> str:
         raise ValueError('Unknown fixup style {}!'.format(fixup))
 
 
-def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=None):
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=None):
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.
@@ -944,9 +941,9 @@ def set_ent_keys(
     block_name lets you change the 'keys' suffix on the prop_block name.
     ent can be any mapping.
     """
-    for prop in prop_block.find_key(block_name, []):
+    for prop in prop_block.find_block(block_name, or_blank=True):
         ent[prop.real_name] = resolve_value(inst, prop.value)
-    for prop in prop_block.find_key('Local' + block_name, []):
+    for prop in prop_block.find_block('Local' + block_name, or_blank=True):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -959,7 +956,7 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
+def resolve_value(inst: Entity, value: str | T) -> str | T:
     """If a value contains '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
@@ -1346,13 +1343,14 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
 
     space = res.int('spacing', 1)
     rand_count = res.int('number', None)
+    rand_list: list[int] | None
     if rand_count:
         rand_list = weighted_random(
             rand_count,
             res['weights', ''],
         )
     else:
-        rand_list = None  # type: Optional[List[int]]
+        rand_list = None
     chance = res.int('chance', 30) / 100
     file = res['file']
     offset = res.int('offset', 0)

@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from functools import partial as func_partial
 from enum import Enum
-from typing import Callable, Union, Any
+from typing import Callable, Any
 import random
 
 import utils
@@ -121,8 +121,8 @@ labels: dict[str, ttk.Label] = {}
 propList: list[str] = []
 
 # selected values for this items
-values: dict[str, Union[tk.Variable, str, float]] = {}
-out_values: dict[str, Union[tk.Variable, str, float]] = {}
+values: dict[str, tk.Variable | str | float] = {}
+out_values: dict[str, tk.Variable | str | float] = {}
 
 PAINT_OPTS = [
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
