@@ -41,10 +41,11 @@ if __name__ == '__main__':
         __name__,
         on_error=on_error,
     )
-    utils.setup_localisations(LOGGER)
-
     LOGGER.info('Arguments: {}', sys.argv)
     LOGGER.info('Running "{}", version {}:', app_name, utils.BEE_VERSION)
+
+    import localisation
+    localisation.setup(LOGGER)
 
     if app_name == 'bee2':
         from app import BEE2
