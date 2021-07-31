@@ -32,13 +32,10 @@ from editoritems_props import TimerDelay
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-OPEN_IN_TAB = 2
-
 wid = {}
 
 selected_item: 'UI.Item'
 selected_sub_item: 'UI.PalItem'
-is_open = False
 
 version_lookup = []
 
@@ -171,6 +168,10 @@ def open_event(item):
         show_prop(item)
     return func
 
+def is_visible() -> bool:
+    """Checks if the window is visible."""
+    return window.winfo_ismapped()
+
 
 def show_prop(widget, warp_cursor=False):
     """Show the properties window for an item.
@@ -179,8 +180,8 @@ def show_prop(widget, warp_cursor=False):
     If warp_cursor is  true, the cursor will be moved relative to this window so
     it stays on top of the selected subitem.
     """
-    global selected_item, selected_sub_item, is_open
-    if warp_cursor and is_open:
+    global selected_item, selected_sub_item
+    if warp_cursor and is_visible():
         cursor_x, cursor_y = window.winfo_pointerxy()
         off_x = cursor_x - window.winfo_rootx()
         off_y = cursor_y - window.winfo_rooty()
@@ -190,7 +191,6 @@ def show_prop(widget, warp_cursor=False):
     window.lift(TK_ROOT)
     selected_item = widget.item
     selected_sub_item = widget
-    is_open = True
 
     adjust_position()
 
@@ -386,13 +386,13 @@ def load_item_data() -> None:
         set_sprite(SPR.COLLISION, 'space_embed')
 
 
-def adjust_position(e=None):
+def adjust_position(e=None) -> None:
     """Move the properties window onto the selected item.
 
     We call this constantly, so the property window will not go outside
     the screen, and snap back to the item when the main window returns.
     """
-    if not is_open or selected_sub_item is None:
+    if not is_visible() or selected_sub_item is None:
         return
 
     # Calculate the pixel offset between the window and the subitem in
@@ -422,9 +422,8 @@ TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 def hide_context(e=None):
     """Hide the properties window, if it's open."""
-    global is_open, selected_item, selected_sub_item
-    if is_open:
-        is_open = False
+    global selected_item, selected_sub_item
+    if is_visible():
         window.withdraw()
         sound.fx('contract')
         selected_item = selected_sub_item = None
@@ -517,21 +516,22 @@ def init_widgets() -> None:
     wid['desc']['yscrollcommand'] = desc_scroll.set
     desc_scroll.grid(row=0, column=1, sticky="NS")
 
-    def show_more_info():
+    def show_more_info() -> None:
+        """Show the 'more info' URL."""
         url = selected_item.url
         if url is not None:
             try:
-                webbrowser.open(url, new=OPEN_IN_TAB, autoraise=True)
+                webbrowser.open_new_tab(url)
             except webbrowser.Error:
                 if messagebox.askyesno(
-                        icon="error",
-                        title="BEE2 - Error",
-                        message=_('Failed to open a web browser. Do you wish '
-                                  'for the URL to be copied to the clipboard '
-                                  'instead?'),
-                        detail='"{!s}"'.format(url),
-                        parent=window,
-                        ):
+                    icon="error",
+                    title="BEE2 - Error",
+                    message=_('Failed to open a web browser. Do you wish '
+                              'for the URL to be copied to the clipboard '
+                              'instead?'),
+                    detail=f'"{url!s}"',
+                    parent=window,
+                ):
                     LOGGER.info("Saving {} to clipboard!", url)
                     TK_ROOT.clipboard_clear()
                     TK_ROOT.clipboard_append(url)
