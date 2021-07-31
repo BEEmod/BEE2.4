@@ -1,8 +1,10 @@
-from tkinter import *  # ui library
-
-from tkinter import ttk  # themed ui components that match the OS
+"""Window for adjusting the default values of item properties."""
+from __future__ import annotations
+import tkinter as tk
+from tkinter import ttk
 from functools import partial as func_partial
 from enum import Enum
+from typing import Callable, Union, Any
 import random
 
 import utils
@@ -11,7 +13,6 @@ from app import contextWin, gameMan, tk_tools, sound, TK_ROOT
 from localisation import gettext
 import srctools.logger
 
-from typing import Dict, List, Union, Any
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -96,7 +97,7 @@ PROP_POS_SPECIAL = [
     'angledpanelanimation',
     'paintflowtype',
     'timerdelay',
-    ]
+]
 PROP_POS = [
     'allowstreak',
     'startenabled',
@@ -109,19 +110,19 @@ PROP_POS = [
     'dropperenabled',
     'autodrop',
     'autorespawn',
-    ]
+]
 
 # holds the checkbox or other item used to manipulate the box
-widgets = {}  # type: Dict[str, Any]
+widgets: dict[str, Any] = {}
 # holds the descriptive labels for each property
-labels = {}  # type: Dict[str, ttk.Label]
+labels: dict[str, ttk.Label] = {}
 
 # The properties we currently have displayed.
-propList = []  # type: List[str]
+propList: list[str] = []
 
 # selected values for this items
-values = {}  # type: Dict[str, Union[Variable, str, float]]
-out_values = {}  # type: Dict[str, Union[Variable, str, float]]
+values: dict[str, Union[tk.Variable, str, float]] = {}
+out_values: dict[str, Union[tk.Variable, str, float]] = {}
 
 PAINT_OPTS = [
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
@@ -129,13 +130,13 @@ PAINT_OPTS = [
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_heavy',
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_drip',
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_bomb',
-    ]
+]
 
 PANEL_ANGLES = [
-    ('30', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_30'),
-    ('45', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_45'),
-    ('60', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_60'),
-    ('90', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_90'),
+    (30, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_30'),
+    (45, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_45'),
+    (60, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_60'),
+    (90, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_90'),
 ]
 
 DEFAULTS = {  # default values for this item
@@ -157,35 +158,46 @@ DEFAULTS = {  # default values for this item
     'paintflowtype': 1,
     'allowstreak': True
     }
+# Used for us to produce the appropriate changing sound.
+last_angle: int = 0
 
-last_angle = '0'
-
-is_open = False
 # ttk.Scale works on floating point values,
 # so it can be put partway. We need to suppress calling our callbacks
 # whilst we fix it.
 enable_tim_callback = True
 enable_pist_callback = True
 
+win = tk.Toplevel(TK_ROOT)
+win.transient(TK_ROOT)
+win.withdraw()
 
-def callback(name):
-    """Do nothing by default!"""
+
+def callback(props: dict[str, str]) -> None:
+    """Called when the window is closed, to apply properties."""
     pass
 
 
-def scroll_angle(key, e):
+def is_visible() -> bool:
+    """Check if the window is visible."""
+    return win.winfo_ismapped()
+
+
+def scroll_angle(key: str, e: tk.Event) -> None:
+    """Change callback for panel angles."""
     if e.delta > 0 and widgets[key].get() != '90':
         e.widget.invoke('buttonup')
     elif e.delta < 0 and widgets[key].get() != '0':
         e.widget.invoke('buttondown')
 
 
-def save_paint(key, val):
+def save_paint(key: str, val: str) -> None:
+    """Save callback for paint options."""
     sound.fx_blockable('config')
     out_values[key] = val
 
 
-def save_angle(key, new_angle):
+def save_angle(key: str, new_angle: int) -> None:
+    """Change callback for angle properties."""
     global last_angle
     if new_angle > last_angle:
         sound.fx_blockable('raise_' + random.choice('123'))
@@ -195,7 +207,8 @@ def save_angle(key, new_angle):
     out_values[key] = 'ramp_' + str(new_angle) + '_deg_open'
 
 
-def save_tim(key, val):
+def save_tim(key: str, val: str) -> None:
+    """Change callback for TimerDelay."""
     global enable_tim_callback
     if enable_tim_callback:
         new_val = round(float(val))
@@ -218,7 +231,7 @@ def save_tim(key, val):
         out_values[key] = str(new_val)
 
 
-def save_pist(key, val):
+def save_pist(key: str, val: str) -> None:
     """The top and bottom positions are closely interrelated."""
     global enable_pist_callback
     if not enable_pist_callback:
@@ -265,7 +278,7 @@ def save_rail(key) -> None:
         widgets['startactive'].state(['!disabled'])
 
 
-def toggleCheck(key, var, e=None):
+def toggle_check(key: str, var: tk.IntVar, _: tk.Event=None) -> None:
     """Toggle a checkbox."""
     if var.get():
         var.set(0)
@@ -274,24 +287,23 @@ def toggleCheck(key, var, e=None):
     set_check(key)
 
 
-def set_check(key):
+def set_check(key: str) -> None:
+    """Generic change callback for checkboxes."""
     sound.fx_blockable('config')
     out_values[key] = str(values[key].get())
 
 
-def exit_win(e=None) -> None:
+def exit_win(_: tk.Event=None) -> None:
     """Quit and save the new settings."""
-    global is_open
     win.grab_release()
     win.withdraw()
-    is_open = False
     out = {}
     for key in propList:
         if key in PROP_TYPES:
             # Use out_values if it has a matching key,
             # or use values by default.
             out_val = out_values.get(key, values[key])
-            if isinstance(out_val, Variable):
+            if isinstance(out_val, tk.Variable):
                 out[key] = str(out_val.get())
             else:
                 out[key] = out_val
@@ -302,7 +314,7 @@ def exit_win(e=None) -> None:
         contextWin.window.deiconify()
 
 
-def can_edit(prop_list):
+def can_edit(prop_list: dict[str, str]) -> bool:
     """Determine if any of these properties are changeable."""
     for prop in prop_list:
         prop_type, prop_name = PROP_TYPES.get(prop, (PropTypes.NONE, ''))
@@ -311,17 +323,15 @@ def can_edit(prop_list):
     return False
 
 
-def init(cback):
-    global callback, labels, win, is_open
+def init(cback: Callable[[dict[str, str]], None]) -> None:
+    """Build the properties window widgets."""
+    global callback
     callback = cback
-    is_open = False
-    win = Toplevel(TK_ROOT)
+
     win.title("BEE2")
     win.resizable(False, False)
     tk_tools.set_window_icon(win)
     win.protocol("WM_DELETE_WINDOW", exit_win)
-    win.transient(TK_ROOT)
-    win.withdraw()
 
     if utils.MAC:
         # Switch to use the 'modal' window style on Mac.
@@ -356,7 +366,7 @@ def init(cback):
 
         labels[key] = ttk.Label(frame, text=prop_name)
         if prop_type is PropTypes.CHECKBOX:
-            values[key] = IntVar(value=DEFAULTS[key])
+            values[key] = tk.IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
                 frame,
@@ -366,39 +376,39 @@ def init(cback):
             widgets[key].bind(
                 '<Return>',
                 func_partial(
-                    toggleCheck,
+                    toggle_check,
                     key,
                     values[key],
                     )
                 )
 
         elif prop_type is PropTypes.OSCILLATE:
-            values[key] = IntVar(value=DEFAULTS[key])
+            values[key] = tk.IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
                 frame,
                 variable=values[key],
                 command=func_partial(save_rail, key),
-                )
+            )
 
         elif prop_type is PropTypes.PANEL:
             frm = ttk.Frame(frame)
             widgets[key] = frm
-            values[key] = StringVar(value=DEFAULTS[key])
+            values[key] = tk.StringVar(value=DEFAULTS[key])
             for pos, (angle, disp_angle) in enumerate(PANEL_ANGLES):
                 ttk.Radiobutton(
                     frm,
                     variable=values[key],
-                    value=angle,
+                    value=str(angle),
                     text=gameMan.translate(disp_angle),
                     command=func_partial(save_angle, key, angle),
-                    ).grid(row=0, column=pos)
+                ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
 
         elif prop_type is PropTypes.GELS:
             frm = ttk.Frame(frame)
             widgets[key] = frm
-            values[key] = IntVar(value=DEFAULTS[key])
+            values[key] = tk.IntVar(value=DEFAULTS[key])
             for pos, text in enumerate(PAINT_OPTS):
                 ttk.Radiobutton(
                     frm,
@@ -406,7 +416,7 @@ def init(cback):
                     value=pos,
                     text=gameMan.translate(text),
                     command=func_partial(save_paint, key, pos),
-                    ).grid(row=0, column=pos)
+                ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
             out_values[key] = str(DEFAULTS[key])
 
@@ -417,7 +427,7 @@ def init(cback):
                 to=4,
                 orient="horizontal",
                 command=func_partial(save_pist, key),
-                )
+            )
             values[key] = DEFAULTS[key]
             out_values[key] = str(DEFAULTS[key])
             if ((key == 'toplevel' and DEFAULTS['startup']) or
@@ -445,10 +455,10 @@ def init(cback):
     values['startup'] = DEFAULTS['startup']
 
 
-def show_window(used_props, parent, item_name):
-    global is_open, last_angle
+def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: str) -> None:
+    """Show the item property changing window."""
+    global last_angle
     propList[:] = [key.casefold() for key in used_props]
-    is_open = True
     spec_row = 1
 
     start_up = srctools.conv_bool(used_props.get('startup', '0'))
@@ -469,7 +479,7 @@ def show_window(used_props, parent, item_name):
         elif prop_type is PropTypes.GELS:
             values[prop].set(value)
         elif prop_type is PropTypes.PANEL:
-            last_angle = value[5:7]
+            last_angle = int(value[5:7])
             values[prop].set(last_angle)
             out_values[prop] = value
         elif prop_type is PropTypes.PISTON:
@@ -482,20 +492,10 @@ def show_window(used_props, parent, item_name):
             else:
                 if ((prop == 'toplevel' and start_up) or
                         (prop == 'bottomlevel' and not start_up)):
-                    widgets[prop].set(
-                        max(
-                            top_level,
-                            bot_level,
-                            )
-                        )
+                    widgets[prop].set(max(top_level, bot_level))
                 if ((prop == 'toplevel' and not start_up) or
                         (prop == 'bottomlevel' and start_up)):
-                    widgets[prop].set(
-                        min(
-                            top_level,
-                            bot_level,
-                            )
-                        )
+                    widgets[prop].set(min(top_level, bot_level))
         elif prop_type is PropTypes.TIMER:
             try:
                 values[prop] = int(value)
@@ -513,7 +513,7 @@ def show_window(used_props, parent, item_name):
             labels[key].grid(
                 row=spec_row,
                 column=0,
-                sticky=E,
+                sticky='e',
                 padx=2,
                 pady=5,
             )
@@ -529,7 +529,7 @@ def show_window(used_props, parent, item_name):
         else:
             labels[key].grid_remove()
             widgets[key].grid_remove()
-# if we have a 'special' prop, add the divider between the types
+    # if we have a 'special' prop, add the divider between the types
     if spec_row > 1:
         widgets['div_h'].grid(
             row=spec_row + 1,
@@ -547,14 +547,14 @@ def show_window(used_props, parent, item_name):
             labels[key].grid(
                 row=(ind // 3) + spec_row,
                 column=(ind % 3) * 3,
-                sticky=E,
+                sticky=tk.E,
                 padx=2,
                 pady=5,
                 )
             widgets[key].grid(
                 row=(ind // 3) + spec_row,
                 column=(ind % 3)*3 + 1,
-                sticky="EW",
+                sticky="ew",
                 padx=2,
                 pady=5,
                 )
@@ -567,7 +567,7 @@ def show_window(used_props, parent, item_name):
         widgets['div_1'].grid(
             row=spec_row,
             column=2,
-            sticky="NS",
+            sticky="ns",
             rowspan=(ind//3) + 1
             )
     else:
@@ -600,7 +600,7 @@ def show_window(used_props, parent, item_name):
     # playing
     sound.block_fx()
 
-    widgets['titleLabel'].configure(text=gettext('Settings for "{}"').format(item_name + '"'))
+    widgets['titleLabel'].configure(text=gettext('Settings for "{}"').format(item_name))
     win.title(gettext('BEE2 - {}').format(item_name))
     win.deiconify()
     win.lift(parent)
