@@ -1,13 +1,15 @@
 """The Style Properties tab, for configuring style-specific properties."""
+from __future__ import annotations
 from tkinter import *
 from tkinter import ttk
 
-from typing import List, Dict, Callable, Optional
+from typing import Callable, Optional
 import operator
+import itertools
 
 from srctools import Property
 from srctools.logger import get_logger
-from packages.stylevar import StyleVar
+from packages import Style, StyleVar
 from app.SubPane import SubPane
 from app import tooltip, TK_ROOT, itemconfig, tk_tools
 from localisation import ngettext, gettext
@@ -90,15 +92,15 @@ styleOptions = [
     ),
 ]
 
-checkbox_all = {}
-checkbox_chosen = {}
-checkbox_other = {}
-tk_vars: Dict[str, IntVar] = {}
+checkbox_all: dict[str, ttk.Checkbutton] = {}
+checkbox_chosen: dict[str, ttk.Checkbutton] = {}
+checkbox_other: dict[str, ttk.Checkbutton] = {}
+tk_vars: dict[str, IntVar] = {}
 
-VAR_LIST: List[StyleVar] = []
-STYLES = {}
+VAR_LIST: list[StyleVar] = []
+STYLES: dict[str, Style] = {}
 
-window = None
+window: Optional[SubPane] = None
 
 UI = {}
 # Callback triggered whenever we reload vars. This is used to update items
@@ -112,23 +114,6 @@ def mandatory_unlocked() -> bool:
         return tk_vars['UnlockDefault'].get() != 0
     except KeyError:  # Not loaded yet
         return False
-
-
-def add_vars(style_vars, styles):
-    """
-    Add the given stylevars to our list.
-
-    """
-    VAR_LIST.clear()
-    VAR_LIST.extend(
-        sorted(style_vars, key=operator.attrgetter('id'))
-    )
-
-    for var in VAR_LIST:
-        var.enabled = BEE2_config.GEN_OPTS.get_bool('StyleVar', var.id, var.default)
-
-    for style in styles:
-        STYLES[style.id] = style
 
 
 @BEE2_config.OPTION_SAVE('StyleVar')
@@ -150,6 +135,16 @@ def load_handler(props: Property) -> None:
             LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
     if _load_cback is not None:
         _load_cback()
+
+
+def export_data(chosen_style: Style) -> dict[str, bool]:
+    """Construct a dict containing the current stylevar settings."""
+    return {
+        var.id: (tk_vars[var.id].get() == 1)
+        for var in
+        itertools.chain(VAR_LIST, styleOptions)
+        if var.applies_to_style(chosen_style)
+    }
 
 
 def make_desc(var: StyleVar) -> str:
@@ -193,7 +188,7 @@ def make_desc(var: StyleVar) -> str:
     return '\n'.join(desc)
 
 
-def refresh(selected_style):
+def refresh(selected_style: Style) -> None:
     """Move the stylevars to the correct position.
 
     This depends on which apply to the current style.
@@ -230,7 +225,7 @@ def refresh(selected_style):
         UI['stylevar_other_none'].grid_remove()
 
 
-def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]):
+def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]) -> None:
     """Create the styleVar pane.
 
     update_item_vis is the callback fired whenever change defaults changes.
@@ -304,6 +299,8 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         font='TkMenuFont',
         justify='center',
         )
+
+    VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
 
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
