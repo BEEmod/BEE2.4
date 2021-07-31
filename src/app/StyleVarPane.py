@@ -42,14 +42,14 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='NoMidVoices',
-        name=_('Suppress Mid-Chamber Dialogue'),
+        name=gettext('Suppress Mid-Chamber Dialogue'),
         default=False,
         desc=gettext('Disable all voicelines other than entry and exit lines.'),
     ),
 
     StyleVar.unstyled(
         id='UnlockDefault',
-        name=_('Unlock Default Items'),
+        name=gettext('Unlock Default Items'),
         default=False,
         desc=gettext(
             'Allow placing and deleting the mandatory Entry/Exit Doors and '
@@ -60,7 +60,7 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='AllowGooMist',
-        name=_('Allow Adding Goo Mist'),
+        name=gettext('Allow Adding Goo Mist'),
         default=True,
         desc=gettext(
             'Add mist particles above Toxic Goo in certain styles. This can '
@@ -71,7 +71,7 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='FunnelAllowSwitchedLights',
-        name=_('Light Reversible Excursion Funnels'),
+        name=gettext('Light Reversible Excursion Funnels'),
         default=True,
         desc=gettext(
             'Funnels emit a small amount of light. However, if multiple funnels '
@@ -83,7 +83,7 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='EnableShapeSignageFrame',
-        name=_('Enable Shape Framing'),
+        name=gettext('Enable Shape Framing'),
         default=True,
         desc=gettext(
             'After 10 shape-type antlines are used, the signs repeat. With this'
@@ -157,14 +157,12 @@ def make_desc(var: StyleVar) -> str:
     else:
         desc = []
 
-    desc.append(
-        _('Default: On')
-        if var.default else
-        _('Default: Off')
-    )
+    # i18n: StyleVar default value.
+    desc.append(gettext('Default: On') if var.default else gettext('Default: Off'))
 
     if var.styles is None:
-        desc.append(_('Styles: Unstyled'))
+        # i18n: StyleVar which is totally unstyled.
+        desc.append(gettext('Styles: Unstyled'))
     else:
         app_styles = [
             style
@@ -174,7 +172,8 @@ def make_desc(var: StyleVar) -> str:
         ]
 
         if len(app_styles) == len(STYLES):
-            desc.append(_('Styles: All'))
+            # i18n: StyleVar which matches all styles.
+            desc.append(gettext('Styles: All'))
         else:
             style_list = sorted(
                 style.selitem_data.short_name
@@ -182,6 +181,7 @@ def make_desc(var: StyleVar) -> str:
                 app_styles
             )
             desc.append(ngettext(
+                # i18n: The styles a StyleVar is allowed for.
                 'Style: {}', 'Styles: {}', len(style_list),
             ).format(', '.join(style_list)))
 
@@ -235,7 +235,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
 
     window = SubPane(
         TK_ROOT,
-        title=_('Style/Item Properties'),
+        title=gettext('Style/Item Properties'),
         name='style',
         menu_bar=menu_bar,
         resize_y=True,
@@ -254,7 +254,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     stylevar_frame = ttk.Frame(nbook)
     stylevar_frame.rowconfigure(0, weight=1)
     stylevar_frame.columnconfigure(0, weight=1)
-    nbook.add(stylevar_frame, text=_('Styles'))
+    nbook.add(stylevar_frame, text=gettext('Styles'))
 
     canvas = Canvas(stylevar_frame, highlightthickness=0)
     # need to use a canvas to allow scrolling
@@ -273,10 +273,10 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
 
     canvas_frame = ttk.Frame(canvas)
 
-    frame_all = ttk.Labelframe(canvas_frame, text=_("All:"))
+    frame_all = ttk.Labelframe(canvas_frame, text=gettext("All:"))
     frame_all.grid(row=0, sticky='EW')
 
-    frm_chosen = ttk.Labelframe(canvas_frame, text=_("Selected Style:"))
+    frm_chosen = ttk.Labelframe(canvas_frame, text=gettext("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(
@@ -284,18 +284,18 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         orient=HORIZONTAL,
         ).grid(row=2, sticky='EW', pady=(10, 5))
 
-    frm_other = ttk.Labelframe(canvas_frame, text=_("Other Styles:"))
+    frm_other = ttk.Labelframe(canvas_frame, text=gettext("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
     UI['stylevar_chosen_none'] = ttk.Label(
         frm_chosen,
-        text=_('No Options!'),
+        text=gettext('No Options!'),
         font='TkMenuFont',
         justify='center',
         )
     UI['stylevar_other_none'] = ttk.Label(
         frm_other,
-        text=_('None!'),
+        text=gettext('None!'),
         font='TkMenuFont',
         justify='center',
         )
@@ -358,5 +358,5 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))
 
     item_config_frame = ttk.Frame(nbook)
-    nbook.add(item_config_frame, text=_('Items'))
+    nbook.add(item_config_frame, text=gettext('Items'))
     itemconfig.make_pane(item_config_frame)

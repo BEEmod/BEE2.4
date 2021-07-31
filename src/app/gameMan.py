@@ -33,6 +33,7 @@ from srctools import (
 )
 import srctools.logger
 from app import backup, optionWindow, tk_tools, TK_ROOT, resource_gen
+from localisation import gettext
 import loadScreen
 import packages.template_brush
 import editoritems
@@ -766,8 +767,8 @@ class Game:
 
                         export_screen.reset()
                         if messagebox.askokcancel(
-                            title=_('BEE2 - Export Failed!'),
-                            message=_(
+                            title=gettext('BEE2 - Export Failed!'),
+                            message=gettext(
                                 'Compiler file {file} missing. '
                                 'Exit Steam applications, then press OK '
                                 'to verify your game cache. You can then '
@@ -858,8 +859,8 @@ class Game:
                         # running.
                         export_screen.reset()
                         messagebox.showerror(
-                            title=_('BEE2 - Export Failed!'),
-                            message=_('Copying compiler file {file} failed. '
+                            title=gettext('BEE2 - Export Failed!'),
+                            message=gettext('Copying compiler file {file} failed. '
                                       'Ensure {game} is not running.').format(
                                         file=comp_file,
                                         game=self.name,
@@ -1079,7 +1080,7 @@ class Game:
 
         self.load_trans(lang)
 
-    def load_trans(self, lang):
+    def load_trans(self, lang) -> None:
         """Actually load the translation."""
         # Already loaded
         if TRANS_DATA:
@@ -1108,10 +1109,10 @@ class Game:
                 if key.startswith('PORTAL2_PuzzleEditor'):
                     TRANS_DATA[key] = value.replace("\\'", "'")
 
-        if _('Quit') == '####':
+        if gettext('Quit') == '####':
             # Dummy translations installed, apply here too.
             for key in TRANS_DATA:
-                TRANS_DATA[key] = _(key)
+                TRANS_DATA[key] = gettext(key)
 
 
 def find_steam_info(game_dir):
@@ -1165,11 +1166,11 @@ def scan_music_locs():
                 make_tag_coop_inst(loc)
             except FileNotFoundError:
                 messagebox.showinfo(
-                    message=_('Ap-Tag Coop gun instance not found!\n'
+                    message=gettext('Ap-Tag Coop gun instance not found!\n'
                               'Coop guns will not work - verify cache to fix.'),
                     parent=TK_ROOT,
                     icon=messagebox.ERROR,
-                    title=_('BEE2 - Aperture Tag Files Missing'),
+                    title=gettext('BEE2 - Aperture Tag Files Missing'),
                 )
                 MUSIC_TAG_LOC = None
             else:
@@ -1283,14 +1284,15 @@ def add_game(e=None, refresh_menu=True):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
-        message=_('Select the folder where the game executable is located '
-                  '({appname})...').format(appname='portal2' + EXE_SUFFIX),
+        message=gettext(
+            'Select the folder where the game executable is located ({appname})...'
+        ).format(appname='portal2' + EXE_SUFFIX),
         parent=TK_ROOT,
-        title=_('BEE2 - Add Game'),
+        title=gettext('BEE2 - Add Game'),
         )
     exe_loc = filedialog.askopenfilename(
-        title=_('Find Game Exe'),
-        filetypes=[(_('Executable'), '.exe')],
+        title=gettext('Find Game Exe'),
+        filetypes=[(gettext('Executable'), '.exe')],
         initialdir='C:',
         )
     if exe_loc:
@@ -1298,36 +1300,36 @@ def add_game(e=None, refresh_menu=True):
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
             messagebox.showinfo(
-                message=_('This does not appear to be a valid game folder!'),
+                message=gettext('This does not appear to be a valid game folder!'),
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
-                title=_('BEE2 - Add Game'),
+                title=gettext('BEE2 - Add Game'),
                 )
             return False
 
         # Mel doesn't use PeTI, so that won't make much sense...
         if gm_id == utils.STEAM_IDS['MEL']:
             messagebox.showinfo(
-                message=_("Portal Stories: Mel doesn't have an editor!"),
+                message=gettext("Portal Stories: Mel doesn't have an editor!"),
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
-                title=_('BEE2 - Add Game'),
+                title=gettext('BEE2 - Add Game'),
             )
             return False
 
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = tk_tools.prompt(
-                _('BEE2 - Add Game'),
-                _("Enter the name of this game:"),
+                gettext('BEE2 - Add Game'),
+                gettext("Enter the name of this game:"),
                 initialvalue=name,
             )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message=_('This name is already taken!'),
-                    title=_('BEE2 - Add Game'),
+                    message=gettext('This name is already taken!'),
+                    title=gettext('BEE2 - Add Game'),
                     )
             elif name is None:
                 return False
@@ -1335,8 +1337,8 @@ def add_game(e=None, refresh_menu=True):
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message=_('Please enter a name for this game!'),
-                    title=_('BEE2 - Add Game'),
+                    message=gettext('Please enter a name for this game!'),
+                    title=gettext('BEE2 - Add Game'),
                     )
             else:
                 break
@@ -1354,13 +1356,13 @@ def remove_game(e=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
-        _("\n (BEE2 will quit, this is the last game set!)")
+        gettext("\n (BEE2 will quit, this is the last game set!)")
         if len(all_games) == 1 else
         ""
     )
     confirm = messagebox.askyesno(
         title="BEE2",
-        message=_('Are you sure you want to delete "{}"?').format(
+        message=gettext('Are you sure you want to delete "{}"?').format(
                 selected_game.name
             ) + lastgame_mess,
         )

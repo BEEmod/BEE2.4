@@ -15,6 +15,7 @@ from app.tooltip import add_tooltip
 import utils
 import srctools.logger
 from app import signage_ui, UI, tkMarkdown, sound, img, tk_tools
+from localisation import gettext
 
 from typing import Union, Callable, List, Tuple, Optional
 
@@ -611,7 +612,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
         new_color, tk_color = askcolor(
             color=(r, g, b),
             parent=parent.winfo_toplevel(),
-            title=_('Choose a Color'),
+            title=gettext('Choose a Color'),
         )
         if new_color is not None:
             r, g, b = map(int, new_color)  # Returned as floats, which is wrong.

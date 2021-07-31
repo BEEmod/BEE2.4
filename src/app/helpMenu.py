@@ -54,26 +54,26 @@ WebResource = NamedTuple('WebResource', [
 Res = WebResource
 
 WEB_RESOURCES = [
-    Res(_('Wiki...'), BEE2_ITEMS_REPO + 'wiki/', ResIcon.BEE2),
+    Res(gettext('Wiki...'), BEE2_ITEMS_REPO + 'wiki/', ResIcon.BEE2),
     Res(
-        _('Original Items...'),
+        gettext('Original Items...'),
         'https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker',
         ResIcon.PORTAL2,
     ),
     # i18n: The chat program.
-    Res(_('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
-    Res(_("aerond's Music Changer..."), MUSIC_CHANGER, ResIcon.MUSIC_CHANGER),
+    Res(gettext('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
+    Res(gettext("aerond's Music Changer..."), MUSIC_CHANGER, ResIcon.MUSIC_CHANGER),
     SEPERATOR,
-    Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
-    Res(_('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
+    Res(gettext('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
+    Res(gettext('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
     SEPERATOR,
-    Res(_('Submit Application Bugs...'), BEE2_REPO + 'issues/new', ResIcon.BUGS),
-    Res(_('Submit Item Bugs...'), BEE2_ITEMS_REPO + 'issues/new', ResIcon.BUGS),
+    Res(gettext('Submit Application Bugs...'), BEE2_REPO + 'issues/new', ResIcon.BUGS),
+    Res(gettext('Submit Item Bugs...'), BEE2_ITEMS_REPO + 'issues/new', ResIcon.BUGS),
     SEPERATOR,
-    Res(_('Portal 2'), steam_url('PORTAL2'), ResIcon.PORTAL2),
-    Res(_('Aperture Tag'), steam_url('TAG'), ResIcon.TAG),
-    Res(_('Portal Stories: Mel'), steam_url('MEL'), ResIcon.MEL),
-    Res(_('Thinking With Time Machine'), steam_url('TWTM'), ResIcon.TWTM),
+    Res(gettext('Portal 2'), steam_url('PORTAL2'), ResIcon.PORTAL2),
+    Res(gettext('Aperture Tag'), steam_url('TAG'), ResIcon.TAG),
+    Res(gettext('Portal Stories: Mel'), steam_url('MEL'), ResIcon.MEL),
+    Res(gettext('Thinking With Time Machine'), steam_url('TWTM'), ResIcon.TWTM),
 ]
 del Res, steam_url
 
@@ -386,6 +386,7 @@ SOFTWARE.
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
 --------
 
 # Libsquish
@@ -460,7 +461,7 @@ class Dialog(tk.Toplevel):
 
         ttk.Button(
             frame,
-            text=_('Close'),
+            text=gettext('Close'),
             command=self.withdraw,
         ).grid(
             row=1, column=0,
@@ -484,7 +485,7 @@ def make_help_menu(parent: tk.Menu):
     # Using this name displays this correctly in OS X
     help = tk.Menu(parent, name='help')
 
-    parent.add_cascade(menu=help, label=_('Help'))
+    parent.add_cascade(menu=help, label=gettext('Help'))
 
     icons: Dict[ResIcon, img.Handle] = {
         icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
@@ -494,7 +495,7 @@ def make_help_menu(parent: tk.Menu):
     icons[ResIcon.NONE] = img.Handle.blank(16, 16)
 
     credits = Dialog(
-        title=_('BEE2 Credits'),
+        title=gettext('BEE2 Credits'),
         text=CREDITS_TEXT,
     )
 
@@ -511,6 +512,6 @@ def make_help_menu(parent: tk.Menu):
 
     help.add_separator()
     help.add_command(
-        label=_('Credits...'),
+        label=gettext('Credits...'),
         command=credits.show,
     )

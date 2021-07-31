@@ -8,6 +8,7 @@ import random
 import utils
 import srctools
 from app import contextWin, gameMan, tk_tools, sound, TK_ROOT
+from localisation import gettext
 import srctools.logger
 
 from typing import Dict, List, Union, Any
@@ -27,7 +28,7 @@ class PropTypes(Enum):
     PANEL = 'panel'
     GELS = 'gelType'
     OSCILLATE = 'track'
-    
+
     @property
     def is_editable(self) -> bool:
         """Check if the user can change this property type."""
@@ -36,9 +37,9 @@ class PropTypes(Enum):
 # All properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
-    'toplevel':                 (PropTypes.PISTON, _('Start Position')),
-    'bottomlevel':              (PropTypes.PISTON, _('End Position')),
-    'timerdelay':               (PropTypes.TIMER, _('Delay \n(0=infinite)')),
+    'toplevel':                 (PropTypes.PISTON, gettext('Start Position')),
+    'bottomlevel':              (PropTypes.PISTON, gettext('End Position')),
+    'timerdelay':               (PropTypes.TIMER, gettext('Delay \n(0=infinite)')),
     'angledpanelanimation':     (PropTypes.PANEL, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
     'paintflowtype':            (PropTypes.GELS,  'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
 
@@ -339,8 +340,8 @@ def init(cback):
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
 
-    labels['noOptions'] = ttk.Label(frame, text=_('No Properties available!'))
-    widgets['saveButton'] = ttk.Button(frame, text=_('Close'), command=exit_win)
+    labels['noOptions'] = ttk.Label(frame, text=gettext('No Properties available!'))
+    widgets['saveButton'] = ttk.Button(frame, text=gettext('Close'), command=exit_win)
     widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
@@ -599,8 +600,8 @@ def show_window(used_props, parent, item_name):
     # playing
     sound.block_fx()
 
-    widgets['titleLabel'].configure(text='Settings for "' + item_name + '"')
-    win.title('BEE2 - ' + item_name)
+    widgets['titleLabel'].configure(text=gettext('Settings for "{}"').format(item_name + '"'))
+    win.title(gettext('BEE2 - {}').format(item_name))
     win.deiconify()
     win.lift(parent)
     win.grab_set()

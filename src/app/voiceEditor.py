@@ -33,24 +33,24 @@ QUOTE_FONT['weight'] = 'bold'
 IMG: Dict[str, Tuple[img.Handle, str]] = {
     spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
     for spr, ctx in [
-        ('sp', _('Singleplayer')),
-        ('coop', _('Cooperative')),
-        ('atlas', _('ATLAS (SP/Coop)')),
-        ('pbody', _('P-Body (SP/Coop)')),
-        ('bendy', _('Bendy')),
-        ('chell', _('Chell')),
-        ('human', _('Human characters (Bendy and Chell)')),
-        ('robot', _('AI characters (ATLAS, P-Body, or Coop)')),
+        ('sp', gettext('Singleplayer')),
+        ('coop', gettext('Cooperative')),
+        ('atlas', gettext('ATLAS (SP/Coop)')),
+        ('pbody', gettext('P-Body (SP/Coop)')),
+        ('bendy', gettext('Bendy')),
+        ('chell', gettext('Chell')),
+        ('human', gettext('Human characters (Bendy and Chell)')),
+        ('robot', gettext('AI characters (ATLAS, P-Body, or Coop)')),
     ]
 }
 
 
 # Friendly names given to certain response channels.
 RESPONSE_NAMES = {
-    'death_goo': _('Death - Toxic Goo'),
-    'death_turret': _('Death - Turrets'),
-    'death_crush': _('Death - Crusher'),
-    'death_laserfield': _('Death - LaserField'),
+    'death_goo': gettext('Death - Toxic Goo'),
+    'death_turret': gettext('Death - Turrets'),
+    'death_crush': gettext('Death - Crusher'),
+    'death_laserfield': gettext('Death - LaserField'),
 }
 
 config: Optional[ConfigFile] = None
@@ -540,4 +540,3 @@ def get_trans_lines(trans_block):
                 yield name.rstrip(), ': "' + trans.lstrip() + '"'
             else:
                 yield '', '"' + prop.value + '"'
-

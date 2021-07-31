@@ -28,6 +28,7 @@ import srctools.logger
 from srctools.filesys import FileSystemChain
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 from consts import SEL_ICON_SIZE as ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
+from localisation import gettext, ngettext
 import utils
 import BEE2_config
 
@@ -48,10 +49,6 @@ GRP_EXP_HOVER = '▼'
 
 BTN_PLAY = '▶'
 BTN_STOP = '■'
-
-if __name__ == '__main__':
-    import gettext
-    gettext.NullTranslations().install(['ngettext'])
 
 
 class NAV_KEYS(Enum):
@@ -452,11 +449,11 @@ class SelectorWin:
         sound_sys: FileSystemChain=None,
         modal=False,
         # i18n: 'None' item description
-        none_desc=_('Do not add anything.'),
+        none_desc=gettext('Do not add anything.'),
         none_attrs=EmptyMapping,
         none_icon: img.Handle = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
         # i18n: 'None' item name.
-        none_name: str = _("<None>"),
+        none_name: str = gettext("<None>"),
         title: str = 'BEE2',
         desc: str = '',
         readonly_desc: str = '',
@@ -642,12 +639,12 @@ class SelectorWin:
             self.sugg_lbl = ttk.Label(
                 self.pal_frame,
                 # Draw lines with box drawing characters
-                text="\u250E\u2500" + _("Suggested") + "\u2500\u2512",
+                text="\u250E\u2500" + gettext("Suggested") + "\u2500\u2512",
             )
         else:
             self.sugg_lbl = ttk.LabelFrame(
                 self.pal_frame,
-                text=_("Suggested"),
+                text=gettext("Suggested"),
                 labelanchor=N,
                 height=50,
             )
@@ -694,7 +691,7 @@ class SelectorWin:
             samp_button.grid(row=0, column=1)
             add_tooltip(
                 samp_button,
-                _("Play a sample of this item."),
+                gettext("Play a sample of this item."),
             )
 
             # On start/stop, update the button label.
@@ -752,7 +749,7 @@ class SelectorWin:
 
         ttk.Button(
             self.prop_frm,
-            text=_("OK"),
+            text=gettext("OK"),
             command=self.save,
         ).grid(
             row=6,
@@ -763,7 +760,7 @@ class SelectorWin:
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
-                text=_("Reset to Default"),
+                text=gettext("Reset to Default"),
                 command=self.sel_suggested,
             )
             self.prop_reset.grid(
@@ -774,7 +771,7 @@ class SelectorWin:
 
         ttk.Button(
             self.prop_frm,
-            text=_("Cancel"),
+            text=gettext("Cancel"),
             command=self.exit,
         ).grid(
             row=6,
@@ -934,7 +931,7 @@ class SelectorWin:
         self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName))
         grouped_items = defaultdict(list)
         # If the item is groupless, use 'Other' for the header.
-        self.group_names = {'':  _('Other')}
+        self.group_names = {'':  gettext('Other')}
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
@@ -1228,7 +1225,7 @@ class SelectorWin:
                     img.apply(label, img.Handle.color(val, 16, 16))
                     # Display the full color when hovering..
                     # i18n: Tooltip for colour swatch.
-                    set_tooltip(label, _('Color: R={r}, G={g}, B={b}').format(
+                    set_tooltip(label, gettext('Color: R={r}, G={g}, B={b}').format(
                         r=int(val.x), g=int(val.y), b=int(val.z),
                     ))
                 elif label.type is AttrTypes.LIST:
