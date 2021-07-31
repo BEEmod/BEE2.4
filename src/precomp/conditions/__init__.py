@@ -44,6 +44,7 @@ from typing import (
     Union, Generic, TypeVar, Any, Callable,
     Iterable, Optional, Dict, List, Tuple, Set, TextIO,
 )
+import attr
 
 from precomp import instanceLocs
 import consts
@@ -169,42 +170,21 @@ class EndCondition(Exception):
 RES_EXHAUSTED = object()
 
 
+@attr.define
 class Condition:
     """A single condition which may be evaluated."""
-    __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
-
-    def __init__(
-        self,
-        flags: List[Property]=None,
-        results: List[Property]=None,
-        else_results: List[Property]=None,
-        priority: Decimal=Decimal(),
-        source: str=None,
-    ) -> None:
-        self.flags = flags or []
-        self.results = results or []
-        self.else_results = else_results or []
-        self.priority = priority
-        self.source = source
-
-    def __repr__(self) -> str:
-        return (
-            'Condition(flags={!r}, '
-            'results={!r}, else_results={!r}, '
-            'priority={!r}'
-        ).format(
-            self.flags,
-            self.results,
-            self.else_results,
-            self.priority,
-        )
+    flags: list[Property] = attr.Factory(list)
+    results: list[Property] = attr.Factory(list)
+    else_results: list[Property] = attr.Factory(list)
+    priority: Decimal = Decimal()
+    source: str = None
 
     @classmethod
-    def parse(cls, prop_block: Property) -> 'Condition':
+    def parse(cls, prop_block: Property) -> Condition:
         """Create a condition from a Property block."""
-        flags = []  # type: List[Property]
-        results = []  # type: List[Property]
-        else_results = []  # type: List[Property]
+        flags: list[Property] = []
+        results: list[Property] = []
+        else_results: list[Property] = []
         priority = Decimal()
         source = None
         for prop in prop_block:
