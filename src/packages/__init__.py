@@ -44,6 +44,7 @@ class SelitemData:
     auth: list[str]  # List of authors.
     icon: Optional[img.Handle]  # Small square icon.
     large_icon: Optional[img.Handle]  # Larger, landscape icon.
+    previews: list[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
     group: Optional[str]
     sort_key: str
@@ -71,13 +72,33 @@ class SelitemData:
         except LookupError:
             icon = None
         try:
+            large_key = info.find_key('iconLarge')
+        except LookupError:
+            large_icon = large_key = None
+        else:
             large_icon = img.Handle.parse(
-                info.find_key('iconlarge'),
+                large_key,
                 pack_id,
                 *consts.SEL_ICON_SIZE_LRG,
             )
+        try:
+            preview_block = info.find_block('previews')
         except LookupError:
-            large_icon = None
+            # Use the large icon, if present.
+            if large_key is not None:
+                previews = [img.Handle.parse(
+                    large_key,
+                    pack_id,
+                    0, 0,
+                )]
+            else:
+                previews = []
+        else:
+            previews = [img.Handle.parse(
+                prop,
+                pack_id,
+                0, 0,
+            ) for prop in preview_block]
 
         return cls(
             name,
@@ -85,6 +106,7 @@ class SelitemData:
             auth,
             icon,
             large_icon,
+            previews,
             desc,
             group,
             sort_key,
@@ -105,6 +127,7 @@ class SelitemData:
             self.auth + other.auth,
             other.icon or self.icon,
             other.large_icon or self.large_icon,
+            self.previews + other.previews,
             tkMarkdown.join(self.desc, other.desc),
             other.group or self.group,
             other.sort_key or self.sort_key,

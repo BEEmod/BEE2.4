@@ -49,6 +49,8 @@ GRP_EXP_HOVER = '▼'
 
 BTN_PLAY = '▶'
 BTN_STOP = '■'
+BTN_PREV = '⟨'
+BTN_NEXT = '⟩'
 
 
 class NAV_KEYS(Enum):
@@ -289,6 +291,7 @@ class Item:
         'longName',
         'icon',
         'large_icon',
+        'previews',
         'desc',
         'authors',
         'group',
@@ -309,6 +312,7 @@ class Item:
         long_name: Optional[str] = None,
         icon: Optional[img.Handle]=None,
         large_icon: Optional[img.Handle] = None,
+        previews: list[img.Handle] = (),
         authors: Iterable[str]=(),
         desc: Union[MarkdownData, str] = MarkdownData(),
         group: str = '',
@@ -331,6 +335,7 @@ class Item:
         else:
             self.icon = img.Handle.color(img.PETI_ITEM_BG, ICON_SIZE, ICON_SIZE)
         self.large_icon = large_icon
+        self.previews = list(previews)
 
         if isinstance(desc, str):
             self.desc = tkMarkdown.convert(desc, None)
@@ -375,6 +380,7 @@ class Item:
             long_name=data.name,
             icon=data.icon,
             large_icon=data.large_icon,
+            previews=data.previews,
             authors=data.auth,
             desc=data.desc,
             group=data.group,
@@ -409,6 +415,7 @@ class Item:
         item.longName = self.longName
         item.icon = self.icon
         item.large_icon = self.large_icon
+        item.previews = self.previews.copy()
         item.desc = self.desc.copy()
         item.authors = self.authors.copy()
         item.group = self.group
@@ -419,6 +426,72 @@ class Item:
 
         item._selector = item.button = None
         return item
+
+
+class PreviewWindow:
+    """Displays images previewing the selected item."""
+    def __init__(self) -> None:
+        self.win = Toplevel(TK_ROOT)
+        self.win.withdraw()
+        self.win.resizable(False, False)
+
+        # Don't destroy the window when closed.
+        self.win.protocol("WM_DELETE_WINDOW", self.hide)
+        self.win.bind("<Escape>", self.hide)
+
+        self.display = ttk.Label(self.win)
+        self.display.grid(row=0, column=1, sticky='nsew')
+        self.win.columnconfigure(1, weight=1)
+        self.win.rowconfigure(0, weight=1)
+
+        self.parent: Optional[SelectorWin] = None
+
+        self.prev_btn = ttk.Button(
+            self.win, text=BTN_PREV, command=functools.partial(self.cycle, -1))
+        self.next_btn = ttk.Button(
+            self.win, text=BTN_NEXT, command=functools.partial(self.cycle, +1))
+
+        self.img: list[img.Handle] = []
+        self.index = 0
+
+    def show(self, parent: SelectorWin, item: Item) -> None:
+        """Show the window."""
+        self.win.transient(parent.win)
+        self.win.title(gettext('{} Preview').format(item.longName))
+
+        self.parent = parent
+        self.index = 0
+        self.img = item.previews
+        img.apply(self.display, self.img[0])
+
+        if len(self.img) > 1:
+            self.prev_btn.grid(row=0, column=0, sticky='ns')
+            self.next_btn.grid(row=0, column=2, sticky='ns')
+        else:
+            self.prev_btn.grid_remove()
+            self.next_btn.grid_remove()
+
+        self.win.deiconify()
+        self.win.lift()
+        utils.center_win(self.win, parent.win)
+        if parent.modal:
+            parent.win.grab_release()
+            self.win.grab_set()
+
+    def hide(self) -> None:
+        """Swap grabs if the parent is modal."""
+        if self.parent.modal:
+            self.win.grab_release()
+            self.parent.win.grab_set()
+        self.win.withdraw()
+
+    def cycle(self, off: int) -> None:
+        """Switch to a new image."""
+        self.index = (self.index + off) % len(self.img)
+        img.apply(self.display, self.img[self.index])
+
+
+_PREVIEW = PreviewWindow()
 
 
 class SelectorWin:
@@ -668,6 +741,7 @@ class SelectorWin:
         img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
         self.prop_icon.grid(row=0, column=0)
         self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
+        tk_tools.bind_leftclick(self.prop_icon, self._icon_clicked)
 
         name_frame = ttk.Frame(self.prop_frm)
 
@@ -701,7 +775,6 @@ class SelectorWin:
                 system=sound_sys,
             )
             samp_button['command'] = self.sampler.play_sample
-            tk_tools.bind_leftclick(self.prop_icon, self.sampler.play_sample)
             samp_button.state(('disabled',))
         else:
             self.sampler = None
@@ -1066,6 +1139,13 @@ class SelectorWin:
         self.display['font'] = self.mouseover_font
         self.disp_label.set(self.suggested.context_lbl)
 
+    def _icon_clicked(self, _: Event) -> None:
+        """When the large image is clicked, either show the previews or play sounds."""
+        if self.sampler:
+            self.sampler.play_sample()
+        elif self.selected.previews:
+            _PREVIEW.show(self, self.selected)
+
     def open_win(self, _: Event = None, *, force_open=False) -> object:
         """Display the window."""
         if self._readonly and not force_open:
@@ -1171,6 +1251,11 @@ class SelectorWin:
         icon = item.large_icon if item.large_icon is not None else item.icon
         img.apply(self.prop_icon, icon)
         self.prop_icon_frm.configure(width=icon.width, height=icon.height)
+
+        if item.previews and not self.sampler:
+            self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
+        else:
+            self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
         if DEV_MODE.get():
             # Show the ID of the item in the description
