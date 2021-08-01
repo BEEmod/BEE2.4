@@ -445,10 +445,10 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         else:
             raise ValueError(f'Unknown filesystem type for "{loc.pak_path}"!')
 
-    with filesys, filesys[loc.path].open_str() as f:
+    with filesys[loc.path].open_str() as f:
         props = Property.parse(f, f'{loc.pak_path}:{loc.path}')
     vmf = srctools.VMF.parse(props, preserve_ids=True)
-    del props, filesys, f
+    del props, filesys, f  # Discard all this data.
 
     # visgroup -> list of brushes/overlays
     detail_ents: dict[str, list[Solid]] = defaultdict(list)

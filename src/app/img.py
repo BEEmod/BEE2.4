@@ -42,7 +42,6 @@ _pending_cleanup: dict[int, tuple[Handle, float]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
-FSYS_BUILTIN.open_ref()
 PACK_SYSTEMS: dict[str, FileSystem] = {}
 
 # Silence DEBUG messages from Pillow, they don't help.
@@ -180,33 +179,31 @@ def _load_file(
         path += ".png"
 
     image: Image.Image
-    with fsys:
-        try:
-            img_file = fsys[path]
-        except (KeyError, FileNotFoundError):
-            img_file = None
+    try:
+        img_file = fsys[path]
+    except (KeyError, FileNotFoundError):
+        img_file = None
 
     # Deprecated behaviour, check the other packages.
     if img_file is None and check_other_packages:
         for pak_id, other_fsys in PACK_SYSTEMS.items():
-            with other_fsys:
-                try:
-                    img_file = other_fsys[path]
-                    LOGGER.warning(
-                        'Image "{}" was found in package "{}", '
-                        'fix the reference.',
-                        uri, pak_id,
-                    )
-                    break
-                except (KeyError, FileNotFoundError):
-                    pass
+            try:
+                img_file = other_fsys[path]
+                LOGGER.warning(
+                    'Image "{}" was found in package "{}", '
+                    'fix the reference.',
+                    uri, pak_id,
+                )
+                break
+            except (KeyError, FileNotFoundError):
+                pass
 
     if img_file is None:
         LOGGER.error('"{}" does not exist!', uri)
         return Handle.error(width, height).get_pil()
 
     try:
-        with img_file.sys, img_file.open_bin() as file:
+        with img_file.open_bin() as file:
             if path.casefold().endswith('.vtf'):
                 vtf = VTF.read(file)
                 mipmap = 0

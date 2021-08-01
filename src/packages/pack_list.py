@@ -39,7 +39,7 @@ class PackList(PakObject, allow_mult=True):
             ]
         elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
-            with filesystem, filesystem.open_str(path) as f:
+            with filesystem.open_str(path) as f:
                 # Each line is a file to pack.
                 # Skip blank lines, strip whitespace, and
                 # allow // comments.

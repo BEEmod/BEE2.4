@@ -392,18 +392,10 @@ def find_packages(pak_dir: str) -> None:
 
         LOGGER.debug('Reading package "' + name + '"')
 
-        # Gain a persistent hold on the filesystem's handle.
-        # That means we don't need to reopen the zip files constantly.
-        filesys.open_ref()
-
         # Valid packages must have an info.txt file!
         try:
             info = filesys.read_prop('info.txt')
         except FileNotFoundError:
-            # Close the ref we've gotten, since it's not in the dict
-            # it won't be done by load_packages().
-            filesys.close_ref()
-
             if os.path.isdir(name):
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
@@ -412,13 +404,7 @@ def find_packages(pak_dir: str) -> None:
                 LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
             continue
-        try:
-            pak_id = info['ID']
-        except IndexError:
-            # Close the ref we've gotten, since it's not in the dict
-            # it won't be done by load_packages().
-            filesys.close_ref()
-            raise
+        pak_id = info['ID']
 
         if pak_id.casefold() in packages:
             raise ValueError(
@@ -883,13 +869,12 @@ class Style(PakObject):
             else:
                 raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
-            with data.fsys:
-                with data.fsys[folder + '/items.txt'].open_str() as f:
-                    items, renderables = EditorItem.parse(f)
-                try:
-                    vbsp = data.fsys.read_prop(folder + '/vbsp_config.cfg')
-                except FileNotFoundError:
-                    vbsp = None
+            with data.fsys[folder + '/items.txt'].open_str() as f:
+                items, renderables = EditorItem.parse(f)
+            try:
+                vbsp = data.fsys.read_prop(folder + '/vbsp_config.cfg')
+            except FileNotFoundError:
+                vbsp = None
 
         return cls(
             style_id=data.id,

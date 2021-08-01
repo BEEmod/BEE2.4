@@ -198,17 +198,17 @@ TEX_DEFAULTS: Dict[
 ] = {
     # Signage overlays.
     GenCat.OVERLAYS: {
-        'exit': consts.Signage.EXIT, 
-        'arrow': consts.Signage.ARROW, 
-        'dot': consts.Signage.SHAPE_DOT, 
-        'moon': consts.Signage.SHAPE_MOON, 
-        'triangle': consts.Signage.SHAPE_TRIANGLE, 
-        'cross': consts.Signage.SHAPE_CROSS, 
-        'square': consts.Signage.SHAPE_SQUARE, 
-        'circle': consts.Signage.SHAPE_CIRCLE, 
-        'sine': consts.Signage.SHAPE_SINE, 
-        'slash': consts.Signage.SHAPE_SLASH, 
-        'star': consts.Signage.SHAPE_STAR, 
+        'exit': consts.Signage.EXIT,
+        'arrow': consts.Signage.ARROW,
+        'dot': consts.Signage.SHAPE_DOT,
+        'moon': consts.Signage.SHAPE_MOON,
+        'triangle': consts.Signage.SHAPE_TRIANGLE,
+        'cross': consts.Signage.SHAPE_CROSS,
+        'square': consts.Signage.SHAPE_SQUARE,
+        'circle': consts.Signage.SHAPE_CIRCLE,
+        'sine': consts.Signage.SHAPE_SINE,
+        'slash': consts.Signage.SHAPE_SLASH,
+        'star': consts.Signage.SHAPE_STAR,
         'wavy': consts.Signage.SHAPE_WAVY,
 
         # If set and enabled, adds frames for >10 sign pairs
@@ -643,7 +643,6 @@ def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> Non
     antigel_loc.mkdir(parents=True, exist_ok=True)
 
     fsys = game.get_filesystem()
-    fsys.open_ref()
 
     # Basetexture -> material name
     tex_to_antigel: Dict[str, str] = {}

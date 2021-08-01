@@ -711,19 +711,18 @@ class ItemConfig(PakObject, allow_mult=True):
             data.pak_id, data.id,
         ))
 
-        with filesystem:
-            for ver in data.info.find_all('Version'):  # type: Property
-                ver_id = ver['ID', 'VER_DEFAULT']
-                vers[ver_id] = styles = {}
-                for sty_block in ver.find_all('Styles'):
-                    for style in sty_block:
-                        styles[style.real_name] = conf = filesystem.read_prop(
-                            'items/' + style.value + '.cfg'
-                        )
+        for ver in data.info.find_all('Version'):
+            ver_id = ver['ID', 'VER_DEFAULT']
+            vers[ver_id] = styles = {}
+            for sty_block in ver.find_all('Styles'):
+                for style in sty_block:
+                    styles[style.real_name] = conf = filesystem.read_prop(
+                        'items/' + style.value + '.cfg'
+                    )
 
-                        set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
-                            data.pak_id, data.id, style.real_name,
-                        ))
+                    set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
+                        data.pak_id, data.id, style.real_name,
+                    ))
 
         return cls(
             data.id,
@@ -770,27 +769,26 @@ def parse_item_folder(
 
         first_item: Optional[Item] = None
         extra_items: List[EditorItem] = []
-        with filesystem:
-            try:
-                props = filesystem.read_prop(prop_path).find_key('Properties')
-                f = filesystem[editor_path].open_str()
-            except FileNotFoundError as err:
-                raise IOError(
-                    '"' + pak_id + ':items/' + fold + '" not valid! '
-                    'Folder likely missing! '
-                ) from err
-            with f:
-                tok = Tokenizer(f, editor_path)
-                for tok_type, tok_value in tok:
-                    if tok_type is Token.STRING:
-                        if tok_value.casefold() != 'item':
-                            raise tok.error('Unknown item option "{}"!', tok_value)
-                        if first_item is None:
-                            first_item = EditorItem.parse_one(tok)
-                        else:
-                            extra_items.append(EditorItem.parse_one(tok))
-                    elif tok_type is not Token.NEWLINE:
-                        raise tok.error(tok_type)
+        try:
+            props = filesystem.read_prop(prop_path).find_key('Properties')
+            f = filesystem[editor_path].open_str()
+        except FileNotFoundError as err:
+            raise IOError(
+                '"' + pak_id + ':items/' + fold + '" not valid! '
+                'Folder likely missing! '
+            ) from err
+        with f:
+            tok = Tokenizer(f, editor_path)
+            for tok_type, tok_value in tok:
+                if tok_type is Token.STRING:
+                    if tok_value.casefold() != 'item':
+                        raise tok.error('Unknown item option "{}"!', tok_value)
+                    if first_item is None:
+                        first_item = EditorItem.parse_one(tok)
+                    else:
+                        extra_items.append(EditorItem.parse_one(tok))
+                elif tok_type is not Token.NEWLINE:
+                    raise tok.error(tok_type)
 
         if first_item is None:
             raise ValueError(
@@ -858,10 +856,7 @@ def parse_item_folder(
                 path=prop_path,
             )
         try:
-            with filesystem:
-                folders[fold].vbsp_config = conf = filesystem.read_prop(
-                    config_path,
-                )
+            folders[fold].vbsp_config = conf = filesystem.read_prop(config_path)
         except FileNotFoundError:
             folders[fold].vbsp_config = conf = Property(None, [])
 

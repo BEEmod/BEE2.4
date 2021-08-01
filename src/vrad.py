@@ -78,7 +78,7 @@ def dump_files(bsp: BSP, dump_folder: str) -> None:
     """Dump packed files to a location.
     """
     dump_folder = os.path.abspath(dump_folder)
-    
+
     LOGGER.info('Dumping packed files to "{}"...', dump_folder)
 
     # Delete files in the folder, but don't delete the folder itself.
@@ -116,11 +116,11 @@ def run_vrad(args: List[str]) -> None:
 def main(argv: List[str]) -> None:
     """Main VRAD script."""
     LOGGER.info('BEE2 VRAD hook started!')
-        
+
     args = " ".join(argv)
     fast_args = argv[1:]
     full_args = argv[1:]
-    
+
     if not fast_args:
         # No arguments!
         LOGGER.info(
@@ -222,8 +222,6 @@ def main(argv: List[str]) -> None:
 
     # Mount the existing packfile, so the cubemap files are recognised.
     fsys.add_sys(ZipFileSystem('<BSP pakfile>', zipfile))
-
-    fsys.open_ref()
 
     LOGGER.info('Done!')
 
