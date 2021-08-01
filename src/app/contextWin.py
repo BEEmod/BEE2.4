@@ -29,6 +29,7 @@ import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass
 from editoritems_props import TimerDelay
+from localisation import gettext
 
 LOGGER = srctools.logger.get_logger(__name__)
 
