@@ -50,6 +50,37 @@ BOX_LEVELS = [
 ]
 START = '1.0'  # Row 1, column 0 = first character
 
+
+try:
+    import comtypes.client as com_client
+    import _wintaskbar
+except ImportError:
+    com_client = _wintaskbar = None
+    def set_taskbar(screen: 'LoadScreen | None') -> None:
+        """Set the taskbar to display this screen."""
+else:
+    taskbar = com_client.CreateObject(
+        '{56fdf344-fd6d-11d0-958a-006097c9a090}',
+        interface=_wintaskbar.ITaskbarList3,
+    )
+    taskbar.HrInit()
+    TK_ROOT_ID = int(TK_ROOT.wm_frame(), 16)
+    taskbar.ActivateTab(TK_ROOT_ID)
+
+    def set_taskbar(screen: 'BaseLoadScreen | None') -> None:
+        """Set the taskbar to display the state of this screen."""
+        if screen is None:
+            taskbar.SetProgressState(TK_ROOT_ID, _wintaskbar.TBPF_NOPROGRESS)
+            return
+        value = 0
+        total = 0
+        for st_id, tot in screen.maxes.items():
+            if tot > 0:
+                value += round(1024 * screen.values[st_id] / tot)
+                total += 1024
+        taskbar.SetProgressValue(TK_ROOT_ID, min(value, total), total or 1)
+
+
 class BaseLoadScreen:
     """Code common to both loading screen types."""
     def __init__(
@@ -163,6 +194,7 @@ class BaseLoadScreen:
         """Remove this screen."""
         self.win.withdraw()
         self.win.destroy()
+        set_taskbar(None)
         del SCREENS[self.scr_id]
 
 
@@ -231,27 +263,30 @@ class LoadScreen(BaseLoadScreen):
         for stage in self.values.keys():
             self.bar_var[stage].set(0)
             self.labels[stage]['text'] = '0/??'
+        set_taskbar(None)
 
     def update_stage(self, stage):
         """Redraw the given stage."""
         max_val = self.maxes[stage]
         if max_val == 0:  # 0/0 sections are skipped automatically.
-            self.bar_var[stage].set(1000)
+            self.bar_var[stage].set(1024)
         else:
             self.bar_var[stage].set(
-                1000 * self.values[stage] / max_val
+                1024 * self.values[stage] // max_val
             )
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.values[stage],
             max_val,
         )
+        set_taskbar(self)
 
     def op_skip_stage(self, stage):
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
         self.labels[stage]['text'] = TRANSLATION['skip']
-        self.bar_var[stage].set(1000)  # Make sure it fills to max
+        self.bar_var[stage].set(1024)  # Make sure it fills to max
+        set_taskbar(self)
 
 
 class SplashScreen(BaseLoadScreen):
@@ -493,6 +528,7 @@ class SplashScreen(BaseLoadScreen):
                 20 + round(fraction * (width - 40)),
                 y2,
             )
+        set_taskbar(self)
 
     def op_set_length(self, stage, num):
         """Set the number of items in a stage."""
@@ -522,6 +558,7 @@ class SplashScreen(BaseLoadScreen):
                     tags=tag,
                 )
             canvas.tag_lower('tick_' + stage, 'bar_' + stage)
+        set_taskbar(self)
 
     def reset_stages(self):
         pass
@@ -790,6 +827,6 @@ def run_background(
         # If we didn't find anything in the pipe, wait longer.
         # Otherwise we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
-    
+
     TK_ROOT.after(10, check_queue)
     TK_ROOT.mainloop()  # Infinite loop, until the entire process tree quits.
