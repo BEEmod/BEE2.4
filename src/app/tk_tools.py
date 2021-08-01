@@ -166,7 +166,7 @@ if utils.WIN:
         ZOOM_IN = 'size_nw_se'
         STRETCH_VERT = 'sb_v_double_arrow'
         STRETCH_HORIZ = 'sb_h_double_arrow'
-        MOVE_ITEM = 'plus'
+        MOVE_ITEM = 'fleur'
         DESTROY_ITEM = 'x_cursor'
         INVALID_DRAG = 'no'
 elif utils.MAC:
@@ -178,7 +178,7 @@ elif utils.MAC:
         ZOOM_IN = 'zoom-in'
         STRETCH_VERT = 'resizeupdown'
         STRETCH_HORIZ = 'resizeleftright'
-        MOVE_ITEM = 'plus'
+        MOVE_ITEM = 'movearrow'
         DESTROY_ITEM = 'poof'
         INVALID_DRAG = 'notallowed'
 elif utils.LINUX:
@@ -190,8 +190,8 @@ elif utils.LINUX:
         ZOOM_IN = 'sizing'
         STRETCH_VERT = 'bottom_side'
         STRETCH_HORIZ = 'right_side'
-        MOVE_ITEM = 'crosshair'
-        DESTROY_ITEM = 'X_cursor'
+        MOVE_ITEM = 'fleur'
+        DESTROY_ITEM = 'x_cursor'
         INVALID_DRAG = 'circle'
 else:
     raise AssertionError
