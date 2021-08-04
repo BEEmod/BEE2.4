@@ -1,4 +1,5 @@
-from typing import Dict, List, Optional, FrozenSet
+"""Definitions for background music used in the map."""
+from __future__ import annotations
 from srctools import Property
 import srctools.logger
 
@@ -18,12 +19,12 @@ class Music(PakObject):
     def __init__(
         self,
         music_id,
-        selitem_data: 'SelitemData',
-        sound: Dict[MusicChannel, List[str]],
-        children: Dict[MusicChannel, str],
+        selitem_data: SelitemData,
+        sound: dict[MusicChannel, list[str]],
+        children: dict[MusicChannel, str],
         config: Property=None,
         inst=None,
-        sample: Dict[MusicChannel, Optional[str]]=None,
+        sample: dict[MusicChannel, str | None]=None,
         pack=(),
         loop_len=0,
         synch_tbeam=False,
@@ -70,7 +71,7 @@ class Music(PakObject):
         # The sample music file to play, if found.
         sample_block = data.info.find_key('sample', '')
         if sample_block.has_children():
-            sample = {}  # type: Dict[MusicChannel, Optional[str]]
+            sample: dict[MusicChannel, str | None] = {}
             for channel in MusicChannel:
                 chan_sample = sample[channel] = sample_block[channel.value, '']
                 if chan_sample:
@@ -166,7 +167,7 @@ class Music(PakObject):
             return False
         return bool(children.sound[channel])
 
-    def get_attrs(self) -> Dict[str, bool]:
+    def get_attrs(self) -> dict[str, bool]:
         """Generate attributes for SelectorWin."""
         attrs = {
             channel.name: self.has_channel(channel)
@@ -176,7 +177,7 @@ class Music(PakObject):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, channel: MusicChannel) -> Optional[str]:
+    def get_suggestion(self, channel: MusicChannel) -> str | None:
         """Get the ID we want to suggest for a channel."""
         try:
             child = Music.by_id(self.children[channel])
@@ -186,7 +187,7 @@ class Music(PakObject):
             return child.id
         return None
 
-    def get_sample(self, channel: MusicChannel) -> Optional[str]:
+    def get_sample(self, channel: MusicChannel) -> str | None:
         """Get the path to the sample file, if present."""
         if self.sample[channel]:
             return self.sample[channel]
@@ -199,7 +200,7 @@ class Music(PakObject):
     @staticmethod
     def export(exp_data: ExportData):
         """Export the selected music."""
-        selected: dict[MusicChannel, Optional[Music]] = exp_data.selected
+        selected: dict[MusicChannel, Music | None] = exp_data.selected
 
         base_music = selected[MusicChannel.BASE]
 
@@ -256,7 +257,7 @@ class Music(PakObject):
 
         This must be done after they all were parsed.
         """
-        sounds: Dict[FrozenSet[str], str] = {}
+        sounds: dict[frozenset[str], str] = {}
 
         for music in cls.all():
             for channel in MusicChannel:
@@ -264,7 +265,7 @@ class Music(PakObject):
                 child_id = music.children.get(channel, '')
                 if child_id:
                     try:
-                        child = cls.by_id(child_id)
+                        cls.by_id(child_id)
                     except KeyError:
                         LOGGER.warning(
                             'Music "{}" refers to nonexistent'
