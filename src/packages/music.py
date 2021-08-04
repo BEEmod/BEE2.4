@@ -47,7 +47,7 @@ class Music(PakObject):
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
-        sound = data.info.find_block('soundscript', or_blank=True)
+        sound = data.info.find_key('soundscript', or_blank=True)
 
         if sound.has_children():
             sounds = {}
@@ -68,7 +68,7 @@ class Music(PakObject):
             synch_tbeam = False
 
         # The sample music file to play, if found.
-        sample_block = data.info.find_key('sample', '')  # type: Property
+        sample_block = data.info.find_key('sample', '')
         if sample_block.has_children():
             sample = {}  # type: Dict[MusicChannel, Optional[str]]
             for channel in MusicChannel:

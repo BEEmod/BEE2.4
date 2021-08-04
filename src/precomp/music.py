@@ -116,18 +116,18 @@ def add(
         # Add the ents for the config itself.
         # If the items aren't in the map, we can skip adding them.
         # Speed-gel sounds also play when flinging, so keep it always.
-        funnel = conf.find_block('tbeam', or_blank=True)
-        bounce = conf.find_block('bouncegel', or_blank=True)
+        funnel = conf.find_key('tbeam', or_blank=True)
+        bounce = conf.find_key('bouncegel', or_blank=True)
 
         make_channel_conf(
             vmf, loc,
             Channel.BASE,
-            conf.find_block('base', or_blank=True).as_array(),
+            conf.find_key('base', or_blank=True).as_array(),
         )
         make_channel_conf(
             vmf, loc,
             Channel.SPEED,
-            conf.find_block('speedgel', or_blank=True).as_array(),
+            conf.find_key('speedgel', or_blank=True).as_array(),
         )
         if 'funnel' in voice_attr or 'excursionfunnel' in voice_attr:
             make_channel_conf(
@@ -144,7 +144,7 @@ def add(
                 bounce.as_array(),
             )
 
-        packfiles = conf.find_block('pack', or_blank=True).as_array()
+        packfiles = conf.find_key('pack', or_blank=True).as_array()
         if packfiles:
             packer = vmf.create_ent('comp_pack', origin=loc)
             for i, fname in enumerate(packfiles, 1):
