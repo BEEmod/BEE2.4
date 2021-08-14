@@ -1414,8 +1414,12 @@ def position_exit_signs(vmf: VMF) -> None:
     )
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
-    # Indicate the singular instances shouldn't be placed.
-    exit_sign['bee_noframe'] = exit_arrow['bee_noframe'] = '1'
+    if options.get(bool, "remove_exit_signs_dual"):
+        exit_sign.remove()
+        exit_arrow.remove()
+    else:
+        # Indicate the singular instances shouldn't be placed.
+        exit_sign['bee_noframe'] = exit_arrow['bee_noframe'] = '1'
 
 
 def change_overlays(vmf: VMF) -> None:
