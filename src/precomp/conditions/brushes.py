@@ -487,7 +487,7 @@ def res_import_template(vmf: VMF, res: Property):
         # So it's the floor block location.
         Vec.from_str(value) - (0, 0, 128)
         for value in
-        res.find_block('BindOverlay', or_blank=True).as_array()
+        res.find_key('BindOverlay', or_blank=True).as_array()
     ]
 
     key_values = res.find_block("Keys", or_blank=True)
