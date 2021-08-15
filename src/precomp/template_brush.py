@@ -647,6 +647,7 @@ def import_template(
     additional_visgroups: Iterable[str]=(),
     visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     bind_tile_pos: Iterable[Vec]=(),
+    align_bind: bool=False,
 ) -> ExportedTemplate:
     """Import the given template at a location.
 
@@ -665,6 +666,7 @@ def import_template(
 
     If any bound_tile_pos are provided, these are offsets to tiledefs which
     should have all the overlays in this template bound to them, and vice versa.
+    If align_bind is set, these will be first aligned to grid.
     """
     import vbsp
     if isinstance(temp_name, Template):
@@ -764,6 +766,11 @@ def import_template(
         for tile_off in bind_tile_pos:
             tile_off = tile_off.copy()
             tile_off.localise(origin, orient)
+            for axis in ('xyz' if align_bind else ''):
+                # Don't realign things in the normal's axis -
+                # those are already fine.
+                if abs(tile_norm[axis]) < 1e-6:
+                    tile_off[axis] = tile_off[axis] // 128 * 128 + 64
             try:
                 tile = tiling.TILES[tile_off.as_tuple(), tile_norm.as_tuple()]
             except KeyError:

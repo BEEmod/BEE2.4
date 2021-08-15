@@ -402,6 +402,7 @@ def res_import_template(vmf: VMF, res: Property):
             bind overlays on a surface to surfaces in this template.
             The value specifies the offset to the surface, where 0 0 0 is the
             floor position. It can also be a block of multiple positions.
+    - `alignBindOverlay`: If set, align the bindOverlay offsets to the grid.
     - `keys`/`localkeys`: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail.
             Specially-handled keys:
@@ -489,6 +490,7 @@ def res_import_template(vmf: VMF, res: Property):
         for value in
         res.find_key('BindOverlay', or_blank=True).as_array()
     ]
+    align_bind_overlay = res.bool('alignBindOverlay')
 
     key_values = res.find_block("Keys", or_blank=True)
     if key_values:
@@ -654,6 +656,7 @@ def res_import_template(vmf: VMF, res: Property):
             add_to_map=True,
             additional_visgroups=visgroups,
             bind_tile_pos=bind_tile_pos,
+            align_bind=align_bind_overlay,
         )
 
         if key_block is not None:
