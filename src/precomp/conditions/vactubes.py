@@ -10,6 +10,7 @@ import srctools.logger
 from precomp import tiling, instanceLocs, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.conditions import make_result, meta_cond, RES_EXHAUSTED
+import utils
 
 COND_MOD_NAME = None
 
@@ -29,7 +30,6 @@ class Config:
     inst_corner: List[str]
     temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
     trig_radius: int
-    inst_straight: str
     inst_support: str  # Placed on each side with an adjacent wall.
     inst_support_ring: str  # If any support is placed, this is placed.
     inst_exit: str
@@ -37,6 +37,14 @@ class Config:
     inst_entry_floor: str
     inst_entry_wall: str
     inst_entry_ceil: str
+
+    # For straight instances, a size (multiple of 128) -> instance.
+    inst_straight: Dict[int, str]
+    # And those sizes from large to small.
+    inst_straight_sizes: List[int] = attr.ib(init=False)
+    @inst_straight_sizes.default
+    def _straight_size(self) -> list[int]:
+        return sorted(self.inst_straight.keys(), reverse=True)
 
 
 @attr.define
@@ -105,6 +113,14 @@ def res_vactubes(vmf: VMF, res: Property):
 
     for block in res.find_all("Instance"):
         # Configuration info for each instance set..
+        straight_block = block.find_key('straight_inst', '')
+        if straight_block.has_children():
+            straight = {
+                int(prop.name): prop.value
+                for prop in straight_block
+            }
+        else:
+            straight = {128: straight_block.value}
         conf = Config(
             # The three sizes of corner instance
             inst_corner=[
@@ -118,8 +134,7 @@ def res_vactubes(vmf: VMF, res: Property):
                 get_temp('corner_large'),
             ],
             trig_radius=block.float('trig_size', 64.0) / 2.0,
-            # Straight instances connected to the next part
-            inst_straight=block['straight_inst', ''],
+            inst_straight=straight,
             # Supports attach to the 4 sides of the straight part,
             # if there's a brush there.
             inst_support=block['support_inst', ''],
@@ -316,41 +331,47 @@ def make_straight(
 
     push_trigger(vmf, origin, normal, [solid])
 
-    for off in range(0, int(dist), 128):
-        position = origin + off * normal
+    off = 0
+    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
         vmf.create_ent(
             classname='func_instance',
-            origin=position,
+            origin=origin + off * orient.forward(),
             angles=angles,
-            file=config.inst_straight,
+            file=config.inst_straight[seg_dist],
         )
-        if not config.inst_support:
-            continue
-        placed_support = False
-        for supp_dir in [orient.up(), orient.left(), -orient.left(), -orient.up()]:
-            try:
-                tile = tiling.TILES[
-                    (position - 128 * supp_dir).as_tuple(),
-                    supp_dir.norm().as_tuple()
-                ]
-            except KeyError:
-                continue
-            # Check all 4 center tiles are present.
-            if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+        off += seg_dist
+    # Supports.
+    if config.inst_support:
+        for off in range(0, int(dist), 128):
+            position = origin + off * normal
+            placed_support = False
+            for supp_dir in [
+                orient.up(), orient.left(),
+                -orient.left(), -orient.up()
+            ]:
+                try:
+                    tile = tiling.TILES[
+                        (position - 128 * supp_dir).as_tuple(),
+                        supp_dir.norm().as_tuple()
+                    ]
+                except KeyError:
+                    continue
+                # Check all 4 center tiles are present.
+                if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+                    vmf.create_ent(
+                        classname='func_instance',
+                        origin=position,
+                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        file=config.inst_support,
+                    )
+                    placed_support = True
+            if placed_support and config.inst_support_ring:
                 vmf.create_ent(
                     classname='func_instance',
                     origin=position,
-                    angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
-                    file=config.inst_support,
+                    angles=angles,
+                    file=config.inst_support_ring,
                 )
-                placed_support = True
-        if placed_support and config.inst_support_ring:
-            vmf.create_ent(
-                classname='func_instance',
-                origin=position,
-                angles=angles,
-                file=config.inst_support_ring,
-            )
 
 
 def make_corner(
