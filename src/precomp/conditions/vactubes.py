@@ -28,6 +28,7 @@ class Config:
     """Configuration for a vactube item set."""
     inst_corner: List[str]
     temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
+    trig_radius: int
     inst_straight: str
     inst_support: str
     inst_exit: str
@@ -115,6 +116,7 @@ def res_vactubes(vmf: VMF, res: Property):
                 get_temp('corner_medium'),
                 get_temp('corner_large'),
             ],
+            trig_radius=block.float('trig_size', 64.0) / 2.0,
             # Straight instances connected to the next part
             inst_straight=block['straight_inst', ''],
             # Supports attach to the 4 sides of the straight part,
@@ -293,37 +295,32 @@ def make_straight(
     is_start=False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
+    angles = round(normal, 6).to_angle()
+    orient = Matrix.from_angle(angles)
 
-    # 32 added to the other directions, plus extended dist in the direction
-    # of the normal - 1
-    p1 = origin + (normal * ((dist // 128 * 128) - 96))
-    # The starting brush needs to
-    # stick out a bit further, to cover the
+    # The starting brush needs to stick out a bit further, to cover the
     # point_push entity.
-    p2 = origin - (normal * (96 if is_start else 32))
+    start_off = -32 if is_start else 0
+    end_off = dist // 128 * 128
 
     # bbox before +- 32 to ensure the above doesn't wipe it out
-    p1, p2 = Vec.bbox(p1, p2)
+    p1, p2 = Vec.bbox(
+        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+        origin + Vec(end_off, config.trig_radius, config.trig_radius) @ orient,
+    )
 
-    solid = vmf.make_prism(
-        # Expand to 64x64 in the other two directions
-        p1 - 32, p2 + 32,
-        mat='tools/toolstrigger',
-    ).solid
+    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
     motion_trigger(vmf, solid.copy())
 
     push_trigger(vmf, origin, normal, [solid])
-
-    angles = normal.to_angle()
-    orient = Matrix.from_angle(angles)
 
     for off in range(0, int(dist), 128):
         position = origin + off * normal
         vmf.create_ent(
             classname='func_instance',
             origin=position,
-            angles=orient.to_angle(),
+            angles=angles,
             file=config.inst_straight,
         )
 
