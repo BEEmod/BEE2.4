@@ -243,7 +243,7 @@ def vactube_gen(vmf: VMF) -> None:
 
         # If the end is placed in goo, don't add logic - it isn't visible, and
         # the object is on a one-way trip anyway.
-        if BLOCK_POS['world': end_loc].is_goo and end_norm.z < 0:
+        if not (BLOCK_POS['world': end_loc].is_goo and end_norm.z < -1e-6):
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
             end_logic['file'] = end.conf.inst_exit
@@ -261,8 +261,8 @@ def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
             # The z-direction is reversed..
             pushdir=normal.to_angle(),
             speed=(
-                UP_PUSH_SPEED if normal.z > 0 else
-                DN_PUSH_SPEED if normal.z < 0 else
+                UP_PUSH_SPEED if normal.z > 1e-6 else
+                DN_PUSH_SPEED if normal.z < -1e-6 else
                 PUSH_SPEED
             ),
             spawnflags='1103',  # Clients, Physics, Everything
@@ -303,13 +303,11 @@ def make_straight(
 
     # The starting brush needs to stick out a bit further, to cover the
     # point_push entity.
-    start_off = -32 if is_start else 0
-    end_off = dist // 128 * 128
+    start_off = -96 if is_start else -64
 
-    # bbox before +- 32 to ensure the above doesn't wipe it out
     p1, p2 = Vec.bbox(
         origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
-        origin + Vec(end_off, config.trig_radius, config.trig_radius) @ orient,
+        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
     )
 
     solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
