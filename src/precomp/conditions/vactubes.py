@@ -30,7 +30,8 @@ class Config:
     temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
     trig_radius: int
     inst_straight: str
-    inst_support: str
+    inst_support: str  # Placed on each side with an adjacent wall.
+    inst_support_ring: str  # If any support is placed, this is placed.
     inst_exit: str
 
     inst_entry_floor: str
@@ -122,6 +123,8 @@ def res_vactubes(vmf: VMF, res: Property):
             # Supports attach to the 4 sides of the straight part,
             # if there's a brush there.
             inst_support=block['support_inst', ''],
+            # If a support is placed, this is also placed once.
+            inst_support_ring=block['support_ring_inst', ''],
             inst_entry_floor=block['entry_floor_inst'],
             inst_entry_wall=block['entry_inst'],
             inst_entry_ceil=block['entry_ceil_inst'],
@@ -323,7 +326,9 @@ def make_straight(
             angles=angles,
             file=config.inst_straight,
         )
-
+        if not config.inst_support:
+            continue
+        placed_support = False
         for supp_dir in [orient.up(), orient.left(), -orient.left(), -orient.up()]:
             try:
                 tile = tiling.TILES[
@@ -340,6 +345,14 @@ def make_straight(
                     angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
                     file=config.inst_support,
                 )
+                placed_support = True
+        if placed_support and config.inst_support_ring:
+            vmf.create_ent(
+                classname='func_instance',
+                origin=position,
+                angles=angles,
+                file=config.inst_support_ring,
+            )
 
 
 def make_corner(
