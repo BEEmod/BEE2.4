@@ -1,8 +1,8 @@
 """Conditions for randomising instances."""
 import random
-from typing import List
+from typing import List, Callable
 
-from srctools import Property, Vec, Entity, VMF
+from srctools import Property, Vec, Entity
 from precomp import conditions
 import srctools
 
@@ -15,7 +15,7 @@ COND_MOD_NAME = 'Randomisation'
 
 
 @make_flag('random')
-def flag_random(inst: Entity, res: Property) -> bool:
+def flag_random(res: Property) -> Callable[[Entity], bool]:
     """Randomly is either true or false."""
     if res.has_children():
         chance = res['chance', '100']
@@ -27,12 +27,15 @@ def flag_random(inst: Entity, res: Property) -> bool:
     # Allow ending with '%' sign
     chance = srctools.conv_int(chance.rstrip('%'), 100)
 
-    set_random_seed(inst, seed)
-    return random.randrange(100) < chance
+    def rand_func(inst: Entity) -> bool:
+        """Apply the random chance."""
+        set_random_seed(inst, seed)
+        return random.randrange(100) < chance
+    return rand_func
 
 
 @make_result_setup('random')
-def res_random_setup(vmf: VMF, res: Property) -> object:
+def res_random_setup(res: Property) -> object:
     weight = ''
     results = []
     chance = 100
