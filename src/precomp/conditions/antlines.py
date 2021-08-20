@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
 import attr
 
-from precomp import instanceLocs, connections, conditions, antlines
+from precomp import instanceLocs, connections, conditions, antlines, tiling
 import srctools.logger
 from precomp.conditions import make_result
 from srctools import VMF, Property, Output, Vec, Entity, Angle, Matrix
@@ -297,39 +297,57 @@ def res_antlaser(vmf: VMF, res: Property):
                     Vec(point),
                     Vec(point),
                 ))
+            elif group.type is NodeType.LASER:
+                sprite_pos = node.pos + conf_glow_height @ node.orient
 
-            sprite_pos = conf_glow_height.copy()
-            sprite_pos.localise(node.pos, node.orient)
+                if glow_conf:
+                    # First add the sprite at the right height.
+                    sprite = vmf.create_ent('env_sprite')
+                    for prop in glow_conf:
+                        sprite[prop.name] = conditions.resolve_value(node.inst, prop.value)
 
-            if glow_conf:
-                # First add the sprite at the right height.
-                sprite = vmf.create_ent('env_sprite')
-                for prop in glow_conf:
-                    sprite[prop.name] = conditions.resolve_value(node.inst, prop.value)
+                    sprite['origin'] = sprite_pos
+                    sprite['targetname'] = NAME_SPR(base_name, i)
+                elif beam_conf:
+                    # If beams but not sprites, we need a target.
+                    vmf.create_ent(
+                        'info_target',
+                        origin=sprite_pos,
+                        targetname=NAME_SPR(base_name, i),
+                    )
 
-                sprite['origin'] = sprite_pos
-                sprite['targetname'] = NAME_SPR(base_name, i)
-            elif beam_conf:
-                # If beams but not sprites, we need a target.
-                vmf.create_ent(
-                    'info_target',
-                    origin=sprite_pos,
-                    targetname=NAME_SPR(base_name, i),
-                )
+                if beam_conf:
+                    # Now the beam going from below up to the sprite.
+                    beam_pos = node.pos + conf_las_start @ node.orient
+                    beam = vmf.create_ent('env_beam')
+                    for prop in beam_conf:
+                        beam[prop.name] = conditions.resolve_value(node.inst, prop.value)
 
-            if beam_conf:
-                # Now the beam going from below up to the sprite.
-                beam_pos = conf_las_start.copy()
-                beam_pos.localise(node.pos, node.orient)
-                beam = vmf.create_ent('env_beam')
-                for prop in beam_conf:
-                    beam[prop.name] = conditions.resolve_value(node.inst, prop.value)
+                    beam['origin'] = beam['targetpoint'] = beam_pos
+                    beam['targetname'] = NAME_BEAM_LOW(base_name, i)
+                    beam['LightningStart'] = beam['targetname']
+                    beam['LightningEnd'] = NAME_SPR(base_name, i)
+                    beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
 
-                beam['origin'] = beam['targetpoint'] = beam_pos
-                beam['targetname'] = NAME_BEAM_LOW(base_name, i)
-                beam['LightningStart'] = beam['targetname']
-                beam['LightningEnd'] = NAME_SPR(base_name, i)
-                beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
+        if group.type is NodeType.CORNER and segments:
+            # Assign tiledefs to the segments.
+            for seg in segments:
+                # Assign tiledefs.
+                mins, maxs = Vec.bbox(seg.start, seg.end)
+                norm_axis = seg.normal.axis()
+                u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+                for pos in Vec.iter_line(mins, maxs, 128):
+                    pos[u_axis] = pos[u_axis] // 128 * 128 + 64
+                    pos[v_axis] = pos[v_axis] // 128 * 128 + 64
+                    pos -= 64 * seg.normal
+                    try:
+                        tile = tiling.TILES[pos.as_tuple(), seg.normal.as_tuple()]
+                    except KeyError:
+                        pass
+                    else:
+                        seg.tiles.add(tile)
+
+            group.item.antlines.add(antlines.Antline(group.item.name + '_antline', segments))
 
         if group.type is NodeType.LASER and beam_conf:
             for i, (node_a, node_b) in enumerate(group.links):
