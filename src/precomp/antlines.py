@@ -244,13 +244,16 @@ class Antline:
                 else:
                     mat = random.choice(conf.tex_corner or conf.tex_straight)
 
-                axis_u, _ = Vec.INV_AXIS[seg.normal.axis()]
+                # Because we can, apply a random rotation to mix up the texture.
+                orient = Matrix.from_angle(seg.normal.to_angle(
+                    random.choice((0.0, 90.0, 180.0, 270.0))
+                ))
                 self._make_overlay(
                     vmf,
                     seg,
                     seg.start,
-                    Vec.with_axes(axis_u, 16),
-                    16 * seg.normal.cross(Vec.with_axes(axis_u, 1)),
+                    16.0 * orient.left(),
+                    16.0 * orient.up(),
                     mat,
                 )
             else:  # Straight
