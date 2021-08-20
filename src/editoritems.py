@@ -991,13 +991,19 @@ class Item:
                 try:
                     self.handle = Handle(handle_str.upper())
                 except ValueError:
-                    raise tok.error('Unknown handle type {}', handle_str)
+                    LOGGER.warning(
+                        'Unknown movement handle "{}"  in ({}:{})',
+                        handle_str, tok.filename, tok.line_num,
+                    )
             elif folded_key == 'invalidsurface':
                 for word in tok.expect(Token.STRING).split():
                     try:
                         self.invalid_surf.add(Surface[word.upper()])
                     except KeyError:
-                        raise tok.error('Unknown surface type {}', word)
+                        LOGGER.warning(
+                            'Unknown invalid surface "{}"  in ({}:{})',
+                            word, tok.filename, tok.line_num,
+                        )
             elif folded_key == 'subtypeproperty':
                 subtype_prop = tok.expect(Token.STRING)
                 try:
@@ -1010,7 +1016,11 @@ class Item:
                 try:
                     self.facing = DesiredFacing(desired_facing.upper())
                 except ValueError:
-                    raise tok.error('Unknown desired facing {}', desired_facing)
+                    LOGGER.warning(
+                        'Unknown desired facing {}, assuming ANYTHING in ({}:{})',
+                        desired_facing, tok.filename, tok.line_num,
+                    )
+                    self.facing = DesiredFacing.NONE
             elif folded_key == 'rendercolor':
                 # Rendercolor is on catapult targets, and is useless.
                 tok.expect(Token.STRING)
