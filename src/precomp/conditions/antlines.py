@@ -1,28 +1,35 @@
 """Items dealing with antlines - Antline Corners and Antlasers."""
+from __future__ import annotations
 from enum import Enum
 from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
 
 from precomp import instanceLocs, connections, conditions
 import srctools.logger
 from precomp.conditions import make_result
-from srctools import VMF, Property, Output, Vec, Entity
+from srctools import VMF, Property, Output, Vec, Entity, Angle
 
 
 COND_MOD_NAME = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlines')
 
-AntLaserConn = connections.Config(
-    '<AntLaser>',
+AntlineConn = connections.Config(
+    '<Antline>',
     input_type=connections.InputType.OR,
     output_act=(None, 'OnUser2'),
     output_deact=(None, 'OnUser1'),
 )
 
-NAME_SPR = '{}-fx_sp_{}'.format  # type: Callable[[str, int], str]
-NAME_BEAM_LOW = '{}-fx_b_low_{}'.format  # type: Callable[[str, int], str]
-NAME_BEAM_CONN = '{}-fx_b_conn_{}'.format  # type: Callable[[str, int], str]
-NAME_CABLE = '{}-cab_{}'.format  # type: Callable[[str, int], str]
+NAME_SPR: Callable[[str, int], str] = '{}-fx_sp_{}'.format
+NAME_BEAM_LOW: Callable[[str, int], str] = '{}-fx_b_low_{}'.format
+NAME_BEAM_CONN: Callable[[str, int], str] = '{}-fx_b_conn_{}'.format
+NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
+
+
+class NodeType(Enum):
+    """Handle our two types of item."""
+    CORNER = 'corner'
+    LASER = 'laser'
 
 
 class RopeState(Enum):
@@ -49,7 +56,8 @@ class RopeState(Enum):
 
 class Group:
     """Represents a group of markers."""
-    def __init__(self, start: connections.Item):
+    def __init__(self, start: connections.Item, typ: NodeType):
+        self.type = typ  # Antlaser or corner?
         self.nodes: List[connections.Item] = [start]
         # We use a frozenset here to ensure we don't double-up the links -
         # users might accidentally do that.
@@ -62,7 +70,7 @@ class Group:
         )
         self.item = connections.Item(
             logic_ent,
-            AntLaserConn,
+            AntlineConn,
             start.ant_floor_style,
             start.ant_wall_style,
         )
@@ -77,19 +85,20 @@ def on_floor(node: connections.Item) -> bool:
 
 @make_result('AntLaser')
 def res_antlaser(vmf: VMF, res: Property):
-    """The condition to generate AntLasers.
+    """The condition to generate AntLasers and Antline Corners.
 
     This is executed once to modify all instances.
     """
-    conf_inst = instanceLocs.resolve(res['instance'])
+    conf_inst_corner = instanceLocs.resolve('<item_bee2_antline_corner>', silent=True)
+    conf_inst_laser = instanceLocs.resolve(res['instance'])
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
     conf_rope_off = res.vec('RopePos')
     conf_toggle_targ = res['toggleTarg', '']
 
-    beam_conf = res.find_key('BeamKeys', [])
-    glow_conf = res.find_key('GlowKeys', [])
-    cable_conf = res.find_key('CableKeys', [])
+    beam_conf = res.find_key('BeamKeys', or_blank=True)
+    glow_conf = res.find_key('GlowKeys', or_blank=True)
+    cable_conf = res.find_key('CableKeys', or_blank=True)
 
     if beam_conf:
         # Grab a copy of the beam spawnflags so we can set our own options.
@@ -118,12 +127,19 @@ def res_antlaser(vmf: VMF, res: Property):
     ]
 
     # Find all the markers.
-    nodes: Dict[str, connections.Item] = {}
+    nodes: dict[str, connections.Item] = {}
+    node_type: dict[str, NodeType] = {}
 
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in conf_inst:
-            continue
+        filename = inst['file'].casefold()
         name = inst['targetname']
+        if filename in conf_inst_laser:
+            node_type[name] = NodeType.LASER
+        elif filename in conf_inst_corner:
+            node_type[name] = NodeType.CORNER
+        else:
+            continue
+
         try:
             # Remove the item - it's no longer going to exist after
             # we're done.
@@ -138,7 +154,7 @@ def res_antlaser(vmf: VMF, res: Property):
     # Now find every connected group, recording inputs, outputs and links.
     todo = set(nodes.values())
 
-    groups = []  # type: List[Group]
+    groups: list[Group] = []
 
     # Node -> is grouped already.
     node_pairing = dict.fromkeys(nodes.values(), False)
@@ -147,7 +163,7 @@ def res_antlaser(vmf: VMF, res: Property):
         start = todo.pop()
         # Synthesise the Item used for logic.
         # We use a random info_target to manage the IO data.
-        group = Group(start)
+        group = Group(start, node_type[start.name])
         groups.append(group)
         for node in group.nodes:
             # If this node has no non-node outputs, destroy the antlines.
@@ -158,8 +174,9 @@ def res_antlaser(vmf: VMF, res: Property):
                 neighbour = conn.to_item
                 todo.discard(neighbour)
                 pair_state = node_pairing.get(neighbour, None)
-                if pair_state is None:
-                    # Not a node, a target of our logic.
+                if pair_state is None or group.type is not node_type[neighbour.name]:
+                    # Not a node or different item type, it must therefore
+                    # be a target of our logic.
                     conn.from_item = group.item
                     has_output = True
                     continue
@@ -184,8 +201,9 @@ def res_antlaser(vmf: VMF, res: Property):
                 neighbour = conn.from_item
                 todo.discard(neighbour)
                 pair_state = node_pairing.get(neighbour, None)
-                if pair_state is None:
-                    # Not a node, an input to the group.
+                if pair_state or group.type is not node_type[neighbour.name]:
+                    # Not a node or different item type, it must therefore
+                    # be a target of our logic.
                     conn.to_item = group.item
                     continue
                 elif pair_state is False:
@@ -203,7 +221,7 @@ def res_antlaser(vmf: VMF, res: Property):
         # and a beam pointing at it. Then for each connection
         # another beam.
 
-        # Choose a random antlaser name to use for our group.
+        # Choose a random item name to use for our group.
         base_name = group.nodes[0].name
 
         out_enable = [Output('', '', 'FireUser2')]
