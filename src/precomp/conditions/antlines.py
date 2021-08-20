@@ -27,6 +27,17 @@ NAME_BEAM_CONN: Callable[[str, int], str] = '{}-fx_b_conn_{}'.format
 NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
 
 
+CORNER_POS = [
+    Vec(8.0, 56.0),
+    Vec(8.0, 40.0),
+    Vec(8.0, 24.0),
+    Vec(8.0, 8.0),
+    Vec(-8.0, 56.0),
+    Vec(-8.0, 40.0),
+    Vec(-8.0, 24.0),
+    Vec(-8.0, 8.0),
+]
+
 class NodeType(Enum):
     """Handle our two types of item."""
     CORNER = 'corner'
@@ -159,6 +170,11 @@ def res_antlaser(vmf: VMF, res: Property):
             raise ValueError('No item for "{}"?'.format(name)) from None
         pos = Vec.from_str(inst['origin'])
         orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        if node_type is NodeType.CORNER:
+            timer_delay = item.inst.fixup.int('$timer_delay')
+            # We treat inf, 1, 2 and 3 as the same, to get around the 1 and 2 not
+            # being selectable issue.
+            pos = CORNER_POS[max(0, timer_delay - 3) % 8] @ orient + pos
         nodes[name] = Node(node_type, inst, item, pos, orient)
 
     if not nodes:
@@ -274,11 +290,12 @@ def res_antlaser(vmf: VMF, res: Property):
 
             if group.type is NodeType.CORNER:
                 node.inst.remove()
+                point = node.pos - 64 * node.orient.up()
                 segments.append(antlines.Segment(
                     antlines.SegType.CORNER,
-                    round(orient.up(), 3),
-                    Vec(pos),
-                    Vec(pos),
+                    round(node.orient.up(), 3),
+                    Vec(point),
+                    Vec(point),
                 ))
 
             sprite_pos = conf_glow_height.copy()
