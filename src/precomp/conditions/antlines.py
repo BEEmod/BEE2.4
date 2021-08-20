@@ -1,5 +1,4 @@
-"""Implement Konclan's AntLaser item.
-"""
+"""Items dealing with antlines - Antline Corners and Antlasers."""
 from enum import Enum
 from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
 
@@ -11,7 +10,7 @@ from srctools import VMF, Property, Output, Vec, Entity
 
 COND_MOD_NAME = None
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlaser')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlines')
 
 AntLaserConn = connections.Config(
     '<AntLaser>',
