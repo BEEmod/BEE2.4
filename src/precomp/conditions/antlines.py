@@ -201,7 +201,7 @@ def res_antlaser(vmf: VMF, res: Property):
                 neighbour = conn.from_item
                 todo.discard(neighbour)
                 pair_state = node_pairing.get(neighbour, None)
-                if pair_state or group.type is not node_type[neighbour.name]:
+                if pair_state is None or group.type is not node_type[neighbour.name]:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
                     conn.to_item = group.item
