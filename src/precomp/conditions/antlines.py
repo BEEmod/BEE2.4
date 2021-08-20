@@ -2,11 +2,12 @@
 from __future__ import annotations
 from enum import Enum
 from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
+import attr
 
-from precomp import instanceLocs, connections, conditions
+from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
 from precomp.conditions import make_result
-from srctools import VMF, Property, Output, Vec, Entity, Angle
+from srctools import VMF, Property, Output, Vec, Entity, Angle, Matrix
 
 
 COND_MOD_NAME = None
@@ -32,6 +33,23 @@ class NodeType(Enum):
     LASER = 'laser'
 
 
+@attr.define(eq=False)
+class Node:
+    """A node placed in the map."""
+    type: NodeType
+    inst: Entity
+    item: connections.Item
+    pos: Vec
+    orient: Matrix
+    # Group has been found yet for this node?
+    is_grouped: bool = False
+
+    @property
+    def on_floor(self) -> bool:
+        """Check if this node is on the floor."""
+        return self.orient.up().z > 0.9
+
+
 class RopeState(Enum):
     """Used to link up ropes."""
     NONE = 'none'  # No rope here.
@@ -40,8 +58,8 @@ class RopeState(Enum):
 
     @staticmethod
     def from_node(
-        points: Dict[connections.Item, Union[Entity, str]],
-        node: connections.Item,
+        points: Dict[Node, Union[Entity, str]],
+        node: Node,
     ) -> Tuple['RopeState', Union[Entity, str]]:
         """Compute the state and ent/name from the points data."""
         try:
@@ -56,31 +74,25 @@ class RopeState(Enum):
 
 class Group:
     """Represents a group of markers."""
-    def __init__(self, start: connections.Item, typ: NodeType):
+    def __init__(self, start: Node, typ: NodeType):
         self.type = typ  # Antlaser or corner?
-        self.nodes: List[connections.Item] = [start]
+        self.nodes: List[Node] = [start]
         # We use a frozenset here to ensure we don't double-up the links -
         # users might accidentally do that.
-        self.links: Set[FrozenSet[connections.Item]] = set()
+        self.links: Set[FrozenSet[Node]] = set()
         # Create the item for the entire group of markers.
         logic_ent = start.inst.map.create_ent(
             'info_target',
-            origin=start.inst['origin'],
-            targetname=start.name,
+            origin=start.pos,
+            targetname=start.item.name,
         )
         self.item = connections.Item(
             logic_ent,
             AntlineConn,
-            start.ant_floor_style,
-            start.ant_wall_style,
+            start.item.ant_floor_style,
+            start.item.ant_wall_style,
         )
         connections.ITEMS[self.item.name] = self.item
-
-
-def on_floor(node: connections.Item) -> bool:
-    """Check if this node is on the floor."""
-    norm = Vec(z=1) @ Angle.from_str(node.inst['angles'])
-    return norm.z > 0.9
 
 
 @make_result('AntLaser')
@@ -127,25 +139,27 @@ def res_antlaser(vmf: VMF, res: Property):
     ]
 
     # Find all the markers.
-    nodes: dict[str, connections.Item] = {}
-    node_type: dict[str, NodeType] = {}
+    nodes: dict[str, Node] = {}
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
         name = inst['targetname']
         if filename in conf_inst_laser:
-            node_type[name] = NodeType.LASER
+            node_type = NodeType.LASER
         elif filename in conf_inst_corner:
-            node_type[name] = NodeType.CORNER
+            node_type = NodeType.CORNER
         else:
             continue
 
         try:
             # Remove the item - it's no longer going to exist after
             # we're done.
-            nodes[name] = connections.ITEMS.pop(name)
+            item = connections.ITEMS.pop(name)
         except KeyError:
             raise ValueError('No item for "{}"?'.format(name)) from None
+        pos = Vec.from_str(inst['origin'])
+        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        nodes[name] = Node(node_type, inst, item, pos, orient)
 
     if not nodes:
         # None at all.
@@ -156,64 +170,61 @@ def res_antlaser(vmf: VMF, res: Property):
 
     groups: list[Group] = []
 
-    # Node -> is grouped already.
-    node_pairing = dict.fromkeys(nodes.values(), False)
-
     while todo:
         start = todo.pop()
         # Synthesise the Item used for logic.
         # We use a random info_target to manage the IO data.
-        group = Group(start, node_type[start.name])
+        group = Group(start, start.type)
         groups.append(group)
         for node in group.nodes:
             # If this node has no non-node outputs, destroy the antlines.
             has_output = False
-            node_pairing[node] = True
+            node.is_grouped = True
 
-            for conn in list(node.outputs):
+            for conn in list(node.item.outputs):
                 neighbour = conn.to_item
-                todo.discard(neighbour)
-                pair_state = node_pairing.get(neighbour, None)
-                if pair_state is None or group.type is not node_type[neighbour.name]:
+                neigh_node = nodes.get(neighbour.name, None)
+                todo.discard(neigh_node)
+                if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
                     conn.from_item = group.item
                     has_output = True
                     continue
-                elif pair_state is False:
+                elif not neigh_node.is_grouped:
                     # Another node.
-                    group.nodes.append(neighbour)
+                    group.nodes.append(neigh_node)
                 # else: True, node already added.
 
                 # For nodes, connect link.
                 conn.remove()
-                group.links.add(frozenset({node, neighbour}))
+                group.links.add(frozenset({node, neigh_node}))
 
             # If we have a real output, we need to transfer it.
             # Otherwise we can just destroy it.
             if has_output:
-                node.transfer_antlines(group.item)
+                node.item.transfer_antlines(group.item)
             else:
-                node.delete_antlines()
+                node.item.delete_antlines()
 
             # Do the same for inputs, so we can catch that.
-            for conn in list(node.inputs):
+            for conn in list(node.item.inputs):
                 neighbour = conn.from_item
-                todo.discard(neighbour)
-                pair_state = node_pairing.get(neighbour, None)
-                if pair_state is None or group.type is not node_type[neighbour.name]:
+                neigh_node = nodes.get(neighbour.name, None)
+                todo.discard(neigh_node)
+                if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
                     conn.to_item = group.item
                     continue
-                elif pair_state is False:
+                elif not neigh_node.is_grouped:
                     # Another node.
-                    group.nodes.append(neighbour)
+                    group.nodes.append(neigh_node)
                 # else: True, node already added.
 
                 # For nodes, connect link.
                 conn.remove()
-                group.links.add(frozenset({neighbour, node}))
+                group.links.add(frozenset({neigh_node, node}))
 
     # Now every node is in a group. Generate the actual entities.
     for group in groups:
@@ -222,15 +233,16 @@ def res_antlaser(vmf: VMF, res: Property):
         # another beam.
 
         # Choose a random item name to use for our group.
-        base_name = group.nodes[0].name
+        base_name = group.nodes[0].item.name
 
         out_enable = [Output('', '', 'FireUser2')]
         out_disable = [Output('', '', 'FireUser1')]
-        for output in conf_outputs:
-            if output.output.casefold() == 'onenabled':
-                out_enable.append(output.copy())
-            else:
-                out_disable.append(output.copy())
+        if group.type is NodeType.LASER:
+            for output in conf_outputs:
+                if output.output.casefold() == 'onenabled':
+                    out_enable.append(output.copy())
+                else:
+                    out_disable.append(output.copy())
 
         group.item.enable_cmd = tuple(out_enable)
         group.item.disable_cmd = tuple(out_disable)
@@ -242,7 +254,10 @@ def res_antlaser(vmf: VMF, res: Property):
             toggle['target'] = conditions.local_name(group.nodes[0].inst, conf_toggle_targ)
 
         # Node -> index for targetnames.
-        indexes: Dict[connections.Item, int] = {}
+        indexes: Dict[Node, int] = {}
+
+        # For antline corners, the antline segments.
+        segments: list[antlines.Segment] = []
 
         # For cables, it's a bit trickier than the beams.
         # The cable ent itself is the one which decides what it links to,
@@ -251,17 +266,23 @@ def res_antlaser(vmf: VMF, res: Property):
         # So this dict is either a targetname to indicate cables with an
         # outgoing connection, or the entity for endpoints without an outgoing
         # connection.
-        cable_points: Dict[connections.Item, Union[Entity, str]] = {}
+        cable_points: Dict[Node, Union[Entity, str]] = {}
 
         for i, node in enumerate(group.nodes, start=1):
             indexes[node] = i
-            node.name = base_name
+            node.item.name = base_name
+
+            if group.type is NodeType.CORNER:
+                node.inst.remove()
+                segments.append(antlines.Segment(
+                    antlines.SegType.CORNER,
+                    round(orient.up(), 3),
+                    Vec(pos),
+                    Vec(pos),
+                ))
 
             sprite_pos = conf_glow_height.copy()
-            sprite_pos.localise(
-                Vec.from_str(node.inst['origin']),
-                Angle.from_str(node.inst['angles']),
-            )
+            sprite_pos.localise(node.pos, node.orient)
 
             if glow_conf:
                 # First add the sprite at the right height.
@@ -282,10 +303,7 @@ def res_antlaser(vmf: VMF, res: Property):
             if beam_conf:
                 # Now the beam going from below up to the sprite.
                 beam_pos = conf_las_start.copy()
-                beam_pos.localise(
-                    Vec.from_str(node.inst['origin']),
-                    Angle.from_str(node.inst['angles']),
-                )
+                beam_pos.localise(node.pos, node.orient)
                 beam = vmf.create_ent('env_beam')
                 for prop in beam_conf:
                     beam[prop.name] = conditions.resolve_value(node.inst, prop.value)
@@ -296,17 +314,17 @@ def res_antlaser(vmf: VMF, res: Property):
                 beam['LightningEnd'] = NAME_SPR(base_name, i)
                 beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
 
-        if beam_conf:
+        if group.type is NodeType.LASER and beam_conf:
             for i, (node_a, node_b) in enumerate(group.links):
                 beam = vmf.create_ent('env_beam')
                 conditions.set_ent_keys(beam, node_a.inst, res, 'BeamKeys')
-                beam['origin'] = beam['targetpoint'] = node_a.inst['origin']
+                beam['origin'] = beam['targetpoint'] = node_a.pos
                 beam['targetname'] = NAME_BEAM_CONN(base_name, i)
                 beam['LightningStart'] = NAME_SPR(base_name, indexes[node_a])
                 beam['LightningEnd'] = NAME_SPR(base_name, indexes[node_b])
                 beam['spawnflags'] = conf_beam_flags
 
-        if cable_conf:
+        if group.type is NodeType.LASER and cable_conf:
             build_cables(
                 vmf,
                 group,
@@ -322,7 +340,7 @@ def res_antlaser(vmf: VMF, res: Property):
 def build_cables(
     vmf: VMF,
     group: Group,
-    cable_points: dict[connections.Item, Union[Entity, str]],
+    cable_points: dict[Node, Union[Entity, str]],
     base_name: str,
     beam_conf: Property,
     conf_rope_off: Vec,
@@ -342,6 +360,8 @@ def build_cables(
     # LU | Flip, do UL
     # LL | Make A, link A to B. Both are linked.
     rope_ind = 0  # Uniqueness value.
+    node_a: Node
+    node_b: Node
     for node_a, node_b in group.links:
         state_a, ent_a = RopeState.from_node(cable_points, node_a)
         state_b, ent_b = RopeState.from_node(cable_points, node_b)
@@ -355,17 +375,8 @@ def build_cables(
             ent_a, ent_b = ent_b, ent_a
             node_a, node_b = node_b, node_a
 
-        pos_a = conf_rope_off.copy()
-        pos_a.localise(
-            Vec.from_str(node_a.inst['origin']),
-            Angle.from_str(node_a.inst['angles']),
-        )
-
-        pos_b = conf_rope_off.copy()
-        pos_b.localise(
-            Vec.from_str(node_b.inst['origin']),
-            Angle.from_str(node_b.inst['angles']),
-        )
+        pos_a = node_a.pos + conf_rope_off @ node_a.orient
+        pos_b = node_b.pos + conf_rope_off @ node_b.orient
 
         # Need to make the A rope if we don't have one that's unlinked.
         if state_a is not RopeState.UNLINKED:
@@ -401,7 +412,7 @@ def build_cables(
 
         # Figure out how much slack to give.
         # If on floor, we need to be taut to have clearance.
-        if on_floor(node_a) or on_floor(node_b):
+        if node_a.on_floor or node_b.on_floor:
             rope_a['slack'] = 60
         else:
             rope_a['slack'] = 125
