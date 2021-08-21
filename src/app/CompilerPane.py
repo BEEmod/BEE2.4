@@ -43,7 +43,7 @@ COMPILE_DEFAULTS = {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        'use_voice_priority': '1',
+        'use_voice_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
     },
@@ -87,7 +87,7 @@ tk_screenshot = None  # The preview image shown
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
-VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True))
+VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'use_voice_priority', False))
 
 player_model_var = tk.StringVar(
     value=PLAYER_MODELS.get(
