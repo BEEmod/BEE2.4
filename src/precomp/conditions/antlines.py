@@ -28,14 +28,14 @@ NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
 
 
 CORNER_POS = [
-    Vec(8.0, 56.0),
-    Vec(8.0, 40.0),
-    Vec(8.0, 24.0),
-    Vec(8.0, 8.0),
-    Vec(-8.0, 56.0),
-    Vec(-8.0, 40.0),
-    Vec(-8.0, 24.0),
-    Vec(-8.0, 8.0),
+    Vec(8.0, 56.0, -64.0),
+    Vec(8.0, 40.0, -64.0),
+    Vec(8.0, 24.0, -64.0),
+    Vec(8.0, 8.0, -64.0),
+    Vec(-8.0, 56.0, -64.0),
+    Vec(-8.0, 40.0, -64.0),
+    Vec(-8.0, 24.0, -64.0),
+    Vec(-8.0, 8.0, -64.0),
 ]
 
 class NodeType(Enum):
@@ -91,12 +91,20 @@ class Group:
         # We use a frozenset here to ensure we don't double-up the links -
         # users might accidentally do that.
         self.links: Set[FrozenSet[Node]] = set()
-        # Create the item for the entire group of markers.
+
+        # Create an info_target to attach I/O to.
+        # The corners have an origin on the floor wheras lasers are normal.
+        if typ is NodeType.CORNER:
+            logic_pos = start.pos + 8 * start.orient.up()
+        else:
+            logic_pos = start.pos - 56 * start.orient.up()
         logic_ent = start.inst.map.create_ent(
             'info_target',
-            origin=start.pos,
+            origin=logic_pos,
             targetname=start.item.name,
         )
+
+        # Create the item for the entire group of markers.
         self.item = connections.Item(
             logic_ent,
             AntlineConn,
@@ -275,6 +283,44 @@ def res_antlaser(vmf: VMF, res: Property):
         # For antline corners, the antline segments.
         segments: list[antlines.Segment] = []
 
+        # frozenset[Node] unpacking isn't clear.
+        node_a: Node
+        node_b: Node
+
+        if group.type is NodeType.CORNER:
+            for node_a, node_b in group.links:
+                # Place a straight antline between each connected node.
+                # If on the same plane, we only need one. If not, we need to
+                # do one for each plane it's in.
+                offset = node_b.pos - node_a.pos
+                if Vec.dot(node_a.orient.up(), node_b.orient.up()) > 0.9:
+                    plane_a = Vec.dot(node_a.pos, node_a.orient.up())
+                    plane_b = Vec.dot(node_b.pos, node_b.orient.up())
+                    if abs(plane_a - plane_b) > 1e-6:
+                        LOGGER.warning(
+                            'Antline corners "{}" - "{}" '
+                            'are on different planes',
+                            node_a.item.name, node_b.item.name,
+                        )
+                        continue
+                    u = node_a.orient.left()
+                    v = node_a.orient.forward()
+                    # Which are we aligned to?
+                    if abs(Vec.dot(offset, u)) < 1e-6 or abs(Vec.dot(offset, v)) < 1e-6:
+                        forward = offset.norm()
+                        segments.append(antlines.Segment(
+                            antlines.SegType.STRAIGHT,
+                            round(node_a.orient.up(), 3),
+                            node_a.pos + 8 * forward,
+                            node_b.pos - 8 * forward,
+                        ))
+                    else:
+                        LOGGER.warning(
+                            'Antline corners "{}" - "{}" '
+                            'are not directly aligned',
+                            node_a.item.name, node_b.item.name,
+                        )
+
         # For cables, it's a bit trickier than the beams.
         # The cable ent itself is the one which decides what it links to,
         # so we need to potentially make endpoint cables at locations with
@@ -290,12 +336,11 @@ def res_antlaser(vmf: VMF, res: Property):
 
             if group.type is NodeType.CORNER:
                 node.inst.remove()
-                point = node.pos - 64 * node.orient.up()
                 segments.append(antlines.Segment(
                     antlines.SegType.CORNER,
                     round(node.orient.up(), 3),
-                    Vec(point),
-                    Vec(point),
+                    Vec(node.pos),
+                    Vec(node.pos),
                 ))
             elif group.type is NodeType.LASER:
                 sprite_pos = node.pos + conf_glow_height @ node.orient
@@ -403,8 +448,7 @@ def build_cables(
 
         if (state_a is RopeState.LINKED
             or (state_a is RopeState.NONE and
-                state_b is RopeState.UNLINKED)
-        ):
+                state_b is RopeState.UNLINKED)):
             # Flip these, handle the opposite order.
             state_a, state_b = state_b, state_a
             ent_a, ent_b = ent_b, ent_a
