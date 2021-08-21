@@ -43,7 +43,7 @@ COMPILE_DEFAULTS = {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        'use_voice_priority': '0',
+        'voiceline_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
     },
@@ -87,7 +87,7 @@ tk_screenshot = None  # The preview image shown
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
-VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'use_voice_priority', False))
+VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
 player_model_var = tk.StringVar(
     value=PLAYER_MODELS.get(
@@ -158,7 +158,7 @@ def save_handler() -> Property:
         Property('sshot_cleanup', str(cleanup_screenshot.get())),
         Property('spawn_elev', str(start_in_elev.get())),
         Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
-        Property('use_voice_priority', str(VOICE_PRIORITY_VAR.get())),
+        Property('voiceline_priority', str(VOICE_PRIORITY_VAR.get())),
         corr_prop,
     ])
     for group, win in CORRIDOR.items():
@@ -213,7 +213,7 @@ def load_handler(props: Property) -> None:
         player_model_var.set(PLAYER_MODELS[player_mdl])
         COMPILE_CFG['General']['player_model'] = player_mdl
 
-    VOICE_PRIORITY_VAR.set(props.bool('use_voice_priority', VOICE_PRIORITY_VAR.get()))
+    VOICE_PRIORITY_VAR.set(props.bool('voiceline_priority', VOICE_PRIORITY_VAR.get()))
 
     corr_prop = props.find_block('corridor', or_blank=True)
     for group, win in CORRIDOR.items():
@@ -483,7 +483,7 @@ def make_widgets() -> None:
     """Create the compiler options pane.
 
     """
-    make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR)
+    make_setter('General', 'voiceline_priority', VOICE_PRIORITY_VAR)
     make_setter('General', 'spawn_elev', start_in_elev)
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
     make_setter('General', 'vrad_force_full', vrad_light_type)

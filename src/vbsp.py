@@ -223,7 +223,7 @@ def add_voice(vmf: VMF):
         style_vars=settings['style_vars'],
         vmf=vmf,
         map_seed=MAP_RAND_SEED,
-        use_priority=BEE2_config.get_bool('General', 'use_voice_priority', False),
+        use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
 
