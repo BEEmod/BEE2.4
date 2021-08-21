@@ -293,9 +293,11 @@ def res_antlaser(vmf: VMF, res: Property):
                 # If on the same plane, we only need one. If not, we need to
                 # do one for each plane it's in.
                 offset = node_b.pos - node_a.pos
-                if Vec.dot(node_a.orient.up(), node_b.orient.up()) > 0.9:
-                    plane_a = Vec.dot(node_a.pos, node_a.orient.up())
-                    plane_b = Vec.dot(node_b.pos, node_b.orient.up())
+                up_a = node_a.orient.up()
+                up_b = node_b.orient.up()
+                plane_a = Vec.dot(node_a.pos, up_a)
+                plane_b = Vec.dot(node_b.pos, up_b)
+                if Vec.dot(up_a, up_b) > 0.9:
                     if abs(plane_a - plane_b) > 1e-6:
                         LOGGER.warning(
                             'Antline corners "{}" - "{}" '
@@ -310,9 +312,9 @@ def res_antlaser(vmf: VMF, res: Property):
                         forward = offset.norm()
                         segments.append(antlines.Segment(
                             antlines.SegType.STRAIGHT,
-                            round(node_a.orient.up(), 3),
-                            node_a.pos + 8 * forward,
-                            node_b.pos - 8 * forward,
+                            round(up_a, 3),
+                            node_a.pos + 8.0 * forward,
+                            node_b.pos - 8.0 * forward,
                         ))
                     else:
                         LOGGER.warning(
@@ -320,6 +322,30 @@ def res_antlaser(vmf: VMF, res: Property):
                             'are not directly aligned',
                             node_a.item.name, node_b.item.name,
                         )
+                else:
+                    # We expect them be aligned to each other.
+                    side = Vec.cross(up_a, up_b)
+                    if abs(Vec.dot(side, offset)) < 1e-6:
+                        mid1 = node_a.pos + Vec.dot(offset, up_b) * up_b
+                        mid2 = node_b.pos - Vec.dot(offset, up_a) * up_a
+                        if mid1 != mid2:
+                            LOGGER.warning(
+                                'Midpoint mismatch: {} != {} for "{}" - "{}"',
+                                mid1, mid2,
+                                node_a.item.name, node_b.item.name,
+                            )
+                        segments.append(antlines.Segment(
+                            antlines.SegType.STRAIGHT,
+                            round(up_a, 3),
+                            node_a.pos + 8.0 * (mid1 - node_a.pos).norm(),
+                            mid1,
+                        ))
+                        segments.append(antlines.Segment(
+                            antlines.SegType.STRAIGHT,
+                            round(up_b, 3),
+                            node_b.pos + 8.0 * (mid2 - node_b.pos).norm(),
+                            mid2,
+                        ))
 
         # For cables, it's a bit trickier than the beams.
         # The cable ent itself is the one which decides what it links to,
