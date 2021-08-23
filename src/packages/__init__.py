@@ -462,116 +462,107 @@ def load_packages(
     Item.log_ent_count = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
 
-    # If we fail we want to clean up our filesystems.
-    should_close_filesystems = True
-    try:
-        find_packages(pak_dir)
+    find_packages(pak_dir)
 
-        pack_count = len(packages)
-        loader.set_length("PAK", pack_count)
+    pack_count = len(packages)
+    loader.set_length("PAK", pack_count)
 
-        if pack_count == 0:
-            no_packages_err(pak_dir, 'No packages found!')
+    if pack_count == 0:
+        no_packages_err(pak_dir, 'No packages found!')
 
-        # We must have the clean style package.
-        if CLEAN_PACKAGE not in packages:
-            no_packages_err(
-                pak_dir,
-                'No Clean Style package! This is required for some '
-                'essential resources and objects.'
-            )
+    # We must have the clean style package.
+    if CLEAN_PACKAGE not in packages:
+        no_packages_err(
+            pak_dir,
+            'No Clean Style package! This is required for some '
+            'essential resources and objects.'
+        )
 
-        data: dict[Type[PakT], list[PakT]] = {}
-        obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
+    data: dict[Type[PakT], list[PakT]] = {}
+    obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
 
-        for obj_type in OBJ_TYPES.values():
-            all_obj[obj_type] = {}
-            obj_override[obj_type] = defaultdict(list)
-            data[obj_type] = []
+    for obj_type in OBJ_TYPES.values():
+        all_obj[obj_type] = {}
+        obj_override[obj_type] = defaultdict(list)
+        data[obj_type] = []
 
-        for pack in packages.values():
-            if not pack.enabled:
-                LOGGER.info('Package {id} disabled!', id=pack.id)
-                pack_count -= 1
-                loader.set_length("PAK", pack_count)
-                continue
+    for pack in packages.values():
+        if not pack.enabled:
+            LOGGER.info('Package {id} disabled!', id=pack.id)
+            pack_count -= 1
+            loader.set_length("PAK", pack_count)
+            continue
 
-            with srctools.logger.context(pack.id):
-                parse_package(pack, obj_override, has_tag_music, has_mel_music)
-            loader.step("PAK")
+        with srctools.logger.context(pack.id):
+            parse_package(pack, obj_override, has_tag_music, has_mel_music)
+        loader.step("PAK")
 
-        loader.set_length("OBJ", sum(
-            len(obj_type)
-            for obj_type in
-            all_obj.values()
-        ))
+    loader.set_length("OBJ", sum(
+        len(obj_type)
+        for obj_type in
+        all_obj.values()
+    ))
 
-        for obj_class, objs in all_obj.items():
-            for obj_id, obj_data in objs.items():
-                # parse through the object and return the resultant class
-                try:
-                    with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
-                        object_ = obj_class.parse(
-                            ParseData(
-                                obj_data.fsys,
-                                obj_id,
-                                obj_data.info_block,
-                                obj_data.pak_id,
-                                False,
-                            )
+    for obj_class, objs in all_obj.items():
+        for obj_id, obj_data in objs.items():
+            # parse through the object and return the resultant class
+            try:
+                with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
+                    object_ = obj_class.parse(
+                        ParseData(
+                            obj_data.fsys,
+                            obj_id,
+                            obj_data.info_block,
+                            obj_data.pak_id,
+                            False,
                         )
+                    )
+            except (NoKeyError, IndexError) as e:
+                reraise_keyerror(e, obj_id)
+                raise  # Never reached.
+            except TokenSyntaxError as e:
+                # Add the relevant package to the filename.
+                if e.file:
+                    e.file = f'{obj_data.pak_id}:{e.file}'
+                raise
+            except Exception as e:
+                raise ValueError(
+                    'Error occured parsing '
+                    f'{obj_data.pak_id}:{obj_id} item!'
+                ) from e
+
+            if not hasattr(object_, 'id'):
+                raise ValueError(
+                    '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
+                )
+
+            # Store in this database so we can find all objects for each type.
+            # noinspection PyProtectedMember
+            obj_class._id_to_obj[object_.id.casefold()] = object_
+
+            object_.pak_id = obj_data.pak_id
+            object_.pak_name = obj_data.disp_name
+            for override_data in obj_override[obj_class].get(obj_id, []):
+                try:
+                    with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
+                        override = obj_class.parse(override_data)
                 except (NoKeyError, IndexError) as e:
-                    reraise_keyerror(e, obj_id)
+                    reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
                     raise  # Never reached.
                 except TokenSyntaxError as e:
                     # Add the relevant package to the filename.
                     if e.file:
-                        e.file = f'{obj_data.pak_id}:{e.file}'
+                        e.file = f'{override_data.pak_id}:{e.file}'
                     raise
                 except Exception as e:
                     raise ValueError(
-                        'Error occured parsing '
-                        f'{obj_data.pak_id}:{obj_id} item!'
+                        f'Error occured parsing {obj_id} override'
+                        f'from package {override_data.pak_id}!'
                     ) from e
 
-                if not hasattr(object_, 'id'):
-                    raise ValueError(
-                        '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
-                    )
-
-                # Store in this database so we can find all objects for each type.
-                # noinspection PyProtectedMember
-                obj_class._id_to_obj[object_.id.casefold()] = object_
-
-                object_.pak_id = obj_data.pak_id
-                object_.pak_name = obj_data.disp_name
-                for override_data in obj_override[obj_class].get(obj_id, []):
-                    try:
-                        with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
-                            override = obj_class.parse(override_data)
-                    except (NoKeyError, IndexError) as e:
-                        reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
-                        raise  # Never reached.
-                    except TokenSyntaxError as e:
-                        # Add the relevant package to the filename.
-                        if e.file:
-                            e.file = f'{override_data.pak_id}:{e.file}'
-                        raise
-                    except Exception as e:
-                        raise ValueError(
-                            f'Error occured parsing {obj_id} override'
-                            f'from package {override_data.pak_id}!'
-                        ) from e
-
-                    object_.add_over(override)
-                data[obj_class].append(object_)
-                loader.step("OBJ")
-
-        should_close_filesystems = False
-    finally:
-        if should_close_filesystems:
-            for sys in PACKAGE_SYS.values():
-                sys.close_ref()
+                object_.add_over(override)
+            data[obj_class].append(object_)
+            loader.step("OBJ")
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
         '{:<15}: {}'.format(obj_type.__name__, len(objs))
