@@ -1,13 +1,13 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
+from collections.abc import Iterable
+
 from srctools import Property
 import srctools.logger
 
 from consts import MusicChannel
-from packages import (
-    PakObject, set_cond_source, ParseData, SelitemData,
-    get_config, ExportData,
-)
+from app import lazy_conf
+from packages import PakObject, ParseData, SelitemData, get_config, ExportData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -22,17 +22,16 @@ class Music(PakObject):
         selitem_data: SelitemData,
         sound: dict[MusicChannel, list[str]],
         children: dict[MusicChannel, str],
-        config: Property=None,
-        inst=None,
-        sample: dict[MusicChannel, str | None]=None,
-        pack=(),
-        loop_len=0,
-        synch_tbeam=False,
-    ):
+        config: lazy_conf.LazyConf = lazy_conf.BLANK,
+        inst: str | None = None,
+        sample: dict[MusicChannel, str | None] = None,
+        pack: Iterable[str] = (),
+        loop_len: int = 0,
+        synch_tbeam: bool = False,
+    ) -> None:
         self.id = music_id
-        self.config = config or Property(None, [])
+        self.config = config
         self.children = children
-        set_cond_source(config, 'Music <{}>'.format(music_id))
         self.inst = inst
         self.sound = sound
         self.packfiles = list(pack)
@@ -122,7 +121,8 @@ class Music(PakObject):
             data.info,
             'music',
             pak_id=data.pak_id,
-        )()
+            source=f'Music <{data.id}>',
+        )
         return cls(
             data.id,
             selitem_data,
@@ -138,7 +138,7 @@ class Music(PakObject):
 
     def add_over(self, override: 'Music') -> None:
         """Add the additional vbsp_config commands to ourselves."""
-        self.config.append(override.config)
+        self.config = lazy_conf.conf_concat(self.config, override.config)
         self.selitem_data += override.selitem_data
 
     def __repr__(self) -> str:
@@ -206,7 +206,7 @@ class Music(PakObject):
         vbsp_config = exp_data.vbsp_conf
 
         if base_music is not None:
-            vbsp_config += base_music.config.copy()
+            vbsp_config += base_music.config()
 
         music_conf = Property('MusicScript', [])
         vbsp_config.append(music_conf)

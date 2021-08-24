@@ -1,7 +1,7 @@
 from srctools import Property
 from packages import (
     PakObject, ExportData, ParseData, SelitemData,
-    get_config, set_cond_source,
+    get_config, lazy_conf
 )
 
 
@@ -11,7 +11,7 @@ class Skybox(PakObject):
         self,
         sky_id,
         selitem_data: SelitemData,
-        config: Property,
+        config: lazy_conf.LazyConf,
         fog_opts: Property,
         mat,
     ) -> None:
@@ -19,7 +19,6 @@ class Skybox(PakObject):
         self.selitem_data = selitem_data
         self.material = mat
         self.config = config
-        set_cond_source(config, 'Skybox <{}>'.format(sky_id))
         self.fog_opts = fog_opts
 
         # Extract this for selector windows to easily display
@@ -34,9 +33,10 @@ class Skybox(PakObject):
             data.info,
             'skybox',
             pak_id=data.pak_id,
-        )()
+            source=f'Skybox <{data.id}>',
+        )
 
-        fog_opts = data.info.find_key("Fog", [])
+        fog_opts = data.info.find_key("Fog", or_blank=True)
 
         return cls(
             data.id,
@@ -49,7 +49,7 @@ class Skybox(PakObject):
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data += override.selitem_data
-        self.config += override.config
+        self.config = lazy_conf.conf_concat(self.config, override.config)
         self.fog_opts += override.fog_opts.copy()
 
     def __repr__(self) -> str:
@@ -73,7 +73,7 @@ class Skybox(PakObject):
             skybox.material,
         )
 
-        exp_data.vbsp_conf.append(skybox.config.copy())
+        exp_data.vbsp_conf.append(skybox.config())
 
         # Styles or other items shouldn't be able to set fog settings..
         if 'fog' in exp_data.vbsp_conf:
