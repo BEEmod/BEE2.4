@@ -14,7 +14,7 @@ from srctools import FileSystem, Property, EmptyMapping
 from pathlib import PurePosixPath as FSPath
 import srctools.logger
 
-from app import tkMarkdown, img
+from app import tkMarkdown, img, lazy_conf
 from packages import (
     PakObject, ParseData, ExportData,
     sep_values, desc_parse,
@@ -120,10 +120,9 @@ class ItemVariant:
             # Item.parse() has resolved this to the actual config.
             vbsp_config = get_config(
                 props,
-                fsys,
                 'items',
                 pak_id,
-            )
+            )()
         else:
             vbsp_config = self.vbsp_config.copy()
 
@@ -141,11 +140,10 @@ class ItemVariant:
 
         vbsp_config += list(get_config(
             props,
-            fsys,
             'items',
             pak_id,
             prop_name='append',
-        ))
+        )())
 
         if 'description' in props:
             desc = desc_parse(props, source, pak_id)
@@ -414,11 +412,10 @@ class Item(PakObject):
 
         all_config = get_config(
             data.info,
-            data.fsys,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
-        )
+        )()
         set_cond_source(all_config, '<Item {} all_conf>'.format(
             data.id,
         ))
@@ -702,11 +699,10 @@ class ItemConfig(PakObject, allow_mult=True):
 
         all_config = get_config(
             data.info,
-            data.fsys,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
-        )
+        )()
         set_cond_source(all_config, '<ItemConfig {}:{} all_conf>'.format(
             data.pak_id, data.id,
         ))

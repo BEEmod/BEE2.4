@@ -7,7 +7,7 @@ from collections import defaultdict
 import attr
 
 import srctools
-from app import tkMarkdown, img
+from app import tkMarkdown, img, lazy_conf
 import utils
 import consts
 from app.packageMan import PACK_CONFIG
@@ -319,42 +319,34 @@ def reraise_keyerror(err: BaseException, obj_id: str) -> NoReturn:
 
 
 def get_config(
-        prop_block: Property,
-        fsys: FileSystem,
-        folder: str,
-        pak_id='',
-        prop_name='config',
-        extension='.cfg',
-        ):
-    """Extract a config file referred to by the given property block.
+    prop_block: Property,
+    folder: str,
+    pak_id: str,
+    prop_name='config',
+    extension='.cfg',
+) -> lazy_conf.LazyConf:
+    """Lazily extract a config file referred to by the given property block.
 
     Looks for the prop_name key in the given prop_block.
     If the keyvalue has a value of "", an empty tree is returned.
-    If it has children, a copy of them is returned.
+    If it has children, a copy of them will be returned.
     Otherwise the value is a filename in the zip which will be parsed.
     """
     prop_block = prop_block.find_key(prop_name, "")
     if prop_block.has_children():
         prop = prop_block.copy()
         prop.name = None
-        return prop
+        return lazy_conf.conf_direct(prop)
 
     if prop_block.value == '':
-        return Property(None, [])
+        return lazy_conf.conf_direct(Property(None, []))
 
     # Zips must use '/' for the separator, even on Windows!
-    path = folder + '/' + prop_block.value
+    path = f'{folder}/{prop_block.value}'
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
-    try:
-        return fsys.read_prop(path)
-    except FileNotFoundError:
-        LOGGER.warning('"{id}:{path}" not in zip!', id=pak_id, path=path)
-        return Property(None, [])
-    except UnicodeDecodeError:
-        LOGGER.exception('Unable to read "{id}:{path}"', id=pak_id, path=path)
-        raise
+    return lazy_conf.conf_file(utils.PackagePath(pak_id, path))
 
 
 def set_cond_source(props: Property, source: str) -> None:

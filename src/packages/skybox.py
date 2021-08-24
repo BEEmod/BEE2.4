@@ -32,10 +32,9 @@ class Skybox(PakObject):
         mat = data.info['material', 'sky_black']
         config = get_config(
             data.info,
-            data.fsys,
             'skybox',
             pak_id=data.pak_id,
-        )
+        )()
 
         fog_opts = data.info.find_key("Fog", [])
 

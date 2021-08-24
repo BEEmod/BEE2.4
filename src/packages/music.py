@@ -120,10 +120,9 @@ class Music(PakObject):
 
         config = get_config(
             data.info,
-            data.fsys,
             'music',
             pak_id=data.pak_id,
-        )
+        )()
         return cls(
             data.id,
             selitem_data,
