@@ -23,7 +23,7 @@ from . import (
     sound,
     img,
     UI,
-    TK_ROOT,
+    TK_ROOT, DEV_MODE,
 )
 import utils
 import srctools.logger
@@ -272,7 +272,7 @@ def load_item_data() -> None:
         style_desc=item_data.desc,
     )
     # Dump out the instances used in this item.
-    if optionWindow.DEV_MODE.get():
+    if DEV_MODE.get():
         inst_desc = []
         for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
             if editor is selected_item.data.editor:
@@ -290,7 +290,7 @@ def load_item_data() -> None:
 
     wid['desc'].set_text(desc)
 
-    if optionWindow.DEV_MODE.get():
+    if DEV_MODE.get():
         source = selected_item.data.source.replace("from", "\nfrom")
         wid['item_id']['text'] = f'{source}\n-> {selected_item.id}:{selected_sub_item.subKey}'
         wid['item_id'].grid()

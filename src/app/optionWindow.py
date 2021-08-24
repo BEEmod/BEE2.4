@@ -14,7 +14,11 @@ from app.tooltip import add_tooltip
 
 import utils
 import srctools.logger
-from app import contextWin, gameMan, tk_tools, sound, logWindow, TK_ROOT
+from app import (
+    contextWin, gameMan, tk_tools, sound, logWindow, TK_ROOT,
+    PLAY_SOUND, KEEP_WIN_INSIDE, FORCE_LOAD_ONTOP, SHOW_LOG_WIN,
+    LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE,
+)
 from localisation import gettext
 import loadScreen
 
@@ -29,13 +33,6 @@ class AfterExport(Enum):
     QUIT = 2  # Quit the app.
 
 UI = {}
-PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
-KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
-FORCE_LOAD_ONTOP = BooleanVar(value=True, name='OPT_force_load_ontop')
-SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
-LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
-PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
-DEV_MODE = BooleanVar(value=False, name='OPT_development_mode')
 AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
@@ -56,7 +53,7 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], str] = {
 refresh_callbacks: List[Callable[[], None]] = []  # functions called to apply settings.
 
 # All the auto-created checkbox variables
-VARS: Dict[Tuple[str, str], BooleanVar] = {}
+VARS: Dict[Tuple[str, str], Variable] = {}
 
 
 def reset_all_win() -> None:

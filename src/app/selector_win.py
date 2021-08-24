@@ -26,7 +26,7 @@ from packages import SelitemData
 from srctools import Vec, Property, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
 from consts import SEL_ICON_SIZE as ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
 from localisation import gettext, ngettext
 import utils
@@ -1236,7 +1236,6 @@ class SelectorWin:
 
     def sel_item(self, item: Item, event: Event = None) -> None:
         """Select the specified item."""
-        from app.optionWindow import DEV_MODE
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''

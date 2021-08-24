@@ -32,7 +32,7 @@ from srctools import (
     FileSystem, FileSystemChain,
 )
 import srctools.logger
-from app import backup, optionWindow, tk_tools, TK_ROOT, resource_gen
+from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE
 from localisation import gettext
 import loadScreen
 import packages.template_brush
@@ -716,7 +716,7 @@ class Game:
             export_screen.step('EXP')
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
-            vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(optionWindow.DEV_MODE.get()))
+            vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
 
             # If there are multiple of these blocks, merge them together.
             # They will end up in this order.

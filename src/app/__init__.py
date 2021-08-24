@@ -120,3 +120,12 @@ def on_error(
     except Exception:
         # Ignore failures...
         pass
+
+# Various configuration booleans.
+PLAY_SOUND = tk.BooleanVar(value=True, name='OPT_play_sounds')
+KEEP_WIN_INSIDE = tk.BooleanVar(value=True, name='OPT_keep_win_inside')
+FORCE_LOAD_ONTOP = tk.BooleanVar(value=True, name='OPT_force_load_ontop')
+SHOW_LOG_WIN = tk.BooleanVar(value=False, name='OPT_show_log_window')
+LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
+PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
+DEV_MODE = tk.BooleanVar(value=False, name='OPT_development_mode')
