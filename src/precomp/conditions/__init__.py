@@ -1197,7 +1197,7 @@ def res_switch(res: Property):
     for prop in res:
         if prop.has_children():
             if prop.name == '<default>':
-                default.append(prop)
+                default.extend(prop)
             else:
                 cases.append(prop)
         else:
