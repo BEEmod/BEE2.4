@@ -1,6 +1,7 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
 from typing import Callable, Pattern
+import functools
 
 from srctools import Property, logger, KeyValError
 from utils import PackagePath
@@ -78,19 +79,24 @@ def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 
 def replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> LazyConf:
 	"""Replace occurances of values in the base config."""
+	rep_funcs = [
+		functools.partial(pattern.sub, repl)
+		for pattern, repl in replacements
+	]
+
 	def replacer() -> Property:
 		"""Replace values."""
 		copy = base()
 		for prop in copy.iter_tree():
 			name = prop.real_name
 			if name is not None:
-				for pattern, result in replacements:
-					name = pattern.sub(name, result)
+				for func in rep_funcs:
+					name = func(name)
 				prop.name = name
 			if not prop.has_children():
 				value = prop.value
-				for pattern, result in replacements:
-					value = pattern.sub(value, result)
+				for func in rep_funcs:
+					value = func(value)
 				prop.value = value
 		return copy
 	return replacer
