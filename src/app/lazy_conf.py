@@ -2,9 +2,9 @@
 from __future__ import annotations
 from typing import Callable, Pattern, Optional
 
-from packages import PACKAGE_SYS
 from srctools import Property, logger
 from utils import PackagePath
+import packages
 
 
 LOGGER = logger.get_logger(__name__)
@@ -19,7 +19,7 @@ def conf_direct(block: Property) -> LazyConf:
 def conf_file(path: PackagePath) -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
-		fsys = PACKAGE_SYS[path.package]
+		fsys = packages.PACKAGE_SYS[path.package]
 	except KeyError:
 		LOGGER.warning('Package does not exist: "{}"', path)
 		return lambda: Property(None, [])
