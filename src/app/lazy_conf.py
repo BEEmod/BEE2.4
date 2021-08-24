@@ -44,21 +44,17 @@ def conf_file(path: PackagePath, missing_ok: bool=False, source: str='') -> Lazy
 			LOGGER.warning('File does not exist: "{}"', path)
 		return BLANK
 
-	cache: Optional[Property] = None
-
 	def loader() -> Property:
-		"""Load the file if required, and return a copy."""
-		nonlocal cache
-		if cache is None:
-			try:
-				with file.open_str() as f:
-					cache = Property.parse(f)
-			except (KeyValError, FileNotFoundError, UnicodeDecodeError):
-				LOGGER.exception('Unable to read "{}"', path)
-				raise
-			if source:
-				packages.set_cond_source(cache, source)
-		return cache.copy()
+		"""Load and parse the specified file when called."""
+		try:
+			with file.open_str() as f:
+				props = Property.parse(f)
+		except (KeyValError, FileNotFoundError, UnicodeDecodeError):
+			LOGGER.exception('Unable to read "{}"', path)
+			raise
+		if source:
+			packages.set_cond_source(props, source)
+		return props
 	return loader
 
 
