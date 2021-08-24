@@ -110,6 +110,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
 
     # Load in our main configs..
     options.load(conf.find_all('Options'))
+    utils.DEV_MODE = options.get(bool, 'dev_mode')
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
