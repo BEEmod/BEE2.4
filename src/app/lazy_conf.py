@@ -4,8 +4,8 @@ from typing import Callable, Pattern
 import functools
 
 from srctools import Property, logger, KeyValError
-from utils import PackagePath
 import packages
+import utils
 
 
 LOGGER = logger.get_logger(__name__)
@@ -30,7 +30,7 @@ def raw_prop(block: Property, source: str= '') -> LazyConf:
 		return BLANK
 
 
-def from_file(path: PackagePath, missing_ok: bool=False, source: str= '') -> LazyConf:
+def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
 		fsys = packages.PACKAGE_SYS[path.package]
@@ -56,6 +56,15 @@ def from_file(path: PackagePath, missing_ok: bool=False, source: str= '') -> Laz
 		if source:
 			packages.set_cond_source(props, source)
 		return props
+
+	if utils.DEV_MODE:
+		# Parse immediately, to check syntax.
+		try:
+			with file.open_str() as f:
+				Property.parse(f)
+		except (KeyValError, FileNotFoundError, UnicodeDecodeError):
+			LOGGER.exception('Unable to read "{}"', path)
+
 	return loader
 
 
