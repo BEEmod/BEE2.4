@@ -1180,13 +1180,13 @@ def res_end_condition() -> None:
 def res_switch(res: Property):
     """Run the same flag multiple times with different arguments.
 
-    'method' is the way the search is done - first, last, random, or all.
-    'flag' is the name of the flag.
-    'seed' sets the randomisation seed for this block, for the random mode.
+    `method` is the way the search is done - `first`, `last`, `random`, or `all`.
+    `flag` is the name of the flag.
+    `seed` sets the randomisation seed for this block, for the random mode.
     Each property group is a case to check - the property name is the flag
     argument, and the contents are the results to execute in that case.
-    The special group "<default>" is only run if no other flag is valid.
-    For 'random' mode, you can omit the flag to choose from all objects. In
+    The special group `"<default>"` is only run if no other flag is valid.
+    For `random` mode, you can omit the flag to choose from all objects. In
     this case the flag arguments are ignored.
     """
     flag_name = ''
