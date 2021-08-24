@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Callable, Pattern, Optional
 
-from srctools import Property, logger
+from srctools import Property, logger, KeyValError
 from utils import PackagePath
 import packages
 
@@ -35,8 +35,12 @@ def conf_file(path: PackagePath) -> LazyConf:
 		"""Load the file if required, and return a copy."""
 		nonlocal cache
 		if cache is None:
-			with file.open_str() as f:
-				cache = Property.parse(f)
+			try:
+				with file.open_str() as f:
+					cache = Property.parse(f)
+			except (KeyValError, FileNotFoundError, UnicodeDecodeError):
+				LOGGER.exception('Unable to read "{}"', path)
+				raise
 		return cache.copy()
 	return loader
 
