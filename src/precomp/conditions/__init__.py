@@ -39,7 +39,7 @@ import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Any, Callable, TextIO
+from typing import Generic, TypeVar, Any, Callable, TextIO, Optional
 
 import attr
 
@@ -1191,7 +1191,7 @@ def res_switch(res: Property):
     """
     flag_name = ''
     method = SWITCH_TYPE.FIRST
-    cases = []
+    raw_cases = []
     default = []
     rand_seed = ''
     for prop in res:
@@ -1199,7 +1199,7 @@ def res_switch(res: Property):
             if prop.name == '<default>':
                 default.extend(prop)
             else:
-                cases.append(prop)
+                raw_cases.append(prop)
         else:
             if prop.name == 'flag':
                 flag_name = prop.value
@@ -1213,7 +1213,12 @@ def res_switch(res: Property):
                 rand_seed = prop.value
 
     if method is SWITCH_TYPE.LAST:
-        cases[:] = cases[::-1]
+        raw_cases.reverse()
+
+    cases: list[tuple[Property, list[Property]]] = [
+        (Property(flag_name, case.real_name), list(case))
+        for case in raw_cases
+    ]
 
     def apply_switch(inst: Entity) -> None:
         """Execute a switch."""
@@ -1222,13 +1227,11 @@ def res_switch(res: Property):
             random.shuffle(cases)
 
         run_default = True
-
-        for case in cases:
-            if flag_name:
-                flag = Property(flag_name, case.real_name)
-                if not check_flag(inst.map, flag, inst):
-                    continue
-            for sub_res in case:
+        for flag, results in cases:
+            # If not set, always succeed for the random situation.
+            if flag.real_name and check_flag(inst.map, flag, inst):
+                continue
+            for sub_res in results:
                 Condition.test_result(inst, sub_res)
             run_default = False
             if method is not SWITCH_TYPE.ALL:
