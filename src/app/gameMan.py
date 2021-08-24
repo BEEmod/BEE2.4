@@ -679,7 +679,7 @@ class Game:
 
             # Start off with the style's data.
             vbsp_config = Property(None, [])
-            vbsp_config += style.config.copy()
+            vbsp_config += style.config()
 
             all_items = style.items.copy()
             renderables = style.renderables.copy()

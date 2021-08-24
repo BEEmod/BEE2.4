@@ -750,7 +750,7 @@ class Style(PakObject):
         selitem_data: SelitemData,
         items: list[EditorItem],
         renderables: dict[RenderableType, Renderable],
-        config=None,
+        config: lazy_conf.LazyConf = lazy_conf.BLANK,
         base_style: Optional[str]=None,
         suggested: tuple[str, str, str, str]=None,
         has_video: bool=True,
@@ -777,12 +777,7 @@ class Style(PakObject):
                 except KeyError:
                     self.corridors[group, i] = CorrDesc()
 
-        if config is None:
-            self.config = Property(None, [])
-        else:
-            self.config = config
-
-        set_cond_source(self.config, 'Style <{}>'.format(style_id))
+        self.config = config
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -796,7 +791,7 @@ class Style(PakObject):
         )
         vpk_name = info['vpk_name', ''].casefold()
 
-        sugg = info.find_key('suggested', [])
+        sugg = info.find_key('suggested', or_blank=True)
         if data.is_override:
             # For overrides, we default to no suggestion..
             sugg = (
@@ -813,15 +808,15 @@ class Style(PakObject):
                 sugg['elev', '<NONE>'],
             )
 
-        corr_conf = info.find_key('corridors', [])
+        corr_conf = info.find_key('corridors', or_blank=True)
         corridors = {}
 
         icon_folder = corr_conf['icon_folder', '']
 
         for group, length in CORRIDOR_COUNTS.items():
-            group_prop = corr_conf.find_key(group, [])
+            group_prop = corr_conf.find_key(group, or_blank=True)
             for i in range(1, length + 1):
-                prop = group_prop.find_key(str(i), '')  # type: Property
+                prop = group_prop.find_key(str(i), '')
 
                 if icon_folder:
                     icon = utils.PackagePath(data.pak_id, 'corr/{}/{}/{}.jpg'.format(icon_folder, group, i))
@@ -845,22 +840,23 @@ class Style(PakObject):
             base = None
         try:
             folder = 'styles/' + info['folder']
-        except IndexError:
+        except LookupError:
             # It's OK for override styles to be missing their 'folder'
             # value.
             if data.is_override:
                 items = []
                 renderables = {}
-                vbsp = None
+                vbsp = lazy_conf.BLANK
             else:
                 raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
                 items, renderables = EditorItem.parse(f)
-            try:
-                vbsp = data.fsys.read_prop(folder + '/vbsp_config.cfg')
-            except FileNotFoundError:
-                vbsp = None
+            vbsp = lazy_conf.conf_file(
+                utils.PackagePath(data.pak_id, folder + '/vbsp_config.cfg'),
+                missing_ok=True,
+                source=f'Style <{data.id}>',
+            )
 
         return cls(
             style_id=data.id,
@@ -879,7 +875,7 @@ class Style(PakObject):
         """Add the additional commands to ourselves."""
         self.items.extend(override.items)
         self.renderables.update(override.renderables)
-        self.config += override.config
+        self.config = lazy_conf.conf_concat(self.config, override.config)
         self.selitem_data += override.selitem_data
 
         self.has_video = self.has_video or override.has_video
@@ -921,7 +917,7 @@ class Style(PakObject):
         This is a special case, since styles should go first in the lists.
         """
         vbsp_config = Property(None, [])
-        vbsp_config += self.config.copy()
+        vbsp_config += self.config()
 
         return self.items, self.renderables, vbsp_config
 
