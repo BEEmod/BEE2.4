@@ -531,9 +531,10 @@ def make_result(orig_name: str, *aliases: str):
         """Create the result when the function is supplied."""
         # Legacy setup func support.
         try:
-            setup_func = RESULT_SETUP[orig_name.casefold()]
+            setup_func = RESULT_SETUP.pop(orig_name.casefold())
         except KeyError:
             func = result_func
+            setup_func = None
         else:
             # Combine the legacy functions into one using a closure.
             func = conv_setup_pair(setup_func, result_func)
@@ -542,6 +543,10 @@ def make_result(orig_name: str, *aliases: str):
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
             RESULT_LOOKUP[name.casefold()] = wrapper
+        if setup_func is not None:
+            for name in aliases:
+                alias_setup = RESULT_SETUP.pop(name.casefold())
+                assert alias_setup is setup_func, alias_setup
         ALL_RESULTS.append((orig_name, aliases, wrapper))
         return func
     return x
@@ -579,6 +584,12 @@ def init(seed: str, inst_list: set[str]) -> None:
     # Sort by priority, where higher = done later
     zero = Decimal(0)
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
+    # Check if any make_result_setup calls were done with no matching result.
+    if utils.DEV_MODE and RESULT_SETUP:
+        raise ValueError('Extra result_setup calls:\n' + '\n'.join([
+            f' - "{name}": {getattr(func, "__module__", "?")}.{func.__qualname__}()'
+            for name, func in RESULT_SETUP.items()
+        ]))
 
 
 def check_all(vmf: VMF) -> None:
