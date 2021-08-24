@@ -138,7 +138,7 @@ class Music(PakObject):
 
     def add_over(self, override: 'Music') -> None:
         """Add the additional vbsp_config commands to ourselves."""
-        self.config = lazy_conf.conf_concat(self.config, override.config)
+        self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data
 
     def __repr__(self) -> str:

@@ -339,7 +339,7 @@ def get_config(
     if prop_block.has_children():
         prop = prop_block.copy()
         prop.name = None
-        return lazy_conf.conf_direct(prop, source=source)
+        return lazy_conf.raw_prop(prop, source=source)
 
     if prop_block.value == '':
         return lazy_conf.BLANK
@@ -349,7 +349,7 @@ def get_config(
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
-    return lazy_conf.conf_file(utils.PackagePath(pak_id, path), source=source)
+    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=source)
 
 
 def set_cond_source(props: Property, source: str) -> None:
@@ -852,7 +852,7 @@ class Style(PakObject):
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
                 items, renderables = EditorItem.parse(f)
-            vbsp = lazy_conf.conf_file(
+            vbsp = lazy_conf.from_file(
                 utils.PackagePath(data.pak_id, folder + '/vbsp_config.cfg'),
                 missing_ok=True,
                 source=f'Style <{data.id}>',
@@ -875,7 +875,7 @@ class Style(PakObject):
         """Add the additional commands to ourselves."""
         self.items.extend(override.items)
         self.renderables.update(override.renderables)
-        self.config = lazy_conf.conf_concat(self.config, override.config)
+        self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data
 
         self.has_video = self.has_video or override.has_video

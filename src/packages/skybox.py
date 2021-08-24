@@ -49,7 +49,7 @@ class Skybox(PakObject):
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data += override.selitem_data
-        self.config = lazy_conf.conf_concat(self.config, override.config)
+        self.config = lazy_conf.concat(self.config, override.config)
         self.fog_opts += override.fog_opts.copy()
 
     def __repr__(self) -> str:

@@ -1,6 +1,6 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
-from typing import Callable, Pattern, Optional
+from typing import Callable, Pattern
 
 from srctools import Property, logger, KeyValError
 from utils import PackagePath
@@ -13,7 +13,7 @@ LazyConf = Callable[[], Property]
 BLANK: LazyConf = lambda: Property(None, [])
 
 
-def conf_direct(block: Property, source: str='') -> LazyConf:
+def raw_prop(block: Property, source: str= '') -> LazyConf:
 	"""Make an existing property conform to the interface."""
 	if block or block.name is not None:
 		if source:
@@ -29,7 +29,7 @@ def conf_direct(block: Property, source: str='') -> LazyConf:
 		return BLANK
 
 
-def conf_file(path: PackagePath, missing_ok: bool=False, source: str='') -> LazyConf:
+def from_file(path: PackagePath, missing_ok: bool=False, source: str= '') -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
 		fsys = packages.PACKAGE_SYS[path.package]
@@ -58,7 +58,7 @@ def conf_file(path: PackagePath, missing_ok: bool=False, source: str='') -> Lazy
 	return loader
 
 
-def conf_concat(a: LazyConf, b: LazyConf) -> LazyConf:
+def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	"""Concatenate the two configs together."""
 	# Catch a raw property being passed in.
 	assert callable(a) and callable(b), (a, b)
@@ -76,7 +76,7 @@ def conf_concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	return concat
 
 
-def conf_replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> LazyConf:
+def replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> LazyConf:
 	"""Replace occurances of values in the base config."""
 	def replacer() -> Property:
 		"""Replace values."""

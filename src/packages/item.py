@@ -107,7 +107,7 @@ class ItemVariant:
         """Perform the override from another item folder."""
         self.authors.extend(other.authors)
         self.tags.extend(self.tags)
-        self.vbsp_config = lazy_conf.conf_concat(self.vbsp_config, other.vbsp_config)
+        self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
     def modify(self, pak_id: str, props: Property, source: str) -> 'ItemVariant':
@@ -129,13 +129,13 @@ class ItemVariant:
 
         if 'replace' in props:
             # Replace property values in the config via regex.
-            vbsp_config = lazy_conf.conf_replace(vbsp_config, [
+            vbsp_config = lazy_conf.replace(vbsp_config, [
                 (re.compile(prop.real_name, re.IGNORECASE), prop.value)
                 for prop in
                 props.find_children('Replace')
             ])
 
-        vbsp_config = lazy_conf.conf_concat(vbsp_config, get_config(
+        vbsp_config = lazy_conf.concat(vbsp_config, get_config(
             props,
             'items',
             pak_id,
@@ -532,7 +532,7 @@ class Item(PakObject):
     def add_over(self, override: 'Item') -> None:
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
-        self.all_conf = lazy_conf.conf_concat(self.all_conf, override.all_conf)
+        self.all_conf = lazy_conf.concat(self.all_conf, override.all_conf)
 
         self.folders.update(override.folders)
 
@@ -667,7 +667,7 @@ class Item(PakObject):
         return (
             [new_item] + item_data.editor_extra,
             # Add all_conf first so it's conditions run first by default
-            lazy_conf.conf_concat(self.all_conf, item_data.vbsp_config),
+            lazy_conf.concat(self.all_conf, item_data.vbsp_config),
         )
 
 
@@ -705,7 +705,7 @@ class ItemConfig(PakObject, allow_mult=True):
             vers[ver_id] = styles = {}
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:
-                    styles[style.real_name] = lazy_conf.conf_file(
+                    styles[style.real_name] = lazy_conf.from_file(
                         utils.PackagePath(data.pak_id, f'items/{style.value}.cfg'),
                         source=f'<ItemConfig {data.pak_id}:{data.id} in "{style.real_name}">',
                     )
@@ -718,7 +718,7 @@ class ItemConfig(PakObject, allow_mult=True):
 
     def add_over(self, override: 'ItemConfig') -> None:
         """Add additional style configs to the original config."""
-        self.all_conf = lazy_conf.conf_concat(self.all_conf, override.all_conf)
+        self.all_conf = lazy_conf.concat(self.all_conf, override.all_conf)
 
         for vers_id, styles in override.versions.items():
             our_styles = self.versions.setdefault(vers_id, {})
@@ -726,7 +726,7 @@ class ItemConfig(PakObject, allow_mult=True):
                 if sty_id not in our_styles:
                     our_styles[sty_id] = style
                 else:
-                    our_styles[sty_id] += lazy_conf.conf_concat(our_styles[sty_id], style)
+                    our_styles[sty_id] += lazy_conf.concat(our_styles[sty_id], style)
 
     @staticmethod
     def export(exp_data: ExportData) -> None:
@@ -841,7 +841,7 @@ def parse_item_folder(
                 id=pak_id,
                 path=prop_path,
             )
-        folders[fold].vbsp_config = lazy_conf.conf_file(
+        folders[fold].vbsp_config = lazy_conf.from_file(
             utils.PackagePath(pak_id, config_path),
             missing_ok=True,
             source=folders[fold].source,
