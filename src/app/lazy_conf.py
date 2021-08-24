@@ -52,10 +52,11 @@ def conf_replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -
 		"""Replace values."""
 		copy = base()
 		for prop in copy.iter_tree():
-			name = orig = prop.real_name
-			for pattern, result in replacements:
-				name = pattern.sub(name, result)
-			prop.name = name
+			name = prop.real_name
+			if name is not None:
+				for pattern, result in replacements:
+					name = pattern.sub(name, result)
+				prop.name = name
 			if not prop.has_children():
 				value = prop.value
 				for pattern, result in replacements:
