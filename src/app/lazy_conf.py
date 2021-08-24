@@ -60,6 +60,8 @@ def conf_file(path: PackagePath, missing_ok: bool=False, source: str='') -> Lazy
 
 def conf_concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	"""Concatenate the two configs together."""
+	# Catch a raw property being passed in.
+	assert callable(a) and callable(b), (a, b)
 	# If either is blank, this is a no-op, so avoid a pointless layer.
 	if a is BLANK:
 		return b
