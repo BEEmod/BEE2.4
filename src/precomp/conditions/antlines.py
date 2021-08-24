@@ -92,6 +92,9 @@ class Group:
         # users might accidentally do that.
         self.links: set[frozenset[Node]] = set()
 
+        # For antline corners, each endpoint -> the segment
+        self.ant_seg: dict[tuple[float, float, float], antlines.Segment] = {}
+
         # Create an info_target to attach I/O to.
         # The corners have an origin on the floor whereas lasers are normal.
         if typ is NodeType.CORNER:
@@ -112,6 +115,22 @@ class Group:
             start.item.ant_wall_style,
         )
         connections.ITEMS[self.item.name] = self.item
+
+    def add_ant_straight(self, normal: Vec, pos1: Vec, pos2: Vec) -> None:
+        """Add a segment going from point 1 to 2."""
+        seg = antlines.Segment(
+            antlines.SegType.STRAIGHT,
+            round(normal, 3),
+            pos1, pos2,
+        )
+        k1 = pos1.as_tuple()
+        k2 = pos2.as_tuple()
+        if k1 in self.ant_seg:
+            LOGGER.warning('Antline segment overlap: {}', k1)
+        if k2 in self.ant_seg:
+            LOGGER.warning('Antline segment overlap: {}', k2)
+        self.ant_seg[k1] = seg
+        self.ant_seg[k2] = seg
 
 
 @make_result('AntLaser')
@@ -310,12 +329,11 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                     # Which are we aligned to?
                     if abs(Vec.dot(offset, u)) < 1e-6 or abs(Vec.dot(offset, v)) < 1e-6:
                         forward = offset.norm()
-                        segments.append(antlines.Segment(
-                            antlines.SegType.STRAIGHT,
-                            round(up_a, 3),
+                        group.add_ant_straight(
+                            up_a,
                             node_a.pos + 8.0 * forward,
                             node_b.pos - 8.0 * forward,
-                        ))
+                        )
                     else:
                         LOGGER.warning(
                             'Antline corners "{}" - "{}" '
@@ -334,18 +352,16 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                                 mid1, mid2,
                                 node_a.item.name, node_b.item.name,
                             )
-                        segments.append(antlines.Segment(
-                            antlines.SegType.STRAIGHT,
-                            round(up_a, 3),
+                        group.add_ant_straight(
+                            up_a,
                             node_a.pos + 8.0 * (mid1 - node_a.pos).norm(),
                             mid1,
-                        ))
-                        segments.append(antlines.Segment(
-                            antlines.SegType.STRAIGHT,
-                            round(up_b, 3),
+                        )
+                        group.add_ant_straight(
+                            up_b,
                             node_b.pos + 8.0 * (mid2 - node_b.pos).norm(),
                             mid2,
-                        ))
+                        )
 
         # For cables, it's a bit trickier than the beams.
         # The cable ent itself is the one which decides what it links to,
@@ -400,6 +416,7 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                     beam['LightningEnd'] = NAME_SPR(base_name, i)
                     beam['spawnflags'] = conf_beam_flags | 128  # Shade Start
 
+        segments += set(group.ant_seg.values())
         if group.type is NodeType.CORNER and segments:
             # Assign tiledefs to the segments.
             for seg in segments:
