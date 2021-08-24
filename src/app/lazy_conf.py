@@ -9,25 +9,40 @@ import packages
 
 LOGGER = logger.get_logger(__name__)
 LazyConf = Callable[[], Property]
+# Empty property.
+BLANK: LazyConf = lambda: Property(None, [])
 
 
-def conf_direct(block: Property) -> LazyConf:
+def conf_direct(block: Property, source: str='') -> LazyConf:
 	"""Make an existing property conform to the interface."""
-	return block.copy
+	if block or block.name is not None:
+		if source:
+			def copier() -> Property:
+				"""Copy the config, then apply the source."""
+				copy = block.copy()
+				packages.set_cond_source(copy, source)
+				return copy
+			return copier
+		else:  # We can just use the bound method.
+			return block.copy
+	else:  # If empty, source is irrelevant, and we can use the constant.
+		return BLANK
 
 
-def conf_file(path: PackagePath) -> LazyConf:
+def conf_file(path: PackagePath, missing_ok: bool=False, source: str='') -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
 		fsys = packages.PACKAGE_SYS[path.package]
 	except KeyError:
-		LOGGER.warning('Package does not exist: "{}"', path)
-		return lambda: Property(None, [])
+		if not missing_ok:
+			LOGGER.warning('Package does not exist: "{}"', path)
+		return BLANK
 	try:
 		file = fsys[path.path]
 	except FileNotFoundError:
-		LOGGER.warning('File does not exist: "{}"', path)
-		return lambda: Property(None, [])
+		if not missing_ok:
+			LOGGER.warning('File does not exist: "{}"', path)
+		return BLANK
 
 	cache: Optional[Property] = None
 
@@ -41,13 +56,26 @@ def conf_file(path: PackagePath) -> LazyConf:
 			except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 				LOGGER.exception('Unable to read "{}"', path)
 				raise
+			if source:
+				packages.set_cond_source(cache, source)
 		return cache.copy()
 	return loader
 
 
 def conf_concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	"""Concatenate the two configs together."""
-	return lambda: a() + b()
+	# If either is blank, this is a no-op, so avoid a pointless layer.
+	if a is BLANK:
+		return b
+	if b is BLANK:
+		return a
+
+	def concat() -> Property:
+		prop = Property(None, [])
+		prop += a()
+		prop += b()
+		return prop
+	return concat
 
 
 def conf_replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> LazyConf:

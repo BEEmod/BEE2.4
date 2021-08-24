@@ -322,8 +322,9 @@ def get_config(
     prop_block: Property,
     folder: str,
     pak_id: str,
-    prop_name='config',
-    extension='.cfg',
+    prop_name: str='config',
+    extension: str='.cfg',
+    source: str='',
 ) -> lazy_conf.LazyConf:
     """Lazily extract a config file referred to by the given property block.
 
@@ -331,22 +332,24 @@ def get_config(
     If the keyvalue has a value of "", an empty tree is returned.
     If it has children, a copy of them will be returned.
     Otherwise the value is a filename in the zip which will be parsed.
+
+    If source is supplied, set_cond_source() will be run.
     """
     prop_block = prop_block.find_key(prop_name, "")
     if prop_block.has_children():
         prop = prop_block.copy()
         prop.name = None
-        return lazy_conf.conf_direct(prop)
+        return lazy_conf.conf_direct(prop, source=source)
 
     if prop_block.value == '':
-        return lazy_conf.conf_direct(Property(None, []))
+        return lazy_conf.BLANK
 
     # Zips must use '/' for the separator, even on Windows!
     path = f'{folder}/{prop_block.value}'
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
-    return lazy_conf.conf_file(utils.PackagePath(pak_id, path))
+    return lazy_conf.conf_file(utils.PackagePath(pak_id, path), source=source)
 
 
 def set_cond_source(props: Property, source: str) -> None:
