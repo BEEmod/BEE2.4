@@ -54,6 +54,8 @@ class Node:
     orient: Matrix
     # Group has been found yet for this node?
     is_grouped: bool = False
+    # Track if an input was set, to force a corner overlay.
+    had_input: bool = False
 
     @property
     def on_floor(self) -> bool:
@@ -92,8 +94,11 @@ class Group:
         # users might accidentally do that.
         self.links: set[frozenset[Node]] = set()
 
-        # For antline corners, each endpoint -> the segment
-        self.ant_seg: dict[tuple[float, float, float], antlines.Segment] = {}
+        # For antline corners, each endpoint + normal -> the segment
+        self.ant_seg: dict[tuple[
+            tuple[float, float, float],
+            tuple[float, float, float],
+        ], antlines.Segment] = {}
 
         # Create an info_target to attach I/O to.
         # The corners have an origin on the floor whereas lasers are normal.
@@ -123,14 +128,30 @@ class Group:
             round(normal, 3),
             pos1, pos2,
         )
-        k1 = pos1.as_tuple()
-        k2 = pos2.as_tuple()
+        norm_key = normal.as_tuple()
+        k1 = pos1.as_tuple(), norm_key
+        k2 = pos2.as_tuple(), norm_key
         if k1 in self.ant_seg:
             LOGGER.warning('Antline segment overlap: {}', k1)
         if k2 in self.ant_seg:
             LOGGER.warning('Antline segment overlap: {}', k2)
         self.ant_seg[k1] = seg
         self.ant_seg[k2] = seg
+
+    def rem_ant_straight(self, norm: tuple[float, float, float], endpoint: Vec) -> Vec:
+        """Remove an antline segment with this enpoint, and return its other.
+
+        This is used for merging corners. We already checked it's valid.
+        """
+        seg = self.ant_seg.pop((endpoint.as_tuple(), norm))
+        if seg.start == endpoint:
+            del self.ant_seg[seg.end.as_tuple(), norm]
+            return seg.end
+        elif seg.end == endpoint:
+            del self.ant_seg[seg.start.as_tuple(), norm]
+            return seg.start
+        else:
+            raise ValueError(f'Antline {seg} has no endpoint {endpoint}!')
 
 
 @make_result('AntLaser')
@@ -259,6 +280,7 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
                     conn.to_item = group.item
+                    node.had_input = True
                     continue
                 elif not neigh_node.is_grouped:
                     # Another node.
@@ -378,12 +400,47 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
 
             if group.type is NodeType.CORNER:
                 node.inst.remove()
-                segments.append(antlines.Segment(
-                    antlines.SegType.CORNER,
-                    round(node.orient.up(), 3),
-                    Vec(node.pos),
-                    Vec(node.pos),
-                ))
+                # Figure out whether we want a corner at this point, or
+                # just a regular dot. If a non-node input was provided it's
+                # always a corner. Otherwise it's one if there's an L, T or X
+                # junction.
+                use_corner = True
+                norm = node.orient.up().as_tuple()
+                if not node.had_input:
+                    neighbors = [
+                        mag * direction for direction in [
+                            node.orient.forward(),
+                            node.orient.left(),
+                        ] for mag in [-8.0, 8.0]
+                        if ((node.pos + mag * direction).as_tuple(), norm) in group.ant_seg
+                    ]
+                    if len(neighbors) == 2:
+                        [off1, off2] = neighbors
+                        if Vec.dot(off1, off2) < -0.99:
+                            # ---o---, merge together. The endpoints we want
+                            # are the other ends of the two segments.
+                            group.add_ant_straight(
+                                node.orient.up(),
+                                group.rem_ant_straight(norm, node.pos + off1),
+                                group.rem_ant_straight(norm, node.pos + off2),
+                            )
+                            use_corner = False
+                    elif len(neighbors) == 1:
+                        # o-----, merge.
+                        [offset] = neighbors
+                        group.add_ant_straight(
+                            node.orient.up(),
+                            group.rem_ant_straight(norm, node.pos + offset),
+                            node.pos - offset,
+                        )
+                        use_corner = False
+                if use_corner:
+                    segments.append(antlines.Segment(
+                        antlines.SegType.CORNER,
+                        round(node.orient.up(), 3),
+                        Vec(node.pos),
+                        Vec(node.pos),
+                    ))
             elif group.type is NodeType.LASER:
                 sprite_pos = node.pos + conf_glow_height @ node.orient
 
