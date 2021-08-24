@@ -1,7 +1,7 @@
 """Items dealing with antlines - Antline Corners and Antlasers."""
 from __future__ import annotations
 from enum import Enum
-from typing import Dict, List, Tuple, Set, FrozenSet, Callable, Union
+from typing import Callable, Union
 import attr
 
 from precomp import instanceLocs, connections, conditions, antlines, tiling
@@ -69,9 +69,9 @@ class RopeState(Enum):
 
     @staticmethod
     def from_node(
-        points: Dict[Node, Union[Entity, str]],
+        points: dict[Node, Union[Entity, str]],
         node: Node,
-    ) -> Tuple['RopeState', Union[Entity, str]]:
+    ) -> tuple[RopeState, Union[Entity, str]]:
         """Compute the state and ent/name from the points data."""
         try:
             ent = points[node]
@@ -85,15 +85,15 @@ class RopeState(Enum):
 
 class Group:
     """Represents a group of markers."""
-    def __init__(self, start: Node, typ: NodeType):
+    def __init__(self, start: Node, typ: NodeType) -> None:
         self.type = typ  # Antlaser or corner?
-        self.nodes: List[Node] = [start]
+        self.nodes: list[Node] = [start]
         # We use a frozenset here to ensure we don't double-up the links -
         # users might accidentally do that.
-        self.links: Set[FrozenSet[Node]] = set()
+        self.links: set[frozenset[Node]] = set()
 
         # Create an info_target to attach I/O to.
-        # The corners have an origin on the floor wheras lasers are normal.
+        # The corners have an origin on the floor whereas lasers are normal.
         if typ is NodeType.CORNER:
             logic_pos = start.pos + 8 * start.orient.up()
         else:
@@ -115,7 +115,7 @@ class Group:
 
 
 @make_result('AntLaser')
-def res_antlaser(vmf: VMF, res: Property):
+def res_antlaser(vmf: VMF, res: Property) -> object:
     """The condition to generate AntLasers and Antline Corners.
 
     This is executed once to modify all instances.
@@ -278,7 +278,7 @@ def res_antlaser(vmf: VMF, res: Property):
             toggle['target'] = conditions.local_name(group.nodes[0].inst, conf_toggle_targ)
 
         # Node -> index for targetnames.
-        indexes: Dict[Node, int] = {}
+        indexes: dict[Node, int] = {}
 
         # For antline corners, the antline segments.
         segments: list[antlines.Segment] = []
@@ -354,7 +354,7 @@ def res_antlaser(vmf: VMF, res: Property):
         # So this dict is either a targetname to indicate cables with an
         # outgoing connection, or the entity for endpoints without an outgoing
         # connection.
-        cable_points: Dict[Node, Union[Entity, str]] = {}
+        cable_points: dict[Node, Union[Entity, str]] = {}
 
         for i, node in enumerate(group.nodes, start=1):
             indexes[node] = i
