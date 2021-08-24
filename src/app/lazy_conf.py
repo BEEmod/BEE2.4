@@ -4,6 +4,7 @@ from typing import Callable, Pattern
 import functools
 
 from srctools import Property, logger, KeyValError
+from app import DEV_MODE
 import packages
 import utils
 
@@ -57,7 +58,7 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 			packages.set_cond_source(props, source)
 		return props
 
-	if utils.DEV_MODE:
+	if DEV_MODE.get():
 		# Parse immediately, to check syntax.
 		try:
 			with file.open_str() as f:
