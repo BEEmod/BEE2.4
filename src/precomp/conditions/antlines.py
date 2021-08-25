@@ -123,12 +123,18 @@ class Group:
 
     def add_ant_straight(self, normal: Vec, pos1: Vec, pos2: Vec) -> None:
         """Add a segment going from point 1 to 2."""
+        if pos1 == pos2:
+            # Zero long, just skip placing.
+            # This occurs if placed right on the edge as we wrap around a voxel
+            # corner.
+            return
+
         seg = antlines.Segment(
             antlines.SegType.STRAIGHT,
             round(normal, 3),
             pos1, pos2,
         )
-        norm_key = normal.as_tuple()
+        norm_key = seg.normal.as_tuple()
         k1 = pos1.as_tuple(), norm_key
         k2 = pos2.as_tuple(), norm_key
         if k1 in self.ant_seg:
@@ -542,6 +548,8 @@ def build_cables(
     rope_ind = 0  # Uniqueness value.
     node_a: Node
     node_b: Node
+    rope_a: Entity
+    rope_b: Entity
     for node_a, node_b in group.links:
         state_a, ent_a = RopeState.from_node(cable_points, node_a)
         state_b, ent_b = RopeState.from_node(cable_points, node_b)
@@ -567,6 +575,7 @@ def build_cables(
             rope_a['targetname'] = NAME_CABLE(base_name, rope_ind)
         else:
             # It is unlinked, so it's the rope to use.
+            assert isinstance(ent_a, Entity)
             rope_a = ent_a
 
         # Only need to make the B rope if it doesn't have one.
@@ -581,6 +590,7 @@ def build_cables(
             cable_points[node_b] = rope_b  # Someone can use this.
         elif state_b is RopeState.UNLINKED:
             # Both must be unlinked, we aren't using this link though.
+            assert isinstance(ent_b, Entity)
             name_b = ent_b['targetname']
         else:  # Linked, we just have the name.
             name_b = ent_b
