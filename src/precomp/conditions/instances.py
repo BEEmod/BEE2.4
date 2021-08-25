@@ -15,9 +15,10 @@ COND_MOD_NAME = 'Instances'
 
 
 @make_flag('instance')
-def flag_file_equal(inst: Entity, flag: Property) -> bool:
+def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
     """Evaluates True if the instance matches the given file."""
-    return inst['file'].casefold() in instanceLocs.resolve(flag.value)
+    inst_list = instanceLocs.resolve(flag.value)
+    return lambda inst: inst['file'].casefold() in inst_list
 
 
 @make_flag('instFlag', 'InstPart')
@@ -365,8 +366,8 @@ def res_global_input_setup(res: Property) -> tuple[str, Output]:
 def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
     """Trigger an input either on map spawn, or when a relay is triggered.
 
-    Arguments:  
-    
+    Arguments:
+
     - `Input`: the input to use, either a name or an `instance:` command.
     - `Target`: If set, a local name to send commands to. Otherwise, the instance itself.
     - `Delay`: Number of seconds to delay the input.
