@@ -14,11 +14,17 @@ COND_MOD_NAME = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlines')
 
-AntlineConn = connections.Config(
-    '<Antline>',
+# Antlasers have their own visuals, so they need an item to stay.
+CONFIG_ANTLASER = connections.Config(
+    '<ANTLASER>',
     input_type=connections.InputType.OR,
     output_act=(None, 'OnUser2'),
     output_deact=(None, 'OnUser1'),
+)
+# But antline corners just place antlines, and can collapse into other items.
+CONFIG_ANTLINE = connections.Config(
+    '<ANTLINE>',
+    input_type=connections.InputType.OR_LOGIC,
 )
 
 NAME_SPR: Callable[[str, int], str] = '{}-fx_sp_{}'.format
@@ -100,22 +106,23 @@ class Group:
             tuple[float, float, float],
         ], antlines.Segment] = {}
 
-        # Create an info_target to attach I/O to.
+        # Create a comp_relay to attach I/O to.
         # The corners have an origin on the floor whereas lasers are normal.
         if typ is NodeType.CORNER:
             logic_pos = start.pos + 8 * start.orient.up()
+            logic_conf = CONFIG_ANTLINE
         else:
             logic_pos = start.pos - 56 * start.orient.up()
+            logic_conf = CONFIG_ANTLASER
         logic_ent = start.inst.map.create_ent(
-            'info_target',
+            'comp_relay',
             origin=logic_pos,
             targetname=start.item.name,
         )
 
         # Create the item for the entire group of markers.
         self.item = connections.Item(
-            logic_ent,
-            AntlineConn,
+            logic_ent, logic_conf,
             start.item.ant_floor_style,
             start.item.ant_wall_style,
         )
