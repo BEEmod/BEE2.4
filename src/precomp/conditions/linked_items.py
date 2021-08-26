@@ -90,10 +90,9 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
 @conditions.meta_cond(-300)
 def link_items(vmf: VMF) -> None:
     """Take the defined linked items, and actually link them together."""
-    if ITEMS_TO_LINK:
-        for name, group in ITEMS_TO_LINK.items():
-            LOGGER.info('Linking {} items...', name)
-            link_item(vmf, group)
+    for name, group in ITEMS_TO_LINK.items():
+        LOGGER.info('Linking {} items...', name)
+        link_item(vmf, group)
 
 
 def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
