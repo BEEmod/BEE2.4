@@ -19,7 +19,7 @@ from packages import CORRIDOR_COUNTS, CorrDesc
 from app import selector_win, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
 from app import tkMarkdown, SubPane, img, tk_tools
-from BEE2_config import ConfigFile, option_handler
+import BEE2_config
 import utils
 
 
@@ -29,7 +29,7 @@ LOGGER = get_logger(__name__)
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR: dict[str, selector_win.selWin] = {}
+CORRIDOR: dict[str, selector_win.SelectorWin] = {}
 CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
 
 CORRIDOR_DESC = tkMarkdown.convert('', None)
@@ -43,7 +43,7 @@ COMPILE_DEFAULTS = {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        'use_voice_priority': '1',
+        'voiceline_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
     },
@@ -74,7 +74,7 @@ PLAYER_MODELS = {
 PLAYER_MODEL_ORDER = ['PETI', 'SP', 'ATLAS', 'PBODY']
 PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
 
-COMPILE_CFG = ConfigFile('compile.cfg')
+COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: Union[SubPane.SubPane, tk.Tk, None] = None
 UI: dict[str, tk.Widget] = {}
@@ -87,7 +87,7 @@ tk_screenshot = None  # The preview image shown
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
-VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True))
+VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
 player_model_var = tk.StringVar(
     value=PLAYER_MODELS.get(
@@ -143,48 +143,49 @@ vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_fu
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
-@option_handler('CompilerPane')
-def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]:
-    """Save/load compiler options from the palette.
+@BEE2_config.OPTION_SAVE('CompilerPane')
+def save_handler() -> Property:
+    """Save the compiler pane to the palette.
 
     Note: We specifically do not save/load the following:
         - packfile dumping
         - compile counts
     This is because these are more system-dependent than map dependent.
     """
-    if props is None:  # Saving
-        corr_prop = Property('corridor', [])
-        props = Property('', [
-            Property('sshot_type', chosen_thumb.get()),
-            Property('sshot_cleanup', str(cleanup_screenshot.get())),
-            Property('spawn_elev', str(start_in_elev.get())),
-            Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
-            Property('use_voice_priority', str(VOICE_PRIORITY_VAR.get())),
-            corr_prop,
-        ])
-        for group, win in CORRIDOR.items():
-            corr_prop[group] = win.chosen_id or '<NONE>'
+    corr_prop = Property('corridor', [])
+    props = Property('', [
+        Property('sshot_type', chosen_thumb.get()),
+        Property('sshot_cleanup', str(cleanup_screenshot.get())),
+        Property('spawn_elev', str(start_in_elev.get())),
+        Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
+        Property('voiceline_priority', str(VOICE_PRIORITY_VAR.get())),
+        corr_prop,
+    ])
+    for group, win in CORRIDOR.items():
+        corr_prop[group] = win.chosen_id or '<NONE>'
 
-        # Embed the screenshot in so we can load it later.
-        if chosen_thumb.get() == 'CUST':
-            # encodebytes() splits it into multiple lines, which we write
-            # in individual blocks to prevent having a massively long line
-            # in the file.
-            with open(SCREENSHOT_LOC, 'rb') as f:
-                screenshot_data = base64.encodebytes(f.read())
-            props.append(Property(
-                'sshot_data',
-                [
-                    Property('b64', data)
-                    for data in
-                    screenshot_data.decode('ascii').splitlines()
-                ]
-            ))
+    # Embed the screenshot in so we can load it later.
+    if chosen_thumb.get() == 'CUST':
+        # encodebytes() splits it into multiple lines, which we write
+        # in individual blocks to prevent having a massively long line
+        # in the file.
+        with open(SCREENSHOT_LOC, 'rb') as f:
+            screenshot_data = base64.encodebytes(f.read())
+        props.append(Property(
+            'sshot_data',
+            [
+                Property('b64', data)
+                for data in
+                screenshot_data.decode('ascii').splitlines()
+            ]
+        ))
 
-        return props
+    return props
 
-    # else: Loading
 
+@BEE2_config.OPTION_LOAD('CompilerPane')
+def load_handler(props: Property) -> None:
+    """Load compiler options from the palette."""
     chosen_thumb.set(props['sshot_type', chosen_thumb.get()])
     cleanup_screenshot.set(props.bool('sshot_cleanup', cleanup_screenshot.get()))
 
@@ -212,9 +213,9 @@ def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]
         player_model_var.set(PLAYER_MODELS[player_mdl])
         COMPILE_CFG['General']['player_model'] = player_mdl
 
-    VOICE_PRIORITY_VAR.set(props.bool('use_voice_priority', VOICE_PRIORITY_VAR.get()))
+    VOICE_PRIORITY_VAR.set(props.bool('voiceline_priority', VOICE_PRIORITY_VAR.get()))
 
-    corr_prop = props.find_key('corridor', [])
+    corr_prop = props.find_block('corridor', or_blank=True)
     for group, win in CORRIDOR.items():
         try:
             sel_id = corr_prop[group]
@@ -295,7 +296,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
     """Create the corridor widget and items."""
     length = CORRIDOR_COUNTS[corr_name]
 
-    CORRIDOR[corr_name] = sel = selector_win.selWin(
+    CORRIDOR[corr_name] = sel = selector_win.SelectorWin(
         TK_ROOT,
         [
             selector_win.Item(
@@ -304,6 +305,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
             )
             for i in range(1, length + 1)
         ],
+        save_id='corr_' + corr_name,
         title=title,
         none_desc=_(
             'Randomly choose a corridor. '
@@ -481,7 +483,7 @@ def make_widgets() -> None:
     """Create the compiler options pane.
 
     """
-    make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR)
+    make_setter('General', 'voiceline_priority', VOICE_PRIORITY_VAR)
     make_setter('General', 'spawn_elev', start_in_elev)
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
     make_setter('General', 'vrad_force_full', vrad_light_type)

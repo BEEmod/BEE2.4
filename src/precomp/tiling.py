@@ -2139,11 +2139,20 @@ def generate_brushes(vmf: VMF) -> None:
     LOGGER.info('Generating goop...')
     generate_goo(vmf)
 
+    nodraw = consts.Tools.NODRAW
     for over, over_tiles in OVERLAY_BINDS.items():
+        # Keep already set sides.
         faces = set(over['sides', ''].split())
+        # We don't want to include nodraw, since that doesn't accept
+        # overlays anyway.
         for tile in over_tiles:
-            faces.update(str(f.id) for f in tile.brush_faces)
+            faces.update(
+                str(f.id)
+                for f in tile.brush_faces
+                if f.mat != nodraw
+            )
 
+        # If it turns out there's no faces for this, discard the overlay.
         if faces:
             over['sides'] = ' '.join(sorted(faces))
         else:

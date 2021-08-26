@@ -73,11 +73,10 @@ class QuotePack(PakObject):
 
         config = get_config(
             data.info,
-            data.fsys,
             'voice',
             pak_id=data.pak_id,
             prop_name='file',
-        )
+        )()
 
         return cls(
             data.id,

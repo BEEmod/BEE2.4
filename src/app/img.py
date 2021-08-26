@@ -13,7 +13,7 @@ import os
 from weakref import ref as WeakRef
 import tkinter as tk
 from tkinter import ttk
-from typing import Generic, TypeVar, Union, Callable, Optional, Type
+from typing import Generic, TypeVar, Union, Callable, Optional, Type, cast
 from app import TK_ROOT
 
 from srctools import Vec, Property
@@ -42,7 +42,6 @@ _pending_cleanup: dict[int, tuple[Handle, float]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
-FSYS_BUILTIN.open_ref()
 PACK_SYSTEMS: dict[str, FileSystem] = {}
 
 # Silence DEBUG messages from Pillow, they don't help.
@@ -180,33 +179,31 @@ def _load_file(
         path += ".png"
 
     image: Image.Image
-    with fsys:
-        try:
-            img_file = fsys[path]
-        except (KeyError, FileNotFoundError):
-            img_file = None
+    try:
+        img_file = fsys[path]
+    except (KeyError, FileNotFoundError):
+        img_file = None
 
     # Deprecated behaviour, check the other packages.
     if img_file is None and check_other_packages:
         for pak_id, other_fsys in PACK_SYSTEMS.items():
-            with other_fsys:
-                try:
-                    img_file = other_fsys[path]
-                    LOGGER.warning(
-                        'Image "{}" was found in package "{}", '
-                        'fix the reference.',
-                        uri, pak_id,
-                    )
-                    break
-                except (KeyError, FileNotFoundError):
-                    pass
+            try:
+                img_file = other_fsys[path]
+                LOGGER.warning(
+                    'Image "{}" was found in package "{}", '
+                    'fix the reference.',
+                    uri, pak_id,
+                )
+                break
+            except (KeyError, FileNotFoundError):
+                pass
 
     if img_file is None:
         LOGGER.error('"{}" does not exist!', uri)
         return Handle.error(width, height).get_pil()
 
     try:
-        with img_file.sys, img_file.open_bin() as file:
+        with img_file.open_bin() as file:
             if path.casefold().endswith('.vtf'):
                 vtf = VTF.read(file)
                 mipmap = 0
@@ -470,17 +467,17 @@ class Handle(Generic[ArgT]):
         return cls._get(typ, args, width, height)
 
     @classmethod
-    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle:
+    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle[PackagePath]:
         """Shortcut for getting a handle to a builtin UI image."""
         return cls._get(TYP_BUILTIN, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
-    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle:
+    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle[PackagePath]:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
         return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
-    def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle:
+    def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle[Sequence[Handle]]:
         """Return a handle composed of several images layered on top of each other."""
         if not children:
             return cls.error(width, height)
@@ -498,22 +495,22 @@ class Handle(Generic[ArgT]):
             return handle
 
     @classmethod
-    def file(cls, path: PackagePath, width: int, height: int) -> Handle:
+    def file(cls, path: PackagePath, width: int, height: int) -> Handle[PackagePath]:
         """Shortcut for getting a handle to file path."""
         return cls._get(TYP_FILE, path, width, height)
 
     @classmethod
-    def error(cls, width: int, height: int) -> Handle:
+    def error(cls, width: int, height: int) -> Handle[str]:
         """Shortcut for getting a handle to an error icon."""
         return cls._get(TYP_ICON, 'error', width, height)
 
     @classmethod
-    def ico_none(cls, width: int, height: int) -> Handle:
+    def ico_none(cls, width: int, height: int) -> Handle[str]:
         """Shortcut for getting a handle to a 'none' icon."""
         return cls._get(TYP_ICON, 'none', width, height)
 
     @classmethod
-    def ico_loading(cls, width: int, height: int) -> Handle:
+    def ico_loading(cls, width: int, height: int) -> Handle[str]:
         """Shortcut for getting a handle to a 'loading' icon."""
         try:
             return _load_handles[width, height]
@@ -528,7 +525,7 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_ALPHA, None, width, height)
 
     @classmethod
-    def color(cls, color: Union[tuple[int, int, int], Vec], width: int, height: int) -> Handle:
+    def color(cls, color: Union[tuple[int, int, int], Vec], width: int, height: int) -> Handle[tuple[int, int, int]]:
         """Shortcut for getting a handle to a solid color."""
         if isinstance(color, Vec):
             # Convert.
@@ -586,7 +583,7 @@ class Handle(Generic[ArgT]):
             return
         self._users.discard(ref)
         if self.type is TYP_COMP:
-            for child in self.arg:  # type: Handle
+            for child in cast('Sequence[Handle]', self.arg):
                 child._decref(self)
         if not self._users:
             _pending_cleanup[id(self)] = (self, time.monotonic())
@@ -598,7 +595,7 @@ class Handle(Generic[ArgT]):
         self._users.add(ref)
         _pending_cleanup.pop(id(self), None)
         if self.type is TYP_COMP:
-            for child in self.arg:  # type: Handle
+            for child in cast('Sequence[Handle]', self.arg):
                 child._incref(self)
 
     def _request_load(self) -> tkImage:
@@ -625,7 +622,9 @@ def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
     """
     try:
         handle = _wid_tk.pop(ref)
-    except (KeyError, TypeError):
+    except (KeyError, TypeError, NameError):
+        # Interpreter could be shutting down and deleted globals, or we were
+        # called twice, etc. Just ignore.
         pass
     else:
         handle._decref(ref)
@@ -675,7 +674,13 @@ def _ui_task() -> None:
             if isinstance(label_ref, WeakRef):
                 label: Optional[tkImgWidgets] = label_ref()
                 if label is not None:
-                    label['image'] = tk_ico
+                    try:
+                        label['image'] = tk_ico
+                    except tk.TclError:
+                        # Can occur if the image has been removed/destroyed, but
+                        # the Python object still exists. Ignore, should be
+                        # cleaned up shortly.
+                        pass
 
     for handle, use_time in list(_pending_cleanup.values()):
         with handle.lock:

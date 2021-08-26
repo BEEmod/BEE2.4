@@ -1,98 +1,106 @@
+"""The Style Properties tab, for configuring style-specific properties."""
+from __future__ import annotations
 from tkinter import *
 from tkinter import ttk
 
-from typing import Union, List, Dict, Callable, Optional
-from collections import namedtuple
+from typing import Callable, Optional
 import operator
+import itertools
 
 from srctools import Property
 from srctools.logger import get_logger
-import packages
+from packages import Style, StyleVar
 from app.SubPane import SubPane
 from app import tooltip, TK_ROOT, itemconfig, tk_tools
+from localisation import ngettext, gettext
 import BEE2_config
 
 
 LOGGER = get_logger(__name__)
 
-
-stylevar = namedtuple('stylevar', 'id name default desc')
-
-# Special StyleVars that are hardcoded into the BEE2
+# Special StyleVars that are hardcoded into the BEE2.
 # These are effectively attributes of Portal 2 itself, and always work
 # in every style.
 styleOptions = [
-    # ID, Name, default value
-    stylevar(
+    StyleVar.unstyled(
         id='MultiverseCave',
-        name=_('Multiverse Cave'),
-        default=1,
-        desc=_('Play the Workshop Cave Johnson lines on map start.')
+        name=gettext('Multiverse Cave'),
+        default=True,
+        desc=gettext('Play the Workshop Cave Johnson lines on map start.'),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='FixFizzlerBump',
-        name=_('Prevent Portal Bump (fizzler)'),
-        default=0,
-        desc=_('Add portal bumpers to make it more difficult to portal across '
-               'fizzler edges. This can prevent placing portals in tight '
-               'spaces near fizzlers, or fizzle portals on activation.')
+        name=gettext('Prevent Portal Bump (fizzler)'),
+        default=False,
+        desc=gettext(
+            'Add portal bumpers to make it more difficult to portal across '
+            'fizzler edges. This can prevent placing portals in tight spaces '
+            'near fizzlers, or fizzle portals on activation.'
+        ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='NoMidVoices',
-        name=_('Suppress Mid-Chamber Dialogue'),
-        default=0,
-        desc=_('Disable all voicelines other than entry and exit lines.')
+        name=gettext('Suppress Mid-Chamber Dialogue'),
+        default=False,
+        desc=gettext('Disable all voicelines other than entry and exit lines.'),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='UnlockDefault',
-        name=_('Unlock Default Items'),
-        default=0,
-        desc=_('Allow placing and deleting the mandatory Entry/Exit Doors and '
-               'Large Observation Room. Use with caution, this can have weird '
-               'results!')
+        name=gettext('Unlock Default Items'),
+        default=False,
+        desc=gettext(
+            'Allow placing and deleting the mandatory Entry/Exit Doors and '
+            'Large Observation Room. Use with caution, this can have weird '
+            'results!'
+        ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='AllowGooMist',
-        name=_('Allow Adding Goo Mist'),
-        default=1,
-        desc=_('Add mist particles above Toxic Goo in certain styles. This can '
-               'increase the entity count significantly with large, complex '
-               'goo pits, so disable if needed.')
+        name=gettext('Allow Adding Goo Mist'),
+        default=True,
+        desc=gettext(
+            'Add mist particles above Toxic Goo in certain styles. This can '
+            'increase the entity count significantly with large, complex goo '
+            'pits, so disable if needed.'
+        ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='FunnelAllowSwitchedLights',
-        name=_('Light Reversible Excursion Funnels'),
-        default=1,
-        desc=_('Funnels emit a small amount of light. However, if multiple funnels '
-               'are near each other and can reverse polarity, this can cause '
-               'lighting issues. Disable this to prevent that by disabling '
-               'lights. Non-reversible Funnels do not have this issue.'),
+        name=gettext('Light Reversible Excursion Funnels'),
+        default=True,
+        desc=gettext(
+            'Funnels emit a small amount of light. However, if multiple funnels '
+            'are near each other and can reverse polarity, this can cause '
+            'lighting issues. Disable this to prevent that by disabling '
+            'lights. Non-reversible Funnels do not have this issue.'
+        ),
     ),
 
-    stylevar(
+    StyleVar.unstyled(
         id='EnableShapeSignageFrame',
-        name=_('Enable Shape Framing'),
-        default=1,
-        desc=_('After 10 shape-type antlines are used, the signs repeat. '
-               'With this enabled, colored frames will be added to '
-               'distinguish them.'),
+        name=gettext('Enable Shape Framing'),
+        default=True,
+        desc=gettext(
+            'After 10 shape-type antlines are used, the signs repeat. With this'
+            ' enabled, colored frames will be added to distinguish them.'
+        ),
     ),
 ]
 
-checkbox_all = {}
-checkbox_chosen = {}
-checkbox_other = {}
-tk_vars = {}  # type: Dict[str, IntVar]
+checkbox_all: dict[str, ttk.Checkbutton] = {}
+checkbox_chosen: dict[str, ttk.Checkbutton] = {}
+checkbox_other: dict[str, ttk.Checkbutton] = {}
+tk_vars: dict[str, IntVar] = {}
 
-VAR_LIST: List[packages.StyleVar] = []
-STYLES = {}
+VAR_LIST: list[StyleVar] = []
+STYLES: dict[str, Style] = {}
 
-window = None
+window: Optional[SubPane] = None
 
 UI = {}
 # Callback triggered whenever we reload vars. This is used to update items
@@ -103,48 +111,43 @@ _load_cback: Optional[Callable[[], None]] = None
 def mandatory_unlocked() -> bool:
     """Return whether mandatory items are unlocked currently."""
     try:
-        return tk_vars['UnlockDefault'].get()
+        return tk_vars['UnlockDefault'].get() != 0
     except KeyError:  # Not loaded yet
         return False
 
 
-def add_vars(style_vars, styles):
-    """
-    Add the given stylevars to our list.
-
-    """
-    VAR_LIST.clear()
-    VAR_LIST.extend(
-        sorted(style_vars, key=operator.attrgetter('id'))
-    )
-
-    for var in VAR_LIST:
-        var.enabled = BEE2_config.GEN_OPTS.get_bool('StyleVar', var.id, var.default)
-
-    for style in styles:
-        STYLES[style.id] = style
+@BEE2_config.OPTION_SAVE('StyleVar')
+def save_handler() -> Property:
+    """Save variables to configs."""
+    props = Property('', [])
+    for var_id, var in sorted(tk_vars.items()):
+        props[var_id] = str(int(var.get()))
+    return props
 
 
-@BEE2_config.option_handler('StyleVar')
-def save_load_stylevars(props: Property=None):
-    """Save and load variables from configs."""
-    if props is None:
-        props = Property('', [])
-        for var_id, var in sorted(tk_vars.items()):
-            props[var_id] = str(int(var.get()))
-        return props
-    else:
-        # Loading
-        for prop in props:
-            try:
-                tk_vars[prop.real_name].set(prop.value)
-            except KeyError:
-                LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
-        if _load_cback is not None:
-            _load_cback()
+@BEE2_config.OPTION_LOAD('StyleVar')
+def load_handler(props: Property) -> None:
+    """Load variables from configs."""
+    for prop in props:
+        try:
+            tk_vars[prop.real_name].set(prop.value)
+        except KeyError:
+            LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
+    if _load_cback is not None:
+        _load_cback()
 
 
-def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
+def export_data(chosen_style: Style) -> dict[str, bool]:
+    """Construct a dict containing the current stylevar settings."""
+    return {
+        var.id: (tk_vars[var.id].get() == 1)
+        for var in
+        itertools.chain(VAR_LIST, styleOptions)
+        if var.applies_to_style(chosen_style)
+    }
+
+
+def make_desc(var: StyleVar) -> str:
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.
@@ -154,14 +157,12 @@ def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
     else:
         desc = []
 
-    desc.append(
-        _('Default: On')
-        if var.default else
-        _('Default: Off')
-    )
+    # i18n: StyleVar default value.
+    desc.append(gettext('Default: On') if var.default else gettext('Default: Off'))
 
-    if is_hardcoded or var.styles is None:
-        desc.append(_('Styles: Unstyled'))
+    if var.styles is None:
+        # i18n: StyleVar which is totally unstyled.
+        desc.append(gettext('Styles: Unstyled'))
     else:
         app_styles = [
             style
@@ -171,21 +172,23 @@ def make_desc(var: Union[packages.StyleVar, stylevar], is_hardcoded=False):
         ]
 
         if len(app_styles) == len(STYLES):
-            desc.append(_('Styles: All'))
+            # i18n: StyleVar which matches all styles.
+            desc.append(gettext('Styles: All'))
         else:
             style_list = sorted(
                 style.selitem_data.short_name
                 for style in
                 app_styles
             )
-            desc.append(
-                ngettext('Style: {}', 'Styles: {}', len(style_list)
+            desc.append(ngettext(
+                # i18n: The styles a StyleVar is allowed for.
+                'Style: {}', 'Styles: {}', len(style_list),
             ).format(', '.join(style_list)))
 
     return '\n'.join(desc)
 
 
-def refresh(selected_style):
+def refresh(selected_style: Style) -> None:
     """Move the stylevars to the correct position.
 
     This depends on which apply to the current style.
@@ -222,7 +225,7 @@ def refresh(selected_style):
         UI['stylevar_other_none'].grid_remove()
 
 
-def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]):
+def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]) -> None:
     """Create the styleVar pane.
 
     update_item_vis is the callback fired whenever change defaults changes.
@@ -232,7 +235,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
 
     window = SubPane(
         TK_ROOT,
-        title=_('Style/Item Properties'),
+        title=gettext('Style/Item Properties'),
         name='style',
         menu_bar=menu_bar,
         resize_y=True,
@@ -251,7 +254,7 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     stylevar_frame = ttk.Frame(nbook)
     stylevar_frame.rowconfigure(0, weight=1)
     stylevar_frame.columnconfigure(0, weight=1)
-    nbook.add(stylevar_frame, text=_('Styles'))
+    nbook.add(stylevar_frame, text=gettext('Styles'))
 
     canvas = Canvas(stylevar_frame, highlightthickness=0)
     # need to use a canvas to allow scrolling
@@ -270,10 +273,10 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
 
     canvas_frame = ttk.Frame(canvas)
 
-    frame_all = ttk.Labelframe(canvas_frame, text=_("All:"))
+    frame_all = ttk.Labelframe(canvas_frame, text=gettext("All:"))
     frame_all.grid(row=0, sticky='EW')
 
-    frm_chosen = ttk.Labelframe(canvas_frame, text=_("Selected Style:"))
+    frm_chosen = ttk.Labelframe(canvas_frame, text=gettext("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(
@@ -281,21 +284,23 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         orient=HORIZONTAL,
         ).grid(row=2, sticky='EW', pady=(10, 5))
 
-    frm_other = ttk.Labelframe(canvas_frame, text=_("Other Styles:"))
+    frm_other = ttk.Labelframe(canvas_frame, text=gettext("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
     UI['stylevar_chosen_none'] = ttk.Label(
         frm_chosen,
-        text=_('No Options!'),
+        text=gettext('No Options!'),
         font='TkMenuFont',
         justify='center',
         )
     UI['stylevar_other_none'] = ttk.Label(
         frm_other,
-        text=_('None!'),
+        text=gettext('None!'),
         font='TkMenuFont',
         justify='center',
         )
+
+    VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
 
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
@@ -313,17 +318,14 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         if var.id == 'UnlockDefault':
             checkbox_all[var.id]['command'] = lambda: update_item_vis()
 
-        tooltip.add_tooltip(
-            checkbox_all[var.id],
-            make_desc(var, is_hardcoded=True),
-        )
+        tooltip.add_tooltip(checkbox_all[var.id], make_desc(var))
 
     for var in VAR_LIST:
         tk_vars[var.id] = IntVar(value=var.enabled)
         args = {
             'variable': tk_vars[var.id],
             'text': var.name,
-            }
+        }
         desc = make_desc(var)
         if var.applies_to_all():
             # Available in all styles - put with the hardcoded variables.
@@ -336,14 +338,9 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
             # Swap between checkboxes depending on style.
             checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
             checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
-            tooltip.add_tooltip(
-                checkbox_chosen[var.id],
-                desc,
-            )
-            tooltip.add_tooltip(
-                checkbox_other[var.id],
-                desc,
-            )
+
+            tooltip.add_tooltip(checkbox_chosen[var.id], desc)
+            tooltip.add_tooltip(checkbox_other[var.id], desc)
 
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas.update_idletasks()
@@ -361,5 +358,5 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
     canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))
 
     item_config_frame = ttk.Frame(nbook)
-    nbook.add(item_config_frame, text=_('Items'))
+    nbook.add(item_config_frame, text=gettext('Items'))
     itemconfig.make_pane(item_config_frame)

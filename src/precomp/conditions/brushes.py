@@ -106,6 +106,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
     if axis.x > 0 or axis.y > 0 or axis.z > 0:
         # If it points forward, we need to reverse the rotating door
         reverse = not reverse
+    axis = abs(axis)
 
     try:
         flag_values = FLAG_ROTATING[door_type]
@@ -114,9 +115,12 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
         return
 
     name = res['ModifyTarget', '']
+    door_ent: Optional[Entity]
     if name:
         name = conditions.local_name(ent, name)
         setter_loc = ent['origin']
+        door_ent = None
+        spawnflags = 0
     else:
         # Generate a brush.
         name = conditions.local_name(ent, res['name', ''])
@@ -129,14 +133,14 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
             classname=door_type,
             targetname=name,
             origin=pos.join(' '),
-            # Extra stuff to apply to the flags (USE, toggle, etc)
-            spawnflags=sum(map(
-                # Add together multiple values
-                srctools.conv_int,
-                res['flags', '0'].split('+')
-                # Make the door always non-solid!
-            )) | flag_values.get('solid_flags', 0),
         )
+        # Extra stuff to apply to the flags (USE, toggle, etc)
+        spawnflags = sum(map(
+            # Add together multiple values
+            srctools.conv_int,
+            res['flags', '0'].split('+')
+            # Make the door always non-solid!
+        )) | flag_values.get('solid_flags', 0)
 
         conditions.set_ent_keys(door_ent, ent, res)
 
@@ -157,21 +161,29 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
         # Generate brush
         door_ent.solids = [vmf.make_prism(pos - 1, pos + 1).solid]
 
-    # Add or remove flags as needed by creating KV setters.
-
+    # Add or remove flags as needed
     for flag, value in zip(
         ('x', 'y', 'z', 'rev'),
-        [axis.x != 0, axis.y != 0, axis.z != 0, reverse],
+        [axis.x > 1e-6, axis.y > 1e-6, axis.z > 1e-6, reverse],
     ):
-        if flag in flag_values:
+        if flag not in flag_values:
+            continue
+        if door_ent is not None:
+            if value:
+                spawnflags |= flag_values[flag]
+            else:
+                spawnflags &= ~flag_values[flag]
+        else:  # Place a KV setter to set this.
             vmf.create_ent(
                 'comp_kv_setter',
                 origin=setter_loc,
                 target=name,
                 mode='flags',
                 kv_name=flag_values[flag],
-                kv_value_local=value,
+                kv_value_global=value,
             )
+    if door_ent is not None:
+        door_ent['spawnflags'] = spawnflags
 
     # This ent uses a keyvalue for reversing...
     if door_type == 'momentary_rot_button':
@@ -181,7 +193,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
             target=name,
             mode='kv',
             kv_name='StartDirection',
-            kv_value_local='1' if reverse else '-1',
+            kv_value_global='1' if reverse else '-1',
         )
 
 
@@ -390,6 +402,7 @@ def res_import_template(vmf: VMF, res: Property):
             bind overlays on a surface to surfaces in this template.
             The value specifies the offset to the surface, where 0 0 0 is the
             floor position. It can also be a block of multiple positions.
+    - `alignBindOverlay`: If set, align the bindOverlay offsets to the grid.
     - `keys`/`localkeys`: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail.
             Specially-handled keys:
@@ -475,8 +488,9 @@ def res_import_template(vmf: VMF, res: Property):
         # So it's the floor block location.
         Vec.from_str(value) - (0, 0, 128)
         for value in
-        res.find_block('BindOverlay', or_blank=True).as_array()
+        res.find_key('BindOverlay', or_blank=True).as_array()
     ]
+    align_bind_overlay = res.bool('alignBindOverlay')
 
     key_values = res.find_block("Keys", or_blank=True)
     if key_values:
@@ -642,6 +656,7 @@ def res_import_template(vmf: VMF, res: Property):
             add_to_map=True,
             additional_visgroups=visgroups,
             bind_tile_pos=bind_tile_pos,
+            align_bind=align_bind_overlay,
         )
 
         if key_block is not None:

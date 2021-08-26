@@ -23,22 +23,20 @@ from . import (
     sound,
     img,
     UI,
-    TK_ROOT,
+    TK_ROOT, DEV_MODE,
 )
 import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass
 from editoritems_props import TimerDelay
+from localisation import gettext
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-OPEN_IN_TAB = 2
 
 wid = {}
 
 selected_item: 'UI.Item'
 selected_sub_item: 'UI.PalItem'
-is_open = False
 
 version_lookup = []
 
@@ -81,34 +79,34 @@ class SPR(Enum):
 
 SPRITE_TOOL = {
     # The tooltips associated with each sprite.
-    'rot_0': _('This item may not be rotated.'),
-    'rot_4': _('This item can be pointed in 4 directions.'),
-    'rot_5': _('This item can be positioned on the sides and center.'),
-    'rot_6': _('This item can be centered in two directions, plus on the sides.'),
-    'rot_8': _('This item can be placed like light strips.'),
-    'rot_36': _('This item can be rotated on the floor to face 360 degrees.'),
-    'rot_catapult': _('This item is positioned using a catapult trajectory.'),
-    'rot_paint': _('This item positions the dropper to hit target locations.'),
+    'rot_0': gettext('This item may not be rotated.'),
+    'rot_4': gettext('This item can be pointed in 4 directions.'),
+    'rot_5': gettext('This item can be positioned on the sides and center.'),
+    'rot_6': gettext('This item can be centered in two directions, plus on the sides.'),
+    'rot_8': gettext('This item can be placed like light strips.'),
+    'rot_36': gettext('This item can be rotated on the floor to face 360 degrees.'),
+    'rot_catapult': gettext('This item is positioned using a catapult trajectory.'),
+    'rot_paint': gettext('This item positions the dropper to hit target locations.'),
 
-    'in_none': _('This item does not accept any inputs.'),
-    'in_norm': _('This item accepts inputs.'),
-    'in_dual': _('This item has two input types (A and B), using the Input A and B items.'),
+    'in_none': gettext('This item does not accept any inputs.'),
+    'in_norm': gettext('This item accepts inputs.'),
+    'in_dual': gettext('This item has two input types (A and B), using the Input A and B items.'),
 
-    'out_none': _('This item does not output.'),
-    'out_norm': _('This item has an output.'),
-    'out_tim': _('This item has a timed output.'),
+    'out_none': gettext('This item does not output.'),
+    'out_norm': gettext('This item has an output.'),
+    'out_tim': gettext('This item has a timed output.'),
 
-    'space_none': _('This item does not take up any space inside walls.'),
-    'space_embed': _('This item takes space inside the wall.'),
+    'space_none': gettext('This item does not take up any space inside walls.'),
+    'space_embed': gettext('This item takes space inside the wall.'),
 
-    'surf_none': _('This item cannot be placed anywhere...'),
-    'surf_ceil': _('This item can only be attached to ceilings.'),
-    'surf_floor': _('This item can only be placed on the floor.'),
-    'surf_floor_ceil': _('This item can be placed on floors and ceilings.'),
-    'surf_wall': _('This item can be placed on walls only.'),
-    'surf_wall_ceil': _('This item can be attached to walls and ceilings.'),
-    'surf_wall_floor': _('This item can be placed on floors and walls.'),
-    'surf_wall_floor_ceil': _('This item can be placed in any orientation.'),
+    'surf_none': gettext('This item cannot be placed anywhere...'),
+    'surf_ceil': gettext('This item can only be attached to ceilings.'),
+    'surf_floor': gettext('This item can only be placed on the floor.'),
+    'surf_floor_ceil': gettext('This item can be placed on floors and ceilings.'),
+    'surf_wall': gettext('This item can be placed on walls only.'),
+    'surf_wall_ceil': gettext('This item can be attached to walls and ceilings.'),
+    'surf_wall_floor': gettext('This item can be placed on floors and walls.'),
+    'surf_wall_floor_ceil': gettext('This item can be placed in any orientation.'),
 }
 IMG_ALPHA = img.Handle.blank(64, 64)
 
@@ -171,6 +169,10 @@ def open_event(item):
         show_prop(item)
     return func
 
+def is_visible() -> bool:
+    """Checks if the window is visible."""
+    return window.winfo_ismapped()
+
 
 def show_prop(widget, warp_cursor=False):
     """Show the properties window for an item.
@@ -179,8 +181,8 @@ def show_prop(widget, warp_cursor=False):
     If warp_cursor is  true, the cursor will be moved relative to this window so
     it stays on top of the selected subitem.
     """
-    global selected_item, selected_sub_item, is_open
-    if warp_cursor and is_open:
+    global selected_item, selected_sub_item
+    if warp_cursor and is_visible():
         cursor_x, cursor_y = window.winfo_pointerxy()
         off_x = cursor_x - window.winfo_rootx()
         off_y = cursor_y - window.winfo_rooty()
@@ -190,7 +192,6 @@ def show_prop(widget, warp_cursor=False):
     window.lift(TK_ROOT)
     selected_item = widget.item
     selected_sub_item = widget
-    is_open = True
 
     adjust_position()
 
@@ -223,7 +224,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list:
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         box.state(['disabled'])
-        box['values'] = [_('No Alternate Versions')]
+        box['values'] = [gettext('No Alternate Versions')]
         box.current(0)
     else:
         box.state(['!disabled'])
@@ -271,7 +272,7 @@ def load_item_data() -> None:
         style_desc=item_data.desc,
     )
     # Dump out the instances used in this item.
-    if optionWindow.DEV_MODE.get():
+    if DEV_MODE.get():
         inst_desc = []
         for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
             if editor is selected_item.data.editor:
@@ -289,7 +290,7 @@ def load_item_data() -> None:
 
     wid['desc'].set_text(desc)
 
-    if optionWindow.DEV_MODE.get():
+    if DEV_MODE.get():
         source = selected_item.data.source.replace("from", "\nfrom")
         wid['item_id']['text'] = f'{source}\n-> {selected_item.id}:{selected_sub_item.subKey}'
         wid['item_id'].grid()
@@ -317,7 +318,7 @@ def load_item_data() -> None:
             set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
-                tooltip.set_tooltip(wid['sprite', SPR.INPUT], _(
+                tooltip.set_tooltip(wid['sprite', SPR.INPUT], gettext(
                     'Excursion Funnels accept a on/off '
                     'input and a directional input.'
                 ))
@@ -368,7 +369,7 @@ def load_item_data() -> None:
         set_sprite(SPR.ROTATION, 'rot_36')
         tooltip.set_tooltip(
             wid['sprite', SPR.ROTATION],
-            SPRITE_TOOL['rot_36'] + _(
+            SPRITE_TOOL['rot_36'] + gettext(
                 'This item can be rotated on the floor to face 360 '
                 'degrees, for Reflection Cubes only.'
             ),
@@ -386,13 +387,13 @@ def load_item_data() -> None:
         set_sprite(SPR.COLLISION, 'space_embed')
 
 
-def adjust_position(e=None):
+def adjust_position(e=None) -> None:
     """Move the properties window onto the selected item.
 
     We call this constantly, so the property window will not go outside
     the screen, and snap back to the item when the main window returns.
     """
-    if not is_open or selected_sub_item is None:
+    if not is_visible() or selected_sub_item is None:
         return
 
     # Calculate the pixel offset between the window and the subitem in
@@ -422,9 +423,8 @@ TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 def hide_context(e=None):
     """Hide the properties window, if it's open."""
-    global is_open, selected_item, selected_sub_item
-    if is_open:
-        is_open = False
+    global selected_item, selected_sub_item
+    if is_visible():
         window.withdraw()
         sound.fx('contract')
         selected_item = selected_sub_item = None
@@ -437,7 +437,7 @@ def init_widgets() -> None:
 
     ttk.Label(
         f,
-        text=_("Properties:"),
+        text=gettext("Properties:"),
         anchor="center",
     ).grid(
         row=0,
@@ -463,9 +463,11 @@ def init_widgets() -> None:
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky='e')
     tooltip.add_tooltip(
         wid['ent_count'],
-        _('The number of entities used for this item. The Source engine '
-          'limits this to 2048 in total. This provides a guide to how many of '
-          'these items can be placed in a map at once.')
+        gettext(
+            'The number of entities used for this item. The Source engine '
+            'limits this to 2048 in total. This provides a guide to how many of '
+            'these items can be placed in a map at once.'
+        ),
     )
 
     wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
@@ -486,7 +488,7 @@ def init_widgets() -> None:
             functools.partial(sub_open, i),
         )
 
-    ttk.Label(f, text=_("Description:"), anchor="sw").grid(
+    ttk.Label(f, text=gettext("Description:"), anchor="sw").grid(
         row=5,
         column=0,
         sticky="SW",
@@ -517,21 +519,23 @@ def init_widgets() -> None:
     wid['desc']['yscrollcommand'] = desc_scroll.set
     desc_scroll.grid(row=0, column=1, sticky="NS")
 
-    def show_more_info():
+    def show_more_info() -> None:
+        """Show the 'more info' URL."""
         url = selected_item.url
         if url is not None:
             try:
-                webbrowser.open(url, new=OPEN_IN_TAB, autoraise=True)
+                webbrowser.open_new_tab(url)
             except webbrowser.Error:
                 if messagebox.askyesno(
-                        icon="error",
-                        title="BEE2 - Error",
-                        message=_('Failed to open a web browser. Do you wish '
-                                  'for the URL to be copied to the clipboard '
-                                  'instead?'),
-                        detail='"{!s}"'.format(url),
-                        parent=window,
-                        ):
+                    icon="error",
+                    title="BEE2 - Error",
+                    message=gettext(
+                        'Failed to open a web browser. Do you wish for the URL '
+                        'to be copied to the clipboard instead?'
+                    ),
+                    detail=f'"{url!s}"',
+                    parent=window,
+                ):
                     LOGGER.info("Saving {} to clipboard!", url)
                     TK_ROOT.clipboard_clear()
                     TK_ROOT.clipboard_append(url)
@@ -540,7 +544,7 @@ def init_widgets() -> None:
             # so it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, text=_("More Info>>"), command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, text=gettext("More Info>>"), command=show_more_info)
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
@@ -557,13 +561,13 @@ def init_widgets() -> None:
 
     wid['changedefaults'] = ttk.Button(
         f,
-        text=_("Change Defaults..."),
+        text=gettext("Change Defaults..."),
         command=show_item_props,
         )
     wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],
-        _('Change the default settings for this item when placed.')
+        gettext('Change the default settings for this item when placed.')
     )
 
     wid['variant'] = ttk.Combobox(

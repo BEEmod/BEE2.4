@@ -6,7 +6,7 @@ import tkinter
 from srctools import FileSystemChain, FileSystem
 import srctools.logger
 
-from app.selector_win import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr
+from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
 from app import TK_ROOT
 from BEE2_config import GEN_OPTS
@@ -129,6 +129,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
+        save_id='music_base',
         title=_('Select Background Music - Base'),
         desc=_('This controls the background music used for a map. Expand '
                'the dropdown to set tracks for specific test elements.'),
@@ -149,6 +150,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.TBEAM),
+        save_id='music_tbeam',
         title=_('Select Excursion Funnel Music'),
         desc=_('Set the music used while inside Excursion Funnels.'),
         has_none=True,
@@ -164,6 +166,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.BOUNCE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BOUNCE),
+        save_id='music_bounce',
         title=_('Select Repulsion Gel Music'),
         desc=_('Select the music played when players jump on Repulsion Gel.'),
         has_none=True,
@@ -176,6 +179,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.SPEED] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.SPEED),
+        save_id='music_speed',
         title=_('Select Propulsion Gel Music'),
         desc=_('Select music played when players have large amounts of horizontal velocity.'),
         has_none=True,

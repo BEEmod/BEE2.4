@@ -11,7 +11,7 @@ from srctools import Property
 from app import music_conf, TK_ROOT
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-from app.selector_win import selWin, Item as selWinItem, AttrDef as SelAttr
+from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 import srctools.logger
 from app import sound as snd
@@ -49,6 +49,12 @@ windows = {}
 frames = {}
 UI = {}
 menus = {}
+
+# These panes.
+skybox_win: SelectorWin
+voice_win: SelectorWin
+style_win: SelectorWin
+elev_win: SelectorWin
 
 # Items chosen for the palette.
 pal_picked = []   # type: List[PalItem]
@@ -456,9 +462,9 @@ def load_settings():
     optionWindow.load()
 
 
-@BEE2_config.option_handler('LastSelected')
-def save_load_selector_win(props: Property=None):
-    """Save and load options on the selector window."""
+@BEE2_config.OPTION_SAVE('LastSelected')
+def save_last_selected() -> Property:
+    """Save the last selected objects."""
     sel_win = [
         ('Style', style_win),
         ('Skybox', skybox_win),
@@ -468,14 +474,24 @@ def save_load_selector_win(props: Property=None):
     for channel, win in music_conf.WINDOWS.items():
         sel_win.append(('Music_' + channel.name.title(), win))
 
-    # Saving
-    if props is None:
-        props = Property('', [])
-        for win_name, win in sel_win:
-            props.append(Property(win_name, win.chosen_id or '<NONE>'))
-        return props
+    props = Property('', [])
+    for win_name, win in sel_win:
+        props.append(Property(win_name, win.chosen_id or '<NONE>'))
+    return props
 
-    # Loading
+
+@BEE2_config.OPTION_LOAD('LastSelected')
+def load_last_selected(props: Property) -> None:
+    """Load the last selected objects."""
+    sel_win = [
+        ('Style', style_win),
+        ('Skybox', skybox_win),
+        ('Voice', voice_win),
+        ('Elevator', elev_win),
+    ]
+    for channel, win in music_conf.WINDOWS.items():
+        sel_win.append(('Music_' + channel.name.title(), win))
+
     for win_name, win in sel_win:
         try:
             win.sel_item_id(props[win_name])
@@ -495,12 +511,10 @@ def load_packages() -> None:
     for item in packages.Item.all():
         item_list[item.id] = Item(item)
 
-    StyleVarPane.add_vars(packages.StyleVar.all(), packages.Style.all())
-
-    sky_list   = []  # type: List[selWinItem]
-    voice_list = []  # type: List[selWinItem]
-    style_list = []  # type: List[selWinItem]
-    elev_list  = []  # type: List[selWinItem]
+    sky_list: list[selWinItem] = []
+    voice_list: list[selWinItem] = []
+    style_list: list[selWinItem] = []
+    elev_list: list[selWinItem] = []
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
@@ -570,9 +584,10 @@ def load_packages() -> None:
             pass
         suggested_refresh()
 
-    skybox_win = selWin(
+    skybox_win = SelectorWin(
         TK_ROOT,
         sky_list,
+        save_id='skyboxes',
         title=_('Select Skyboxes'),
         desc=_('The skybox decides what the area outside the chamber is like.'
                ' It chooses the colour of sky (seen in some items), the style'
@@ -587,9 +602,10 @@ def load_packages() -> None:
         ],
     )
 
-    voice_win = selWin(
+    voice_win = SelectorWin(
         TK_ROOT,
         voice_list,
+        save_id='voicelines',
         title=_('Select Additional Voice Lines'),
         desc=_('Voice lines choose which extra voices play as the player enters'
                ' or exits a chamber. They are chosen based on which items are'
@@ -608,9 +624,10 @@ def load_packages() -> None:
         ],
     )
 
-    style_win = selWin(
+    style_win = SelectorWin(
         TK_ROOT,
         style_list,
+        save_id='styles',
         title=_('Select Style'),
         desc=_('The Style controls many aspects of the map. It decides the '
                'materials used for walls, the appearance of entrances and '
@@ -627,9 +644,10 @@ def load_packages() -> None:
         ]
     )
 
-    elev_win = selWin(
+    elev_win = SelectorWin(
         TK_ROOT,
         elev_list,
+        save_id='elevators',
         title=_('Select Elevator Video'),
         desc=_('Set the video played on the video screens in modern Aperture '
                'elevator rooms. Not all styles feature these. If set to '
@@ -667,13 +685,13 @@ def current_style() -> packages.Style:
 def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
-    style_win = StyleVarPane.window
+    stylevar_win = StyleVarPane.window
     opt_win = windows['opt']
     pal_win = windows['pal']
     # The x-pos of the right side of the main window
     xpos = min(
         TK_ROOT.winfo_screenwidth()
-        - style_win.winfo_reqwidth(),
+        - stylevar_win.winfo_reqwidth(),
 
         TK_ROOT.winfo_rootx()
         + TK_ROOT.winfo_reqwidth()
@@ -699,13 +717,14 @@ def reposition_panes() -> None:
     opt_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty()-40,
-        width=style_win.winfo_reqwidth())
-    style_win.move(
+        width=stylevar_win.winfo_reqwidth())
+    stylevar_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
 
 
-def reset_panes():
+def reset_panes() -> None:
+    """Reset the position of all panes."""
     reposition_panes()
     windows['pal'].save_conf()
     windows['opt'].save_conf()
@@ -713,7 +732,7 @@ def reset_panes():
     CompilerPane.window.save_conf()
 
 
-def suggested_refresh():
+def suggested_refresh() -> None:
     """Enable or disable the suggestion setting button."""
     if 'suggested_style' in UI:
         windows = [
@@ -735,7 +754,7 @@ def refresh_pal_ui() -> None:
     paletteLoader.pal_list.sort(key=str)  # sort by name
     selectedPalette = paletteLoader.pal_list.index(cur_palette)
 
-    listbox = UI['palette']  # type: Listbox
+    listbox: Listbox = UI['palette']
     listbox.delete(0, END)
 
     for i, pal in enumerate(paletteLoader.pal_list):
@@ -789,22 +808,11 @@ def refresh_pal_ui() -> None:
     selectedPalette_radio.set(selectedPalette)
 
 
-def export_editoritems(e=None):
+def export_editoritems(e=None) -> None:
     """Export the selected Items and Style into the chosen game."""
 
     # Convert IntVar to boolean, and only export values in the selected style
-    style_vals = StyleVarPane.tk_vars
     chosen_style = current_style()
-    style_vars = {
-        var.id: (style_vals[var.id].get() == 1)
-        for var in
-        StyleVarPane.VAR_LIST
-        if var.applies_to_style(chosen_style)
-    }
-
-    # Add all of the special/hardcoded style vars
-    for var in StyleVarPane.styleOptions:
-        style_vars[var.id] = style_vals[var.id].get() == 1
 
     # The chosen items on the palette
     pal_data = [(it.id, it.subKey) for it in pal_picked]
@@ -836,7 +844,7 @@ def export_editoritems(e=None):
             packages.Elevator: elev_win.chosen_id,
 
             packages.Item: (pal_data, item_versions, item_properties),
-            packages.StyleVar: style_vars,
+            packages.StyleVar: StyleVarPane.export_data(chosen_style),
             packages.Signage: signage_ui.export_data(),
 
             # The others don't have one, so it defaults to None.
@@ -1084,20 +1092,20 @@ def drag_fast(e):
     flow_preview()
 
 
-def set_pal_radio():
+def set_pal_radio() -> None:
     global selectedPalette
     selectedPalette = selectedPalette_radio.get()
     set_pal_listbox_selection()
     set_palette()
 
 
-def set_pal_listbox_selection(e=None):
+def set_pal_listbox_selection(e=None) -> None:
     """Select the currently chosen palette in the listbox."""
     UI['palette'].selection_clear(0, len(paletteLoader.pal_list))
     UI['palette'].selection_set(selectedPalette)
 
 
-def set_palette(e=None):
+def set_palette(e=None) -> None:
     """Select a palette."""
     global selectedPalette
     if selectedPalette >= len(paletteLoader.pal_list) or selectedPalette < 0:
@@ -1134,7 +1142,7 @@ def set_palette(e=None):
         ))
 
     if chosen_pal.settings is not None:
-        BEE2_config.apply_settings(chosen_pal.settings)
+        BEE2_config.apply_settings(chosen_pal.settings, is_palette=True)
 
     if len(paletteLoader.pal_list) < 2 or paletteLoader.pal_list[selectedPalette].prevent_overwrite:
         UI['pal_remove'].state(('disabled',))
@@ -1160,7 +1168,7 @@ def pal_clear() -> None:
 def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
     mandatory_unlocked = StyleVarPane.mandatory_unlocked()
-    
+
     if len(pal_picked) == 32:
         return
 
@@ -1430,7 +1438,7 @@ def init_option(pane: SubPane) -> None:
         _('Enable or disable particular voice lines, to prevent them from '
           'being added.'),
     )
-    
+
     if utils.WIN:
         # On windows, the buttons get inset on the left a bit. Inset everything
         # else to adjust.
@@ -1453,7 +1461,7 @@ def init_option(pane: SubPane) -> None:
         sizegrip.grid(row=2, column=5, rowspan=2, sticky="NS")
 
 
-def flow_preview():
+def flow_preview() -> None:
     """Position all the preview icons based on the array.
 
     Run to refresh if items are moved around.
@@ -1477,7 +1485,7 @@ def flow_preview():
     UI['pre_sel_line'].lift()
 
 
-def init_preview(f):
+def init_preview(f: Frame) -> None:
     """Generate the preview pane.
 
      This shows the items that will export to the palette.
@@ -1511,7 +1519,8 @@ def init_preview(f):
     flow_preview()
 
 
-def init_picker(f):
+def init_picker(f: Frame) -> None:
+    """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
     ttk.Label(
         f,
@@ -1563,7 +1572,7 @@ def init_picker(f):
     f.bind("<Configure>", flow_picker)
 
 
-def flow_picker(e=None):
+def flow_picker(e=None) -> None:
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
@@ -1619,6 +1628,7 @@ def flow_picker(e=None):
 
 
 def init_drag_icon() -> None:
+    """Create the window for rendering held items."""
     drag_win = Toplevel(TK_ROOT)
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
@@ -1638,7 +1648,7 @@ def init_drag_icon() -> None:
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game: 'gameMan.Game'):
+def set_game(game: 'gameMan.Game') -> None:
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.

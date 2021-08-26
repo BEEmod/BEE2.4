@@ -110,6 +110,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
 
     # Load in our main configs..
     options.load(conf.find_all('Options'))
+    utils.DEV_MODE = options.get(bool, 'dev_mode')
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
@@ -223,7 +224,7 @@ def add_voice(vmf: VMF):
         style_vars=settings['style_vars'],
         vmf=vmf,
         map_seed=MAP_RAND_SEED,
-        use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
+        use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
 
@@ -1414,8 +1415,12 @@ def position_exit_signs(vmf: VMF) -> None:
     )
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
-    # Indicate the singular instances shouldn't be placed.
-    exit_sign['bee_noframe'] = exit_arrow['bee_noframe'] = '1'
+    if options.get(bool, "remove_exit_signs_dual"):
+        exit_sign.remove()
+        exit_arrow.remove()
+    else:
+        # Indicate the singular instances shouldn't be placed.
+        exit_sign['bee_noframe'] = exit_arrow['bee_noframe'] = '1'
 
 
 def change_overlays(vmf: VMF) -> None:

@@ -24,7 +24,7 @@ def parse_template(pak_id: str, file: File) -> None:
         LOGGER.warning('Fast-parse failure on {}!', path)
         with file.open_str() as f:
             props = Property.parse(f)
-        conf_ents = VMF.parse(props).by_class['bee2_template_conf']
+        conf_ents = list(VMF.parse(props).by_class['bee2_template_conf'])
         del props
         if len(conf_ents) > 1:
             raise KeyValError(f'Multiple configuration entities in template!', path, None)

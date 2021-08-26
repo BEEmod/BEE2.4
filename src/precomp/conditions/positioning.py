@@ -459,7 +459,7 @@ def res_alt_orientation(inst: Entity, res: Property) -> None:
 @make_result('setAngles')
 def res_set_angles(inst: Entity, res: Property):
     """Set the orientation of an instance to a certain angle."""
-    inst['angles'] = res.value
+    inst['angles'] = inst.fixup.substitute(res.value)
 
 
 @make_result('OffsetInst', 'offsetinstance')
@@ -522,7 +522,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
     inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
 
 
-@make_result('RotateInst')
+@make_result('RotateInst', 'RotateInstance')
 def res_rotate_inst(inst: Entity, res: Property) -> None:
     """Rotate the instance around an axis.
 
@@ -542,7 +542,7 @@ def res_rotate_inst(inst: Entity, res: Property) -> None:
 
     try:
         offset = Vec.from_str(inst.fixup.substitute(res['around']))
-    except NoKeyError:
+    except LookupError:
         pass
     else:
         origin = Vec.from_str(inst['origin'])

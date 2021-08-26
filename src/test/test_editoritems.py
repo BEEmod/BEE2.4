@@ -128,7 +128,7 @@ def test_parse_goo() -> None:
     assert item.deletable is True
     assert item.anchor_goo is False
     assert item.anchor_barriers is False
-    assert item.pseduo_handle is False
+    assert item.pseudo_handle is False
     assert item.force_input is False
     assert item.force_output is False
     assert item.antline_points == {

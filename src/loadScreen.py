@@ -13,6 +13,7 @@ import contextlib
 import multiprocessing
 
 from app import logWindow
+from localisation import gettext
 from BEE2_config import GEN_OPTS
 import utils
 import srctools.logger
@@ -79,7 +80,7 @@ def suppress_screens() -> Any:
 # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
 # so patching .show() will fix them all.
 # contextlib managers can also be used as decorators.
-commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)
+commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
 class LoadScreen:
@@ -205,17 +206,17 @@ BG_PROC = multiprocessing.Process(
         logWindow.PIPE_DAEMON_REC,
         # Pass translation strings.
         {
-            'skip': _('Skipped!'),
-            'version': _('Version: ') + utils.BEE_VERSION,
-            'cancel': _('Cancel'),
-            'clear': _('Clear'),
-            'copy': _('Copy'),
-            'log_show': _('Show:'),
-            'log_title': _('Logs - {}').format(utils.BEE_VERSION),
+            'skip': gettext('Skipped!'),
+            'version': gettext('Version: ') + utils.BEE_VERSION,
+            'cancel': gettext('Cancel'),
+            'clear': gettext('Clear'),
+            'copy': gettext('Copy'),
+            'log_show': gettext('Show:'),
+            'log_title': gettext('Logs - {}').format(utils.BEE_VERSION),
             'level_text': [
-                _('Debug messages'),
-                _('Default'),
-                _('Warnings Only'),
+                gettext('Debug messages'),
+                gettext('Default'),
+                gettext('Warnings Only'),
             ],
         }
     ),
@@ -225,9 +226,9 @@ BG_PROC = multiprocessing.Process(
 BG_PROC.start()
 
 main_loader = LoadScreen(
-    ('PAK', _('Packages')),
-    ('OBJ', _('Loading Objects')),
-    ('UI', _('Initialising UI')),
-    title_text=_('Better Extended Editor for Portal 2'),
+    ('PAK', gettext('Packages')),
+    ('OBJ', gettext('Loading Objects')),
+    ('UI', gettext('Initialising UI')),
+    title_text=gettext('Better Extended Editor for Portal 2'),
     is_splash=True,
 )

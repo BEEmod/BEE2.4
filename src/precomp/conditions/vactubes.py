@@ -10,6 +10,7 @@ import srctools.logger
 from precomp import tiling, instanceLocs, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.conditions import make_result, meta_cond, RES_EXHAUSTED
+import utils
 
 COND_MOD_NAME = None
 
@@ -28,13 +29,22 @@ class Config:
     """Configuration for a vactube item set."""
     inst_corner: List[str]
     temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
-    inst_straight: str
-    inst_support: str
+    trig_radius: int
+    inst_support: str  # Placed on each side with an adjacent wall.
+    inst_support_ring: str  # If any support is placed, this is placed.
     inst_exit: str
 
     inst_entry_floor: str
     inst_entry_wall: str
     inst_entry_ceil: str
+
+    # For straight instances, a size (multiple of 128) -> instance.
+    inst_straight: Dict[int, str]
+    # And those sizes from large to small.
+    inst_straight_sizes: List[int] = attr.ib(init=False)
+    @inst_straight_sizes.default
+    def _straight_size(self) -> list[int]:
+        return sorted(self.inst_straight.keys(), reverse=True)
 
 
 @attr.define
@@ -103,6 +113,14 @@ def res_vactubes(vmf: VMF, res: Property):
 
     for block in res.find_all("Instance"):
         # Configuration info for each instance set..
+        straight_block = block.find_key('straight_inst', '')
+        if straight_block.has_children():
+            straight = {
+                int(prop.name): prop.value
+                for prop in straight_block
+            }
+        else:
+            straight = {128: straight_block.value}
         conf = Config(
             # The three sizes of corner instance
             inst_corner=[
@@ -115,11 +133,13 @@ def res_vactubes(vmf: VMF, res: Property):
                 get_temp('corner_medium'),
                 get_temp('corner_large'),
             ],
-            # Straight instances connected to the next part
-            inst_straight=block['straight_inst', ''],
+            trig_radius=block.float('trig_size', 64.0) / 2.0,
+            inst_straight=straight,
             # Supports attach to the 4 sides of the straight part,
             # if there's a brush there.
             inst_support=block['support_inst', ''],
+            # If a support is placed, this is also placed once.
+            inst_support_ring=block['support_ring_inst', ''],
             inst_entry_floor=block['entry_floor_inst'],
             inst_entry_wall=block['entry_inst'],
             inst_entry_ceil=block['entry_ceil_inst'],
@@ -238,7 +258,7 @@ def vactube_gen(vmf: VMF) -> None:
 
         # If the end is placed in goo, don't add logic - it isn't visible, and
         # the object is on a one-way trip anyway.
-        if BLOCK_POS['world': end_loc].is_goo and end_norm.z < 0:
+        if not (BLOCK_POS['world': end_loc].is_goo and end_norm.z < -1e-6):
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
             end_logic['file'] = end.conf.inst_exit
@@ -256,8 +276,8 @@ def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
             # The z-direction is reversed..
             pushdir=normal.to_angle(),
             speed=(
-                UP_PUSH_SPEED if normal.z > 0 else
-                DN_PUSH_SPEED if normal.z < 0 else
+                UP_PUSH_SPEED if normal.z > 1e-6 else
+                DN_PUSH_SPEED if normal.z < -1e-6 else
                 PUSH_SPEED
             ),
             spawnflags='1103',  # Clients, Physics, Everything
@@ -293,55 +313,64 @@ def make_straight(
     is_start=False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
+    angles = round(normal, 6).to_angle()
+    orient = Matrix.from_angle(angles)
 
-    # 32 added to the other directions, plus extended dist in the direction
-    # of the normal - 1
-    p1 = origin + (normal * ((dist // 128 * 128) - 96))
-    # The starting brush needs to
-    # stick out a bit further, to cover the
+    # The starting brush needs to stick out a bit further, to cover the
     # point_push entity.
-    p2 = origin - (normal * (96 if is_start else 32))
+    start_off = -96 if is_start else -64
 
-    # bbox before +- 32 to ensure the above doesn't wipe it out
-    p1, p2 = Vec.bbox(p1, p2)
+    p1, p2 = Vec.bbox(
+        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+    )
 
-    solid = vmf.make_prism(
-        # Expand to 64x64 in the other two directions
-        p1 - 32, p2 + 32,
-        mat='tools/toolstrigger',
-    ).solid
+    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
     motion_trigger(vmf, solid.copy())
 
     push_trigger(vmf, origin, normal, [solid])
 
-    angles = normal.to_angle()
-    orient = Matrix.from_angle(angles)
-
-    for off in range(0, int(dist), 128):
-        position = origin + off * normal
+    off = 0
+    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
         vmf.create_ent(
             classname='func_instance',
-            origin=position,
-            angles=orient.to_angle(),
-            file=config.inst_straight,
+            origin=origin + off * orient.forward(),
+            angles=angles,
+            file=config.inst_straight[seg_dist],
         )
-
-        for supp_dir in [orient.up(), orient.left(), -orient.left(), -orient.up()]:
-            try:
-                tile = tiling.TILES[
-                    (position - 128 * supp_dir).as_tuple(),
-                    supp_dir.norm().as_tuple()
-                ]
-            except KeyError:
-                continue
-            # Check all 4 center tiles are present.
-            if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+        off += seg_dist
+    # Supports.
+    if config.inst_support:
+        for off in range(0, int(dist), 128):
+            position = origin + off * normal
+            placed_support = False
+            for supp_dir in [
+                orient.up(), orient.left(),
+                -orient.left(), -orient.up()
+            ]:
+                try:
+                    tile = tiling.TILES[
+                        (position - 128 * supp_dir).as_tuple(),
+                        supp_dir.norm().as_tuple()
+                    ]
+                except KeyError:
+                    continue
+                # Check all 4 center tiles are present.
+                if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+                    vmf.create_ent(
+                        classname='func_instance',
+                        origin=position,
+                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        file=config.inst_support,
+                    )
+                    placed_support = True
+            if placed_support and config.inst_support_ring:
                 vmf.create_ent(
                     classname='func_instance',
                     origin=position,
-                    angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
-                    file=config.inst_support,
+                    angles=angles,
+                    file=config.inst_support_ring,
                 )
 
 
