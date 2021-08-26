@@ -12,6 +12,7 @@ from tkinter import ttk
 from app import img, TK_ROOT
 import srctools.logger
 from app import tk_tools
+from localisation import gettext
 import utils
 from BEE2_config import ConfigFile
 from app.tooltip import add_tooltip
@@ -103,7 +104,7 @@ def init_widgets():
 
     ttk.Label(
         trans_frame,
-        text=_('Transcript:'),
+        text=gettext('Transcript:'),
         ).grid(
             row=0,
             column=0,
@@ -142,7 +143,7 @@ def init_widgets():
 
     ttk.Button(
         win,
-        text=_('Save'),
+        text=gettext('Save'),
         command=save,
         ).grid(row=2, column=0)
 
@@ -217,7 +218,7 @@ def add_tabs():
                 compound=RIGHT,
                 image=img.Handle.builtin('icons/resp_quote', 16, 16),
                 #Note: 'response' tab name, should be short.
-                text=_('Resp')
+                text=gettext('Resp')
                 )
         else:
             notebook.tab(tab, text=tab.nb_text)
@@ -234,7 +235,7 @@ def show(quote_pack):
 
     voice_item = quote_pack
 
-    win.title(_('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
+    win.title(gettext('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
     win.grab_set()
     notebook = UI['tabs']
 
@@ -311,17 +312,17 @@ def make_tab(group, config: ConfigFile, tab_type):
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
-        group_name = _('Mid - Chamber')
+        group_name = gettext('Mid - Chamber')
         group_id = 'MIDCHAMBER'
-        group_desc = _(
+        group_desc = gettext(
             'Lines played during the actual chamber, '
             'after specific events have occurred.'
         )
     elif tab_type is TabTypes.RESPONSE:
         # Note: 'Response' tab header, and description
-        group_name = _('Responses')
+        group_name = gettext('Responses')
         group_id = None
-        group_desc = _(
+        group_desc = gettext(
             'Lines played in response to certain events in Coop.'
         )
     elif tab_type is TabTypes.NORM:
@@ -419,7 +420,7 @@ def make_tab(group, config: ConfigFile, tab_type):
             group_id = quote.name
         else:
             # note: default for quote names
-            name = quote['name', _('No Name!')]
+            name = quote['name', gettext('No Name!')]
 
         ttk.Label(
             frame,
@@ -455,7 +456,7 @@ def make_tab(group, config: ConfigFile, tab_type):
             check = ttk.Checkbutton(
                 line_frame,
                 # note: default voice line name next to checkbox.
-                text=line['name', _('No Name?')],
+                text=line['name', gettext('No Name?')],
             )
 
             check.quote_var = IntVar(
