@@ -1229,7 +1229,7 @@ def res_switch(res: Property):
         run_default = True
         for flag, results in cases:
             # If not set, always succeed for the random situation.
-            if flag.real_name and check_flag(inst.map, flag, inst):
+            if flag.real_name and not check_flag(inst.map, flag, inst):
                 continue
             for sub_res in results:
                 Condition.test_result(inst, sub_res)
