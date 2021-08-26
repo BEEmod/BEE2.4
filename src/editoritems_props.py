@@ -695,7 +695,7 @@ class GlassTypeProp(_EnumProp[GlassTypes]):
 PROP_TYPES.update({
     # If no ID, it's an internal implementation
     # class.
-    prop_type.casefold(): prop_type  # type: ignore
+    prop_type.id.casefold(): prop_type  # type: ignore
     for prop_type in globals().values()
     if isinstance(prop_type, type)
     and hasattr(prop_type, 'id')
