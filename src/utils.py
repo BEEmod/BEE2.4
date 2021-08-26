@@ -188,10 +188,9 @@ del N, S, E, W
 RetT = TypeVar('RetT')
 FuncT = TypeVar('FuncT', bound=Callable)
 EnumT = TypeVar('EnumT', bound=Enum)
-EnumTypeT = TypeVar('EnumTypeT', bound=Type[Enum])
 
 
-def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
+def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
     """Make a enum with property getters more efficent.
 
     Call the getter on each member, and then replace it with a dict lookup.
@@ -204,6 +203,7 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
         data_exc = {}
 
         exc: Exception
+        enum: EnumT
         for enum in cls:
             try:
                 res = value.fget(enum)

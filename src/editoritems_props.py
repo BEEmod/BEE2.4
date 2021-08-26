@@ -28,13 +28,13 @@ class ItemProp(Generic[ValueT]):
         """Generic repr() for properties."""
         return f'{type(self).__qualname__}({self.default!r})'
 
-    def __eq__(self, other: object) -> object:
+    def __eq__(self, other: object) -> bool:
         """Subclasses do not compare equal."""
         if type(self) is type(other):
             return self.default == cast(ItemProp, other).default
         return NotImplemented
 
-    def __ne__(self, other: object) -> object:
+    def __ne__(self, other: object) -> bool:
         """Subclasses do not compare equal."""
         if type(self) is type(other):
             return self.default != cast(ItemProp, other).default
@@ -158,7 +158,7 @@ class _EnumProp(ItemProp[ValueT], Generic[ValueT]):
 
     @staticmethod
     def _export_value(typ: ValueT) -> str:
-        return str(typ.value)
+        return str(typ.value)  # type: ignore
 
 
 class _InternalStrProp(ItemProp[str]):
@@ -695,7 +695,7 @@ class GlassTypeProp(_EnumProp[GlassTypes]):
 PROP_TYPES.update({
     # If no ID, it's an internal implementation
     # class.
-    prop_type.id.casefold(): prop_type
+    prop_type.casefold(): prop_type  # type: ignore
     for prop_type in globals().values()
     if isinstance(prop_type, type)
     and hasattr(prop_type, 'id')

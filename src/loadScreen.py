@@ -80,7 +80,7 @@ def suppress_screens() -> Any:
 # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
 # so patching .show() will fix them all.
 # contextlib managers can also be used as decorators.
-commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)
+commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
 class LoadScreen:

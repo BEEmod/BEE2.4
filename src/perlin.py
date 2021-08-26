@@ -1,4 +1,5 @@
 # Copied from https://github.com/caseman/noise (pure-python portions only).
+# type: ignore
 """Perlin noise -- pure python implementation.
 
 Copyright (c) 2008, Casey Duncan (casey dot duncan at gmail dot com)
@@ -356,7 +357,3 @@ class TileableNoise(BaseNoise):
 										  grad3(perm[BA + kk], x - 1, y, z - 1)),
 								 lerp(fx, grad3(perm[AB + kk], x, y - 1, z - 1),
 										  grad3(perm[BB + kk], x - 1, y - 1, z - 1))))
-
-
-
-
