@@ -11,6 +11,7 @@ from babel.messages.mofile import write_mo
 
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+workpath: str  # PyInstaller sets this.
 
 
 # src -> build subfolder.
@@ -23,7 +24,7 @@ data_files = [
 ]
 
 
-def do_localisation():
+def do_localisation() -> None:
     """Build localisation."""
 
     # Make the directories.
@@ -83,6 +84,29 @@ def do_localisation():
     data_files.append((str(i18n / 'en.mo'), 'i18n/'))
 
 
+def build_srctools_fgd() -> None:
+    """Build a copy of the Srctools compiler entities."""
+    import srctools
+    engine_fgd = srctools.FGD.engine_dbase()
+    engine_fgd.collapse_bases()
+    fgd = srctools.FGD()
+
+    for ent in engine_fgd:
+        if ent.classname.startswith('comp_'):
+            fgd.entities[ent.classname] = ent
+            # The relevant HammerAddons tags.
+            ent.strip_tags(frozenset({
+                'SINCE_HL2', 'SINCE_HLS', 'SINCE_EP1', 'SINCE_EP2', 'SINCE_TF2',
+                'SINCE_P1', 'SINCE_L4D', 'SINCE_L4D2', 'SINCE_ASW', 'SINCE_P2',
+                'P2', 'UNTIL_CSGO', 'VSCRIPT', 'INST_IO',
+            }))
+
+    with Path(workpath, 'srctools.fgd').open('w') as fgd_file:
+        fgd.export(fgd_file)
+    data_files.append((fgd_file.name, '.'))
+
+
+build_srctools_fgd()
 do_localisation()
 
 

@@ -503,7 +503,8 @@ class Game:
                 )
                 with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
-                file.write(imp_res_read_binary(srctools, 'srctools.fgd'))
+                with utils.install_path('srctools.fgd').open('rb') as src_fgd:
+                    shutil.copyfileobj(src_fgd, file)
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
