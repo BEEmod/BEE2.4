@@ -1,6 +1,7 @@
 """Implements a condition which allows linking items into a sequence."""
 from __future__ import annotations
 from typing import Optional, Callable
+from enum import Enum
 import math
 import attr
 
@@ -14,12 +15,21 @@ COND_MOD_NAME = 'Item Linkage'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.linkedItem')
 
 
+class AntlineHandling(Enum):
+    """How to handle antlines."""
+    REMOVE = 'remove'
+    KEEP = 'keep'
+    MOVE = 'move'
+
+
 @attr.define
 class Config:
     """Configuration for linked items."""
     logic_start: Optional[str]
     logic_mid: Optional[str]
     logic_end: Optional[str]
+
+    antline: AntlineHandling
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
@@ -42,7 +52,7 @@ ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
 
 @conditions.make_result('LinkedItem')
 def res_linked_item(res: Property) -> Callable[[Entity], None]:
-    """Marks the current instance for linkage with similar items for linkage.
+    """Marks the current instance for linkage together into a chain.
 
     At priority level -300, the sequence of similarly-marked items this links
     to is grouped together, and given fixup values to allow linking them.
@@ -53,6 +63,12 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
     * StartLogic/MidLogic/EndLogic: These instances will be overlaid on the
       instance, depending on whether it starts/ends or is in the middle of the
       path.
+    * Antlines: Controls what happens to antlines linking between the items.
+      If one of the items outputs to a non-linked item, those antlines must be
+      kept. Three behaviours are available:
+      * `remove` (default): Completely remove the antlines.
+      * `keep`: Leave them untouched.
+      * `move`: Move them all to the first item.
     * EndcapInst: Special instance for Unstationary Scaffolds. If the item is
       facing upwards, and is the end for a mostly horizontal beam it is switched
       to this instance, and rotated to face towards the previous track.
@@ -70,14 +86,21 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
     except KeyError:
         group_list = ITEMS_TO_LINK[group] = []
 
+    antline_str = res['antlines', res['antline', 'remove']]
+    try:
+        antline = AntlineHandling(antline_str.casefold())
+    except ValueError:
+        raise ValueError(
+            f'Unknown antline behaviour "{antline_str}" '
+            f'(accepted: {", ".join(AntlineHandling)})'
+        ) from None
+
     conf = Config(
         logic_start=resolve_optional(res, 'startlogic'),
         logic_mid=resolve_optional(res, 'midLogic'),
         logic_end=resolve_optional(res, 'endLogic'),
-
-        # Specially rotated to face the next track!
+        antline=antline,
         scaff_endcap=resolve_optional(res, 'EndcapInst'),
-        # If it's allowed to point any direction, not just 90 degrees.
         scaff_endcap_free_rot=res.bool('endcap_free_rotate'),
     )
 
@@ -106,6 +129,18 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
             if node.next is None and node.prev is None:
                 # No connections in either direction, just skip.
                 continue
+
+            # We can't touch antlines if the item has regular outputs.
+            if not node.item.outputs:
+                if conf.antline is AntlineHandling.REMOVE:
+                    node.item.delete_antlines()
+                elif conf.antline is AntlineHandling.MOVE:
+                    if index != 0:
+                        node.item.transfer_antlines(node_list[0].item)
+                elif conf.antline is AntlineHandling.KEEP:
+                    pass
+                else:
+                    raise AssertionError(conf.antline)
 
             # If start/end, the other node.
             other_node: Optional[item_chain.Node[Config]] = None

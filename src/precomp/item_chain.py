@@ -66,13 +66,11 @@ def chain(
 
     # Now compute the links, and check for double-links.
     for node in nodes.values():
-        has_other_io = False
         for conn in list(node.item.outputs):
             try:
                 next_node = nodes[conn.to_item.name]
             except KeyError:
                 # Not one of our instances - fine, it's just actual IO.
-                has_other_io = True
                 continue
             conn.remove()
             if node.next is not None:
@@ -81,10 +79,6 @@ def chain(
                 raise ValueError('Item "{}" links to multiple input items!')
             node.next = next_node
             next_node.prev = node
-
-        # If we don't have real IO, we can delete the antlines automatically.
-        if not has_other_io:
-            node.item.delete_antlines()
 
     todo = set(nodes.values())
     while todo:
