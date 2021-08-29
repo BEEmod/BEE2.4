@@ -1,12 +1,13 @@
 """Results for generating additional instances.
 
 """
-from typing import Optional
+import random
+from typing import Optional, Callable
 from srctools import Vec, Entity, Property, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, conditions
-from precomp.conditions import make_result, RES_EXHAUSTED, GLOBAL_INSTANCES
+from precomp.conditions import make_result, set_random_seed, RES_EXHAUSTED, GLOBAL_INSTANCES
 
 
 COND_MOD_NAME = 'Instance Generation'
@@ -133,6 +134,56 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         overlay_inst['origin'] = conditions.resolve_offset(inst, res['offset'])
 
     return overlay_inst
+
+
+@make_result('addShuffleGroup')
+def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
+    """Pick from a pool of instances to randomise decoration.
+
+    For each sub-condition that succeeds, a random instance is placed, with
+    a fixup set to a value corresponding to the condition.
+
+    Parameters:
+        - Var: The fixup variable to set on each item. This is used to tweak it
+          to match the condition.
+        - Conditions: Each value here is the value to produce if this instance
+          is required. The contents of the block is then a condition flag to
+          check.
+        - Pool: A list of instances to randomly allocate to the conditions. There
+          should be at least as many pool values as there are conditions.
+        - Seed: Value to modify the seed with before placing.
+    """
+    flag_groups = [
+        (prop.real_name, list(prop))
+        for prop in res.find_children('conditions')
+        if prop.real_name is not None
+    ]
+    variable = res['var']
+    seed = 'sg' + res['seed', '']
+    instances = res.find_key('pool').as_array()
+    if len(instances) < len(flag_groups):
+        raise ValueError("Shuffle group can't have more conditions than instances.")
+
+    def add_group(inst: Entity) -> None:
+        """Place the group."""
+        conditions.set_random_seed(inst, seed)
+        pool = instances.copy()
+        random.shuffle(pool)
+
+        for (value, flags), filename in zip(flag_groups, pool):
+            for flag in flags:
+                if not conditions.check_flag(vmf, flag, inst):
+                    break
+            else:  # Succeeded.
+                vmf.create_ent(
+                    'func_instance',
+                    targetname=inst['targetname'],
+                    file=filename,
+                    angles=inst['angles'],
+                    origin=inst['origin'],
+                    fixup_style='0',
+                ).fixup[variable] = value
+    return add_group
 
 
 @make_result('addCavePortrait')
