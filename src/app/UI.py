@@ -1492,14 +1492,14 @@ def init_preview(f: Frame) -> None:
     """
     UI['pre_bg_img'] = Label(f, bg=ItemsBG)
     UI['pre_bg_img'].grid(row=0, column=0)
-    img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 271, 563))
+    img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 0, 0))
 
     UI['pre_disp_name'] = ttk.Label(
         f,
         text="",
         style='BG.TLabel',
         )
-    UI['pre_disp_name'].place(x=10, y=552)
+    UI['pre_disp_name'].place(x=10, y=554)
 
     UI['pre_sel_line'] = Label(
         f,
