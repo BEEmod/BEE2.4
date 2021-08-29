@@ -112,6 +112,6 @@ The Source engine has very strict limits on toggleable lights. Only two dynamic 
 
 If you just want to make a few small edits, another option is to put those things into instances, then import them into BEE as custom items. This allows you to place them directly into your Puzzlemaker map, instead of having to modify it. The process of creating custom items won't be fully described here, but you can read up on the [package format](https://github.com/BEEmod/BEE2-items/wiki/Package-Format) and the [custom item tutorial](https://github.com/BEEmod/BEE2-items/wiki/itemstutorial) to get started. If you need help with anything, feel free to ask for help in #ucp-development on the Discord server.
 
-### Why is BTS being removed
+### Why is BTS being removed?
 
 The BTS style was made back before BEE2.4, our direction has changed long since then. The style doesn't work in PeTI and it has become increasingly difficult to develop it. We've decided that its best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it. For now this is where we part ways with the BTS style.
