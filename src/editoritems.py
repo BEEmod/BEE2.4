@@ -24,7 +24,16 @@ LOGGER = logger.get_logger(__name__)
 
 class ItemClass(Enum):
     """PeTI item classes."""
-    # Value: (ID, instance count, models per subitem)
+    # Value:
+    # -  The ID used in the configs.
+    # - The number of instances items of this type have, at maximum.
+    # - The number of models to provide for each subtype.
+
+    def __init__(self, name: str, inst_count: int, models: int) -> None:
+        """Initialise attributes."""
+        self.id = name
+        self.inst_count = inst_count
+        self.mdl_per_subtype = models
 
     # Default
     UNCLASSED = ('ItemBase', 1, 1)
@@ -45,7 +54,7 @@ class ItemClass(Enum):
     FAITH_PLATE = 'ItemCatapult', 1, 1
 
     CUBE_DROPPER = 'ItemCubeDropper', 1, 1
-    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper', 1, 1
+    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper', 1, 4
     FAITH_TARGET = 'ItemCatapultTarget', 1, 1
 
     # Input-less items
@@ -63,7 +72,7 @@ class ItemClass(Enum):
     # Extent/handle pseudo-items
     HANDLE_FIZZLER = 'ItemBarrierHazardExtent', 0, 1
     HANDLE_GLASS = 'ItemBarrierExtent', 0, 1
-    HANDLE_PISTON_PLATFORM = 'ItemPistonPlatformExtent', 0, 1
+    HANDLE_PISTON_PLATFORM = 'ItemPistonPlatformExtent', 0, 2
     HANDLE_TRACK_PLATFORM = 'ItemRailPlatformExtent', 0, 1
 
     # Entry/Exit corridors
@@ -71,21 +80,6 @@ class ItemClass(Enum):
     DOOR_ENTRY_COOP = 'ItemCoopEntranceDoor', 5, 1
     DOOR_EXIT_SP = 'ItemExitDoor', 6, 2
     DOOR_EXIT_COOP = 'ItemCoopExitDoor', 6, 2
-
-    @property
-    def id(self) -> str:
-        """The ID used in the configs."""
-        return self.value[0]
-
-    @property
-    def inst_count(self) -> int:
-        """The number of intances items of this type have, at maximum."""
-        return self.value[1]
-
-    @property
-    def models_per_subtype(self) -> int:
-        """The number of models to provide for each subtype."""
-        return self.value[2]
 
 
 CLASS_BY_NAME = {
@@ -1060,7 +1054,6 @@ class Item:
                 self.properties[prop_str.casefold()] = UnknownProp(
                     prop_str, default, index,
                 )
-                LOGGER.info('Unknown: {}', self.properties)
             else:
                 try:
                     self.properties[prop_type.id.casefold()] = prop_type(
@@ -1756,7 +1749,38 @@ class Item:
         antline_points: List[List[AntlinePoint]]
 
         self.properties = {
-            prop.id: prop
+            prop.id.casefold(): prop
             for prop in props
         }
         self.antline_points = dict(zip(ConnSide, antline_points))
+
+    def validate(self) -> None:
+        """Look through the item and check for potential mistakes in configuration."""
+        for i, subtype in enumerate(self.subtypes, 1):
+            if len(subtype.models) != self.cls.mdl_per_subtype:
+                # Suppress, this is a Reflection Gel hack.
+                if len(subtype.models) == 5 and self.cls is ItemClass.PAINT_DROPPER:
+                    continue
+
+                LOGGER.warning(
+                    '{} items expect {} models, but subtype {} has {} models!',
+                    self.cls.id, self.cls.mdl_per_subtype,
+                    i, len(subtype.models),
+                )
+        if 'buttontype' in self.properties and self.cls is not ItemClass.FLOOR_BUTTON:
+            LOGGER.warning(
+                'The ButtonType property does nothing if the '
+                'item class is not ItemButtonFloor, only instance 0 is shown.'
+            )
+        if self.has_prim_input() and 'connectioncount' not in self.properties:
+            LOGGER.warning(
+                'Items with inputs must have ConnectionCount to work!'
+            )
+        # Track platform is a special case, it has hardcoded connections for
+        # each track segment.
+        if (
+            (self.has_prim_input() or self.has_sec_input() or self.has_output())
+            and not self.antline_points
+            and self.cls is not ItemClass.TRACK_PLATFORM
+        ):
+            LOGGER.warning('Items with inputs or outputs need ConnectionPoints definition!')

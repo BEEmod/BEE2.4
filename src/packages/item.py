@@ -16,7 +16,7 @@ from srctools import FileSystem, Property, EmptyMapping
 from pathlib import PurePosixPath as FSPath
 import srctools.logger
 
-from app import tkMarkdown, img, lazy_conf
+from app import tkMarkdown, img, lazy_conf, DEV_MODE
 from packages import (
     PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
@@ -995,6 +995,16 @@ def assign_styled_items(
 
             # Fix this reference to point to the actual value.
             vers.def_style = styles[vers.def_style]
+
+            if DEV_MODE.get():
+                # Check each editoritem definition for some known issues.
+                for sty_id, variant in styles.items():
+                    assert isinstance(variant, ItemVariant), f'{item.id}:{sty_id} = {variant!r}!!'
+                    with srctools.logger.context(f'{item.id}:{sty_id}'):
+                        variant.editor.validate()
+                    for extra in variant.editor_extra:
+                        with srctools.logger.context(f'{item.id}:{sty_id} -> {extra.id}'):
+                            extra.validate()
 
             for style in Style.all():
                 if style.id in styles:
