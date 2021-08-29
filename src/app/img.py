@@ -241,8 +241,8 @@ def _pil_from_package(uri: PackagePath, width: int, height: int) -> Image.Image:
     try:
         fsys = PACK_SYSTEMS[uri.package]
     except KeyError:
-        LOGGER.warning('Unknown package "{}" for loading images!', uri.package)
-        return Handle.error(width, height).load_pil()
+        LOGGER.warning('Unknown package for loading images: "{}"!', uri)
+        return Handle.error(width, height).get_pil()
 
     return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
 
