@@ -2,8 +2,7 @@
 import tkinter as tk
 from types import TracebackType
 from typing import Type
-from utils import BEE_VERSION
-
+import utils
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
@@ -102,7 +101,7 @@ def on_error(
     try:
         from tkinter import messagebox
         messagebox.showinfo(
-            title='BEEMOD {} Error!'.format(BEE_VERSION),
+            title='BEEMOD {} Error!'.format(utils.BEE_VERSION),
             message='An error occurred: \n{}\n\nThis has '
                     'been copied to the clipboard.'.format(err),
             icon=messagebox.ERROR,
@@ -128,4 +127,4 @@ FORCE_LOAD_ONTOP = tk.BooleanVar(value=True, name='OPT_force_load_ontop')
 SHOW_LOG_WIN = tk.BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
 PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
-DEV_MODE = tk.BooleanVar(value=False, name='OPT_development_mode')
+DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')

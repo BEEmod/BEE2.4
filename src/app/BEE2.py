@@ -2,7 +2,7 @@
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
 
-from app import gameMan, paletteLoader, UI, music_conf, logWindow, img, TK_ROOT
+from app import gameMan, paletteLoader, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE
 import loadScreen
 import packages
 import utils
@@ -38,6 +38,9 @@ DEFAULT_SETTINGS = {
         # Warn if a file is missing that a packfile refers to
         'log_incorrect_packfile': '0',
 
+        # Determines if additional options are displayed.
+        'development_mode': '0',
+
         # Show the log window on startup
         'show_log_win': '0',
         # The lowest level which will be shown.
@@ -47,6 +50,10 @@ DEFAULT_SETTINGS = {
 
 GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
+
+# Special case, load in this early so it applies.
+utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')
+DEV_MODE.set(utils.DEV_MODE)
 
 LOGGER.debug('Starting loading screen...')
 loadScreen.main_loader.set_length('UI', 15)
