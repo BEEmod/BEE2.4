@@ -31,10 +31,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 # Finds names surrounded by %s
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 
-# The name given to standard connections - regular input/outputs in editoritems.
-CONN_NORM = 'CONNECTION_STANDARD'
-CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
-
 
 class UnParsedItemVariant(NamedTuple):
     """The desired variant for an item, before we've figured out the dependencies."""
@@ -175,7 +171,7 @@ class ItemVariant:
             url=props['url', self.url],
             all_name=self.all_name,
             all_icon=self.all_icon,
-            source='{} from {}'.format(source, self.source),
+            source=f'{source} from {self.source}',
         )
         [variant.editor] = variant._modify_editoritems(
             props,
@@ -232,7 +228,7 @@ class ItemVariant:
                 if is_extra:
                     raise Exception(
                         'Cannot specify "all" for hidden '
-                        'editoritems blocks in {}!'.format(source)
+                        f'editoritems blocks in {source}!'
                     )
                 if pal_icon is not None:
                     self.all_icon = pal_icon
@@ -247,8 +243,8 @@ class ItemVariant:
                 subtype_item, subtype_ind, subtype = subtype_lookup[subtype_ind]
             except (IndexError, ValueError, TypeError):
                 raise Exception(
-                    'Invalid index "{}" when modifying '
-                    'editoritems for {}'.format(item.name, source)
+                    f'Invalid index "{item.name}" when modifying '
+                    f'editoritems for {source}'
                 )
             subtype_item.subtypes = subtype_item.subtypes.copy()
             subtype_item.subtypes[subtype_ind] = subtype = copy.deepcopy(subtype)
@@ -270,7 +266,7 @@ class ItemVariant:
                 if is_extra:
                     raise ValueError(
                         'Cannot specify BEE2 icons for hidden '
-                        'editoritems blocks in {}!'.format(source)
+                        f'editoritems blocks in {source}!'
                     )
                 self.icons[item.name] = bee2_icon
 
@@ -283,7 +279,7 @@ class ItemVariant:
             if len(editor) != 1:
                 raise ValueError(
                     'Cannot specify instances for multiple '
-                    'editoritems blocks in {}!'.format(source)
+                    f'editoritems blocks in {source}!'
                 )
             editor[0].instances = editor[0].instances.copy()
             editor[0].cust_instances = editor[0].cust_instances.copy()
@@ -325,7 +321,7 @@ class ItemVariant:
             if len(editor) != 1:
                 raise ValueError(
                     'Cannot specify I/O for multiple '
-                    'editoritems blocks in {}!'.format(source)
+                    f'editoritems blocks in {source}!'
                 )
             force = io_props['force', '']
             editor[0].conn_config = ConnConfig.parse(editor[0].id, io_props)
@@ -464,11 +460,9 @@ class Item(PakObject):
 
                 if style.real_name == folder.style:
                     raise ValueError(
-                        'Item "{}"\'s "{}" style '
-                        'can\'t inherit from itself!'.format(
-                            data.id,
-                            style.real_name,
-                        ))
+                        f'Item "{data.id}"\'s "{style.real_name}" style '
+                        "can't inherit from itself!"
+                    )
             versions[ver_id] = version = Version(
                 ver_id, ver_name, ver_isolate, styles, def_style,
             )
@@ -556,7 +550,7 @@ class Item(PakObject):
                         # our_style.override_from_folder(style)
 
     def __repr__(self) -> str:
-        return '<Item:{}>'.format(self.id)
+        return f'<Item:{self.id}>'
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -778,8 +772,8 @@ def parse_item_folder(
 
         if first_item is None:
             raise ValueError(
-                '"{}:items/{}/editoritems.txt has no '
-                '"Item" block!'.format(pak_id, fold)
+                f'"{pak_id}:items/{fold}/editoritems.txt has no '
+                '"Item" block!'
             )
 
         # extra_items is any extra blocks (offset catchers, extent items).
@@ -789,12 +783,12 @@ def parse_item_folder(
             for subtype in extra_item.subtypes:
                 if subtype.pal_pos is not None:
                     LOGGER.warning(
-                        '"{}:items/{}/editoritems.txt has palette set for extra'
-                        ' item blocks. Deleting.'.format(pak_id, fold)
+                        f'"{pak_id}:items/{fold}/editoritems.txt has '
+                        f'palette set for extra item blocks. Deleting.'
                     )
                     subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
 
-        # In files this is specificed as PNG, but it's always really VTF.
+        # In files this is specified as PNG, but it's always really VTF.
         try:
             all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
         except LookupError:
@@ -875,7 +869,7 @@ def apply_replacements(conf: Property) -> Property:
         try:
             return replace[var.casefold()]
         except KeyError:
-            raise ValueError('Unresolved variable: {!r}\n{}'.format(var, replace))
+            raise ValueError(f'Unresolved variable: {var!r}\n{replace}')
 
     for prop in new_conf.iter_tree(blocks=True):
         prop.name = RE_PERCENT_VAR.sub(rep_func, prop.real_name)
@@ -920,6 +914,9 @@ def assign_styled_items(
                 # Not done yet
                 styles[sty_id] = None
 
+            # If we have multiple versions, mention them.
+            vers_desc = f' with version {vers.id}' if len(all_ver) > 1 else ''
+
             # Evaluate style lookups and modifications
             while to_change:
                 # Needs to be done next loop.
@@ -939,12 +936,9 @@ def assign_styled_items(
                                 start_data = styles[conf.style]
                         except KeyError:
                             raise ValueError(
-                                'Item {}\'s {} style referenced '
-                                'invalid style "{}"'.format(
-                                    item.id,
-                                    sty_id,
-                                    conf.style,
-                                ))
+                                f'Item {item.id}\'s {sty_id} style{vers_desc} '
+                                f'referenced invalid style "{conf.style}"'
+                            )
                         if start_data is None:
                             # Not done yet!
                             deferred.append((sty_id, conf))
@@ -952,11 +946,9 @@ def assign_styled_items(
                         # Can't have both!
                         if conf.folder:
                             raise ValueError(
-                                'Item {}\'s {} style has both folder and'
-                                ' style!'.format(
-                                    item.id,
-                                    sty_id,
-                                ))
+                                f'Item {item.id}\'s {sty_id} style has '
+                                f'both folder and style{vers_desc}!'
+                            )
                     elif conf.folder:
                         # Just a folder ref, we can do it immediately.
                         # We know this dict should be set.
@@ -968,10 +960,9 @@ def assign_styled_items(
                     else:
                         # No source for our data!
                         raise ValueError(
-                            'Item {}\'s {} style has no data source!'.format(
-                                item.id,
-                                sty_id,
-                            ))
+                            f"Item {item.id}'s {sty_id} style has no data "
+                            f"source{vers_desc}!"
+                        )
 
                     if conf.config is None:
                         styles[sty_id] = start_data.copy()
@@ -979,17 +970,19 @@ def assign_styled_items(
                         styles[sty_id] = start_data.modify(
                             conf.pak_id,
                             conf.config,
-                            '<{}:{}.{}>'.format(item.id, vers.id, sty_id),
+                            f'<{item.id}:{vers.id}.{sty_id}>',
                         )
 
                 # If we defer all the styles, there must be a loop somewhere.
                 # We can't resolve that!
                 if len(deferred) == len(to_change):
+                    unresolved = '\n'.join(
+                        f'{conf.style} -> {sty_id}'
+                        for sty_id, conf in deferred
+                    )
                     raise ValueError(
-                        'Loop in style references!\nNot resolved:\n' + '\n'.join(
-                            '{} -> {}'.format(conf.style, sty_id)
-                            for sty_id, conf in deferred
-                        )
+                        f'Loop in style references for item {item.id}'
+                        f'{vers_desc}!\nNot resolved:\n{unresolved}'
                     )
                 to_change = deferred
 
@@ -1026,10 +1019,11 @@ def assign_styled_items(
                     # No parent matches!
                     if log_missing_styles and not item.unstyled:
                         LOGGER.warning(
-                            'Item "{item}" using '
-                            'inappropriate style for "{style}"!',
-                            item=item.id,
-                            style=style.id,
+                            'Item "{0.id}"{2} using '
+                            'inappropriate style for "{1.id}"!',
+                            item,
+                            style,
+                            vers_desc,
                         )
 
                     # If 'isolate versions' is set on the item,
