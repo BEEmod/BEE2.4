@@ -3,13 +3,11 @@
 A system is provided so configurations can be shared and partially modified
 as required.
 """
+from __future__ import annotations
 import operator
 import re
 import copy
-from typing import (
-    Optional, Union, Tuple, NamedTuple,
-    Dict, List, Match, Set, cast,
-)
+from typing import NamedTuple, Match, cast
 
 import utils
 from srctools import FileSystem, Property, EmptyMapping
@@ -36,9 +34,9 @@ class UnParsedItemVariant(NamedTuple):
     """The desired variant for an item, before we've figured out the dependencies."""
     pak_id: str  # The package that defined this variant.
     filesys: FileSystem  # The original filesystem.
-    folder: Optional[str]  # If set, use the given folder from our package.
-    style: Optional[str]  # Inherit from a specific style (implies folder is None)
-    config: Optional[Property]  # Config for editing
+    folder: str | None  # If set, use the given folder from our package.
+    style: str | None  # Inherit from a specific style (implies folder is None)
+    config: Property | None  # Config for editing
 
 
 class ItemVariant:
@@ -48,17 +46,17 @@ class ItemVariant:
         self,
         editoritems: EditorItem,
         vbsp_config: lazy_conf.LazyConf,
-        editor_extra: List[EditorItem],
-        authors: List[str],
-        tags: List[str],
+        editor_extra: list[EditorItem],
+        authors: list[str],
+        tags: list[str],
         desc: tkMarkdown.MarkdownData,
-        icons: Dict[str, img.Handle],
+        icons: dict[str, img.Handle],
         ent_count: str='',
         url: str = None,
         all_name: str=None,
         all_icon: FSPath=None,
         source: str='',
-    ):
+    ) -> None:
         self.editor = editoritems
         self.editor_extra = editor_extra
         self.vbsp_config = vbsp_config
@@ -75,7 +73,7 @@ class ItemVariant:
         self.all_name = all_name
         self.all_icon = all_icon
 
-    def copy(self) -> 'ItemVariant':
+    def copy(self) -> ItemVariant:
         """Make a copy of all the data."""
         return ItemVariant(
             self.editor,
@@ -99,14 +97,14 @@ class ItemVariant:
             self.all_name is not None
         )
 
-    def override_from_folder(self, other: 'ItemVariant') -> None:
+    def override_from_folder(self, other: ItemVariant) -> None:
         """Perform the override from another item folder."""
         self.authors.extend(other.authors)
         self.tags.extend(self.tags)
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    def modify(self, pak_id: str, props: Property, source: str) -> 'ItemVariant':
+    def modify(self, pak_id: str, props: Property, source: str) -> ItemVariant:
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -195,11 +193,11 @@ class ItemVariant:
     def _modify_editoritems(
         self,
         props: Property,
-        editor: List[EditorItem],
+        editor: list[EditorItem],
         pak_id: str,
         source: str,
         is_extra: bool,
-    ) -> List[EditorItem]:
+    ) -> list[EditorItem]:
         """Modify either the base or extra editoritems block."""
         # We can share a lot of the data, if it isn't changed and we take
         # care to copy modified parts.
@@ -220,7 +218,11 @@ class ItemVariant:
                 pal_icon = None
             pal_name = item['pal_name', None]  # Name for the palette icon
             try:
-                bee2_icon = img.Handle.parse(item.find_key('BEE2'), pak_id, 64, 64, subfolder='items')
+                bee2_icon = img.Handle.parse(
+                    item.find_key('BEE2'), pak_id,
+                    64, 64,
+                    subfolder='items',
+                )
             except LookupError:
                 bee2_icon = None
 
@@ -346,8 +348,8 @@ class Version:
         vers_id: str,
         name: str,
         isolate: bool,
-        styles: Dict[str, ItemVariant],
-        def_style: Union[ItemVariant, Union[str, ItemVariant]],
+        styles: dict[str, ItemVariant],
+        def_style: ItemVariant | str,
     ) -> None:
         self.name = name
         self.id = vers_id
@@ -366,7 +368,7 @@ class Item(PakObject):
     def __init__(
         self,
         item_id: str,
-        versions: Dict[str, Version],
+        versions: dict[str, Version],
         def_version: Version,
         needs_unlock: bool=False,
         all_conf: lazy_conf.LazyConf=lazy_conf.BLANK,
@@ -374,7 +376,7 @@ class Item(PakObject):
         isolate_versions: bool=False,
         glob_desc: tkMarkdown.MarkdownData=(),
         desc_last: bool=False,
-        folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
+        folders: dict[tuple[FileSystem, str], ItemVariant]=EmptyMapping,
     ) -> None:
         self.id = item_id
         self.versions = versions
@@ -393,11 +395,11 @@ class Item(PakObject):
     @classmethod
     def parse(cls, data: ParseData):
         """Parse an item definition."""
-        versions: Dict[str, Version] = {}
-        def_version: Optional[Version] = None
+        versions: dict[str, Version] = {}
+        def_version: Version | None = None
         # The folders we parse for this - we don't want to parse the same
         # one twice.
-        folders_to_parse: Set[str] = set()
+        folders_to_parse: set[str] = set()
         unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id, data.pak_id)
@@ -414,7 +416,7 @@ class Item(PakObject):
         for ver in data.info.find_all('version'):
             ver_name = ver['name', 'Regular']
             ver_id = ver['ID', 'VER_DEFAULT']
-            styles: Dict[str, ItemVariant] = {}
+            styles: dict[str, ItemVariant] = {}
             ver_isolate = ver.bool('isolated')
             def_style = None
 
@@ -553,7 +555,7 @@ class Item(PakObject):
         return f'<Item:{self.id}>'
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export all items into the configs.
 
         For the selected attribute, this takes a tuple of values:
@@ -568,12 +570,11 @@ class Item(PakObject):
 
         style_id = exp_data.selected_style.id
 
-        aux_item_configs: Dict[str, ItemConfig] = {
+        aux_item_configs: dict[str, ItemConfig] = {
             conf.id: conf
             for conf in ItemConfig.all()
         }
 
-        item: Item
         for item in sorted(Item.all(), key=operator.attrgetter('id')):
             ver_id = versions.get(item.id, 'VER_DEFAULT')
 
@@ -613,8 +614,8 @@ class Item(PakObject):
         pal_list,
         ver_id,
         style_id,
-        prop_conf: Dict[str, Dict[str, str]],
-    ) -> Tuple[List[EditorItem], lazy_conf.LazyConf]:
+        prop_conf: dict[str, dict[str, str]],
+    ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
         """Get the data for an exported item."""
 
         # Build a dictionary of this item's palette positions,
@@ -674,14 +675,14 @@ class ItemConfig(PakObject, allow_mult=True):
         self,
         it_id,
         all_conf: lazy_conf.LazyConf,
-        version_conf: Dict[str, Dict[str, lazy_conf.LazyConf]],
+        version_conf: dict[str, dict[str, lazy_conf.LazyConf]],
     ) -> None:
         self.id = it_id
         self.versions = version_conf
         self.all_conf = all_conf
 
     @classmethod
-    def parse(cls, data: ParseData):
+    def parse(cls, data: ParseData) -> ItemConfig:
         """Parse from config files."""
         vers: dict[str, dict[str, lazy_conf.LazyConf]] = {}
         styles: dict[str, lazy_conf.LazyConf]
@@ -710,7 +711,7 @@ class ItemConfig(PakObject, allow_mult=True):
             vers,
         )
 
-    def add_over(self, override: 'ItemConfig') -> None:
+    def add_over(self, override: ItemConfig) -> None:
         """Add additional style configs to the original config."""
         self.all_conf = lazy_conf.concat(self.all_conf, override.all_conf)
 
@@ -732,23 +733,23 @@ class ItemConfig(PakObject, allow_mult=True):
 
 
 def parse_item_folder(
-    folders_to_parse: Set[str],
+    folders_to_parse: set[str],
     filesystem: FileSystem,
     pak_id: str,
-) -> Dict[str, ItemVariant]:
+) -> dict[str, ItemVariant]:
     """Parse through the data in item/ folders.
 
     folders is a dict, with the keys set to the folder names we want.
     The values will be filled in with itemVariant values
     """
-    folders: Dict[str, ItemVariant] = {}
+    folders: dict[str, ItemVariant] = {}
     for fold in folders_to_parse:
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
 
-        first_item: Optional[Item] = None
-        extra_items: List[EditorItem] = []
+        first_item: Item | None = None
+        extra_items: list[EditorItem] = []
         try:
             props = filesystem.read_prop(prop_path).find_key('Properties')
             f = filesystem[editor_path].open_str()
@@ -809,7 +810,11 @@ def parse_item_folder(
             ent_count=props['ent_count', ''],
             url=props['infoURL', None],
             icons={
-                prop.name: img.Handle.parse(prop, pak_id, 64, 64, subfolder='items')
+                prop.name: img.Handle.parse(
+                    prop, pak_id,
+                    64, 64,
+                    subfolder='items',
+                )
                 for prop in
                 props.find_children('icon')
             },
@@ -850,7 +855,7 @@ def apply_replacements(conf: Property) -> Property:
     These replace %values% starting and ending with percents. A double-percent
     allows literal percents. Unassigned values are an error.
     """
-    replace = {}
+    replace: dict[str, str] = {}
     new_conf = Property(conf.real_name, [])
 
     # Strip the replacement blocks from the config, and save the values.
@@ -861,7 +866,7 @@ def apply_replacements(conf: Property) -> Property:
         else:
             new_conf.append(prop)
 
-    def rep_func(match: Match):
+    def rep_func(match: Match) -> str:
         """Does the replacement."""
         var = match.group(1)
         if not var:  # %% becomes %.
@@ -907,8 +912,8 @@ def assign_styled_items(
         for vers in all_ver:
             # We need to repeatedly loop to handle the chains of
             # dependencies. This is a list of (style_id, UnParsed).
-            to_change: List[Tuple[str, UnParsedItemVariant]] = []
-            styles: Dict[str, Union[UnParsedItemVariant, ItemVariant, None]] = vers.styles
+            to_change: list[tuple[str, UnParsedItemVariant]] = []
+            styles: dict[str, UnParsedItemVariant | ItemVariant | None] = vers.styles
             for sty_id, conf in styles.items():
                 to_change.append((sty_id, conf))
                 # Not done yet
@@ -920,7 +925,7 @@ def assign_styled_items(
             # Evaluate style lookups and modifications
             while to_change:
                 # Needs to be done next loop.
-                deferred = []
+                deferred: list[tuple[str, UnParsedItemVariant]] = []
                 # UnParsedItemVariant options:
                 # filesys: FileSystem  # The original filesystem.
                 # folder: str  # If set, use the given folder from our package.
