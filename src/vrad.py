@@ -115,7 +115,7 @@ def run_vrad(args: List[str]) -> None:
 
 def main(argv: List[str]) -> None:
     """Main VRAD script."""
-    LOGGER.info('BEE2 VRAD hook started!')
+    LOGGER.info("BEE{} VRAD hook initiallised.", utils.BEE_VERSION)
 
     args = " ".join(argv)
     fast_args = argv[1:]
