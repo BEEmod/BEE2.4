@@ -79,12 +79,18 @@ class NAV_KEYS(Enum):
     PLAY_SOUND = 'space'
 
 
+@utils.freeze_enum_props
 class AttrTypes(Enum):
     """The type of labels used for selectoritem attributes."""
     STR = STRING = 'string'  # Normal text
     LIST = 'list'  # A sequence, joined by commas
     BOOL = 'bool'  # A yes/no checkmark
     COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
+
+    @property
+    def is_wide(self) -> bool:
+        """Determine if this should be placed on its own row, or paired with another."""
+        return self.value in ('string', 'list')
 
 
 AttrValues =  Union[str, list, bool, Vec]
@@ -883,17 +889,24 @@ class SelectorWin:
         )
 
         if attributes:
-            attr_frame = ttk.Frame(self.prop_frm)
-            attr_frame.grid(
+            attrs_frame = ttk.Frame(self.prop_frm)
+            attrs_frame.grid(
                 row=5,
                 column=0,
                 columnspan=3,
                 sticky=EW,
+                padx=5,
             )
+            attrs_frame.columnconfigure(0, weight=1)
+            attrs_frame.columnconfigure(1, weight=1)
 
             self.attr = {}
             # Add in all the attribute labels
-            for index, attrib in enumerate(attributes):
+            index = 0
+            # Wide before short.
+            attr_order = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
+            for attrib in attr_order:
+                attr_frame = ttk.Frame(attrs_frame)
                 desc_label = ttk.Label(
                     attr_frame,
                     text=attrib.desc,
@@ -901,6 +914,7 @@ class SelectorWin:
                 self.attr[attrib.id] = val_label = ttk.Label(
                     attr_frame,
                 )
+
                 val_label.default = attrib.default
                 val_label.type = attrib.type
                 if attrib.type is AttrTypes.BOOL:
@@ -915,17 +929,33 @@ class SelectorWin:
                     # Show the color value when hovered.
                     add_tooltip(val_label)
 
-                # Position in a 2-wide grid
-                desc_label.grid(
-                    row=index // 2,
-                    column=(index % 2) * 2,
-                    sticky=E,
-                )
-                val_label.grid(
-                    row=index // 2,
-                    column=(index % 2) * 2 + 1,
-                    sticky=W,
-                )
+                desc_label.grid(row=0, column=0,  sticky=E)
+                val_label.grid(row=0, column=1, sticky=W)
+                # Wide ones have their own row, narrow ones are two to a row
+                if attrib.type.is_wide:
+                    if index % 2:  # Row has a single narrow, skip the empty space.
+                        index += 1
+                    attr_frame.grid(
+                        row=index // 2,
+                        column=0, columnspan=2,
+                        sticky=W,
+                    )
+                    index += 2
+                else:
+                    if index % 2:  # Right.
+                        ttk.Separator(orient=VERTICAL).grid(row=index//2, column=1, sticky=NS)
+                        attr_frame.grid(
+                            row=index // 2,
+                            column=2,
+                            sticky=E,
+                        )
+                    else:
+                        attr_frame.grid(
+                            row=index // 2,
+                            column=0,
+                            sticky=W,
+                        )
+                    index += 1
         else:
             self.attr = None
 
