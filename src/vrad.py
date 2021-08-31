@@ -74,35 +74,6 @@ def load_transforms() -> None:
         finder.load_all()
 
 
-def dump_files(bsp: BSP, dump_folder: str) -> None:
-    """Dump packed files to a location.
-    """
-    dump_folder = os.path.abspath(dump_folder)
-
-    LOGGER.info('Dumping packed files to "{}"...', dump_folder)
-
-    # Delete files in the folder, but don't delete the folder itself.
-    try:
-        files = os.listdir(dump_folder)
-    except FileNotFoundError:
-        return
-
-    for name in files:
-        name = os.path.join(dump_folder, name)
-        if os.path.isdir(name):
-            try:
-                shutil.rmtree(name)
-            except OSError:
-                # It's possible to fail here, if the window is open elsewhere.
-                # If so, just skip removal and fill the folder.
-                pass
-        else:
-            os.remove(name)
-
-    for zipinfo in bsp.pakfile.infolist():
-        bsp.pakfile.extract(zipinfo, dump_folder)
-
-
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
     code = srctools.run.run_compiler(os.path.join(os.getcwd(), "vrad"), args)
@@ -275,6 +246,15 @@ def main(argv: List[str]) -> None:
             else:
                 pack_blacklist.add(child_sys)
 
+    if config.get_bool('General', 'packfile_dump_enable'):
+        dump_loc = Path(config.get_val(
+            'General',
+            'packfile_dump_dir',
+            '../dump/'
+        )).absolute()
+    else:
+        dump_loc = None
+
     if '-no_pack' not in args:
         # Cubemap files packed into the map already.
         existing = set(bsp_file.pakfile.namelist())
@@ -285,18 +265,13 @@ def main(argv: List[str]) -> None:
             ignore_vpk=True,
             whitelist=pack_whitelist,
             blacklist=pack_blacklist,
+            dump_loc=dump_loc,
         )
 
         LOGGER.info('Packed files:\n{}', '\n'.join(
             set(bsp_file.pakfile.namelist()) - existing
         ))
 
-    if config.get_bool('General', 'packfile_dump_enable'):
-        dump_files(bsp_file, config.get_val(
-            'General',
-            'packfile_dump_dir',
-            '../dump/'
-        ))
 
     LOGGER.info('Writing BSP...')
     bsp_file.save()
