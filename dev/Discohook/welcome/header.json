@@ -1,0 +1,24 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": BEE Welcome - Header",
+      "messages": [
+        {
+          "data": {
+            "content": "Hello, and welcome to the BEEmod Discord server! This is the official server to chat about the BEEmod for Portal 2. Before you continue, please take a moment to read through the rules and information here.",
+            "embeds": null,
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

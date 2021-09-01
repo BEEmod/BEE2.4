@@ -1,0 +1,30 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Antivirus",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "My anti-virus program flagged BEE2.4 as malware?",
+                "description": "This is a known issue, and happens for a number of reasons that are mostly out of our control. Antivirus software will often assume that if a file isn't commonly downloaded, it must be malware. *Real* viruses are also sometimes written in Python, meaning they would share many of the same libraries and files. Additionally, BEE2.4 does several things which could cause it to be seen as a virus - copying a bunch of files into the folder for another program (Portal 2), and replacing executables with its own versions (the compilers). However, we can assure you that BEE2.4 does not contain any malicious code. If you don't believe us, [check for yourself](https://github.com/BEEmod/BEE2.4/tree/master/src); the entire project is open-source.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

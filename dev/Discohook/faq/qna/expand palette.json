@@ -1,0 +1,30 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Expand Palette",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you expand the palette/add <feature\\> to puzzlemaker?",
+                "description": "No. Most of the Puzzlemaker is hard-coded and outside our reach. While we can add new test elements and modify the compiler or in-game appearances, we cannot change how the editor itself behaves. This includes expanding the palette, adding custom labels to item settings (hence \"Button Type\", \"Start Reversed\", etc. on many items), creating new UIs, increasing connection limits, or merging non-compatible items.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

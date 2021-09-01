@@ -1,0 +1,24 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Bottomless Pits",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "How do I use bottomless pits/what happened to 3D Factory?",
+                "description": "The bottomless pits originally featured in BEEmod had significant problems, so they've been removed for the time being. The plan is to implement a \"chamber exterior\" system which would allow generating areas surrounding the map, including improved bottomless pits. However, this feature is not yet being worked on.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          }
+        }
+      ]
+    }
+  ]
+}

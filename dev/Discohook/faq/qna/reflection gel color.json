@@ -1,0 +1,30 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Reflection Gel Color",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you change the color of Reflection Gel to be different than Conversion Gel?",
+                "description": "Once again, no. Reflection Gel is hardcoded to use the color of Conversion Gel (`portal_paint_color`) when on a surface, and the color of Propulsion Gel (`speed_paint_color`) on light bridges and when splashed on the screen. We can separately change the color of the blobs though, which has been done, making them a dark gray.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

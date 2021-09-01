@@ -1,0 +1,30 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Uninstall",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "How do I uninstall BEE2.4 from a game?",
+                "description": "The most common answer to this question would be \"verify the game files\". However, this is **not** the correct way of uninstalling - although the editor items and style will be restored to default, editor textures will not be reverted and many custom assets added by BEE2.4 will be left in the game files. To fully uninstall BEE2.4, select the game you want to uninstall it from and choose *File > Uninstall from Selected Game*. This will completely remove BEE2.4 from the game, including editor textures and custom assets.\n\nTo uninstall the BEE2 app itself, perform the above steps, then simply delete the application folder.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}
