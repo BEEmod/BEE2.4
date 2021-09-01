@@ -1,0 +1,394 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEEmod FAQ",
+      "messages": [
+        {
+          "data": {
+            "content": "This is a list of answers to questions that have been frequently asked by users. If you are having problems with BEE2.4 or want to ask about a feature, check here.",
+            "embeds": [
+              {
+                "title": "Where is the executable?",
+                "description": "The executable is located in the root of the extracted folder. If it's not there, you probably downloaded the wrong file. Make sure you download the mod from the [releases page](https://github.com/BEEmod/BEE2.4/releases), and not using the \"Clone or download\" button on the main page, as this will download the mod's source code rather than a compiled release.",
+                "color": 16761704
+              },
+              {
+                "title": "My anti-virus program flagged BEE2.4 as malware?",
+                "description": "This is a known issue, and happens for a number of reasons that are mostly out of our control. Antivirus software will often assume that if a file isn't commonly downloaded, it must be malware. *Real* viruses are also sometimes written in Python, meaning they would share many of the same libraries and files. Additionally, BEE2.4 does several things which could cause it to be seen as a virus - copying a bunch of files into the folder for another program (Portal 2), and replacing executables with its own versions (the compilers). However, we can assure you that BEE2.4 does not contain any malicious code. If you don't believe us, [check for yourself](https://github.com/BEEmod/BEE2.4/tree/master/src); the entire project is open-source.",
+                "color": 16761704
+              },
+              {
+                "title": "How do I uninstall BEE2.4 from a game?",
+                "description": "The most common answer to this question would be \"verify the game files\". However, this is **not** the correct way of uninstalling - although the editor items and style will be restored to default, editor textures will not be reverted and many custom assets added by BEE2.4 will be left in the game files. To fully uninstall BEE2.4, select the game you want to uninstall it from and choose *File > Uninstall from Selected Game*. This will completely remove BEE2.4 from the game, including editor textures and custom assets.\n\nTo uninstall the BEE2 app itself, perform the above steps, then simply delete the application folder.",
+                "color": 16761704
+              },
+              {
+                "title": "Do people playing my BEEmod maps need BEEmod installed to see the custom content, or play the map at all?",
+                "description": "No. This was the case with the High Energy Pellet items in the original BEEmod, but the BEE2 packs all custom content into the map automatically. (It's supposed to, at least. If something doesn't get packed, it's a bug; report it on the issue tracker if it hasn't already been.)",
+                "color": 16761704
+              },
+              {
+                "title": "What games does BEE2.4 support?",
+                "description": "BEE2.4 supports Portal 2 and Aperture Tag. Thinking With Time Machine support is planned, but not yet implemented. (BEE2.4 can be used with TWTM, but you will not have the time machine and several other things will be broken.) Destroyed Aperture support is also planned once that mod is released.",
+                "color": 16761704
+              },
+              {
+                "title": "What about Portal 2: Community Edition? Will BEE2.4 be compatible with that, will it make any new things possible?",
+                "description": "Theoretically, P2CE would expand what is possible with BEEmod; however, the P2CE developers were unable to obtain the Puzzlemaker source code from Valve, so it won't be included. They will likely implement their own puzzlemaker from scratch at some point in the future, but it is not currently being worked on and would likely be incompatible with BEE.",
+                "color": 16761704
+              },
+              {
+                "title": "I have a pirated/cracked version of Portal 2, can I use BEE2.4?",
+                "description": "We do not support cracked versions of Portal 2. While BEE2.4 may still work, we will not help you if you run into any problems. We highly recommend that you buy the game legally on Steam; Portal 2 only costs $10 USD by default, and is usually on sale for an even lower price.",
+                "color": 16761704
+              },
+              {
+                "title": "When is the next update for BEE2.4?",
+                "description": "There are no set release dates for BEE2 updates. Sometimes they will be released every few weeks, and sometimes there will be months between updates. Instructions to run development versions of BEE2.4 can be found in the readme, if you want to test new features before they have been released.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    },
+    {
+      "name": "BEEmod FAQ Items",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "How do I use Catwalks/Vactubes/Unstationary Scaffolds?",
+                "description": "These items effectively act as nodes, which need to be connected to each other in order to do anything. The exact way in which this works is different for each item, see their wiki pages for more details: [Vactubes](https://github.com/BEEmod/BEE2-items/wiki/Vactubes), [Catwalks](https://github.com/BEEmod/BEE2-items/wiki/Catwalks), and [Unstationary Scaffolds](https://github.com/BEEmod/BEE2-items/wiki/Unstationary-Scaffold)",
+                "color": 16761704
+              },
+              {
+                "title": "In the Bomb Cube's description it says it can destroy breakable glass, but the Breakable Glass item isn't in the BEE2.4. Where is it?",
+                "description": "Breakable Glass hasn't been reimplemented yet, but it is planned, which is why it's mentioned in the Bomb Cube description.",
+                "color": 16761704
+              },
+              {
+                "title": "When I change the angle of Portal 1 panels it makes a high-pitched/corrupted noise, how do I fix it?",
+                "description": "This is a known issue which seems to be related to audio caching, as the audio files themselves sound correct. One fix that seems to work is running the commands `snd_updateaudiocache` and `sv_soundemitter_flush` in the console, in that order. There's no way currently to make the mod apply this automatically, which is why the issue hasn't properly been fixed.",
+                "color": 16761704
+              },
+              {
+                "title": "Old versions of BEE2 had a lot more items, what happened to them and are they coming back?",
+                "description": "BEE2.4 is a complete rewrite of the app with a different internal item format, so all of the old items need to be manually ported. This is in progress, see issue [#95](https://github.com/BEEmod/BEE2-items/issues/95) for more details.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you add new style *x*?",
+                "description": "Styles take a lot of work to create and maintain, so new ones are rarely added. For a new style to even be considered, it should make sense overall, work with most/all of Portal 2's test elements, and be possible to reasonably implement in the Puzzlemaker.\n\nAs an example, Portal 1 is a style that fits this criteria, as most of Portal 2's test elements can reasonably exist there and it has a block-based structure similar to Clean. On the other hand, BTS style typically doesn't use test elements like buttons and cubes, and it's very difficult to make it look good in the Puzzlemaker. The only reason BTS was added is because these guidelines didn't exist yet at the time.\n\nIf your suggested style is a simple variant of an existing style (e.g. Original Clean, which just changes wall textures), it may be added. Custom packages can also add their own styles, so feel free to implement a new style yourself.",
+                "color": 16761704
+              },
+              {
+                "title": "Why doesn't Portal 1 GLaDOS have any lines?",
+                "description": "The Portal 1 GLaDOS lines aren't in Portal 2 by default, and as stated below, it's not possible to pack voice lines into maps. The plan is to use existing lines that are similar to the P1 dialogue, but this hasn't been implemented yet.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": "https://discord.com/channels/293435914598744064/804814306897690715/804822932974075915"
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    },
+    {
+      "name": "BEEmod FAQ Features",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you add Adhesion Gel/<some other custom gel\\> to BEE2.4?",
+                "description": "No. Adhesion Gel never functioned properly in any released version of Portal 2. It was replaced with Reflection Gel in the Peer Review update, keeping all the functional Adhesion Gel effects (this is why it can counteract Propulsion Gel). Gels are hardcoded into the game, so it's not possible to properly implement Adhesion Gel, or any other custom gel type. It is possible to re-create Adhesion Gel using tricks with rotating the map, but this can't reasonably work in the Puzzlemaker.\n\nMore recently, mods such as Desolation and Portal 2: Community Edition have obtained the source code from Valve and reimplemented Adhesion Gel properly. However, it's not possible to include this modified code in workshop maps, and these mods can't themselves include the Puzzlemaker for technical reasons.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you change the color of Reflection Gel to be different than Conversion Gel?",
+                "description": "Once again, no. Reflection Gel is hardcoded to use the color of Conversion Gel (`portal_paint_color`) when on a surface, and the color of Propulsion Gel (`speed_paint_color`) on light bridges and when splashed on the screen. We can separately change the color of the blobs though, which has been done, making them a dark gray.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you expand the palette/add <feature\\> to puzzlemaker?",
+                "description": "No. Most of the Puzzlemaker is hard-coded and outside our reach. While we can add new test elements and modify the compiler or in-game appearances, we cannot change how the editor itself behaves. This includes expanding the palette, adding custom labels to item settings (hence \"Button Type\", \"Start Reversed\", etc. on many items), creating new UIs, increasing connection limits, or merging non-compatible items.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you add custom voicelines / voicelines from mod *x* to BEE2.4?",
+                "description": "It's not possible to properly pack voice lines into maps; while we can pack the actual sounds easily, we can't pack the choreo files that are used for localization, subtitles, and chaining lines. Additionally, the developers of most mods (including Portal Stories: Mel) have said that they do not want people using their custom voice lines in maps.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you add the ability to colorize buttons, so that they can only be activated by a matching cube?",
+                "description": "This is possible, but it isn't going to be implemented because:\n\n- It would be somewhat complicated to get working properly and doesn't have much use.\n- Cube colors can be customized, so the mapper could choose two colors that were so close together that they were indistinguishable but didn't work together.\n- Some players may have colorblindness, again making the cubes hard to distinguish.\n\nThe purpose of the cube colorizer is to make it easier to tell which cubes came from which droppers, if one of them needs to be respawned as part of the puzzle. In this case it's fine if they can't be distinguished, since the player can just keep track of that themselves (as if the cubes were uncolored). Most good puzzles don't need more than 2 cubes, so just the default cube and sphere types usually work fine. Additional unique cube types (such as a triangle cube) have also been discussed.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you add the ability to colorize light strips?",
+                "description": "This is also possible; however, the refraction shader used by light strips isn't compatible with the property used to color other things (e.g. cubes). The app would need to generate individual textures for each selected color, then those would be applied in-game. For this reason, the feature isn't currently being worked on, but could possibly be added in the future.",
+                "color": 16761704
+              },
+              {
+                "title": "Can you add lights that are toggled by an input?",
+                "description": "The Source engine has very strict limits on toggleable lights. Only two dynamic lights can affect a single surface, and only 32 possible combinations of light states can exist across the entire map. This makes toggleable lights infeasible for a mod such as BEE2, as the majority of users are not going to be aware of these restrictions. Additionally, darkness is not meant to be used as a test element. It doesn't actually affect the puzzle in any way and is just annoying. So while this is technically possible to an extent, it's not going to be implemented either way.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": "https://discord.com/channels/293435914598744064/804814306897690715/804826669746880533"
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    },
+    {
+      "name": "BEEmod Information",
+      "messages": [
+        {
+          "data": {
+            "content": "Hello, and welcome to the BEEmod Discord server! This is the official server to chat about the BEEmod for Portal 2. Before you continue, please take a moment to read through the rules and information here.",
+            "embeds": [
+              {
+                "title": "--------------- RULES ----------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> :one: Act mature.",
+                    "value": "> Occasional jokes are fine, but there is a line. This is not a meme server. Don’t be excessively childish or try to trick people into something."
+                  },
+                  {
+                    "name": "> :two: Keep discussion in English.",
+                    "value": "> We cannot moderate other languages. If you're talking to someone in a different language, please take the discussion to DMs."
+                  },
+                  {
+                    "name": "> :three: Do not post any sort of NSFW content.",
+                    "value": "> This also includes things on your profile such as your avatar."
+                  },
+                  {
+                    "name": "> :four: Don't spam.",
+                    "value": "> This one should be obvious, but don't post messages rapidly or use a load of emojis/reactions. A good rule is more than 5 is a waste."
+                  },
+                  {
+                    "name": "> :five: Do not abuse mentions.",
+                    "value": "> Only ping the Central Core role when a user is breaking the rules. `@everyone` and `@here` are turned off, don't try to use them."
+                  },
+                  {
+                    "name": "> :six: Don't ask to ask a question.",
+                    "value": "> Just ask it, we're here to help."
+                  },
+                  {
+                    "name": "> :seven: Know what you're talking about when giving help",
+                    "value": "> For example: don't try to help people with Hammer unless you actually use hammer"
+                  },
+                  {
+                    "name": "> :eight: Please do not use this server for bug reports or feature requests.",
+                    "value": "> These should be posted on the Issues page of the correct GitHub repositories (More information below)."
+                  }
+                ]
+              },
+              {
+                "title": "--------------- INFO ----------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> GitHub Repositories (repos)",
+                    "value": "> BEEmod is split into two repositories. One for the app itself, and the other is for items and  in-editor / in-game content. Issues and suggestions related to the BEE2 application (executable) should go on BEE2.4, anything else on BEE2-items. If you have a question regarding BEE2.4, first check the FAQ, and if you can't find your answer there you can ask in one of the other channels."
+                  },
+                  {
+                    "name": "> Enrolling",
+                    "value": "> To receive the Test Subject role and gain access to all of the chat channels on this server, head to <#605131357533896864> and use the command `?enroll`. For security reasons, you will need to have a verified phone number on your Discord account in order to post here. If you still do not receive the role after using this command, it likely means Dyno was offline. Post a message in the channel and we will assign it manually."
+                  },
+                  {
+                    "name": "> Contributors",
+                    "value": "> The Contributor role is given to anybody who has contributed some sort of content to the BEE2.4. Typically this role will not be given for creating a separate tool/pack or BEE2.2 content, although this is not always the case."
+                  }
+                ]
+              },
+              {
+                "title": "--------------- LINKS ---------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> BEE2.4 App/Compiler Repository:",
+                    "value": "> https://github.com/BEEmod/BEE2.4\n> GitHub repository for the BEE2.4 application and compiler."
+                  },
+                  {
+                    "name": "> BEE2.4 Items Repository:",
+                    "value": "> https://github.com/BEEmod/BEE2-items\n> GitHub repository for items, styles, and all the other resources for BEE2.4."
+                  },
+                  {
+                    "name": "> BEEmod Organization Page:",
+                    "value": "> https://github.com/BEEmod\n> Additional BEE repositories such as BEE2.2 can be found here."
+                  },
+                  {
+                    "name": "> Contributing Guidelines:",
+                    "value": "> https://github.com/BEEmod/.github/blob/master/contributing.md\n> Rules and guidelines for GitHub issues. Please read this before posting an issue."
+                  },
+                  {
+                    "name": "> Permanent Invite:",
+                    "value": "> https://discord.gg/hnGFJrz\n> Use this link to share the server."
+                  },
+                  {
+                    "name": "> Gitter Archives:",
+                    "value": "> https://cdn.discordapp.com/attachments/300106564088627200/757068508902195261/BEE2_Gitter_Archives.zip\n> A ZIP containing exported copies of all the messages in the old BEEmod Gitter chats."
+                  }
+                ]
+              },
+              {
+                "title": "--------------- CHANNELS ---------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> INFORMATION",
+                    "value": "> <#293438670654930944>: You're here.\n> <#804814306897690715>: Frequently asked questions, check here before posting\n> <#293451173413912588>: New BEE2 releases will be announced here.\n> <#782084434207440906>: BEE Discord server news will be announced here.\n> <#293447504018669568>: Feed of actions on the repos. You should probably mute this.\n> <#605131357533896864>: Use this channel to get the Test Subject role."
+                  },
+                  {
+                    "name": "> BEEMOD 2.4",
+                    "value": "> <#293435914598744064>: General BEEmod discussion.\n> <#293443271731052544>: Discussion specifically about the application or compiler.\n> <#293443637214183424>: Discussion specifically about items.\n> <#293444021190131713>: Discussion about development of future releases."
+                  },
+                  {
+                    "name": "> USER CREATED PACKAGES",
+                    "value": "> <#721409165976666153>: Disclaimer about this unofficial extra content\n> <#605129795033890816>: Posts containing released content by other users\n> <#695590412089425941>: Discussion about user packages\n> <#721407139616260216>: Discussion about development of your own items\n> <#721407166992351273>: Discussion for problems with downloaded user packages"
+                  },
+                  {
+                    "name": "> OTHER",
+                    "value": "> <#315249214680465409>: Discussion and troubleshooting about Hammer maps.\n> <#307998594777219073>: Discussion not entirely related to BEEmod, or bot commands. Not for posting memes."
+                  },
+                  {
+                    "name": "> STREAMING",
+                    "value": "> <#687481192433319936>: Chat for users who don't have a mic\n> :loud_sound: stream: Stream your package development or other similar processes"
+                  }
+                ],
+                "footer": {
+                  "text": "Happy map-making!"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/772505563263139840/72eo2k8colfYB1m_w13Ide_WewSgW_AhHsd1AUWjhIO3J6toLiCsZvLyah8iU5W_-_qs"
+        }
+      ]
+    },
+    {
+      "name": "BEEmod FAQ Template",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Question",
+                "description": "Answer",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          }
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    },
+    {
+      "name": "BEEFAQ Des Industrial",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Will you add Desolation's Industrial style to BEE2.4?",
+                "description": "No. The Industrial style is fairly complex and would be difficult to implement in the Puzzlemaker, requiring lots of compiler modifications. It also relies on many custom assets which would need to be packed into maps, exceeding the Workshop file size limit very easily. Even if ways around both of these things were found, the style also makes use of custom features of Desolation's engine, which can't be replicated in standard Portal 2.\n\nImplementing the style within Desolation itself would solve the latter two issues, but Desolation won't be able to use Valve's puzzlemaker for technical reasons, and the developers currently have no plans to write their own. It also wouldn't solve the first problem, which is actually generating Industrial maps.\n\nAdditionally, see the question above about new styles in general.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          }
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    },
+    {
+      "name": "BEEFAQ Bottomless Pits",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "How do I use bottomless pits/what happened to 3D Factory?",
+                "description": "The bottomless pits originally featured in BEEmod had significant problems, so they've been removed for the time being. The plan is to implement a \"chamber exterior\" system which would allow generating areas surrounding the map, including improved bottomless pits. However, this feature is not yet being worked on.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": "https://discord.com/channels/293435914598744064/804814306897690715/875907911929462794"
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    },
+    {
+      "name": "BEEFAQ Exporting",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "I exported my BEEmod map to Hammer and it won't compile/music won't play/<some other issue>.",
+                "description": "`puzzlemaker_export` does not work with BEEmod, as the custom compiler isn't able to modify the map and make it actually functional. Before reading on however, keep in mind that exporting Puzzlemaker maps to Hammer is usually not the best idea. If you want to make extensive modifications to a map, or are just starting out learning Hammer, it's generally easier to build a map from scratch rather than trying to modify a Puzzlemaker map. Only consider exporting if you just want to make small adjustments to a map, and already have experience using Hammer.\n\nIf this is what you want to do, first set Spawn Point to Elevator and disable Restart When Reaching Exit in the BEE2 app. Compile your map in Puzzlemaker, then open `maps/styled/preview.vmf` in Hammer and resave it to a different location so it doesn't get overwritten. Additionally, check your Build Programs settings to make sure that you're using the BEE2 version of VRAD (simply called `vrad.exe`), as this is needed for some features such as music to work.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": "https://discord.com/api/webhooks/804814799292071936/h87ylHSiy6gBb3A-yfPOuuIf-JLL0QBumFt78Kgqk6broKpWJFXNQR0ywRTplHPhxHFo"
+        }
+      ]
+    }
+  ]
+}
