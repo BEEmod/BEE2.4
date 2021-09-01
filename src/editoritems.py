@@ -414,7 +414,7 @@ DEFAULT_SOUNDS = {
     Sound.CREATE: 'P2Editor.PlaceOther',
     Sound.DELETE: 'P2Editor.RemoveOther',
 }
-_BLANK_INST = [ InstCount(FSPath(), 0, 0, 0) ]
+_BLANK_INST = [InstCount(FSPath(), 0, 0, 0)]
 
 
 class ConnSide(Enum):
@@ -1037,12 +1037,13 @@ class Item:
                 # Rendercolor is on catapult targets, and is useless.
                 tok.expect(Token.STRING)
             else:
+                # These flag keyvalues can be handled the same way.
                 try:
-                    attr = self._BOOL_ATTRS[folded_key]
+                    conf_attr = self._BOOL_ATTRS[folded_key]
                 except KeyError:
                     raise tok.error('Unknown editor option {}', key)
                 else:
-                    setattr(self, attr, conv_bool(tok.expect(Token.STRING)))
+                    setattr(self, conf_attr, conv_bool(tok.expect(Token.STRING)))
 
     def _parse_properties_block(self, tok: Tokenizer) -> None:
         """Parse the properties block of the item definitions."""
@@ -1180,7 +1181,7 @@ class Item:
             try:
                 conn_type = ConnTypes(conn_name.upper())
             except ValueError:
-                # Our custom BEEmod options.
+                # Our custom BEEMOD options.
                 if conn_name.casefold() in ('bee', 'bee2'):
                     for key in tok.block(conn_name):
                         value = tok.expect(Token.STRING, skip_newline=False)
