@@ -4,7 +4,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Type, Callable, ClassVar, IO
+from typing import Type, Callable, ClassVar, Protocol, Any
 from pathlib import PurePosixPath as FSPath
 
 import attr
@@ -246,6 +246,12 @@ class ConnTypes(Enum):
     FIZZ = 'CONNECTION_HAZARD'  # Output from base.
 
 
+class _TextFile(Protocol):
+    """The functions we require in order to write text to a file."""
+    def write(self, __text: str) -> Any:
+        """We simply need a write() method, and ignore the return value."""
+
+
 @attr.define
 class Connection:
     """Activate/deactivate pair defined for connections."""
@@ -254,7 +260,7 @@ class Connection:
     deact_name: str | None
     deactivate: str | None  # Input/output used to deactivate.
 
-    def write(self, f: IO[str], conn_type: str) -> None:
+    def write(self, f: _TextFile, conn_type: str) -> None:
         """Produce the activate/deactivate keys."""
         if self.activate is None and self.deactivate is None:
             return
@@ -723,7 +729,7 @@ class SubType:
                 raise tok.error('Unknown subtype option "{}"!', key)
         return subtype
 
-    def export(self, f: IO[str]) -> None:
+    def export(self, f: _TextFile) -> None:
         """Write the subtype to a file."""
         f.write('\t\t"SubType"\n\t\t\t{\n')
         if self.name:
@@ -1469,7 +1475,7 @@ class Item:
         self.overlays.append(Overlay(material, center, size, rotation))
 
     @classmethod
-    def export(cls, f: IO[str], items: Iterable[Item], renderables: Mapping[RenderableType, Renderable]) -> None:
+    def export(cls, f: _TextFile, items: Iterable[Item], renderables: Mapping[RenderableType, Renderable]) -> None:
         """Write a full editoritems file out."""
         f.write('"ItemData"\n{\n')
         for item in items:
@@ -1487,7 +1493,7 @@ class Item:
             f.write('\t}\n')
         f.write('}\n')
 
-    def export_one(self, f: IO[str]) -> None:
+    def export_one(self, f: _TextFile) -> None:
         """Write a single item out to a file."""
         f.write('"Item"\n\t{\n')
         if self.cls is not ItemClass.UNCLASSED:
@@ -1652,7 +1658,7 @@ class Item:
         f.write('\t\t}\n')
         f.write('\t}\n')
 
-    def _export_occupied_voxels(self, f: IO[str]) -> None:
+    def _export_occupied_voxels(self, f: _TextFile) -> None:
         """Write occupied voxels to a file."""
         voxel_groups: dict[tuple[Coord, CollType, CollType | None], list[OccupiedVoxel]] = defaultdict(list)
         voxel: OccupiedVoxel
