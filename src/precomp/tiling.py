@@ -1877,6 +1877,9 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     norm = Vec(z=1) @ Angle.from_str(panel_ent['angles'])
     grid_pos -= 128*norm
 
+    # To match the editor model, flip around the orientation.
+    panel_ent['spawnflags'] = srctools.conv_int(panel_ent['spawnflags']) ^ 2
+
     TILES[grid_pos.as_tuple(), norm.as_tuple()] = tile = TileDef(
         grid_pos,
         norm,
