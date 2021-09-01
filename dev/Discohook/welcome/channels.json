@@ -1,0 +1,54 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Welcome - Channels",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "--------------- CHANNELS ---------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> INFORMATION",
+                    "value": "> <#293438670654930944>: You're here.\n> <#804814306897690715>: Frequently asked questions, check here before posting\n> <#293451173413912588>: New BEE2 releases will be announced here.\n> <#782084434207440906>: BEE Discord server news will be announced here.\n> <#293447504018669568>: Feed of actions on the repos. You should probably mute this.\n> <#605131357533896864>: Use this channel to get the Test Subject role."
+                  },
+                  {
+                    "name": "> BEEMOD 2.4",
+                    "value": "> <#293435914598744064>: General BEEmod discussion.\n> <#293443271731052544>: Discussion specifically about the application or compiler.\n> <#293443637214183424>: Discussion specifically about items.\n> <#293444021190131713>: Discussion about development of future releases."
+                  },
+                  {
+                    "name": "> USER CREATED PACKAGES",
+                    "value": "> <#721409165976666153>: Disclaimer about this unofficial extra content\n> <#605129795033890816>: Posts containing released content by other users\n> <#695590412089425941>: Discussion about user packages\n> <#721407139616260216>: Discussion about development of your own items\n> <#721407166992351273>: Discussion for problems with downloaded user packages"
+                  },
+                  {
+                    "name": "> OTHER",
+                    "value": "> <#315249214680465409>: Discussion and troubleshooting about Hammer maps.\n> <#307998594777219073>: Discussion not entirely related to BEEmod, or bot commands. Not for posting memes."
+                  },
+                  {
+                    "name": "> STREAMING",
+                    "value": "> <#687481192433319936>: Chat for users who don't have a mic\n> :loud_sound: stream: Stream your package development or other similar processes"
+                  }
+                ],
+                "footer": {
+                  "text": "Happy map-making!"
+                }
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

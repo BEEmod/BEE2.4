@@ -1,0 +1,24 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Desolation Industrial",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Will you add Desolation's Industrial style to BEE2.4?",
+                "description": "No. The Industrial style is fairly complex and would be difficult to implement in the Puzzlemaker, requiring lots of compiler modifications. It also relies on many custom assets which would need to be packed into maps, exceeding the Workshop file size limit very easily. Even if ways around both of these things were found, the style also makes use of custom features of Desolation's engine, which can't be replicated in standard Portal 2.\n\nImplementing the style within Desolation itself would solve the latter two issues, but Desolation won't be able to use Valve's puzzlemaker for technical reasons, and the developers currently have no plans to write their own. It also wouldn't solve the first problem, which is actually generating Industrial maps.\n\nAdditionally, see the question above about new styles in general.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          }
+        }
+      ]
+    }
+  ]
+}

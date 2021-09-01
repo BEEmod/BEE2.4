@@ -1,0 +1,30 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Colorized Buttons",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you add the ability to colorize buttons, so that they can only be activated by a matching cube?",
+                "description": "This is possible, but it isn't going to be implemented because:\n\n- It would be somewhat complicated to get working properly and doesn't have much use.\n- Cube colors can be customized, so the mapper could choose two colors that were so close together that they were indistinguishable but didn't work together.\n- Some players may have colorblindness, again making the cubes hard to distinguish.\n\nThe purpose of the cube colorizer is to make it easier to tell which cubes came from which droppers, if one of them needs to be respawned as part of the puzzle. In this case it's fine if they can't be distinguished, since the player can just keep track of that themselves (as if the cubes were uncolored). Most good puzzles don't need more than 2 cubes, so just the default cube and sphere types usually work fine. Additional unique cube types (such as a triangle cube) have also been discussed.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

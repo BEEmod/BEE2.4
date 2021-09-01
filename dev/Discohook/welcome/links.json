@@ -1,0 +1,55 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Welcome - Links",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "--------------- LINKS ---------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> BEE2.4 App/Compiler Repository:",
+                    "value": "> https://github.com/BEEmod/BEE2.4\n> GitHub repository for the BEE2.4 application and compiler."
+                  },
+                  {
+                    "name": "> BEE2.4 Items Repository:",
+                    "value": "> https://github.com/BEEmod/BEE2-items\n> GitHub repository for items, styles, and all the other resources for BEE2.4."
+                  },
+                  {
+                    "name": "> BEEmod Organization Page:",
+                    "value": "> https://github.com/BEEmod\n> Additional BEE repositories such as BEE2.2 can be found here."
+                  },
+                  {
+                    "name": "> Contributing Guidelines:",
+                    "value": "> https://github.com/BEEmod/.github/blob/master/contributing.md\n> Rules and guidelines for GitHub issues. Please read this before posting an issue."
+                  },
+                  {
+                    "name": "> Permanent Invite:",
+                    "value": "> https://discord.gg/hnGFJrz\n> Use this link to share the server."
+                  },
+                  {
+                    "name": "> Gitter Archives:",
+                    "value": "> https://cdn.discordapp.com/attachments/300106564088627200/757068508902195261/BEE2_Gitter_Archives.zip\n> A ZIP containing exported copies of all the messages in the old BEEmod Gitter chats."
+                  }
+                ]
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

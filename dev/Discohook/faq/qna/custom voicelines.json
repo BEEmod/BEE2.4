@@ -1,0 +1,30 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Custom Voicelines",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you add custom voicelines / voicelines from mod *x* to BEE2.4?",
+                "description": "It's not possible to properly pack voice lines into maps; while we can pack the actual sounds easily, we can't pack the choreo files that are used for localization, subtitles, and chaining lines. Additionally, the developers of most mods (including Portal Stories: Mel) have said that they do not want people using their custom voice lines in maps.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

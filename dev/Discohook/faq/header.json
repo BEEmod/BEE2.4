@@ -1,0 +1,24 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Header",
+      "messages": [
+        {
+          "data": {
+            "content": "This is a list of answers to questions that have been frequently asked by users. If you are having problems with BEE2.4 or want to ask about a feature, check here.",
+            "embeds": null,
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

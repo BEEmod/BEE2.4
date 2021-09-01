@@ -1,0 +1,43 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Welcome - Info",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "--------------- INFO ----------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> GitHub Repositories (repos)",
+                    "value": "> BEEmod is split into two repositories. One for the app itself, and the other is for items and  in-editor / in-game content. Issues and suggestions related to the BEE2 application (executable) should go on BEE2.4, anything else on BEE2-items. If you have a question regarding BEE2.4, first check the FAQ, and if you can't find your answer there you can ask in one of the other channels."
+                  },
+                  {
+                    "name": "> Enrolling",
+                    "value": "> To receive the Test Subject role and gain access to all of the chat channels on this server, head to <#605131357533896864> and use the command `?enroll`. For security reasons, you will need to have a verified phone number on your Discord account in order to post here. If you still do not receive the role after using this command, it likely means Dyno was offline. Post a message in the channel and we will assign it manually."
+                  },
+                  {
+                    "name": "> Contributors",
+                    "value": "> The Contributor role is given to anybody who has contributed some sort of content to the BEE2.4. Typically this role will not be given for creating a separate tool/pack or BEE2.2 content, although this is not always the case."
+                  }
+                ]
+              }
+            ],
+            "username": "BLoBDOS",
+            "avatar_url": "https://cdn.discordapp.com/avatars/772505563263139840/a9c0169aba6d1a74b9a16d50430b70fb.webp"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}
