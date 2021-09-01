@@ -130,8 +130,17 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     id_to_item: dict[str, editoritems.Item] = {}
     item: editoritems.Item
     with open('bee2/editor.bin', 'rb') as inst:
-        for item in pickle.load(inst):
-            id_to_item[item.id.casefold()] = item
+        try:
+            for item in pickle.load(inst):
+                id_to_item[item.id.casefold()] = item
+        except Exception:  # Anything from __setstate__ etc.
+            LOGGER.exception(
+                'Failed to parse editoritems dump. Recompile the compiler '
+                'and/or export the palette.'
+                if utils.DEV_MODE else
+                'Failed to parse editoritems dump. Re-export BEE2.'
+            )
+            sys.exit(1)
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
