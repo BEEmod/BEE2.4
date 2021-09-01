@@ -20,17 +20,13 @@ The most common answer to this question would be "verify the game files". Howeve
 
 To uninstall the BEE2 app itself, perform the above steps, then simply delete the application folder.
 
-### BEE2 immediately crashes on startup with an error about `basemodui.txt`. How do I fix it?
-
-Valve broke the syntax of this file in a Portal 2 update, causing BEEmod to be unable to properly read the file and crash. On Windows, this has been fixed in [v4.36.0](https://github.com/BEEmod/BEE2.4/releases/tag/2.4.36.1_) and later, so just updating will solve the problem. If you are using BEE2 on Mac, or need to keep using an old version of the mod for some reason, you'll want to open up `Portal 2/portal2_dlc2/resource/basemodui_english.txt` (regardless of your language) and add an extra `}` on a new line at the end of the file.
-
 ### Do people playing my BEEmod maps need BEEmod installed to see the custom content, or play the map at all?
 
 No. This was the case with the High Energy Pellet items in the original BEEmod, but the BEE2 packs all custom content into the map automatically. (It's supposed to, at least. If something doesn't get packed, it's a bug; report it on the issue tracker if it hasn't already been.)
 
 ### What games does BEE2.4 support?
 
-BEE2.4 supports Portal 2 and Aperture Tag. Thinking With Time Machine support is planned, but not yet implemented. (BEE2.4 can be used with TWTM, but you will not have the time machine and several other things will be broken.) Destroyed Aperture support will also be added sometime after its release.
+BEE2.4 supports Portal 2 and Aperture Tag. Thinking With Time Machine support is planned, but not yet implemented. (BEE2.4 can be used with TWTM, but you will not have the time machine and several other things will be broken.) Destroyed Aperture support is also planned once that mod is released.
 
 ### What about Portal 2: Community Edition? Will BEE2.4 be compatible with that, will it make any new things possible?
 
@@ -46,35 +42,37 @@ There are no set release dates for BEE2 updates. Sometimes they will be released
 
 ### How do I use Catwalks/Vactubes/Unstationary Scaffolds?
 
-These items effectively act as "nodes", and need to be linked together to do anything. See the items' wiki pages for more details: [Vactubes](https://github.com/BEEmod/BEE2-items/wiki/Vactubes), [Catwalks](https://github.com/BEEmod/BEE2-items/wiki/Catwalks), and [Unstationary Scaffold](https://github.com/BEEmod/BEE2-items/wiki/Unstationary-Scaffold)
+These items effectively act as nodes, which need to be connected to each other in order to do anything. The exact way in which this works is different for each item, see their wiki pages for more details: [Vactubes](https://github.com/BEEmod/BEE2-items/wiki/Vactubes), [Catwalks](https://github.com/BEEmod/BEE2-items/wiki/Catwalks), and [Unstationary Scaffolds](https://github.com/BEEmod/BEE2-items/wiki/Unstationary-Scaffold)
 
 ### In the Bomb Cube's description it says it can destroy breakable glass, but the Breakable Glass item isn't in the BEE2.4. Where is it?
 
-Breakable Glass hasn't been reimplemented yet, it is planned though which is why it's mentioned in the Bomb Cube description.
+Breakable Glass hasn't been reimplemented yet, but it is planned, which is why it's mentioned in the Bomb Cube description.
 
 ### When I change the angle of Portal 1 panels it makes a high-pitched/corrupted noise, how do I fix it?
 
 This is a known issue which seems to be related to audio caching, as the audio files themselves sound correct. One fix that seems to work is running the commands `snd_updateaudiocache` and `sv_soundemitter_flush` in the console, in that order. There's no way currently to make the mod apply this automatically, which is why the issue hasn't properly been fixed.
 
-### Can you add BEE2.2/tspenAddons items to BEE2.4?
+### Old versions of BEE2 had a lot more items, what happened to them and are they coming back?
 
-This is in progress. See issue [#95](https://github.com/BEEmod/BEE2-items/issues/95).
+BEE2.4 is a complete rewrite of the app with a different internal item format, so all of the old items need to be manually ported. This is in progress, see issue [#95](https://github.com/BEEmod/BEE2-items/issues/95) for more details.
 
-### When will the new style *x* be released?
+### Can you add new style *x*?
 
-Styles take a lot of work to create and maintain. A list of planned styles can be found on the [Upcoming Features](https://github.com/BEEmod/BEE2-items/wiki/Upcoming-features) page, though these have no set release dates.
+Styles take a lot of work to create and maintain, so new ones are rarely added. For a new style to even be considered, it should make sense overall, work with most/all of Portal 2's test elements, and be possible to reasonably implement in the Puzzlemaker.
 
-### What happened to the signage list that appeared when right-clicking it, how do I know what timer value corresponds to what sign?
+As an example, Portal 1 is a style that fits this criteria, as most of Portal 2's test elements can reasonably exist there and it has a block-based structure similar to Clean. On the other hand, BTS style typically doesn't use test elements like buttons and cubes, and it's very difficult to make it look good in the Puzzlemaker, hence why it was removed; had this been considered back in 2015, the style never would have been added to begin with.
 
-It's now possible to customize the available signages. In the Style/Item Properties window, go to the Items tab and choose Customize Signage. This shows a list of every signage with its timer value, and allows you to customize them.
+If your suggested style is a simple variant of an existing style (e.g. Original Clean, which just changes wall textures), it may be added. Custom packages can also add their own styles, so feel free to implement a new style yourself.
 
 ### Why doesn't Portal 1 GLaDOS have any lines?
 
-The P1 GLaDOS lines aren't in Portal 2 by default, and as stated below, it's not possible to pack voice lines into maps. The plan is to use existing lines that are similar to the P1 dialogue, but this hasn't been implemented yet.
+The P1 GLaDOS lines aren't in Portal 2 by default, and as stated below, it's not possible to pack voice lines into maps. In the next release, existing lines which are similar to the P1 dialogue will be used.
 
 ### Can you add Adhesion Gel/<some other custom gel\> to BEE2.4?
 
-No. Adhesion Gel never functioned properly in any released version of Portal 2. It was replaced with Reflection Gel in the Peer Review update, keeping all the functional Adhesion Gel effects (this is why it is "slightly sticky"). Gels are hard-coded into the game, so it's not possible to properly implement Adhesion Gel, or any other custom gel type. It is possible to [re-create Adhesion Gel](https://steamcommunity.com/sharedfiles/filedetails/?id=860192232) using various entities and scripts, but this involves tricks with rotating the map and can't be implemented in the Puzzlemaker.
+No. Adhesion Gel never functioned properly in any released version of Portal 2. It was replaced with Reflection Gel in the Peer Review update, keeping all the functional Adhesion Gel effects (this is why it can counteract Propulsion Gel). Gels are hardcoded into the game, so it's not possible to properly implement Adhesion Gel, or any other custom gel type. It is possible to re-create Adhesion Gel using tricks with rotating the map, but this can't reasonably work in the Puzzlemaker.
+
+More recently, mods such as Desolation and Portal 2: Community Edition have obtained the source code from Valve and reimplemented Adhesion Gel properly. However, it's not possible to include this modified code in workshop maps, and these mods can't themselves include the Puzzlemaker for technical reasons.
 
 ### Can you change the color of Reflection Gel to be different than Conversion Gel?
 
@@ -96,7 +94,7 @@ This is possible, but it isn't going to be implemented because:
 - Cube colors can be customized, so the mapper could choose two colors that were so close together that they were indistinguishable but didn't work together.
 - Some players may have colorblindness, again making the cubes hard to distinguish.
 
-The purpose of the cube colorizer is to make it easier to tell which cubes came from which droppers, if one of them needs to be respawned as part of the puzzle. In this case it's fine if they can't be distinguished, since the player can just keep track of that themselves (as if the cubes were uncolored).
+The purpose of the cube colorizer is to make it easier to tell which cubes came from which droppers, if one of them needs to be respawned as part of the puzzle. In this case it's fine if they can't be distinguished, since the player can just keep track of that themselves (as if the cubes were uncolored). Most good puzzles don't need more than 2 cubes, so just the default cube and sphere types usually work fine. Additional unique cube types (such as a triangle cube) have also been discussed.
 
 ### Can you add the ability to colorize light strips?
 
@@ -108,10 +106,10 @@ The Source engine has very strict limits on toggleable lights. Only two dynamic 
 
 ### I exported my BEE2.4 map to Hammer and it won't compile/music won't play/<some other issue\>.
 
-`puzzlemaker_export` does not work with BEE2.4, as the custom compiler is not able to modify the map and make it actually able to compile. To use BEE2 maps in Hammer, set Spawn Point to Elevator and disable Restart When Reaching Exit. Compile your map in Puzzlemaker, then open `maps/styled/preview.vmf` in Hammer and resave it under a different filename so it doesn't get overwritten. This method still has issues, however, and it's generally better to recreate the map from scratch in Hammer even if you're not using BEE2.
+`puzzlemaker_export` does not work with BEEmod, as the custom compiler isn't able to modify the map and make it actually functional. Before reading on however, keep in mind that exporting Puzzlemaker maps to Hammer is usually not the best idea. If you want to make extensive modifications to a map, or are just starting out learning Hammer, it's generally easier to build a map from scratch, as Puzzlemaker maps are generated in a complex way making them difficult to edit by hand. Only consider exporting if you just want to make small adjustments to a map, and already have experience using Hammer.
 
-If you just want to make a few small edits, another option is to put those things into instances, then import them into BEE as custom items. This allows you to place them directly into your Puzzlemaker map, instead of having to modify it. The process of creating custom items won't be fully described here, but you can read up on the [package format](https://github.com/BEEmod/BEE2-items/wiki/Package-Format) and the [custom item tutorial](https://github.com/BEEmod/BEE2-items/wiki/itemstutorial) to get started. If you need help with anything, feel free to ask for help in #ucp-development on the Discord server.
+If this is still what you want to do, first set Spawn Point to Elevator and disable Restart When Reaching Exit in the BEE2 app. Compile your map in Puzzlemaker, then open `maps/styled/preview.vmf` in Hammer and resave it to a different location so it doesn't get overwritten. Additionally, check your Build Programs settings to make sure that you're using the BEE2 version of VRAD (simply called `vrad.exe`), as this is needed for some features such as music to work.
 
 ### Why is BTS being removed?
 
-The BTS style was made back before BEE2.4, our direction has changed long since then. The style doesn't work in PeTI and it has become increasingly difficult to develop it. We've decided that its best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it. For now this is where we part ways with the BTS style.
+The BTS style was made back before BEE2.4, and our direction has long since changed. The style doesn't work in the Puzzlemaker and it has become increasingly difficult to maintain and develop. As such, we've decided that it's best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it, but it would likely take on a different form, and nothing regarding this is being worked on right now.
