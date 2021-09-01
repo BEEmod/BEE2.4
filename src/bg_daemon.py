@@ -144,8 +144,11 @@ class BaseLoadScreen:
 
     def op_set_length(self, stage: str, num: int) -> None:
         """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.update_stage(stage)
+        if num == 0:
+            self.op_skip_stage(stage)
+        else:
+            self.maxes[stage] = num
+            self.update_stage(stage)
 
     def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
@@ -473,14 +476,18 @@ class SplashScreen(BaseLoadScreen):
                 )
 
     def update_stage(self, stage):
-        text = '{}: ({}/{})'.format(
-            self.names[stage],
-            self.values[stage],
-            self.maxes[stage],
-        )
+        if self.maxes[stage] == 0:
+            text = f'{self.names[stage]}: (0/0)'
+            self.set_bar(stage, 1)
+        else:
+            text = (
+                f'{self.names[stage]}: '
+                f'({self.values[stage]}/{self.maxes[stage]})'
+            )
+            self.set_bar(stage, self.values[stage] / self.maxes[stage])
+
         self.sml_canvas.itemconfig('text_' + stage, text=text)
         self.lrg_canvas.itemconfig('text_' + stage, text=text)
-        self.set_bar(stage, self.values[stage] / self.maxes[stage])
 
     def set_bar(self, stage, fraction):
         """Set a progress bar to this fractional length."""
@@ -504,7 +511,7 @@ class SplashScreen(BaseLoadScreen):
             canvas.delete('tick_' + stage)
 
             if num == 0:
-                return  # No ticks
+                continue  # No ticks
 
             # Draw the ticks in...
             _, y1, _, y2 = canvas.coords('bar_' + stage)
@@ -790,6 +797,6 @@ def run_background(
         # If we didn't find anything in the pipe, wait longer.
         # Otherwise we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
-    
+
     TK_ROOT.after(10, check_queue)
     TK_ROOT.mainloop()  # Infinite loop, until the entire process tree quits.
