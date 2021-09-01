@@ -360,7 +360,6 @@ def parse_antlines(vmf: VMF) -> tuple[
         origin = Vec.from_str(over['basisorigin'])
         normal = Vec.from_str(over['basisnormal'])
         orient = Matrix.from_angle(Angle.from_str(over['angles']))
-        u, v = Vec.INV_AXIS[normal.axis()]
 
         if mat == mat_corner:
             seg_type = SegType.CORNER
@@ -368,10 +367,10 @@ def parse_antlines(vmf: VMF) -> tuple[
 
             # One on each side - we know the size.
             points = [
-                origin + Vec.with_axes(u, +8),
-                origin + Vec.with_axes(u, -8),
-                origin + Vec.with_axes(v, +8),
-                origin + Vec.with_axes(v, -8),
+                origin + orient.left(-8.0),
+                origin + orient.left(+8.0),
+                origin + orient.forward(-8.0),
+                origin + orient.forward(+8.0),
             ]
         elif mat == mat_straight:
             seg_type = SegType.STRAIGHT
@@ -467,15 +466,15 @@ def fix_single_straight(
     """Figure out the correct rotation for 1-long straight antlines."""
     # Check the U and V axis, to see if there's another antline on both
     # sides. If there is that's the correct orientation.
-    axis_u, axis_v = Vec.INV_AXIS[seg.normal.axis()]
+    orient = Matrix.from_angle(seg.normal.to_angle())
 
     center = seg.start.copy()
 
     for off in [
-        Vec.with_axes(axis_u, -8),
-        Vec.with_axes(axis_u, +8),
-        Vec.with_axes(axis_v, -8),
-        Vec.with_axes(axis_v, +8),
+        orient.left(-8.0),
+        orient.left(+8.0),
+        orient.up(-8.0),
+        orient.up(+8.0),
     ]:
         pos = center + off
         try:

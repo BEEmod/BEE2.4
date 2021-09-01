@@ -530,6 +530,9 @@ def res_rotate_inst(inst: Entity, res: Property) -> None:
     be rotated `angle` degrees around it.
     Otherwise, `angle` is a pitch-yaw-roll angle which is applied.
     `around` can be a point (local, pre-rotation) which is used as the origin.
+
+    Tip: If you want to match angled panels, rotate with an axis of `0 -1 0`
+    and an around value of `0 -64 -64`.
     """
     angles = Angle.from_str(inst['angles'])
     if 'axis' in res:

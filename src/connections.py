@@ -2,11 +2,11 @@
 
 This controls how I/O is generated for each item.
 """
+from __future__ import annotations
 import sys
 from enum import Enum
 from typing import Dict, Optional, Tuple, Iterable, List
 
-import consts
 from srctools import Output, Vec, Property
 
 
@@ -392,6 +392,7 @@ class Config:
             self.disable_cmd,
             self.default_dual,
             self.sec_invert_var,
+            self.sec_spawn_fire,
             self.sec_enable_cmd,
             self.sec_disable_cmd,
             self.output_type,
