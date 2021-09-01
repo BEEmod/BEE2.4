@@ -7,7 +7,6 @@ from srctools import Vec, Entity, Property, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, conditions
-from precomp.conditions import make_result, set_random_seed, RES_EXHAUSTED, GLOBAL_INSTANCES
 
 
 COND_MOD_NAME = 'Instance Generation'
@@ -15,7 +14,7 @@ COND_MOD_NAME = 'Instance Generation'
 LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
-@make_result('addGlobal')
+@conditions.make_result('addGlobal')
 def res_add_global_inst(vmf: VMF, res: Property):
     """Add one instance in a specific location.
 
@@ -36,7 +35,7 @@ def res_add_global_inst(vmf: VMF, res: Property):
     if not res.has_children():
         res = Property('AddGlobal', [Property('File', res.value)])
 
-    if res.bool('allow_multiple') or res['file'] not in GLOBAL_INSTANCES:
+    if res.bool('allow_multiple') or res['file'] not in conditions.GLOBAL_INSTANCES:
         # By default we will skip adding the instance
         # if was already added - this is helpful for
         # items that add to original items, or to avoid
@@ -52,14 +51,14 @@ def res_add_global_inst(vmf: VMF, res: Property):
             new_inst['origin'] = res['position']
         except IndexError:
             new_inst['origin'] = options.get(Vec, 'global_ents_loc')
-        GLOBAL_INSTANCES.add(res['file'])
+        conditions.GLOBAL_INSTANCES.add(res['file'])
         if new_inst['targetname'] == '':
             new_inst['targetname'] = "inst_"
             new_inst.make_unique()
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@make_result('addOverlay', 'overlayinst')
+@conditions.make_result('addOverlay', 'overlayinst')
 def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Entity]:
     """Add another instance on top of this one.
 
@@ -136,7 +135,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
     return overlay_inst
 
 
-@make_result('addShuffleGroup')
+@conditions.make_result('addShuffleGroup')
 def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
     """Pick from a pool of instances to randomise decoration.
 
@@ -153,28 +152,52 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
           should be at least as many pool values as there are conditions.
         - Seed: Value to modify the seed with before placing.
     """
-    flag_groups = [
-        (prop.real_name, list(prop))
-        for prop in res.find_children('conditions')
-        if prop.real_name is not None
+    conf_variable = res['var']
+    conf_seed = 'sg' + res['seed', '']
+    conf_pools: dict[str, list[str]] = {}
+    for prop in res.find_children('pool'):
+        if prop.has_children():
+            raise ValueError('Instances in pool cannot be a property block!')
+        conf_pools.setdefault(prop.name, []).append(prop.value)
+
+    # (flag, value, pools)
+    conf_selectors: list[tuple[list[Property], str, frozenset[str]]] = []
+    for prop in res.find_all('selector'):
+        conf_value = prop['value', '']
+        conf_flags = list(prop.find_children('conditions'))
+        try:
+            picked_pools = prop['pools'].casefold().split()
+        except LookupError:
+            picked_pools = frozenset(conf_pools)
+        else:
+            for pool_name in picked_pools:
+                if pool_name not in conf_pools:
+                    raise ValueError(f'Unknown pool name {pool_name}!')
+        conf_selectors.append((conf_flags, conf_value, frozenset(picked_pools)))
+
+    all_pools = [
+        (name, inst)
+        for name, instances in conf_pools.items()
+        for inst in instances
     ]
-    variable = res['var']
-    seed = 'sg' + res['seed', '']
-    instances = res.find_key('pool').as_array()
-    if len(instances) < len(flag_groups):
-        raise ValueError("Shuffle group can't have more conditions than instances.")
+    all_pools.sort()  # Ensure consistent order.
 
     def add_group(inst: Entity) -> None:
         """Place the group."""
-        conditions.set_random_seed(inst, seed)
-        pool = instances.copy()
-        random.shuffle(pool)
-
-        for (value, flags), filename in zip(flag_groups, pool):
+        conditions.set_random_seed(inst, conf_seed)
+        pools = all_pools.copy()
+        for (flags, value, potential_pools) in conf_selectors:
             for flag in flags:
                 if not conditions.check_flag(vmf, flag, inst):
                     break
             else:  # Succeeded.
+                allowed_inst = [
+                    (name, inst)
+                    for (name, inst) in pools
+                    if name in potential_pools
+                ]
+                name, filename = random.choice(allowed_inst)
+                pools.remove((name, filename))
                 vmf.create_ent(
                     'func_instance',
                     targetname=inst['targetname'],
@@ -182,11 +205,11 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
                     angles=inst['angles'],
                     origin=inst['origin'],
                     fixup_style='0',
-                ).fixup[variable] = value
+                ).fixup[conf_variable] = value
     return add_group
 
 
-@make_result('addCavePortrait')
+@conditions.make_result('addCavePortrait')
 def res_cave_portrait(vmf: VMF, inst: Entity, res: Property) -> None:
     """A variant of AddOverlay for adding Cave Portraits.
 
