@@ -453,7 +453,7 @@ class ConnSide(Enum):
         raise error_func('Unknown connection side ({}, {}, 0)', x, y)
 
 
-@attr.define
+@attr.frozen
 class AntlinePoint:
     """Locations antlines can connect to."""
     pos: Coord
@@ -462,7 +462,7 @@ class AntlinePoint:
     group: int | None
 
 
-@attr.define
+@attr.frozen
 class OccupiedVoxel:
     """Represents the collision information for an item.
 
