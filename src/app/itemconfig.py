@@ -325,9 +325,14 @@ def make_pane(parent: ttk.Frame):
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
 
+                try:
+                    widget = wid.create_func(wid_frame, wid.values, wid.config)
+                except Exception:
+                    LOGGER.exception('Could not construct widget {}.{}', config.id, wid.id)
+                    continue
+
                 label = ttk.Label(wid_frame, text=wid.name + ': ')
                 label.grid(row=0, column=0)
-                widget = wid.create_func(wid_frame, wid.values, wid.config)
                 widget.grid(row=0, column=1, sticky='e')
 
                 if wid.tooltip:
