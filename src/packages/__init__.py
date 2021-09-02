@@ -702,7 +702,7 @@ class Package:
     @property
     def enabled(self) -> bool:
         """Should this package be loaded?"""
-        if self.id == CLEAN_PACKAGE:
+        if self.id.casefold() == CLEAN_PACKAGE:
             # The clean style package is special!
             # It must be present.
             return True
@@ -712,7 +712,7 @@ class Package:
     @enabled.setter
     def enabled(self, value: bool) -> None:
         """Enable or disable the package."""
-        if self.id == CLEAN_PACKAGE:
+        if self.id.casefold() == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
