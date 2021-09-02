@@ -701,6 +701,25 @@ def start_loading() -> None:
     TK_ROOT.tk.call(_ui_task_cmd)
 
 
+def refresh_all() -> None:
+    """Force all images to reload."""
+    LOGGER.info('Forcing all images to reload!')
+    for handle in list(_handles.values()):
+        with handle.lock:
+            # If force-loaded it's builtin UI etc we shouldn't reload.
+            # If already loading, no point.
+            if not handle._force_loaded and not handle._loading:
+                handle._cached_tk = handle._cached_pil = None
+                _queue_load.put(handle)
+                loading =  Handle.ico_loading(handle.width, handle.height).get_tk()
+                for label_ref in handle._users:
+                    if isinstance(label_ref, WeakRef):
+                        label: Optional[tkImgWidgets] = label_ref()
+                        if label is not None:
+                            label['image'] = loading
+    LOGGER.info('Queued {} images to reload.', _queue_load.qsize())
+
+
 # noinspection PyProtectedMember
 def apply(widget: tkImgWidgetsT, img: Optional[Handle]) -> tkImgWidgetsT:
     """Set the image in a widget.

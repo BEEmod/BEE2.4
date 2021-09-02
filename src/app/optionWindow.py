@@ -15,7 +15,7 @@ from app.tooltip import add_tooltip
 import utils
 import srctools.logger
 from app import (
-    contextWin, gameMan, tk_tools, sound, logWindow, TK_ROOT,
+    contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT,
     PLAY_SOUND, KEEP_WIN_INSIDE, FORCE_LOAD_ONTOP, SHOW_LOG_WIN,
     LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE,
 )
@@ -399,7 +399,7 @@ def init_win_tab(f: ttk.Frame) -> None:
 
 
 def init_dev_tab(f: ttk.Frame) -> None:
-    f.columnconfigure(1, weight=1)
+    f.columnconfigure(0, weight=1)
     f.columnconfigure(2, weight=1)
 
     make_checkbox(
@@ -409,7 +409,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         desc=gettext('Log missing entity counts'),
         tooltip=gettext('When loading items, log items with missing entity counts '
                   'in their properties.txt file.'),
-    ).grid(row=0, column=0, sticky=W)
+    ).grid(row=0, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -418,7 +418,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         desc=gettext("Log when item doesn't have a style"),
         tooltip=gettext('Log items have no applicable version for a particular style.'
                   'This usually means it will look very bad.'),
-    ).grid(row=1, column=0, sticky=W)
+    ).grid(row=1, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -428,7 +428,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         tooltip=gettext('Log when an item reuses a variant from a parent style '
                   '(1970s using 1950s items, for example). This is usually '
                   'fine, but may need to be fixed.'),
-    ).grid(row=2, column=0, sticky=W)
+    ).grid(row=2, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -438,7 +438,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         tooltip=gettext('Log when the resources a "PackList" refers to are not '
                   'present in the zip. This may be fine (in a prerequisite zip),'
                   ' but it often indicates an error.'),
-    ).grid(row=3, column=0, sticky=W)
+    ).grid(row=3, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -448,7 +448,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         desc=gettext("Development Mode"),
         tooltip=gettext('Enables displaying additional UI specific for '
                   'development purposes. Requires restart to have an effect.'),
-    ).grid(row=0, column=1, sticky=W)
+    ).grid(row=0, column=2, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -461,7 +461,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
                   "Only enable if you're"
                   ' developing new content, to ensure it is not '
                   'overwritten.'),
-    ).grid(row=1, column=1, sticky=W)
+    ).grid(row=1, column=2, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -470,7 +470,7 @@ def init_dev_tab(f: ttk.Frame) -> None:
         desc=gettext('Show Log Window'),
         var=SHOW_LOG_WIN,
         tooltip=gettext('Show the log file in real-time.'),
-    ).grid(row=2, column=1, sticky=W)
+    ).grid(row=2, column=2, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
@@ -480,10 +480,10 @@ def init_dev_tab(f: ttk.Frame) -> None:
         tooltip=gettext('Make all props_map_editor models available for use. '
                   'Portal 2 has a limit of 1024 models loaded in memory at '
                   'once, so we need to disable unused ones to free this up.'),
-    ).grid(row=3, column=1, sticky='w')
+    ).grid(row=3, column=2, columnspan=2, sticky='w')
 
     ttk.Separator(orient='horizontal').grid(
-        row=9, column=0, columnspan=2, sticky='ew'
+        row=9, column=0, columnspan=3, sticky='ew'
     )
 
     ttk.Button(
@@ -497,6 +497,15 @@ def init_dev_tab(f: ttk.Frame) -> None:
         text=gettext('Dump Items list'),
         command=report_items,
     ).grid(row=10, column=1)
+    reload_img = ttk.Button(
+        f,
+        text=gettext('Reload Images'),
+        command=img.refresh_all,
+    )
+    add_tooltip(reload_img, gettext(
+        'Reload all images in the app. Expect the app to freeze momentarily.'
+    ))
+    reload_img.grid(row=10, column=2)
 
 # Various "reports" that can be produced.
 
