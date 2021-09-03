@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-07-02 15:17+1000\n"
+"POT-Creation-Date: 2021-09-03 17:57+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -69,7 +69,7 @@ msgstr ""
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
-#: utils.py
+#: localisation.py
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
@@ -405,6 +405,7 @@ msgid ""
 "enabled, colored frames will be added to distinguish them."
 msgstr ""
 
+#. i18n: StyleVar default value.
 #: app/StyleVarPane.py
 msgid "Default: On"
 msgstr ""
@@ -413,10 +414,12 @@ msgstr ""
 msgid "Default: Off"
 msgstr ""
 
+#. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
 msgid "Styles: Unstyled"
 msgstr ""
 
+#. i18n: StyleVar which matches all styles.
 #: app/StyleVarPane.py
 msgid "Styles: All"
 msgstr ""
@@ -1127,6 +1130,14 @@ msgstr ""
 msgid "No Properties available!"
 msgstr ""
 
+#: app/itemPropWin.py
+msgid "Settings for \"{}\""
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "BEE2 - {}"
+msgstr ""
+
 #: app/item_search.py
 msgid "Search:"
 msgstr ""
@@ -1454,6 +1465,14 @@ msgstr ""
 msgid "Dump Items list"
 msgstr ""
 
+#: app/optionWindow.py
+msgid "Reload Images"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgstr ""
+
 #: app/packageMan.py
 msgid "BEE2 - Restart Required!"
 msgstr ""
@@ -1490,6 +1509,10 @@ msgstr ""
 
 #: app/richTextBox.py
 msgid "Open \"{}\" in the default browser?"
+msgstr ""
+
+#: app/selector_win.py
+msgid "{} Preview"
 msgstr ""
 
 #. i18n: 'None' item description
