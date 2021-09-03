@@ -1375,8 +1375,14 @@ class SelectorWin:
             self.save()
             return
 
+        cur_group_name = self.selected.group.casefold()
+        cur_group = self.grouped_items[cur_group_name]
+        # Force the current group to be visible, so you can see what's
+        # happening.
+        self.group_widgets[cur_group_name].visible = True
+
         # A list of groups names, in the order that they're visible onscreen
-        # (skipping hidden ones).
+        # (skipping hidden ones). Force-include
         ordered_groups = [
             group_name
             for group_name in self.group_order
@@ -1400,9 +1406,6 @@ class SelectorWin:
                 item_ind=0,
             )
             return
-
-        cur_group_name = self.selected.group.casefold()
-        cur_group = self.grouped_items[cur_group_name]
 
         # The index in the current group for an item
         item_ind = cur_group.index(self.selected)
