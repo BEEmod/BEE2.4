@@ -1,0 +1,41 @@
+name: Generic Feature Request
+description: Suggest an idea for the mod
+title: "Suggestion: <Title>"
+labels: [Enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If this is your first time opening an issue here, please read the [contributing guidelines](https://github.com/BEEmod/.github/blob/c865feea6f7f4bd9a65e8aaecac9c7731db9628f/contributing.md).
+
+        Remember:
+        - Do not open an issue if you are not using the latest BEEmod application and packages.
+        - Make sure you're in the right place. Item and style related issues should go in the [BEE2-items repo](https://github.com/BEEmod/BEE2-items/).
+        - Perform a search to make sure this issue hasn't already been reported.
+        - Do not use the issue tracker to ask questions.
+        - Issues should not be combined, unless they are very closely related (e.g. two bugs with a specific item in a specific case).
+        - Make absolutely sure the issue is not UCP (User Created Packages) related
+  - type: textarea
+    attributes:
+      label: Description of the feature
+      description: Provide a clear and concise description of what you want to happen.
+      placeholder: |
+        X should be improved in Y way.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Why should this be implemented
+      description: Explain what problems this feature would solve, or otherwise why it should be implemented.
+      placeholder: |
+        I think doing this would improve Y.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional information
+      description: Provide any additional information that might be helpful.
+      placeholder: |
+        Here are some screenshots demonstrating my improvement.
+    validations:
+      required: false

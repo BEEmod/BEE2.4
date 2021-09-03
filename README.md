@@ -52,11 +52,10 @@ Pillow might need to be installed via the system package manager with the TK com
 Finally, switch to the BEE2.4 repo and build the compiler, then the application:
 
 	cd BEE2.4/src/
-	pyinstaller --distpath ../dist/BEE2/ --workpath ../build_tmp compiler.spec
+	pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp compiler.spec
 	pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp BEE2.spec
 	
-The built application is found in `BEE2.4/dist/BEE2/`.
-Copy `BEE2.4/dist/64/compiler/` into this folder as well.
+The built application is found in `BEE2.4/dist/64bit/BEE2/`.
 To generate the packages zips, either manually zip the contents of each folder or 
 use the `compile_packages` script in BEE2-items. 
 This does the same thing, but additionally removes some unnessary content 
