@@ -8,7 +8,7 @@ import random
 import math
 
 from srctools import Property
-from app import music_conf, TK_ROOT
+from app import music_conf, TK_ROOT, WX_APP
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
@@ -445,6 +445,7 @@ def quit_application() -> None:
     # Destroy the TK windows, finalise logging, then quit.
     logging.shutdown()
     TK_ROOT.quit()
+    WX_APP.ExitMainLoop()
     sys.exit(0)
 
 gameMan.quit_application = quit_application
