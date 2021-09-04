@@ -33,15 +33,15 @@ import utils
 # These are both valid TK image types.
 tkImage = Union[ImageTk.PhotoImage, tk.PhotoImage]
 # Widgets with an image attribute that can be set.
-tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
-tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button)
+ImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button, wx.StaticBitmap]
+ImgWidgetsT = TypeVar('ImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button, wx.StaticBitmap)
 
 ArgT = TypeVar('ArgT')
 
 # Used to keep track of the used handles, so we can deduplicate them.
 _handles: dict[tuple, Handle] = {}
 # Matches widgets to the handle they use.
-_wid_tk: dict[WeakRef[tkImgWidgets], Handle] = {}
+_wid_tk: dict[WeakRef[ImgWidgets], Handle] = {}
 # Records handles with a loaded image, but no labels using it.
 # These will be cleaned up after some time passes.
 _pending_cleanup: dict[int, tuple[Handle, float]] = {}
@@ -57,8 +57,25 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 PETI_ITEM_BG = (229, 232, 233)
 PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
+# Queues to pass tasks between threads correctly.
+# Handles first pass to load, where the background thread loads the PIL data.
 _queue_load: Queue[Handle] = Queue()
+# Then it's put into a UI queue for their background task to set widgets.
 _queue_ui: Queue[Handle] = Queue()
+
+
+class LoadState(Flag):
+    """The loading state of the handle."""
+    IDLE = 0  # Not needing to load.
+    LOAD = 1  # Wants to be loaded.
+    WANTS_TK = 2  # Needs TK to be loaded.
+    WANTS_WX = 4  # Wants WX to be loaded.
+    FORCED = 8  # get_XX was called, never unload.
+
+    WANTS_BOTH = WANTS_TK | WANTS_WX
+    LOAD_TK = LOAD | WANTS_TK
+    LOAD_WX = LOAD | WANTS_WX
+    LOAD_BOTH = LOAD | WANTS_TK | WANTS_WX
 
 
 def _load_special(path: str) -> Image.Image:
@@ -351,10 +368,8 @@ class Handle(Generic[ArgT]):
         self._cached_wx = None
         self._force_loaded = False
         self._users: set[Union[WeakRef[ImgWidgets], Handle]] = set()
-        # If None, get_tk()/get_pil()/get_wx() was used.
-        # If true, this is in the queue to load. Setting this requires
-        # the loading lock.
-        self._loading = False
+        # The current state - the lock should be held to change!
+        self._state = LoadState.IDLE
         self.lock = threading.Lock()
 
     @classmethod
@@ -558,7 +573,7 @@ class Handle(Generic[ArgT]):
         with self.lock:
             if self.type.allow_raw:
                 # Force load, so it's always ready.
-                self._force_loaded = True
+                self._state &= LoadState.FORCED
             elif not self._users:
                 # Loading something unused, schedule it to be cleaned.
                 _pending_cleanup[id(self)] = (self, time.monotonic())
@@ -572,7 +587,7 @@ class Handle(Generic[ArgT]):
         """
         if not self.type.allow_raw:
             raise ValueError('Cannot use get_tk() on non-builtin types!')
-        self._force_loaded = True
+        self._state &= LoadState.FORCED
         return self._load_tk()
 
     def get_wx(self) -> Bitmap:
@@ -583,7 +598,7 @@ class Handle(Generic[ArgT]):
         """
         if not self.type.allow_raw:
             raise ValueError('Cannot use get_wx() on non-builtin types!')
-        self._force_loaded = True
+        self._state &= LoadState.FORCED
         return self._load_wx()
 
     def _load_pil(self) -> Image.Image:
@@ -608,20 +623,20 @@ class Handle(Generic[ArgT]):
 
     def _load_wx(self) -> Bitmap:
         """Internal method to synchronously load the WX image."""
-        if self._cached_tk is None:
+        if self._cached_wx is None:
             if self.type.wx_func is None:
                 res = self._load_pil()
                 # Except for builtin types (icons), strip alpha.
                 if not self.type.alpha_result:
                     res = res.convert('RGB')
-                self._cached_wx = Bitmap.FromBuffer(res.width, res.height, res.getdata())
+                self._cached_wx = Bitmap.FromBuffer(res.width, res.height, res.tobytes("raw", "RGB"))
             else:
                 self._cached_wx = self.type.wx_func(self.arg, self.width, self.height)
         return self._cached_wx
 
     def _decref(self, ref: 'Union[WeakRef[tkImgWidgets], Handle]') -> None:
         """A label was no longer set to this handle."""
-        if self._force_loaded or (
+        if LoadState.FORCED in self._state or (
             self._cached_tk is None and
             self._cached_wx is None and
             self._cached_pil is None
@@ -636,7 +651,7 @@ class Handle(Generic[ArgT]):
 
     def _incref(self, ref: 'Union[WeakRef[tkImgWidgets], Handle]') -> None:
         """Add a label to the list of those controlled by us."""
-        if self._force_loaded:
+        if LoadState.FORCED in self._state:
             return
         self._users.add(ref)
         _pending_cleanup.pop(id(self), None)
@@ -650,13 +665,13 @@ class Handle(Generic[ArgT]):
         If this can be done synchronously, the result is returned.
         Otherwise, this returns the loading icon.
         """
-        if self._loading is True:
+        if LoadState.WANTS_TK in self._state:
             return Handle.ico_loading(self.width, self.height).get_tk()
         with self.lock:
             if self._cached_tk is not None:
                 return self._cached_tk
-            if self._loading is False:
-                self._loading = True
+            if LoadState.WANTS_TK not in self._state:
+                self._state &= LoadState.LOAD_TK
                 _queue_load.put(self)
         return Handle.ico_loading(self.width, self.height).get_tk()
 
@@ -666,18 +681,18 @@ class Handle(Generic[ArgT]):
         If this can be done synchronously, the result is returned.
         Otherwise, this returns the loading icon.
         """
-        if self._loading is True:
+        if LoadState.WANTS_WX in self._state:
             return Handle.ico_loading(self.width, self.height).get_wx()
         with self.lock:
             if self._cached_wx is not None:
                 return self._cached_wx
-            if self._loading is False:
-                self._loading = True
+            if LoadState.WANTS_WX not in self._state:
+                self._state &= LoadState.LOAD_WX
                 _queue_load.put(self)
         return Handle.ico_loading(self.width, self.height).get_wx()
 
 
-def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
+def _label_destroyed(ref: WeakRef[ImgWidgets]) -> None:
     """Finaliser for _wid_tk keys.
 
     Removes them from the dict, and decreases the usage count on the handle.
@@ -695,12 +710,21 @@ def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
 # noinspection PyProtectedMember
 def _background_task() -> None:
     """Background task doing the actual loading."""
+    load_unset = ~LoadState.LOAD
     while True:
         handle = _queue_load.get()
         with handle.lock:
-            if handle._loading is True:
+            if LoadState.LOAD in handle._state:
                 handle._load_pil()
-                handle._loading = False
+                handle._state &= load_unset
+                for widget_ref in handle._users:
+                    if not isinstance(widget_ref, WeakRef):
+                        continue
+                    wid = widget_ref()
+                    if isinstance(wid, wx.StaticBitmap):
+                        handle._state |= LoadState.WANTS_WX
+                    elif wid is not None:
+                        handle._state |= LoadState.WANTS_TK
         _queue_ui.put(handle)
 
 
@@ -731,13 +755,16 @@ def _ui_task() -> None:
             handle = _queue_ui.get_nowait()
         except EmptyQueue:
             break
-        tk_ico = handle._load_tk()
-        for label_ref in handle._users:
-            if isinstance(label_ref, WeakRef):
-                label: Optional[tkImgWidgets] = label_ref()
-                if label is not None:
+        with handle.lock:
+            handle._state &= ~LoadState.WANTS_BOTH
+        for widget_ref in handle._users:
+            if isinstance(widget_ref, WeakRef):
+                widget: Optional[ImgWidgets] = widget_ref()
+                if isinstance(widget, wx.StaticBitmap):
+                    widget.SetBitmap(handle._load_wx())
+                elif widget is not None:
                     try:
-                        label['image'] = tk_ico
+                        widget['image'] = handle._load_tk()
                     except tk.TclError:
                         # Can occur if the image has been removed/destroyed, but
                         # the Python object still exists. Ignore, should be
@@ -746,9 +773,9 @@ def _ui_task() -> None:
 
     for handle, use_time in list(_pending_cleanup.values()):
         with handle.lock:
-            if use_time < timeout - 5.0 and handle._loading is not None and not handle._users:
+            if use_time < timeout - 5.0 and  handle._state is LoadState.IDLE and not handle._users:
                 del _pending_cleanup[id(handle)]
-                handle._cached_tk = handle._cached_pil = None
+                handle._cached_tk = handle._cached_wx = handle._cached_pil = None
     TK_ROOT.tk.call(_ui_task_cmd)
 
 # Cache the registered ID, so we don't have to re-register.
@@ -763,6 +790,7 @@ def start_loading() -> None:
     TK_ROOT.tk.call(_ui_task_cmd)
 
 
+# noinspection PyProtectedMember
 def refresh_all() -> None:
     """Force all images to reload."""
     LOGGER.info('Forcing all images to reload!')
@@ -770,20 +798,23 @@ def refresh_all() -> None:
         with handle.lock:
             # If force-loaded it's builtin UI etc we shouldn't reload.
             # If already loading, no point.
-            if not handle._force_loaded and not handle._loading:
+            if LoadState.FORCED not in handle._state and LoadState.LOAD not in handle._state:
                 handle._cached_tk = handle._cached_wx = handle._cached_pil = None
                 _queue_load.put(handle)
-                loading =  Handle.ico_loading(handle.width, handle.height).get_tk()
-                for label_ref in handle._users:
-                    if isinstance(label_ref, WeakRef):
-                        label: Optional[tkImgWidgets] = label_ref()
-                        if label is not None:
-                            label['image'] = loading
+                load_tk = Handle.ico_loading(handle.width, handle.height).get_tk()
+                load_wx = Handle.ico_loading(handle.width, handle.height).get_wx()
+                for widget_ref in handle._users:
+                    if isinstance(widget_ref, WeakRef):
+                        widget: Optional[ImgWidgets] = widget_ref()
+                        if isinstance(widget, wx.StaticBitmap):
+                            widget.SetBitmap(load_wx)
+                        elif widget is not None:
+                            widget['image'] = load_tk
     LOGGER.info('Queued {} images to reload.', _queue_load.qsize())
 
 
 # noinspection PyProtectedMember
-def apply(widget: tkImgWidgetsT, img: Optional[Handle]) -> tkImgWidgetsT:
+def apply(widget: ImgWidgetsT, img: Optional[Handle]) -> ImgWidgetsT:
     """Set the image in a widget.
 
     This tracks the widget, so later reloads will affect the widget.
@@ -807,11 +838,18 @@ def apply(widget: tkImgWidgetsT, img: Optional[Handle]) -> tkImgWidgetsT:
         old._decref(ref)
     img._incref(ref)
     _wid_tk[ref] = img
-    cached_img = img._cached_tk
-    if cached_img is not None:
-        widget['image'] = cached_img
-    else:  # Need to load.
-        widget['image'] = img._request_load()
+    if isinstance(widget, wx.StaticBitmap):  # WX.
+        cached_wx = img._cached_wx
+        if cached_wx is not None:
+            widget.SetBitmap(cached_wx)
+        else:  # Need to load.
+            widget.SetBitmap(img._request_load_wx())
+    else:
+        cached_tk = img._cached_tk
+        if cached_tk is not None:
+            widget['image'] = cached_tk
+        else:  # Need to load.
+            widget['image'] = img._request_load_tk()
     return widget
 
 

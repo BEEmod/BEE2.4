@@ -6,7 +6,7 @@ from tkinter.messagebox import askokcancel
 from typing import Union, Tuple, Dict, Callable
 import webbrowser
 
-from app import tkMarkdown
+from app import tkMarkdown, img
 from app.tk_tools import Cursors
 import utils
 import srctools.logger
@@ -166,7 +166,7 @@ class tkRichText(tkinter.Text):
             elif isinstance(block, tkMarkdown.Image):
                 super().insert('end', '\n')
                 # TODO: Setup apply to handle this?
-                block.handle._force_loaded = True
+                block.handle._state &= img.LoadState.FORCED
                 self.image_create('end', image=block.handle._load_tk())
                 super().insert('end', '\n')
             else:
