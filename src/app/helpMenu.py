@@ -8,9 +8,7 @@ import wx.html
 import webbrowser
 import functools
 
-
-from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, WX_APP
+from app import tkMarkdown, sound, img
 from localisation import gettext
 import utils
 
@@ -451,7 +449,6 @@ class AboutDialog(wx.Dialog):
         self.SetSizer(self.sizer)
 
         self.SetEscapeId(self.close_btn.GetId())
-
 
     def show_dialog(self) -> None:
         global CREDITS_TEXT
