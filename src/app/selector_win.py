@@ -1124,14 +1124,16 @@ class SelectorWin:
             if item.button is not None:
                 img.apply(item.button, None)
 
-        SAVED_STATE[self.save_id] = WindowState(
-            open_groups={
-                grp_id: grp.visible
-                for grp_id, grp in self.group_widgets.items()
-            },
-            width=self.win.winfo_width(),
-            height=self.win.winfo_height(),
-        )
+        if not self.first_open:  # We've got state to store.
+            SAVED_STATE[self.save_id] = state = WindowState(
+                open_groups={
+                    grp_id: grp.visible
+                    for grp_id, grp in self.group_widgets.items()
+                },
+                width=self.win.winfo_width(),
+                height=self.win.winfo_height(),
+            )
+            LOGGER.debug('Storing window state "{}" = {}', self.save_id, state)
 
         if self.modal:
             self.win.grab_release()
@@ -1194,6 +1196,10 @@ class SelectorWin:
             except KeyError:
                 pass
             else:
+                LOGGER.debug(
+                    'Restoring saved selectorwin state "{}" = {}',
+                    self.save_id, state,
+                )
                 for grp_id, is_open in state.open_groups.items():
                     try:
                         self.group_widgets[grp_id].visible = is_open
@@ -1208,7 +1214,7 @@ class SelectorWin:
                     self.win.geometry(f'{width}x{height}')
 
         self.win.deiconify()
-        self.win.lift(self.parent)
+        self.win.lift()
 
         if self.modal:
             self.win.grab_set()
