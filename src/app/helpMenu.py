@@ -431,7 +431,7 @@ class AboutDialog(wx.Dialog):
             None,
             title=gettext('BEE2 Credits'),
             name='about',
-            style=wx.DEFAULT_DIALOG_STYLE | wx.MAXIMIZE_BOX | wx.RESIZE_BORDER | wx.VSCROLL,
+            style=wx.DEFAULT_DIALOG_STYLE | wx.MAXIMIZE_BOX | wx.RESIZE_BORDER,
         )
         self.Hide()
 
@@ -440,7 +440,7 @@ class AboutDialog(wx.Dialog):
         sizer_btns = wx.BoxSizer(wx.HORIZONTAL)
         self.sizer.Add(sizer_btns, 1, wx.ALL | wx.EXPAND, 2)
 
-        self.textbox = wx.html.HtmlWindow(self, wx.ID_ANY)
+        self.textbox = wx.html.HtmlWindow(self, wx.ID_ANY, style=wx.VSCROLL)
         sizer_btns.Add(self.textbox, 1, wx.EXPAND, 0)
 
         self.close_btn = wx.Button(self, wx.ID_CLOSE, "")
