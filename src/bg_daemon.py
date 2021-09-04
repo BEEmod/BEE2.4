@@ -4,11 +4,16 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
+# Setup so logging feeds to stdout -> original process
+import srctools.logger
+srctools.logger.init_logging(None)
+
+import logging
 import os
 import sys
 from typing import Optional, Dict, Tuple, List, Iterator, Union
 
-import wx
+import wx.richtext
 import multiprocessing.connection
 
 import utils
@@ -87,11 +92,14 @@ def get_splash_image(
 
 # Colours to use for each log level
 LVL_COLOURS = {
-    logging.CRITICAL: 'white',
-    logging.ERROR: 'red',
-    logging.WARNING: '#FF7D00',  # 255, 125, 0
-    logging.INFO: '#0050FF',
-    logging.DEBUG: 'grey',
+    logging.CRITICAL: wx.TextAttr(
+        colText=(255, 255, 255),
+        colBack=(255, 32, 32),
+    ),  # White on red
+    logging.ERROR: wx.TextAttr((255, 32, 32)),  # Red
+    logging.WARNING: wx.TextAttr((255, 125, 0)),  # Portal Orange
+    logging.INFO: wx.TextAttr((0, 80, 255)),  # Portal Blue
+    logging.DEBUG: wx.TextAttr((80, 80, 80)),  # Grey
 }
 
 BOX_LEVELS = [
@@ -241,7 +249,7 @@ class BaseLoadScreen:
 
     def op_destroy(self) -> None:
         """Remove this screen."""
-        self.win.Show(False)
+        self.op_hide()
         self.win.Destroy()
         del SCREENS[self.scr_id]
 
@@ -657,7 +665,7 @@ class SplashScreen(BaseLoadScreen):
                 self.cancel()
                 return
 
-        self.move_start(event)
+        self.move_stop(event)
 
     # def compact_button(self, compact: bool, old_width, new_width):
     #     """Make the event function to set values."""
@@ -679,7 +687,130 @@ class SplashScreen(BaseLoadScreen):
     #     return func
 
 
-def run_screen(
+class LogWindow:
+    """Display UI containing the logs."""
+    def __init__(self, translations: dict, pipe: multiprocessing.connection.Connection) -> None:
+        self.pipe = pipe
+        self.has_text = False
+
+        self.win = win = wx.Frame(None, wx.ID_ANY)
+        win.SetSize((638, 300))
+        win.SetTitle(translations['log_title'])
+        win.Hide()
+
+        self.wrapper = wx.Panel(win, wx.ID_ANY, style=wx.BORDER_NONE)
+        self.wrapper.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+        self.wrapper.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+
+        sizer_vert = wx.BoxSizer(wx.VERTICAL)
+
+        self.log_display = wx.richtext.RichTextCtrl(
+            self.wrapper, wx.ID_ANY,
+            style=wx.TE_MULTILINE | wx.TE_READONLY,
+        )
+        self.log_display.SetFont(wx.Font(
+            wx.FontInfo(10).FaceName("Courier New").Family(wx.FONTFAMILY_MODERN)
+        ))
+        # Indent multiline messages under the first line.
+        sizer_vert.Add(self.log_display, 1, wx.EXPAND, 0)
+
+        sizer_toolbar = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_vert.Add(sizer_toolbar, 0, wx.EXPAND, 0)
+
+        self.btn_clear = wx.Button(self.wrapper, wx.ID_CLEAR, "")
+        sizer_toolbar.Add(self.btn_clear, 0, 0, 0)
+
+        self.btn_copy = wx.Button(self.wrapper, wx.ID_COPY, "")
+        sizer_toolbar.Add(self.btn_copy, 0, 0, 0)
+
+        lbl_show = wx.StaticText(self.wrapper, wx.ID_ANY, translations['log_show'], style=wx.ALIGN_RIGHT)
+        lbl_show.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWTEXT))
+        sizer_toolbar.Add(lbl_show, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
+
+        self.filter_combo = wx.ComboBox(
+            self.wrapper,
+            wx.ID_ANY,
+            style=wx.CB_DROPDOWN | wx.TE_READONLY,
+            choices=translations['level_text'],
+        )
+        sizer_toolbar.Add(self.filter_combo, 0, 0, 0)
+        self.wrapper.SetSizer(sizer_vert)
+        win.Layout()
+
+        self.filter_combo.Bind(wx.EVT_COMBOBOX, self._event_set_level)
+        self.btn_clear.Bind(wx.EVT_BUTTON, self._event_clear)
+        self.btn_copy.Bind(wx.EVT_BUTTON, self._event_copy)
+
+    def log(self, levelno: int, text: str) -> None:
+        """Add a logging message."""
+        if self.has_text:
+            # Start with a newline so it doesn't end with one.
+            self.log_display.MoveEnd()
+            self.log_display.Newline()
+
+        self.log_display.BeginLeftIndent(
+            leftIndent=0,
+            leftSubIndent=30,
+        )
+        # This has to be done inside BeginLeftIndent.
+        try:
+            self.log_display.SetDefaultStyle(LVL_COLOURS[levelno])
+        except KeyError:
+            pass
+        # Convert line breaks inside the message to a soft line break, which
+        # gets indented.
+        self.log_display.MoveEnd()
+        self.log_display.WriteText(
+            text.replace('\n', wx.richtext.RichTextLineBreakChar)
+        )
+        self.log_display.EndLeftIndent()
+
+        # Scroll to the end
+        self.log_display.ShowPosition(self.log_display.GetLastPosition())
+
+        self.log_display.Update()
+        self.has_text = True
+
+    def _event_copy(self, event: wx.CommandEvent) -> None:
+        """Copy the selected text, or the whole console."""
+        text = self.log_display.GetStringSelection()
+        if not text:
+            text = self.log_display.GetValue()
+        clip: wx.Clipboard = wx.Clipboard.Get()
+        clip.SetData(wx.TextDataObject(text))
+
+    def _event_clear(self, event: wx.CommandEvent) -> None:
+        """Clear the console."""
+        self.log_display.Clear()
+        self.has_text = False
+
+    def _event_set_level(self, event: wx.CommandEvent) -> None:
+        """Set the level of log messages we display."""
+        level = BOX_LEVELS[event.GetSelection()]
+        self.pipe.send(('level', level))
+
+    def _evt_close(self) -> None:
+        """Called when the window close button is pressed."""
+        self.pipe.send(('visible', False))
+        self.win.Hide()
+
+    def handle(self, msg: tuple) -> None:
+        """Handle messages from the main app."""
+        operation, parm1, parm2 = msg
+        if operation == 'log':
+            self.log(parm1, parm2)
+        elif operation == 'visible':
+            self.win.Show(parm1)
+        elif operation == 'level':
+            try:
+                self.filter_combo.SetSelection(BOX_LEVELS.index(parm1))
+            except ValueError:
+                pass
+        else:
+            raise ValueError(f'Bad command {operation!r}({parm1!r}, {parm2!r})!')
+
+
+def run_background(
     pipe_send: multiprocessing.connection.Connection,
     pipe_rec: multiprocessing.connection.Connection,
     log_pipe_send: multiprocessing.connection.Connection,
@@ -696,14 +827,17 @@ def run_screen(
     TRANSLATION.update(translations)
 
     force_ontop = True
+
     app = wx.App()
+    import wx_log
+    wx_log.apply()
+
+    log_window = LogWindow(translations, log_pipe_send)
 
     def check_queue(event: wx.IdleEvent) -> None:
         """Update stages from the parent process."""
         nonlocal force_ontop
-        had_values = False
         while PIPE_REC.poll():  # Pop off all the values.
-            had_values = True
             operation, scr_id, args = PIPE_REC.recv()
             # logger.info('<{}>.{}{!r}', scr_id, operation, args)
             if operation == 'init':
@@ -729,6 +863,8 @@ def run_screen(
                     func(*args)
                 except Exception:
                     raise Exception(operation)
+        while log_pipe_rec.poll():
+            log_window.handle(log_pipe_rec.recv())
         # Ensure another idle event will be fired.
         event.RequestMore()
 

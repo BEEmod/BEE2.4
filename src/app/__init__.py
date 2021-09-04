@@ -1,7 +1,6 @@
 """The package containg all UI code."""
 import tkinter as tk
 import wx
-import logging
 from types import TracebackType
 from typing import Type
 import utils
@@ -124,44 +123,8 @@ def on_error(
         # Ignore failures...
         pass
 
-
-# Convert WX log levels to stdlib equivalents.
-levels_wx_to_stdlib = {
-    wx.LOG_Debug: logging.DEBUG,
-    wx.LOG_Error: logging.ERROR,
-    wx.LOG_FatalError: logging.FATAL,
-    wx.LOG_Info: logging.INFO,
-    wx.LOG_Max: logging.DEBUG,
-    wx.LOG_Message: logging.INFO,
-    wx.LOG_Progress: logging.DEBUG,
-    wx.LOG_Status: logging.INFO,
-    wx.LOG_Trace: logging.DEBUG,
-    wx.LOG_User: logging.DEBUG,
-    wx.LOG_Warning: logging.WARNING,
-}
-
-
-class WXLogTarg(wx.Log):
-    """Handle WX logging, and redirect it to Python's log system."""
-    def __init__(self) -> None:
-        super().__init__()
-        self.logger: logging.Logger = logging.getLogger('wxWidgets')
-
-    def DoLogRecord(self, level: int, msg: str, info: wx.LogRecordInfo) -> None:
-        """Pass the WX log system into the Python system."""
-        # Filename and function name are bytes, ew.
-        self.logger.handle(self.logger.makeRecord(
-            'wxWidgets',
-            levels_wx_to_stdlib.get(level, logging.INFO),
-            info.filename.decode('utf8', 'ignore'),
-            info.line,
-            msg,
-            (),  # It's already been formatted so no args are needed.
-            None,  # Exception info, not compatible.
-            info.func.decode('utf8', 'ignore'),
-        ))
-
-wx.Log.SetActiveTarget(WXLogTarg())
+import wx_log
+wx_log.apply()
 
 # Various configuration booleans.
 PLAY_SOUND = tk.BooleanVar(value=True, name='OPT_play_sounds')
@@ -171,5 +134,3 @@ SHOW_LOG_WIN = tk.BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
 PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
 DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
-
-

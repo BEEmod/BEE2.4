@@ -8,7 +8,6 @@ The id() of the main-process object is used to identify loadscreens.
 from types import TracebackType
 from tkinter import commondialog
 from weakref import WeakSet
-from abc import abstractmethod
 import contextlib
 import multiprocessing
 
@@ -208,9 +207,6 @@ BG_PROC = multiprocessing.Process(
         {
             'skip': gettext('Skipped!'),
             'version': gettext('Version: ') + utils.BEE_VERSION,
-            'cancel': gettext('Cancel'),
-            'clear': gettext('Clear'),
-            'copy': gettext('Copy'),
             'log_show': gettext('Show:'),
             'log_title': gettext('Logs - {}').format(utils.BEE_VERSION),
             'level_text': [
