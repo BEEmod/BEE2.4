@@ -1,6 +1,6 @@
 """Various constant values (Mainly texture names.)"""
-from collections.abc import MutableMapping, Iterator
-from typing import cast, Any, TypeVar, Type
+from __future__ import annotations
+from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
 from enum import Enum, EnumMeta
 from srctools import Side
 
