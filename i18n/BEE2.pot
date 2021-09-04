@@ -4,14 +4,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-01-14 14:25+1000\n"
+"POT-Creation-Date: 2021-09-03 17:57+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.6.0\n"
+"Generated-By: Babel 2.9.0\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -25,16 +25,40 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: app/tagsPane.py loadScreen.py
+#: app/UI.py loadScreen.py
+msgid "Clear"
+msgstr ""
+
+#: loadScreen.py
+msgid "Copy"
+msgstr ""
+
+#: loadScreen.py
+msgid "Show:"
+msgstr ""
+
+#: loadScreen.py
+msgid "Logs - {}"
+msgstr ""
+
+#: loadScreen.py
+msgid "Debug messages"
+msgstr ""
+
+#: loadScreen.py
+msgid "Default"
+msgstr ""
+
+#: loadScreen.py
+msgid "Warnings Only"
+msgstr ""
+
+#: loadScreen.py
 msgid "Packages"
 msgstr ""
 
 #: loadScreen.py
 msgid "Loading Objects"
-msgstr ""
-
-#: loadScreen.py
-msgid "Loading Images"
 msgstr ""
 
 #: loadScreen.py
@@ -45,7 +69,7 @@ msgstr ""
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
-#: utils.py
+#: localisation.py
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
@@ -69,6 +93,7 @@ msgstr ""
 msgid "Bendy"
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
@@ -76,6 +101,7 @@ msgid ""
 "shapes."
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
@@ -87,6 +113,7 @@ msgid ""
 "entities at runtime."
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
@@ -271,6 +298,20 @@ msgid "Corridor:"
 msgstr ""
 
 #: app/CompilerPane.py
+msgid "Singleplayer Entry Corridor"
+msgstr ""
+
+#. i18n: corridor selector window title.
+#: app/CompilerPane.py
+msgid "Singleplayer Exit Corridor"
+msgstr ""
+
+#. i18n: corridor selector window title.
+#: app/CompilerPane.py
+msgid "Coop Exit Corridor"
+msgstr ""
+
+#: app/CompilerPane.py
 msgid "SP Entry:"
 msgstr ""
 
@@ -279,7 +320,7 @@ msgid "SP Exit:"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Coop:"
+msgid "Coop Exit:"
 msgstr ""
 
 #: app/CompilerPane.py
@@ -364,6 +405,7 @@ msgid ""
 "enabled, colored frames will be added to distinguish them."
 msgstr ""
 
+#. i18n: StyleVar default value.
 #: app/StyleVarPane.py
 msgid "Default: On"
 msgstr ""
@@ -372,10 +414,12 @@ msgstr ""
 msgid "Default: Off"
 msgstr ""
 
+#. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
 msgid "Styles: Unstyled"
 msgstr ""
 
+#. i18n: StyleVar which matches all styles.
 #: app/StyleVarPane.py
 msgid "Styles: All"
 msgstr ""
@@ -641,10 +685,6 @@ msgstr ""
 
 #: app/UI.py
 msgid "Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "Clear"
 msgstr ""
 
 #: app/UI.py
@@ -1013,6 +1053,7 @@ msgstr ""
 msgid "Original Items..."
 msgstr ""
 
+#. i18n: The chat program.
 #: app/helpMenu.py
 msgid "Discord Server..."
 msgstr ""
@@ -1037,10 +1078,12 @@ msgstr ""
 msgid "Submit Item Bugs..."
 msgstr ""
 
+#. i18n: Original Palette
 #: app/helpMenu.py app/paletteLoader.py
 msgid "Portal 2"
 msgstr ""
 
+#. i18n: Aperture Tag's palette
 #: app/helpMenu.py app/paletteLoader.py
 msgid "Aperture Tag"
 msgstr ""
@@ -1087,32 +1130,20 @@ msgstr ""
 msgid "No Properties available!"
 msgstr ""
 
+#: app/itemPropWin.py
+msgid "Settings for \"{}\""
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "BEE2 - {}"
+msgstr ""
+
+#: app/item_search.py
+msgid "Search:"
+msgstr ""
+
 #: app/itemconfig.py
 msgid "Choose a Color"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Debug messages"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Default"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Warnings Only"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Logs - {}"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Copy"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Show:"
 msgstr ""
 
 #: app/music_conf.py
@@ -1390,7 +1421,9 @@ msgid "Development Mode"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Enables displaying additional UI specific for development purposes."
+msgid ""
+"Enables displaying additional UI specific for development purposes. "
+"Requires restart to have an effect."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1432,6 +1465,14 @@ msgstr ""
 msgid "Dump Items list"
 msgstr ""
 
+#: app/optionWindow.py
+msgid "Reload Images"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgstr ""
+
 #: app/packageMan.py
 msgid "BEE2 - Restart Required!"
 msgstr ""
@@ -1446,18 +1487,22 @@ msgstr ""
 msgid "BEE2 - Manage Packages"
 msgstr ""
 
+#. i18n: Last exported items
 #: app/paletteLoader.py
 msgid "<Last Export>"
 msgstr ""
 
+#. i18n: Empty palette name
 #: app/paletteLoader.py
 msgid "Blank"
 msgstr ""
 
+#. i18n: BEEmod 1 palette.
 #: app/paletteLoader.py
 msgid "BEEMod"
 msgstr ""
 
+#. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
 msgstr ""
@@ -1467,9 +1512,15 @@ msgid "Open \"{}\" in the default browser?"
 msgstr ""
 
 #: app/selector_win.py
+msgid "{} Preview"
+msgstr ""
+
+#. i18n: 'None' item description
+#: app/selector_win.py
 msgid "Do not add anything."
 msgstr ""
 
+#. i18n: 'None' item name.
 #: app/selector_win.py
 msgid "<None>"
 msgstr ""
@@ -1496,6 +1547,7 @@ msgid_plural "Authors: {}"
 msgstr[0] ""
 msgstr[1] ""
 
+#. i18n: Tooltip for colour swatch.
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr ""
@@ -1510,26 +1562,6 @@ msgstr ""
 
 #: app/signage_ui.py
 msgid "Signage: {}"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Tags"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Authors"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Any"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "All"
-msgstr ""
-
-#: app/tagsPane.py
-msgid "Available Tags (click):"
 msgstr ""
 
 #: app/voiceEditor.py

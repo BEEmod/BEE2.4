@@ -40,7 +40,7 @@ MATMOD_OFFSETS = [
     Vec(0,  16, -32),
     Vec(0, -16, -64),
     Vec(0,   0,  32),
-] * 4  # Just in case there happens to be more textures.
+]
 
 
 class TexGroup(Enum):
@@ -200,7 +200,7 @@ class FizzlerType:
         """Read in a fizzler from a config."""
         fizz_id = conf['id']
         item_ids = [
-            prop.value.casefold()
+            prop.value.upper()
             for prop in
             conf.find_all('item_id')
         ]
@@ -944,9 +944,9 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         for item_id in fizz_type.item_ids:
             if ':' in item_id:
                 item_id, barrier_type = item_id.split(':')
-                if barrier_type == 'laserfield':
+                if barrier_type == 'LASERFIELD':
                     barrier_skin = 2
-                elif barrier_type == 'fizzler':
+                elif barrier_type == 'FIZZLER':
                     barrier_skin = 0
                 else:
                     LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id)
@@ -983,7 +983,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
             continue
 
         origin = Vec.from_str(inst['origin'])
-        normal = Vec(z=1).rotate_by_str(inst['angles'])
+        normal = Vec(z=1) @ Angle.from_str(inst['angles'])
         fizz_pos[origin.as_tuple(), normal.as_tuple()] = name
 
     for name, base_inst in fizz_bases.items():
@@ -992,8 +992,8 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         up_axis = orient.left()
 
         # If upside-down, make it face upright.
-        if up_axis == (0, 0, -1):
-            up_axis = Vec(z=1)
+        if up_axis.z < 0:
+            up_axis = -up_axis
 
         base_inst.outputs.clear()
 
@@ -1002,20 +1002,26 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         # We don't care about the instances after this, so don't keep track.
         length_axis = orient.up().axis()
 
-        emitters = []  # type: List[Tuple[Vec, Vec]]
+        emitters: List[Tuple[Vec, Vec]] = []
 
-        model_pairs = {}  # type: Dict[Tuple[float, float], Vec]
+        model_pairs: Dict[Tuple[float, float], Vec] = {}
 
         model_skin = models[0].fixup.int('$skin')
 
         try:
             item_id, item_subtype = instanceLocs.ITEM_FOR_FILE[base_inst['file'].casefold()]
+        except KeyError:
+            raise ValueError('No item id for "{}"!'.format(
+                base_inst['file'],
+            )) from None
+        try:
             fizz_type = fizz_types[item_id, model_skin]
         except KeyError:
             LOGGER.warning('Fizzler types: {}', fizz_types.keys())
-            raise ValueError('No fizzler type for "{}"!'.format(
-                base_inst['file'],
-            )) from None
+            raise ValueError(
+                f'No fizzler type for {item_id}:{item_subtype} '
+                f'("{base_inst["file"]}")!'
+            ) from None
 
         for attr_name in fizz_type.voice_attrs:
             voice_attrs[attr_name] = True
@@ -1068,7 +1074,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]) -> None:
         try:
             fizz_name = fizz_pos[
                 Vec.from_str(inst['origin']).as_tuple(),
-                Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
+                (Vec(0, 0, 1) @ Angle.from_str(inst['angles'])).as_tuple()
             ]
             fizz_item = connections.ITEMS[fizz_name]
         except KeyError:
@@ -1362,13 +1368,12 @@ def generate_fizzlers(vmf: VMF):
                     brush_ent = vmf.create_ent(classname='func_brush')
 
                     for key_name, key_value in brush_type.keys.items():
-                        brush_ent[key_name] = conditions.resolve_value(fizz.base_inst, key_value)
+                        brush_ent[key_name] = fizz.base_inst.fixup.substitute(key_value, allow_invert=True)
 
                     for key_name, key_value in brush_type.local_keys.items():
                         brush_ent[key_name] = conditions.local_name(
-                            fizz.base_inst, conditions.resolve_value(
-                                fizz.base_inst, key_value,
-                            )
+                            fizz.base_inst,
+                            fizz.base_inst.fixup.substitute(key_value, allow_invert=True),
                         )
 
                     brush_ent['targetname'] = conditions.local_name(
@@ -1446,7 +1451,7 @@ def generate_fizzlers(vmf: VMF):
         for brush_type, used_tex in mat_mod_tex.items():
             brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
             mat_mod_name = conditions.local_name(fizz.base_inst, brush_type.mat_mod_name)
-            for off, tex in zip(MATMOD_OFFSETS, sorted(used_tex)):
+            for off, tex in zip(itertools.cycle(MATMOD_OFFSETS), sorted(used_tex)):
                 pos = off @ min_orient
                 pos += Vec.from_str(fizz.base_inst['origin'])
                 vmf.create_ent(

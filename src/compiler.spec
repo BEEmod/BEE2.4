@@ -1,4 +1,6 @@
 """Build commands for VBSP and VRAD."""
+from pathlib import Path
+from PyInstaller.utils.hooks import collect_submodules
 import contextlib
 import pkgutil
 import os
@@ -17,6 +19,17 @@ elif LINUX:
 else:
     suffix = ''
 
+# Find the BSP transforms from HammerAddons.
+try:
+    transform_loc = Path(os.environ['BSP_TRANSFORMS']).resolve()
+except KeyError:
+    transform_loc = Path('../../HammerAddons/transforms/').resolve()
+if not transform_loc.exists():
+    raise ValueError(
+        f'Invalid BSP transforms location "{transform_loc}"!\n'
+        'Clone TeamSpen210/HammerAddons next to BEE2.4, or set the '
+        'environment variable BSP_TRANSFORMS to the location.'
+    )
 
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
@@ -46,7 +59,20 @@ EXCLUDES = [
     'win32evtlogutil',
     'smtplib',
     'http',
+
+    # Imported in utils, but not required in compiler.
+    'bg_daemon',
 ]
+
+# The modules made available for plugins to use.
+INCLUDES = [
+    'abc', 'array', 'base64', 'binascii', 'binhex',
+    'bisect', 'colorsys', 'collections', 'csv', 'datetime',
+    'decimal', 'difflib', 'enum', 'fractions', 'functools',
+    'io', 'itertools', 'json', 'math', 'random', 're',
+    'statistics', 'string', 'struct',
+]
+INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'test' not in name and 'script' not in name)
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
@@ -58,8 +84,7 @@ if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'sock
     # Subprocess uses this in UNIX-style OSes, but not Windows.
     if WIN:
         EXCLUDES += ['selectors', 'select']
-if not hasattr(logging.handlers, 'pickle'):
-    EXCLUDES.append('pickle')
+
 del logging
 
 if MAC or LINUX:
@@ -68,14 +93,17 @@ if MAC or LINUX:
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
 
+if sys.version_info >= (3, 7):
+    # Only needed on 3.6, it's in the stdlib thereafter.
+    EXCLUDES += ['importlib_resources']
 
 # Include the condition sub-modules that are dynamically imported.
-INCLUDES = [
+INCLUDES += [
     'precomp.conditions.' + module
     for loader, module, is_package in
     pkgutil.iter_modules(['precomp/conditions'])
 ]
-print(INCLUDES)
+
 
 bee_version = input('BEE2 Version ("x.y.z" or blank for dev): ')
 if bee_version:
@@ -94,6 +122,14 @@ if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
+# Empty module to be the package __init__.
+transforms_stub = Path(workpath, 'transforms_stub.py')
+try:
+    with transforms_stub.open('x') as f:
+        f.write('__path__ = []\n')
+except FileExistsError:
+    pass
+
 # Finally, run the PyInstaller analysis process.
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
@@ -105,6 +141,18 @@ vbsp_vrad_an = Analysis(
     excludes=EXCLUDES,
     noarchive=False
 )
+
+# Force the BSP transforms to be included in their own location.
+for mod in transform_loc.rglob('*.py'):
+    rel_path = mod.relative_to(transform_loc)
+
+    if rel_path.name.casefold() == '__init__.py':
+        rel_path = rel_path.parent
+    mod_name = rel_path.with_suffix('')
+    dotted = str(mod_name).replace('\\', '.').replace('/', '.')
+    vbsp_vrad_an.pure.append(('postcomp.transforms.' + dotted, str(mod), 'PYMODULE'))
+
+vbsp_vrad_an.pure.append(('postcomp.transforms', str(transforms_stub), 'PYMODULE'))
 
 pyz = PYZ(
     vbsp_vrad_an.pure,

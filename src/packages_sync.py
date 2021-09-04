@@ -76,7 +76,7 @@ def get_package(file: Path) -> RawFileSystem:
             pack_id = last_package
 
         try:
-            fsys = PACKAGES[pack_id].fsys
+            fsys = PACKAGES[pack_id.casefold()].fsys
         except KeyError:
             continue
         else:
@@ -101,7 +101,7 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
         part = relative.parts
         try:
             res_path = Path(*part[part.index('resources')+1:])
-        except IndexError:
+        except ValueError:
             LOGGER.warning('File "{!s} not a resource!', file)
             return
 

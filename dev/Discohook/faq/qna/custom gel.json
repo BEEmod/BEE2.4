@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Custom Gel",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you add Adhesion Gel/<some other custom gel\\> to BEE2.4?",
+                "description": "No. Adhesion Gel never functioned properly in any released version of Portal 2. It was replaced with Reflection Gel in the Peer Review update, keeping all the functional Adhesion Gel effects (this is why it can counteract Propulsion Gel). Gels are hardcoded into the game, so it's not possible to properly implement Adhesion Gel, or any other custom gel type. It is possible to re-create Adhesion Gel using tricks with rotating the map, but this can't reasonably work in the Puzzlemaker.\n\nMore recently, mods such as Desolation and Portal 2: Community Edition have obtained the source code from Valve and reimplemented Adhesion Gel properly. However, it's not possible to include this modified code in workshop maps, and these mods can't themselves include the Puzzlemaker for technical reasons.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

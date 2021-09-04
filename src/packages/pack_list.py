@@ -9,7 +9,7 @@ from packages import (
 from srctools import Property
 
 
-class PackList(PakObject, allow_mult=True, has_img=False):
+class PackList(PakObject, allow_mult=True):
     """Specifies a group of resources which can be packed together."""
     def __init__(self, pak_id: str, files: List[str]) -> None:
         self.id = pak_id
@@ -18,7 +18,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
     @classmethod
     def parse(cls, data: ParseData) -> 'PackList':
         """Read pack lists from packages."""
-        filesystem = data.fsys  # type: FileSystem
+        filesystem = data.fsys
         conf = data.info.find_key('Config', '')
 
         if 'AddIfMat' in data.info:
@@ -39,7 +39,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
             ]
         elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
-            with filesystem, filesystem.open_str(path) as f:
+            with filesystem.open_str(path) as f:
                 # Each line is a file to pack.
                 # Skip blank lines, strip whitespace, and
                 # allow // comments.

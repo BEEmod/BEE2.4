@@ -41,7 +41,7 @@ def make_packitems() -> Iterable[CheckItem]:
             pack.disp_name,
             hover_text=pack.desc or 'No description!',
             # The clean package can't be disabled!
-            lock_check=(pack.id == packages.CLEAN_PACKAGE),
+            lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
             state=pack.enabled
         )
         item.package = pack

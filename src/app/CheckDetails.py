@@ -12,7 +12,8 @@ import tkinter as tk
 import functools
 
 from app.tooltip import add_tooltip, set_tooltip
-import utils
+from app import tk_tools
+from localisation import gettext
 
 from typing import List, Iterator, Optional
 
@@ -122,14 +123,14 @@ class Item:
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
-                wid.bind('<Enter>', self.hover_start, add='+')
-                wid.bind('<Leave>', self.hover_stop, add='+')
-                utils.bind_leftclick(wid, self.row_click, add='+')
-                wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add='+')
+                wid.bind('<Enter>', self.hover_start, add=True)
+                wid.bind('<Leave>', self.hover_stop, add=True)
+                tk_tools.bind_leftclick(wid, self.row_click, add=True)
+                wid.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.row_unclick, add=True)
 
             self.val_widgets.append(wid)
 
-        utils.add_mousewheel(
+        tk_tools.add_mousewheel(
             self.master.wid_canvas,
             self.check,
             *self.val_widgets
@@ -216,7 +217,7 @@ class CheckDetails(ttk.Frame):
         )
         self.wid_head_check.grid(row=0, column=0)
 
-        add_tooltip(self.wid_head_check, _("Toggle all checkboxes."))
+        add_tooltip(self.wid_head_check, gettext("Toggle all checkboxes."))
 
         def checkbox_enter(e):
             """When hovering over the 'all' checkbox, highlight the others."""
@@ -264,7 +265,7 @@ class CheckDetails(ttk.Frame):
 
         self.horiz_scroll.grid(row=2, column=0, columnspan=2, sticky='EWS')
         self.vert_scroll.grid(row=1, column=2, sticky='NSE')
-        if add_sizegrip and utils.USE_SIZEGRIP:
+        if add_sizegrip and tk_tools.USE_SIZEGRIP:
             self.sizegrip = ttk.Sizegrip(self)
             self.sizegrip.grid(row=2, column=2)
         else:
@@ -286,7 +287,7 @@ class CheckDetails(ttk.Frame):
 
         self.add_items(*items)
 
-        utils.add_mousewheel(
+        tk_tools.add_mousewheel(
             self.wid_canvas,
 
             self.wid_canvas,
@@ -328,7 +329,7 @@ class CheckDetails(ttk.Frame):
 
             header.bind('<Enter>', header_enter)
             header.bind('<Leave>', header_leave)
-            utils.bind_leftclick(label, functools.partial(self.sort, i))
+            tk_tools.bind_leftclick(label, functools.partial(self.sort, i))
 
             # Headers can't become smaller than their initial size -
             # The amount of space to show all the text + arrow
@@ -515,7 +516,7 @@ if __name__ == '__main__':
         ]
     )
     test_inst.grid(sticky='NSEW')
-    utils.add_mousewheel(test_inst.wid_canvas, TK_ROOT)
+    tk_tools.add_mousewheel(test_inst.wid_canvas, TK_ROOT)
 
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)

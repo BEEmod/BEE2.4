@@ -1,5 +1,4 @@
 """Implement cubes and droppers."""
-import io
 import itertools
 from contextlib import suppress
 from collections import namedtuple
@@ -8,7 +7,7 @@ from weakref import WeakKeyDictionary
 from enum import Enum
 from typing import (
     Optional, Union, Tuple, NamedTuple,
-    Dict, List, Set, FrozenSet, Iterable,
+    Dict, List, Set, FrozenSet, Iterable, MutableMapping
 )
 
 from precomp import brushLoc, options, packing, conditions
@@ -17,7 +16,7 @@ from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst
 from srctools import (
     Property, VMF, Entity, Vec, Output,
-    EmptyMapping
+    EmptyMapping, Matrix, Angle,
 )
 import srctools.logger
 from srctools.vmf import EntityFixup
@@ -28,13 +27,13 @@ LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Cubes/Droppers'
 
 # All the types we have loaded
-CUBE_TYPES = {}  # type: Dict[str, CubeType]
-DROPPER_TYPES = {}  # type: Dict[str, DropperType]
-ADDON_TYPES = {}  # type: Dict[str, CubeAddon]
+CUBE_TYPES: Dict[str, 'CubeType'] = {}
+DROPPER_TYPES: Dict[str, 'DropperType'] = {}
+ADDON_TYPES: Dict[str, 'CubeAddon'] = {}
 
 # All the cubes/droppers
 PAIRS: List['CubePair'] = []
-INST_TO_PAIR: Dict[Entity, 'CubePair'] = WeakKeyDictionary()
+INST_TO_PAIR: MutableMapping[Entity, 'CubePair'] = WeakKeyDictionary()
 
 # Distance from the floor to the bottom of dropperless cubes.
 # That's needed for light bridges and things like that.
@@ -43,11 +42,11 @@ DROPPERLESS_OFFSET = 22 - 64
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
-CUBE_POS = {}  # type: Dict[Tuple[float, float, float], CubePair]
+CUBE_POS: Dict[Tuple[float, float, float], 'CubePair'] = {}
 
 # Prevents duplicating different filter entities.
 # It's either a frozenset of filter names, or a single model.
-CUBE_FILTERS = {}  # type: Dict[Union[str, FrozenSet[str]], str]
+CUBE_FILTERS: Dict[Union[str, FrozenSet[str]], str] = {}
 # Multi-filters are sequentially named.
 CUBE_FILTER_MULTI_IND = 0
 
@@ -58,10 +57,6 @@ MULTI_FILTER_COUNT = 10
 # These are in global_pti_ents.
 FILTER_MONST_CLS = '@is_fbox'
 FILTER_CUBE_CLS = '@is_mbox'
-
-# The BSP file path -> data for each script query function that's
-# desired.
-CUBE_SCRIPT_FILTERS = {}  # type: Dict[str, io.StringIO]
 
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
@@ -80,9 +75,6 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 # loaded in the base-entity machinery.
 # It's somewhat buggy though, so we use the SetModel method if possible.
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
-
-
-ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
 
 
 class CubeEntType(Enum):
@@ -151,6 +143,13 @@ class CubeOutputs(Enum):
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
     ON_PICKUP = 'OnPickup'
     ON_DROP = 'OnDrop'
+
+
+class AddonFixups(Enum):
+    """Special fixup variables usable in cube addons."""
+    DROPPER = 'dropper'
+    CUBE = 'cube'
+    LINKED = 'linked'
 
 
 class ModelSwapMeth(Enum):
@@ -240,17 +239,17 @@ class CubeAddon:
         inst: str='',
         pack: str='',
         vscript: str='',
-        script_vars: Iterable[ScriptVar]=(),
         outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
+        fixups: Optional[List[Tuple[str, Union[str, AddonFixups]]]]=None,
     ):
         self.id = id
         self.inst = inst
         self.pack = pack
         self.vscript = vscript  # Entity script(s)s to add to the cube.
         self.outputs = {}  # type: Dict[CubeOutputs, List[Output]]
-
-        # Fire inputs to functions with instance vars.
-        self.script_vars = list(script_vars)
+        # None means not defined at all, so fallback to copying everything.
+        # "fixups" {} on the other hand would not copy any fixups.
+        self.fixups = fixups
 
         for out_type in CubeOutputs:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
@@ -263,8 +262,8 @@ class CubeAddon:
             props['instance', ''],
             props['packlist', ''],
             props['vscript', ''],
-            cls._parse_scriptvar(props),
             cls._parse_outputs(props),
+            cls._parse_fixups(props),
         )
         return addon
 
@@ -275,9 +274,9 @@ class CubeAddon:
         pack = props['overlay_pack', '']
         script = props['vscript', '']
         outputs = cls._parse_outputs(props)
-        script_vars = cls._parse_scriptvar(props)
-        if inst or pack or script or script_vars or any(outputs.values()):
-            return cls(cube_id, inst, pack, script, script_vars, outputs)
+        fixups = cls._parse_fixups(props)
+        if inst or pack or script or any(outputs.values()) or fixups:
+            return cls(cube_id, inst, pack, script, outputs, fixups)
         else:
             return None
 
@@ -293,21 +292,18 @@ class CubeAddon:
         return outputs
 
     @staticmethod
-    def _parse_scriptvar(props: Property):
-        script_vars = []
-        for prop in props.find_children('ScriptVars'):
-            func, args = prop.value.split('(')
-
-            # Allow this to be used.
-            if prop.name == '!self':
-                prop.name = 'box'
-
-            script_vars.append(ScriptVar(
-                prop.real_name,
-                func,
-                list(map(str.strip, args.rstrip(')').split(','))),
-            ))
-        return script_vars
+    def _parse_fixups(props: Property) -> Optional[List[Tuple[str, Union[str, AddonFixups]]]]:
+        fixups = []
+        found = False
+        for parent in props.find_all('Fixups'):
+            found = True
+            for prop in parent:
+                if prop.value.startswith('<') and prop.value.endswith('>'):
+                    src = AddonFixups(prop.value[1:-1].casefold())
+                else:
+                    src = prop.value
+                fixups.append((prop.real_name, src))
+        return fixups if found else None
 
 
 class DropperType:
@@ -317,7 +313,7 @@ class DropperType:
         id: str,
         item_id: str,
         cube_pos: Vec,
-        cube_direction: Vec,
+        cube_orient: Angle,
         out_start_drop: Tuple[Optional[str], str],
         out_finish_drop: Tuple[Optional[str], str],
         in_respawn: Tuple[Optional[str], str],
@@ -326,8 +322,8 @@ class DropperType:
         self.id = id
         self.instances = resolve_inst(item_id)
         self.cube_pos = cube_pos
-        # Normal in the 'front' direction for reflection/frankencubes.
-        self.cube_direction = cube_direction
+        # Orientation of the cube.
+        self.cube_orient = cube_orient
 
         # Instance output fired when finishing dropping. !activator
         # should be the cube!
@@ -345,17 +341,30 @@ class DropperType:
     @classmethod
     def parse(cls, conf: Property):
         """Parse from vbsp_config."""
-        cube_dir = conf['cube_dir', '+x']
-        try:
-            cube_dir = Vec(conditions.DIRECTIONS[cube_dir])
-        except KeyError:
-            cube_dir = Vec.from_str(cube_dir, x=1)
+        if 'cube_ang' in conf:
+            cube_orient = Angle.from_str(conf['cube_ang'])
+        elif 'cube_dir' in conf:
+            # Old configuration - the X forward direction.+
+            LOGGER.warning(
+                'Cube type "{}" uses deprectated cube_dir option, '
+                'use cube_angles instead.',
+                conf['id'],
+            )
+            cube_dir = conf['cube_dir']
+            try:
+                cube_dir = Vec(conditions.DIRECTIONS[cube_dir])
+            except KeyError:
+                cube_dir = Vec.from_str(cube_dir, x=1)
+            # Set roll to counteract us being on the ceiling.
+            cube_orient = cube_dir.to_angle(180)
+        else:
+            cube_orient = Angle()
 
         return cls(
             conf['id'].upper(),
             conf['itemid'],
             conf.vec('cube_pos'),
-            cube_dir,
+            cube_orient,
             out_start_drop=Output.parse_name(conf['OutStartDrop']),
             out_finish_drop=Output.parse_name(conf['OutFinishDrop']),
             in_respawn=Output.parse_name(conf['InputRespawn']),
@@ -674,19 +683,6 @@ def parse_conf(conf: Property):
             LOGGER.warning('Valve Cube type "{}" is missing!', cube_id)
 
 
-def write_vscripts(vrad_conf: Property):
-    """Write CUBE_SCRIPT_FILTERS functions out for VRAD to use."""
-
-    if CUBE_SCRIPT_FILTERS:
-        conf_block = vrad_conf.ensure_exists('InjectFiles')
-
-        for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
-            filename = 'cube_vscript_{:02}.nut'.format(i)
-            with open('bee2/inject/' + filename, 'w') as f:
-                f.write(buffer.getvalue())
-            conf_block[filename] = 'scripts/vscripts/' + bsp_name
-
-
 def parse_filter_types(
     cubes: List[str]
 ) -> Tuple[Set[CubeType], Set[CubeType], Set[CubeType]]:
@@ -934,6 +930,8 @@ def flag_cube_type(inst: Entity, res: Property):
     * `<any>`: Any kind of cube item
     * `<none>`: Not a cube item
     * `<companion>`: A cube marked as companion-like.
+    * `<sphere>` or `<ball>`: A sphere-type cube.
+    * `<reflection>` or `<reflect>`: A reflection-type cube.
     * `<dropper>`: The dropper half of a pair.
     * `<cube>`: The cube half of a pair.
     """
@@ -960,6 +958,10 @@ def flag_cube_type(inst: Entity, res: Property):
             return False
         elif cube_type == 'companion':
             return pair.cube_type.is_companion
+        elif cube_type in ('sphere', 'ball'):
+            return pair.cube_type.type is CubeEntType.sphere
+        elif cube_type in ('reflect', 'reflection'):
+            return pair.cube_type.type is CubeEntType.reflect
         elif cube_type == 'dropper':
             return inst is pair.dropper
         elif cube_type == 'cube':
@@ -1280,9 +1282,10 @@ def link_cubes(vmf: VMF):
             # Not one we care about.
             continue
 
-        pairs = []  # type: List[CubePair]
+        pairs: List[CubePair] = []
 
         origin = Vec.from_str(inst['origin'])
+        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
         with suppress(KeyError):
             pairs.append(CUBE_POS[origin.as_tuple()])
@@ -1290,7 +1293,7 @@ def link_cubes(vmf: VMF):
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
         # placed on the illusory cube item under them.
-        if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
+        if orient.up().z > 0.9:
             pos = brushLoc.POS.raycast_world(
                 origin,
                 direction=(0, 0, 1),
@@ -1389,38 +1392,6 @@ def setup_output(
     return out
 
 
-def add_scriptvar(
-    out_name: str,
-    fixup: EntityFixup,
-    inst: Entity,
-    vars: List[ScriptVar],
-) -> List[Output]:
-    """Apply "scriptvars" to a cube.
-
-    If blank or invalid Null will be used.
-    """
-    out = []
-    for var in vars:
-        args = []
-        for arg in var.vars:
-            value = fixup[arg]
-            if value:
-                try:
-                    value = format(float(value), 'g')
-                except ValueError:
-                    value = '`' + value + '`'
-            else:
-                value = 'null'
-            args.append(value)
-        out.append(Output(
-            out_name,
-            conditions.local_name(inst, var.local_name),
-            'RunScriptCode',
-            '{}({})'.format(var.function, ', '.join(args)),
-        ))
-    return out
-
-
 def make_cube(
     vmf: VMF,
     pair: CubePair,
@@ -1463,12 +1434,10 @@ def make_cube(
         if not pair.drop_type:
             raise ValueError('Cube in dropper without dropper!')
 
-        norm = drop_type.cube_direction.copy().rotate_by_str(
-            pair.dropper['angles']
-        )
+        angles = drop_type.cube_orient @ Angle.from_str(pair.dropper['angles'])
         targ_inst = pair.dropper
     else:
-        norm = Vec(x=-1).rotate_by_str(pair.cube['angles'])
+        angles = Angle(0, 180, 0) @ Angle.from_str(pair.cube['angles'])
         targ_inst = pair.cube
 
     if pair.paint_type is not None:
@@ -1514,7 +1483,7 @@ def make_cube(
                         'OnUser4',
                         '!self',
                         'Skin',
-                        CUBE_SKINS[CubePaintType.BOUNCE, pair.cube_type.type],
+                        CUBE_SKINS[pair.cube_type.type].spawn_skin(CubePaintType.BOUNCE),
                         only_once=True,
                     )
                 )
@@ -1564,10 +1533,8 @@ def make_cube(
                 # Don't paint it on spawn.
                 spawn_paint = None
 
-    yaw = norm.to_angle().yaw
-
     cust_model = cube_type.model
-    pack = cube_type.pack  # type: Optional[Union[str, List[str]]]
+    pack: Optional[Union[str, List[str]]] = cube_type.pack
 
     has_addon_inst = False
     vscripts = []
@@ -1579,13 +1546,25 @@ def make_cube(
                 targetname=targ_inst['targetname'],
                 origin=origin,
                 # If out of dropper, spin to match the frankenturret box position.
-                angles=Vec(
-                    -25.5 if is_frank and not in_dropper else 0, yaw, 0,
+                angles=(
+                    Angle(-25.5, 0, 0) @ angles
+                    if is_frank and not in_dropper
+                    else angles
                 ),
                 file=addon.inst,
             )
-            # Copy the cube stuff to the addon, since it's specific to the cube.
-            inst.fixup.update(pair.cube_fixup)
+            if addon.fixups is not None:
+                for fixup_var, fixup_src in addon.fixups:
+                    if fixup_src is AddonFixups.CUBE:
+                        inst.fixup[fixup_var] = not in_dropper
+                    elif fixup_src is AddonFixups.DROPPER:
+                        inst.fixup[fixup_var] = in_dropper
+                    elif fixup_src is AddonFixups.LINKED:
+                        inst.fixup[fixup_var] = pair.dropper is not None and pair.cube is not None
+                    else:
+                        inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_src, allow_invert=True)
+            else:
+                inst.fixup.update(pair.cube_fixup)
         packing.pack_list(vmf, addon.pack)
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
@@ -1597,18 +1576,20 @@ def make_cube(
         cust_model = cube_type.model_color
         pack = cube_type.pack_color
         # Multiply the two tints together.
-        ent['rendercolor'] = round(Vec(
-            # a/255 * b/255 * 255 -> a*b/255
-            cube_type.base_tint.x * pair.tint.x,
-            cube_type.base_tint.y * pair.tint.y,
-            cube_type.base_tint.z * pair.tint.z,
-        ) / 255)
+        # a/255 * b/255 * 255 -> a*b/255
+        r = cube_type.base_tint.x * pair.tint.x // 255
+        g = cube_type.base_tint.y * pair.tint.y // 255
+        b = cube_type.base_tint.z * pair.tint.z // 255
+        ent['rendercolor'] = f'{int(r)} {int(g)} {int(b)}'
     else:
         ent['rendercolor'] = cube_type.base_tint
 
     if is_frank:
         ent['classname'] = 'prop_monster_box'
-        ent['angles'] = Vec((25.5 if in_dropper else 0), yaw, 0)
+        if in_dropper:
+            ent['angles'] = Angle(25.5, 0, 0) @ angles
+        else:
+            ent['angles'] = angles
         ent['StartAsBox'] = in_dropper
         ent['AllowSilentDissolve'] = 1
     else:
@@ -1633,7 +1614,7 @@ def make_cube(
                 skinset.update(skin.speed)
 
         ent['skinset'] = ' '.join(map(str, sorted(skinset)))
-        ent['angles'] = Vec(0, yaw, 0)
+        ent['angles'] = angles
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
 
@@ -1730,13 +1711,10 @@ def generate_cubes(vmf: VMF):
         # One or both of the cube ents we make.
         cubes = []  # type: List[Entity]
 
-        # Transfer addon outputs to the pair data, and accumulate all the script
-        # vars.
-        script_vars = []
+        # Transfer addon outputs to the pair data.
         for addon in pair.addons:
             for out_type, out_list in addon.outputs.items():
                 pair.outputs[out_type].extend(out_list)
-            script_vars.extend(addon.script_vars)
 
         # Generate the outputs to paint the cubes.
         if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not None:
@@ -1755,7 +1733,7 @@ def generate_cubes(vmf: VMF):
         if pair.dropper:
             assert pair.drop_type is not None
             pos = Vec.from_str(pair.dropper['origin'])
-            pos += pair.spawn_offset.copy().rotate_by_str(pair.dropper['angles'])
+            pos += pair.spawn_offset @ Angle.from_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map)
             cubes.append(drop_cube)
 
@@ -1797,13 +1775,6 @@ def generate_cubes(vmf: VMF):
                 # After first firing, it deletes so it doesn't trigger after.
                 out.only_once = True
                 drop_cube.add_out(out)
-
-            drop_cube.add_out(*add_scriptvar(
-                'OnUser4',
-                pair.cube_fixup,
-                pair.dropper,
-                script_vars,
-            ))
 
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,
@@ -1859,7 +1830,7 @@ def generate_cubes(vmf: VMF):
 
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
-            pos += Vec(z=DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
+            pos += Vec(z=DROPPERLESS_OFFSET) @ Angle.from_str(pair.cube['angles'])
             has_addon, cube = make_cube(vmf, pair, pos, False, bounce_in_map, speed_in_map)
             cubes.append(cube)
             cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'box')
@@ -1896,14 +1867,6 @@ def generate_cubes(vmf: VMF):
             # For consistency with the dropped cube, add a User1 output
             # that fizzles it.
             cube.add_out(Output('OnUser1', '!self', 'Dissolve'))
-
-            # Add script-var setup inputs.
-            cube_temp.add_out(*add_scriptvar(
-                'OnEntitySpawned',
-                pair.cube_fixup,
-                pair.cube,
-                script_vars,
-            ))
 
             for temp_out in pair.outputs[CubeOutputs.SPAWN]:
                 cube_temp.add_out(setup_output(

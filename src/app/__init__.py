@@ -4,8 +4,7 @@ import wx
 import logging
 from types import TracebackType
 from typing import Type
-from utils import BEE_VERSION
-
+import utils
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
@@ -53,7 +52,6 @@ def tk_error(
         msg='Uncaught Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
-    logging.shutdown()
 
     # Since this isn't caught normally, it won't quit the application.
     # Quit ourselves manually. to prevent TK just freezing.
@@ -86,6 +84,18 @@ def on_error(
     except Exception:
         pass
 
+    # Try and terminate background operations.
+    try:
+        import loadScreen
+        loadScreen.BG_PROC.kill()
+    except Exception:
+        pass
+    try:
+        from . import sound
+        sound.sounds = sound.NullSound()
+    except Exception:
+        pass
+
     if not issubclass(exc_type, Exception):
         # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
         # so ignore the error.
@@ -95,7 +105,7 @@ def on_error(
     try:
         from tkinter import messagebox
         messagebox.showinfo(
-            title='BEEMOD {} Error!'.format(BEE_VERSION),
+            title='BEEMOD {} Error!'.format(utils.BEE_VERSION),
             message='An error occurred: \n{}\n\nThis has '
                     'been copied to the clipboard.'.format(err),
             icon=messagebox.ERROR,
@@ -152,3 +162,14 @@ class WXLogTarg(wx.Log):
         ))
 
 wx.Log.SetActiveTarget(WXLogTarg())
+
+# Various configuration booleans.
+PLAY_SOUND = tk.BooleanVar(value=True, name='OPT_play_sounds')
+KEEP_WIN_INSIDE = tk.BooleanVar(value=True, name='OPT_keep_win_inside')
+FORCE_LOAD_ONTOP = tk.BooleanVar(value=True, name='OPT_force_load_ontop')
+SHOW_LOG_WIN = tk.BooleanVar(value=False, name='OPT_show_log_window')
+LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
+PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
+DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
+
+

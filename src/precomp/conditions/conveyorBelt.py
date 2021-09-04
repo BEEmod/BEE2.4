@@ -1,6 +1,6 @@
 """Continuously moving belts, like in BTS.
 """
-from srctools import Property, Vec, Entity, Output, VMF
+from srctools import Property, Vec, Entity, Output, VMF, Angle, Matrix
 
 import srctools.logger
 from precomp import instanceLocs, template_brush, conditions
@@ -26,7 +26,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
           outputs in VMFs.
         `RotateSegments`: If true (default), force segments to face in the
           direction of movement.
-        * `BeamKeys`: If set, a list of keyvalues to use to generate an env_beam 
+        * `BeamKeys`: If set, a list of keyvalues to use to generate an env_beam
           travelling from start to end. The origin is treated specially - X is
           the distance from walls, y is the distance to the side, and z is the
           height.
@@ -43,8 +43,9 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         inst.remove()
         return
 
-    move_dir = Vec(1, 0, 0).rotate_by_str(inst.fixup['$travel_direction'])
-    move_dir = move_dir.rotate_by_str(inst['angles'])
+    orig_orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    move_dir = Vec(1, 0, 0) @ Angle.from_str(inst.fixup['$travel_direction'])
+    move_dir = move_dir @ orig_orient
     start_offset = inst.fixup.float('$starting_position')
     teleport_to_start = res.bool('TrackTeleport', True)
     segment_inst_file = instanceLocs.resolve_one(res['SegmentInst', ''])
@@ -66,12 +67,13 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
             start_pos, end_pos = end_pos, start_pos
         inst['origin'] = start_pos
 
-    norm = Vec(z=1).rotate_by_str(inst['angles'])
+    norm = orig_orient.up()
 
     if res.bool('rotateSegments', True):
-        inst['angles'] = angles = move_dir.to_angle_roll(norm)
+        orient = Matrix.from_basis(x=move_dir, z=norm)
+        inst['angles'] = orient.to_angle()
     else:
-        angles = Vec.from_str(inst['angles'])
+        orient = orig_orient
 
     # Add the EnableMotion trigger_multiple seen in platform items.
     # This wakes up cubes when it starts moving.
@@ -113,7 +115,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
                 targetname=track_name.format(index),
                 file=segment_inst_file,
                 origin=pos,
-                angles=angles,
+                angles=orient.to_angle(),
             )
             seg_inst.fixup.update(inst.fixup)
 
@@ -122,7 +124,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
                 vmf,
                 rail_template,
                 pos,
-                angles,
+                orient,
                 force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
             )
@@ -163,10 +165,10 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         del beam['LightningEnd']
         beam['origin'] = start_pos + Vec(
             -beam_off.x, beam_off.y, beam_off.z,
-        ).rotate(*angles)
+        ) @ orient
         beam['TargetPoint'] = end_pos + Vec(
             +beam_off.x, beam_off.y, beam_off.z,
-        ).rotate(*angles)
+        ) @ orient
 
     # Allow adding outputs to the last path_track.
     for prop in res.find_all('EndOutput'):
@@ -189,8 +191,8 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         motion_trig.add_out(Output('OnStartTouch', '!activator', 'ExitDisabledState'))
         # Match the size of the original...
         motion_trig.solids.append(vmf.make_prism(
-            start_pos + Vec(72, -56, 58).rotate(*angles),
-            end_pos + Vec(-72, 56, 144).rotate(*angles),
+            start_pos + Vec(72, -56, 58) @ orient,
+            end_pos + Vec(-72, 56, 144) @ orient,
             mat=consts.Tools.TRIGGER,
         ).solid)
 
@@ -201,15 +203,15 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
             origin=track_start,
         )
         floor_noportal.solids.append(vmf.make_prism(
-            start_pos + Vec(-60, -60, -66).rotate(*angles),
-            end_pos + Vec(60, 60, -60).rotate(*angles),
+            start_pos + Vec(-60, -60, -66) @ orient,
+            end_pos + Vec(60, 60, -60) @ orient,
             mat=consts.Tools.INVISIBLE,
         ).solid)
 
     # A brush covering under the platform.
     base_trig = vmf.make_prism(
-        start_pos + Vec(-64, -64, 48).rotate(*angles),
-        end_pos + Vec(64, 64, 56).rotate(*angles),
+        start_pos + Vec(-64, -64, 48) @ orient,
+        end_pos + Vec(64, 64, 56) @ orient,
         mat=consts.Tools.INVISIBLE,
     ).solid
 

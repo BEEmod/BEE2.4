@@ -2,7 +2,10 @@
 General code used for tkinter portions.
 
 """
-from typing import Union, Callable, Optional
+import functools
+import sys
+from enum import Enum
+from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Literal
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -82,7 +85,250 @@ else:  # Linux
     LISTBOX_BG_COLOR = 'white'
 
 
-def event_cancel(*args, **kwargs):
+# Some events differ on different systems, so define them here.
+if utils.MAC:
+    KEY_EXPORT = '<Command-e>'
+    KEY_SAVE = '<Command-s>'
+    KEY_SAVE_AS = '<Command-Shift-s>'
+
+    # tkinter replaces Command- with the special symbol automatically.
+    ACCEL_EXPORT = 'Command-E'
+    ACCEL_SAVE = 'Command-S'
+    ACCEL_SAVE_AS = 'Command-Shift-S'
+else:
+    KEY_EXPORT = '<Control-e>'
+    KEY_SAVE = '<Control-s>'
+    KEY_SAVE_AS = '<Control-Shift-s>'
+
+    # The text used to show shortcuts in menus.
+    ACCEL_EXPORT = 'Ctrl-E'
+    ACCEL_SAVE = 'Ctrl-S'
+    ACCEL_SAVE_AS = 'Ctrl-Shift-S'
+
+USE_SIZEGRIP = not utils.MAC  # On Mac, we don't want to use the sizegrip widget.
+
+if utils.WIN:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+    }
+elif utils.MAC:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-2>',
+        'RIGHT_DOUBLE': '<Double-Button-2>',
+        'RIGHT_CTRL': '<Control-Button-2>',
+        'RIGHT_SHIFT': '<Shift-Button-2>',
+        'RIGHT_RELEASE': '<ButtonRelease-2>',
+        'RIGHT_MOVE': '<B2-Motion>',
+    }
+elif utils.LINUX:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+    }
+else:
+    raise AssertionError
+
+if utils.WIN:
+    class Cursors(str, Enum):
+        """Cursors we use, mapping to the relevant OS cursor."""
+        REGULAR = 'arrow'
+        LINK = 'hand2'
+        WAIT = 'watch'
+        ZOOM_IN = 'size_nw_se'
+        STRETCH_VERT = 'sb_v_double_arrow'
+        STRETCH_HORIZ = 'sb_h_double_arrow'
+        MOVE_ITEM = 'fleur'
+        DESTROY_ITEM = 'x_cursor'
+        INVALID_DRAG = 'no'
+elif utils.MAC:
+    class Cursors(str, Enum):  # type: ignore
+        """Cursors we use, mapping to the relevant OS cursor."""
+        REGULAR = 'arrow'
+        LINK = 'pointinghand'
+        WAIT = 'spinning'
+        ZOOM_IN = 'zoom-in'
+        STRETCH_VERT = 'resizeupdown'
+        STRETCH_HORIZ = 'resizeleftright'
+        MOVE_ITEM = 'movearrow'
+        DESTROY_ITEM = 'poof'
+        INVALID_DRAG = 'notallowed'
+elif utils.LINUX:
+    class Cursors(str, Enum):  # type: ignore
+        """Cursors we use, mapping to the relevant OS cursor."""
+        REGULAR = 'arrow'
+        LINK = 'hand1'
+        WAIT = 'watch'
+        ZOOM_IN = 'sizing'
+        STRETCH_VERT = 'bottom_side'
+        STRETCH_HORIZ = 'right_side'
+        MOVE_ITEM = 'fleur'
+        DESTROY_ITEM = 'x_cursor'
+        INVALID_DRAG = 'circle'
+else:
+    raise AssertionError
+
+
+@overload
+def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: """..."""
+@overload
+def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: """..."""
+def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
+    """Add events so scrolling anywhere in a frame will scroll a target.
+
+    frames should be the TK objects to bind to - mainly Frame or
+    Toplevel objects.
+    Set orient to 'x' or 'y'.
+    This is needed since different platforms handle mousewheel events
+    differently:
+     - Windows needs the delta value to be divided by 120.
+     - OS X needs the delta value passed unmodified.
+      - Linux uses Button-4 and Button-5 events instead of
+        a MouseWheel event.
+    """
+    scroll_func = getattr(target, orient + 'view_scroll')
+
+    if utils.WIN:
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
+            scroll_func(int(event.delta / -120), "units")
+        for frame in frames:
+            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
+    elif utils.MAC:
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
+            scroll_func(-event.delta, "units")
+        for frame in frames:
+            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
+    elif utils.LINUX:
+        def scroll_up(event: tk.Event) -> None:
+            """Handle scrolling up."""
+            scroll_func(-1, "units")
+
+        def scroll_down(event: tk.Event) -> None:
+            """Handle scrolling down."""
+            scroll_func(1, "units")
+
+        for frame in frames:
+            frame.bind('<Button-4>', scroll_up, add=True)
+            frame.bind('<Button-5>', scroll_down, add=True)
+    else:
+        raise AssertionError('Unknown platform ' + sys.platform)
+
+
+EventFunc = Callable[[tk.Event], Any]
+EventFuncT = TypeVar('EventFuncT', bound=EventFunc)
+
+
+class _Binder(Protocol):
+    @overload
+    def __call__(self, wid: tk.Misc, *, add: bool=False) -> Callable[[EventFuncT], EventFuncT]:
+        pass
+    @overload
+    def __call__(self, wid: tk.Misc, func: EventFunc, *, add: bool=False) -> str:
+        pass
+    def __call__(self, wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Union[Callable[[EventFuncT], EventFuncT], str]:
+        pass
+
+
+def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -> _Binder:
+    """Decorator for the bind_click functions.
+
+    This allows calling directly, or decorating a function with just wid and add
+    attributes.
+    """
+    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False):
+        """Decorator or normal interface, func is optional to be a decorator."""
+        if func is None:
+            def deco_2(func):
+                """Used as a decorator - must be called second with the function."""
+                bind_func(wid, func, add)
+                return func
+            return deco_2
+        else:
+            # Normally, call directly
+            return bind_func(wid, func, add)
+    return functools.update_wrapper(cast(_Binder, deco), bind_func)
+
+if utils.MAC:
+    # On OSX, make left-clicks switch to a rightclick when control is held.
+    @_bind_event_handler
+    def bind_leftclick(wid, func, add=False):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held.
+        """
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func(e)
+        wid.bind(EVENTS['LEFT'], event_handler, add=add)
+
+    @_bind_event_handler
+    def bind_leftclick_double(wid, func, add=False):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held."""
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func(e)
+        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
+
+    @_bind_event_handler
+    def bind_rightclick(wid, func, add=False):
+        """On OSX, we need to bind to both rightclick and control-leftclick."""
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
+else:
+    @_bind_event_handler
+    def bind_leftclick(wid, func, add=False):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT'], func, add=add)
+
+    @_bind_event_handler
+    def bind_leftclick_double(wid, func, add=False):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
+
+    @_bind_event_handler
+    def bind_rightclick(wid, func, add=False):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+
+
+def event_cancel(*args, **kwargs) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
 
@@ -182,12 +428,12 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     @property
     def value(self) -> int:
         """Get the value of the spinbox."""
-        return self.tk.call(self._w, 'get')
+        return self.tk.call(self._w, 'get')  # type: ignore
 
     @value.setter
     def value(self, value: int) -> None:
         """Set the spinbox to a value."""
-        self.tk.call(self._w, 'set', value)
+        self.tk.call(self._w, 'set', value)  # type: ignore
 
     def validate(self) -> bool:
         """Values must be integers."""
@@ -195,7 +441,7 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
             self.old_val = int(self.value)
             return True
         except ValueError:
-            self.value = str(self.old_val)
+            self.value = self.old_val
             return False
 
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
@@ -248,11 +494,11 @@ class FileField(ttk.Frame):
             self,
             textvariable=self._text_var,
             font=_file_field_font,
-            cursor=utils.CURSORS['regular'],
+            cursor=Cursors.REGULAR,
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)
-        utils.bind_leftclick(self.textbox, self.browse)
+        bind_leftclick(self.textbox, self.browse)
         # The full location is displayed in a tooltip.
         add_tooltip(self.textbox, self._location)
         self.textbox.bind('<Configure>', self._text_configure)
@@ -260,10 +506,14 @@ class FileField(ttk.Frame):
         self.browse_btn = ttk.Button(
             self,
             text="...",
-            width=1.5,
             command=self.browse,
         )
         self.browse_btn.grid(row=0, column=1)
+        # It should be this narrow, but perhaps this doesn't accept floats?
+        try:
+            self.browse_btn['width'] = 1.5
+        except tk.TclError:
+            self.browse_btn['width'] = 2
 
         self._text_var.set(self._truncate(loc))
 

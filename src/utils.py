@@ -1,27 +1,21 @@
 """Various functions shared among the compiler and application."""
+from __future__ import annotations
 from collections import deque
-import functools
+from typing import (
+    TypeVar, Any, NoReturn, Generic, Type,
+    SupportsInt, Union, Callable,
+    Sequence, Iterator, Iterable, Mapping,
+    KeysView, ValuesView, ItemsView, Generator,
+)
 import logging
 import os
 import stat
 import shutil
+import copyreg
 import sys
 from pathlib import Path
 from enum import Enum
 from types import TracebackType
-
-from typing import (
-    Tuple, List, Set, Sequence,
-    Iterator, Iterable, SupportsInt, Mapping,
-    TypeVar, Any,
-    Union, Callable, Generator,
-    KeysView, ValuesView, ItemsView, Type,
-)
-
-try:
-    from typing import NoReturn
-except ImportError:  # py < 3.6.5
-    NoReturn = None  # type: ignore
 
 
 try:
@@ -66,6 +60,17 @@ STEAM_IDS = {
     # 211480: 'In Motion'
 }
 
+
+# Add core srctools types into the pickle registry, so they can be more directly
+# loaded.
+# IDs 240 - 255 are available for application uses.
+copyreg.add_extension('srctools.math', '_mk_vec', 240)
+copyreg.add_extension('srctools.math', '_mk_ang', 241)
+copyreg.add_extension('srctools.math', '_mk_mat', 242)
+copyreg.add_extension('srctools.math', 'Vec_tuple', 243)
+copyreg.add_extension('srctools.property_parser', 'Property', 244)
+
+
 # Appropriate locations to store config options for each OS.
 if WIN:
     _SETTINGS_ROOT = Path(os.environ['APPDATA'])
@@ -76,26 +81,29 @@ elif LINUX:
 else:
     # Defer the error until used, so it goes in logs and whatnot.
     # Utils is early, so it'll get lost in stderr.
-    _SETTINGS_ROOT = None
-    
+    _SETTINGS_ROOT = None  # type: ignore
+
 # We always go in a BEE2 subfolder
 if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
+if FROZEN:
+    # This special attribute is set by PyInstaller to our folder.
+    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
+else:
+    # We're running from src/, so data is in the folder above that.
+    # Go up once from the file to its containing folder, then to the parent.
+    _INSTALL_ROOT = Path(sys.argv[0]).resolve().parent.parent
+
 
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
-    if FROZEN:
-        # This special attribute is set by PyInstaller to our folder.
-        return Path(sys._MEIPASS) / path
-    else:
-        # We're running from src/, so data is in the folder above that.
-        return (Path('../') / path).resolve()
+    return _INSTALL_ROOT / path
 
 
 def conf_location(path: str) -> Path:
     """Return the full path to save settings to.
-    
+
     The passed-in path is relative to the settings folder.
     Any additional subfolders will be created if necessary.
     If it ends with a '/' or '\', it is treated as a folder.
@@ -104,7 +112,7 @@ def conf_location(path: str) -> Path:
         raise FileNotFoundError("Don't know a good config directory!")
 
     loc = _SETTINGS_ROOT / path
-    
+
     if path.endswith(('\\', '/')) and not loc.suffix:
         folder = loc
     else:
@@ -122,241 +130,15 @@ def fix_cur_directory() -> None:
     os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 
 
-if WIN:
-    # Some events differ on different systems, so define them here.
-    EVENTS = {
-        'LEFT': '<Button-1>',
-        'LEFT_DOUBLE': '<Double-Button-1>',
-        'LEFT_CTRL': '<Control-Button-1>',
-        'LEFT_SHIFT': '<Shift-Button-1>',
-        'LEFT_RELEASE': '<ButtonRelease-1>',
-        'LEFT_MOVE': '<B1-Motion>',
+def _run_bg_daemon(*args) -> None:
+    """Helper to make loadScreen not need to import bg_daemon.
 
-        'RIGHT': '<Button-3>',
-        'RIGHT_DOUBLE': '<Double-Button-3>',
-        'RIGHT_CTRL': '<Control-Button-3>',
-        'RIGHT_SHIFT': '<Shift-Button-3>',
-        'RIGHT_RELEASE': '<ButtonRelease-3>',
-        'RIGHT_MOVE': '<B3-Motion>',
-
-        'KEY_EXPORT': '<Control-e>',
-        'KEY_SAVE_AS': '<Control-s>',
-        'KEY_SAVE': '<Control-Shift-s>',
-    }
-    # The text used to show shortcuts in menus.
-    KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
-    }
-
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'hand2',
-        'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
-    }
-
-    def add_mousewheel(target, *frames, orient='y'):
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frames should be the TK objects to bind to - mainly Frame or
-        Toplevel objects.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - Windows needs the delta value to be divided by 120.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
-        def mousewheel_handler(event):
-            scroll_func(int(event.delta / -120), "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
-
-elif MAC:
-    EVENTS = {
-        'LEFT': '<Button-1>',
-        'LEFT_DOUBLE': '<Double-Button-1>',
-        'LEFT_CTRL': '<Control-Button-1>',
-        'LEFT_SHIFT': '<Shift-Button-1>',
-        'LEFT_RELEASE': '<ButtonRelease-1>',
-        'LEFT_MOVE': '<B1-Motion>',
-
-        'RIGHT': '<Button-2>',
-        'RIGHT_DOUBLE': '<Double-Button-2>',
-        'RIGHT_CTRL': '<Control-Button-2>',
-        'RIGHT_SHIFT': '<Shift-Button-2>',
-        'RIGHT_RELEASE': '<ButtonRelease-2>',
-        'RIGHT_MOVE': '<B2-Motion>',
-
-        'KEY_EXPORT': '<Command-e>',
-        'KEY_SAVE_AS': '<Command-s>',
-        'KEY_SAVE': '<Command-Shift-s>',
-    }
-
-    KEY_ACCEL = {
-        # tkinter replaces Command- with the special symbol automatically.
-        'KEY_EXPORT': 'Command-E',
-        'KEY_SAVE': 'Command-S',
-        'KEY_SAVE_AS': 'Command-Shift-S',
-    }
-
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'pointinghand',
-        'wait': 'spinning',
-        'stretch_vert': 'resizeupdown',
-        'stretch_horiz': 'resizeleftright',
-        'move_item': 'plus',
-        'destroy_item': 'poof',
-        'invalid_drag': 'notallowed',
-    }
-
-    def add_mousewheel(target, *frames, orient='y'):
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frame should be a sequence of any TK objects, like a Toplevel or Frame.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - OS X needs the delta value passed unmodified.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
-        def mousewheel_handler(event):
-            scroll_func(-event.delta, "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
-elif LINUX:
-    EVENTS = {
-        'LEFT': '<Button-1>',
-        'LEFT_DOUBLE': '<Double-Button-1>',
-        'LEFT_CTRL': '<Control-Button-1>',
-        'LEFT_SHIFT': '<Shift-Button-1>',
-        'LEFT_RELEASE': '<ButtonRelease-1>',
-        'LEFT_MOVE': '<B1-Motion>',
-
-        'RIGHT': '<Button-3>',
-        'RIGHT_DOUBLE': '<Double-Button-3>',
-        'RIGHT_CTRL': '<Control-Button-3>',
-        'RIGHT_SHIFT': '<Shift-Button-3>',
-        'RIGHT_RELEASE': '<ButtonRelease-3>',
-        'RIGHT_MOVE': '<B3-Motion>',
-
-        'KEY_EXPORT': '<Control-e>',
-        'KEY_SAVE_AS': '<Control-s>',
-        'KEY_SAVE': '<Control-Shift-s>',
-    }
-    KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl+E',
-        'KEY_SAVE': 'Ctrl+S',
-        'KEY_SAVE_AS': 'Shift+Ctrl+S',
-    }
-
-    CURSORS = {
-        'regular': 'arrow',
-        'link': 'hand1',
-        'wait': 'watch',
-        'stretch_vert': 'bottom_side',
-        'stretch_horiz': 'right_side',
-        'move_item': 'crosshair',
-        'destroy_item': 'X_cursor',
-        'invalid_drag': 'circle',
-    }
-
-    def add_mousewheel(target, *frames, orient='y'):
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frame should be a sequence of any TK objects, like a Toplevel or Frame.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - Linux uses Button-4 and Button-5 events instead of
-        a MouseWheel event.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
-        def scroll_up(_):
-            scroll_func(-1, "units")
-
-        def scroll_down(_):
-            scroll_func(1, "units")
-
-        for frame in frames:
-            frame.bind('<Button-4>', scroll_up, add='+')
-            frame.bind('<Button-5>', scroll_down, add='+')
-
-
-def bind_event_handler(bind_func):
-    """Decorator for the bind_click functions.
-
-    This allows calling directly, or decorating a function with just wid and add
-    attributes.
+    Instead we can redirect the import through here, which is a module
+    both processes need to import. Then the main process doesn't need
+    to import bg_daemon, and the daemon doesn't need to import loadScreen.
     """
-    def deco(wid, func=None, add='+'):
-        """Decorator or normal interface, func is optional to be a decorator."""
-        if func is None:
-            def deco_2(func):
-                """Used as a decorator - must be called second with the function."""
-                bind_func(wid, func, add)
-                return func
-            return deco_2
-        else:
-            # Normally, call directly
-            return bind_func(wid, func, add)
-    return functools.update_wrapper(deco, bind_func)
-
-if MAC:
-    # On OSX, make left-clicks switch to a rightclick when control is held.
-    @bind_event_handler
-    def bind_leftclick(wid, func, add='+'):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held.
-        """
-        def event_handler(e):
-            # e.state is a set of binary flags
-            # Don't run the event if control is held!
-            if e.state & 4 == 0:
-                func(e)
-        wid.bind(EVENTS['LEFT'], event_handler, add=add)
-
-    @bind_event_handler
-    def bind_leftclick_double(wid, func, add='+'):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held."""
-        def event_handler(e):
-            # e.state is a set of binary flags
-            # Don't run the event if control is held!
-            if e.state & 4 == 0:
-                func(e)
-        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
-
-    @bind_event_handler
-    def bind_rightclick(wid, func, add='+'):
-        """On OSX, we need to bind to both rightclick and control-leftclick."""
-        wid.bind(EVENTS['RIGHT'], func, add=add)
-        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
-else:
-    @bind_event_handler
-    def bind_leftclick(wid, func, add='+'):
-        """Other systems just bind directly."""
-        wid.bind(EVENTS['LEFT'], func, add=add)
-
-    @bind_event_handler
-    def bind_leftclick_double(wid, func, add='+'):
-        """Other systems just bind directly."""
-        wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
-
-    @bind_event_handler
-    def bind_rightclick(wid, func, add='+'):
-        """Other systems just bind directly."""
-        wid.bind(EVENTS['RIGHT'], func, add=add)
-
-USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget.
+    import bg_daemon
+    bg_daemon.run_background(*args)
 
 
 class CONN_TYPES(Enum):
@@ -404,11 +186,11 @@ CONN_LOOKUP = {
 del N, S, E, W
 
 RetT = TypeVar('RetT')
+FuncT = TypeVar('FuncT', bound=Callable)
 EnumT = TypeVar('EnumT', bound=Enum)
-EnumTypeT = TypeVar('EnumTypeT', bound=Type[Enum])
 
 
-def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
+def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
     """Make a enum with property getters more efficent.
 
     Call the getter on each member, and then replace it with a dict lookup.
@@ -421,6 +203,7 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
         data_exc = {}
 
         exc: Exception
+        enum: EnumT
         for enum in cls:
             try:
                 res = value.fget(enum)
@@ -435,7 +218,7 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
                 data[enum] = res
         if data_exc:
             func = _exc_freeze(data, data_exc)
-        else: # If we don't raise, we can use the C-func
+        else:  # If we don't raise, we can use the C-func
             func = data.get
         setattr(cls, name, property(fget=func, doc=value.__doc__))
     return cls
@@ -443,7 +226,7 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, Tuple[BaseException, TracebackType]],
+    data_exc: Mapping[EnumT, tuple[BaseException, TracebackType]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -456,7 +239,7 @@ def _exc_freeze(
     return getter
 
 
-class FuncLookup(Mapping[str, Callable[..., Any]]):
+class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
     """A dict for holding callback functions.
 
     Functions are added by using this as a decorator. Positional arguments
@@ -474,19 +257,22 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
     ) -> None:
         self.casefold = casefold
         self.__name__ = name
-        self._registry = {}
+        self._registry: dict[str, FuncT] = {}
         self.allowed_attrs = set(attrs)
 
-    def __call__(self, *names: str, **kwargs) -> Callable[[Callable[..., RetT]], Callable[..., RetT]]:
+    def __call__(self, *names: str, **kwargs) -> Callable[[FuncT], FuncT]:
         """Add a function to the dict."""
         if not names:
             raise TypeError('No names passed!')
 
         bad_keywords = kwargs.keys() - self.allowed_attrs
         if bad_keywords:
-            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+            raise TypeError(
+                f'Invalid keywords: {", ".join(bad_keywords)}. '
+                f'Allowed: {", ".join(self.allowed_attrs)}'
+            )
 
-        def callback(func: 'Callable[..., RetT]') -> 'Callable[..., RetT]':
+        def callback(func: FuncT) -> FuncT:
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
@@ -506,7 +292,7 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
             return NotImplemented
         return self._registry == conv
 
-    def __iter__(self) -> Iterator[Callable[..., Any]]:
+    def __iter__(self) -> Iterator[FuncT]:
         """Yield all the functions."""
         return iter(self.values())
 
@@ -514,18 +300,18 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
         """Yield all the valid IDs."""
         return self._registry.keys()
 
-    def values(self) -> ValuesView[Callable[..., Any]]:
+    def values(self) -> ValuesView[FuncT]:
         """Yield all the functions."""
         return self._registry.values()
 
-    def items(self) -> ItemsView[str, Callable[..., Any]]:
+    def items(self) -> ItemsView[str, FuncT]:
         """Return pairs of (ID, func)."""
         return self._registry.items()
 
     def __len__(self) -> int:
         return len(set(self._registry.values()))
 
-    def __getitem__(self, names: Union[str, Tuple[str]]) -> Callable[..., Any]:
+    def __getitem__(self, names: Union[str, tuple[str]]) -> FuncT:
         if isinstance(names, str):
             names = names,
 
@@ -543,8 +329,8 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
 
     def __setitem__(
         self,
-        names: Union[str, Tuple[str]],
-        func: Callable[..., Any],
+        names: Union[str, tuple[str, ...]],
+        func: FuncT,
     ) -> None:
         if isinstance(names, str):
             names = names,
@@ -557,22 +343,73 @@ class FuncLookup(Mapping[str, Callable[..., Any]]):
             self._registry[name] = func
 
     def __delitem__(self, name: str) -> None:
+        if not isinstance(name, str):
+            raise KeyError(name)
         if self.casefold:
             name = name.casefold()
         del self._registry[name]
 
-    def __contains__(self, name: str) -> bool:
+    def __contains__(self, name: object) -> bool:
+        if not isinstance(name, str):
+            return False
         if self.casefold:
             name = name.casefold()
         return name in self._registry
 
-    def functions(self) -> Set[Callable[..., Any]]:
+    def functions(self) -> set[FuncT]:
         """Return the set of functions in this mapping."""
         return set(self._registry.values())
 
     def clear(self) -> None:
         """Delete all functions."""
         self._registry.clear()
+
+
+class PackagePath:
+    """Represents a file located inside a specific package.
+
+    This can be either resolved later into a file object.
+    The string form is "package:path/to/file.ext", with <special> package names
+    reserved for app-specific usages (internal or generated paths)
+    """
+    __slots__ = ['package', 'path']
+    def __init__(self, pack_id: str, path: str) -> None:
+        self.package = pack_id.casefold()
+        self.path = path.replace('\\', '/')
+
+    @classmethod
+    def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
+        """Parse a string into a path. If a package isn't provided, the default is used."""
+        if isinstance(uri, PackagePath):
+            return uri
+        if ':' in uri:
+            return cls(*uri.split(':', 1))
+        else:
+            return cls(def_package, uri)
+
+    def __str__(self) -> str:
+        return f'{self.package}:{self.path}'
+
+    def __repr__(self) -> str:
+        return f'PackagePath({self.package!r}, {self.path!r})'
+
+    def __hash__(self) -> int:
+        return hash((self.package, self.path))
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, str):
+            other = self.parse(other, self.package)
+        elif not isinstance(other, PackagePath):
+            return NotImplemented
+        return self.package == other.package and self.path == other.path
+
+    def in_folder(self, folder: str) -> PackagePath:
+        """Return the package, but inside this subfolder."""
+        return PackagePath(self.package, f'{folder}/{self.path}')
+
+    def child(self, child: str) -> PackagePath:
+        """Return a child file of this package."""
+        return PackagePath(self.package, f'{self.path}/{child}')
 
 
 def get_indent(line: str) -> str:
@@ -585,6 +422,7 @@ def get_indent(line: str) -> str:
             white.append(char)
         else:
             return ''.join(white)
+    return ''
 
 
 def iter_grid(
@@ -593,7 +431,7 @@ def iter_grid(
     min_x: int=0,
     min_y: int=0,
     stride: int=1,
-) -> Iterator[Tuple[int, int]]:
+) -> Iterator[tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
         for y in range(min_y, max_y, stride):
@@ -609,7 +447,7 @@ def adjust_inside_screen(
     win,
     horiz_bound: int=14,
     vert_bound: int=45,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Adjust a window position to ensure it fits inside the screen.
 
     The new value is returned.
@@ -632,7 +470,7 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window, parent=None):
+def center_win(window, parent=None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
@@ -652,7 +490,7 @@ def _append_bothsides(deq: deque) -> Generator[None, Any, None]:
         deq.appendleft((yield))
 
 
-def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
+def fit(dist: SupportsInt, obj: Sequence[int]) -> list[int]:
     """Figure out the smallest number of parts to stretch a distance.
 
     The list should be a series of sizes, from largest to smallest.
@@ -664,7 +502,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
         return []
     orig_dist = dist
     smallest = obj[-1]
-    items = deque()
+    items: deque[int] = deque()
 
     # We use this so the small sections appear on both sides of the area.
     adder = _append_bothsides(items)
@@ -687,7 +525,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> List[int]:
 ValueT = TypeVar('ValueT')
 
 
-def group_runs(iterable: Iterable[ValueT]) -> Iterator[Tuple[ValueT, int, int]]:
+def group_runs(iterable: Iterable[ValueT]) -> Iterator[tuple[ValueT, int, int]]:
     """Group runs of equal values.
 
     Yields (value, min_ind, max_ind) tuples, where all of iterable[min:max+1]
@@ -729,7 +567,6 @@ def restart_app() -> NoReturn:
 
 def quit_app(status=0) -> NoReturn:
     """Quit the application."""
-    logging.shutdown()
     sys.exit(status)
 
 
@@ -781,7 +618,7 @@ def merge_tree(
     names = os.listdir(src)
 
     os.makedirs(dst, exist_ok=True)
-    errors = []  # type: List[Tuple[str, str, str]]
+    errors: list[tuple[str, str, str]] = []
     for name in names:
         srcname = os.path.join(src, name)
         dstname = os.path.join(dst, name)
@@ -811,101 +648,3 @@ def merge_tree(
             errors.append((src, dst, str(why)))
     if errors:
         raise shutil.Error(errors)
-
-
-def setup_localisations(logger: logging.Logger) -> None:
-    """Setup gettext localisations."""
-    from srctools.property_parser import PROP_FLAGS_DEFAULT
-    import gettext
-    import locale
-
-    # Get the 'en_US' style language code
-    lang_code = locale.getdefaultlocale()[0]
-
-    # Allow overriding through command line.
-    if len(sys.argv) > 1:
-        for arg in sys.argv[1:]:
-            if arg.casefold().startswith('lang='):
-                lang_code = arg[5:]
-                break
-
-    # Expands single code to parent categories.
-    expanded_langs = gettext._expand_lang(lang_code)
-
-    logger.info('Language: {!r}', lang_code)
-    logger.debug('Language codes: {!r}', expanded_langs)
-
-    # Add these to Property's default flags, so config files can also
-    # be localised.
-    for lang in expanded_langs:
-        PROP_FLAGS_DEFAULT['lang_' + lang] = True
-
-    lang_folder = install_path('i18n')
-
-    trans: gettext.NullTranslations
-
-    for lang in expanded_langs:
-        try:
-            file = open(lang_folder / (lang + '.mo').format(lang), 'rb')
-        except FileNotFoundError:
-            continue
-        with file:
-            trans = gettext.GNUTranslations(file)
-            break
-    else:
-        # To help identify missing translations, replace everything with
-        # something noticable.
-        if lang_code == 'dummy':
-            class DummyTranslations(gettext.NullTranslations):
-                """Dummy form for identifying missing translation entries."""
-                def gettext(self, message: str) -> str:
-                    """Generate placeholder of the right size."""
-                    # We don't want to leave {arr} intact.
-                    return ''.join([
-                        '#' if s.isalnum() or s in '{}' else s
-                        for s in message
-                    ])
-
-                def ngettext(self, msgid1: str, msgid2: str, n: int) -> str:
-                    """Generate placeholder of the right size for plurals."""
-                    return self.gettext(msgid1 if n == 1 else msgid2)
-
-                lgettext = gettext
-                lngettext = ngettext
-
-            trans = DummyTranslations()
-        # No translations, fallback to English.
-        # That's fine if the user's language is actually English.
-        else:
-            if 'en' not in expanded_langs:
-                logger.warning(
-                    "Can't find translation for codes: {!r}!",
-                    expanded_langs,
-                )
-            trans = gettext.NullTranslations()
-
-    # Add these functions to builtins, plus _=gettext
-    trans.install(['gettext', 'ngettext'])
-
-    # Some lang-specific overrides..
-
-    if trans.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
-        # For Japanese/Chinese, we want a 'sans-serif' / gothic font
-        # style.
-        try:
-            from tkinter import font
-        except ImportError:
-            return
-        font_names = [
-            'TkDefaultFont',
-            'TkHeadingFont',
-            'TkTooltipFont',
-            'TkMenuFont',
-            'TkTextFont',
-            'TkCaptionFont',
-            'TkSmallCaptionFont',
-            'TkIconFont',
-            # Note - not fixed-width...
-        ]
-        for font_name in font_names:
-            font.nametofont(font_name).configure(family='sans-serif')

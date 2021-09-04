@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import srctools
 import contextlib
@@ -10,6 +11,7 @@ from babel.messages.mofile import write_mo
 
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+workpath: str  # PyInstaller sets this.
 
 
 # src -> build subfolder.
@@ -22,7 +24,7 @@ data_files = [
 ]
 
 
-def do_localisation():
+def do_localisation() -> None:
     """Build localisation."""
 
     # Make the directories.
@@ -36,7 +38,10 @@ def do_localisation():
         msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
 
-    extracted = babel.messages.extract.extract_from_dir('.')
+    extracted = babel.messages.extract.extract_from_dir(
+        '.',
+        comment_tags=['i18n:'],
+    )
     for filename, lineno, message, comments, context in extracted:
         catalog.add(
             message,
@@ -79,6 +84,29 @@ def do_localisation():
     data_files.append((str(i18n / 'en.mo'), 'i18n/'))
 
 
+def build_srctools_fgd() -> None:
+    """Build a copy of the Srctools compiler entities."""
+    import srctools
+    engine_fgd = srctools.FGD.engine_dbase()
+    engine_fgd.collapse_bases()
+    fgd = srctools.FGD()
+
+    for ent in engine_fgd:
+        if ent.classname.startswith('comp_'):
+            fgd.entities[ent.classname] = ent
+            # The relevant HammerAddons tags.
+            ent.strip_tags(frozenset({
+                'SINCE_HL2', 'SINCE_HLS', 'SINCE_EP1', 'SINCE_EP2', 'SINCE_TF2',
+                'SINCE_P1', 'SINCE_L4D', 'SINCE_L4D2', 'SINCE_ASW', 'SINCE_P2',
+                'P2', 'UNTIL_CSGO', 'VSCRIPT', 'INST_IO',
+            }))
+
+    with Path(workpath, 'srctools.fgd').open('w') as fgd_file:
+        fgd.export(fgd_file)
+    data_files.append((fgd_file.name, '.'))
+
+
+build_srctools_fgd()
 do_localisation()
 
 
@@ -128,7 +156,7 @@ EXCLUDES = [
     'idlelib.tabbedpages',
     'idlelib.textView',
 
-    'numpy', # PIL.ImageFilter imports, we don't need NumPy!
+    'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
@@ -144,6 +172,10 @@ EXCLUDES = [
     'optparse',
     'argparse',
 ]
+
+if sys.version_info >= (3, 7):
+    # Only needed on 3.6, it's in the stdlib thereafter.
+    EXCLUDES += ['importlib_resources']
 
 bee_version = input('BEE2 Version (x.y.z): ')
 
@@ -165,6 +197,9 @@ for snd in os.listdir('../sounds/'):
         continue
     data_files.append(('../sounds/' + snd, 'sounds'))
 
+# Include the compiler, picking the right architecture.
+bitness = 64 if sys.maxsize > (2**33) else 32
+data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
 
 # Finally, run the PyInstaller analysis process.
 

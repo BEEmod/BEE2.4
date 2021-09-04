@@ -418,7 +418,7 @@ def save_pal(items, name: str, include_settings: bool):
         pal_list.append(pal)
 
     if include_settings:
-        pal.settings = BEE2_config.get_curr_settings()
+        pal.settings = BEE2_config.get_curr_settings(is_palette=True)
     else:
         pal.settings = None
 

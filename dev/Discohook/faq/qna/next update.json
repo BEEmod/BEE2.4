@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Next Update",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "When is the next update for BEE2.4?",
+                "description": "There are no set release dates for BEE2 updates. Sometimes they will be released every few weeks, and sometimes there will be months between updates. Instructions to run development versions of BEE2.4 can be found in the readme, if you want to test new features before they have been released.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

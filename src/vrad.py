@@ -10,60 +10,68 @@ LOGGER = init_logging('bee2/vrad.log')
 import os
 import shutil
 import sys
+import importlib
+import pkgutil
 from io import BytesIO
 from zipfile import ZipFile
 from typing import List, Set
+from pathlib import Path
 
 import srctools.run
-from srctools import Property, FGD
+from srctools import FGD
 from srctools.bsp import BSP, BSP_LUMPS
-from srctools.filesys import (
-    RawFileSystem, VPKFileSystem, ZipFileSystem,
-    FileSystem,
-)
+from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
+from srctools.scripts.plugin import PluginFinder, Source as PluginSource
 
+from BEE2_config import ConfigFile
+from postcomp import music, screenshot
+# Load our BSP transforms.
+# noinspection PyUnresolvedReferences
 from postcomp import (
-    music,
-    screenshot,
     coop_responses,
     filter,
 )
+import utils
 
 
-def dump_files(bsp: BSP, dump_folder: str) -> None:
-    """Dump packed files to a location.
+def load_transforms() -> None:
+    """Load all the BSP transforms.
+
+    We need to do this differently when frozen, since they're embedded in our
+    executable.
     """
-    if not dump_folder:
-        return
-
-    dump_folder = os.path.abspath(dump_folder)
-    
-    LOGGER.info('Dumping packed files to "{}"...', dump_folder)
-
-    # Delete files in the folder, but don't delete the folder itself.
-    try:
-        files = os.listdir(dump_folder)
-    except FileNotFoundError:
-        return
-
-    for name in files:
-        name = os.path.join(dump_folder, name)
-        if os.path.isdir(name):
-            try:
-                shutil.rmtree(name)
-            except OSError:
-                # It's possible to fail here, if the window is open elsewhere.
-                # If so, just skip removal and fill the folder.
-                pass
-        else:
-            os.remove(name)
-
-    with bsp.packfile() as zipfile:
-        for zipinfo in zipfile.infolist():
-            zipfile.extract(zipinfo, dump_folder)
+    # Find the modules in the conditions package.
+    # PyInstaller messes this up a bit.
+    if utils.FROZEN:
+        # This is the PyInstaller loader injected during bootstrap.
+        # See PyInstaller/loader/pyimod03_importers.py
+        # toc is a PyInstaller-specific attribute containing a set of
+        # all frozen modules.
+        loader = pkgutil.get_loader('postcomp.transforms')
+        for module in loader.toc:
+            if module.startswith('postcomp.transforms'):
+                LOGGER.debug('Importing transform {}', module)
+                sys.modules[module] = importlib.import_module(module)
+    else:
+        # We can just delegate to the regular postcompiler finder.
+        try:
+            transform_loc = Path(os.environ['BSP_TRANSFORMS'])
+        except KeyError:
+            transform_loc = utils.install_path('../HammerAddons/transforms/')
+        if not transform_loc.exists():
+            raise ValueError(
+                f'Invalid BSP transforms location "{transform_loc.resolve()}"!\n'
+                'Clone TeamSpen210/HammerAddons next to BEE2.4, or set the '
+                'environment variable BSP_TRANSFORMS to the location.'
+            )
+        finder = PluginFinder('postcomp.transforms', [
+            PluginSource(transform_loc, recurse=True),
+        ])
+        sys.meta_path.append(finder)
+        finder.load_all()
 
 
 def run_vrad(args: List[str]) -> None:
@@ -78,12 +86,12 @@ def run_vrad(args: List[str]) -> None:
 
 def main(argv: List[str]) -> None:
     """Main VRAD script."""
-    LOGGER.info('BEE2 VRAD hook started!')
-        
+    LOGGER.info("BEE{} VRAD hook initiallised.", utils.BEE_VERSION)
+
     args = " ".join(argv)
     fast_args = argv[1:]
     full_args = argv[1:]
-    
+
     if not fast_args:
         # No arguments!
         LOGGER.info(
@@ -104,15 +112,7 @@ def main(argv: List[str]) -> None:
     LOGGER.info("Map path is " + path)
 
     LOGGER.info('Loading Settings...')
-    try:
-        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
-            conf = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
-                'Config', []
-            )
-    except FileNotFoundError:
-        conf = Property('Config', [])
-    else:
-        LOGGER.info('Config Loaded!')
+    config = ConfigFile('compile.cfg')
 
     for a in fast_args[:]:
         folded_a = a.casefold()
@@ -151,20 +151,18 @@ def main(argv: List[str]) -> None:
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
 
-    bsp_ents = bsp_file.read_ent_data()
-
-    # If VBSP thinks it's hammer, trust it.
-    if conf.bool('is_hammer', False):
-        is_peti = edit_args = False
-    else:
+    # If VBSP marked it as Hammer, trust that.
+    if srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_peti']):
         is_peti = True
         # Detect preview via knowing the bsp name. If we are in preview,
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
-            edit_args = not conf.bool('force_full', False)
+            edit_args = not config.get_bool('General', 'vrad_force_full')
         else:
             # publishing - always force full lighting.
             edit_args = False
+    else:
+        is_peti = edit_args = False
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override commands!
@@ -182,15 +180,6 @@ def main(argv: List[str]) -> None:
     root_folder = game.path.parent
     fsys = game.get_filesystem()
 
-    # Put the Mel and Tag filesystems in so we can pack from there.
-    fsys_tag = fsys_mel = None
-    if is_peti and 'mel_vpk' in conf:
-        fsys_mel = VPKFileSystem(conf['mel_vpk'])
-        fsys.add_sys(fsys_mel)
-    if is_peti and 'tag_dir' in conf:
-        fsys_tag = RawFileSystem(conf['tag_dir'])
-        fsys.add_sys(fsys_tag)
-
     # Special case - move the BEE2 fsys FIRST, so we always pack files found
     # there.
     for child_sys in fsys.systems[:]:
@@ -204,8 +193,6 @@ def main(argv: List[str]) -> None:
 
     # Mount the existing packfile, so the cubemap files are recognised.
     fsys.add_sys(ZipFileSystem('<BSP pakfile>', zipfile))
-
-    fsys.open_ref()
 
     LOGGER.info('Done!')
 
@@ -221,6 +208,8 @@ def main(argv: List[str]) -> None:
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
 
+    load_transforms()
+
     # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
     for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
@@ -229,23 +218,14 @@ def main(argv: List[str]) -> None:
 
     if is_peti:
         LOGGER.info('Checking for music:')
-        music.generate(bsp_ents, packlist)
-
-        for prop in conf.find_children('InjectFiles'):
-            filename = os.path.join('bee2', 'inject', prop.real_name)
-            try:
-                with open(filename, 'rb') as f:
-                    LOGGER.info('Injecting "{}" into packfile.', prop.value)
-                    packlist.pack_file(prop.value, data=f.read())
-            except FileNotFoundError:
-                pass
+        music.generate(bsp_file.ents, packlist)
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_ents, fsys, packlist, bsp_file, game)
+    run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
-    packlist.pack_fgd(bsp_ents, fgd)
+    packlist.pack_fgd(bsp_file.ents, fgd)
     packlist.eval_dependencies()
     LOGGER.info('Done!')
 
@@ -255,10 +235,6 @@ def main(argv: List[str]) -> None:
     pack_whitelist = set()  # type: Set[FileSystem]
     pack_blacklist = set()  # type: Set[FileSystem]
     if is_peti:
-        if fsys_mel is not None:
-            pack_whitelist.add(fsys_mel)
-        if fsys_tag is not None:
-            pack_whitelist.add(fsys_tag)
         # Exclude absolutely everything except our folder.
         for child_sys, _ in fsys.systems:
             # Add 'bee2/' and 'bee2_dev/' only.
@@ -270,10 +246,18 @@ def main(argv: List[str]) -> None:
             else:
                 pack_blacklist.add(child_sys)
 
+    if config.get_bool('General', 'packfile_dump_enable'):
+        dump_loc = Path(config.get_val(
+            'General',
+            'packfile_dump_dir',
+            '../dump/'
+        )).absolute()
+    else:
+        dump_loc = None
+
     if '-no_pack' not in args:
         # Cubemap files packed into the map already.
-        with bsp_file.packfile() as zipfile:
-            existing = set(zipfile.namelist())
+        existing = set(bsp_file.pakfile.namelist())
 
         LOGGER.info('Writing to BSP...')
         packlist.pack_into_zip(
@@ -281,23 +265,20 @@ def main(argv: List[str]) -> None:
             ignore_vpk=True,
             whitelist=pack_whitelist,
             blacklist=pack_blacklist,
+            dump_loc=dump_loc,
         )
 
-        with bsp_file.packfile() as zipfile:
-            LOGGER.info('Packed files:\n{}', '\n'.join(
-                set(zipfile.namelist()) - existing
-            ))
+        LOGGER.info('Packed files:\n{}', '\n'.join(
+            set(bsp_file.pakfile.namelist()) - existing
+        ))
 
-    dump_files(bsp_file, conf['packfile_dump', ''])
 
-    # Copy new entity data.
-    bsp_file.lumps[BSP_LUMPS.ENTITIES].data = BSP.write_ent_data(bsp_ents)
-
+    LOGGER.info('Writing BSP...')
     bsp_file.save()
     LOGGER.info(' - BSP written!')
 
     if is_peti:
-        screenshot.modify(conf)
+        screenshot.modify(config, game.path)
 
     if edit_args:
         LOGGER.info("Forcing Cheap Lighting!")

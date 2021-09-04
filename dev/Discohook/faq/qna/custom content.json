@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Custom Content",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Do people playing my BEEmod maps need BEEmod installed to see the custom content, or play the map at all?",
+                "description": "No. This was the case with the High Energy Pellet items in the original BEEmod, but the BEE2 packs all custom content into the map automatically. (It's supposed to, at least. If something doesn't get packed, it's a bug; report it on the issue tracker if it hasn't already been.)",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

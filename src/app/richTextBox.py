@@ -6,7 +6,8 @@ from tkinter.messagebox import askokcancel
 from typing import Union, Tuple, Dict, Callable
 import webbrowser
 
-from app import tkMarkdown, img
+from app import tkMarkdown
+from app.tk_tools import Cursors
 import utils
 import srctools.logger
 
@@ -25,7 +26,7 @@ class tkRichText(tkinter.Text):
         self.italic_font['slant'] = 'italic'
 
         # URL -> tag name and callback ID.
-        self._link_commands: Dict[str, Tuple[str, int]] = {}
+        self._link_commands: Dict[str, Tuple[str, str]] = {}
 
         super().__init__(
             parent,
@@ -34,11 +35,11 @@ class tkRichText(tkinter.Text):
             wrap="word",
             font=self.font,
             # We only want the I-beam cursor over text.
-            cursor=utils.CURSORS['regular'],
+            cursor=Cursors.REGULAR,
         )
 
         self.heading_font = {}
-        cur_size = self.font['size']
+        cur_size: float = self.font['size']
         for size in range(6, 0, -1):
             self.heading_font[size] = font = self.font.copy()
             cur_size /= 0.8735
@@ -50,7 +51,7 @@ class tkRichText(tkinter.Text):
 
         self.tag_config(
             "underline",
-            underline=1,
+            underline=True,
         )
         self.tag_config(
             "bold",
@@ -68,6 +69,10 @@ class tkRichText(tkinter.Text):
             "invert",
             background='black',
             foreground='white',
+        )
+        self.tag_config(
+            "code",
+            font='TkFixedFont',
         )
         self.tag_config(
             "indent",
@@ -97,7 +102,7 @@ class tkRichText(tkinter.Text):
         )
         self.tag_config(
             "link",
-            underline=1,
+            underline=True,
             foreground='blue',
         )
 
@@ -106,12 +111,12 @@ class tkRichText(tkinter.Text):
         self.tag_bind(
             "link",
             "<Enter>",
-            lambda e: self.configure(cursor=utils.CURSORS['link']),
+            lambda e: self.__setitem__('cursor', Cursors.LINK),
         )
         self.tag_bind(
             "link",
             "<Leave>",
-            lambda e: self.configure(cursor=utils.CURSORS['regular']),
+            lambda e: self.__setitem__('cursor', Cursors.REGULAR),
         )
 
         self['state'] = "disabled"
@@ -160,7 +165,9 @@ class tkRichText(tkinter.Text):
                 super().insert('end', block.text, tags)
             elif isinstance(block, tkMarkdown.Image):
                 super().insert('end', '\n')
-                self.image_create('end', image=img.png(block.src))
+                # TODO: Setup apply to handle this?
+                block.handle._force_loaded = True
+                self.image_create('end', image=block.handle._load_tk())
                 super().insert('end', '\n')
             else:
                 raise ValueError('Unknown block {!r}?'.format(block))

@@ -2,7 +2,7 @@ from packages import PakObject, ParseData, ExportData
 from srctools import Property
 
 
-class EditorSound(PakObject, has_img=False):
+class EditorSound(PakObject):
     """Add sounds that are usable in the editor.
 
     The editor only reads in game_sounds_editor, so custom sounds must be

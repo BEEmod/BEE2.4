@@ -1,18 +1,16 @@
 """Implements the cutomisable vactube items.
 """
-from collections import namedtuple
-from typing import Dict, Tuple, List, Iterator, Optional, NamedTuple
+from typing import Optional, Dict, Tuple, List, Iterator, Iterable
 
-from srctools import Vec, Vec_tuple, Property, Entity, VMF, Solid, Matrix, Angle
+import attr
+
+from srctools import Vec, Property, Entity, VMF, Solid, Matrix, Angle
 import srctools.logger
 
 from precomp import tiling, instanceLocs, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
-from precomp.conditions import (
-    make_result, make_result_setup, RES_EXHAUSTED,
-    meta_cond
-)
-import vbsp
+from precomp.conditions import make_result, meta_cond, RES_EXHAUSTED
+import utils
 
 COND_MOD_NAME = None
 
@@ -22,33 +20,49 @@ PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
-PUSH_TRIGS = {}
+PUSH_TRIGS: Dict[Tuple[float, float, float], Entity] = {}
 VAC_TRACKS: List[Tuple['Marker', Dict[str, 'Marker']]] = []  # Tuples of (start, group)
 
 
-class Config(NamedTuple):
+@attr.define
+class Config:
+    """Configuration for a vactube item set."""
     inst_corner: List[str]
-    temp_corner: List[Optional[template_brush.Template]]
-    inst_straight: str
-    inst_support: str
+    temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
+    trig_radius: int
+    inst_support: str  # Placed on each side with an adjacent wall.
+    inst_support_ring: str  # If any support is placed, this is placed.
     inst_exit: str
 
     inst_entry_floor: str
     inst_entry_wall: str
     inst_entry_ceil: str
 
+    # For straight instances, a size (multiple of 128) -> instance.
+    inst_straight: Dict[int, str]
+    # And those sizes from large to small.
+    inst_straight_sizes: List[int] = attr.ib(init=False)
+    @inst_straight_sizes.default
+    def _straight_size(self) -> list[int]:
+        return sorted(self.inst_straight.keys(), reverse=True)
 
+
+@attr.define
 class Marker:
     """A single node point."""
-    next: Optional[str]
+    ent: Entity = attr.ib(on_setattr=attr.setters.frozen)
+    conf: Config
+    size: int
+    no_prev: bool = True
+    next: Optional[str] = None
+    orient: Matrix = attr.ib(init=False, on_setattr=attr.setters.frozen)
 
-    def __init__(self, inst: Entity, conf: Config, size: int) -> None:
-        self.ent = inst
-        self.conf = conf
-        self.next = None
-        self.no_prev = True
-        self.size = size
-        self.orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    # noinspection PyUnresolvedReferences
+    @orient.default
+    def _init_orient(self) -> Matrix:
+        """We need to rotate the orient, because items have forward as negative X."""
+        rot = Matrix.from_angle(Angle.from_str(self.ent['angles']))
+        return Matrix.from_yaw(180) @ rot
 
     def follow_path(self, vac_list: Dict[str, 'Marker']) -> Iterator[Tuple['Marker', 'Marker']]:
         """Follow the provided vactube path, yielding each pair of nodes."""
@@ -68,30 +82,45 @@ class Marker:
 VAC_CONFIGS: Dict[str, Dict[str, Tuple[Config, int]]] = {}
 
 
-@make_result_setup('CustVactube')
-def res_vactube_setup(res: Property):
+@make_result('CustVactube')
+def res_vactubes(vmf: VMF, res: Property):
+    """Specialised result to parse vactubes from markers.
+
+    Only runs once, and then quits the condition list. After priority 400,
+    the ents will actually be placed.
+    """
     group = res['group', 'DEFAULT_GROUP']
 
     if group not in VAC_CONFIGS:
         # Store our values in the CONFIGS dictionary
-        inst_configs = VAC_CONFIGS[group] = {}
+        inst_config = VAC_CONFIGS[group] = {}
     else:
         # Grab the already-filled values, and add to them
-        inst_configs = VAC_CONFIGS[group]
+        inst_config = VAC_CONFIGS[group]
 
-    def get_temp(key):
+    def get_temp(key: str) -> Tuple[Optional[template_brush.Template], Iterable[str]]:
+        """Read the template, handling errors."""
         try:
-            temp_id = block['temp_' + key]
+            temp_name = block['temp_' + key]
         except LookupError:
-            return None
+            return None, ()
+        temp_id, visgroups = template_brush.parse_temp_name(temp_name)
         try:
-            return template_brush.get_template(temp_id)
+            return template_brush.get_template(temp_id), visgroups
         except template_brush.InvalidTemplateName:
-            LOGGER.warning('Invalid template "{}" for vactube group {}!', temp_id, group)
-            return None
+            LOGGER.warning('Invalid template "{}" for vactube group {}!', temp_name, group)
+            return None, ()
 
     for block in res.find_all("Instance"):
         # Configuration info for each instance set..
+        straight_block = block.find_key('straight_inst', '')
+        if straight_block.has_children():
+            straight = {
+                int(prop.name): prop.value
+                for prop in straight_block
+            }
+        else:
+            straight = {128: straight_block.value}
         conf = Config(
             # The three sizes of corner instance
             inst_corner=[
@@ -104,11 +133,13 @@ def res_vactube_setup(res: Property):
                 get_temp('corner_medium'),
                 get_temp('corner_large'),
             ],
-            # Straight instances connected to the next part
-            inst_straight=block['straight_inst', ''],
+            trig_radius=block.float('trig_size', 64.0) / 2.0,
+            inst_straight=straight,
             # Supports attach to the 4 sides of the straight part,
             # if there's a brush there.
             inst_support=block['support_inst', ''],
+            # If a support is placed, this is also placed once.
+            inst_support_ring=block['support_ring_inst', ''],
             inst_entry_floor=block['entry_floor_inst'],
             inst_entry_wall=block['entry_inst'],
             inst_entry_ceil=block['entry_ceil_inst'],
@@ -124,75 +155,67 @@ def res_vactube_setup(res: Property):
                 size = 0
                 file = prop.value
 
-            for inst in instanceLocs.resolve(file):
-                inst_configs[inst] = conf, size
+            for inst_filename in instanceLocs.resolve(file):
+                inst_config[inst_filename] = conf, size
 
-    return group
+    def result(_: Entity) -> None:
+        """Create the vactubes."""
+        if group not in VAC_CONFIGS:
+            # We've already executed this config group
+            return RES_EXHAUSTED
 
+        del VAC_CONFIGS[group]  # Don't let this run twice
 
-@make_result('CustVactube')
-def res_make_vactubes(vmf: VMF, res: Property):
-    """Specialised result to parse vactubes from markers.
+        markers: Dict[str, Marker] = {}
 
-    Only runs once, and then quits the condition list. After priority 400,
-    the ents will actually be placed.
-    """
-    if res.value not in VAC_CONFIGS:
-        # We've already executed this config group
-        return RES_EXHAUSTED
-
-    inst_config = VAC_CONFIGS[res.value]
-    del VAC_CONFIGS[res.value]  # Don't let this run twice
-
-    markers: Dict[str, Marker] = {}
-
-    # Find all our markers, so we can look them up by targetname.
-    for inst in vmf.by_class['func_instance']:  # type: Entity
-        try:
-            config, inst_size = inst_config[inst['file'].casefold()]
-        except KeyError:
-            continue  # Not a marker
-
-        # Remove the original instance from the level - we spawn entirely new
-        # ones.
-        inst.remove()
-
-        markers[inst['targetname']] = Marker(inst, config, inst_size)
-
-    for mark_name, marker in markers.items():
-        marker_item = connections.ITEMS[mark_name]
-
-        marker_item.delete_antlines()
-
-        next_marker = None
-        for conn in list(marker_item.outputs):
+        # Find all our markers, so we can look them up by targetname.
+        for inst in vmf.by_class['func_instance']:
             try:
-                next_marker = markers[conn.to_item.name]
+                config, inst_size = inst_config[inst['file'].casefold()]
             except KeyError:
-                LOGGER.warning(
-                    'Vactube connected to non-vactube ("{}")!',
-                    conn.to_item.name,
-                )
-                continue
+                continue  # Not a marker
 
-            conn.remove()
-                
-            if marker.next is not None:
-                raise ValueError('Vactube connected to two targets!')
-            marker.next = conn.to_item.name
-            next_marker.no_prev = False
+            # Remove the original instance from the level - we spawn entirely new
+            # ones.
+            inst.remove()
 
-        if next_marker is None:
-            # No next-instances were found..
-            # Mark as no-connections
-            marker.next = None
+            markers[inst['targetname']] = Marker(inst, config, inst_size)
 
-    # We do generation only from the start of chains.
-    for marker in markers.values():
-        if marker.no_prev:
-            VAC_TRACKS.append((marker, markers))
+        for mark_name, marker in markers.items():
+            marker_item = connections.ITEMS[mark_name]
 
-    return RES_EXHAUSTED
+            marker_item.delete_antlines()
+
+            next_marker = None
+            for conn in list(marker_item.outputs):
+                try:
+                    next_marker = markers[conn.to_item.name]
+                except KeyError:
+                    LOGGER.warning(
+                        'Vactube connected to non-vactube ("{}")!',
+                        conn.to_item.name,
+                    )
+                    continue
+
+                conn.remove()
+
+                if marker.next is not None:
+                    raise ValueError('Vactube connected to two targets!')
+                marker.next = conn.to_item.name
+                next_marker.no_prev = False
+
+            if next_marker is None:
+                # No next-instances were found..
+                # Mark as no-connections
+                marker.next = None
+
+        # We do generation only from the start of chains.
+        for marker in markers.values():
+            if marker.no_prev:
+                VAC_TRACKS.append((marker, markers))
+
+        return RES_EXHAUSTED
+    return result
 
 
 @meta_cond(400)
@@ -202,7 +225,7 @@ def vactube_gen(vmf: VMF) -> None:
         return
     LOGGER.info('Generating vactubes...')
     for start, all_markers in VAC_TRACKS:
-        start_normal = -start.orient.forward()
+        start_normal = start.orient.forward()
 
         # First create the start section..
         start_logic = start.ent.copy()
@@ -221,7 +244,7 @@ def vactube_gen(vmf: VMF) -> None:
             join_markers(vmf, inst, end, inst is start)
 
         end_loc = Vec.from_str(end.ent['origin'])
-        end_norm = -end.orient.forward()
+        end_norm = end.orient.forward()
 
         # join_markers creates straight parts up-to the marker, but not at it's
         # location - create the last one.
@@ -235,13 +258,14 @@ def vactube_gen(vmf: VMF) -> None:
 
         # If the end is placed in goo, don't add logic - it isn't visible, and
         # the object is on a one-way trip anyway.
-        if BLOCK_POS['world': end_loc].is_goo and end_norm.z < 0:
+        if not (BLOCK_POS['world': end_loc].is_goo and end_norm.z < -1e-6):
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
             end_logic['file'] = end.conf.inst_exit
 
 
 def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
+    """Generate the push trigger for these solids."""
     # We only need one trigger per direction, for now.
     try:
         ent = PUSH_TRIGS[normal.as_tuple()]
@@ -252,8 +276,8 @@ def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
             # The z-direction is reversed..
             pushdir=normal.to_angle(),
             speed=(
-                UP_PUSH_SPEED if normal.z > 0 else
-                DN_PUSH_SPEED if normal.z < 0 else
+                UP_PUSH_SPEED if normal.z > 1e-6 else
+                DN_PUSH_SPEED if normal.z < -1e-6 else
                 PUSH_SPEED
             ),
             spawnflags='1103',  # Clients, Physics, Everything
@@ -273,7 +297,7 @@ def motion_trigger(vmf: VMF, *solids: Solid) -> None:
     duck_trig = vmf.create_ent(
         classname='trigger_playermovement',
         origin=motion_trig['origin'],
-        spawnflags=1 + 2048,  # Clients, Auto-duck while in trigger.
+        spawnflags=1 | 2048,  # Clients, Auto-duck while in trigger.
     )
     for solid in solids:
         motion_trig.solids.append(solid.copy())
@@ -289,55 +313,64 @@ def make_straight(
     is_start=False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
+    angles = round(normal, 6).to_angle()
+    orient = Matrix.from_angle(angles)
 
-    # 32 added to the other directions, plus extended dist in the direction
-    # of the normal - 1
-    p1 = origin + (normal * ((dist // 128 * 128) - 96))
-    # The starting brush needs to
-    # stick out a bit further, to cover the
+    # The starting brush needs to stick out a bit further, to cover the
     # point_push entity.
-    p2 = origin - (normal * (96 if is_start else 32))
+    start_off = -96 if is_start else -64
 
-    # bbox before +- 32 to ensure the above doesn't wipe it out
-    p1, p2 = Vec.bbox(p1, p2)
+    p1, p2 = Vec.bbox(
+        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+    )
 
-    solid = vmf.make_prism(
-        # Expand to 64x64 in the other two directions
-        p1 - 32, p2 + 32,
-        mat='tools/toolstrigger',
-    ).solid
+    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
     motion_trigger(vmf, solid.copy())
 
     push_trigger(vmf, origin, normal, [solid])
 
-    angles = normal.to_angle()
-    orient = Matrix.from_angle(angles)
-
-    for off in range(0, int(dist), 128):
-        position = origin + off * normal
+    off = 0
+    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
         vmf.create_ent(
             classname='func_instance',
-            origin=position,
-            angles=orient.to_angle(),
-            file=config.inst_straight,
+            origin=origin + off * orient.forward(),
+            angles=angles,
+            file=config.inst_straight[seg_dist],
         )
-
-        for supp_dir in [orient.up(), orient.left(), -orient.left(), -orient.up()]:
-            try:
-                tile = tiling.TILES[
-                    (position - 128 * supp_dir).as_tuple(),
-                    supp_dir.norm().as_tuple()
-                ]
-            except KeyError:
-                continue
-            # Check all 4 center tiles are present.
-            if all(tile[u, v].is_tile for u in (1,2) for v in (1, 2)):
+        off += seg_dist
+    # Supports.
+    if config.inst_support:
+        for off in range(0, int(dist), 128):
+            position = origin + off * normal
+            placed_support = False
+            for supp_dir in [
+                orient.up(), orient.left(),
+                -orient.left(), -orient.up()
+            ]:
+                try:
+                    tile = tiling.TILES[
+                        (position - 128 * supp_dir).as_tuple(),
+                        supp_dir.norm().as_tuple()
+                    ]
+                except KeyError:
+                    continue
+                # Check all 4 center tiles are present.
+                if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+                    vmf.create_ent(
+                        classname='func_instance',
+                        origin=position,
+                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        file=config.inst_support,
+                    )
+                    placed_support = True
+            if placed_support and config.inst_support_ring:
                 vmf.create_ent(
                     classname='func_instance',
                     origin=position,
-                    angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
-                    file=config.inst_support,
+                    angles=angles,
+                    file=config.inst_support_ring,
                 )
 
 
@@ -349,19 +382,21 @@ def make_corner(
     size: int,
     config: Config,
 ) -> None:
+    """Place a corner."""
     angles = Matrix.from_basis(z=start_dir, x=end_dir).to_angle()
     vmf.create_ent(
         classname='func_instance',
         origin=origin,
         angles=angles,
-        file=config.inst_corner[size],
+        file=config.inst_corner[int(size)],
     )
 
-    temp = config.temp_corner[size]
-    if temp:
+    temp, visgroups = config.temp_corner[int(size)]
+    if temp is not None:
         temp_solids = template_brush.import_template(
             vmf,
             temp,
+            additional_visgroups=visgroups,
             origin=origin,
             angles=angles,
             force_type=template_brush.TEMP_TYPES.world,
@@ -383,18 +418,18 @@ def make_bend(
     """Make a corner and the straight sections leading into it."""
     off = origin_b - origin_a
     # The distance to move first, then second.
-    first_movement = off.norm_mask(norm_a)
-    sec_movement = off.norm_mask(norm_b)
+    first_movement = round(Vec.dot(off, norm_a))
+    sec_movement = round(Vec.dot(off, norm_b))
 
     # The size of the corner ranges from 1-3. It's
     # limited by the user's setting and the distance we have in each direction
     corner_size = int(min(
-        first_movement.mag() // 128, sec_movement.mag() // 128,
+        first_movement // 128, sec_movement // 128,
         3, max_size,
     ))
 
-    straight_a = first_movement.mag() - (corner_size - 1) * 128
-    straight_b = sec_movement.mag() - (corner_size) * 128
+    straight_a = first_movement - (corner_size - 1) * 128
+    straight_b = sec_movement - corner_size * 128
 
     if corner_size < 1:
         return  # No room!
@@ -442,19 +477,19 @@ def make_ubend(
     offset = origin_b - origin_a
 
     out_axis = normal.axis()
-    out_off = offset[out_axis]
+    out_off = int(offset[out_axis])
     offset[out_axis] = 0
 
     if len(offset) == 2:
         # Len counts the non-zero values..
-        # If 2, the ubend is diagonal so it's ambigous where to put the bends.
+        # If 2, the u-bend is diagonal so it's ambiguous where to put the bends.
         return []
 
     side_norm = offset.norm()
 
-    for side_axis, side_dist in zip('xyz', offset):
-        if side_dist:
-            side_dist = abs(side_dist) + 128
+    for side_axis, side_dist_flt in zip('xyz', offset):
+        if abs(side_dist_flt) > 0.01:
+            side_dist = int(abs(side_dist_flt)) + 128
             break
     else:
         # The two tube items are on top of another, that's
@@ -573,10 +608,18 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
     origin_a = Vec.from_str(mark_a.ent['origin'])
     origin_b = Vec.from_str(mark_b.ent['origin'])
 
-    norm_a = Vec(-1, 0, 0).rotate_by_str(mark_a.ent['angles'])
-    norm_b = Vec(-1, 0, 0).rotate_by_str(mark_b.ent['angles'])
+    norm_a = mark_a.orient.forward()
+    norm_b = mark_b.orient.forward()
 
     config = mark_a.conf
+
+    LOGGER.debug(
+        'Connect markers: {} @ {} -> {} @ {}, dot={}\n{}',
+        origin_a, norm_a,
+        origin_b, norm_b,
+        Vec.dot(norm_a, norm_b),
+        config,
+    )
 
     if norm_a == norm_b:
         # Either straight-line, or s-bend.
@@ -610,7 +653,7 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
     side_dir = Vec.cross(norm_a, norm_b)
     side_off_a = side_dir.dot(origin_a)
     side_off_b = side_dir.dot(origin_b)
-    if side_off_a == side_off_b:
+    if abs(side_off_a - side_off_b) < 1e-6:
         make_bend(
             vmf,
             origin_a,
@@ -619,4 +662,13 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
             norm_b,
             config,
             max_size=mark_a.size,
+        )
+    else:
+        LOGGER.warning(
+            'Cannot connect markers: {} @ {} -> {} @ {}\n '
+            'Sides: {:.12f} {:.12f}\n{}',
+            origin_a, norm_a,
+            origin_b, norm_b,
+            side_off_a, side_off_b,
+            config,
         )

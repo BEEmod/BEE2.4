@@ -1,9 +1,8 @@
 """Adds voicelines dynamically into the map."""
 import itertools
 import random
-from collections import namedtuple
 from decimal import Decimal
-from typing import List, Set
+from typing import List, Set, NamedTuple, Iterator
 
 import srctools.logger
 import vbsp
@@ -15,9 +14,6 @@ from srctools import Property, Vec, VMF, Output, Entity
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
 
-map_attr = {}
-style_vars = {}
-
 ADDED_BULLSEYES = set()
 
 # Special quote instances assoicated with an item/style.
@@ -26,9 +22,6 @@ QUOTE_EVENTS = {}  # id -> instance mapping
 
 # The block of SP and coop voice data
 QUOTE_DATA = Property('Quotes', [])
-
-ALLOW_MID_VOICES = False
-vmf_file = None  # type: VMF
 
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/bee2/voice/'
@@ -39,7 +32,10 @@ RESP_HAS_NAMES = {
     'death_laserfield': 'laserfield',
 }
 
-PossibleQuote = namedtuple('PossibleQuote', 'priority, lines')
+
+class PossibleQuote(NamedTuple):
+    priority: int
+    lines: List[Property]
 
 
 # Create a fake instance to pass to condition flags. This way we can
@@ -57,7 +53,7 @@ def has_responses():
     return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
 
 
-def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool) -> None:
+def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, voice_attrs: dict) -> None:
     """Write the coop responses information into the map."""
     config = ConfigFile('bee2/resp_voice.cfg', in_conf_folder=False)
     response_block = QUOTE_DATA.find_key('CoopResponses', [])
@@ -78,7 +74,7 @@ def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool) -> None:
             continue
 
         voice_attr = RESP_HAS_NAMES.get(section.name, '')
-        if voice_attr and not map_attr[voice_attr]:
+        if voice_attr and not voice_attrs[voice_attr]:
             # This response category isn't present.
             continue
 
@@ -119,7 +115,16 @@ def res_quote_event(res: Property):
     return conditions.RES_EXHAUSTED
 
 
-def find_group_quotes(vmf, group, mid_quotes, use_dings, conf, mid_name, player_flag_set):
+def find_group_quotes(
+    vmf: VMF,
+    group: Property,
+    mid_quotes,
+    allow_mid_voices,
+    use_dings,
+    conf,
+    mid_name: str,
+    player_flag_set: Set[str],
+) -> Iterator[PossibleQuote]:
     """Scan through a group, looking for applicable quote options."""
     is_mid = (group.name == 'midchamber')
 
@@ -154,7 +159,7 @@ def find_group_quotes(vmf, group, mid_quotes, use_dings, conf, mid_name, player_
 
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line_id, True):
-                if ALLOW_MID_VOICES and is_mid:
+                if allow_mid_voices and is_mid:
                     line_mid_quotes.append((line, use_dings, mid_name))
                 else:
                     poss_quotes.append(line)
@@ -176,13 +181,13 @@ def find_group_quotes(vmf, group, mid_quotes, use_dings, conf, mid_name, player_
     LOGGER.info('"{}": {}/{} quotes..', group_id, valid_quotes, len(all_quotes))
 
 
-def add_bullseye(quote_loc: Vec, name: str):
+def add_bullseye(vmf: VMF, quote_loc: Vec, name: str) -> None:
     """Add a bullseye to the map."""
     # Cave's voice lines require a special named bullseye to
     # work correctly.
     # Don't add the same one more than once.
     if name not in ADDED_BULLSEYES:
-        vmf_file.create_ent(
+        vmf.create_ent(
             classname='npc_bullseye',
             # Not solid, Take No Damage, Think outside PVS
             spawnflags='222224',
@@ -194,6 +199,7 @@ def add_bullseye(quote_loc: Vec, name: str):
 
 
 def add_choreo(
+    vmf: VMF,
     c_line: str,
     targetname: str,
     loc: Vec,
@@ -207,7 +213,7 @@ def add_choreo(
     if not c_line.startswith('scenes/'):
         c_line = 'scenes/' + c_line
 
-    choreo = vmf_file.create_ent(
+    choreo = vmf.create_ent(
         classname='logic_choreographed_scene',
         targetname=targetname,
         origin=loc,
@@ -241,7 +247,14 @@ def add_choreo(
     return choreo
 
 
-def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
+def add_quote(
+    vmf: VMF,
+    quote: Property,
+    targetname: str,
+    quote_loc: Vec,
+    style_vars: dict,
+    use_dings: bool,
+) -> None:
     """Add a quote to the map."""
     LOGGER.info('Adding quote: {}', quote)
 
@@ -258,7 +271,7 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
         name = prop.name.casefold()
 
         if name == 'file':
-            vmf_file.create_ent(
+            vmf.create_ent(
                 classname='func_instance',
                 targetname='',
                 file=INST_PREFIX + prop.value,
@@ -286,6 +299,7 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
                         secondary_name + str(ind)
                     )
                     choreo = add_choreo(
+                        vmf,
                         choreo_line.value,
                         targetname=name,
                         loc=start + off * (ind - 1),
@@ -311,6 +325,7 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
             else:
                 # Add a single choreo command.
                 choreo = add_choreo(
+                    vmf,
                     prop.value,
                     targetname,
                     quote_loc,
@@ -324,7 +339,7 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
         elif name == 'snd':
             start_names.append(targetname)
 
-            snd = vmf_file.create_ent(
+            snd = vmf.create_ent(
                 classname='ambient_generic',
                 spawnflags='49',  # Infinite Range, Starts Silent
                 targetname=targetname,
@@ -342,7 +357,7 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
             )
             start_ents.append(snd)
         elif name == 'bullseye':
-            add_bullseye(quote_loc, prop.value)
+            add_bullseye(vmf, quote_loc, prop.value)
         elif name == 'cc_emit':
             # In Aperture Tag, this additional console command is used
             # to add the closed captions.
@@ -355,16 +370,16 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
             # chosen.
             style_vars[prop.value.casefold()] = True
         elif name == 'packlist':
-            packing.pack_list(vmf_file, prop.value)
+            packing.pack_list(vmf, prop.value)
         elif name == 'pack':
             if prop.has_children():
-                packing.pack_files(vmf_file, *[
+                packing.pack_files(vmf, *[
                     subprop.value
                     for subprop in
                     prop
                 ])
             else:
-                packing.pack_files(vmf_file, prop.value)
+                packing.pack_files(vmf, prop.value)
         elif name == 'choreo_name':
             # Change the targetname used for subsequent entities
             targetname = prop.value
@@ -414,7 +429,7 @@ def sort_func(quote: PossibleQuote):
     # Without floating-point error.
     try:
         return Decimal(quote.priority)
-    except ValueError:
+    except ArithmeticError:
         # Default to priority 0
         return Decimal(0)
 
@@ -425,20 +440,15 @@ def get_studio_loc() -> Vec:
 
 
 def add_voice(
-        has_items: dict,
-        style_vars_: dict,
-        vmf_file_: VMF,
-        map_seed: str,
-        use_priority=True,
-):
+    voice_attrs: dict,
+    style_vars: dict,
+    vmf: VMF,
+    map_seed: str,
+    use_priority=True,
+) -> None:
     """Add a voice line to the map."""
     from precomp.conditions.monitor import make_voice_studio
-    global ALLOW_MID_VOICES, vmf_file, map_attr, style_vars
     LOGGER.info('Adding Voice Lines!')
-
-    vmf_file = vmf_file_
-    map_attr = has_items
-    style_vars = style_vars_
 
     norm_config = ConfigFile('bee2/voice.cfg', in_conf_folder=False)
     mid_config = ConfigFile('bee2/mid_voice.cfg', in_conf_folder=False)
@@ -447,7 +457,7 @@ def add_voice(
     quote_loc = get_studio_loc()
     if quote_base:
         LOGGER.info('Adding Base instance!')
-        vmf_file.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             targetname='voice',
             file=INST_PREFIX + quote_base,
@@ -457,7 +467,7 @@ def add_voice(
         )
 
     # Either box in with nodraw, or place the voiceline studio.
-    has_studio = make_voice_studio(vmf_file)
+    has_studio = make_voice_studio(vmf)
 
     bullsye_actor = vbsp_options.get(str, 'voice_studio_actor')
     if bullsye_actor and has_studio:
@@ -465,16 +475,16 @@ def add_voice(
 
     global_bullseye = QUOTE_DATA['bullseye', '']
     if global_bullseye:
-        add_bullseye(quote_loc, global_bullseye)
+        add_bullseye(vmf, quote_loc, global_bullseye)
 
-    ALLOW_MID_VOICES = not style_vars.get('nomidvoices', False)
+    allow_mid_voices = not style_vars.get('nomidvoices', False)
 
     mid_quotes = []
 
     # Enable using the beep before and after choreo lines.
     allow_dings = srctools.conv_bool(QUOTE_DATA['use_dings', '0'])
     if allow_dings:
-        vmf_file.create_ent(
+        vmf.create_ent(
             classname='logic_choreographed_scene',
             targetname='@ding_on',
             origin=quote_loc + (-8, -16, 0),
@@ -482,7 +492,7 @@ def add_voice(
             busyactor="1",  # Wait for actor to stop talking
             onplayerdeath='0',
         )
-        vmf_file.create_ent(
+        vmf.create_ent(
             classname='logic_choreographed_scene',
             targetname='@ding_off',
             origin=quote_loc + (8, -16, 0),
@@ -506,12 +516,12 @@ def add_voice(
 
     if has_responses():
         LOGGER.info('Generating responses data..')
-        encode_coop_responses(vmf_file, quote_loc, allow_dings)
+        encode_coop_responses(vmf, quote_loc, allow_dings, voice_attrs)
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         if not file:
             continue
-        vmf_file.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             targetname='voice_event_' + str(ind),
             file=file,
@@ -553,10 +563,11 @@ def add_voice(
 
         possible_quotes = sorted(
             find_group_quotes(
-                vmf_file,
+                vmf,
                 group,
                 mid_quotes,
-                use_dings,
+                use_dings=use_dings,
+                allow_mid_voices=allow_mid_voices,
                 conf=mid_config if group.name == 'midchamber' else norm_config,
                 mid_name=quote_targetname,
                 player_flag_set=player_flag_set,
@@ -564,6 +575,10 @@ def add_voice(
             key=sort_func,
             reverse=True,
         )
+
+        LOGGER.debug('Possible {}quotes:', 'mid ' if group.name == 'midchamber' else '')
+        for quot in possible_quotes:
+            LOGGER.debug('- {}', quot)
 
         if possible_quotes:
             choreo_loc = group.vec('choreo_loc', *quote_loc)
@@ -589,9 +604,11 @@ def add_voice(
 
             # Add one of the associated quotes
             add_quote(
+                vmf,
                 random.choice(chosen),
                 quote_targetname,
                 choreo_loc,
+                style_vars,
                 use_dings,
             )
 
@@ -601,7 +618,7 @@ def add_voice(
         # This is used for Cave and core Wheatley.
         LOGGER.info('Using microphones...')
         if vbsp.GAME_MODE == 'SP':
-            vmf_file.create_ent(
+            vmf.create_ent(
                 classname='env_microphone',
                 targetname='player_speaker_sp',
                 speakername='!player',
@@ -609,14 +626,14 @@ def add_voice(
                 origin=quote_loc,
             )
         else:
-            vmf_file.create_ent(
+            vmf.create_ent(
                 classname='env_microphone',
                 targetname='player_speaker_blue',
                 speakername='!player_blue',
                 maxRange='386',
                 origin=quote_loc,
             )
-            vmf_file.create_ent(
+            vmf.create_ent(
                 classname='env_microphone',
                 targetname='player_speaker_orange',
                 speakername='!player_orange',
@@ -628,6 +645,6 @@ def add_voice(
     for mid_lines in mid_quotes:
         line = random.choice(mid_lines)
         mid_item, use_ding, mid_name = line
-        add_quote(mid_item, mid_name, quote_loc, use_ding)
+        add_quote(vmf, mid_item, mid_name, quote_loc, style_vars, use_ding)
 
     LOGGER.info('Done!')

@@ -6,9 +6,12 @@ import mistletoe
 from mistletoe import block_token as btok
 from mistletoe import span_token as stok
 import srctools.logger
+import urllib.parse
 
-from typing import Optional, Union, Iterable, List, Tuple, NamedTuple
+from typing import Optional, Union, Iterable, List, Tuple, NamedTuple, Sequence
 
+import utils
+from app.img import Handle as ImgHandle
 
 LOGGER = srctools.logger.get_logger(__name__)
 # Mistletoe toke types.
@@ -24,12 +27,11 @@ class TextSegment(NamedTuple):
 
 class Image(NamedTuple):
     """An image."""
-    src: str
+    handle: ImgHandle
 
 # The kinds of data contained in MarkdownData
 Block = Union[TextSegment, Image]
 
-_NEWLINE = TextSegment('\n', (), None)
 _HR = [
     TextSegment('\n', (), None),
     TextSegment('\n', ('hrule', ), None),
@@ -43,6 +45,7 @@ class MarkdownData:
     Blocks are a list of data.
     """
     __slots__ = ['blocks']
+    blocks: Sequence[Block]  # External users shouldn't modify directly.
     def __init__(
         self,
         blocks: Iterable[Block] = (),
@@ -55,7 +58,12 @@ class MarkdownData:
 
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
-        return MarkdownData(self.blocks.copy())
+        return MarkdownData(self.blocks)
+
+    @classmethod
+    def text(cls, text: str, *tags: str, url: Optional[str] = None) -> 'MarkdownData':
+        """Construct data with a single text segment."""
+        return cls([TextSegment(text, tags, url)])
 
     __copy__ = copy
 
@@ -67,10 +75,12 @@ class TKRenderer(mistletoe.BaseRenderer):
         # The lists we're currently generating.
         # If none it's bulleted, otherwise it's the current count.
         self._list_stack: List[Optional[int]] = []
+        self.package: Optional[str] = None
         super().__init__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._list_stack.clear()
+        self.package = None
 
     def render(self, token: btok.BlockToken) -> MarkdownData:
         return super().render(token)
@@ -92,7 +102,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         # Merge together adjacent text segments.
         for child in token.children:
             for data in self.render(child).blocks:
-                if blocks and isinstance(blocks[-1], TextSegment):
+                if isinstance(data, TextSegment) and blocks and isinstance(blocks[-1], TextSegment):
                     last = blocks[-1]
                     if last.tags == data.tags and last.url == data.url:
                         blocks[-1] = TextSegment(last.text + data.text, last.tags, last.url)
@@ -147,7 +157,9 @@ class TKRenderer(mistletoe.BaseRenderer):
         return self._text(child.content)
 
     def render_image(self, token: stok.Image) -> MarkdownData:
-        return MarkdownData([Image(token.src)])
+        """Embed an image into a file."""
+        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), self.package)
+        return MarkdownData([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
         [child] = token.children
@@ -229,9 +241,13 @@ class TKRenderer(mistletoe.BaseRenderer):
 _RENDERER = TKRenderer()
 
 
-def convert(text: str) -> MarkdownData:
-    """Convert markdown syntax into data ready to be passed to richTextBox."""
+def convert(text: str, package: Optional[str]) -> MarkdownData:
+    """Convert markdown syntax into data ready to be passed to richTextBox.
+
+    The package must be passed to allow using images in the document.
+    """
     with _RENDERER:
+        _RENDERER.package = package
         return _RENDERER.render(mistletoe.Document(text))
 
 
@@ -242,13 +258,13 @@ def join(*args: MarkdownData) -> MarkdownData:
     """
     if len(args) == 1:
         # We only have one block, just copy and return.
-        return MarkdownData(args[0].blocks.copy())
+        return MarkdownData(args[0].blocks)
 
     blocks: List[Block] = []
 
     for child in args:
         for data in child.blocks:
-            if blocks and isinstance(blocks[-1], TextSegment):
+            if isinstance(data, TextSegment) and blocks and isinstance(blocks[-1], TextSegment):
                 if blocks[-1].tags == data.tags and blocks[-1].url == data.url:
                     blocks[-1] = TextSegment(blocks[-1].text + data.text, blocks[-1].tags, blocks[-1].url)
                     continue

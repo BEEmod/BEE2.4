@@ -2,11 +2,11 @@
 
 This controls how I/O is generated for each item.
 """
+from __future__ import annotations
 import sys
 from enum import Enum
 from typing import Dict, Optional, Tuple, Iterable, List
 
-import consts
 from srctools import Output, Vec, Property
 
 
@@ -115,11 +115,11 @@ class Config:
         input_type: InputType=InputType.DEFAULT,
 
         spawn_fire: FeatureMode=FeatureMode.NEVER,
-
         invert_var: str = '0',
         enable_cmd: Iterable[Output]=(),
         disable_cmd: Iterable[Output]=(),
 
+        sec_spawn_fire: FeatureMode=FeatureMode.NEVER,
         sec_invert_var: str='0',
         sec_enable_cmd: Iterable[Output]=(),
         sec_disable_cmd: Iterable[Output]=(),
@@ -165,6 +165,7 @@ class Config:
 
         # Same for secondary items.
         self.sec_invert_var = sec_invert_var
+        self.sec_spawn_fire = sec_spawn_fire
         self.sec_enable_cmd = tuple(sec_enable_cmd)
         self.sec_disable_cmd = tuple(sec_disable_cmd)
 
@@ -267,6 +268,11 @@ class Config:
 
             spawn_fire = FeatureMode.ALWAYS if spawn_fire_bool else FeatureMode.NEVER
 
+        try:
+            sec_spawn_fire = FeatureMode(conf['spawnfire', 'never'].casefold())
+        except ValueError:  # Default to primary value.
+            sec_spawn_fire = spawn_fire
+
         if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
             sec_disable_cmd = get_outputs('sec_disable_cmd')
@@ -330,9 +336,9 @@ class Config:
             ]
 
         return Config(
-            item_id, default_dual, input_type, spawn_fire,
-            invert_var, enable_cmd, disable_cmd,
-            sec_invert_var, sec_enable_cmd, sec_disable_cmd,
+            item_id, default_dual, input_type,
+            spawn_fire, invert_var, enable_cmd, disable_cmd,
+            sec_spawn_fire, sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
             timer_sound_pos, timer_done_cmd, force_timer_sound,
@@ -358,6 +364,7 @@ class Config:
             self.disable_cmd,
             self.default_dual,
             sys.intern(self.sec_invert_var),
+            self.sec_spawn_fire,
             self.sec_enable_cmd,
             self.sec_disable_cmd,
             self.output_type,
@@ -385,6 +392,7 @@ class Config:
             self.disable_cmd,
             self.default_dual,
             self.sec_invert_var,
+            self.sec_spawn_fire,
             self.sec_enable_cmd,
             self.sec_disable_cmd,
             self.output_type,

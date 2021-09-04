@@ -1,6 +1,6 @@
-"""Implements the splash screen in a subprocess.
+"""Implements load screens and the log window in a subprocess.
 
-During package loading, we are busy performing tasks in the main thread.
+These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
@@ -85,6 +85,20 @@ def get_splash_image(
             )
         return wx.Bitmap(image)
 
+# Colours to use for each log level
+LVL_COLOURS = {
+    logging.CRITICAL: 'white',
+    logging.ERROR: 'red',
+    logging.WARNING: '#FF7D00',  # 255, 125, 0
+    logging.INFO: '#0050FF',
+    logging.DEBUG: 'grey',
+}
+
+BOX_LEVELS = [
+    'DEBUG',
+    'INFO',
+    'WARNING',
+]
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
@@ -207,8 +221,11 @@ class BaseLoadScreen:
 
     def op_set_length(self, stage: str, num: int) -> None:
         """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.update_stage(stage)
+        if num == 0:
+            self.op_skip_stage(stage)
+        else:
+            self.maxes[stage] = num
+            self.update_stage(stage)
 
     def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
@@ -234,7 +251,6 @@ class LoadScreen(BaseLoadScreen):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-
         sizer_vert = wx.BoxSizer(wx.VERTICAL)
 
         title_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -666,9 +682,11 @@ class SplashScreen(BaseLoadScreen):
 def run_screen(
     pipe_send: multiprocessing.connection.Connection,
     pipe_rec: multiprocessing.connection.Connection,
+    log_pipe_send: multiprocessing.connection.Connection,
+    log_pipe_rec: multiprocessing.connection.Connection,
     # Pass in various bits of translated text
     # so we don't need to do it here.
-    translations,
+    translations: dict,
 ):
     """Runs in the other process, with an end of a pipe for input."""
     global PIPE_REC, PIPE_SEND
@@ -706,7 +724,7 @@ def run_screen(
                 try:
                     func = getattr(SCREENS[scr_id], 'op_' + operation)
                 except AttributeError:
-                    raise ValueError('Bad command "{}"!'.format(operation))
+                    raise ValueError(f'Bad command "{operation}"!')
                 try:
                     func(*args)
                 except Exception:

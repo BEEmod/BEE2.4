@@ -1,17 +1,17 @@
 """Handles the music configuration UI."""
 from typing import Dict, Iterable, Optional, List
-
-from BEE2_config import GEN_OPTS
-from app.SubPane import SubPane
-from loadScreen import LoadScreen
-from packages import Music
-from consts import MusicChannel
 from tkinter import ttk
-from app.selector_win import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr
-from srctools import FileSystemChain, FileSystem
-from app import TK_ROOT
 import tkinter
+
+from srctools import FileSystemChain, FileSystem
 import srctools.logger
+
+from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
+from app.SubPane import SubPane
+from app import TK_ROOT
+from BEE2_config import GEN_OPTS
+from consts import MusicChannel
+from packages import Music
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
@@ -20,10 +20,10 @@ BTN_CONTRACT_HOVER = '▲'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-WINDOWS = {}  # type: Dict[MusicChannel, SelectorWin]
-SEL_ITEMS = {}  # type: Dict[str, SelItem]
-
-is_collapsed = False
+WINDOWS: Dict[MusicChannel, SelectorWin] = {}
+SEL_ITEMS: Dict[str, SelItem] = {}
+# If the per-channel selector boxes are currently hidden.
+is_collapsed: bool = False
 
 filesystem = FileSystemChain()
 
@@ -34,7 +34,7 @@ def load_filesystems(systems: Iterable[FileSystem]):
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(music_id: str, *, sel_item: bool=False):
+def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
     """Set the music ID that is suggested for the base.
 
     If sel_item is true, select the suggested item as well.
@@ -59,7 +59,7 @@ def set_suggested(music_id: str, *, sel_item: bool=False):
             WINDOWS[channel].set_suggested(sugg)
 
 
-def export_data():
+def export_data() -> Dict[MusicChannel, Optional[Music]]:
     """Return the data used to export this."""
     return {
         channel:
@@ -70,7 +70,7 @@ def export_data():
     }
 
 
-def selwin_callback(music_id: Optional[str], channel: MusicChannel):
+def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
     """Callback for the selector windows.
 
     This saves into the config file the last selected item.
@@ -94,7 +94,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel):
                 win.readonly = has_inst
 
 
-def load_selitems(loader: LoadScreen):
+def load_selitems() -> None:
     """Load the selector items early, to correspond with the loadscreen order."""
     for item in Music.all():
         SEL_ITEMS[item.id] = SelItem.from_data(
@@ -102,7 +102,6 @@ def load_selitems(loader: LoadScreen):
             item.selitem_data,
             item.get_attrs()
         )
-        loader.step('IMG')
 
 
 def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
@@ -130,6 +129,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
+        save_id='music_base',
         title=_('Select Background Music - Base'),
         desc=_('This controls the background music used for a map. Expand '
                'the dropdown to set tracks for specific test elements.'),
@@ -150,6 +150,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.TBEAM),
+        save_id='music_tbeam',
         title=_('Select Excursion Funnel Music'),
         desc=_('Set the music used while inside Excursion Funnels.'),
         has_none=True,
@@ -165,6 +166,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.BOUNCE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BOUNCE),
+        save_id='music_bounce',
         title=_('Select Repulsion Gel Music'),
         desc=_('Select the music played when players jump on Repulsion Gel.'),
         has_none=True,
@@ -177,6 +179,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.SPEED] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.SPEED),
+        save_id='music_speed',
         title=_('Select Propulsion Gel Music'),
         desc=_('Select music played when players have large amounts of horizontal velocity.'),
         has_none=True,
@@ -189,7 +192,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
 
     # Widgets we want to remove when collapsing.
-    exp_widgets = []  # type: List[tkinter.Widget]
+    exp_widgets: list[tkinter.Widget] = []
 
     def toggle_btn_enter(event=None):
         toggle_btn['text'] = BTN_EXPAND_HOVER if is_collapsed else BTN_CONTRACT_HOVER
@@ -197,7 +200,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     def toggle_btn_exit(event=None):
         toggle_btn['text'] = BTN_EXPAND if is_collapsed else BTN_CONTRACT
 
-    def set_collapsed():
+    def set_collapsed() -> None:
         """Configure for the collapsed state."""
         global is_collapsed
         is_collapsed = True
@@ -211,7 +214,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         for wid in exp_widgets:
             wid.grid_remove()
 
-    def set_expanded():
+    def set_expanded() -> None:
         """Configure for the expanded state."""
         global is_collapsed
         is_collapsed = False
@@ -223,7 +226,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         pane.update_idletasks()
         pane.move()
 
-    def toggle(event=None):
+    def toggle(event: tkinter.Event) -> None:
         if is_collapsed:
             set_expanded()
         else:

@@ -1,6 +1,8 @@
 """Conditions related to global properties - stylevars, music, which game, etc."""
+from __future__ import annotations
 
-from typing import AbstractSet, Collection, Set, Dict, Optional, Tuple
+import re
+from typing import Optional, Collection
 
 from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
@@ -12,8 +14,9 @@ import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.globals')
-
 COND_MOD_NAME = 'Global Properties'
+# Match 'name[24]'
+BRACE_RE = re.compile(r'([^[]+)\[([0-9]+)]')
 
 
 @make_flag('styleVar')
@@ -131,30 +134,6 @@ def res_set_option(res: Property) -> bool:
     return RES_EXHAUSTED
 
 
-@make_flag('ItemConfig')
-def res_match_item_config(inst: Entity, res: Property) -> bool:
-    """Check if an Item Config Panel value matches another value.
-
-    * `ID` is the ID of the group.
-    * `Name` is the name of the widget.
-    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
-    * `Value` is the value to compare to.
-    """
-    group_id = res['ID']
-    wid_name = res['Name'].casefold()
-    desired_value = res['Value']
-    if res.bool('UseTimer'):
-        timer_delay = inst.fixup.int('$timer_delay')
-    else:
-        timer_delay = None
-
-    conf = options.get_itemconf((group_id, wid_name), None, timer_delay)
-    if conf is None:  # Doesn't exist
-        return False
-
-    return conf == desired_value
-
-
 @make_result('styleVar')
 def res_set_style_var(res: Property) -> bool:
     """Set Style Vars.
@@ -177,7 +156,7 @@ def res_set_voice_attr(res: Property) -> object:
     be present for syntax reasons.
     """
     if res.has_children():
-        for opt in res.value:
+        for opt in res:
             vbsp.settings['has_attr'][opt.name] = True
     else:
         vbsp.settings['has_attr'][res.value.casefold()] = True
@@ -185,7 +164,7 @@ def res_set_voice_attr(res: Property) -> object:
 
 
 # The set is the set of skins to use. If empty, all are used.
-CACHED_MODELS: Dict[str, Tuple[Set[int], Entity]] = {}
+CACHED_MODELS: dict[str, tuple[set[int], Entity]] = {}
 
 
 @make_result('PreCacheModel')
@@ -199,7 +178,7 @@ def res_pre_cache_model(vmf: VMF, res: Property) -> None:
         skins = [int(skin) for skin in res['skinset', ''].split()]
     else:
         model = res.value
-        skins = ()
+        skins = []
     precache_model(vmf, model, skins)
 
 
@@ -238,26 +217,59 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None
         ent['skinset'] = ''
 
 
+def get_itemconf(inst: Entity, res: Property) -> Optional[str]:
+    """Implement ItemConfig and GetItemConfig shared logic."""
+    timer_delay: Optional[int]
+
+    group_id = res['ID']
+    wid_name = inst.fixup.substitute(res['Name']).casefold()
+
+    match = BRACE_RE.match(wid_name)
+    if match is not None:  # Match name[timer], after $fixup substitution.
+        wid_name, timer_str = match.groups()
+        # Should not fail, we matched it above.
+        timer_delay = int(timer_str)
+    elif res.bool('UseTimer'):
+        LOGGER.warning(
+            'UseTimer is deprecated, use name = "{}[$timer_delay]".',
+            wid_name,
+        )
+        timer_delay = inst.fixup.int('$timer_delay')
+    else:
+        timer_delay = None
+
+    return options.get_itemconf((group_id, wid_name), None, timer_delay)
+
+
+@make_flag('ItemConfig')
+def res_match_item_config(inst: Entity, res: Property) -> bool:
+    """Check if an Item Config Panel value matches another value.
+
+    * `ID` is the ID of the group.
+    * `Name` is the name of the widget, or "name[timer]" to pick the value for
+      timer multi-widgets.
+    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * `Value` is the value to compare to.
+    """
+    conf = get_itemconf(inst, res)
+    desired_value = res['Value']
+    if conf is None:  # Doesn't exist
+        return False
+
+    return conf == desired_value
+
+
 @make_result('GetItemConfig')
 def res_item_config_to_fixup(inst: Entity, res: Property) -> None:
     """Load a config from the item config panel onto a fixup.
 
     * `ID` is the ID of the group.
-    * `Name` is the name of the widget.
-    * `resultVar` is the location to store the value into.
+    * `Name` is the name of the widget, or "name[timer]" to pick the value for
+      timer multi-widgets.
     * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * `resultVar` is the location to store the value into.
     * `Default` is the default value, if the config isn't found.
     """
-    group_id = res['ID']
-    wid_name = res['Name']
     default = res['default']
-    if res.bool('UseTimer'):
-        timer_delay = inst.fixup.int('$timer_delay')
-    else:
-        timer_delay = None
-
-    inst.fixup[res['ResultVar']] = options.get_itemconf(
-        (group_id, wid_name),
-        default,
-        timer_delay,
-    )
+    conf = get_itemconf(inst, res)
+    inst.fixup[res['ResultVar']] = conf if conf is not None else default

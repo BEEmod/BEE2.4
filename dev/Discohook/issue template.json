@@ -1,0 +1,34 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Issues - Template",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Issue Name",
+                "description": ">>> **__Version__**\n\n\n**__Error__**\n\n\n**__Workaround__**",
+                "color": 16761704,
+                "author": {
+                  "name": "#0000",
+                  "url": "https://github.com/BEEmod/",
+                  "icon_url": "https://cdn.discordapp.com/avatars/300059278541062146/df91181b3f1cf0ef1592fbe18e0962d7.webp?size=128"
+                }
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

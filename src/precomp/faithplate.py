@@ -5,7 +5,7 @@ This also handles Bomb-type Paint Droppers.
 import collections
 
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
-from srctools import Entity, Vec, VMF
+from srctools import Entity, Vec, VMF, Angle
 from srctools.logger import get_logger
 
 from typing import Dict, Optional, List, Tuple, Union
@@ -177,12 +177,12 @@ def associate_faith_plates(vmf: VMF) -> None:
             origin = Vec.from_str(inst['origin'])
             norm = Vec(z=1).rotate_by_str(inst['angles'])
             try:
-                tile = tiling.TILES[(origin - 128 * norm).as_tuple(), norm.as_tuple()]
+                tdef = tiling.TILES[(origin - 128 * norm).as_tuple(), norm.as_tuple()]
             except KeyError:
                 LOGGER.warning('No tile for bullseye at {}!', origin - 64 * norm)
                 continue
-            tile.bullseye_count += 1
-            tile.add_portal_helper()
+            tdef.bullseye_count += 1
+            tdef.add_portal_helper()
         else:
             instances[inst['targetname']] = inst
 
@@ -223,6 +223,7 @@ def gen_faithplates(vmf: VMF) -> None:
 
     for plate in PLATES.values():
         if isinstance(plate, (AngledPlate, PaintDropper)):
+            targ_pos: Union[Tuple[float, float, float], tiling.TileDef]
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:
@@ -241,7 +242,7 @@ def gen_faithplates(vmf: VMF) -> None:
                     vmf,
                     plate.template,
                     trig_origin + plate.trig_offset,
-                    Vec.from_str(plate.inst['angles']),
+                    Angle.from_str(plate.inst['angles']),
                     force_type=template_brush.TEMP_TYPES.world,
                     add_to_map=False,
                 ).world

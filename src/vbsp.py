@@ -1,7 +1,5 @@
 """Implements the BEE2 VBSP compiler replacement."""
 # Do this very early, so we log the startup sequence.
-import pickle
-
 from srctools.logger import init_logging
 
 LOGGER = init_logging('bee2/vbsp.log')
@@ -11,11 +9,14 @@ import sys
 import shutil
 import random
 import logging
+import pickle
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
+from atomicwrites import atomic_write
 
-from srctools import Property, Vec, AtomicWriter, Vec_tuple, Angle
+from srctools import Property, Vec, Vec_tuple, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
+from srctools.game import Game
 from BEE2_config import ConfigFile
 import utils
 import srctools.run
@@ -43,7 +44,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, List, Set, Iterable
+from typing import Any, Dict, Tuple, Set, Iterable, Optional
 
 
 COND_MOD_NAME = 'VBSP'
@@ -60,25 +61,6 @@ settings: Dict[str, Dict[str, Any]] = {
     "has_attr":       defaultdict(bool),
     "packtrigger":    defaultdict(list),
 }
-
-# The textures used for white surfaces.
-WHITE_PAN = [
-    "tile/white_floor_tile002a",
-    "tile/white_wall_tile003a",
-    "tile/white_wall_tile003h",
-
-    "tile/white_wall_tile003c",  # 2x2
-    "tile/white_wall_tile003f",  # 4x4
-    ]
-
-# Ditto for black surfaces.
-BLACK_PAN = [
-    "metal/black_floor_metal_001c",
-    "metal/black_wall_metal_002c",
-    "metal/black_wall_metal_002e",
-    "metal/black_wall_metal_002a",  # 2x2
-    "metal/black_wall_metal_002b",  # 4x4
-    ]
 
 BEE2_config = ConfigFile('compile.cfg')
 
@@ -108,7 +90,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
-    texturing.load_config(conf.find_key('textures', []))
+    texturing.load_config(conf.find_block('textures', or_blank=True))
 
     # Antline texturing settings.
     # We optionally allow different ones for floors.
@@ -128,10 +110,12 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
 
     # Load in our main configs..
     options.load(conf.find_all('Options'))
+    utils.DEV_MODE = options.get(bool, 'dev_mode')
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        voice_line.QUOTE_DATA += quote_block.copy()
+        quote_block.name = None
+        voice_line.QUOTE_DATA.append(quote_block)
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -139,15 +123,24 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
             settings['style_vars'][
                 var.name.casefold()] = srctools.conv_bool(var.value)
 
-    # Load in templates.
-    template_brush.load_templates()
+    # Load in templates locations.
+    template_brush.load_templates('bee2/templates.lst')
 
     # Load a copy of the item configuration.
-    id_to_item: Dict[str, editoritems.Item] = {}
+    id_to_item: dict[str, editoritems.Item] = {}
     item: editoritems.Item
     with open('bee2/editor.bin', 'rb') as inst:
-        for item in pickle.load(inst):
-            id_to_item[item.id.casefold()] = item
+        try:
+            for item in pickle.load(inst):
+                id_to_item[item.id.casefold()] = item
+        except Exception:  # Anything from __setstate__ etc.
+            LOGGER.exception(
+                'Failed to parse editoritems dump. Recompile the compiler '
+                'and/or export the palette.'
+                if utils.DEV_MODE else
+                'Failed to parse editoritems dump. Re-export BEE2.'
+            )
+            sys.exit(1)
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
@@ -176,7 +169,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     load_signs(conf)
 
     # Get configuration for the elevator, defaulting to ''.
-    elev = conf.find_key('elevator', [])
+    elev = conf.find_block('elevator', or_blank=True)
     settings['elevator'] = {
         key: elev[key, '']
         for key in
@@ -186,14 +179,13 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
         )
     }
 
-    settings['music_conf'] = conf.find_key('MusicScript', [])
+    settings['music_conf'] = conf.find_block('MusicScript', or_blank=True)
 
     # Bottomless pit configuration
-    pit = conf.find_key("bottomless_pit", [])
-    bottomlessPit.load_settings(pit)
+    bottomlessPit.load_settings(conf.find_block("bottomless_pit", or_blank=True))
 
     # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
-    fog_config = conf.find_key("fog", [])
+    fog_config = conf.find_block("fog", or_blank=True)
     # Update inplace so imports get the settings
     settings['fog'].update({
         # These defaults are from Clean Style.
@@ -237,11 +229,11 @@ def load_map(map_path: str) -> VMF:
 def add_voice(vmf: VMF):
     """Add voice lines to the map."""
     voice_line.add_voice(
-        has_items=settings['has_attr'],
-        style_vars_=settings['style_vars'],
-        vmf_file_=vmf,
+        voice_attrs=settings['has_attr'],
+        style_vars=settings['style_vars'],
+        vmf=vmf,
         map_seed=MAP_RAND_SEED,
-        use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
+        use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
 
@@ -466,7 +458,7 @@ def set_player_portalgun(vmf: VMF) -> None:
         has['spawn_nogun'] = True
 
     ent_pos = options.get(Vec, 'global_pti_ents_loc')
-    
+
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
 
     if not blue_portal or not oran_portal or force_portal_man:
@@ -866,6 +858,8 @@ def get_map_info(vmf: VMF) -> Set[str]:
     # The door frame instances
     entry_door_frame = exit_door_frame = None
 
+    filenames = Counter()
+
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
         # doors.
@@ -879,7 +873,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
         # later
 
         file = item['file'].casefold()
-        LOGGER.debug('File: "{}"', file)
+        filenames[file] += 1
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
             # In SP mode the same instance is used for entry and exit door
@@ -956,6 +950,11 @@ def get_map_info(vmf: VMF) -> Set[str]:
             exit_door_frame = item
 
         inst_files.add(item['file'])
+
+    LOGGER.debug('Instances present:\n{}', '\n'.join([
+        f'- "{file}": {count}'
+        for file, count in filenames.most_common()
+    ]))
 
     LOGGER.info("Game Mode: " + GAME_MODE)
     LOGGER.info("Is Preview: " + str(IS_PREVIEW))
@@ -1182,7 +1181,7 @@ def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
 def fit_goo_mist(
     vmf: VMF,
     sides: Iterable[Vec_tuple],
-    needs_mist: Set[Vec_tuple],
+    needs_mist: Set[Tuple[float, float, float]],
     grid_x: int,
     grid_y: int,
     particle: str,
@@ -1215,59 +1214,6 @@ def fit_goo_mist(
             )
             for (x, y) in utils.iter_grid(grid_x, grid_y, stride=128):
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
-
-
-@conditions.meta_cond(priority=-50)
-def set_barrier_frame_type(vmf: VMF) -> None:
-    """Set a $type instvar on glass frame.
-
-    This allows using different instances on glass and grating.
-    """
-    barrier_types = {}  # origin, normal -> 'glass' / 'grating'
-    barrier_pos: List[Tuple[Vec, str]] = []
-
-    # Find glass and grating brushes..
-    for brush in vmf.iter_wbrushes(world=False, detail=True):
-        for side in brush:
-            if side.mat == consts.Special.GLASS:
-                break
-        else:
-            # Not glass..
-            continue
-        barrier_pos.append((brush.get_origin(), 'glass'))
-
-    for brush_ent in vmf.by_class['func_brush']:
-        for side in brush_ent.sides():
-            if side.mat == consts.Special.GRATING:
-                break
-        else:
-            # Not grating..
-            continue
-        barrier_pos.append((brush_ent.get_origin(), 'grating'))
-
-    # The origins are at weird offsets, calc a grid pos + normal instead
-    for pos, barrier_type in barrier_pos:
-        grid_pos = pos // 128 * 128 + (64, 64, 64)
-        barrier_types[
-            grid_pos.as_tuple(),
-            (pos - grid_pos).norm().as_tuple()
-        ] = barrier_type
-
-    barrier_files = instanceLocs.resolve('<ITEM_BARRIER>')
-    glass_file = instanceLocs.resolve('[glass_128]')
-    for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in barrier_files:
-            continue
-        if inst['file'].casefold() in glass_file:
-            # The glass instance faces a different way to the frames..
-            norm = Vec(-1, 0, 0) @ Angle.from_str(inst['angles'])
-        else:
-            norm = Vec(0, 0, -1) @ Angle.from_str(inst['angles'])
-        origin = Vec.from_str(inst['origin'])
-        try:
-            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), round(norm).as_tuple()]
-        except KeyError:
-            pass
 
 
 def change_brush(vmf: VMF) -> None:
@@ -1403,6 +1349,89 @@ def cond_force_clump(inst: Entity, res: Property):
     ))
 
 
+@conditions.meta_cond(priority=-10)
+def position_exit_signs(vmf: VMF) -> None:
+    """Configure exit signage.
+
+    If "remove_exit_signs" is set, then delete them. Otherwise if "signExitInst"
+    is set, overlay the specified instance on top of the sign pair.
+    """
+    exit_sign: Optional[Entity]
+    exit_arrow: Optional[Entity]
+    try:
+        [exit_sign] = vmf.by_target['exitdoor_stickman']
+    except ValueError:
+        exit_sign = None
+    try:
+        [exit_arrow] = vmf.by_target['exitdoor_arrow']
+    except ValueError:
+        exit_arrow = None
+
+    if options.get(bool, "remove_exit_signs"):
+        if exit_sign is not None:
+            exit_sign.remove()
+        if exit_arrow is not None:
+            exit_arrow.remove()
+
+    inst_filename = options.get(str, 'signExitInst')
+    if inst_filename is None or exit_sign is None or exit_arrow is None:
+        return
+
+    sign_pos = Vec.from_str(exit_sign['origin'])
+    arrow_pos = Vec.from_str(exit_arrow['origin'])
+    arrow_norm = Vec.from_str(exit_arrow['basisnormal'])
+    sign_norm = Vec.from_str(exit_sign['basisnormal'])
+    offset = arrow_pos - sign_pos
+
+    if round(offset.mag()) != 32 or arrow_norm != sign_norm:
+        LOGGER.warning('Exit sign overlays are not aligned!')
+        return
+
+    arrow_dir = -Vec.from_str(exit_arrow['basisv'])  # Texture points down.
+    u = Vec.from_str(exit_sign['basisu'])
+    v = Vec.from_str(exit_sign['basisv'])
+    angles = Matrix.from_basis(x=u, y=v, z=sign_norm).to_angle()
+
+    if arrow_dir == u:
+        sign_dir = 'east'
+    elif arrow_dir == v:
+        sign_dir = 'north'
+    elif arrow_dir == -u:
+        sign_dir = 'west'
+    elif arrow_dir == -v:
+        sign_dir = 'south'
+    else:
+        LOGGER.warning(
+            'Could not match exit sign norm of ({}) to u=({}), v=({})',
+            arrow_dir, u, v,
+        )
+        return
+    if abs(Vec.dot(offset, u)) > 0.5:
+        orient = 'horizontal'
+    elif abs(Vec.dot(offset, v)) > 0.5:
+        orient = 'vertical'
+    else:
+        LOGGER.warning('Exit signs stacked on each other????')
+        return
+
+    inst = vmf.create_ent(
+        'func_instance',
+        targetname='exitdoor_sign',
+        origin=round((sign_pos + arrow_pos) / 2, 0),  # Center
+        angles=angles,
+        file=inst_filename,
+        fixup_style='0',  # Prefix
+    )
+    inst.fixup['$arrow'] = sign_dir
+    inst.fixup['$orient'] = orient
+    if options.get(bool, "remove_exit_signs_dual"):
+        exit_sign.remove()
+        exit_arrow.remove()
+    else:
+        # Indicate the singular instances shouldn't be placed.
+        exit_sign['bee_noframe'] = exit_arrow['bee_noframe'] = '1'
+
+
 def change_overlays(vmf: VMF) -> None:
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
@@ -1423,26 +1452,12 @@ def change_overlays(vmf: VMF) -> None:
             # don't touch them.
             continue
 
-        if (over['targetname'] == 'exitdoor_stickman' or
-                over['targetname'] == 'exitdoor_arrow'):
-            if options.get(bool, "remove_exit_signs"):
-                # Some styles have instance-based ones, remove the
-                # originals if needed to ensure it looks nice.
-                over.remove()
-                continue  # Break out, to make sure the instance isn't added
-            else:
-                # blank the targetname, so we don't get the
-                # useless info_overlay_accessors for these signs.
-                del over['targetname']
-
-        case_mat = over['material'].casefold()
-
         try:
-            sign_type = consts.Signage(case_mat)
+            sign_type = consts.Signage(over['material'].casefold())
         except ValueError:
             continue
 
-        if sign_inst is not None:
+        if sign_inst is not None and 'bee_noframe' not in over:
             new_inst = vmf.create_ent(
                 classname='func_instance',
                 origin=over['origin'],
@@ -1457,8 +1472,11 @@ def change_overlays(vmf: VMF) -> None:
         # This also means items set to signage only won't get toggle
         # instances.
         del over['targetname']
+        del over['bee_noframe']  # Not needed anymore.
 
-        over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        over['material'] = mat = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        if not mat:
+            over.remove()
         if sign_size != 16:
             # Resize the signage overlays
             # These are the 4 vertex locations
@@ -1573,46 +1591,6 @@ def fix_worldspawn(vmf: VMF) -> None:
     vmf.spawn['skyname'] = options.get(str, 'skybox')
 
 
-def make_vrad_config(is_peti: bool) -> None:
-    """Generate a config file for VRAD from our configs.
-
-    This way VRAD doesn't need to parse through vbsp_config, or anything else.
-    """
-    LOGGER.info('Generating VRAD config...')
-    conf = Property('Config', [
-    ])
-    conf['is_peti'] = srctools.bool_as_int(is_peti)
-
-    if is_peti:
-        conf['force_full'] = srctools.bool_as_int(
-            BEE2_config.get_bool('General', 'vrad_force_full')
-        )
-        conf['screenshot_type'] = BEE2_config.get_val(
-            'Screenshot', 'type', 'PETI'
-        ).upper()
-        conf['clean_screenshots'] = srctools.bool_as_int(
-            BEE2_config.get_bool('Screenshot', 'del_old')
-        )
-        conf['is_preview'] = srctools.bool_as_int(
-            IS_PREVIEW
-        )
-        conf['game_id'] = options.get(str, 'game_id')
-
-        if BEE2_config.get_bool('General', 'packfile_dump_enable'):
-            conf['packfile_dump'] = BEE2_config.get_val(
-                'General',
-                'packfile_dump_dir',
-                ''
-            )
-
-        # This generates scripts and might need to tell VRAD.
-        cubes.write_vscripts(conf)
-
-    with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
-        for line in conf.export():
-            f.write(line)
-
-
 def instance_symlink() -> None:
     """On OS X and Linux, Valve broke VBSP's instances/ finding code.
 
@@ -1639,7 +1617,7 @@ def save(vmf: VMF, path: str) -> None:
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with AtomicWriter(path) as f:
+    with atomic_write(path, overwrite=True, encoding='utf8') as f:
         vmf.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 
@@ -1849,6 +1827,7 @@ def main() -> None:
         'styled',
         path_file,
     )
+    game_dir = ''
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
@@ -1856,15 +1835,19 @@ def main() -> None:
             new_args[i] = ''
             old_args[i] = ''
         # Strip the entity limit, and the following number
-        if a == '-entity_limit':
+        elif a == '-entity_limit':
             new_args[i] = ''
             if len(new_args) > i+1 and new_args[i+1] == '1750':
                 new_args[i+1] = ''
+        elif a == '-game':
+            game_dir = new_args[i+1]
 
     LOGGER.info('Map path is "' + path + '"')
     LOGGER.info('New path: "' + new_path + '"')
-    if path == "":
+    if not path:
         raise Exception("No map passed!")
+    if not game_dir:
+        raise Exception("No game directory passed!")
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1879,6 +1862,7 @@ def main() -> None:
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
 
+    game = Game(game_dir)
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
@@ -1916,18 +1900,14 @@ def main() -> None:
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
 
-        conditions.init(
-            seed=MAP_RAND_SEED,
-            inst_list=all_inst,
-            vmf_file=vmf,
-        )
+        conditions.init(MAP_RAND_SEED, all_inst)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
 
         del side_to_antline
 
-        texturing.setup(vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
+        texturing.setup(game, vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
 
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)
@@ -1944,6 +1924,12 @@ def main() -> None:
             for out in ent.outputs:
                 out.comma_sep = False
 
+        # Ensure VRAD knows that the map is PeTI, it can't figure that out
+        # from parameters.
+        vmf.spawn['BEE2_is_peti'] = True
+        # Set this so VRAD can know.
+        vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
+
         save(vmf, new_path)
         run_vbsp(
             vbsp_args=new_args,
@@ -1951,9 +1937,6 @@ def main() -> None:
             new_path=new_path,
         )
 
-    # We always need to do this - VRAD can't easily determine if the map is
-    # a Hammer one.
-    make_vrad_config(is_peti=not is_hammer)
     LOGGER.info("BEE2 VBSP hook finished!")
 
 

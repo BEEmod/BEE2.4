@@ -14,7 +14,12 @@ from app.tooltip import add_tooltip
 
 import utils
 import srctools.logger
-from app import contextWin, gameMan, tk_tools, sound, logWindow, TK_ROOT
+from app import (
+    contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT,
+    PLAY_SOUND, KEEP_WIN_INSIDE, FORCE_LOAD_ONTOP, SHOW_LOG_WIN,
+    LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE,
+)
+from localisation import gettext
 import loadScreen
 
 
@@ -28,13 +33,6 @@ class AfterExport(Enum):
     QUIT = 2  # Quit the app.
 
 UI = {}
-PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
-KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
-FORCE_LOAD_ONTOP = BooleanVar(value=True, name='OPT_force_load_ontop')
-SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
-LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
-PRESERVE_RESOURCES = BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
-DEV_MODE = BooleanVar(value=False, name='OPT_development_mode')
 AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
@@ -43,19 +41,19 @@ AFTER_EXPORT_ACTION = IntVar(
 # action, launching_game -> suffix on the message box.
 AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], str] = {
     (AfterExport.NORMAL, False): '',
-    (AfterExport.NORMAL, True): _('\nLaunch Game?'),
+    (AfterExport.NORMAL, True): gettext('\nLaunch Game?'),
 
-    (AfterExport.MINIMISE, False): _('\nMinimise BEE2?'),
-    (AfterExport.MINIMISE, True): _('\nLaunch Game and minimise BEE2?'),
+    (AfterExport.MINIMISE, False): gettext('\nMinimise BEE2?'),
+    (AfterExport.MINIMISE, True): gettext('\nLaunch Game and minimise BEE2?'),
 
-    (AfterExport.QUIT, False): _('\nQuit BEE2?'),
-    (AfterExport.QUIT, True): _('\nLaunch Game and quit BEE2?'),
+    (AfterExport.QUIT, False): gettext('\nQuit BEE2?'),
+    (AfterExport.QUIT, True): gettext('\nLaunch Game and quit BEE2?'),
 }
 
 refresh_callbacks: List[Callable[[], None]] = []  # functions called to apply settings.
 
 # All the auto-created checkbox variables
-VARS: Dict[Tuple[str, str], BooleanVar] = {}
+VARS: Dict[Tuple[str, str], Variable] = {}
 
 
 def reset_all_win() -> None:
@@ -68,7 +66,7 @@ def reset_all_win() -> None:
 win = Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
 tk_tools.set_window_icon(win)
-win.title(_('BEE2 Options'))
+win.title(gettext('BEE2 Options'))
 win.withdraw()
 
 
@@ -92,6 +90,7 @@ def save() -> None:
 
     sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
+    logWindow.HANDLER.set_visible(SHOW_LOG_WIN.get())
     loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 
     for func in refresh_callbacks:
@@ -105,7 +104,7 @@ def clear_caches() -> None:
      """
     import packages
 
-    message = _(
+    message = gettext(
         'Package cache times have been reset. '
         'These will now be extracted during the next export.'
     )
@@ -122,7 +121,7 @@ def clear_caches() -> None:
     # anything...
     if PRESERVE_RESOURCES.get():
         PRESERVE_RESOURCES.set(False)
-        message += '\n\n' + _('"Preserve Game Resources" has been disabled.')
+        message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
 
     save()  # Save any option changes..
 
@@ -132,9 +131,9 @@ def clear_caches() -> None:
 
     # Since we've saved, dismiss this window.
     win.withdraw()
-    
+
     messagebox.showinfo(
-        title=_('Packages Reset'),
+        title=gettext('Packages Reset'),
         message=message,
     )
 
@@ -215,19 +214,19 @@ def init_widgets() -> None:
     UI['fr_general'] = fr_general = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_general, text=_('General'))
+    nbook.add(fr_general, text=gettext('General'))
     init_gen_tab(fr_general)
 
     UI['fr_win'] = fr_win = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_win, text=_('Windows'))
+    nbook.add(fr_win, text=gettext('Windows'))
     init_win_tab(fr_win)
 
     UI['fr_dev'] = fr_dev = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_dev, text=_('Development'))
+    nbook.add(fr_dev, text=gettext('Development'))
     init_dev_tab(fr_dev)
 
     ok_cancel = ttk.Frame(
@@ -251,12 +250,12 @@ def init_widgets() -> None:
 
     UI['ok_btn'] = ok_btn = ttk.Button(
         ok_cancel,
-        text=_('OK'),
+        text=gettext('OK'),
         command=ok,
     )
     UI['cancel_btn'] = cancel_btn = ttk.Button(
         ok_cancel,
-        text=_('Cancel'),
+        text=gettext('Cancel'),
         command=cancel,
     )
     ok_btn.grid(row=0, column=0)
@@ -282,7 +281,7 @@ def init_gen_tab(f: ttk.Frame) -> None:
 
     after_export_frame = ttk.LabelFrame(
         f,
-        text=_('After Export:'),
+        text=gettext('After Export:'),
     )
     after_export_frame.grid(
         row=0,
@@ -299,19 +298,19 @@ def init_gen_tab(f: ttk.Frame) -> None:
 
     exp_nothing = ttk.Radiobutton(
         after_export_frame,
-        text=_('Do Nothing'),
+        text=gettext('Do Nothing'),
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.NORMAL.value,
     )
     exp_minimise = ttk.Radiobutton(
         after_export_frame,
-        text=_('Minimise BEE2'),
+        text=gettext('Minimise BEE2'),
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.MINIMISE.value,
     )
     exp_quit = ttk.Radiobutton(
         after_export_frame,
-        text=_('Quit BEE2'),
+        text=gettext('Quit BEE2'),
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.QUIT.value,
     )
@@ -319,50 +318,50 @@ def init_gen_tab(f: ttk.Frame) -> None:
     exp_minimise.grid(row=1, column=0, sticky='w')
     exp_quit.grid(row=2, column=0, sticky='w')
 
-    add_tooltip(exp_nothing, _('After exports, do nothing and '
+    add_tooltip(exp_nothing, gettext('After exports, do nothing and '
                                'keep the BEE2 in focus.'))
-    add_tooltip(exp_minimise, _('After exports, minimise to the taskbar/dock.'))
-    add_tooltip(exp_quit, _('After exports, quit the BEE2.'))
+    add_tooltip(exp_minimise, gettext('After exports, minimise to the taskbar/dock.'))
+    add_tooltip(exp_quit, gettext('After exports, quit the BEE2.'))
 
     make_checkbox(
         after_export_frame,
         section='General',
         item='launch_Game',
         var=LAUNCH_AFTER_EXPORT,
-        desc=_('Launch Game'),
-        tooltip=_('After exporting, launch the selected game automatically.'),
+        desc=gettext('Launch Game'),
+        tooltip=gettext('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
-    if sound.initiallised:
+    if sound.has_sound():
         mute = make_checkbox(
             f,
             section='General',
             item='play_sounds',
-            desc=_('Play Sounds'),
+            desc=gettext('Play Sounds'),
             var=PLAY_SOUND,
         )
     else:
         mute = ttk.Checkbutton(
             f,
-            text=_('Play Sounds'),
+            text=gettext('Play Sounds'),
             state='disabled',
         )
         add_tooltip(
             mute,
-            _('Pyglet is either not installed or broken.\n'
+            gettext('Pyglet is either not installed or broken.\n'
               'Sound effects have been disabled.')
         )
     mute.grid(row=0, column=1, sticky='E')
 
     UI['reset_cache'] = reset_cache = ttk.Button(
         f,
-        text=_('Reset Package Caches'),
+        text=gettext('Reset Package Caches'),
         command=clear_caches,
     )
     reset_cache.grid(row=1, column=1, sticky='EW')
     add_tooltip(
         reset_cache,
-        _('Force re-extracting all package resources.'),
+        gettext('Force re-extracting all package resources.'),
     )
 
 
@@ -371,8 +370,8 @@ def init_win_tab(f: ttk.Frame) -> None:
         f,
         section='General',
         item='keep_win_inside',
-        desc=_('Keep windows inside screen'),
-        tooltip=_('Prevent sub-windows from moving outside the screen borders. '
+        desc=gettext('Keep windows inside screen'),
+        tooltip=gettext('Prevent sub-windows from moving outside the screen borders. '
                   'If you have multiple monitors, disable this.'),
         var=KEEP_WIN_INSIDE,
     )
@@ -382,9 +381,9 @@ def init_win_tab(f: ttk.Frame) -> None:
         f,
         section='General',
         item='splash_stay_ontop',
-        desc=_('Keep loading screens on top'),
+        desc=gettext('Keep loading screens on top'),
         var=FORCE_LOAD_ONTOP,
-        tooltip=_(
+        tooltip=gettext(
             "Force loading screens to be on top of other windows. "
             "Since they don't appear on the taskbar/dock, they can't be "
             "brought to the top easily again."
@@ -393,111 +392,120 @@ def init_win_tab(f: ttk.Frame) -> None:
 
     ttk.Button(
         f,
-        text=_('Reset All Window Positions'),
+        text=gettext('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
         command=lambda: reset_all_win(),
     ).grid(row=1, column=0, sticky=EW)
 
 
 def init_dev_tab(f: ttk.Frame) -> None:
-    f.columnconfigure(1, weight=1)
+    f.columnconfigure(0, weight=1)
     f.columnconfigure(2, weight=1)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_missing_ent_count',
-        desc=_('Log missing entity counts'),
-        tooltip=_('When loading items, log items with missing entity counts '
+        desc=gettext('Log missing entity counts'),
+        tooltip=gettext('When loading items, log items with missing entity counts '
                   'in their properties.txt file.'),
-    ).grid(row=0, column=0, sticky=W)
+    ).grid(row=0, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_missing_styles',
-        desc=_("Log when item doesn't have a style"),
-        tooltip=_('Log items have no applicable version for a particular style.'
+        desc=gettext("Log when item doesn't have a style"),
+        tooltip=gettext('Log items have no applicable version for a particular style.'
                   'This usually means it will look very bad.'),
-    ).grid(row=1, column=0, sticky=W)
+    ).grid(row=1, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_item_fallbacks',
-        desc=_("Log when item uses parent's style"),
-        tooltip=_('Log when an item reuses a variant from a parent style '
+        desc=gettext("Log when item uses parent's style"),
+        tooltip=gettext('Log when an item reuses a variant from a parent style '
                   '(1970s using 1950s items, for example). This is usually '
                   'fine, but may need to be fixed.'),
-    ).grid(row=2, column=0, sticky=W)
+    ).grid(row=2, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_incorrect_packfile',
-        desc=_("Log missing packfile resources"),
-        tooltip=_('Log when the resources a "PackList" refers to are not '
+        desc=gettext("Log missing packfile resources"),
+        tooltip=gettext('Log when the resources a "PackList" refers to are not '
                   'present in the zip. This may be fine (in a prerequisite zip),'
                   ' but it often indicates an error.'),
-    ).grid(row=3, column=0, sticky=W)
+    ).grid(row=3, column=0, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='development_mode',
         var=DEV_MODE,
-        desc=_("Development Mode"),
-        tooltip=_('Enables displaying additional UI specific for '
-                  'development purposes.'),
-    ).grid(row=0, column=1, sticky=W)
+        desc=gettext("Development Mode"),
+        tooltip=gettext('Enables displaying additional UI specific for '
+                  'development purposes. Requires restart to have an effect.'),
+    ).grid(row=0, column=2, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='General',
         item='preserve_bee2_resource_dir',
-        desc=_('Preserve Game Directories'),
+        desc=gettext('Preserve Game Directories'),
         var=PRESERVE_RESOURCES,
-        tooltip=_('When exporting, do not copy resources to \n"bee2/" and'
+        tooltip=gettext('When exporting, do not copy resources to \n"bee2/" and'
                   ' "sdk_content/maps/bee2/".\n'
                   "Only enable if you're"
                   ' developing new content, to ensure it is not '
                   'overwritten.'),
-    ).grid(row=1, column=1, sticky=W)
+    ).grid(row=1, column=2, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='show_log_win',
-        desc=_('Show Log Window'),
+        desc=gettext('Show Log Window'),
         var=SHOW_LOG_WIN,
-        tooltip=_('Show the log file in real-time.'),
-    ).grid(row=2, column=1, sticky=W)
+        tooltip=gettext('Show the log file in real-time.'),
+    ).grid(row=2, column=2, columnspan=2, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='force_all_editor_models',
-        desc=_("Force Editor Models"),
-        tooltip=_('Make all props_map_editor models available for use. '
+        desc=gettext("Force Editor Models"),
+        tooltip=gettext('Make all props_map_editor models available for use. '
                   'Portal 2 has a limit of 1024 models loaded in memory at '
                   'once, so we need to disable unused ones to free this up.'),
-    ).grid(row=3, column=1, sticky='w')
+    ).grid(row=3, column=2, columnspan=2, sticky='w')
 
     ttk.Separator(orient='horizontal').grid(
-        row=9, column=0, columnspan=2, sticky='ew'
+        row=9, column=0, columnspan=3, sticky='ew'
     )
 
     ttk.Button(
         f,
-        text=_('Dump All objects'),
+        text=gettext('Dump All objects'),
         command=report_all_obj,
     ).grid(row=10, column=0)
 
     ttk.Button(
         f,
-        text=_('Dump Items list'),
+        text=gettext('Dump Items list'),
         command=report_items,
     ).grid(row=10, column=1)
+    reload_img = ttk.Button(
+        f,
+        text=gettext('Reload Images'),
+        command=img.refresh_all,
+    )
+    add_tooltip(reload_img, gettext(
+        'Reload all images in the app. Expect the app to freeze momentarily.'
+    ))
+    reload_img.grid(row=10, column=2)
 
 # Various "reports" that can be produced.
 
@@ -516,8 +524,8 @@ def report_all_obj() -> None:
     from packages import OBJ_TYPES
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(obj_type.cls.all())} {type_name}:\n')
-            for obj in obj_type.cls.all():
+            f.write(f'{len(obj_type.all())} {type_name}:\n')
+            for obj in obj_type.all():
                 f.write(f'- {obj.id}\n')
 
 

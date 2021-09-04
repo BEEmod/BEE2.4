@@ -9,7 +9,7 @@ from packages import Signage, Style
 import tkinter as tk
 from srctools import Property
 from tkinter import ttk
-from app.tk_tools import HidingScroll
+from app import tk_tools
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -18,6 +18,8 @@ window.withdraw()
 
 drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
+IMG_ERROR = img.Handle.error(64, 64)
+IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 DEFAULT_IDS = {
     3: 'SIGN_NUM_1',
@@ -50,43 +52,40 @@ def export_data() -> List[Tuple[str, str]]:
         if slot.contents is not None
     ]
 
-@overload
-def save_load_signage() -> Property: ...
-@overload
-def save_load_signage(props: Property) -> None: ...
+
+@BEE2_config.OPTION_SAVE('Signage')
+def save_signage() -> Property:
+    """Save the signage info to settings or a palette."""
+    props = Property('Signage', [])
+    for timer, slot in SLOTS_SELECTED.items():
+        props.append(Property(
+            str(timer),
+            '' if slot.contents is None
+            else slot.contents.id,
+        ))
+    return props
 
 
-@BEE2_config.option_handler('Signage')
-def save_load_signage(props: Property=None) -> Optional[Property]:
-    """Save or load the signage info."""
-    if props is None:  # Save to properties.
-        props = Property('Signage', [])
-        for timer, slot in SLOTS_SELECTED.items():
-            props.append(Property(
-                str(timer),
-                '' if slot.contents is None
-                else slot.contents.id,
-            ))
-        return props
-    else:  # Load from provided properties.
-        for child in props:
+@BEE2_config.OPTION_LOAD('Signage')
+def load_signage(props: Property) -> None:
+    """Load the signage info from settings or a palette."""
+    for child in props:
+        try:
+            slot = SLOTS_SELECTED[int(child.name)]
+        except (ValueError, TypeError):
+            LOGGER.warning('Non-numeric timer value "{}"!', child.name)
+            continue
+        except KeyError:
+            LOGGER.warning('Invalid timer value {}!', child.name)
+            continue
+
+        if child.value:
             try:
-                slot = SLOTS_SELECTED[int(child.name)]
-            except (ValueError, TypeError):
-                LOGGER.warning('Non-numeric timer value "{}"!', child.name)
-                continue
+                slot.contents = Signage.by_id(child.value)
             except KeyError:
-                LOGGER.warning('Invalid timer value {}!', child.name)
-                continue
-
-            if child.value:
-                try:
-                    slot.contents = Signage.by_id(child.value)
-                except KeyError:
-                    LOGGER.warning('No signage with id "{}"!', child.value)
-            else:
-                slot.contents = None
-        return None
+                LOGGER.warning('No signage with id "{}"!', child.value)
+        else:
+            slot.contents = None
 
 
 def style_changed(new_style: Style) -> None:
@@ -107,21 +106,22 @@ def style_changed(new_style: Style) -> None:
             try:
                 icon = sign.styles['BEE2_CLEAN'].icon
             except KeyError:
-                sign.dnd_icon = img.img_error
+                sign.dnd_icon = IMG_ERROR
                 continue
         if icon:
-            sign.dnd_icon = img.png(icon, resize_to=(64, 64))
+            sign.dnd_icon = icon
         else:
             LOGGER.warning(
                 'No icon for "{}" signage in <{}> style!',
                 sign.id,
                 new_style.id,
             )
-            sign.dnd_icon = img.img_error
-    drag_man.refresh_icons()
+            sign.dnd_icon = IMG_ERROR
+    if window.winfo_ismapped():
+        drag_man.load_icons()
 
 
-def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
+def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
 
     If no signages are defined, this returns None.
@@ -130,7 +130,6 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
     if not any(Signage.all()):
         return ttk.Label(master)
 
-    window.protocol("WM_DELETE_WINDOW", window.withdraw)
     window.resizable(True, True)
     window.title(_('Configure Signage'))
 
@@ -143,7 +142,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
 
     canv_all = tk.Canvas(window)
 
-    scroll = HidingScroll(window, orient='vertical', command=canv_all.yview)
+    scroll = tk_tools.HidingScroll(window, orient='vertical', command=canv_all.yview)
     canv_all['yscrollcommand'] = scroll.set
 
     name_label = ttk.Label(window, text='', justify='center')
@@ -158,11 +157,12 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
     window.columnconfigure(1, weight=1)
     window.rowconfigure(3, weight=1)
 
-    utils.add_mousewheel(canv_all, canv_all, window)
+    tk_tools.add_mousewheel(canv_all, canv_all, window)
 
-    blank_sign = img.color_square(img.PETI_ITEM_BG, 64)
-    preview_left = ttk.Label(frame_preview, image=blank_sign, anchor='e')
-    preview_right = ttk.Label(frame_preview, image=blank_sign, anchor='w')
+    preview_left = ttk.Label(frame_preview, anchor='e')
+    preview_right = ttk.Label(frame_preview, anchor='w')
+    img.apply(preview_left, IMG_BLANK)
+    img.apply(preview_right, IMG_BLANK)
     preview_left.grid(row=0, column=0)
     preview_right.grid(row=0, column=1)
 
@@ -183,17 +183,19 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         if hover_sign is None:
             return
         if hover_arrow and sign_arrow:
-            preview_left['image'] = hover_sign.dnd_icon
-            preview_right['image'] = sign_arrow.dnd_icon
+            left = hover_sign.dnd_icon
+            right = sign_arrow.dnd_icon
         else:
             try:
-                preview_left['image'] = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+                left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
             except KeyError:
-                preview_left['image'] = hover_sign.dnd_icon
+                left = hover_sign.dnd_icon
             try:
-                preview_right['image'] = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+                right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
             except KeyError:
-                preview_right['image'] = blank_sign
+                right = IMG_BLANK
+        img.apply(preview_left, left)
+        img.apply(preview_right, right)
         hover_toggle_id = TK_ROOT.after(1000, hover_toggle)
 
     def on_hover(slot: dragdrop.Slot[Signage]) -> None:
@@ -215,8 +217,8 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         if hover_toggle_id is not None:
             TK_ROOT.after_cancel(hover_toggle_id)
             hover_toggle_id = None
-        preview_left['image'] = blank_sign
-        preview_right['image'] = blank_sign
+        img.apply(preview_left, IMG_BLANK)
+        img.apply(preview_right, IMG_BLANK)
 
     drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
     drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
@@ -249,11 +251,20 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Misc]:
         lambda e: drag_man.flow_slots(canv_all, drag_man.sources()),
     )
 
+    def hide_window() -> None:
+        """Hide the window."""
+        window.withdraw()
+        drag_man.unload_icons()
+        img.apply(preview_left, IMG_BLANK)
+        img.apply(preview_right, IMG_BLANK)
+
     def show_window() -> None:
         """Show the window."""
+        drag_man.load_icons()
         window.deiconify()
         utils.center_win(window, TK_ROOT)
 
+    window.protocol("WM_DELETE_WINDOW", hide_window)
     return ttk.Button(
         master,
         text=_('Configure Signage'),

@@ -1,7 +1,7 @@
 """Implements Glass and Grating."""
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, Tuple, List, Set, Callable
+from typing import Dict, Tuple, List, Callable
 
 from precomp import (
     texturing, options, packing,
@@ -11,8 +11,8 @@ import consts
 import srctools.logger
 from precomp.conditions import make_result
 from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_one
-from srctools import VMF, Vec, Solid, Property, Entity
+from precomp.instanceLocs import resolve_one, resolve
+from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -33,19 +33,29 @@ class HoleType(Enum):
     LARGE = 'large'  # 3x3 hole (funnel)
 
 # (origin, normal) -> BarrierType
-BARRIERS = {}  # type: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], BarrierType]
+BARRIERS: Dict[
+    Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+    BarrierType,
+] = {}
+HOLES: Dict[
+    Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+    HoleType,
+] = {}
 
-HOLES = {}  # type: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], HoleType]
 
-
-def get_pos_norm(origin: Vec):
+def get_pos_norm(origin: Vec) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
 def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
-    """Remove instances from the map, and store off the positions."""
+    """Find all glass/grating in the map.
+
+    This removes the per-tile instances, and all original brushwork.
+    The frames are updated with a fixup var, as appropriate.
+    """
+    frame_inst = resolve('[glass_frames]', silent=True)
     glass_inst = resolve_one('[glass_128]')
 
     pos = None
@@ -77,6 +87,14 @@ def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
         filename = inst['file'].casefold()
         if filename == glass_inst:
             inst.remove()
+        elif filename in frame_inst:
+            # Add a fixup to allow distinguishing the type.
+            pos = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm = Vec(z=-1) @ Angle.from_str(inst['angles'])
+            try:
+                inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = BARRIERS[pos.as_tuple(), norm.as_tuple()].value
+            except KeyError:
+                LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
     if options.get(str, 'glass_pack') and has_attr['glass']:
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
@@ -125,8 +143,8 @@ def res_glass_hole(inst: Entity, res: Property):
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
     hole_type = HoleType(res.value)
 
-    normal = Vec(z=-1).rotate_by_str(inst['angles'])
-    origin = Vec.from_str(inst['origin']) // 128 * 128 + 64
+    normal: Vec = round(Vec(z=-1) @ Angle.from_str(inst['angles']), 6)
+    origin: Vec = Vec.from_str(inst['origin']) // 128 * 128 + 64
 
     if test_hole_spot(origin, normal, hole_type):
         HOLES[origin.as_tuple(), normal.as_tuple()] = hole_type
@@ -156,20 +174,27 @@ def make_barriers(vmf: VMF):
     grate_temp = template_brush.get_scaling_template(
         options.get(str, "grating_template")
     )
+    hole_temp_small: List[Solid]
+    hole_temp_lrg_diag: List[Solid]
+    hole_temp_lrg_cutout: List[Solid]
+    hole_temp_lrg_square: List[Solid]
+
     # Avoid error without this package.
     if HOLES:
         # Grab the template solids we need.
-        hole_temp = template_brush.get_template(
+        hole_combined_temp = template_brush.get_template(
             options.get(str, 'glass_hole_temp')
         )
-        hole_world, hole_detail, _ = hole_temp.visgrouped({'small'})
+        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'small'})
         hole_temp_small = hole_world + hole_detail
-        hole_world, hole_detail, _ = hole_temp.visgrouped({'large'})
-        hole_temp_large = hole_world + hole_detail
-        hole_world, hole_detail, _ = hole_temp.visgrouped({'large_corner'})
-        hole_temp_corner = hole_world + hole_detail
+        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'large_diagonal'})
+        hole_temp_lrg_diag = hole_world + hole_detail
+        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'large_cutout'})
+        hole_temp_lrg_cutout = hole_world + hole_detail
+        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'large_square'})
+        hole_temp_lrg_square = hole_world + hole_detail
     else:
-        hole_temp_small = hole_temp_large = hole_temp_corner = None
+        hole_temp_small = hole_temp_lrg_diag = hole_temp_lrg_cutout = hole_temp_lrg_square = []
 
     floorbeam_temp = options.get(str, 'glass_floorbeam_temp')
 
@@ -197,12 +222,15 @@ def make_barriers(vmf: VMF):
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
     # (normal_dist, positive_axis, type) -> [(x, y)]
-    slices = defaultdict(set)  # type: Dict[Tuple[Tuple[float, float, float], bool, BarrierType], Set[Tuple[float, float]]]
+    slices: Dict[
+        Tuple[Tuple[float, float, float], bool, BarrierType],
+        Dict[Tuple[int, int], False]
+    ] = defaultdict(dict)
     # We have this on the 32-grid so we can cut squares for holes.
 
-    for (origin, normal), barr_type in BARRIERS.items():
-        origin = Vec(origin)
-        normal = Vec(normal)
+    for (origin_tup, normal_tup), barr_type in BARRIERS.items():
+        origin = Vec(origin_tup)
+        normal = Vec(normal_tup)
         norm_axis = normal.axis()
         u, v = origin.other_axes(norm_axis)
         norm_pos = Vec.with_axes(norm_axis, origin)
@@ -213,18 +241,18 @@ def make_barriers(vmf: VMF):
         ]
         for u_off in [-48, -16, 16, 48]:
             for v_off in [-48, -16, 16, 48]:
-                slice_plane.add((
-                    (u + u_off) // 32,
-                    (v + v_off) // 32,
-                ))
+                slice_plane[
+                    int((u + u_off) // 32),
+                    int((v + v_off) // 32),
+                ] = True
 
     # Remove pane sections where the holes are. We then generate those with
     # templates for slanted parts.
-    for (origin, normal), hole_type in HOLES.items():
-        barr_type = BARRIERS[origin, normal]
+    for (origin_tup, norm_tup), hole_type in HOLES.items():
+        barr_type = BARRIERS[origin_tup, norm_tup]
 
-        origin = Vec(origin)
-        normal = Vec(normal)
+        origin = Vec(origin_tup)
+        normal = Vec(norm_tup)
         norm_axis = normal.axis()
         u, v = origin.other_axes(norm_axis)
         norm_pos = Vec.with_axes(norm_axis, origin)
@@ -235,22 +263,26 @@ def make_barriers(vmf: VMF):
         ]
         if hole_type is HoleType.LARGE:
             offsets = (-80, -48, -16, 16, 48, 80)
-            hole_temp = hole_temp_large.copy()
         else:
             offsets = (-16, 16)
-            hole_temp = hole_temp_small.copy()
         for u_off in offsets:
             for v_off in offsets:
-                # Skip the corners on large holes.
-                # Those aren't actually used, so skip them. That way
-                # we can have them diagonally or  without glass in the corner.
-                if u_off in (-80, 80) and v_off in (-80, 80):
-                    continue
-
-                slice_plane.discard((
-                    (u + u_off) // 32,
-                    (v + v_off) // 32,
-                ))
+                # Remove these squares, but keep them in the dict
+                # so we can check if there was glass there.
+                uv = (
+                    int((u + u_off) // 32),
+                    int((v + v_off) // 32),
+                )
+                if uv in slice_plane:
+                    slice_plane[uv] = False
+                # These have to be present, except for the corners
+                # on the large hole.
+                elif abs(u_off) != 80 or abs(v_off) != 80:
+                    u_ax, v_ax = Vec.INV_AXIS[norm_axis]
+                    LOGGER.warning(
+                        'Hole tried to remove missing tile at ({})?',
+                        Vec.with_axes(norm_axis, norm_pos, u_ax, u + u_off, v_ax, v + v_off),
+                    )
 
         # Now generate the curved brushwork.
 
@@ -261,47 +293,64 @@ def make_barriers(vmf: VMF):
         else:
             raise NotImplementedError
 
-        angles = normal.to_angle(0)
-        # Angle corresponding to the brush, for the corners.
-        angle_list = [angles] * len(hole_temp)
+        angles = normal.to_angle()
+        hole_temp: List[Tuple[List[Solid], Matrix]] = []
 
         # This is a tricky bit. Two large templates would collide
-        # diagonally,
-        # so chop off the corners, then put them back only if there's not
-        # one diagonally.
+        # diagonally, and we allow the corner glass to not be present since
+        # the hole doesn't actually use that 32x32 segment.
+        # So we need to determine which of 3 templates to use.
+        corn_angles = angles.copy()
         if hole_type is HoleType.LARGE:
-            for roll in (0, 90, 180, 270):
-                corn_angles = angles.copy()
-                corn_angles.z = roll
-                hole_off = origin + Vec(y=128, z=128).rotate(*corn_angles)
+            for corn_angles.roll in (0, 90, 180, 270):
+                corn_mat = Matrix.from_angle(corn_angles)
+
+                corn_dir = Vec(y=1, z=1) @ corn_angles
+                hole_off = origin + 128 * corn_dir
                 diag_type = HOLES.get(
                     (hole_off.as_tuple(), normal.as_tuple()),
                     None,
                 )
-                if diag_type is not HoleType.LARGE:
-                    hole_temp += hole_temp_corner
-                    angle_list += [corn_angles] * len(hole_temp_corner)
+                corner_pos = origin + 80 * corn_dir
+                corn_u, corn_v = corner_pos.other_axes(norm_axis)
+                corn_u = int(corn_u // 32)
+                corn_v = int(corn_v // 32)
 
-        def solid_pane_func(off1, off2, mat):
+                if diag_type is HoleType.LARGE:
+                    # There's another large template to this direction.
+                    # Just have 1 generate both combined, so the brushes can
+                    # be more optimal. To pick, arbitrarily make the upper one
+                    # be in charge.
+                    if corn_v > v // 32:
+                        hole_temp.append((hole_temp_lrg_diag, corn_mat))
+                    continue
+                if (corn_u, corn_v) in slice_plane:
+                    hole_temp.append((hole_temp_lrg_square, corn_mat))
+                else:
+                    hole_temp.append((hole_temp_lrg_cutout, corn_mat))
+
+        else:
+            hole_temp.append((hole_temp_small, Matrix.from_angle(angles)))
+
+        def solid_pane_func(off1: float, off2: float, mat: str) -> List[Solid]:
             """Given the two thicknesses, produce the curved hole from the template."""
-            off_min = min(off1, off2)
-            off_max = max(off1, off2)
-            new_brushes = [
-                brush.copy(vmf_file=vmf)
-                for brush in hole_temp
-            ]
-
-            for brush, br_angles in zip(new_brushes, angle_list):
-                for face in brush.sides:
-                    face.mat = mat
-                    f_norm = face.normal()
-                    if f_norm.x == 1:
-                        face.translate(Vec(x=4 - off_max))
-                        # face.mat = 'min'
-                    elif f_norm.x == -1:
-                        face.translate(Vec(x=-4 - off_min))
-                        # face.mat = 'max'
-                    face.localise(origin, br_angles)
+            off_min = 64 - max(off1, off2)
+            off_max = 64 - min(off1, off2)
+            new_brushes = []
+            for brushes, matrix in hole_temp:
+                for orig_brush in brushes:
+                    brush = orig_brush.copy(vmf_file=vmf)
+                    new_brushes.append(brush)
+                    for face in brush.sides:
+                        face.mat = mat
+                        for point in face.planes:
+                            if point.x > 64:
+                                point.x = off_max
+                            else:
+                                point.x = off_min
+                        face.localise(origin, matrix)
+                        # Increase precision, these are small detail brushes.
+                        face.lightmap = 8
             return new_brushes
 
         make_glass_grating(
@@ -327,7 +376,7 @@ def make_barriers(vmf: VMF):
 
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
 
-        for min_u, min_v, max_u, max_v in grid_optimise(dict.fromkeys(pos_slice, True)):
+        for min_u, min_v, max_u, max_v in grid_optimise(pos_slice):
             # These are two points in the origin plane, at the borders.
             pos_min = Vec.with_axes(
                 norm_axis, plane_pos,
@@ -340,7 +389,7 @@ def make_barriers(vmf: VMF):
                 v_axis, max_v * 32 + 32,
             )
 
-            def solid_pane_func(pos1, pos2, mat):
+            def solid_pane_func(pos1: float, pos2: float, mat: str) -> List[Solid]:
                 """Make the solid brush."""
                 return [vmf.make_prism(
                     pos_min + normal * (64.0 - pos1),
@@ -350,12 +399,18 @@ def make_barriers(vmf: VMF):
 
             make_glass_grating(
                 vmf,
-                (pos_min + pos_max)/2,
+                (pos_min + pos_max)/2 + 63 * normal,
                 normal,
                 barr_type,
                 front_temp,
                 solid_pane_func,
             )
+            # Generate hint brushes, to ensure sorting is done correctly.
+            [hint] = solid_pane_func(0, 4.0, consts.Tools.SKIP)
+            for side in hint:
+                if abs(Vec.dot(side.normal(), normal)) > 0.99:
+                    side.mat = consts.Tools.HINT
+            vmf.add_brush(hint)
 
     if floorbeam_temp:
         LOGGER.info('Adding Glass floor beams...')
@@ -389,15 +444,14 @@ def make_glass_grating(
             'func_brush',
             renderfx=14,  # Constant Glow
             solidity=1,  # Never solid
+            origin=ent_pos,
         )
         tex_cat = 'grating'
-    # The actual glass/grating brush - 0.5-1 units back from the surface.
-    main_ent.solids = solid_func(0.5, 1, consts.Tools.NODRAW)
+    # The actual glass/grating brush - 0.5-1.5 units back from the surface.
+    main_ent.solids = solid_func(0.5, 1.5, consts.Tools.NODRAW)
 
-    abs_norm = abs(normal)
     for face in main_ent.sides():
-        f_normal = face.normal()
-        if abs(f_normal) == abs_norm:
+        if abs(Vec.dot(normal, face.normal())) > 0.99:
             texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
             front_temp.apply(face, change_mat=False)
 
@@ -489,8 +543,8 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 if our_group is neigh_group:
                     continue
 
-                # Now merge the two lists. We then need to update all dict locs
-                # to point to the new list.
+                # Now merge the two lists. We then need to update all dict
+                # locations to point to the new list.
 
                 if len(neigh_group) > len(our_group):
                     small_group, large_group = our_group, neigh_group
@@ -510,24 +564,22 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     # Side -> u, v or None
 
     for group in groups:
-
         bbox_min, bbox_max = Vec.bbox(group)
         dimensions = bbox_max - bbox_min
-        LOGGER.info('Size = {}', dimensions)
 
         # Our beams align to the smallest axis.
         if dimensions.y > dimensions.x:
             beam_ax = 'x'
             side_ax = 'y'
-            rot = Vec(0, 0, 0)
+            rot = Matrix()
         else:
             beam_ax = 'y'
             side_ax = 'x'
-            rot = Vec(0, 90, 0)
+            rot = Matrix.from_yaw(90)
 
         # Build min, max tuples for each axis in the other direction.
         # This tells us where the beams will be.
-        beams = {}  # type: Dict[int, Tuple[int, int]]
+        beams: dict[float, tuple[float, float]] = {}
 
         # Add 128 so the first pos isn't a beam.
         offset = bbox_min[side_ax] + 128
