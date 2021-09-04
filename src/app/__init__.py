@@ -13,13 +13,25 @@ TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 # Same with wxWidgets.
 WX_APP = wx.App()
 
+# Temporary until main window is rewritten.
+dummy_frame = wx.Frame(None, wx.ID_ANY)
+dummy_frame.SetSize((638, 300))
+dummy_frame.SetTitle("Don't kill me!")
+dummy_frame.Show()
+
 
 def run_main_loop() -> None:
     """Allow determining if this is running."""
     global _main_loop_running
     _main_loop_running = True
-    # Drive TK from WX's loop.
-    WX_APP.Bind(wx.EVT_UPDATE_UI, lambda e: TK_ROOT.update())
+
+    def prod_tk(event: wx.IdleEvent) -> None:
+        """Run TK from inside WX's event loop."""
+        TK_ROOT.update()
+        event.RequestMore()
+
+    WX_APP.Bind(wx.EVT_IDLE, prod_tk)
+    wx.WakeUpIdle()
     WX_APP.MainLoop()
 
 
