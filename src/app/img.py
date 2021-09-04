@@ -8,20 +8,26 @@ import time
 import threading
 from collections.abc import Sequence, Mapping
 from queue import Queue, Empty as EmptyQueue
+
+import wx
 from PIL import ImageTk, Image, ImageDraw
 import os
 from weakref import ref as WeakRef
+from typing import Generic, TypeVar, Union, Callable, Optional, Type, cast
+from enum import Flag
+import logging
+
 import tkinter as tk
 from tkinter import ttk
-from typing import Generic, TypeVar, Union, Callable, Optional, Type, cast
-from app import TK_ROOT
+from wx import Bitmap
 
 from srctools import Vec, Property
 from srctools.vtf import VTFFlags, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
-from utils import PackagePath
 import srctools.logger
-import logging
+
+from app import TK_ROOT
+from utils import PackagePath
 import utils
 
 # These are both valid TK image types.
@@ -119,7 +125,7 @@ PATH_WHITE = PackagePath('<color>', 'fff')
 class ImageType(Generic[ArgT]):
     """Represents a kind of image that can be loaded or generated.
 
-    This contains callables for generating a PIL or TK image from a specified
+    This contains callables for generating a PIL, TK or WX image from a specified
     arg type, width and height.
     """
     def __init__(
@@ -127,12 +133,14 @@ class ImageType(Generic[ArgT]):
         name: str,
         pil_func: Callable[[ArgT, int, int], Image.Image],
         tk_func: Optional[Callable[[ArgT, int, int], tkImage]]=None,
+        wx_func: Optional[Callable[[ArgT, int, int], Bitmap]]=None,
         allow_raw: bool=False,
         alpha_result: bool=False,
     ) -> None:
         self.name = name
         self.pil_func = pil_func
         self.tk_func = tk_func
+        self.wx_func = wx_func
         self.allow_raw = allow_raw
         self.alpha_result = alpha_result
 
@@ -154,6 +162,12 @@ def _tk_from_color(color: tuple[int, int, int], width: int, height: int) -> tkIm
     return img
 
 
+def _wx_from_color(color: tuple[int, int, int], width: int, height: int) -> Bitmap:
+    """Directly produce an image of this size with the specified color."""
+    r, g, b = color
+    return Bitmap.FromRGBA(width or 16, height or 16, r, g, b, 255)
+
+
 def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
     """Produce an image of this size with transparent pixels."""
     return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
@@ -164,6 +178,11 @@ def _tk_empty(arg: object, width: int, height: int) -> tkImage:
     img = tk.PhotoImage(width=width or 16, height=height or 16)
     img.blank()
     return img
+
+
+def _wx_empty(args: object, width: int, height: int) -> Bitmap:
+    """Produce an image of this size which is entirely transparent."""
+    return Bitmap.FromRGBA(width or 16, height or 16, 0, 0, 0, 0)
 
 
 def _load_file(
@@ -296,8 +315,8 @@ def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
     return img
 
 
-TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
-TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty, alpha_result=True)
+TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color, _wx_from_color)
+TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty, _wx_empty, alpha_result=True)
 TYP_FILE = ImageType('file', _pil_from_package)
 TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
 TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
