@@ -4,12 +4,14 @@ from typing import NamedTuple, Dict
 
 from tkinter import ttk
 import tkinter as tk
+import wx.html
 import webbrowser
 import functools
 
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, WX_APP
+from localisation import gettext
 import utils
 
 # For version info
@@ -424,60 +426,45 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
-class Dialog(tk.Toplevel):
-    """Show a dialog with a message."""
-    def __init__(self, title: str, text: str):
-        super().__init__(TK_ROOT)
-        self.withdraw()
-        self.title(title)
-        self.transient(master=TK_ROOT)
-        self.resizable(width=True, height=True)
-        self.text = text
-        tk_tools.set_window_icon(self)
-
-        # Hide when the exit button is pressed, or Escape
-        # on the keyboard.
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
-        self.bind("<Escape>", self.withdraw)
-
-        frame = tk.Frame(self, background='white')
-        frame.grid(row=0, column=0, sticky='nsew')
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-
-        self.textbox = tkRichText(frame, width=80, height=24)
-        self.textbox.configure(background='white', relief='flat')
-        self.textbox.grid(row=0, column=0, sticky='nsew')
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        scrollbox = tk_tools.HidingScroll(
-            frame,
-            orient='vertical',
-            command=self.textbox.yview,
+class AboutDialog(wx.Dialog):
+    """Credits display."""
+    def __init__(self) -> None:
+        super().__init__(
+            None,
+            title=gettext('BEE2 Credits'),
+            name='about',
+            style=wx.DEFAULT_DIALOG_STYLE | wx.MAXIMIZE_BOX | wx.RESIZE_BORDER | wx.VSCROLL,
         )
-        scrollbox.grid(row=0, column=1, sticky='ns')
-        self.textbox['yscrollcommand'] = scrollbox.set
+        self.Hide()
 
-        ttk.Button(
-            frame,
-            text=gettext('Close'),
-            command=self.withdraw,
-        ).grid(
-            row=1, column=0,
-        )
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
 
-    def show(self, e=None):
+        sizer_btns = wx.BoxSizer(wx.HORIZONTAL)
+        self.sizer.Add(sizer_btns, 1, wx.ALL | wx.EXPAND, 2)
+
+        self.textbox = wx.html.HtmlWindow(self, wx.ID_ANY)
+        sizer_btns.Add(self.textbox, 1, wx.EXPAND, 0)
+
+        self.close_btn = wx.Button(self, wx.ID_CLOSE, "")
+        self.sizer.Add(self.close_btn, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
+
+        self.SetSizer(self.sizer)
+
+        self.SetEscapeId(self.close_btn.GetId())
+
+
+    def show_dialog(self) -> None:
+        global CREDITS_TEXT
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
-        if self.text is not None:
-            parsed_text = tkMarkdown.convert(self.text, package=None)
-            self.textbox.set_text(parsed_text)
-            self.text = None
+        if CREDITS_TEXT:
+            parsed_text = tkMarkdown.parse(CREDITS_TEXT)
+            self.textbox.SetPage(parsed_text)
+            CREDITS_TEXT = None
 
-        self.deiconify()
-        self.update_idletasks()
-        utils.center_win(self, TK_ROOT)
+        self.Layout()
+        self.Show()
+        self.Centre()
 
 
 def make_help_menu(parent: tk.Menu):
@@ -494,10 +481,7 @@ def make_help_menu(parent: tk.Menu):
     }
     icons[ResIcon.NONE] = img.Handle.blank(16, 16)
 
-    credits = Dialog(
-        title=gettext('BEE2 Credits'),
-        text=CREDITS_TEXT,
-    )
+    about = AboutDialog()
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:
@@ -513,5 +497,5 @@ def make_help_menu(parent: tk.Menu):
     help.add_separator()
     help.add_command(
         label=gettext('Credits...'),
-        command=credits.show,
+        command=about.show_dialog,
     )

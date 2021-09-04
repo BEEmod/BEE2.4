@@ -251,6 +251,11 @@ def convert(text: str, package: Optional[str]) -> MarkdownData:
         return _RENDERER.render(mistletoe.Document(text))
 
 
+def parse(text: str) -> str:
+    """Convert to raw HTML."""
+    return mistletoe.markdown(text)
+
+
 def join(*args: MarkdownData) -> MarkdownData:
     """Join several text blocks together.
 
