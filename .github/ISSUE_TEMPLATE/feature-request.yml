@@ -1,6 +1,5 @@
-name: Generic Feature Request
+name: Feature Request
 description: Suggest an idea for the mod
-title: "Suggestion: <Title>"
 labels: [Enhancement]
 body:
   - type: markdown
