@@ -1,6 +1,5 @@
 name: Application Crash
 description: Report a app crash
-title: "Compile Error: <Title>"
 labels: [Bug, App Crash]
 body:
   - type: markdown

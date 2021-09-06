@@ -1,6 +1,5 @@
 name: Compiler Bug Report
 description: Create a report to help us improve
-title: "Compiler: <Title>"
 labels: [Bug, Compiler]
 body:
   - type: markdown
