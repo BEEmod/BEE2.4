@@ -30,6 +30,7 @@ else:
     FROZEN = True
     # If blank, in dev mode.
     DEV_MODE = not BEE_VERSION
+BEE_VERSION += ' 64-bit' if sys.maxsize > (2 << 48) else ' 32-bit'
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
