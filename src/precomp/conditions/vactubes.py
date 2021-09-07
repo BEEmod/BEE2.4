@@ -1,6 +1,7 @@
 """Implements the cutomisable vactube items.
 """
-from typing import Optional, Dict, Tuple, List, Iterator, Iterable
+from __future__ import annotations
+from collections.abc import Iterator, Iterable
 
 import attr
 
@@ -20,15 +21,15 @@ PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
-PUSH_TRIGS: Dict[Tuple[float, float, float], Entity] = {}
-VAC_TRACKS: List[Tuple['Marker', Dict[str, 'Marker']]] = []  # Tuples of (start, group)
+PUSH_TRIGS: dict[tuple[float, float, float], Entity] = {}
+VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
 
 
 @attr.define
 class Config:
     """Configuration for a vactube item set."""
-    inst_corner: List[str]
-    temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
+    inst_corner: list[str]
+    temp_corner: list[tuple[template_brush.Template | None, Iterable[str]]]
     trig_radius: int
     inst_support: str  # Placed on each side with an adjacent wall.
     inst_support_ring: str  # If any support is placed, this is placed.
@@ -39,9 +40,9 @@ class Config:
     inst_entry_ceil: str
 
     # For straight instances, a size (multiple of 128) -> instance.
-    inst_straight: Dict[int, str]
+    inst_straight: dict[int, str]
     # And those sizes from large to small.
-    inst_straight_sizes: List[int] = attr.ib(init=False)
+    inst_straight_sizes: list[int] = attr.ib(init=False)
     @inst_straight_sizes.default
     def _straight_size(self) -> list[int]:
         return sorted(self.inst_straight.keys(), reverse=True)
@@ -54,7 +55,7 @@ class Marker:
     conf: Config
     size: int
     no_prev: bool = True
-    next: Optional[str] = None
+    next: str | None = None
     orient: Matrix = attr.ib(init=False, on_setattr=attr.setters.frozen)
 
     # noinspection PyUnresolvedReferences
@@ -64,7 +65,7 @@ class Marker:
         rot = Matrix.from_angle(Angle.from_str(self.ent['angles']))
         return Matrix.from_yaw(180) @ rot
 
-    def follow_path(self, vac_list: Dict[str, 'Marker']) -> Iterator[Tuple['Marker', 'Marker']]:
+    def follow_path(self, vac_list: dict[str, Marker]) -> Iterator[tuple[Marker, Marker]]:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:
@@ -79,7 +80,7 @@ class Marker:
 # Store the configs for vactube items so we can
 # join them together - multiple item types can participate in the same
 # vactube track.
-VAC_CONFIGS: Dict[str, Dict[str, Tuple[Config, int]]] = {}
+VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
 @make_result('CustVactube')
@@ -98,7 +99,7 @@ def res_vactubes(vmf: VMF, res: Property):
         # Grab the already-filled values, and add to them
         inst_config = VAC_CONFIGS[group]
 
-    def get_temp(key: str) -> Tuple[Optional[template_brush.Template], Iterable[str]]:
+    def get_temp(key: str) -> tuple[template_brush.Template | None, Iterable[str]]:
         """Read the template, handling errors."""
         try:
             temp_name = block['temp_' + key]
@@ -166,7 +167,7 @@ def res_vactubes(vmf: VMF, res: Property):
 
         del VAC_CONFIGS[group]  # Don't let this run twice
 
-        markers: Dict[str, Marker] = {}
+        markers: dict[str, Marker] = {}
 
         # Find all our markers, so we can look them up by targetname.
         for inst in vmf.by_class['func_instance']:
@@ -264,7 +265,7 @@ def vactube_gen(vmf: VMF) -> None:
             end_logic['file'] = end.conf.inst_exit
 
 
-def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
+def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
     """Generate the push trigger for these solids."""
     # We only need one trigger per direction, for now.
     try:
@@ -623,7 +624,7 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
 
     if norm_a == norm_b:
         # Either straight-line, or s-bend.
-        dist = (origin_a - origin_b).mag()
+        dist = round((origin_a - origin_b).mag())
 
         if origin_a + (norm_a * dist) == origin_b:
             make_straight(
