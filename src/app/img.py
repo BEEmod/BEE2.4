@@ -772,11 +772,14 @@ def make_splash_screen(
     It then adds the gradients on top.
     """
     import random
-    folder = str(utils.install_path('images/splash_screen'))
+    folder = utils.install_path('images/splash_screen')
+    user_folder = folder / 'user'
     path = '<nothing>'
+    if user_folder.exists():
+        folder = user_folder
     try:
-        path = random.choice(os.listdir(folder))
-        with open(os.path.join(folder, path), 'rb') as img_file:
+        path = random.choice(list(folder.iterdir()))
+        with path.open('rb') as img_file:
             image = Image.open(img_file)
             image.load()
     except (FileNotFoundError, IndexError, IOError):
