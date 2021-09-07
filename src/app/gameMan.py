@@ -32,13 +32,13 @@ from srctools import (
     FileSystem, FileSystemChain,
 )
 import srctools.logger
+import srctools.fgd
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE
 from localisation import gettext
 import loadScreen
 import packages.template_brush
 import editoritems
 import utils
-import srctools
 
 from typing import Optional, Union, Any, Type, IO
 
@@ -221,6 +221,13 @@ sp_a5_finale02_stage_end.wav\
 # sp_a1_jazz_tramride.wav
 # still_alive_gutair_cover.wav
 # want_you_gone_guitar_cover.wav
+
+# HammerAddons tags relevant to P2.
+FGD_TAGS = frozenset({
+    'SINCE_HL2', 'SINCE_HLS', 'SINCE_EP1', 'SINCE_EP2', 'SINCE_TF2',
+    'SINCE_P1', 'SINCE_L4D', 'SINCE_L4D2', 'SINCE_ASW', 'SINCE_P2',
+    'P2', 'UNTIL_CSGO', 'VSCRIPT', 'INST_IO'
+})
 
 
 def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
@@ -491,6 +498,15 @@ class Game:
                 del data[i:]
                 break
 
+        engine_fgd = srctools.FGD.engine_dbase()
+        engine_fgd.collapse_bases()
+        fgd = srctools.FGD()
+
+        for ent in engine_fgd:
+            if ent.classname.startswith('comp_'):
+                fgd.entities[ent.classname] = ent
+                ent.strip_tags(FGD_TAGS)
+
         with atomic_write(fgd_path, overwrite=True, mode='wb') as file:
             for line in data:
                 file.write(line)
@@ -503,8 +519,10 @@ class Game:
                 )
                 with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
-                with utils.install_path('srctools.fgd').open('rb') as src_fgd:
-                    shutil.copyfileobj(src_fgd, file)
+                with io.TextIOWrapper(file) as file_str:
+                    fgd.export(file_str)
+                    file_str.detach()  # Ensure it doesn't close it itself.
+
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
