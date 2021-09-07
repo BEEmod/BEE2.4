@@ -426,7 +426,7 @@ def make_bend(
     # limited by the user's setting and the distance we have in each direction
     corner_size = int(min(
         first_movement // 128, sec_movement // 128,
-        3, max_size,
+        3, max_size + 1,
     ))
 
     straight_a = first_movement - (corner_size - 1) * 128
