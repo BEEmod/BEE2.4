@@ -2,6 +2,7 @@
 
 This produces a stream of values, which are fed into richTextBox to display.
 """
+from __future__ import annotations
 import mistletoe
 from mistletoe import block_token as btok
 from mistletoe import span_token as stok
@@ -44,13 +45,14 @@ class MarkdownData:
 
     Blocks are a list of data.
     """
-    __slots__ = ['blocks']
+    __slots__ = ['blocks', '_unstripped']
     blocks: Sequence[Block]  # External users shouldn't modify directly.
     def __init__(
         self,
         blocks: Iterable[Block] = (),
     ) -> None:
         self.blocks = list(blocks)
+        self._unstripped = True
 
     def __bool__(self) -> bool:
         """Empty data is false."""
@@ -116,7 +118,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         result = self.render_inner(token)
         for i, data in enumerate(result.blocks):
             if isinstance(data, TextSegment):
-                result.blocks[i] = TextSegment(data.text, tuple(added_tags.union(data.tags)), url or data.url)
+                result.blocks[i] = TextSegment(data.text, tuple(added_tags.union(data.tags)), url or data.url)  # type: ignore
         return result
 
     def _text(self, text: str, *tags: str, url: str=None) -> MarkdownData:
@@ -141,14 +143,6 @@ class TKRenderer(mistletoe.BaseRenderer):
         if not result.blocks:
             return result
 
-        # Strip newlines from the start and end.
-        first = result.blocks[0]
-        if isinstance(first, TextSegment) and first.text.startswith('\n'):
-            result.blocks[0] = TextSegment(first.text.lstrip('\n'), first.tags, first.url)
-
-        last = result.blocks[-1]
-        if isinstance(last, TextSegment) and last.text.endswith('\n'):
-            result.blocks[-1] = TextSegment(last.text.rstrip('\n'), last.tags, last.url)
         return result
 
     def render_escape_sequence(self, token: stok.EscapeSequence) -> MarkdownData:

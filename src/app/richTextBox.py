@@ -8,7 +8,7 @@ import webbrowser
 
 from app import tkMarkdown
 from app.tk_tools import Cursors
-import utils
+from localisation import gettext
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -125,6 +125,8 @@ class tkRichText(tkinter.Text):
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')
 
+    # noinspection PyUnresolvedReferences
+    # noinspection PyProtectedMember
     def set_text(self, text_data: Union[str, tkMarkdown.MarkdownData]) -> None:
         """Write the rich-text into the textbox.
 
@@ -145,8 +147,19 @@ class tkRichText(tkinter.Text):
             super().insert("end", text_data)
             return
 
+        # Strip newlines from the start and end of text.
+        if text_data._unstripped and len(text_data.blocks) > 1:
+            first = text_data.blocks[0]
+            if isinstance(first, tkMarkdown.TextSegment) and first.text.startswith('\n'):
+                text_data.blocks[0] = tkMarkdown.TextSegment(first.text.lstrip('\n'), first.tags, first.url)
+
+            last = text_data.blocks[-1]
+            if isinstance(last, tkMarkdown.TextSegment) and last.text.endswith('\n'):
+                text_data.blocks[-1] = tkMarkdown.TextSegment(last.text.rstrip('\n'), last.tags, last.url)
+            text_data._unstripped = True
+
         segment: tkMarkdown.TextSegment
-        for block in text_data.blocks:
+        for i, block in enumerate(text_data.blocks):
             if isinstance(block, tkMarkdown.TextSegment):
                 if block.url:
                     try:
@@ -180,7 +193,7 @@ class tkRichText(tkinter.Text):
         def callback(e):
             if askokcancel(
                 title='BEE2 - Open URL?',
-                message=_('Open "{}" in the default browser?').format(url),
+                message=gettext('Open "{}" in the default browser?').format(url),
                 parent=self,
             ):
                 webbrowser.open(url)
