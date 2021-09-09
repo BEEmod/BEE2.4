@@ -101,6 +101,9 @@ cust_file_loc_var = tk.StringVar(value='')
 
 packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
 
+default_lrg_icon = img.Handle.builtin('BEE2/corr_generic', selector_win.ICON_SIZE, selector_win.ICON_SIZE)
+default_sml_icon = default_lrg_icon.crop(selector_win.ICON_CROP_SHRINK)
+
 count_brush = tk.IntVar(value=0)
 count_entity = tk.IntVar(value=0)
 count_overlay = tk.IntVar(value=0)
@@ -248,8 +251,6 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
     CORRIDOR_DATA.clear()
     CORRIDOR_DATA.update(config)
 
-    default_icon = img.Handle.builtin('BEE2/corr_generic', 64, 64)
-
     corridor_conf = COMPILE_CFG['CorridorNames']
 
     for group, length in CORRIDOR_COUNTS.items():
@@ -266,7 +267,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
             corridor_conf['{}_{}_icon'.format(group, ind)] = str(data.icon)
 
             # Note: default corridor description
-            desc = data.name or _('Corridor')
+            desc = data.name or gettext('Corridor')
             item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
 
             if data.icon:
@@ -274,12 +275,10 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
                     data.icon,
                     *selector_win.ICON_SIZE_LRG,
                 )
-                item.icon = img.Handle.parse_uri(
-                    data.icon,
-                    selector_win.ICON_SIZE, selector_win.ICON_SIZE,
-                )
+                item.icon = None
             else:
-                item.icon = item.large_icon = default_icon
+                item.icon = default_sml_icon
+                item.large_icon = default_lrg_icon
 
             if data.desc:
                 item.desc = tkMarkdown.convert(data.desc, None)
