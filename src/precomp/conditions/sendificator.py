@@ -1,29 +1,26 @@
-from typing import Tuple, Dict
-
+"""Implement special support """
+from __future__ import annotations
 from precomp import connections, conditions
 import srctools.logger
-from srctools import Property, Entity, VMF, Vec, Output
+from srctools import Property, Entity, VMF, Vec, Output, Angle, Matrix
+
 
 COND_MOD_NAME = None
-
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 # Laser name -> offset, normal
-SENDTOR_TARGETS = {}  # type: Dict[str, Tuple[Vec, Vec]]
-
-
-@conditions.make_result_setup('SendificatorLaser')
-def res_sendificator_laser_setup(res: Property):
-    return (
-        res.vec('offset'),
-        res.vec('direction', 0, 0, 1)
-    )
+SENDTOR_TARGETS: dict[str, tuple[Vec, Vec]] = {}
 
 
 @conditions.make_result('SendificatorLaser')
-def res_sendificator_laser(inst: Entity, res: Property):
+def res_sendificator_laser(res: Property):
     """Record the position of the target for Sendificator Lasers."""
-    SENDTOR_TARGETS[inst['targetname']] = res.value
+    target = res.vec('offset'), res.vec('direction', 0, 0, 1)
+
+    def set_laser(inst: Entity) -> None:
+        """Store off the target position."""
+        SENDTOR_TARGETS[inst['targetname']] = target
+    return set_laser
 
 
 @conditions.make_result('Sendificator')
@@ -37,7 +34,7 @@ def res_sendificator(vmf: VMF, inst: Entity):
 
     sendtor.enable_cmd += (Output(
         '',
-        '@{}_las_relay_*'.format(sendtor_name),
+        f'@{sendtor_name}_las_relay_*',
         'Trigger',
         delay=0.01,
     ), )
@@ -51,17 +48,12 @@ def res_sendificator(vmf: VMF, inst: Entity):
             LOGGER.warning('"{}" is not a Sendificator target!', las_item.name)
             continue
 
-        angles = Vec.from_str(las_item.inst['angles'])
+        orient = Matrix.from_angle(Angle.from_str(las_item.inst['angles']))
 
-        targ_offset = targ_offset.copy()
-        targ_normal = targ_normal.copy().rotate(*angles)
+        targ_offset =  Vec.from_str(las_item.inst['origin']) + targ_offset @ orient
+        targ_normal = targ_normal @ orient
 
-        targ_offset.localise(
-            Vec.from_str(las_item.inst['origin']),
-            angles,
-        )
-
-        relay_name = '@{}_las_relay_{}'.format(sendtor_name, ind)
+        relay_name = f'@{sendtor_name}_las_relay_{ind}'
 
         relay = vmf.create_ent(
             'logic_relay',
@@ -84,4 +76,3 @@ def res_sendificator(vmf: VMF, inst: Entity):
         relay['StartDisabled'] = not is_on
         las_item.enable_cmd += (Output('', relay_name, 'Enable'),)
         las_item.disable_cmd += (Output('', relay_name, 'Disable'),)
-        LOGGER.info('Relay: {}', relay)
