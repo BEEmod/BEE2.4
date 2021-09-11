@@ -9,12 +9,13 @@ import threading
 from collections.abc import Sequence, Mapping
 from queue import Queue, Empty as EmptyQueue
 from PIL import ImageTk, Image, ImageDraw
-import os
 from weakref import ref as WeakRef
 import tkinter as tk
 from tkinter import ttk
 from typing import Generic, TypeVar, Union, Callable, Optional, Type, cast
 from app import TK_ROOT
+
+import attr
 
 from srctools import Vec, Property
 from srctools.vtf import VTFFlags, VTF
@@ -276,6 +277,35 @@ def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -
     return img
 
 
+@attr.define
+class CropInfo:
+    """Crop parameters."""
+    source: Handle
+    bounds: tuple[int, int, int, int]  # left, top, right, bottom coords.
+    transpose: Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
+
+
+def _pil_from_crop(info: CropInfo, width: int, height: int) -> Image.Image:
+    """Crop this image down to part of the source."""
+    src_w = info.source.width
+    src_h = info.source.height
+
+    # noinspection PyProtectedMember
+    image = info.source._load_pil()
+    # Shrink down the source to the final source so the bounds apply.
+    # TODO: Rescale bounds to actual source size to improve result?
+    if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
+        image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
+
+    image = image.crop(info.bounds)
+    if info.transpose is not None:
+        image = image.transpose(info.transpose)
+
+    if width > 0 and height > 0 and (width, height) != image.size:
+        image = image.resize((width, height), resample=Image.ANTIALIAS)
+    return image
+
+
 def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
     """Construct an image with an overlaid icon."""
     ico = ICONS[arg]
@@ -303,6 +333,7 @@ TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, 
 TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
 TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
 TYP_COMP = ImageType('composite', _pil_from_composite)
+TYP_CROP = ImageType('crop', _pil_from_crop)
 
 
 class Handle(Generic[ArgT]):
@@ -494,6 +525,15 @@ class Handle(Generic[ArgT]):
             handle = _handles[TYP_COMP, key, width, height] = Handle(TYP_COMP, children, width, height)
             return handle
 
+    def crop(
+        self,
+        bounds: tuple[int, int, int, int],
+        transpose: int | None = None,
+        width: int = 0, height: int = 0,
+    ) -> Handle[Sequence[Handle]]:
+        """Wrap a handle to crop it into a smaller size."""
+        return Handle(TYP_CROP, CropInfo(self, bounds, transpose), width, height)
+
     @classmethod
     def file(cls, path: PackagePath, width: int, height: int) -> Handle[PackagePath]:
         """Shortcut for getting a handle to file path."""
@@ -577,18 +617,20 @@ class Handle(Generic[ArgT]):
                 self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
         return self._cached_tk
 
-    def _decref(self, ref: 'Union[WeakRef[tkImgWidgets], Handle]') -> None:
+    def _decref(self, ref: 'WeakRef[tkImgWidgets] | Handle') -> None:
         """A label was no longer set to this handle."""
         if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
             return
         self._users.discard(ref)
         if self.type is TYP_COMP:
             for child in cast('Sequence[Handle]', self.arg):
-                child._decref(self)
+                child._decref(ref)
+        elif self.type is TYP_CROP:
+            cast(CropInfo, self.arg).source._decref(ref)
         if not self._users:
             _pending_cleanup[id(self)] = (self, time.monotonic())
 
-    def _incref(self, ref: 'Union[WeakRef[tkImgWidgets], Handle]') -> None:
+    def _incref(self, ref: 'WeakRef[tkImgWidgets] | Handle') -> None:
         """Add a label to the list of those controlled by us."""
         if self._force_loaded:
             return
@@ -596,7 +638,9 @@ class Handle(Generic[ArgT]):
         _pending_cleanup.pop(id(self), None)
         if self.type is TYP_COMP:
             for child in cast('Sequence[Handle]', self.arg):
-                child._incref(self)
+                child._incref(ref)
+        elif self.type is TYP_CROP:
+            cast(CropInfo, self.arg).source._incref(ref)
 
     def _request_load(self) -> tkImage:
         """Request a reload of this image.
@@ -742,6 +786,9 @@ def apply(widget: tkImgWidgetsT, img: Optional[Handle]) -> tkImgWidgetsT:
     except KeyError:
         pass
     else:
+        if old is img:
+            # Unchanged.
+            return widget
         old._decref(ref)
     img._incref(ref)
     _wid_tk[ref] = img

@@ -18,7 +18,7 @@ __all__ = [
     'FixupVars',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
     'COUNTER_OR_ON', 'COUNTER_OR_OFF',
-    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG',
+    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG', 'SEL_ICON_CROP_SHRINK',
 ]
 
 
@@ -257,3 +257,4 @@ COUNTER_OR_OFF = 'OnHitMin'
 
 SEL_ICON_SIZE = 96  # Size of the selector win icons
 SEL_ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.
+SEL_ICON_CROP_SHRINK = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.

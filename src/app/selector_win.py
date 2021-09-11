@@ -27,7 +27,11 @@ from srctools import Vec, Property, EmptyMapping
 import srctools.logger
 from srctools.filesys import FileSystemChain
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
-from consts import SEL_ICON_SIZE as ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
+from consts import (
+    SEL_ICON_SIZE as ICON_SIZE,
+    SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
+    SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
+)
 from localisation import gettext, ngettext
 import utils
 import BEE2_config
@@ -295,7 +299,7 @@ class Item:
         'name',
         'shortName',
         'longName',
-        'icon',
+        '_icon',
         'large_icon',
         'previews',
         'desc',
@@ -336,10 +340,7 @@ class Item:
         else:
             self._context_lbl = self.longName
 
-        if icon is not None:
-            self.icon = icon
-        else:
-            self.icon = img.Handle.color(img.PETI_ITEM_BG, ICON_SIZE, ICON_SIZE)
+        self._icon = icon
         self.large_icon = large_icon
         self.previews = list(previews)
 
@@ -358,6 +359,24 @@ class Item:
         # The position on the menu this item is located at.
         # This is needed to change the font.
         self._context_ind: Optional[int] = None
+
+    @property
+    def icon(self) -> img.Handle:
+        """If the small image is missing, replace it with the cropped large one."""
+        if self._icon is None:
+            if self.large_icon is not None:
+                self._icon = self.large_icon.crop(
+                    ICON_CROP_SHRINK,
+                    width=ICON_SIZE, height=ICON_SIZE,
+                )
+            else:
+                self._icon = img.Handle.color(img.PETI_ITEM_BG, ICON_SIZE, ICON_SIZE)
+        return self._icon
+
+    @icon.setter
+    def icon(self, image: img.Handle | None) -> None:
+        """Alter the icon used."""
+        self._icon = image
 
     def __repr__(self) -> str:
         return f'<Item:{self.name}>'
