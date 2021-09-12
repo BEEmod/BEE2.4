@@ -385,7 +385,7 @@ def res_import_template(vmf: VMF, res: Property):
             add after a colon, comma-seperated (`temp_id:vis1,vis2`).
             Either section, or the whole value can be a `$fixup`.
     - `angles`: Override the instance rotation, so it is always rotated this much.
-    - `rotate`: Apply the specified rotation before the instance's rotation.
+    - `rotation`: Apply the specified rotation before the instance's rotation.
     - `offset`: Offset the template from the instance's position.
     - `force`: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overridden. If `invert` is
