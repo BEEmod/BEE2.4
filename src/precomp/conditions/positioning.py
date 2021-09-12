@@ -445,11 +445,15 @@ def res_alt_orientation(inst: Entity, res: Property) -> None:
     """Apply an alternate orientation.
 
     "wall" makes the attaching surface in the -X direction, making obs rooms,
-    corridors etc easier to place.
+    corridors etc easier to build.  
+    "ceiling" flips the instance, making items such as droppers easier to build.
+    The rotation handle still points in the -X direction.
     """
     val = res.value.casefold()
     if val == 'wall':
         pose = Angle(-90, 180, 0)
+    elif val == 'ceiling':
+        pose = Angle(0, 0, 180)
     else:
         raise ValueError(f'Unknown orientation type "{res.value}"!')
     pose @= Angle.from_str(inst['angles'])
