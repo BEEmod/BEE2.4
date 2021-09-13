@@ -519,10 +519,9 @@ class Game:
                 )
                 with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
-                file_str = io.TextIOWrapper(file)
+                file_str = io.TextIOWrapper(file, encoding='iso-8859-1')
                 fgd.export(file_str)
                 file_str.detach()  # Ensure it doesn't close it itself.
-
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
