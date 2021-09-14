@@ -30,7 +30,7 @@ from typing import List, Optional
 
 import shutil
 
-from BEE2_config import GEN_OPTS
+from BEE2_config import GEN_OPTS, get_package_locs
 from packages import (
     packages as PACKAGES,
     find_packages,
@@ -193,7 +193,8 @@ def main(files: List[str]) -> int:
 
     # Disable logging of package info.
     packages_logger.setLevel(logging.ERROR)
-    find_packages(GEN_OPTS['Directories']['package'])
+    for loc in get_package_locs():
+        find_packages(loc)
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
