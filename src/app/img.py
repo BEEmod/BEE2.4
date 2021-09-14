@@ -124,9 +124,10 @@ def _get_tk_img(width: int, height: int) -> ImageTk.PhotoImage:
     return img
 
 
-def _discard_tk_img(img: ImageTk.PhotoImage) -> None:
+def _discard_tk_img(img: Optional[ImageTk.PhotoImage]) -> None:
     """Store an unused image so it can be reused."""
-    # Use setdefault and append so each step is atomic.
+    if img is not None:
+        # Use setdefault and append so each step is atomic.
     img_list = _unused_tk_img.setdefault((img.width(), img.height()), [])
     img_list.append(img)
 
