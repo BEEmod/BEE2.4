@@ -442,18 +442,18 @@ def res_force_upright(inst: Entity):
 
 
 @make_result('switchOrientation')
-def res_alt_orientation(inst: Entity, res: Property) -> None:
+def res_alt_orientation(res: Property) -> Callable[[Entity], None]:
     """Apply an alternate orientation.
 
     "wall" makes the attaching surface in the -X direction, making obs rooms,
     corridors etc easier to build. The Z axis points in the former +X direction.
-    "ceiling" flips the instance, making items such as droppers easier to build. 
+    "ceiling" flips the instance, making items such as droppers easier to build.
     The X axis remains unchanged.
     """
     val = res.value.casefold()
     if val == 'wall':
         pose = Matrix.from_angle(-90, 180, 0)
-    elif val in ('ceil', 'ceiling')
+    elif val in ('ceil', 'ceiling'):
         pose = Matrix.from_roll(180)
     else:
         raise ValueError(f'Unknown orientation type "{res.value}"!')
