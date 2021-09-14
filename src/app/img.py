@@ -25,8 +25,6 @@ import srctools.logger
 import logging
 import utils
 
-# These are both valid TK image types.
-tkImage = Union[ImageTk.PhotoImage, tk.PhotoImage]
 # Widgets with an image attribute that can be set.
 tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button)
@@ -40,6 +38,9 @@ _wid_tk: dict[WeakRef[tkImgWidgets], Handle] = {}
 # Records handles with a loaded image, but no labels using it.
 # These will be cleaned up after some time passes.
 _pending_cleanup: dict[int, tuple[Handle, float]] = {}
+
+# TK images have unique IDs, so preserve discarded image objects.
+_unused_tk_img: dict[tuple[int, int], list[tk.PhotoImage]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
@@ -107,6 +108,29 @@ def tuple_size(size: Union[tuple[int, int], int]) -> tuple[int, int]:
     return size, size
 
 
+def _get_tk_img(width: int, height: int) -> ImageTk.PhotoImage:
+    """Recycle an old image, or construct a new one."""
+    if not width:
+        width = 16
+    if not height:
+        height = 16
+
+    # Use setdefault and pop so each step is atomic.
+    img_list = _unused_tk_img.setdefault((width, height), [])
+    try:
+        img = img_list.pop()
+    except IndexError:
+        img = ImageTk.PhotoImage('RGBA', (width, height))
+    return img
+
+
+def _discard_tk_img(img: ImageTk.PhotoImage) -> None:
+    """Store an unused image so it can be reused."""
+    # Use setdefault and append so each step is atomic.
+    img_list = _unused_tk_img.setdefault((img.width(), img.height()), [])
+    img_list.append(img)
+
+
 # Special paths which map to various images.
 PATH_BLANK = PackagePath('<special>', 'blank')
 PATH_ERROR = PackagePath('<special>', 'error')
@@ -120,20 +144,18 @@ PATH_WHITE = PackagePath('<color>', 'fff')
 class ImageType(Generic[ArgT]):
     """Represents a kind of image that can be loaded or generated.
 
-    This contains callables for generating a PIL or TK image from a specified
+    This contains callables for generating a PIL image from a specified
     arg type, width and height.
     """
     def __init__(
         self,
         name: str,
         pil_func: Callable[[ArgT, int, int], Image.Image],
-        tk_func: Optional[Callable[[ArgT, int, int], tkImage]]=None,
         allow_raw: bool=False,
         alpha_result: bool=False,
     ) -> None:
         self.name = name
         self.pil_func = pil_func
-        self.tk_func = tk_func
         self.allow_raw = allow_raw
         self.alpha_result = alpha_result
 
@@ -146,25 +168,9 @@ def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Ima
     return Image.new('RGBA', (width or 16, height or 16), color + (255, ))
 
 
-def _tk_from_color(color: tuple[int, int, int], width: int, height: int) -> tkImage:
-    """Directly produce an image of this size with the specified color."""
-    r, g, b = color
-    img = tk.PhotoImage(width=width or 16, height=height or 16)
-    # Make hex RGB, then set the full image to that.
-    img.put(f'{{#{r:02X}{g:02X}{b:02X}}}', to=(0, 0, width or 16, height or 16))
-    return img
-
-
 def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
     """Produce an image of this size with transparent pixels."""
     return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
-
-
-def _tk_empty(arg: object, width: int, height: int) -> tkImage:
-    """Produce a TK image of this size which is entirely transparent."""
-    img = tk.PhotoImage(width=width or 16, height=height or 16)
-    img.blank()
-    return img
 
 
 def _load_file(
@@ -326,8 +332,8 @@ def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
     return img
 
 
-TYP_COLOR = ImageType('color', _pil_from_color, _tk_from_color)
-TYP_ALPHA = ImageType('alpha', _pil_empty, _tk_empty, alpha_result=True)
+TYP_COLOR = ImageType('color', _pil_from_color)
+TYP_ALPHA = ImageType('alpha', _pil_empty, alpha_result=True)
 TYP_FILE = ImageType('file', _pil_from_package)
 TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
 TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
@@ -343,7 +349,7 @@ class Handle(Generic[ArgT]):
     in a background thread.
     """
     _cached_pil: Optional[Image.Image]
-    _cached_tk: Optional[tkImage]
+    _cached_tk: Optional[ImageTk.PhotoImage]
     def __init__(
         self,
         typ: ImageType[ArgT],
@@ -583,7 +589,7 @@ class Handle(Generic[ArgT]):
                 _pending_cleanup[id(self)] = (self, time.monotonic())
             return self._load_pil()
 
-    def get_tk(self) -> tkImage:
+    def get_tk(self) -> ImageTk.PhotoImage:
         """Load the TK image if required, then return it.
 
         Only available on BUILTIN type images since they cannot then be
@@ -595,26 +601,21 @@ class Handle(Generic[ArgT]):
         return self._load_tk()
 
     def _load_pil(self) -> Image.Image:
+        """Load the PIL image if required, then return it."""
         if self._cached_pil is None:
             self._cached_pil = self.type.pil_func(self.arg, self.width, self.height)
         return self._cached_pil
 
-    def _load_tk(self) -> tkImage:
-        """Load the TK image if required, then return it.
-
-        Should not be used if possible, to allow deferring loads to the
-        background.
-        """
+    def _load_tk(self) -> ImageTk.PhotoImage:
+        """Load the TK image if required, then return it."""
         if self._cached_tk is None:
             # LOGGER.debug('Loading {}', self)
-            if self.type.tk_func is None:
-                res = self._load_pil()
-                # Except for builtin types (icons), strip alpha.
-                if not self.type.alpha_result:
-                    res = res.convert('RGB')
-                self._cached_tk = ImageTk.PhotoImage(image=res)
-            else:
-                self._cached_tk = self.type.tk_func(self.arg, self.width, self.height)
+            res = self._load_pil()
+            # Except for builtin types (icons), strip alpha.
+            if not self.type.alpha_result:
+                res = res.convert('RGB')
+            self._cached_tk = _get_tk_img(res.width, res.height)
+            self._cached_tk.paste(res)
         return self._cached_tk
 
     def _decref(self, ref: 'WeakRef[tkImgWidgets] | Handle') -> None:
@@ -642,7 +643,7 @@ class Handle(Generic[ArgT]):
         elif self.type is TYP_CROP:
             cast(CropInfo, self.arg).source._incref(ref)
 
-    def _request_load(self) -> tkImage:
+    def _request_load(self) -> ImageTk.PhotoImage:
         """Request a reload of this image.
 
         If this can be done synchronously, the result is returned.
@@ -730,6 +731,7 @@ def _ui_task() -> None:
         with handle.lock:
             if use_time < timeout - 5.0 and handle._loading is not None and not handle._users:
                 del _pending_cleanup[id(handle)]
+                _discard_tk_img(handle._cached_tk)
                 handle._cached_tk = handle._cached_pil = None
     TK_ROOT.tk.call(_ui_task_cmd)
 
@@ -745,6 +747,7 @@ def start_loading() -> None:
     TK_ROOT.tk.call(_ui_task_cmd)
 
 
+# noinspection PyProtectedMember
 def refresh_all() -> None:
     """Force all images to reload."""
     LOGGER.info('Forcing all images to reload!')
@@ -753,6 +756,8 @@ def refresh_all() -> None:
             # If force-loaded it's builtin UI etc we shouldn't reload.
             # If already loading, no point.
             if not handle._force_loaded and not handle._loading:
+                if handle._cached_tk is not None:
+                    _discard_tk_img(handle._cached_tk)
                 handle._cached_tk = handle._cached_pil = None
                 _queue_load.put(handle)
                 loading =  Handle.ico_loading(handle.width, handle.height).get_tk()
