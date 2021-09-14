@@ -1291,7 +1291,11 @@ class SelectorWin:
 
     def sel_item(self, item: Item, event: Event = None) -> None:
         """Select the specified item."""
-        self.prop_name['text'] = item.longName
+        # If this is immediately set, it sometimes acts like the label is 1 wide.
+        # Instead set it to a single character, and delay the actual setting.
+        self.prop_name['text'] = ' '
+        self.prop_name.after_idle(lambda: self.prop_name.configure(text=item.longName))
+
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
         else:
