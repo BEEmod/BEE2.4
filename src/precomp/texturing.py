@@ -217,6 +217,8 @@ TEX_DEFAULTS: Dict[
 
         # Faith Plate bullseye for non-moving surfaces.
         'bullseye': consts.Special.BULLSEYE,
+        # Tideline overlay around the outside of goo pits.
+        'tideline': consts.Goo.TIDELINE,
     },
     # Misc textures.
     GenCat.SPECIAL: {

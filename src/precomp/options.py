@@ -490,6 +490,8 @@ DEFAULTS = [
         """),
     Opt('generate_tidelines', False,
         """Generate tideline overlays around the outside of goo pits.
+        
+        The material used is configured by `overlays.tideline`.
         """),
 
     Opt('glass_floorbeam_temp', TYPE.STR,

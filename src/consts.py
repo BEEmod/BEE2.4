@@ -200,6 +200,7 @@ class Special(MaterialGroup):
 class Goo(MaterialGroup):
     REFLECTIVE = "nature/toxicslime_a2_bridge_intro"
     CHEAP = "nature/toxicslime_puzzlemaker_cheap"
+    TIDELINE = "overlays/tideline01b"
 
 
 class Antlines(MaterialGroup):

@@ -2221,13 +2221,14 @@ def generate_goo(vmf: VMF) -> None:
                 try:
                     tideline = tideline_over[key]
                 except KeyError:
+                    ent_pos = voxel_center + 32 * Vec(x, y, 1)
                     tideline = tideline_over[key] = Tideline(
                         vmf.create_ent(
                             'info_overlay',
-                            material='overlays/tideline01b',
+                            material=texturing.OVERLAYS.get(ent_pos, 'tideline'),
                             angles='0 0 0',
-                            origin=voxel_center + (0, 0, 32),
-                            basisOrigin=voxel_center + (0, 0, 32),
+                            origin=ent_pos,
+                            basisOrigin=ent_pos,
                             basisNormal=f'{x} {y} 0',
                             basisU=side,
                             basisV='0 0 1',
