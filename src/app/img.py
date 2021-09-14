@@ -625,9 +625,9 @@ class Handle(Generic[ArgT]):
         self._users.discard(ref)
         if self.type is TYP_COMP:
             for child in cast('Sequence[Handle]', self.arg):
-                child._decref(ref)
+                child._decref(self)
         elif self.type is TYP_CROP:
-            cast(CropInfo, self.arg).source._decref(ref)
+            cast(CropInfo, self.arg).source._decref(self)
         if not self._users:
             _pending_cleanup[id(self)] = (self, time.monotonic())
 
@@ -639,9 +639,9 @@ class Handle(Generic[ArgT]):
         _pending_cleanup.pop(id(self), None)
         if self.type is TYP_COMP:
             for child in cast('Sequence[Handle]', self.arg):
-                child._incref(ref)
+                child._incref(self)
         elif self.type is TYP_CROP:
-            cast(CropInfo, self.arg).source._incref(ref)
+            cast(CropInfo, self.arg).source._incref(self)
 
     def _request_load(self) -> ImageTk.PhotoImage:
         """Request a reload of this image.
