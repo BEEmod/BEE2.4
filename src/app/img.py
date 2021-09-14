@@ -12,7 +12,7 @@ from PIL import ImageTk, Image, ImageDraw
 from weakref import ref as WeakRef
 import tkinter as tk
 from tkinter import ttk
-from typing import Generic, TypeVar, Union, Callable, Optional, Type, cast
+from typing import Generic, TypeVar, Union, Callable, Type, cast
 from app import TK_ROOT
 
 import attr
@@ -101,7 +101,7 @@ def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
         )
 
 
-def tuple_size(size: Union[tuple[int, int], int]) -> tuple[int, int]:
+def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
     """Return an xy tuple given a size or tuple."""
     if isinstance(size, tuple):
         return size
@@ -124,12 +124,12 @@ def _get_tk_img(width: int, height: int) -> ImageTk.PhotoImage:
     return img
 
 
-def _discard_tk_img(img: Optional[ImageTk.PhotoImage]) -> None:
+def _discard_tk_img(img: ImageTk.PhotoImage | None) -> None:
     """Store an unused image so it can be reused."""
     if img is not None:
         # Use setdefault and append so each step is atomic.
-    img_list = _unused_tk_img.setdefault((img.width(), img.height()), [])
-    img_list.append(img)
+        img_list = _unused_tk_img.setdefault((img.width(), img.height()), [])
+        img_list.append(img)
 
 
 # Special paths which map to various images.
@@ -349,8 +349,8 @@ class Handle(Generic[ArgT]):
     The args are dependent on the type, and are used to create the image
     in a background thread.
     """
-    _cached_pil: Optional[Image.Image]
-    _cached_tk: Optional[ImageTk.PhotoImage]
+    _cached_pil: Image.Image | None
+    _cached_tk: ImageTk.PhotoImage | None
     def __init__(
         self,
         typ: ImageType[ArgT],
@@ -367,7 +367,7 @@ class Handle(Generic[ArgT]):
         self._cached_pil = None
         self._cached_tk = None
         self._force_loaded = False
-        self._users: set[Union[WeakRef[tkImgWidgets], Handle]] = set()
+        self._users: set[WeakRef[tkImgWidgets] | Handle] = set()
         # If None, get_tk()/get_pil() was used.
         # If true, this is in the queue to load. Setting this requires
         # the loading lock.
@@ -375,7 +375,7 @@ class Handle(Generic[ArgT]):
         self.lock = threading.Lock()
 
     @classmethod
-    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: Union[int, tuple[int, int]], height: int) -> Handle[ArgT]:
+    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: int | tuple[int, int], height: int) -> Handle[ArgT]:
         if isinstance(width, tuple):
             width, height = width
         try:
@@ -572,7 +572,7 @@ class Handle(Generic[ArgT]):
         return cls._get(TYP_ALPHA, None, width, height)
 
     @classmethod
-    def color(cls, color: Union[tuple[int, int, int], Vec], width: int, height: int) -> Handle[tuple[int, int, int]]:
+    def color(cls, color: tuple[int, int, int] | Vec, width: int, height: int) -> Handle[tuple[int, int, int]]:
         """Shortcut for getting a handle to a solid color."""
         if isinstance(color, Vec):
             # Convert.
@@ -718,7 +718,7 @@ def _ui_task() -> None:
         tk_ico = handle._load_tk()
         for label_ref in handle._users:
             if isinstance(label_ref, WeakRef):
-                label: Optional[tkImgWidgets] = label_ref()
+                label: tkImgWidgets | None = label_ref()
                 if label is not None:
                     try:
                         label['image'] = tk_ico
@@ -757,21 +757,20 @@ def refresh_all() -> None:
             # If force-loaded it's builtin UI etc we shouldn't reload.
             # If already loading, no point.
             if not handle._force_loaded and not handle._loading:
-                if handle._cached_tk is not None:
-                    _discard_tk_img(handle._cached_tk)
+                _discard_tk_img(handle._cached_tk)
                 handle._cached_tk = handle._cached_pil = None
                 _queue_load.put(handle)
                 loading =  Handle.ico_loading(handle.width, handle.height).get_tk()
                 for label_ref in handle._users:
                     if isinstance(label_ref, WeakRef):
-                        label: Optional[tkImgWidgets] = label_ref()
+                        label: tkImgWidgets | None = label_ref()
                         if label is not None:
                             label['image'] = loading
     LOGGER.info('Queued {} images to reload.', _queue_load.qsize())
 
 
 # noinspection PyProtectedMember
-def apply(widget: tkImgWidgetsT, img: Optional[Handle]) -> tkImgWidgetsT:
+def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
     """Set the image in a widget.
 
     This tracks the widget, so later reloads will affect the widget.
