@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Dict, Set
+from typing import Tuple, Dict, Set, Callable
 
 from precomp.conditions import (
     make_flag, make_result, resolve_offset,
@@ -29,7 +29,7 @@ TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
     'dir',
     'direction',
 )
-def flag_angles(inst: Entity, flag: Property):
+def flag_angles(flag: Property) -> Callable[[Entity], None]:
     """Check that a instance is pointed in a direction.
 
     The value should be either just the angle to check, or a block of
@@ -42,7 +42,6 @@ def flag_angles(inst: Entity, flag: Property):
     - `Allow_inverse`: If true, this also returns True if the instance is
         pointed the opposite direction .
     """
-    angle = inst['angles', '0 0 0']
 
     if flag.has_children():
         targ_angle = flag['direction', '0 0 0']
@@ -57,20 +56,22 @@ def flag_angles(inst: Entity, flag: Property):
         from_dir = Vec(0, 0, 1)
         allow_inverse = False
 
-    normal = DIRECTIONS.get(targ_angle.casefold(), None)
-    if normal is None:
-        return False  # If it's not a special angle,
-        # so it failed the exact match
+    try:
+        normal = DIRECTIONS[targ_angle.casefold()]
+    except KeyError:
+        normal = Vec.from_str(targ_angle)
 
-    inst_normal = from_dir.rotate_by_str(angle)
+    def check_orient(inst: Entity) -> bool:
+        """Check the orientation against the instance."""
+        inst_normal = from_dir @ Angle.from_str(inst['angles'])
 
-    if normal == 'WALL':
-        # Special case - it's not on the floor or ceiling
-        return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
-    else:
-        return inst_normal == normal or (
-            allow_inverse and -inst_normal == normal
-        )
+        if normal == 'WALL':
+            # Special case - it's not on the floor or ceiling
+            return abs(inst_normal.z) < 1e-6
+        else:
+            return inst_normal == normal or (
+                allow_inverse and -inst_normal == normal
+            )
 
 
 def brush_at_loc(
@@ -445,19 +446,22 @@ def res_alt_orientation(inst: Entity, res: Property) -> None:
     """Apply an alternate orientation.
 
     "wall" makes the attaching surface in the -X direction, making obs rooms,
-    corridors etc easier to build.  
-    "ceiling" flips the instance, making items such as droppers easier to build.
-    The rotation handle still points in the -X direction.
+    corridors etc easier to build. The Z axis points in the former +X direction.
+    "ceiling" flips the instance, making items such as droppers easier to build. 
+    The X axis remains unchanged.
     """
     val = res.value.casefold()
     if val == 'wall':
-        pose = Angle(-90, 180, 0)
-    elif val == 'ceiling':
-        pose = Angle(0, 0, 180)
+        pose = Matrix.from_angle(-90, 180, 0)
+    elif val in ('ceil', 'ceiling')
+        pose = Matrix.from_roll(180)
     else:
         raise ValueError(f'Unknown orientation type "{res.value}"!')
-    pose @= Angle.from_str(inst['angles'])
-    inst['angles'] = pose
+
+    def swap_orient(inst: Entity) -> None:
+        """Apply the new orientation."""
+        inst['angles'] = pose @ Angle.from_str(inst['angles'])
+    return swap_orient
 
 
 @make_result('setAngles')
