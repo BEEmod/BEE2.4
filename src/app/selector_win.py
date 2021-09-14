@@ -651,7 +651,7 @@ class SelectorWin:
         self._readonly = False
         self.modal = modal
 
-        self.win = Toplevel(tk)
+        self.win = Toplevel(tk, name='selwin_' + save_id)
         self.win.withdraw()
         self.win.title("BEE2 - " + title)
         self.win.transient(master=tk)
@@ -688,6 +688,7 @@ class SelectorWin:
         if desc:
             self.desc_label = ttk.Label(
                 self.win,
+                name='desc_label',
                 text=desc,
                 justify=LEFT,
                 anchor=W,
@@ -701,6 +702,7 @@ class SelectorWin:
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = PanedWindow(
             self.win,
+            name='area_panes',
             orient=HORIZONTAL,
             sashpad=2,  # Padding above/below panes
             sashwidth=3,  # Width of border
@@ -715,7 +717,7 @@ class SelectorWin:
         shim.columnconfigure(0, weight=1)
 
         # We need to use a canvas to allow scrolling.
-        self.wid_canvas = Canvas(shim, highlightthickness=0)
+        self.wid_canvas = Canvas(shim, highlightthickness=0, name='pal_canvas')
         self.wid_canvas.grid(row=0, column=0, sticky="NSEW")
 
         # Add another frame inside to place labels on.
@@ -724,6 +726,7 @@ class SelectorWin:
 
         self.wid_scroll = tk_tools.HidingScroll(
             shim,
+            name='scrollbar',
             orient=VERTICAL,
             command=self.wid_canvas.yview,
         )
@@ -736,25 +739,28 @@ class SelectorWin:
             # Labelframe doesn't look good here on OSX
             self.sugg_lbl = ttk.Label(
                 self.pal_frame,
+                name='suggest_label',
                 # Draw lines with box drawing characters
                 text="\u250E\u2500" + gettext("Suggested") + "\u2500\u2512",
             )
         else:
             self.sugg_lbl = ttk.LabelFrame(
                 self.pal_frame,
+                name='suggest_label',
                 text=gettext("Suggested"),
                 labelanchor=N,
                 height=50,
             )
 
         # Holds all the widgets which provide info for the current item.
-        self.prop_frm = ttk.Frame(self.pane_win, borderwidth=4, relief='raised')
+        self.prop_frm = ttk.Frame(self.pane_win, name='prop_frame', borderwidth=4, relief='raised')
         self.prop_frm.columnconfigure(1, weight=1)
 
         # Border around the selected item icon.
         width, height = ICON_SIZE_LRG
         self.prop_icon_frm = ttk.Frame(
             self.prop_frm,
+            name='prop_icon_frame',
             borderwidth=4,
             relief='raised',
             width=width,
@@ -762,7 +768,7 @@ class SelectorWin:
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
-        self.prop_icon = ttk.Label(self.prop_icon_frm)
+        self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
         img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
         self.prop_icon.grid(row=0, column=0)
         self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
@@ -772,6 +778,7 @@ class SelectorWin:
 
         self.prop_name = ttk.Label(
             name_frame,
+            name='prop_name',
             text="Item",
             justify=CENTER,
             font=("Helvetica", 12, "bold"),
@@ -784,6 +791,7 @@ class SelectorWin:
         if sound_sys is not None and sound.has_sound():
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
+                name='sample_button',
                 text=BTN_PLAY,
                 width=2,
             )
@@ -819,6 +827,7 @@ class SelectorWin:
 
         self.prop_desc = tkRichText(
             self.prop_desc_frm,
+            name='prop_desc',
             width=40,
             height=4,
             font="TkSmallCaptionFont",
@@ -833,6 +842,7 @@ class SelectorWin:
 
         self.prop_scroll = tk_tools.HidingScroll(
             self.prop_desc_frm,
+            name='desc_scroll',
             orient=VERTICAL,
             command=self.prop_desc.yview,
         )
@@ -847,17 +857,19 @@ class SelectorWin:
 
         ttk.Button(
             self.prop_frm,
+            name='btn_ok',
             text=gettext("OK"),
             command=self.save,
         ).grid(
             row=6,
             column=0,
             padx=(8, 8),
-            )
+        )
 
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
+                name='btn_reset',
                 text=gettext("Reset to Default"),
                 command=self.sel_suggested,
             )
@@ -869,6 +881,7 @@ class SelectorWin:
 
         ttk.Button(
             self.prop_frm,
+            name='btn_cancel',
             text=gettext("Cancel"),
             command=self.exit,
         ).grid(
@@ -1068,11 +1081,12 @@ class SelectorWin:
 
             if item.button is None:  # New, create the button widget.
                 if item is self.noneItem:
-                    item.button = ttk.Button(self.pal_frame)
+                    item.button = ttk.Button(self.pal_frame, name='item_none')
                     item.context_lbl = item.context_lbl
                 else:
                     item.button = ttk.Button(
                         self.pal_frame,
+                        name='item_' + item.name,
                         text=item.shortName,
                         compound='top',
                     )

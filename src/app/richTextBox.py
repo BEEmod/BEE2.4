@@ -16,7 +16,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 class tkRichText(tkinter.Text):
     """A version of the TK Text widget which allows using special formatting."""
-    def __init__(self, parent, width=10, height=4, font="TkDefaultFont"):
+    def __init__(self, parent, width=10, height=4, font="TkDefaultFont", **kargs):
         # Setup all our configuration for inserting text.
         self.font = nametofont(font)
         self.bold_font = self.font.copy()
@@ -36,6 +36,7 @@ class tkRichText(tkinter.Text):
             font=self.font,
             # We only want the I-beam cursor over text.
             cursor=Cursors.REGULAR,
+            **kargs,
         )
 
         self.heading_font = {}
