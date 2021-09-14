@@ -10,7 +10,7 @@ Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
-from typing import Any, Mapping, Optional, Callable
+from typing import Any, Mapping, Optional, Callable, Iterator
 from threading import Lock, Event
 from atomicwrites import atomic_write
 
@@ -88,6 +88,20 @@ def write_settings() -> None:
     ) as file:
         for line in props.export():
             file.write(line)
+
+
+def get_package_locs() -> Iterator[Path]:
+    """Return all the package search locations from the config."""
+    section = GEN_OPTS['Directories']
+    yield Path(section['package'])
+    i = 1
+    while True:
+        try:
+            val = section[f'package{i}']
+        except KeyError:
+            return
+        yield Path(val)
+        i += 1
 
 
 class ConfigFile(ConfigParser):

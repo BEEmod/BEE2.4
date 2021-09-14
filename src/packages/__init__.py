@@ -2,8 +2,9 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-import os
 from collections import defaultdict
+from pathlib import Path
+
 import attr
 
 import srctools
@@ -363,20 +364,25 @@ def set_cond_source(props: Property, source: str) -> None:
         cond['__src__'] = source
 
 
-def find_packages(pak_dir: str) -> None:
+def find_packages(pak_dir: Path) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
-    for name in os.listdir(pak_dir):  # Both files and dirs
-        name = os.path.join(pak_dir, name)
-        folded = name.casefold()
+    try:
+        contents = list(pak_dir.iterdir())
+    except FileNotFoundError:
+        LOGGER.warning('Package search location "{}" does not exist!', pak_dir)
+        return
+
+    for name in contents:  # Both files and dirs
+        folded = name.stem.casefold()
         if folded.endswith('.vpk') and not folded.endswith('_dir.vpk'):
             # _000.vpk files, useless without the directory
             continue
 
-        if os.path.isdir(name):
+        if name.is_dir():
             filesys = RawFileSystem(name)
         else:
-            ext = os.path.splitext(folded)[1]
+            ext = name.suffix.casefold()
             if ext in ('.bee_pack', '.zip'):
                 filesys = ZipFileSystem(name)
             elif ext == '.vpk':
@@ -385,13 +391,13 @@ def find_packages(pak_dir: str) -> None:
                 LOGGER.info('Extra file: {}', name)
                 continue
 
-        LOGGER.debug('Reading package "' + name + '"')
+        LOGGER.debug('Reading package "{}"', name)
 
         # Valid packages must have an info.txt file!
         try:
             info = filesys.read_prop('info.txt')
         except FileNotFoundError:
-            if os.path.isdir(name):
+            if name.is_dir():
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
                 find_packages(name)
@@ -421,24 +427,33 @@ def find_packages(pak_dir: str) -> None:
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dir: str, msg: str) -> NoReturn:
+def no_packages_err(pak_dirs: list[Path], msg: str) -> NoReturn:
     """Show an error message indicating no packages are present."""
     from tkinter import messagebox
     import sys
     # We don't have a packages directory!
+    if len(pak_dirs) == 1:
+        trailer = str(pak_dirs[0])
+    else:
+        trailer = (
+            'one of the following locations:\n' +
+            '\n'.join(f' - {fold}' for fold in pak_dirs)
+        )
+    message = (
+        f'{msg}\nGet the packages from '
+        '"https://github.com/BEEmod/BEE2-items" '
+        f'and place them in {trailer}'
+    )
+    LOGGER.error(message)
     messagebox.showerror(
         title='BEE2 - Invalid Packages Directory!',
-        message=(
-            '{}\nGet the packages from '
-            '"https://github.com/BEEmod/BEE2-items" '
-            'and place them in "{}".').format(msg, pak_dir + os.path.sep),
-        # Add slash to the end to indicate it's a folder.
+        message=message,
     )
     sys.exit()
 
 
 def load_packages(
-    pak_dir: str,
+    pak_dirs: list[Path],
     loader: LoadScreen,
     log_item_fallbacks=False,
     log_missing_styles=False,
@@ -449,26 +464,23 @@ def load_packages(
 ) -> Mapping[str, FileSystem]:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
-    pak_dir = os.path.abspath(pak_dir)
-
-    if not os.path.isdir(pak_dir):
-        no_packages_err(pak_dir, 'The given packages directory is not present!')
 
     Item.log_ent_count = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
 
-    find_packages(pak_dir)
+    for pak_dir in pak_dirs:
+        find_packages(pak_dir)
 
     pack_count = len(packages)
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
-        no_packages_err(pak_dir, 'No packages found!')
+        no_packages_err(pak_dirs, 'No packages found!')
 
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packages:
         no_packages_err(
-            pak_dir,
+            pak_dirs,
             'No Clean Style package! This is required for some '
             'essential resources and objects.'
         )
@@ -685,7 +697,7 @@ class Package:
         pak_id: str,
         filesystem: FileSystem,
         info: Property,
-        name: str,
+        path: Path,
     ) -> None:
         disp_name = info['Name', None]
         if disp_name is None:
@@ -695,7 +707,7 @@ class Package:
         self.id = pak_id
         self.fsys = filesystem
         self.info = info
-        self.name = name
+        self.path = path
         self.disp_name = disp_name
         self.desc = ''  # Filled in by parse_package.
 
@@ -724,7 +736,7 @@ class Package:
             LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
 
-        zip_modtime = int(os.stat(self.name).st_mtime)
+        zip_modtime = int(self.path.stat().st_mtime)
 
         # If zero, it's never extracted...
         if zip_modtime != mod_time or mod_time == 0:
@@ -739,7 +751,7 @@ class Package:
             # No modification time
             return 0
         else:
-            return int(os.stat(self.name).st_mtime)
+            return int(self.path.stat().st_mtime)
 
 
 class Style(PakObject):

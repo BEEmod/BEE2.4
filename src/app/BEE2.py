@@ -1,6 +1,6 @@
 """Run the BEE2."""
 # BEE2_config creates this config file to allow easy cross-module access
-from BEE2_config import GEN_OPTS
+from BEE2_config import GEN_OPTS, get_package_locs
 
 from app import gameMan, paletteLoader, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE
 import loadScreen
@@ -79,7 +79,7 @@ gameMan.scan_music_locs()
 
 LOGGER.info('Loading Packages...')
 package_sys = packages.load_packages(
-    GEN_OPTS['Directories']['package'],
+    list(get_package_locs()),
     loader=loadScreen.main_loader,
     log_item_fallbacks=GEN_OPTS.get_bool(
         'Debug', 'log_item_fallbacks'),
