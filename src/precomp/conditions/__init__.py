@@ -32,18 +32,17 @@ import inspect
 import io
 import itertools
 import math
-import random
 import sys
 import typing
 import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Any, Callable, TextIO, Optional
+from typing import Generic, TypeVar, Any, Callable, TextIO
 
 import attr
 
-from precomp import instanceLocs
+from precomp import instanceLocs, rand
 import consts
 import srctools.logger
 import utils
@@ -1027,6 +1026,8 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
 
 def set_random_seed(inst: Entity, seed: str) -> None:
     """Compute and set a random seed for a specific entity."""
+    warnings.warn('Use rand.seed()', DeprecationWarning, 2)
+    import random
     from precomp import instance_traits
 
     name = inst['targetname']
@@ -1409,22 +1410,22 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
 
     suff = ''
     for loc in possible_locs:
-        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
-        if random.random() > chance:
+        rng = rand.seed(b'goo_debris', loc)
+        if rng.random() > chance:
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list) + 1)
+            suff = '_' + str(rng.choice(rand_list) + 1)
 
         if offset > 0:
-            loc.x += random.randint(-offset, offset)
-            loc.y += random.randint(-offset, offset)
+            loc.x += rng.randint(-offset, offset)
+            loc.y += rng.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
         vmf.create_ent(
             classname='func_instance',
             file=file + suff + '.vmf',
             origin=loc.join(' '),
-            angles='0 {} 0'.format(random.randrange(0, 3600)/10)
+            angles='0 {} 0'.format(rng.randrange(0, 3600)/10)
         )
 
     return RES_EXHAUSTED

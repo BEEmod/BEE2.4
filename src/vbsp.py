@@ -7,7 +7,6 @@ LOGGER = init_logging('bee2/vbsp.log')
 import os
 import sys
 import shutil
-import random
 import logging
 import pickle
 from io import StringIO
@@ -648,11 +647,11 @@ def add_fog_ents(vmf: VMF) -> None:
 
     fog_opt = settings['fog']
 
-    random.seed(MAP_RAND_SEED + '_shadow_angle')
+    rng = rand.seed(b'shadow_angle')
     vmf.create_ent(
         classname='shadow_control',
         # Slight variations around downward direction.
-        angles=Vec(random.randrange(85, 90), random.randrange(0, 360), 0),
+        angles=Angle(rng.randrange(85, 90), rng.randrange(0, 360), 0),
         origin=pos + (0, 16, 0),
         distance=100,
         color=fog_opt['shadow'],
@@ -1477,7 +1476,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
     music.add(
         vmf,
         loc,
-        settings['music_conf'],
+        settings['music_conf'],  # type: ignore
         settings['has_attr'],
         game_mode == 'SP',
     )
