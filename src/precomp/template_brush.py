@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import itertools
 import os
-import random
 from collections import defaultdict
-from typing import Union, Callable, Optional, Tuple, Mapping, Iterable, Iterator
+from typing import Union, Optional, Tuple, Mapping, Iterable, Iterator
 
 from decimal import Decimal
 from enum import Enum
@@ -21,7 +20,7 @@ import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
-from . import tiling, texturing, options
+from . import tiling, texturing, options, rand
 import consts
 
 
@@ -645,7 +644,6 @@ def import_template(
     force_type: TEMP_TYPES=TEMP_TYPES.default,
     add_to_map: bool=True,
     additional_visgroups: Iterable[str]=(),
-    visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     bind_tile_pos: Iterable[Vec]=(),
     align_bind: bool=False,
 ) -> ExportedTemplate:
@@ -661,8 +659,6 @@ def import_template(
 
     If targetname is set, it will be used to localise overlay names.
     add_to_map sets whether to add the brushes and func_detail to the map.
-    visgroup_choose is a callback used to determine if visgroups should be
-    added - it's passed a list of names, and should return a list of ones to use.
 
     If any bound_tile_pos are provided, these are offsets to tiledefs which
     should have all the overlays in this template bound to them, and vice versa.
@@ -677,7 +673,6 @@ def import_template(
         template = get_template(temp_name)
 
     chosen_groups.update(additional_visgroups)
-    chosen_groups.update(visgroup_choose(template.visgroups))
     chosen_groups.add('')
 
     orig_world, orig_detail, orig_over = template.visgrouped(chosen_groups)
@@ -1116,7 +1111,6 @@ def retexture_template(
             folded_mat = face.mat.casefold()
 
             norm = face.normal()
-            random.seed(rand_prefix + norm.join('_'))
 
             if orig_id in template.realign_faces:
                 try:
@@ -1163,7 +1157,7 @@ def retexture_template(
 
             if override_mat is not None:
                 # Replace_tex overrides everything.
-                mat = random.choice(override_mat)
+                mat =  rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
                 if mat.startswith('<') and mat.endswith('>'):
@@ -1238,7 +1232,8 @@ def retexture_template(
         mat = over['material'].casefold()
 
         if mat in replace_tex:
-            mat = random.choice(replace_tex[mat])
+            rng = rand.seed(b'temp', template_data.template.id, over_pos, mat)
+            mat = rng.choice(replace_tex[mat])
             if mat[:1] == '$' and fixup is not None:
                 mat = fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):
