@@ -1,6 +1,5 @@
 """Results relating to brushwork."""
 from __future__ import annotations
-import random
 from typing import Optional, Callable, Iterable
 from collections import defaultdict
 
@@ -9,7 +8,7 @@ from srctools.math import Vec, Angle, Matrix, to_matrix
 import srctools.logger
 
 from precomp import (
-    conditions, tiling, texturing,
+    conditions, tiling, texturing, rand,
     instance_traits, brushLoc, faithplate, template_brush,
 )
 import vbsp
@@ -324,11 +323,6 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
             tile_grids[axis] = tiling.TileSize.TILE_2x2
         else:
             tile_grids[axis] = tiling.TileSize.TILE_4x4
-
-    grid_offset = origin // 128  # type: Vec
-
-    # All brushes in each grid have the same textures for each side.
-    random.seed(grid_offset.join(' ') + '-partial_block')
 
     solids = vmf.make_prism(point1, point2)
 
@@ -842,14 +836,16 @@ def res_set_tile(inst: Entity, res: Property) -> None:
 
     chance = srctools.conv_float(res['chance', '100'].rstrip('%'), 100.0)
     if chance < 100.0:
-        conditions.set_random_seed(inst, 'tile' + res['seed', ''])
+        rng = rand.seed(b'tile', inst, res['seed', ''])
+    else:
+        rng = None
 
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
             if val in '_ ':
                 continue
 
-            if chance < 100.0 and random.uniform(0, 100) > chance:
+            if rng is not None and rng.uniform(0, 100) > chance:
                 continue
 
             pos = Vec(32 * x, -32 * y, 0) @ orient + offset
@@ -862,7 +858,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
                 size = None
             else:
                 try:
-                    new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
+                    new_tile = tiling.TILETYPE_FROM_CHAR[val]
                 except KeyError:
                     LOGGER.warning('Unknown tiletype "{}"!', val)
                 else:

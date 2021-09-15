@@ -1216,7 +1216,7 @@ def res_switch(res: Property):
     if method is SWITCH_TYPE.LAST:
         raw_cases.reverse()
 
-    cases: list[tuple[Property, list[Property]]] = [
+    conf_cases: list[tuple[Property, list[Property]]] = [
         (Property(flag_name, case.real_name), list(case))
         for case in raw_cases
     ]
@@ -1224,8 +1224,10 @@ def res_switch(res: Property):
     def apply_switch(inst: Entity) -> None:
         """Execute a switch."""
         if method is SWITCH_TYPE.RANDOM:
-            set_random_seed(inst, rand_seed)
-            random.shuffle(cases)
+            cases = conf_cases.copy()
+            rand.seed(b'switch', rand_seed, inst).shuffle(cases)
+        else:  # Won't change.
+            cases = conf_cases
 
         run_default = True
         for flag, results in cases:
