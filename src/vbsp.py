@@ -40,6 +40,7 @@ from precomp import (
     fizzler,
     voice_line,
     music,
+    rand,
 )
 import consts
 import editoritems
@@ -1114,25 +1115,6 @@ def mod_doorframe(inst: Entity, corr_id, corr_type, corr_name):
         inst['file'] = replace
 
 
-def calc_rand_seed(vmf: VMF) -> str:
-    """Use the ambient light entities to create a map seed.
-
-     This ensures textures remain the same when the map is recompiled.
-    """
-    amb_light = instanceLocs.resolve('<ITEM_POINT_LIGHT>')
-    lst = [
-        inst['targetname'] or '-'  # If no targ
-        for inst in
-        vmf.by_class['func_instance']
-        if inst['file'].casefold() in amb_light
-        ]
-    if len(lst) == 0:
-        # Very small maps won't have any ambient light entities at all.
-        return 'SEED'
-    else:
-        return '|'.join(lst)
-
-
 def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
     """Add water_mist* particle systems to goo.
 
@@ -1891,7 +1873,7 @@ def main() -> None:
             antline_floor=ant_floor,
         )
 
-        MAP_RAND_SEED = calc_rand_seed(vmf)
+        MAP_RAND_SEED = rand.init_seed(vmf)
 
         all_inst = get_map_info(vmf)
 
