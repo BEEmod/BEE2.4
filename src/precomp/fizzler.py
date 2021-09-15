@@ -1,5 +1,4 @@
 """Implements fizzler/laserfield generation and customisation."""
-import random
 from collections import defaultdict, namedtuple
 from typing import Dict, List, Optional, Tuple, Iterator, Set, Callable
 
@@ -18,7 +17,7 @@ from precomp import (
     options,
     packing,
     template_brush,
-    conditions,
+    conditions, rand,
 )
 import consts
 
@@ -1140,8 +1139,8 @@ def generate_fizzlers(vmf: VMF):
             packing.pack_list(vmf, pack)
 
         if fizz_type.inst[FizzInst.BASE, is_static]:
-            random.seed('{}_fizz_base_{}'.format(MAP_RAND_SEED, fizz_name))
-            fizz.base_inst['file'] = random.choice(fizz_type.inst[FizzInst.BASE, is_static])
+            rng = rand.seed(b'fizz_base', fizz_name)
+            fizz.base_inst['file'] = rng.choice(fizz_type.inst[FizzInst.BASE, is_static])
 
         if not fizz.emitters:
             LOGGER.warning('No emitters for fizzler "{}"!', fizz_name)
@@ -1236,9 +1235,9 @@ def generate_fizzlers(vmf: VMF):
 
                     # Allow randomising speed and direction.
                     if 0 < beam.speed_min  < beam.speed_max:
-                        random.seed('{}{}{}'.format(MAP_RAND_SEED, min_off, max_off))
-                        beam_ent['TextureScroll'] = random.randint(beam.speed_min, beam.speed_max)
-                        if random.choice((False, True)):
+                        rng = rand.seed(b'fizz_beam', min_off, max_off)
+                        beam_ent['TextureScroll'] = rng.randint(beam.speed_min, beam.speed_max)
+                        if rng.choice((False, True)):
                             # Flip to reverse direction.
                             min_off, max_off = max_off, min_off
 
@@ -1267,12 +1266,12 @@ def generate_fizzlers(vmf: VMF):
 
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
-            random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_min))
+            rng = rand.seed(b'fizz_seg', seg_min, seg_max)
             if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]:
                 min_inst = vmf.create_ent(
                     targetname=get_model_name(seg_ind),
                     classname='func_instance',
-                    file=random.choice(fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]),
+                    file=rng.choice(fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]),
                     origin=(seg_min + seg_max)/2,
                     angles=min_orient.to_angle(),
                 )
@@ -1281,15 +1280,14 @@ def generate_fizzlers(vmf: VMF):
                 min_inst = vmf.create_ent(
                     targetname=get_model_name(seg_ind),
                     classname='func_instance',
-                    file=random.choice(model_min),
+                    file=rng.choice(model_min),
                     origin=seg_min,
                     angles=min_orient.to_angle(),
                 )
-                random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_max))
                 max_inst = vmf.create_ent(
                     targetname=get_model_name(seg_ind),
                     classname='func_instance',
-                    file=random.choice(model_max),
+                    file=rng.choice(model_max),
                     origin=seg_max,
                     angles=max_orient.to_angle(),
                 )
@@ -1299,6 +1297,7 @@ def generate_fizzlers(vmf: VMF):
             instance_traits.get(min_inst).update(fizz_traits)
 
             if has_fizz_border:
+                # noinspection PyProtectedMember
                 fizz._gen_fizz_border(vmf, seg_min, seg_max)
 
             if fizz.embedded:
@@ -1310,14 +1309,14 @@ def generate_fizzlers(vmf: VMF):
 
                 # Go 64 from each side, and always have at least 1 section
                 # A 128 gap will have length = 0
+                rng = rand.seed(b'fizz_mid', seg_min, seg_max)
                 for ind, dist in enumerate(range(64, round(length) - 63, 128)):
                     mid_pos = seg_min + forward * dist
-                    random.seed('{}_fizz_mid_{}'.format(MAP_RAND_SEED, mid_pos))
                     mid_inst = vmf.create_ent(
                         classname='func_instance',
                         targetname=fizz_name,
                         angles=min_orient.to_angle(),
-                        file=random.choice(fizz_type.inst[FizzInst.GRID, is_static]),
+                        file=rng.choice(fizz_type.inst[FizzInst.GRID, is_static]),
                         origin=mid_pos,
                     )
                     mid_inst.fixup.update(fizz.base_inst.fixup)

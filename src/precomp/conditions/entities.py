@@ -1,10 +1,8 @@
 """Conditions related to specific kinds of entities."""
-import random
-
 from srctools import Property, Vec, VMF, Entity, Angle
 import srctools.logger
 
-from precomp import tiling, texturing, template_brush, conditions
+from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.conditions import make_result, make_result_setup
 from precomp.template_brush import TEMP_TYPES
@@ -78,19 +76,21 @@ def res_insert_overlay(vmf: VMF, res: Property):
         )
 
         for over in temp.overlay:
-            random.seed('TEMP_OVERLAY_' + over['basisorigin'])
+            pos = Vec.from_str(over['basisorigin'])
             mat = over['material']
             try:
-                mat = random.choice(replace_tex[mat.casefold().replace('\\', '/')])
+                replace = replace_tex[mat.casefold().replace('\\', '/')]
             except KeyError:
                 pass
+            else:
+                mat = rand.seed(b'temp_over', temp_id, pos).choice(replace)
 
             if mat[:1] == '$':
                 mat = inst.fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):
                 # Lookup in the texture data.
                 gen, mat = texturing.parse_name(mat[1:-1])
-                mat = gen.get(Vec.from_str(over['basisorigin']), mat)
+                mat = gen.get(pos, mat)
             over['material'] = mat
             tiledef.bind_overlay(over)
 
