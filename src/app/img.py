@@ -473,19 +473,19 @@ class Handle(Generic[ArgT]):
                     if ',' in color:
                         r, g, b = map(int, color.split(','))
                     elif len(color) == 3:
-                        r = int(uri.path[0] * 2, 16)
-                        g = int(uri.path[1] * 2, 16)
-                        b = int(uri.path[2] * 2, 16)
+                        r = int(color[0] * 2, 16)
+                        g = int(color[1] * 2, 16)
+                        b = int(color[2] * 2, 16)
                     elif len(color) == 6:
-                        r = int(uri.path[0:2], 16)
-                        g = int(uri.path[2:4], 16)
-                        b = int(uri.path[4:6], 16)
+                        r = int(color[0:2], 16)
+                        g = int(color[2:4], 16)
+                        b = int(color[4:6], 16)
                     else:
                         raise ValueError
                 except (ValueError, TypeError, OverflowError):
                     # Try to grab from TK's colour list.
                     try:
-                        r, g, b = TK_ROOT.winfo_rgb(uri.path)
+                        r, g, b = TK_ROOT.winfo_rgb(color)
                         # They're full 16-bit colors, we don't want that.
                         r >>= 8
                         g >>= 8
