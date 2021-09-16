@@ -33,6 +33,7 @@ def init_seed(vmf: VMF) -> str:
     light_names.sort()  # Ensure consistent order!
     for name in light_names:
         MAP_HASH.update(name)
+    LOGGER.debug('Map random seed: {}', MAP_HASH.hexdigest())
 
     return b'|'.join(light_names).decode()  # TODO Remove
 
