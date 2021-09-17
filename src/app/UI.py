@@ -810,9 +810,13 @@ def refresh_pal_ui() -> None:
 
 def export_editoritems(e=None) -> None:
     """Export the selected Items and Style into the chosen game."""
-
-    # Convert IntVar to boolean, and only export values in the selected style
-    chosen_style = current_style()
+    # Disable, so you can't double-export.
+    UI['pal_export'].state(('disabled',))
+    menus['file'].entryconfigure(menus['file'].export_btn_index, state='disabled')
+    TK_ROOT.update_idletasks()
+    try:
+        # Convert IntVar to boolean, and only export values in the selected style
+        chosen_style = current_style()
 
     # The chosen items on the palette
     pal_data = [(it.id, it.subKey) for it in pal_picked]
@@ -926,9 +930,12 @@ def export_editoritems(e=None) -> None:
     set_pal_radio()
 
     # Re-set this, so we clear the '*' on buttons if extracting cache.
-    set_game(gameMan.selected_game)
+        set_game(gameMan.selected_game)
 
-    refresh_pal_ui()
+        refresh_pal_ui()
+    finally:
+        UI['pal_export'].state(('!disabled',))
+    menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
 
 
 def set_disp_name(item, e=None) -> None:
@@ -1361,11 +1368,12 @@ def init_option(pane: SubPane) -> None:
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
-    ttk.Button(
+    UI['pal_export'] = ttk.Button(
         frame,
         textvariable=EXPORT_CMD_VAR,
         command=export_editoritems,
-    ).grid(row=4, sticky="EW", padx=5)
+    )
+    UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
     props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
