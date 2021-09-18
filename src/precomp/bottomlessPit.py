@@ -1,10 +1,8 @@
 """Generates Bottomless Pits."""
-import random
-
 from srctools import Vec, Property, VMF, Solid, Side, Output
 import srctools.logger
 import utils
-from precomp import brushLoc, options
+from precomp import brushLoc, options, rand
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -283,9 +281,8 @@ def make_bottomless_pit(vmf: VMF, max_height):
             # Middle of the pit...
             continue
 
-        random.seed('pit_' + str(pos.x) + str(pos.y) + 'sides')
-
-        file = random.choice(side_types[inst_type])
+        rng = rand.seed(b'pit', pos.x, pos.y)
+        file = rng.choice(side_types[inst_type])
 
         if file != '':
             vmf.create_ent(
@@ -298,7 +295,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
         # Straight uses two side-instances in parallel - "|o|"
         if inst_type is utils.CONN_TYPES.straight:
-            file = random.choice(side_types[inst_type])
+            file = rng.choice(side_types[inst_type])
             if file != '':
                 vmf.create_ent(
                     classname='func_instance',
@@ -394,5 +391,3 @@ def make_pit_shell(vmf: VMF):
         Vec(20 * 128, 20 * 128, -4864),
         mat='tools/toolstrigger',
     ).solid]
-
-
