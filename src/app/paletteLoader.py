@@ -14,6 +14,7 @@ from typing import List, Tuple, Optional, Dict
 LOGGER = srctools.logger.get_logger(__name__)
 
 PAL_DIR = utils.conf_location('palettes/')
+GROUP_BUILTIN = '<BUILTIN>'
 
 PAL_EXT = '.bee2_palette'
 
@@ -202,6 +203,7 @@ class Palette:
         pos: List[Tuple[str, int]],
         trans_name='',
         prevent_overwrite=False,
+        group: str='',
         filename: str=None,
         settings: Optional[Property]=None,
     ):
@@ -213,6 +215,9 @@ class Palette:
                 self.name = TRANS_NAMES[trans_name.upper()]
             except KeyError:
                 LOGGER.warning('Unknown translated palette "{}', trans_name)
+
+        # Group to show the palette in.
+        self.group = group
 
         # If loaded from a file, the path to use.
         # None determines a filename automatically.
@@ -226,12 +231,12 @@ class Palette:
         # If not None, settings associated with the palette.
         self.settings = settings
 
-    def __str__(self):
-        return self.name
-
+    def __repr__(self) -> str:
+        return f'<Palette {self.name!r}>'
 
     @classmethod
-    def parse(cls, path: str):
+    def parse(cls, path: str) -> 'Palette':
+        """Parse a palette from a file."""
         with open(path, encoding='utf8') as f:
             props = Property.parse(f, path)
         name = props['Name', '??']
@@ -250,12 +255,13 @@ class Palette:
             name,
             items,
             trans_name=trans_name,
+            group=props['group', ''],
             prevent_overwrite=props.bool('readonly'),
             filename=os.path.basename(path),
             settings=settings,
         )
 
-    def save(self, ignore_readonly=False):
+    def save(self, ignore_readonly=False) -> None:
         """Save the palette file into the specified location.
 
         If ignore_readonly is true, this will ignore the `prevent_overwrite`
@@ -325,6 +331,7 @@ def load_palettes():
             items,
             name,
             prevent_overwrite=True,
+            group=GROUP_BUILTIN,
         ))
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
@@ -398,8 +405,8 @@ def parse_legacy(posfile, propfile, path):
                 val = line.split('",')
                 if len(val) == 2:
                     pos.append((
-                        val[0][1:], # Item ID
-                        int(val[1].strip()), # Item subtype
+                        val[0][1:],  # Item ID
+                        int(val[1].strip()),  # Item subtype
                         ))
                 else:
                     LOGGER.warning('Malformed row "{}"!', line)
