@@ -82,6 +82,12 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
     """
     marker_filenames = instanceLocs.resolve(res['markeritem'])
 
+    # TODO: Reimplement cutout tiles.
+    for inst in vmf.by_class['func_instance']:
+        if inst['file'].casefold() in marker_filenames:
+            inst.remove()
+    return
+
     x: float
     y: float
     max_x: float
@@ -198,8 +204,6 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
         # Remove all traces of this item (other than in connections lists).
         inst.remove()
         del connections.ITEMS[targ]
-
-    return  # TODO: Reimplement cutout tiles.
 
     for start_floor, end_floor in FLOOR_IO:
         box_min = Vec(INST_LOCS[start_floor])
