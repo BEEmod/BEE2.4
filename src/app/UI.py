@@ -818,118 +818,118 @@ def export_editoritems(e=None) -> None:
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
 
-    # The chosen items on the palette
-    pal_data = [(it.id, it.subKey) for it in pal_picked]
+        # The chosen items on the palette
+        pal_data = [(it.id, it.subKey) for it in pal_picked]
 
-    item_versions = {
-        it_id: item.selected_ver
-        for it_id, item in
-        item_list.items()
-    }
-
-    item_properties = {
-        it_id: {
-            key[5:]: value
-            for key, value in
-            section.items() if
-            key.startswith('prop_')
+        item_versions = {
+            it_id: item.selected_ver
+            for it_id, item in
+            item_list.items()
         }
-        for it_id, section in
-        item_opts.items()
-    }
 
-    success, vpk_success = gameMan.selected_game.export(
-        style=chosen_style,
-        selected_objects={
-            # Specify the 'chosen item' for each object type
-            packages.Music: music_conf.export_data(),
-            packages.Skybox: skybox_win.chosen_id,
-            packages.QuotePack: voice_win.chosen_id,
-            packages.Elevator: elev_win.chosen_id,
+        item_properties = {
+            it_id: {
+                key[5:]: value
+                for key, value in
+                section.items() if
+                key.startswith('prop_')
+            }
+            for it_id, section in
+            item_opts.items()
+        }
 
-            packages.Item: (pal_data, item_versions, item_properties),
-            packages.StyleVar: StyleVarPane.export_data(chosen_style),
-            packages.Signage: signage_ui.export_data(),
+        success, vpk_success = gameMan.selected_game.export(
+            style=chosen_style,
+            selected_objects={
+                # Specify the 'chosen item' for each object type
+                packages.Music: music_conf.export_data(),
+                packages.Skybox: skybox_win.chosen_id,
+                packages.QuotePack: voice_win.chosen_id,
+                packages.Elevator: elev_win.chosen_id,
 
-            # The others don't have one, so it defaults to None.
-        },
-        should_refresh=not GEN_OPTS.get_bool(
-            'General',
-            'preserve_BEE2_resource_dir',
-            False,
-        )
-    )
+                packages.Item: (pal_data, item_versions, item_properties),
+                packages.StyleVar: StyleVarPane.export_data(chosen_style),
+                packages.Signage: signage_ui.export_data(),
 
-    if not success:
-        return
-
-    export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
-
-    for pal in paletteLoader.pal_list[:]:
-        if pal.filename == export_filename:
-            paletteLoader.pal_list.remove(pal)
-
-    new_pal = paletteLoader.Palette(
-        '??',
-        pal_data,
-        # This makes it lookup the translated name
-        # instead of using a configured one.
-        trans_name='LAST_EXPORT',
-        # Use a specific filename - this replaces existing files.
-        filename=export_filename,
-        # And prevent overwrite
-        prevent_overwrite=True,
-        )
-    paletteLoader.pal_list.append(new_pal)
-    new_pal.save(ignore_readonly=True)
-
-    # Save the configs since we're writing to disk lots anyway.
-    GEN_OPTS.save_check()
-    item_opts.save_check()
-    BEE2_config.write_settings()
-
-    message = _('Selected Items and Style successfully exported!')
-    if not vpk_success:
-        message += _(
-            '\n\nWarning: VPK files were not exported, quit Portal 2 and '
-            'Hammer to ensure editor wall previews are changed.'
+                # The others don't have one, so it defaults to None.
+            },
+            should_refresh=not GEN_OPTS.get_bool(
+                'General',
+                'preserve_BEE2_resource_dir',
+                False,
+            )
         )
 
-    chosen_action = optionWindow.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
-    want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
+        if not success:
+            return
 
-    if want_launch or chosen_action is not optionWindow.AfterExport.NORMAL:
-        do_action = messagebox.askyesno(
-            'BEEMOD2',
-            message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
-            parent=TK_ROOT,
-        )
-    else:  # No action to do, so just show an OK.
-        messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
-        do_action = False
+        export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
 
-    # Do the desired action - if quit, we don't bother to update UI.
-    if do_action:
-        # Launch first so quitting doesn't affect this.
-        if want_launch:
-            gameMan.selected_game.launch()
+        for pal in paletteLoader.pal_list[:]:
+            if pal.filename == export_filename:
+                paletteLoader.pal_list.remove(pal)
 
-        if chosen_action is optionWindow.AfterExport.NORMAL:
-            pass
-        elif chosen_action is optionWindow.AfterExport.MINIMISE:
-            TK_ROOT.iconify()
-        elif chosen_action is optionWindow.AfterExport.QUIT:
-            quit_application()
-            # We never return from this.
-        else:
-            raise ValueError('Unknown action "{}"'.format(chosen_action))
+        new_pal = paletteLoader.Palette(
+            '??',
+            pal_data,
+            # This makes it lookup the translated name
+            # instead of using a configured one.
+            trans_name='LAST_EXPORT',
+            # Use a specific filename - this replaces existing files.
+            filename=export_filename,
+            # And prevent overwrite
+            prevent_overwrite=True,
+            )
+        paletteLoader.pal_list.append(new_pal)
+        new_pal.save(ignore_readonly=True)
 
-    # Select the last_export palette, so reloading loads this item selection.
-    paletteLoader.pal_list.sort(key=str)
-    selectedPalette_radio.set(paletteLoader.pal_list.index(new_pal))
-    set_pal_radio()
+        # Save the configs since we're writing to disk lots anyway.
+        GEN_OPTS.save_check()
+        item_opts.save_check()
+        BEE2_config.write_settings()
 
-    # Re-set this, so we clear the '*' on buttons if extracting cache.
+        message = _('Selected Items and Style successfully exported!')
+        if not vpk_success:
+            message += _(
+                '\n\nWarning: VPK files were not exported, quit Portal 2 and '
+                'Hammer to ensure editor wall previews are changed.'
+            )
+
+        chosen_action = optionWindow.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
+        want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
+
+        if want_launch or chosen_action is not optionWindow.AfterExport.NORMAL:
+            do_action = messagebox.askyesno(
+                'BEEMOD2',
+                message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
+                parent=TK_ROOT,
+            )
+        else:  # No action to do, so just show an OK.
+            messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
+            do_action = False
+
+        # Do the desired action - if quit, we don't bother to update UI.
+        if do_action:
+            # Launch first so quitting doesn't affect this.
+            if want_launch:
+                gameMan.selected_game.launch()
+
+            if chosen_action is optionWindow.AfterExport.NORMAL:
+                pass
+            elif chosen_action is optionWindow.AfterExport.MINIMISE:
+                TK_ROOT.iconify()
+            elif chosen_action is optionWindow.AfterExport.QUIT:
+                quit_application()
+                # We never return from this.
+            else:
+                raise ValueError('Unknown action "{}"'.format(chosen_action))
+
+        # Select the last_export palette, so reloading loads this item selection.
+        paletteLoader.pal_list.sort(key=str)
+        selectedPalette_radio.set(paletteLoader.pal_list.index(new_pal))
+        set_pal_radio()
+
+        # Re-set this, so we clear the '*' on buttons if extracting cache.
         set_game(gameMan.selected_game)
 
         refresh_pal_ui()
