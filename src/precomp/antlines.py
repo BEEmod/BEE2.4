@@ -415,7 +415,7 @@ def parse_antlines(vmf: VMF) -> tuple[
             # Lookup the point to see if we've already checked it.
             # If not, write us into that spot.
             neighbour = join_points.setdefault(
-                (over_name, point.x, point.y, point.z),
+                (over_name, ) + point.as_tuple(),
                 seg,
             )
             if neighbour is seg:
