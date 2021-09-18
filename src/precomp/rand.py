@@ -18,6 +18,41 @@ THREE_INTS = Struct('<3i')
 LOGGER = logger.get_logger(__name__)
 
 
+def parse_weights(count: int, weights: str) -> list[int]:
+    """Generate random indexes with weights.
+
+    This produces a list intended to be fed to random.choice(), with
+    repeated indexes corresponding to the comma-separated weight values.
+    """
+    if weights == '':
+        # Empty = equal weighting.
+        return list(range(count))
+    if ',' not in weights:
+        LOGGER.warning('Invalid weight! ({})', weights)
+        return list(range(count))
+
+    # Parse the weight
+    vals = weights.split(',')
+    weight = []
+    if len(vals) == count:
+        for i, val in enumerate(vals):
+            val = val.strip()
+            if val.isdecimal():
+                # repeat the index the correct number of times
+                weight.extend(
+                    [i] * int(val)
+                )
+            else:
+                # Abandon parsing
+                break
+    if len(weight) == 0:
+        LOGGER.warning('Failed parsing weight! ({!s})',weight)
+        weight = list(range(count))
+    # random.choice(weight) will now give an index with the correct
+    # probabilities.
+    return weight
+
+
 def init_seed(vmf: VMF) -> str:
     """Seed with the map layout.
 

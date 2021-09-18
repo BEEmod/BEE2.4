@@ -61,7 +61,7 @@ def res_random(res: Property) -> Callable[[Entity], None]:
         # Does nothing
         return lambda e: None
 
-    weights_list = conditions.weighted_random(len(results), weight_str)
+    weights_list = rand.parse_weights(len(results), weight_str)
 
     # Note: We can't delete 'global' results, instead replace by 'dummy'
     # results that don't execute.
@@ -120,10 +120,7 @@ def res_add_variant(res: Property):
             count = int(count_val)
         except (TypeError, ValueError):
             raise ValueError(f'Invalid variant count {count_val}!')
-        weighting = conditions.weighted_random(
-            count,
-            res['weights', ''],
-        )
+        weighting = rand.parse_weights(count, res['weights', ''])
         seed = res['seed', '']
     else:
         try:

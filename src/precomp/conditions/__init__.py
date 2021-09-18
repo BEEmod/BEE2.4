@@ -815,41 +815,6 @@ def dump_func_docs(file: TextIO, func: Callable):
         print('**No documentation!**', file=file)
 
 
-def weighted_random(count: int, weights: str) -> list[int]:
-    """Generate random indexes with weights.
-
-    This produces a list intended to be fed to random.choice(), with
-    repeated indexes corresponding to the comma-separated weight values.
-    """
-    if weights == '':
-        # Empty = equal weighting.
-        return list(range(count))
-    if ',' not in weights:
-        LOGGER.warning('Invalid weight! ({})', weights)
-        return list(range(count))
-
-    # Parse the weight
-    vals = weights.split(',')
-    weight = []
-    if len(vals) == count:
-        for i, val in enumerate(vals):
-            val = val.strip()
-            if val.isdecimal():
-                # repeat the index the correct number of times
-                weight.extend(
-                    [i] * int(val)
-                )
-            else:
-                # Abandon parsing
-                break
-    if len(weight) == 0:
-        LOGGER.warning('Failed parsing weight! ({!s})',weight)
-        weight = list(range(count))
-    # random.choice(weight) will now give an index with the correct
-    # probabilities.
-    return weight
-
-
 def add_output(inst: Entity, prop: Property, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(

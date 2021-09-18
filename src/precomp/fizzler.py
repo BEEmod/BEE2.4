@@ -228,10 +228,10 @@ class FizzlerType:
             if weights:
                 # Produce the weights, then process through the original
                 # list to build a new one with repeated elements.
-                inst[inst_type, is_static] = instances = [
-                    instances[i]
-                    for i in conditions.weighted_random(len(instances), weights)
-                ]
+                inst[inst_type, is_static] = instances = list(map(
+                    instances.__getitem__,
+                    rand.parse_weights(len(instances), weights)
+                ))
             # If static versions aren't given, reuse non-static ones.
             # We do False, True so it's already been calculated.
             if not instances and is_static:
