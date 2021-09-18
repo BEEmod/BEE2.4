@@ -134,10 +134,6 @@ class Item:
             for ind, sub in enumerate(self.def_data.editor.subtypes)
             if sub.pal_name or sub.pal_icon
         ]
-        if not self.visual_subtypes:
-            # We need at least one subtype, otherwise something's wrong
-            # with the file.
-            raise Exception('Item {} has no visible subtypes!'.format(item.id))
 
         self.authors = self.def_data.authors
         self.id = item.id
