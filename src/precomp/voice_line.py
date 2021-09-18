@@ -442,7 +442,6 @@ def add_voice(
     voice_attrs: dict,
     style_vars: dict,
     vmf: VMF,
-    map_seed: str,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""

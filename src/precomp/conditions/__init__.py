@@ -573,11 +573,8 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: set[str]) -> None:
+def init(inst_list: set[str]) -> None:
     """Initialise the Conditions system."""
-    # Get a bunch of values from VBSP
-    global MAP_RAND_SEED
-    MAP_RAND_SEED = seed
     ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later

@@ -68,11 +68,6 @@ GAME_MODE = 'ERR'  # SP or COOP?
 # Are we in preview mode? (Spawn in entry door instead of elevator)
 IS_PREVIEW = 'ERR'  # type: bool
 
-# A seed value for randomness, based on the general map layout.
-# This stops patterns from repeating in different maps, but keeps it the same
-# when recompiling.
-MAP_RAND_SEED = ''
-
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
 IGNORED_OVERLAYS = set()
@@ -232,7 +227,6 @@ def add_voice(vmf: VMF):
         voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
         vmf=vmf,
-        map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
@@ -1872,7 +1866,7 @@ def main() -> None:
             antline_floor=ant_floor,
         )
 
-        MAP_RAND_SEED = rand.init_seed(vmf)
+        rand.init_seed(vmf)
 
         all_inst = get_map_info(vmf)
 
@@ -1881,14 +1875,14 @@ def main() -> None:
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
 
-        conditions.init(MAP_RAND_SEED, all_inst)
+        conditions.init(all_inst)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
 
         del side_to_antline
 
-        texturing.setup(game, vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
+        texturing.setup(game, vmf, list(tiling.TILES.values()))
 
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)

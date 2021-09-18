@@ -1110,8 +1110,6 @@ def generate_fizzlers(vmf: VMF):
     After this is done, fizzler-related conditions will not function correctly.
     However the model instances are now available for modification.
     """
-    from vbsp import MAP_RAND_SEED
-
     has_fizz_border = 'fizz_border' in texturing.SPECIAL
 
     for fizz in FIZZLERS.values():

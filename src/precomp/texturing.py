@@ -1,7 +1,6 @@
 """Manages the list of textures used for brushes, and how they are applied."""
 import itertools
 import abc
-from collections import namedtuple
 from enum import Enum
 from pathlib import Path
 
@@ -632,7 +631,7 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
+def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     """Do various setup steps, needed for generating textures.
 
     - Set randomisation seed on all the generators.
@@ -670,20 +669,7 @@ def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> Non
         tex_to_antigel[texture.casefold()] = mat_name
         antigel_mats.add(vmt_file.stem)
 
-    gen_key_str: Union[GenCat, str]
-    for gen_key, generator in GENERATORS.items():
-        # Compute a unique string for randomisation
-        if isinstance(gen_key, tuple):
-            gen_cat, gen_orient, gen_portal = gen_key
-            gen_key_str = '{}.{}.{}'.format(
-                gen_cat.value,
-                gen_portal.value,
-                gen_orient,
-            )
-        else:
-            gen_key_str = gen_key
-
-        generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key_str)
+    for generator in GENERATORS.values():
         generator.setup(vmf, tiles)
 
         # No need to convert if it's overlay, or it's bullseye and those
