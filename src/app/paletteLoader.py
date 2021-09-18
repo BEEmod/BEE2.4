@@ -1,3 +1,4 @@
+from typing import List, Tuple, Optional, Dict
 import os
 import shutil
 import zipfile
@@ -8,7 +9,7 @@ import srctools.logger
 import BEE2_config
 from srctools import Property, NoKeyError, KeyValError
 
-from typing import List, Tuple, Optional, Dict
+from localisation import gettext
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -23,19 +24,19 @@ pal_list: List['Palette'] = []
 # Allow translating the names of the built-in palettes
 TRANS_NAMES: Dict[str, str] = {
     # i18n: Last exported items
-    'LAST_EXPORT': _('<Last Export>'),
+    'LAST_EXPORT': gettext('<Last Export>'),
     # i18n: Empty palette name
-    'EMPTY': _('Blank'),
+    'EMPTY': gettext('Blank'),
 
     # i18n: BEEmod 1 palette.
-    'BEEMOD': _('BEEMod'),
+    'BEEMOD': gettext('BEEMod'),
     # i18n: Default items merged together
-    'P2_COLLAPSED': _('Portal 2 Collapsed'),
+    'P2_COLLAPSED': gettext('Portal 2 Collapsed'),
 
     # i18n: Original Palette
-    'PORTAL2': _('Portal 2'),
+    'PORTAL2': gettext('Portal 2'),
     # i18n: Aperture Tag's palette
-    'APTAG': _('Aperture Tag'),
+    'APTAG': gettext('Aperture Tag'),
 }
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
