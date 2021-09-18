@@ -29,7 +29,7 @@ TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
     'dir',
     'direction',
 )
-def flag_angles(flag: Property) -> Callable[[Entity], None]:
+def flag_angles(flag: Property) -> Callable[[Entity], bool]:
     """Check that a instance is pointed in a direction.
 
     The value should be either just the angle to check, or a block of
@@ -72,6 +72,7 @@ def flag_angles(flag: Property) -> Callable[[Entity], None]:
             return inst_normal == normal or (
                 allow_inverse and -inst_normal == normal
             )
+    return check_orient
 
 
 def brush_at_loc(
