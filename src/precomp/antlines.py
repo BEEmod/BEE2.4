@@ -185,7 +185,7 @@ class Antline:
     name: str
     line: list[Segment]
 
-    def export(self, vmf: VMF, wall_conf: AntType, floor_conf: AntType) -> None:
+    def export(self, vmf: VMF, *, wall_conf: AntType, floor_conf: AntType) -> None:
         """Add the antlines into the map."""
 
         # First, do some optimisation. If corners aren't defined, try and

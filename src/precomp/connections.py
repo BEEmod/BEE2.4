@@ -151,6 +151,7 @@ class Item:
         self,
         inst: Entity,
         item_type: Config,
+        *,  # Don't mix up antlines!
         ant_floor_style: AntType,
         ant_wall_style: AntType,
         panels: Iterable[Entity]=(),
@@ -445,6 +446,7 @@ def calc_connections(
     antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
+    *,  # Don't mix up antlines!
     antline_wall: AntType,
     antline_floor: AntType,
 ) -> None:
