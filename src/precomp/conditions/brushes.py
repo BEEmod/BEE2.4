@@ -1,15 +1,15 @@
 """Results relating to brushwork."""
 from __future__ import annotations
-import random
-from typing import Optional, Callable, Iterable
+from typing import Callable, Iterable
 from collections import defaultdict
+from random import Random
 
 from srctools import Property, NoKeyError, Output, Entity, VMF
 from srctools.math import Vec, Angle, Matrix, to_matrix
 import srctools.logger
 
 from precomp import (
-    conditions, tiling, texturing,
+    conditions, tiling, texturing, rand,
     instance_traits, brushLoc, faithplate, template_brush,
 )
 import vbsp
@@ -115,7 +115,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
         return
 
     name = res['ModifyTarget', '']
-    door_ent: Optional[Entity]
+    door_ent: Entity | None
     if name:
         name = conditions.local_name(ent, name)
         setter_loc = ent['origin']
@@ -325,11 +325,6 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
         else:
             tile_grids[axis] = tiling.TileSize.TILE_4x4
 
-    grid_offset = origin // 128  # type: Vec
-
-    # All brushes in each grid have the same textures for each side.
-    random.seed(grid_offset.join(' ') + '-partial_block')
-
     solids = vmf.make_prism(point1, point2)
 
     solids.north.mat = texturing.gen(
@@ -458,7 +453,7 @@ def res_import_template(vmf: VMF, res: Property):
     else:
         force_type = template_brush.TEMP_TYPES.default
 
-    force_grid: Optional[texturing.TileSize]
+    force_grid: texturing.TileSize | None
     size: texturing.TileSize
     for size in texturing.TileSize:
         if size in force:
@@ -474,7 +469,7 @@ def res_import_template(vmf: VMF, res: Property):
     else:
         surf_cat = texturing.GenCat.NORMAL
 
-    replace_tex = {}
+    replace_tex: dict[str, list[str]] = {}
     for prop in res.find_block('replace', or_blank=True):
         replace_tex.setdefault(prop.name, []).append(prop.value)
 
@@ -514,11 +509,8 @@ def res_import_template(vmf: VMF, res: Property):
         key_block = None
         outputs = []
 
-    conf_visgroup_func: Callable[[set[str]], Iterable[str]]
-
-    def conf_visgroup_func(groups):
-        """none = don't add any visgroups."""
-        return ()
+    # None = don't add any more.
+    visgroup_func: Callable[[Random, list[str]], Iterable[str]] | None = None
 
     try:  # allow both spellings.
         visgroup_prop = res.find_key('visgroups')
@@ -533,17 +525,16 @@ def res_import_template(vmf: VMF, res: Property):
         if visgroup_mode == 'none':
             pass
         elif visgroup_mode == 'choose':
-            def conf_visgroup_func(groups):
+            def visgroup_func(rng: Random, groups: list[str]) -> Iterable[str]:
                 """choose = add one random group."""
-                return [random.choice(groups)]
+                return [rng.choice(groups)]
         else:
             percent = srctools.conv_float(visgroup_mode.rstrip('%'), 0.00)
             if percent > 0.0:
-                def conf_visgroup_func(groups):
+                def visgroup_func(rng: Random, groups: list[str]) -> Iterable[str]:
                     """Number = percent chance for each to be added"""
-                    for group in groups:
-                        val = random.uniform(0, 100)
-                        if val <= percent:
+                    for group in sorted(groups):
+                        if rng.uniform(0, 100) <= percent:
                             yield group
 
     picker_vars = [
@@ -572,15 +563,7 @@ def res_import_template(vmf: VMF, res: Property):
 
     def place_template(inst: Entity) -> None:
         """Place a template."""
-
         temp_id = inst.fixup.substitute(orig_temp_id)
-
-        if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
-            def visgroup_func(group):
-                """Use all the groups."""
-                yield from group
-        else:
-            visgroup_func = conf_visgroup_func
 
         # Special case - if blank, just do nothing silently.
         if not temp_id:
@@ -638,10 +621,19 @@ def res_import_template(vmf: VMF, res: Property):
         # else: False value, no invert.
 
         if ang_override is not None:
-            angles = ang_override
+            orient = ang_override
         else:
-            angles = rotation @ Angle.from_str(inst['angles', '0 0 0'])
+            orient = rotation @ Angle.from_str(inst['angles', '0 0 0'])
         origin = conditions.resolve_offset(inst, offset)
+
+        # If this var is set, it forces all to be included.
+        if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
+            visgroups.update(template.visgroups)
+        elif visgroup_func is not None:
+            visgroups.update(visgroup_func(
+                rand.seed(b'temp', template.id, origin, orient),
+                list(template.visgroups),
+            ))
 
         LOGGER.debug('Placing template "{}" at {} with visgroups {}', template.id, origin, visgroups)
 
@@ -649,10 +641,9 @@ def res_import_template(vmf: VMF, res: Property):
             vmf,
             template,
             origin,
-            angles,
+            orient,
             targetname=inst['targetname', ''],
             force_type=force_type,
-            visgroup_choose=visgroup_func,
             add_to_map=True,
             additional_visgroups=visgroups,
             bind_tile_pos=bind_tile_pos,
@@ -662,12 +653,12 @@ def res_import_template(vmf: VMF, res: Property):
         if key_block is not None:
             conditions.set_ent_keys(temp_data.detail, inst, key_block)
             br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
-            br_origin.localise(origin, angles)
+            br_origin.localise(origin, orient)
             temp_data.detail['origin'] = br_origin
 
             move_dir = temp_data.detail['movedir', '']
             if move_dir.startswith('<') and move_dir.endswith('>'):
-                move_dir = Vec.from_str(move_dir) @ angles
+                move_dir = Vec.from_str(move_dir) @ orient
                 temp_data.detail['movedir'] = move_dir.to_angle()
 
             for out in outputs:
@@ -687,9 +678,7 @@ def res_import_template(vmf: VMF, res: Property):
         )
 
         for picker_name, picker_var in picker_vars:
-            picker_val = temp_data.picker_results.get(
-                picker_name, None,
-            )  # type: Optional[texturing.Portalable]
+            picker_val = temp_data.picker_results.get(picker_name, None)
             if picker_val is not None:
                 inst.fixup[picker_var] = picker_val.value
             else:
@@ -842,14 +831,16 @@ def res_set_tile(inst: Entity, res: Property) -> None:
 
     chance = srctools.conv_float(res['chance', '100'].rstrip('%'), 100.0)
     if chance < 100.0:
-        conditions.set_random_seed(inst, 'tile' + res['seed', ''])
+        rng = rand.seed(b'tile', inst, res['seed', ''])
+    else:
+        rng = None
 
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
             if val in '_ ':
                 continue
 
-            if chance < 100.0 and random.uniform(0, 100) > chance:
+            if rng is not None and rng.uniform(0, 100) > chance:
                 continue
 
             pos = Vec(32 * x, -32 * y, 0) @ orient + offset
@@ -862,7 +853,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
                 size = None
             else:
                 try:
-                    new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
+                    new_tile = tiling.TILETYPE_FROM_CHAR[val]
                 except KeyError:
                     LOGGER.warning('Unknown tiletype "{}"!', val)
                 else:
@@ -912,7 +903,7 @@ def res_add_placement_helper(inst: Entity, res: Property):
     pos = conditions.resolve_offset(inst, res['offset', '0 0 0'], zoff=-64)
     normal = res.vec('normal', 0, 0, 1) @ orient
 
-    up_dir: Optional[Vec]
+    up_dir: Vec | None
     try:
         up_dir = Vec.from_str(res['upDir']) @ orient
     except LookupError:
@@ -1070,7 +1061,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         return
 
     # If bevels is provided, parse out the overall world positions.
-    bevel_world: Optional[set[tuple[int, int]]]
+    bevel_world: set[tuple[int, int]] | None
     try:
         bevel_prop = props.find_key('bevel')
     except NoKeyError:
@@ -1140,8 +1131,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.bevels.clear()
             for u, v in bevel_world:
                 # Convert from world points to UV positions.
-                u = (u - tile.pos[uaxis] + 48) / 32
-                v = (v - tile.pos[vaxis] + 48) / 32
+                u = (u - tile.pos[uaxis] + 48) // 32
+                v = (v - tile.pos[vaxis] + 48) // 32
                 # Cull outside here, we wont't use them.
                 if -1 <= u <= 4 and -1 <= v <= 4:
                     panel.bevels.add((u, v))
@@ -1165,7 +1156,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         # First grab the existing ent, so we can edit it.
         # These should all have the same value, unless they were independently
         # edited with mismatching point sets. In that case destroy all those existing ones.
-        existing_ents: set[Optional[Entity]] = {panel.brush_ent for panel in panels}
+        existing_ents: set[Entity | None] = {panel.brush_ent for panel in panels}
         try:
             [brush_ent] = existing_ents
         except ValueError:

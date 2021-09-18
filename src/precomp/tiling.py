@@ -15,7 +15,6 @@ from enum import Enum
 from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
 import attr
-import random
 
 from srctools import Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
@@ -30,7 +29,7 @@ from . import (
     options,
     antlines,
     template_brush,
-    conditions,
+    conditions, rand,
 )
 import utils
 import consts
@@ -2245,15 +2244,14 @@ def generate_goo(vmf: VMF) -> None:
                     tideline.max = max(tideline.max, off)
                     OVERLAY_BINDS[tideline.over].append(tile)
 
-    tideline_rand = random.Random()
     for tideline in tideline_over.values():
         tide_min = tideline.min - tideline.mid - 64
         tide_max = tideline.max - tideline.mid + 64
-        tideline_rand.seed(f'{tideline.over["origin"]}:{tide_min}:{tide_max}')
+        rng = rand.seed(b'tideline', tide_min, tide_max)
 
         width = (tide_max - tide_min) / 128.0
         # Randomly flip around
-        if tideline_rand.choice((False, True)):
+        if rng.choice((False, True)):
             tideline.over['startu'] = 0
             tideline.over['endu'] = width
         else:
@@ -2261,10 +2259,10 @@ def generate_goo(vmf: VMF) -> None:
             tideline.over['startu'] = width
 
         # Vary the ends up/down from 32, to distort a little.
-        tideline.over['uv0'] = f'{tide_min} {random.randint(-36, -28)} 0'
-        tideline.over['uv1'] = f'{tide_min} {random.randint(28, 32)} 0'
-        tideline.over['uv2'] = f'{tide_max} {random.randint(28, 32)} 0'
-        tideline.over['uv3'] = f'{tide_max} {random.randint(-36, -28)} 0'
+        tideline.over['uv0'] = f'{tide_min} {rng.randint(-36, -28)} 0'
+        tideline.over['uv1'] = f'{tide_min} {rng.randint(28, 32)} 0'
+        tideline.over['uv2'] = f'{tide_max} {rng.randint(28, 32)} 0'
+        tideline.over['uv3'] = f'{tide_max} {rng.randint(-36, -28)} 0'
 
     # No goo.
     if not goo_pos or pos is None:

@@ -32,18 +32,17 @@ import inspect
 import io
 import itertools
 import math
-import random
 import sys
 import typing
 import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Any, Callable, TextIO, Optional
+from typing import Generic, TypeVar, Any, Callable, TextIO
 
 import attr
 
-from precomp import instanceLocs
+from precomp import instanceLocs, rand
 import consts
 import srctools.logger
 import utils
@@ -574,11 +573,8 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: set[str]) -> None:
+def init(inst_list: set[str]) -> None:
     """Initialise the Conditions system."""
-    # Get a bunch of values from VBSP
-    global MAP_RAND_SEED
-    MAP_RAND_SEED = seed
     ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later
@@ -816,41 +812,6 @@ def dump_func_docs(file: TextIO, func: Callable):
         print('**No documentation!**', file=file)
 
 
-def weighted_random(count: int, weights: str) -> list[int]:
-    """Generate random indexes with weights.
-
-    This produces a list intended to be fed to random.choice(), with
-    repeated indexes corresponding to the comma-separated weight values.
-    """
-    if weights == '':
-        # Empty = equal weighting.
-        return list(range(count))
-    if ',' not in weights:
-        LOGGER.warning('Invalid weight! ({})', weights)
-        return list(range(count))
-
-    # Parse the weight
-    vals = weights.split(',')
-    weight = []
-    if len(vals) == count:
-        for i, val in enumerate(vals):
-            val = val.strip()
-            if val.isdecimal():
-                # repeat the index the correct number of times
-                weight.extend(
-                    [i] * int(val)
-                )
-            else:
-                # Abandon parsing
-                break
-    if len(weight) == 0:
-        LOGGER.warning('Failed parsing weight! ({!s})',weight)
-        weight = list(range(count))
-    # random.choice(weight) will now give an index with the correct
-    # probabilities.
-    return weight
-
-
 def add_output(inst: Entity, prop: Property, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(
@@ -1025,27 +986,6 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     return offset
 
 
-def set_random_seed(inst: Entity, seed: str) -> None:
-    """Compute and set a random seed for a specific entity."""
-    from precomp import instance_traits
-
-    name = inst['targetname']
-    # The global instances like elevators always get the same name, or
-    # none at all so we cannot use those for the seed. Instead use the global
-    # seed.
-    if name == '' or 'preplaced' in instance_traits.get(inst):
-        import vbsp
-        random.seed('{}{}{}{}'.format(
-            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
-        ))
-    else:
-        # We still need to use angles and origin, since things like
-        # fizzlers might not get unique names.
-        random.seed('{}{}{}{}'.format(
-            inst['targetname'], seed, inst['origin'], inst['angles']
-        ))
-
-
 @make_flag('debug')
 @make_result('debug')
 def debug_flag(inst: Entity, props: Property):
@@ -1215,7 +1155,7 @@ def res_switch(res: Property):
     if method is SWITCH_TYPE.LAST:
         raw_cases.reverse()
 
-    cases: list[tuple[Property, list[Property]]] = [
+    conf_cases: list[tuple[Property, list[Property]]] = [
         (Property(flag_name, case.real_name), list(case))
         for case in raw_cases
     ]
@@ -1223,8 +1163,10 @@ def res_switch(res: Property):
     def apply_switch(inst: Entity) -> None:
         """Execute a switch."""
         if method is SWITCH_TYPE.RANDOM:
-            set_random_seed(inst, rand_seed)
-            random.shuffle(cases)
+            cases = conf_cases.copy()
+            rand.seed(b'switch', rand_seed, inst).shuffle(cases)
+        else:  # Won't change.
+            cases = conf_cases
 
         run_default = True
         for flag, results in cases:
@@ -1409,22 +1351,22 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
 
     suff = ''
     for loc in possible_locs:
-        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
-        if random.random() > chance:
+        rng = rand.seed(b'goo_debris', loc)
+        if rng.random() > chance:
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list) + 1)
+            suff = '_' + str(rng.choice(rand_list) + 1)
 
         if offset > 0:
-            loc.x += random.randint(-offset, offset)
-            loc.y += random.randint(-offset, offset)
+            loc.x += rng.randint(-offset, offset)
+            loc.y += rng.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
         vmf.create_ent(
             classname='func_instance',
             file=file + suff + '.vmf',
             origin=loc.join(' '),
-            angles='0 {} 0'.format(random.randrange(0, 3600)/10)
+            angles='0 {} 0'.format(rng.randrange(0, 3600)/10)
         )
 
     return RES_EXHAUSTED

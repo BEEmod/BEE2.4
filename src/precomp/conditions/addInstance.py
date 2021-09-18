@@ -1,12 +1,11 @@
 """Results for generating additional instances.
 
 """
-import random
 from typing import Optional, Callable
 from srctools import Vec, Entity, Property, VMF, Angle
 import srctools.logger
 
-from precomp import instanceLocs, options, conditions
+from precomp import instanceLocs, options, conditions, rand
 
 
 COND_MOD_NAME = 'Instance Generation'
@@ -184,7 +183,7 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 
     def add_group(inst: Entity) -> None:
         """Place the group."""
-        conditions.set_random_seed(inst, conf_seed)
+        rng = rand.seed(b'shufflegroup', conf_seed, inst)
         pools = all_pools.copy()
         for (flags, value, potential_pools) in conf_selectors:
             for flag in flags:
@@ -196,7 +195,7 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
                     for (name, inst) in pools
                     if name in potential_pools
                 ]
-                name, filename = random.choice(allowed_inst)
+                name, filename = rng.choice(allowed_inst)
                 pools.remove((name, filename))
                 vmf.create_ent(
                     'func_instance',

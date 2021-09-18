@@ -4,14 +4,13 @@ from collections import defaultdict
 from collections.abc import Iterator
 from enum import Enum
 import math
-import random
 
 import attr
 
 from srctools import Vec, Angle, Matrix, Property, conv_float, logger
 from srctools.vmf import VMF, overlay_bounds, make_overlay
 
-from precomp import tiling
+from precomp import tiling, rand
 import consts
 
 
@@ -160,18 +159,19 @@ class Segment:
         Neighbouring sections will be merged when they have the same
         type.
         """
+        rng = rand.seed(b'ant_broken', self.start, self.end, chance)
         offset = self.end - self.start
         dist = offset.mag() // 16
         norm = 16 * offset.norm()
 
         if dist < 3 or chance == 0:
             # Short antlines always are either on/off.
-            yield self.start, self.end, (random.randrange(100) < chance)
+            yield self.start, self.end, (rng.randrange(100) < chance)
         else:
             run_start = self.start
-            last_type = random.randrange(100) < chance
+            last_type = rng.randrange(100) < chance
             for i in range(1, int(dist)):
-                next_type = random.randrange(100) < chance
+                next_type = rng.randrange(100) < chance
                 if next_type != last_type:
                     yield run_start, self.start + i * norm, last_type
                     last_type = next_type
@@ -236,17 +236,17 @@ class Antline:
 
         for seg in self.line:
             conf = floor_conf if seg.on_floor else wall_conf
-            random.seed('ant {} {}'.format(seg.start, seg.end))
+            rng = rand.seed(b'antline', seg.start, seg.end)
             if seg.type is SegType.CORNER:
                 mat: AntTex
-                if random.randrange(100) < conf.broken_chance:
-                    mat = random.choice(conf.broken_corner or conf.broken_straight)
+                if rng.randrange(100) < conf.broken_chance:
+                    mat = rng.choice(conf.broken_corner or conf.broken_straight)
                 else:
-                    mat = random.choice(conf.tex_corner or conf.tex_straight)
+                    mat = rng.choice(conf.tex_corner or conf.tex_straight)
 
                 # Because we can, apply a random rotation to mix up the texture.
                 orient = Matrix.from_angle(seg.normal.to_angle(
-                    random.choice((0.0, 90.0, 180.0, 270.0))
+                    rng.choice((0.0, 90.0, 180.0, 270.0))
                 ))
                 self._make_overlay(
                     vmf,
@@ -260,9 +260,9 @@ class Antline:
                 # TODO: Break up these segments.
                 for a, b, is_broken in seg.broken_iter(conf.broken_chance):
                     if is_broken:
-                        mat = random.choice(conf.broken_straight)
+                        mat = rng.choice(conf.broken_straight)
                     else:
-                        mat = random.choice(conf.tex_straight)
+                        mat = rng.choice(conf.tex_straight)
                     self._make_straight(
                         vmf,
                         seg,

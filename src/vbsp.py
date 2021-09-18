@@ -7,7 +7,6 @@ LOGGER = init_logging('bee2/vbsp.log')
 import os
 import sys
 import shutil
-import random
 import logging
 import pickle
 from io import StringIO
@@ -40,6 +39,7 @@ from precomp import (
     fizzler,
     voice_line,
     music,
+    rand,
 )
 import consts
 import editoritems
@@ -67,11 +67,6 @@ BEE2_config = ConfigFile('compile.cfg')
 GAME_MODE = 'ERR'  # SP or COOP?
 # Are we in preview mode? (Spawn in entry door instead of elevator)
 IS_PREVIEW = 'ERR'  # type: bool
-
-# A seed value for randomness, based on the general map layout.
-# This stops patterns from repeating in different maps, but keeps it the same
-# when recompiling.
-MAP_RAND_SEED = ''
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
@@ -232,7 +227,6 @@ def add_voice(vmf: VMF):
         voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
         vmf=vmf,
-        map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
@@ -647,11 +641,11 @@ def add_fog_ents(vmf: VMF) -> None:
 
     fog_opt = settings['fog']
 
-    random.seed(MAP_RAND_SEED + '_shadow_angle')
+    rng = rand.seed(b'shadow_angle')
     vmf.create_ent(
         classname='shadow_control',
         # Slight variations around downward direction.
-        angles=Vec(random.randrange(85, 90), random.randrange(0, 360), 0),
+        angles=Angle(rng.randrange(85, 90), rng.randrange(0, 360), 0),
         origin=pos + (0, 16, 0),
         distance=100,
         color=fog_opt['shadow'],
@@ -1114,25 +1108,6 @@ def mod_doorframe(inst: Entity, corr_id, corr_type, corr_name):
         inst['file'] = replace
 
 
-def calc_rand_seed(vmf: VMF) -> str:
-    """Use the ambient light entities to create a map seed.
-
-     This ensures textures remain the same when the map is recompiled.
-    """
-    amb_light = instanceLocs.resolve('<ITEM_POINT_LIGHT>')
-    lst = [
-        inst['targetname'] or '-'  # If no targ
-        for inst in
-        vmf.by_class['func_instance']
-        if inst['file'].casefold() in amb_light
-        ]
-    if len(lst) == 0:
-        # Very small maps won't have any ambient light entities at all.
-        return 'SEED'
-    else:
-        return '|'.join(lst)
-
-
 def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
     """Add water_mist* particle systems to goo.
 
@@ -1495,7 +1470,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
     music.add(
         vmf,
         loc,
-        settings['music_conf'],
+        settings['music_conf'],  # type: ignore
         settings['has_attr'],
         game_mode == 'SP',
     )
@@ -1891,7 +1866,7 @@ def main() -> None:
             antline_floor=ant_floor,
         )
 
-        MAP_RAND_SEED = calc_rand_seed(vmf)
+        rand.init_seed(vmf)
 
         all_inst = get_map_info(vmf)
 
@@ -1900,14 +1875,14 @@ def main() -> None:
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
 
-        conditions.init(MAP_RAND_SEED, all_inst)
+        conditions.init(all_inst)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
 
         del side_to_antline
 
-        texturing.setup(game, vmf, MAP_RAND_SEED, list(tiling.TILES.values()))
+        texturing.setup(game, vmf, list(tiling.TILES.values()))
 
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)

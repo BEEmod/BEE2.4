@@ -1,16 +1,11 @@
 """Conditions for randomising instances."""
-import functools
-import random
 from typing import Callable
 
 from srctools import Property, Vec, Entity, Angle
-from precomp import conditions
 import srctools
 
-from precomp.conditions import (
-    Condition, RES_EXHAUSTED,
-    set_random_seed, make_flag, make_result,
-)
+from precomp import conditions, rand
+from precomp.conditions import Condition, RES_EXHAUSTED, make_flag, make_result
 
 COND_MOD_NAME = 'Randomisation'
 
@@ -20,18 +15,17 @@ def flag_random(res: Property) -> Callable[[Entity], bool]:
     """Randomly is either true or false."""
     if res.has_children():
         chance = res['chance', '100']
-        seed = 'a' + res['seed', '']
+        seed = res['seed', '']
     else:
         chance = res.value
-        seed = 'a'
+        seed = ''
 
     # Allow ending with '%' sign
     chance = srctools.conv_int(chance.rstrip('%'), 100)
 
     def rand_func(inst: Entity) -> bool:
         """Apply the random chance."""
-        set_random_seed(inst, seed)
-        return random.randrange(100) < chance
+        return rand.seed(b'rand_flag', inst, seed).randrange(100) < chance
     return rand_func
 
 
@@ -48,7 +42,7 @@ def res_random(res: Property) -> Callable[[Entity], None]:
     weight_str = ''
     results = []
     chance = 100
-    seed = 'b'
+    seed = ''
     for prop in res:
         if prop.name == 'chance':
             # Allow ending with '%' sign
@@ -67,18 +61,18 @@ def res_random(res: Property) -> Callable[[Entity], None]:
         # Does nothing
         return lambda e: None
 
-    weights_list = conditions.weighted_random(len(results), weight_str)
+    weights_list = rand.parse_weights(len(results), weight_str)
 
     # Note: We can't delete 'global' results, instead replace by 'dummy'
     # results that don't execute.
     # Otherwise the chances would be messed up.
     def apply_random(inst: Entity) -> None:
         """Pick a random result and run it."""
-        set_random_seed(inst, seed)
-        if random.randrange(100) > chance:
+        rng = rand.seed(b'rand_res', inst, seed)
+        if rng.randrange(100) > chance:
             return
 
-        ind = random.choice(weights_list)
+        ind = rng.choice(weights_list)
         choice = results[ind]
         if choice.name == 'nop':
             pass
@@ -105,10 +99,11 @@ def res_add_variant(res: Property):
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form `_var4`.
-    Two properties should be given:
+    Two or three properties should be given:
 
     - `Number`: The number of random instances.
     - `Weights`: A comma-separated list of weights for each instance.
+    - `seed`: Optional seed to disambiuate multiple options.
 
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of `2, 1, 1` means the first instance has a 2/4 chance of
@@ -125,10 +120,8 @@ def res_add_variant(res: Property):
             count = int(count_val)
         except (TypeError, ValueError):
             raise ValueError(f'Invalid variant count {count_val}!')
-        weighting = conditions.weighted_random(
-            count,
-            res['weights', ''],
-        )
+        weighting = rand.parse_weights(count, res['weights', ''])
+        seed = res['seed', '']
     else:
         try:
             count = int(res.value)
@@ -136,11 +129,12 @@ def res_add_variant(res: Property):
             raise ValueError(f'Invalid variant count {res.value!r}!')
         else:
             weighting = list(range(count))
+        seed = res.value
 
     def apply_variant(inst: Entity) -> None:
         """Apply the variant."""
-        set_random_seed(inst, 'variant')
-        conditions.add_suffix(inst, f"_var{str(random.choice(weighting) + 1)}")
+        rng = rand.seed(b'variant', inst, seed)
+        conditions.add_suffix(inst, f"_var{rng.choice(weighting) + 1}")
     return apply_variant
 
 
@@ -157,17 +151,15 @@ def res_rand_num(res: Property) -> Callable[[Entity], None]:
     max_val = srctools.conv_float(res['max', 1.0])
     min_val = srctools.conv_float(res['min', 0.0])
     var = res['resultvar', '$random']
-    seed = 'd' + res['seed', 'random']
-
-    if is_float:
-        func = functools.partial(random.uniform, min_val, max_val)
-    else:
-        func = functools.partial(random.randint, min_val, max_val)
+    seed = res['seed', '']
 
     def randomise(inst: Entity) -> None:
         """Apply the random number."""
-        set_random_seed(inst, seed)
-        inst.fixup[var] = str(func())
+        rng = rand.seed(b'rand_num', inst, seed)
+        if is_float:
+            inst.fixup[var] = rng.uniform(min_val, max_val)
+        else:
+            inst.fixup[var] = rng.randint(min_val, max_val)
     return randomise
 
 
@@ -182,12 +174,12 @@ def res_rand_vec(inst: Entity, res: Property) -> None:
     is_float = srctools.conv_bool(res['decimal'])
     var = res['resultvar', '$random']
 
-    set_random_seed(inst, 'e' + res['seed', 'random'])
+    rng = rand.seed(b'rand_vec', inst, res['seed', ''])
 
     if is_float:
-        func = random.uniform
+        func = rng.uniform
     else:
-        func = random.randint
+        func = rng.randint
 
     value = Vec()
 
@@ -219,11 +211,11 @@ def res_rand_inst_shift(res: Property) -> Callable[[Entity], None]:
 
     def shift_ent(inst: Entity) -> None:
         """Randomly shift the instance."""
-        set_random_seed(inst, seed)
+        rng = rand.seed(b'rand_shift', inst, seed)
         pos = Vec(
-            random.uniform(min_x, max_x),
-            random.uniform(min_y, max_y),
-            random.uniform(min_z, max_z),
+            rng.uniform(min_x, max_x),
+            rng.uniform(min_y, max_y),
+            rng.uniform(min_z, max_z),
         )
         pos.localise(Vec.from_str(inst['origin']), Angle.from_str(inst['angles']))
         inst['origin'] = pos
