@@ -147,7 +147,7 @@ class Segment:
     @property
     def on_floor(self) -> bool:
         """Return if this segment is on the floor/wall."""
-        return abs(self.normal.z) < 1e-6
+        return abs(self.normal.z) > 1e-6
 
     def broken_iter(
         self,
