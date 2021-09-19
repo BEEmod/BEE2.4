@@ -276,7 +276,7 @@ class PaletteUI:
         """Select a new palette, and update state. This does not update items/settings!"""
         pal = self.palettes[uuid]
         self.selected_uuid = uuid
-        BEE2_config.GEN_OPTS['Last_Selected']['palette'] = uuid.hex
+        BEE2_config.GEN_OPTS['Last_Selected']['palette_uuid'] = uuid.hex
 
     def event_select_menu(self) -> None:
         """Called when the menu buttons are clicked."""
