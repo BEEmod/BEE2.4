@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import BEE2_config
-from app.paletteLoader import Palette, UUID_PORTAL2
+from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT
 from app import tk_tools, paletteLoader, TK_ROOT, img
 from localisation import gettext
 
@@ -223,7 +223,7 @@ class PaletteUI:
             self.ui_menu_delete_index,
             label=gettext('Delete Palette "{}"').format(self.selected.name),
         )
-        if self.selected.prevent_overwrite:
+        if self.selected.readonly:
             self.ui_remove.state(('disabled',))
             self.save_btn_state(('disabled',))
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='disabled')
@@ -243,7 +243,7 @@ class PaletteUI:
     def event_remove(self) -> None:
         """Remove the currently selected palette."""
         pal = self.selected
-        if not pal.prevent_overwrite and messagebox.askyesno(
+        if not pal.readonly and messagebox.askyesno(
             title='BEE2',
             message=gettext('Are you sure you want to delete "{}"?').format(pal.name),
             parent=TK_ROOT,
@@ -255,7 +255,7 @@ class PaletteUI:
 
     def event_save(self) -> None:
         """Save the current palette over the original name."""
-        if self.selected.prevent_overwrite:
+        if self.selected.readonly:
             self.event_save_as()
             return
         else:
@@ -289,7 +289,7 @@ class PaletteUI:
 
     def event_change_group(self) -> None:
         """Change the group of a palette."""
-        if self.selected.prevent_overwrite:
+        if self.selected.readonly:
             return
         res = tk_tools.prompt(
             gettext("BEE2 - Change Palette Group"),

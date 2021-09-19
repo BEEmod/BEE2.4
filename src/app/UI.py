@@ -16,7 +16,6 @@ from loadScreen import main_loader as loader
 import srctools.logger
 from app import sound as snd
 import BEE2_config
-from app import paletteLoader
 import packages
 from app import img
 from app import itemconfig
@@ -795,8 +794,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
                 # instead of using a configured one.
                 trans_name='LAST_EXPORT',
                 uuid=paletteUI.UUID_EXPORT,
-                # And prevent overwrite
-                prevent_overwrite=True,
+                readonly=True,
             )
         last_export.pos = pal_data
         last_export.save(ignore_readonly=True)

@@ -208,7 +208,7 @@ class Palette:
         name,
         pos: List[Tuple[str, int]],
         trans_name='',
-        prevent_overwrite=False,
+        readonly=False,
         group: str='',
         filename: str=None,
         settings: Optional[Property]=None,
@@ -239,8 +239,8 @@ class Palette:
         self.pos = pos
         # If true, prevent overwriting the original file
         # (premade palettes or <LAST EXPORT>)
-        self.prevent_overwrite = prevent_overwrite
-        if prevent_overwrite:
+        self.readonly = readonly
+        if readonly:
             self.group = GROUP_BUILTIN
 
         # If not None, settings associated with the palette.
@@ -282,7 +282,7 @@ class Palette:
             items,
             trans_name=trans_name,
             group=props['group', ''],
-            prevent_overwrite=props.bool('readonly'),
+            readonly=props.bool('readonly'),
             filename=os.path.basename(path),
             uuid=uuid,
             settings=settings,
@@ -295,7 +295,7 @@ class Palette:
     def save(self, ignore_readonly=False) -> None:
         """Save the palette file into the specified location.
 
-        If ignore_readonly is true, this will ignore the `prevent_overwrite`
+        If ignore_readonly is true, this will ignore the `readonly`
         property of the palette (allowing resaving those properties over old
         versions). Otherwise those palettes always create a new file.
         """
@@ -303,7 +303,7 @@ class Palette:
         props = Property(None, [
             Property('Name', self.name),
             Property('TransName', self.trans_name),
-            Property('ReadOnly', srctools.bool_as_int(self.prevent_overwrite)),
+            Property('ReadOnly', srctools.bool_as_int(self.readonly)),
             Property('UUID', self.uuid.hex),
             Property('Items', [
                 Property(item_id, str(subitem))
@@ -318,7 +318,7 @@ class Palette:
         else:
             del props['TransName']
 
-        if not self.prevent_overwrite:
+        if not self.readonly:
             del props['ReadOnly']
 
         if self.settings is not None:
@@ -329,7 +329,7 @@ class Palette:
         # Use a hash to ensure it's a valid path (without '-' if negative)
         # If a conflict occurs, add ' ' and hash again to get a different
         # value.
-        if self.filename is None or (self.prevent_overwrite and not ignore_readonly):
+        if self.filename is None or (self.readonly and not ignore_readonly):
             hash_src = self.name
             while True:
                 hash_filename = str(abs(hash(hash_src))) + PAL_EXT
@@ -362,7 +362,7 @@ def load_palettes() -> List[Palette]:
             name,
             items,
             name,
-            prevent_overwrite=True,
+            readonly=True,
             group=GROUP_BUILTIN,
             uuid=uuid5(DEFAULT_NS, name),
         ))
@@ -418,7 +418,7 @@ def load_palettes() -> List[Palette]:
             os.remove(path)
         else:
             # Folders can't be overwritten...
-            pal.prevent_overwrite = True
+            pal.readonly = True
             pal.save()
             shutil.rmtree(path)
 
