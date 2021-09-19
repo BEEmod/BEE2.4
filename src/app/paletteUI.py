@@ -8,7 +8,7 @@ from tkinter import ttk, messagebox
 
 import BEE2_config
 from app.paletteLoader import Palette, UUID_EXPORT, UUID_BLANK, UUID_PORTAL2
-from app import tk_tools, paletteLoader, TK_ROOT
+from app import tk_tools, paletteLoader, TK_ROOT, img
 from localisation import gettext
 
 import srctools.logger
@@ -16,6 +16,9 @@ import srctools.logger
 LOGGER = srctools.logger.get_logger(__name__)
 # "Wheel of Dharma" / white sun, close enough and should be in most fonts.
 CHR_GEAR = '☼ '
+TREE_TAG_GROUPS = 'pal_group'
+TREE_TAG_PALETTES = 'palette'
+ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 
 
 class PaletteUI:
@@ -63,6 +66,8 @@ class PaletteUI:
 
         self.ui_treeview = ttk.Treeview(f, show='tree', selectmode='browse')
         self.ui_treeview.grid(row=1, sticky="NSEW")
+        self.ui_treeview.tag_bind(TREE_TAG_PALETTES, '<ButtonPress>', self.event_select_tree)
+        self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', self.event_group_select_tree)
 
         # def set_pal_listbox(e=None):
         #     global selectedPalette
@@ -98,6 +103,7 @@ class PaletteUI:
 
         self.ui_menu = menu
         self.ui_group_menus: dict[str, tk.Menu] = {}
+        self.ui_group_treeids: dict[str, str] = {}
         menu.add_command(
             label=gettext('Clear'),
             command=cmd_clear,
@@ -152,6 +158,11 @@ class PaletteUI:
         """Update the UI to show correct state."""
         # Clear out all the current data.
         self.ui_menu.delete(self.ui_menu_palettes_index, 'end')
+        try:
+            self.ui_treeview.detach(TREE_TAG_GROUPS)
+            self.ui_treeview.delete(TREE_TAG_PALETTES)
+        except tk.TclError:
+            pass  # First time, nothing on the UI.
 
         groups: dict[str, list[Palette]] = {}
         for pal in self.palettes.values():
@@ -166,14 +177,32 @@ class PaletteUI:
                 except KeyError:
                     grp_menu = self.ui_group_menus[group] = tk.Menu(self.ui_menu)
                 self.ui_menu.add_cascade(label=group, menu=grp_menu)
+
+                try:
+                    grp_tree = self.ui_group_treeids[group]
+                except KeyError:
+                    grp_tree = self.ui_group_treeids[group] = self.ui_treeview.insert(
+                        '', 'end',
+                        text=group,
+                        open=True,
+                        tags=TREE_TAG_GROUPS,
+                    )
             else:  # '', directly add.
                 grp_menu = self.ui_menu
+                grp_tree = ''  # Root.
             for pal in sorted(palettes, key=lambda p: p.name):
                 grp_menu.add_radiobutton(
                     label=CHR_GEAR + pal.name if pal.settings is not None else pal.name,
                     value=pal.uuid.hex,
                     command=self.event_select_menu,
                     variable=self.var_pal_select,
+                )
+                self.ui_treeview.insert(
+                    grp_tree, 'end',
+                    text=pal.name,
+                    iid='pal_' + pal.uuid.hex,
+                    image=ICO_GEAR.get_tk() if pal.settings is not None else '',
+                    tags=TREE_TAG_PALETTES,
                 )
 
         self.ui_menu.entryconfigure(
@@ -253,8 +282,23 @@ class PaletteUI:
 
     def event_select_menu(self) -> None:
         """Called when the menu buttons are clicked."""
-        self.select_palette(UUID(hex=self.var_pal_select.get()))
+        uuid_hex = self.var_pal_select.get()
+        self.select_palette(UUID(hex=uuid_hex))
+        self.ui_treeview.selection_set('pal_' + uuid_hex)
+        self.ui_treeview.see('pal_' + uuid_hex)
         self.set_items(self.selected)
+
+    def event_select_tree(self, evt: tk.Event) -> None:
+        """Called when palettes are selected on the treeview."""
+        # We're called just before it actually changes, so look up by the cursor pos.
+        uuid_hex = self.ui_treeview.identify('item', evt.x, evt.y)[4:]
+        self.var_pal_select.set(uuid_hex)
+        self.select_palette(UUID(hex=uuid_hex))
+        self.set_items(self.selected)
+
+    def event_group_select_tree(self, _: tk.Event) -> None:
+        """When a group item is selected on the tree, reselect the palette."""
+        self.ui_treeview.selection_set('pal_' + self.selected.uuid.hex)
 
 
 # def set_pal_radio() -> None:
