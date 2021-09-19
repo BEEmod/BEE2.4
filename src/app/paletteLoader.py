@@ -266,7 +266,7 @@ class Palette:
             uuid = uuid5(DEFAULT_NS, trans_name)
         else:
             try:
-                uuid = UUID(hex=props[''])
+                uuid = UUID(hex=props['UUID'])
             except (ValueError, LookupError):
                 uuid = uuid4()
                 needs_save = True
