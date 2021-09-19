@@ -450,15 +450,6 @@ def parse_legacy(posfile, propfile, path) -> Optional[Palette]:
                     return None
     return Palette(name, pos)
 
-
-def check_exists(name):
-    """Check if a palette with the given name exists."""
-    for pal in pal_list:
-        if pal.name == name:
-            return True
-    return False
-
-
 if __name__ == '__main__':
     results = load_palettes()
     for palette in results:

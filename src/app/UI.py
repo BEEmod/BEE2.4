@@ -730,68 +730,6 @@ def suggested_refresh() -> None:
             UI['suggested_style'].state(['!disabled'])
 
 
-def refresh_pal_ui() -> None:
-    """Update the UI to show the correct palettes."""
-    return
-    global selectedPalette
-    cur_palette = paletteLoader.pal_list[selectedPalette]
-    paletteLoader.pal_list.sort(key=str)  # sort by name
-    selectedPalette = paletteLoader.pal_list.index(cur_palette)
-
-    listbox: Listbox = UI['palette']
-    listbox.delete(0, END)
-
-    for i, pal in enumerate(paletteLoader.pal_list):
-        if pal.settings is not None:
-            listbox.insert(i, CHR_GEAR + pal.name)
-        else:
-            listbox.insert(i, pal.name)
-
-        if pal.prevent_overwrite:
-            listbox.itemconfig(
-                i,
-                foreground='grey',
-                background=tk_tools.LISTBOX_BG_COLOR,
-                selectbackground=tk_tools.LISTBOX_BG_SEL_COLOR,
-            )
-        else:
-            listbox.itemconfig(
-                i,
-                foreground='black',
-                background=tk_tools.LISTBOX_BG_COLOR,
-                selectbackground=tk_tools.LISTBOX_BG_SEL_COLOR,
-            )
-
-    if len(paletteLoader.pal_list) < 2 or cur_palette.prevent_overwrite:
-        UI['pal_remove'].state(('disabled',))
-        UI['pal_save'].state(('disabled', ))  # Save As only.
-        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=DISABLED)
-        menus['pal'].entryconfigure(menus['pal_save_ind'], state=DISABLED)
-    else:
-        UI['pal_remove'].state(('!disabled',))
-        UI['pal_save'].state(('!disabled', ))
-        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=NORMAL)
-        menus['pal'].entryconfigure(menus['pal_save_ind'], state=NORMAL)
-
-    for ind in range(menus['pal'].index(END), 0, -1):
-        # Delete all the old radiobuttons
-        # Iterate backward to ensure indexes stay the same.
-        if menus['pal'].type(ind) == RADIOBUTTON:
-            menus['pal'].delete(ind)
-    # Add a set of options to pick the palette into the menu system
-    for val, pal in enumerate(paletteLoader.pal_list):
-        menus['pal'].add_radiobutton(
-            label=(
-                pal.name if pal.settings is None
-                else CHR_GEAR + pal.name
-            ),
-            variable=selectedPalette_radio,
-            value=val,
-            command=set_pal_radio,
-            )
-    selectedPalette_radio.set(selectedPalette)
-
-
 def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.

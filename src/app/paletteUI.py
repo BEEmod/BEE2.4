@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import BEE2_config
-from app.paletteLoader import Palette, UUID_EXPORT, UUID_BLANK, UUID_PORTAL2
+from app.paletteLoader import Palette, UUID_PORTAL2
 from app import tk_tools, paletteLoader, TK_ROOT, img
 from localisation import gettext
 
@@ -260,20 +260,10 @@ class PaletteUI:
 
     def event_save_as(self) -> None:
         """Save the palette with a new name."""
-        while True:
-            name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
-            if name is None:
-                # Cancelled...
-                return
-            elif paletteLoader.check_exists(name):
-                if messagebox.askyesno(
-                    icon=messagebox.QUESTION,
-                    title='BEE2',
-                    message=gettext('This palette already exists. Overwrite?'),
-                ):
-                    break
-            else:
-                break
+        name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
+        if name is None:
+            # Cancelled...
+            return
         pal = Palette(name, self.get_items())
         while pal.uuid in self.palettes:  # Should be impossible.
             pal.uuid = paletteLoader.uuid4()
