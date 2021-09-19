@@ -115,6 +115,12 @@ class PaletteUI:
         self.ui_menu_regroup_index = menu.index('end')
 
         menu.add_command(
+            label=gettext('Rename Palette...'),
+            command=self.event_rename,
+        )
+        self.ui_menu_rename_index = menu.index('end')
+
+        menu.add_command(
             label=gettext('Fill Palette'),
             command=cmd_shuffle,
         )
@@ -233,12 +239,14 @@ class PaletteUI:
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='disabled')
             self.ui_menu.entryconfigure(self.ui_menu_regroup_index, state='disabled')
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='disabled')
+            self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='disabled')
         else:
             self.ui_remove.state(('!disabled',))
             self.save_btn_state(('!disabled',))
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='normal')
             self.ui_menu.entryconfigure(self.ui_menu_regroup_index, state='normal')
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='normal')
+            self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='normal')
 
     def event_save_settings_changed(self) -> None:
         """Save the state of this button."""
@@ -283,6 +291,17 @@ class PaletteUI:
         pal.save()
         self.palettes[pal.uuid] = pal
         self.select_palette(pal.uuid)
+        self.update_state()
+
+    def event_rename(self) -> None:
+        """Rename an existing palette."""
+        if self.selected.readonly:
+            return
+        name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
+        if name is None:
+            # Cancelled...
+            return
+        self.selected.name = name
         self.update_state()
 
     def select_palette(self, uuid: UUID) -> None:
