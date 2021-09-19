@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional, Dict, IO
+from typing import List, Tuple, Optional, Dict, IO, Iterator
 import os
 import shutil
 import zipfile
@@ -352,20 +352,20 @@ class Palette:
             os.remove(os.path.join(PAL_DIR, self.filename))
 
 
-def load_palettes() -> List[Palette]:
-    """Scan and read in all palettes in the specified directory."""
+def load_palettes() -> Iterator[Palette]:
+    """Scan and read in all palettes. Legacy files will be converted in the process."""
 
     # Load our builtin palettes.
     for name, items in DEFAULT_PALETTES.items():
         LOGGER.info('Loading builtin "{}"', name)
-        pal_list.append(Palette(
+        yield Palette(
             name,
             items,
             name,
             readonly=True,
             group=GROUP_BUILTIN,
             uuid=uuid5(DEFAULT_NS, name),
-        ))
+        )
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
@@ -376,7 +376,7 @@ def load_palettes() -> List[Palette]:
         try:
             if name.endswith(PAL_EXT):
                 try:
-                    pal_list.append(Palette.parse(path))
+                    yield Palette.parse(path)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
@@ -402,7 +402,7 @@ def load_palettes() -> List[Palette]:
             # Legacy parsing of BEE2.2 files..
             pal = parse_legacy(pos_file, prop_file, name)
             if pal is not None:
-                pal_list.append(pal)
+                yield pal
             else:
                 continue
         finally:
@@ -421,10 +421,6 @@ def load_palettes() -> List[Palette]:
             pal.readonly = True
             pal.save()
             shutil.rmtree(path)
-
-    # Ensure the list has a defined order..
-    pal_list.sort(key=str)
-    return pal_list
 
 
 def parse_legacy(posfile, propfile, path) -> Optional[Palette]:
