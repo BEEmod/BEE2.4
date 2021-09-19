@@ -7,13 +7,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import BEE2_config
-from app.paletteLoader import Palette
-from app import tk_tools, paletteLoader
+from app.paletteLoader import Palette, UUID_EXPORT, UUID_BLANK, UUID_PORTAL2
+from app import tk_tools, paletteLoader, TK_ROOT
 from localisation import gettext
 
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
+# "Wheel of Dharma" / white sun, close enough and should be in most fonts.
+CHR_GEAR = '☼ '
 
 
 class PaletteUI:
@@ -24,13 +26,15 @@ class PaletteUI:
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],
         get_items: Callable[[], list[tuple[str, int]]],
+        set_items: Callable[[Palette], None],
     ) -> None:
         """Initialises the palette pane.
 
-        The paramters are used to communicate with the item list:
+        The parameters are used to communicate with the item list:
         - cmd_clear and cmd_shuffle are called to do those actions to the list.
         - pal_get_items is called to retrieve the current list of selected items.
         - cmd_save_btn_state is the .state() method on the save button.
+        - cmd_set_items is called to apply a palette to the list of items.
         """
         self.palettes: dict[UUID, Palette] = {
             pal.uuid: pal
@@ -40,13 +44,14 @@ class PaletteUI:
         try:
             self.selected_uuid = UUID(hex=BEE2_config.GEN_OPTS.get_val('Last_Selected', 'palette_uuid', ''))
         except ValueError:
-            self.selected_uuid = paletteLoader.UUID_PORTAL2
+            self.selected_uuid = UUID_PORTAL2
 
         f.rowconfigure(1, weight=1)
         f.columnconfigure(0, weight=1)
         self.var_save_settings = tk.BooleanVar(value=BEE2_config.GEN_OPTS.get_bool('General', 'palette_save_settings'))
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
         self.get_items = get_items
+        self.set_items = set_items
         # Overwritten to configure the save state button.
         self.save_btn_state = lambda s: None
 
@@ -73,17 +78,13 @@ class PaletteUI:
         #
         # listbox.bind("<<ListboxSelect>>", set_pal_listbox)
 
-        # Set the selected state when hovered, so users can see which is
-        # selected.
-        # listbox.selection_set(0)
-
         scrollbar = tk_tools.HidingScroll(
             f,
             orient='vertical',
-            command=self.ui_treeview.yview_scroll,
+            command=self.ui_treeview.yview,
         )
         scrollbar.grid(row=1, column=1, sticky="NS")
-        self.ui_treeview['yscrollcommand'] = scrollbar
+        self.ui_treeview['yscrollcommand'] = scrollbar.set
 
         self.ui_remove = ttk.Button(
             f,
@@ -96,6 +97,7 @@ class PaletteUI:
             ttk.Sizegrip(f).grid(row=2, column=1)
 
         self.ui_menu = menu
+        self.ui_group_menus: dict[str, tk.Menu] = {}
         menu.add_command(
             label=gettext('Clear'),
             command=cmd_clear,
@@ -133,7 +135,7 @@ class PaletteUI:
         )
 
         menu.add_separator()
-        self.ui_menu_palettes_index = menu.index('end')
+        self.ui_menu_palettes_index = menu.index('end') + 1
 
         # refresh_pal_ui() adds the palette menu options here.
 
@@ -144,10 +146,40 @@ class PaletteUI:
             return self.palettes[self.selected_uuid]
         except KeyError:
             LOGGER.warning('No such palette with ID {}', self.selected_uuid)
-            return self.palettes[paletteLoader.UUID_PORTAL2]
+            return self.palettes[UUID_PORTAL2]
 
     def update_state(self) -> None:
         """Update the UI to show correct state."""
+        # Clear out all the current data.
+        self.ui_menu.delete(self.ui_menu_palettes_index, 'end')
+
+        groups: dict[str, list[Palette]] = {}
+        for pal in self.palettes.values():
+            groups.setdefault(pal.group, []).append(pal)
+
+        for group, palettes in sorted(groups.items(), key=lambda t: (t[0] != paletteLoader.GROUP_BUILTIN, t[0])):
+            if group == paletteLoader.GROUP_BUILTIN:
+                group = gettext('Builtin')  # i18n: Palette group title.
+            if group:
+                try:
+                    grp_menu = self.ui_group_menus[group]
+                except KeyError:
+                    grp_menu = self.ui_group_menus[group] = tk.Menu(self.ui_menu)
+                self.ui_menu.add_cascade(label=group, menu=grp_menu)
+            else:  # '', directly add.
+                grp_menu = self.ui_menu
+            for pal in sorted(palettes, key=lambda p: p.name):
+                grp_menu.add_radiobutton(
+                    label=CHR_GEAR + pal.name if pal.settings is not None else pal.name,
+                    value=pal.uuid.hex,
+                    command=self.event_select_menu,
+                    variable=self.var_pal_select,
+                )
+
+        self.ui_menu.entryconfigure(
+            self.ui_menu_delete_index,
+            label=gettext('Delete Palette "{}"').format(self.selected.name),
+        )
         if self.selected.prevent_overwrite:
             self.ui_remove.state(('disabled',))
             self.save_btn_state(('disabled',))
@@ -165,6 +197,16 @@ class PaletteUI:
 
     def event_remove(self) -> None:
         """Remove the currently selected palette."""
+        pal = self.selected
+        if not pal.prevent_overwrite and messagebox.askyesno(
+            title='BEE2',
+            message=gettext('Are you sure you want to delete "{}"?').format(pal.name),
+            parent=TK_ROOT,
+        ):
+            pal.delete_from_disk()
+            del self.palettes[pal.uuid]
+        self.select_palette(paletteLoader.UUID_PORTAL2)
+        self.set_items(self.selected)
 
     def event_save(self) -> None:
         """Save the current palette over the original name."""
@@ -199,9 +241,20 @@ class PaletteUI:
         pal = Palette(name, self.get_items())
         while pal.uuid in self.palettes:  # Should be impossible.
             pal.uuid = paletteLoader.uuid4()
-        self.palettes[pal.uuid] = pal
         pal.save()
+        self.select_palette(pal.uuid)
         self.update_state()
+
+    def select_palette(self, uuid: UUID) -> None:
+        """Select a new palette, and update state. This does not update items/settings!"""
+        pal = self.palettes[uuid]
+        self.selected_uuid = uuid
+        BEE2_config.GEN_OPTS['Last_Selected']['palette'] = uuid.hex
+
+    def event_select_menu(self) -> None:
+        """Called when the menu buttons are clicked."""
+        self.select_palette(UUID(hex=self.var_pal_select.get()))
+        self.set_items(self.selected)
 
 
 # def set_pal_radio() -> None:

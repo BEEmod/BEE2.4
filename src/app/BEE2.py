@@ -102,10 +102,6 @@ UI.load_packages()
 loadScreen.main_loader.step('UI')
 LOGGER.info('Done!')
 
-LOGGER.info('Loading Palettes...')
-paletteLoader.load_palettes()
-LOGGER.info('Done!')
-
 # Check games for Portal 2's basemodui.txt file, so we can translate items.
 LOGGER.info('Loading Item Translations...')
 for game in gameMan.all_games:

@@ -42,6 +42,7 @@ TRANS_NAMES: Dict[str, str] = {
 DEFAULT_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')
 UUID_PORTAL2 = uuid5(DEFAULT_NS, 'PORTAL2')
 UUID_EXPORT = uuid5(DEFAULT_NS, 'LAST_EXPORT')
+UUID_BLANK = uuid5(DEFAULT_NS, 'EMPTY')
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
 DEFAULT_PALETTES: Dict[str, List[Tuple[str, int]]] = {
