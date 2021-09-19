@@ -9,7 +9,7 @@ from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Opti
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, simpledialog
+from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
@@ -333,21 +333,80 @@ def event_cancel(*args, **kwargs) -> str:
     return 'break'
 
 
-class QueryShim(simpledialog._QueryString):
-    """Replicate the new API with the old simpledialog code."""
-    def __init__(self, parent, title, message, text0):
-        super().__init__(title, message, initialvalue=text0, parent=parent)
+def _default_validator(value) -> str:
+    if not value.strip():
+        raise ValueError("A value must be provided!")
+    return value
+
+
+class BasicQueryValidator(simpledialog.Dialog):
+    """Implement the dialog with the simpledialog code."""
+    def __init__(
+        self,
+        parent: tk.Misc,
+        title: str, message: str, initial: str,
+        validator: Callable[[str], str] = _default_validator,
+    ) -> None:
+        self.__validator = validator
+        self.__title = title
+        self.__message = message
+        self.__initial = initial
+        super().__init__(parent, title)
 
     def body(self, master):
-        """Ensure the window icon is changed."""
+        """Ensure the window icon is changed, and copy code from askstring's internals."""
         super().body(master)
         set_window_icon(self)
+        w = ttk.Label(master, text=self.__message, justify='left')
+        w.grid(row=0, padx=5, sticky='w')
+
+        self.entry = ttk.Entry(master, name="entry")
+        self.entry.grid(row=1, padx=5, sticky='we')
+
+        if self.__initial:
+            self.entry.insert(0, self.__initial)
+            self.entry.select_range(0, 'end')
+
+        return self.entry
+
+    def validate(self) -> bool:
+        try:
+            self.result = self.__validator(self.entry.get())
+        except ValueError as exc:
+            messagebox.showwarning(self.__title, exc.args[0], parent=self)
+            return False
+        else:
+            return True
+
+Query = None
+if Query is not None:
+    class QueryValidator(Query):
+        """Implement using IDLE's better code for this."""
+        def __init__(
+            self,
+            parent: tk.Misc,
+            title: str, message: str, initial: str,
+            validator: Callable[[str], str] = _default_validator,
+        ) -> None:
+            self.__validator = validator
+            super().__init__(parent, title, message, text0=initial)
+
+        def entry_ok(self) -> Optional[str]:
+            """Return non-blank entry or None."""
+            try:
+                return self.__validator(self.entry.get())
+            except ValueError as exc:
+                self.showerror(exc.args[0])
+                return None
+else:
+    QueryValidator = BasicQueryValidator
 
 
 def prompt(
     title: str, message: str,
     initialvalue: str='',
     parent: tk.Misc= TK_ROOT,
+    validator: Callable[[str], str] = _default_validator,
 ) -> Optional[str]:
     """Ask the user to enter a string."""
     from loadScreen import suppress_screens
@@ -359,14 +418,10 @@ def prompt(
         if Query is None or (utils.WIN and (
             not _main_loop_running or not TK_ROOT.winfo_viewable()
         )):
-            query_cls = QueryShim
+            query_cls = BasicQueryValidator
         else:
-            query_cls = Query
-        return query_cls(
-            parent,
-            title, message,
-            text0=initialvalue,
-        ).result
+            query_cls = QueryValidator
+        return query_cls(parent, title, message, initialvalue, validator).result
 
 
 class HidingScroll(ttk.Scrollbar):
