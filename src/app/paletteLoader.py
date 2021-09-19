@@ -1,13 +1,13 @@
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, IO
 import os
 import shutil
 import zipfile
 import random
+import io
 from uuid import UUID, uuid4, uuid5
 import utils
 
 import srctools.logger
-import BEE2_config
 from srctools import Property, NoKeyError, KeyValError
 
 from localisation import gettext
@@ -271,6 +271,7 @@ class Palette:
                 uuid = uuid4()
                 needs_save = True
 
+        settings: Optional[Property]
         try:
             settings = props.find_key('Settings')
         except NoKeyError:
@@ -369,7 +370,9 @@ def load_palettes() -> List[Palette]:
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
         path = os.path.join(PAL_DIR, name)
-        pos_file, prop_file = None, None
+
+        pos_file: Optional[IO[str]] = None
+        prop_file: Optional[IO[str]] = None
         try:
             if name.endswith(PAL_EXT):
                 try:
@@ -382,8 +385,8 @@ def load_palettes() -> List[Palette]:
             elif name.endswith('.zip'):
                 # Extract from a zip
                 with zipfile.ZipFile(path) as zip_file:
-                    pos_file = zip_file.open('positions.txt')
-                    prop_file = zip_file.open('properties.txt')
+                    pos_file = io.TextIOWrapper(zip_file.open('positions.txt'), encoding='ascii', errors='ignore')
+                    prop_file = io.TextIOWrapper(zip_file.open('properties.txt'), encoding='ascii', errors='ignore')
             elif os.path.isdir(path):
                 # Open from the subfolder
                 pos_file = open(os.path.join(path, 'positions.txt'))
@@ -400,6 +403,8 @@ def load_palettes() -> List[Palette]:
             pal = parse_legacy(pos_file, prop_file, name)
             if pal is not None:
                 pal_list.append(pal)
+            else:
+                continue
         finally:
             if pos_file:
                 pos_file.close()
