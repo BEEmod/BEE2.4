@@ -42,7 +42,7 @@ from app import (
     music_conf,
 )
 
-from typing import List, Dict, Tuple, Optional, Set, Iterator
+from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -1188,7 +1188,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     UI['pal_export'] = ttk.Button(
         frame,
         textvariable=EXPORT_CMD_VAR,
-        command=export_editoritems,
+        command=lambda: export_editoritems(pal_ui),
     )
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
@@ -1493,7 +1493,7 @@ def set_game(game: 'gameMan.Game') -> None:
     EXPORT_CMD_VAR.set(text)
 
 
-def init_menu_bar(win: Toplevel) -> Tuple[Menu, Menu]:
+def init_menu_bar(win: Toplevel, export: Callable[[], None]) -> Tuple[Menu, Menu]:
     """Create the top menu bar.
 
     This returns the View and palette menus, for later population.
@@ -1516,7 +1516,7 @@ def init_menu_bar(win: Toplevel) -> Tuple[Menu, Menu]:
 
     file_menu.add_command(
         label=_("Export"),
-        command=export_editoritems,
+        command=export,
         accelerator=tk_tools.ACCEL_EXPORT,
     )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
@@ -1568,7 +1568,7 @@ def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    view_menu, pal_menu = init_menu_bar(TK_ROOT)
+    view_menu, pal_menu = init_menu_bar(TK_ROOT, export=lambda: export_editoritems(pal_ui))
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),

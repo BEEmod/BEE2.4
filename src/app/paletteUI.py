@@ -64,10 +64,12 @@ class PaletteUI:
             command=cmd_clear,
         ).grid(row=0, sticky="EW")
 
-        self.ui_treeview = ttk.Treeview(f, show='tree', selectmode='browse')
+        self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
         self.ui_treeview.grid(row=1, sticky="NSEW")
         self.ui_treeview.tag_bind(TREE_TAG_PALETTES, '<ButtonPress>', self.event_select_tree)
-        self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', self.event_group_select_tree)
+        # Avoid re-registering the double-lambda, just do it here.
+        evtid_group_select = self.ui_treeview.register(self.event_group_select_tree)
+        self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', lambda e: treeview.tk.call('after', 'idle', evtid_group_select))
 
         # def set_pal_listbox(e=None):
         #     global selectedPalette
@@ -158,11 +160,15 @@ class PaletteUI:
         """Update the UI to show correct state."""
         # Clear out all the current data.
         self.ui_menu.delete(self.ui_menu_palettes_index, 'end')
-        try:
-            self.ui_treeview.detach(TREE_TAG_GROUPS)
-            self.ui_treeview.delete(TREE_TAG_PALETTES)
-        except tk.TclError:
-            pass  # First time, nothing on the UI.
+
+        # Detach all groups + children, and get a list of existing ones.
+        existing: set[str] = set()
+        for group_id in self.ui_group_treeids.values():
+            existing.update(self.ui_treeview.get_children(group_id))
+            self.ui_treeview.detach(group_id)
+        for pal_id in self.ui_treeview.get_children(''):
+            if pal_id.startswith('pal_'):
+                self.ui_treeview.delete(pal_id)
 
         groups: dict[str, list[Palette]] = {}
         for pal in self.palettes.values():
@@ -187,6 +193,8 @@ class PaletteUI:
                         open=True,
                         tags=TREE_TAG_GROUPS,
                     )
+                else:
+                    self.ui_treeview.move(grp_tree, '', 9999)
             else:  # '', directly add.
                 grp_menu = self.ui_menu
                 grp_tree = ''  # Root.
@@ -197,13 +205,26 @@ class PaletteUI:
                     command=self.event_select_menu,
                     variable=self.var_pal_select,
                 )
-                self.ui_treeview.insert(
-                    grp_tree, 'end',
-                    text=pal.name,
-                    iid='pal_' + pal.uuid.hex,
-                    image=ICO_GEAR.get_tk() if pal.settings is not None else '',
-                    tags=TREE_TAG_PALETTES,
-                )
+                pal_id = 'pal_' + pal.uuid.hex
+                if pal_id in existing:
+                    existing.remove(pal_id)
+                    self.ui_treeview.move(pal_id, grp_tree, 99999)
+                    self.ui_treeview.item(
+                        pal_id,
+                        text=pal.name,
+                        image=ICO_GEAR.get_tk() if pal.settings is not None else '',
+                    )
+                else:  # New
+                    self.ui_treeview.insert(
+                        grp_tree, 'end',
+                        text=pal.name,
+                        iid='pal_' + pal.uuid.hex,
+                        image=ICO_GEAR.get_tk() if pal.settings is not None else '',
+                        tags=TREE_TAG_PALETTES,
+                    )
+        # Finally strip any ones which were removed.
+        if existing:
+            self.ui_treeview.delete(*existing)
 
         self.ui_menu.entryconfigure(
             self.ui_menu_delete_index,
@@ -271,6 +292,7 @@ class PaletteUI:
         while pal.uuid in self.palettes:  # Should be impossible.
             pal.uuid = paletteLoader.uuid4()
         pal.save()
+        self.palettes[pal.uuid] = pal
         self.select_palette(pal.uuid)
         self.update_state()
 
@@ -296,7 +318,7 @@ class PaletteUI:
         self.select_palette(UUID(hex=uuid_hex))
         self.set_items(self.selected)
 
-    def event_group_select_tree(self, _: tk.Event) -> None:
+    def event_group_select_tree(self) -> None:
         """When a group item is selected on the tree, reselect the palette."""
         self.ui_treeview.selection_set('pal_' + self.selected.uuid.hex)
 
