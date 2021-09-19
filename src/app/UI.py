@@ -8,7 +8,7 @@ import random
 import math
 
 from srctools import Property
-from app import music_conf, TK_ROOT
+from app import TK_ROOT
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
@@ -22,6 +22,7 @@ from app import img
 from app import itemconfig
 import utils
 import consts
+from localisation import gettext as _
 from app import (
     tk_tools,
     SubPane,
@@ -37,6 +38,8 @@ from app import (
     backup as backup_win,
     tooltip,
     signage_ui,
+    paletteUI,
+    music_conf,
 )
 
 from typing import List, Dict, Tuple, Optional, Set, Iterator
@@ -65,7 +68,7 @@ pal_picked_fake = []  # type: List[ttk.Label]
 # Labels for empty picker positions
 pal_items_fake = []  # type: List[ttk.Label]
 # The current filtering state.
-cur_filter: Optional[Set[Tuple[str, int]]] = None
+cur_filter: Optional[Set[Tuple[str, int]]] = None\
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -76,13 +79,8 @@ ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 selected_style = "BEE2_CLEAN"
-selectedPalette = 0
-# fake value the menu radio buttons set
-selectedPalette_radio = IntVar(value=0)
 # Variable used for export button (changes to include game name)
 EXPORT_CMD_VAR = StringVar(value=_('Export...'))
-# If set, save settings into the palette in addition to items.
-var_pal_save_settings = BooleanVar(value=True)
 
 # Maps item IDs to our wrapper for the object.
 item_list = {}  # type: Dict[str, Item]
@@ -448,13 +446,6 @@ gameMan.quit_application = quit_application
 
 def load_settings():
     """Load options from the general config file."""
-    global selectedPalette
-    try:
-        selectedPalette = GEN_OPTS.get_int('Last_Selected', 'palette')
-    except (KeyError, ValueError):
-        pass  # It'll be set to the first palette by default, and then saved
-    selectedPalette_radio.set(selectedPalette)
-
     optionWindow.load()
 
 
@@ -1146,17 +1137,6 @@ def set_palette(chosen_pal: paletteLoader.Palette) -> None:
     if chosen_pal.settings is not None:
         BEE2_config.apply_settings(chosen_pal.settings, is_palette=True)
 
-    if len(paletteLoader.pal_list) < 2 or paletteLoader.pal_list[selectedPalette].prevent_overwrite:
-        UI['pal_remove'].state(('disabled',))
-        UI['pal_save'].state(('disabled', ))  # Save As only.
-        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=DISABLED)
-        menus['pal'].entryconfigure(menus['pal_save_ind'], state=DISABLED)
-    else:
-        UI['pal_remove'].state(('!disabled',))
-        UI['pal_save'].state(('!disabled', ))
-        menus['pal'].entryconfigure(menus['pal_delete_ind'], state=NORMAL)
-        menus['pal'].entryconfigure(menus['pal_save_ind'], state=NORMAL)
-
     flow_preview()
 
 
@@ -1203,46 +1183,6 @@ def pal_shuffle() -> None:
         ))
     flow_preview()
 
-
-def pal_save_as(e: Event=None) -> None:
-    """Save the palette with a new name."""
-    while True:
-        name = tk_tools.prompt(
-            _("BEE2 - Save Palette"),
-            _("Enter a name:"),
-        )
-        if name is None:
-            # Cancelled...
-            return
-        elif paletteLoader.check_exists(name):
-            if messagebox.askyesno(
-                icon=messagebox.QUESTION,
-                title='BEE2',
-                message=_('This palette already exists. Overwrite?'),
-            ):
-                break
-        else:
-            break
-    paletteLoader.save_pal(
-        [(it.id, it.subKey) for it in pal_picked],
-        name,
-        var_pal_save_settings.get(),
-    )
-    refresh_pal_ui()
-
-
-def pal_save(e=None) -> None:
-    """Save the current palette over the original name."""
-    pal = paletteLoader.pal_list[selectedPalette]
-    if pal.prevent_overwrite:
-        pal_save_as()
-    else:
-        paletteLoader.save_pal(
-            [(it.id, it.subKey) for it in pal_picked],
-            pal.name,
-            var_pal_save_settings.get(),
-        )
-        refresh_pal_ui()
 
 
 def pal_remove() -> None:
@@ -1327,7 +1267,7 @@ def init_palette(f) -> None:
         ttk.Sizegrip(f).grid(row=2, column=1)
 
 
-def init_option(pane: SubPane) -> None:
+def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1336,30 +1276,25 @@ def init_option(pane: SubPane) -> None:
     frame.grid(row=0, column=0, sticky=NSEW)
     frame.columnconfigure(0, weight=1)
 
-    UI['pal_save'] = ttk.Button(
+    pal_save = ttk.Button(
         frame,
         text=_("Save Palette..."),
-        command=pal_save,
+        command=pal_ui.event_save,
     )
-    UI['pal_save'].grid(row=0, sticky="EW", padx=5)
+    pal_save.grid(row=0, sticky="EW", padx=5)
+    pal_ui.save_btn_state = pal_save.state
     ttk.Button(
         frame,
         text=_("Save Palette As..."),
-        command=pal_save_as,
+        command=pal_ui.event_save_as,
     ).grid(row=1, sticky="EW", padx=5)
-
-    def save_settings_changed() -> None:
-        GEN_OPTS['General'][
-            'palette_save_settings'
-        ] = srctools.bool_as_int(var_pal_save_settings.get())
 
     ttk.Checkbutton(
         frame,
         text=_('Save Settings in Palettes'),
-        variable=var_pal_save_settings,
-        command=save_settings_changed,
+        variable=pal_ui.var_save_settings,
+        command=pal_ui.event_save_settings_changed,
     ).grid(row=2, sticky="EW", padx=5)
-    var_pal_save_settings.set(GEN_OPTS.get_bool('General', 'palette_save_settings'))
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
@@ -1671,10 +1606,10 @@ def set_game(game: 'gameMan.Game') -> None:
     EXPORT_CMD_VAR.set(text)
 
 
-def init_menu_bar(win: Toplevel) -> Menu:
+def init_menu_bar(win: Toplevel) -> Tuple[Menu, Menu]:
     """Create the top menu bar.
 
-    This returns the View menu, for later population.
+    This returns the View and palette menus, for later population.
     """
     bar = Menu(win)
     # Suppress ability to make each menu a separate window - weird old
@@ -1733,63 +1668,20 @@ def init_menu_bar(win: Toplevel) -> Menu:
     pal_menu = menus['pal'] = Menu(bar)
     # Menu name
     bar.add_cascade(menu=pal_menu, label=_('Palette'))
-    pal_menu.add_command(
-        label=_('Clear'),
-        command=pal_clear,
-        )
-    pal_menu.add_command(
-        # Placeholder..
-        label=_('Delete Palette'),  # This name is overwritten later
-        command=pal_remove,
-        )
-    menus['pal_delete_ind'] = pal_menu.index('end')
-    pal_menu.add_command(
-        label=_('Fill Palette'),
-        command=pal_shuffle,
-    )
-
-    pal_menu.add_separator()
-
-    pal_menu.add_checkbutton(
-        label=_('Save Settings in Palettes'),
-        variable=var_pal_save_settings,
-    )
-
-    pal_menu.add_separator()
-
-    pal_menu.add_command(
-        label=_('Save Palette'),
-        command=pal_save,
-        accelerator=tk_tools.ACCEL_SAVE,
-    )
-    menus['pal_save_ind'] = pal_menu.index('end')
-    pal_menu.add_command(
-        label=_('Save Palette As...'),
-        command=pal_save_as,
-        accelerator=tk_tools.ACCEL_SAVE_AS,
-    )
-
-    pal_menu.add_separator()
-
-    # refresh_pal_ui() adds the palette menu options here.
 
     view_menu = Menu(bar)
     bar.add_cascade(menu=view_menu, label=_('View'))
 
-    win.bind_all(tk_tools.KEY_SAVE, pal_save)
-    win.bind_all(tk_tools.KEY_SAVE_AS, pal_save_as)
-    win.bind_all(tk_tools.KEY_EXPORT, export_editoritems)
-
     helpMenu.make_help_menu(bar)
 
-    return view_menu
+    return view_menu, pal_menu
 
 
 def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    view_menu = init_menu_bar(TK_ROOT)
+    view_menu, pal_menu = init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
@@ -1903,7 +1795,16 @@ def init_windows() -> None:
     windows['pal'].columnconfigure(0, weight=1)
     windows['pal'].rowconfigure(0, weight=1)
 
-    init_palette(pal_frame)
+    pal_ui = paletteUI.PaletteUI(
+        pal_frame, pal_menu,
+        cmd_clear=pal_clear,
+        cmd_shuffle=pal_shuffle,
+        get_items=lambda: [(it.id, it.subKey) for it in pal_picked],
+    )
+
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save)
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as)
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, export_editoritems)
 
     loader.step('UI')
 
@@ -1921,7 +1822,7 @@ def init_windows() -> None:
         tool_img='icons/win_options',
         tool_col=2,
     )
-    init_option(windows['opt'])
+    init_option(windows['opt'], pal_ui)
 
     loader.step('UI')
 
@@ -2065,7 +1966,8 @@ def init_windows() -> None:
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     img.start_loading()
-    set_palette(paletteLoader.pal_list[selectedPalette])
+    set_palette(pal_ui.selected)
     # Set_palette needs to run first, so it can fix invalid palette indexes.
     BEE2_config.read_settings()
-    refresh_pal_ui()
+    # pal_ui.update_state()
+    # refresh_pal_ui()

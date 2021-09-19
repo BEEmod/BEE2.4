@@ -40,6 +40,8 @@ TRANS_NAMES: Dict[str, str] = {
     'APTAG': gettext('Aperture Tag'),
 }
 DEFAULT_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')
+UUID_PORTAL2 = uuid5(DEFAULT_NS, 'PORTAL2')
+UUID_EXPORT = uuid5(DEFAULT_NS, 'LAST_EXPORT')
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
 DEFAULT_PALETTES: Dict[str, List[Tuple[str, int]]] = {
@@ -439,25 +441,6 @@ def parse_legacy(posfile, propfile, path) -> Optional[Palette]:
                     LOGGER.warning('Malformed row "{}"!', line)
                     return None
     return Palette(name, pos)
-
-
-def save_pal(items, name: str, include_settings: bool):
-    """Save a palette under the specified name."""
-    for pal in pal_list:
-        if pal.name == name and not pal.prevent_overwrite:
-            pal.pos = list(items)
-            break
-    else:
-        pal = Palette(name, list(items))
-        pal_list.append(pal)
-
-    if include_settings:
-        pal.settings = BEE2_config.get_curr_settings(is_palette=True)
-    else:
-        pal.settings = None
-
-    pal.save()
-    return pal
 
 
 def check_exists(name):
