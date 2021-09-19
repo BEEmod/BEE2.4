@@ -240,6 +240,8 @@ class Palette:
         # If true, prevent overwriting the original file
         # (premade palettes or <LAST EXPORT>)
         self.prevent_overwrite = prevent_overwrite
+        if prevent_overwrite:
+            self.group = GROUP_BUILTIN
 
         # If not None, settings associated with the palette.
         self.settings = settings

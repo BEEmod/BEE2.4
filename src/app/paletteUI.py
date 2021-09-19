@@ -170,7 +170,7 @@ class PaletteUI:
 
         for group, palettes in sorted(groups.items(), key=lambda t: (t[0] != paletteLoader.GROUP_BUILTIN, t[0])):
             if group == paletteLoader.GROUP_BUILTIN:
-                group = gettext('Builtin')  # i18n: Palette group title.
+                group = gettext('Builtin / Readonly')  # i18n: Palette group title.
             if group:
                 try:
                     grp_menu = self.ui_group_menus[group]
