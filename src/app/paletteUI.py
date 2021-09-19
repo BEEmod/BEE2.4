@@ -67,9 +67,14 @@ class PaletteUI:
         self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
         self.ui_treeview.grid(row=1, sticky="NSEW")
         self.ui_treeview.tag_bind(TREE_TAG_PALETTES, '<ButtonPress>', self.event_select_tree)
+
         # Avoid re-registering the double-lambda, just do it here.
-        evtid_group_select = self.ui_treeview.register(self.event_group_select_tree)
-        self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', lambda e: treeview.tk.call('after', 'idle', evtid_group_select))
+        # This makes clicking the groups return selection to the palette.
+        evtid_reselect = self.ui_treeview.register(self.treeview_reselect)
+        self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', lambda e: treeview.tk.call('after', 'idle', evtid_reselect))
+
+        # And ensure when focus returns we reselect, in case it deselects.
+        f.winfo_toplevel().bind('<FocusIn>', lambda e: self.treeview_reselect(), add=True)
 
         scrollbar = tk_tools.HidingScroll(
             f,
@@ -137,8 +142,7 @@ class PaletteUI:
 
         menu.add_separator()
         self.ui_menu_palettes_index = menu.index('end') + 1
-
-        # refresh_pal_ui() adds the palette menu options here.
+        self.update_state()
 
     @property
     def selected(self) -> Palette:
@@ -319,6 +323,9 @@ class PaletteUI:
         self.set_items(self.selected)
         self.update_state()
 
-    def event_group_select_tree(self) -> None:
+    def treeview_reselect(self) -> None:
         """When a group item is selected on the tree, reselect the palette."""
-        self.ui_treeview.selection_set('pal_' + self.selected.uuid.hex)
+        # This could be called before all the items are added to the UI.
+        uuid_hex = 'pal_' + self.selected.uuid.hex
+        if self.ui_treeview.exists(uuid_hex):
+            self.ui_treeview.selection_set(uuid_hex)
