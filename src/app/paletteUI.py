@@ -71,20 +71,6 @@ class PaletteUI:
         evtid_group_select = self.ui_treeview.register(self.event_group_select_tree)
         self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', lambda e: treeview.tk.call('after', 'idle', evtid_group_select))
 
-        # def set_pal_listbox(e=None):
-        #     global selectedPalette
-        #     cur_selection = listbox.curselection()
-        #     if cur_selection:  # Might be blank if none selected
-        #         selectedPalette = int(cur_selection[0])
-        #         selectedPalette_radio.set(selectedPalette)
-        #
-        #         # Actually set palette..
-        #         set_palette()
-        #     else:
-        #         listbox.selection_set(selectedPalette, selectedPalette)
-        #
-        # listbox.bind("<<ListboxSelect>>", set_pal_listbox)
-
         scrollbar = tk_tools.HidingScroll(
             f,
             orient='vertical',
@@ -321,22 +307,3 @@ class PaletteUI:
     def event_group_select_tree(self) -> None:
         """When a group item is selected on the tree, reselect the palette."""
         self.ui_treeview.selection_set('pal_' + self.selected.uuid.hex)
-
-
-# def set_pal_radio() -> None:
-#     global selected
-#     pal_uuid = selected_var.get()
-#     try:
-#         pal = palettes[UUID(hex=pal_uuid)]
-#     except KeyError:
-#         LOGGER.warning('Unknown palette UUID {}', pal_uuid)
-#         return
-#
-#     set_treeview_selection()
-#     set_palette()
-#
-#
-# def set_treeview_selection(e=None) -> None:
-#     """Select the currently chosen palette in the treeview."""
-#     UI['palette'].selection_clear(0, len(paletteLoader.pal_list))
-#     UI['palette'].selection_set(selectedPalette)
