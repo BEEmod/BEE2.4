@@ -102,6 +102,13 @@ class PaletteUI:
             command=self.event_remove,
         )
         self.ui_menu_delete_index = menu.index('end')
+
+        menu.add_command(
+            label=gettext('Change Palette Group...'),
+            command=self.event_change_group,
+        )
+        self.ui_menu_regroup_index = menu.index('end')
+
         menu.add_command(
             label=gettext('Fill Palette'),
             command=cmd_shuffle,
@@ -220,11 +227,13 @@ class PaletteUI:
             self.ui_remove.state(('disabled',))
             self.save_btn_state(('disabled',))
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='disabled')
+            self.ui_menu.entryconfigure(self.ui_menu_regroup_index, state='disabled')
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='disabled')
         else:
             self.ui_remove.state(('!disabled',))
             self.save_btn_state(('!disabled',))
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='normal')
+            self.ui_menu.entryconfigure(self.ui_menu_regroup_index, state='normal')
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='normal')
 
     def event_save_settings_changed(self) -> None:
@@ -278,6 +287,20 @@ class PaletteUI:
         self.selected_uuid = uuid
         BEE2_config.GEN_OPTS['Last_Selected']['palette_uuid'] = uuid.hex
 
+    def event_change_group(self) -> None:
+        """Change the group of a palette."""
+        if self.selected.prevent_overwrite:
+            return
+        res = tk_tools.prompt(
+            gettext("BEE2 - Change Palette Group"),
+            gettext('Enter the name of the group for this palette, or "" to ungroup.'),
+            validator=lambda x: x,
+        )
+        if res is not None:
+            self.selected.group = res.strip('<>')
+            self.selected.save()
+            self.update_state()
+
     def event_select_menu(self) -> None:
         """Called when the menu buttons are clicked."""
         uuid_hex = self.var_pal_select.get()
@@ -285,6 +308,7 @@ class PaletteUI:
         self.ui_treeview.selection_set('pal_' + uuid_hex)
         self.ui_treeview.see('pal_' + uuid_hex)
         self.set_items(self.selected)
+        self.update_state()
 
     def event_select_tree(self, evt: tk.Event) -> None:
         """Called when palettes are selected on the treeview."""
@@ -293,6 +317,7 @@ class PaletteUI:
         self.var_pal_select.set(uuid_hex)
         self.select_palette(UUID(hex=uuid_hex))
         self.set_items(self.selected)
+        self.update_state()
 
     def event_group_select_tree(self) -> None:
         """When a group item is selected on the tree, reselect the palette."""
