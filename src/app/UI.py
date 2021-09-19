@@ -1096,10 +1096,16 @@ def drag_fast(e):
 
 
 def set_pal_radio() -> None:
+    """Set the palette, from the menu options."""
     global selectedPalette
     selectedPalette = selectedPalette_radio.get()
     set_pal_listbox_selection()
-    set_palette()
+    if selectedPalette >= len(paletteLoader.pal_list) or selectedPalette < 0:
+        LOGGER.warning('Invalid palette index!')
+        selectedPalette = 0
+
+    chosen_pal = paletteLoader.pal_list[selectedPalette]
+    set_palette(chosen_pal)
 
 
 def set_pal_listbox_selection(e=None) -> None:
@@ -1108,15 +1114,8 @@ def set_pal_listbox_selection(e=None) -> None:
     UI['palette'].selection_set(selectedPalette)
 
 
-def set_palette(e=None) -> None:
+def set_palette(chosen_pal: paletteLoader.Palette) -> None:
     """Select a palette."""
-    global selectedPalette
-    if selectedPalette >= len(paletteLoader.pal_list) or selectedPalette < 0:
-        LOGGER.warning('Invalid palette index!')
-        selectedPalette = 0
-
-    chosen_pal = paletteLoader.pal_list[selectedPalette]
-
     GEN_OPTS['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
     menus['pal'].entryconfigure(
@@ -1265,7 +1264,7 @@ def pal_remove() -> None:
         selectedPalette -= 1
         selectedPalette_radio.set(selectedPalette)
         refresh_pal_ui()
-        set_palette()
+        set_palette(paletteLoader.pal_list[selectedPalette])
 
 
 # UI functions, each accepts the parent frame to place everything in.
@@ -1298,7 +1297,7 @@ def init_palette(f) -> None:
             selectedPalette_radio.set(selectedPalette)
 
             # Actually set palette..
-            set_palette()
+            set_palette(paletteLoader.pal_list[selectedPalette])
         else:
             listbox.selection_set(selectedPalette, selectedPalette)
 
@@ -2066,7 +2065,7 @@ def init_windows() -> None:
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     img.start_loading()
-    set_palette()
+    set_palette(paletteLoader.pal_list[selectedPalette])
     # Set_palette needs to run first, so it can fix invalid palette indexes.
     BEE2_config.read_settings()
     refresh_pal_ui()
