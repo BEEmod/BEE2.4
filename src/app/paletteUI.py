@@ -264,7 +264,7 @@ class PaletteUI:
                 self.selected.settings = BEE2_config.get_curr_settings(is_palette=True)
             else:
                 self.selected.settings = None
-            self.selected.save()
+            self.selected.save(ignore_readonly=True)
         self.update_state()
 
     def event_save_as(self) -> None:
