@@ -1,4 +1,6 @@
-from typing import List, Tuple, Optional, Dict, IO, Iterator
+"""Defines the palette data structure and file saving/loading logic."""
+from __future__ import annotations
+from typing import IO, Iterator
 import os
 import shutil
 import zipfile
@@ -14,16 +16,13 @@ from localisation import gettext
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
 PAL_DIR = utils.conf_location('palettes/')
 GROUP_BUILTIN = '<BUILTIN>'
-
 PAL_EXT = '.bee2_palette'
-
-pal_list: List['Palette'] = []
+pal_list: list[Palette] = []
 
 # Allow translating the names of the built-in palettes
-TRANS_NAMES: Dict[str, str] = {
+TRANS_NAMES: dict[str, str] = {
     # i18n: Last exported items
     'LAST_EXPORT': gettext('<Last Export>'),
     # i18n: Empty palette name
@@ -45,7 +44,7 @@ UUID_EXPORT = uuid5(DEFAULT_NS, 'LAST_EXPORT')
 UUID_BLANK = uuid5(DEFAULT_NS, 'EMPTY')
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
-DEFAULT_PALETTES: Dict[str, List[Tuple[str, int]]] = {
+DEFAULT_PALETTES: dict[str, list[tuple[str, int]]] = {
     'EMPTY': [],
     'PORTAL2': [
         ("ITEM_BUTTON_PEDESTAL", 0),
@@ -205,14 +204,14 @@ class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
     def __init__(
         self,
-        name,
-        pos: List[Tuple[str, int]],
-        trans_name='',
-        readonly=False,
-        group: str='',
-        filename: str=None,
-        settings: Optional[Property]=None,
-        uuid: UUID =None,
+        name: str,
+        pos: list[tuple[str, int]],
+        trans_name: str = '',
+        readonly: bool = False,
+        group: str = '',
+        filename: str = None,
+        settings: Property | None = None,
+        uuid: UUID = None,
     ) -> None:
         # Name of the palette
         self.name = name
@@ -250,7 +249,7 @@ class Palette:
         return f'<Palette {self.name!r} @ {self.uuid}>'
 
     @classmethod
-    def parse(cls, path: str) -> 'Palette':
+    def parse(cls, path: str) -> Palette:
         """Parse a palette from a file."""
         needs_save = False
         with open(path, encoding='utf8') as f:
@@ -271,7 +270,7 @@ class Palette:
                 uuid = uuid4()
                 needs_save = True
 
-        settings: Optional[Property]
+        settings: Property | None
         try:
             settings = props.find_key('Settings')
         except NoKeyError:
@@ -292,7 +291,7 @@ class Palette:
             pal.save()
         return pal
 
-    def save(self, ignore_readonly=False) -> None:
+    def save(self, ignore_readonly: bool = False) -> None:
         """Save the palette file into the specified location.
 
         If ignore_readonly is true, this will ignore the `readonly`
@@ -346,7 +345,7 @@ class Palette:
             for line in props.export():
                 file.write(line)
 
-    def delete_from_disk(self):
+    def delete_from_disk(self) -> None:
         """Delete this palette from disk."""
         if self.filename is not None:
             os.remove(os.path.join(PAL_DIR, self.filename))
@@ -371,8 +370,8 @@ def load_palettes() -> Iterator[Palette]:
         LOGGER.info('Loading "{}"', name)
         path = os.path.join(PAL_DIR, name)
 
-        pos_file: Optional[IO[str]] = None
-        prop_file: Optional[IO[str]] = None
+        pos_file: IO[str] | None = None
+        prop_file: IO[str] | None = None
         try:
             if name.endswith(PAL_EXT):
                 try:
@@ -423,7 +422,7 @@ def load_palettes() -> Iterator[Palette]:
             shutil.rmtree(path)
 
 
-def parse_legacy(posfile, propfile, path) -> Optional[Palette]:
+def parse_legacy(posfile, propfile, path) -> Palette | None:
     """Parse the original BEE2.2 palette format."""
     props = Property.parse(propfile, path + ':properties.txt')
     name = props['name', 'Unnamed']
