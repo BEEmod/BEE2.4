@@ -397,7 +397,6 @@ class PalItem(Label):
         if self in pal_picked:
             pal_picked.remove(self)
         self.place_forget()
-        self.destroy()
 
     def on_pal(self) -> bool:
         """Determine if this item is on the palette."""
