@@ -476,9 +476,8 @@ def fix_single_straight(
         orient.up(-8.0),
         orient.up(+8.0),
     ]:
-        pos = center + off
         try:
-            neigh = join_points[over_name, pos.x, pos.y, pos.z]
+            neigh = join_points[(over_name, ) + (center + off).as_tuple()]
         except KeyError:
             continue
 
@@ -498,8 +497,7 @@ def fix_single_straight(
         elif seg.start != off_min or seg.end != off_max:
             # The other side is also present. Only override if we are on both
             # sides.
-            opposite = center - off
-            if (over_name, opposite.x, opposite.y, opposite.z) in join_points:
+            if (over_name, ) + (center - off).as_tuple() in join_points:
                 seg.start = off_min
                 seg.end = off_max
         # Else: Both equal, we're fine.
