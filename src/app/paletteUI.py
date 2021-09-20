@@ -14,8 +14,6 @@ from localisation import gettext
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
-# "Wheel of Dharma" / white sun, close enough and should be in most fonts.
-CHR_GEAR = '☼ '
 TREE_TAG_GROUPS = 'pal_group'
 TREE_TAG_PALETTES = 'palette'
 ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
@@ -204,11 +202,14 @@ class PaletteUI:
                 grp_menu = self.ui_menu
                 grp_tree = ''  # Root.
             for pal in sorted(palettes, key=lambda p: p.name):
+                gear_img = ICO_GEAR.get_tk() if pal.settings is not None else ''
                 grp_menu.add_radiobutton(
-                    label=CHR_GEAR + pal.name if pal.settings is not None else pal.name,
+                    label=pal.name,
                     value=pal.uuid.hex,
                     command=self.event_select_menu,
                     variable=self.var_pal_select,
+                    image=gear_img,
+                    compound='left',
                 )
                 pal_id = 'pal_' + pal.uuid.hex
                 if pal_id in existing:
@@ -217,14 +218,14 @@ class PaletteUI:
                     self.ui_treeview.item(
                         pal_id,
                         text=pal.name,
-                        image=ICO_GEAR.get_tk() if pal.settings is not None else '',
+                        image=gear_img,
                     )
                 else:  # New
                     self.ui_treeview.insert(
                         grp_tree, 'end',
                         text=pal.name,
                         iid='pal_' + pal.uuid.hex,
-                        image=ICO_GEAR.get_tk() if pal.settings is not None else '',
+                        image=gear_img,
                         tags=TREE_TAG_PALETTES,
                     )
         # Finally strip any ones which were removed.
