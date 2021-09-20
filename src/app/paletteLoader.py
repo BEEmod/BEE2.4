@@ -19,7 +19,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 PAL_DIR = utils.conf_location('palettes/')
 GROUP_BUILTIN = '<BUILTIN>'
 PAL_EXT = '.bee2_palette'
-pal_list: list[Palette] = []
 
 # Allow translating the names of the built-in palettes
 TRANS_NAMES: dict[str, str] = {
