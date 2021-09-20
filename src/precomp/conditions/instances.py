@@ -330,8 +330,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
 
     conditions.set_ent_keys(new_ent, inst, res)
 
-    origin.localise(Vec.from_str(new_ent['origin']), angles)
-    new_ent['origin'] = origin
+    new_ent['origin'] = Vec.from_str(new_ent['origin']) @ angles + origin
     new_ent['angles'] = angles
     new_ent['targetname'] = inst['targetname']
 
