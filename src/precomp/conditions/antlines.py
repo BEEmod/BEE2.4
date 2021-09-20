@@ -123,8 +123,8 @@ class Group:
         # Create the item for the entire group of markers.
         self.item = connections.Item(
             logic_ent, logic_conf,
-            start.item.ant_floor_style,
-            start.item.ant_wall_style,
+            ant_floor_style=start.item.ant_floor_style,
+            ant_wall_style=start.item.ant_wall_style,
         )
         connections.ITEMS[self.item.name] = self.item
 
