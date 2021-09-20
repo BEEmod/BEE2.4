@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import BEE2_config
-from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT
+from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
 from app import tk_tools, paletteLoader, TK_ROOT, img
 from localisation import gettext
 
@@ -17,6 +17,11 @@ LOGGER = srctools.logger.get_logger(__name__)
 TREE_TAG_GROUPS = 'pal_group'
 TREE_TAG_PALETTES = 'palette'
 ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
+
+# Re-export paletteLoader values for convenience.
+__all__ = [
+    'PaletteUI', 'Palette', 'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
+]
 
 
 class PaletteUI:
