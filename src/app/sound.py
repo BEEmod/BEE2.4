@@ -224,8 +224,6 @@ class SamplePlayer:
         """Close down previous sounds."""
         if self._handle is not None:
             self._handle.close()
-        if self._cur_sys is not None:
-            self._cur_sys.close_ref()
         self._handle = self._cur_sys = None
 
     def play_sample(self, e: Event=None) -> None:
@@ -261,7 +259,6 @@ class SamplePlayer:
                 # Use the file objects directly.
                 load_path = self.cur_file
                 self._cur_sys = child_sys
-                self._cur_sys.open_ref()
                 self._handle = file.open_bin()
                 LOGGER.debug('Loading music via {!r}', self._handle)
             try:
