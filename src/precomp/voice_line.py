@@ -585,7 +585,10 @@ def add_voice(
                 chosen = possible_quotes[0].lines
             else:
                 # Chose one of the quote blocks.
-                chosen = rand.seed(b'VOICE_QUOTE', len(possible_quotes)).choice(possible_quotes).lines
+                chosen = rand.seed(b'VOICE_QUOTE_BLOCK', *[
+                    prop['id', 'ID'] for quoteblock in possible_quotes
+                    for prop in quoteblock.lines
+                ]).choice(possible_quotes).lines
 
             # Use the IDs for the voice lines, so each quote block will chose different lines.
             rng = rand.seed(b'VOICE_QUOTE', *[
