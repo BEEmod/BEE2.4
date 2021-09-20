@@ -162,6 +162,8 @@ class PaletteUI:
     def update_state(self) -> None:
         """Update the UI to show correct state."""
         # Clear out all the current data.
+        for grp_menu in self.ui_group_menus.values():
+            grp_menu.delete(0, 'end')
         self.ui_menu.delete(self.ui_menu_palettes_index, 'end')
 
         # Detach all groups + children, and get a list of existing ones.
