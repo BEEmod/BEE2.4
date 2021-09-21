@@ -1301,7 +1301,7 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
     rand_count = res.int('number', None)
     rand_list: list[int] | None
     if rand_count:
-        rand_list = weighted_random(
+        rand_list = rand.parse_weights(
             rand_count,
             res['weights', ''],
         )
@@ -1349,14 +1349,15 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
         len(goo_top_locs),
     )
 
-    suff = ''
     for loc in possible_locs:
         rng = rand.seed(b'goo_debris', loc)
         if rng.random() > chance:
             continue
 
         if rand_list is not None:
-            suff = '_' + str(rng.choice(rand_list) + 1)
+            rand_fname = f'{file}_{rng.choice(rand_list) + 1}.vmf'
+        else:
+            rand_fname = file + '.vmf'
 
         if offset > 0:
             loc.x += rng.randint(-offset, offset)
@@ -1364,9 +1365,9 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
         loc.z -= 32  # Position the instances in the center of the 128 grid.
         vmf.create_ent(
             classname='func_instance',
-            file=file + suff + '.vmf',
+            file=rand_fname,
             origin=loc.join(' '),
-            angles='0 {} 0'.format(rng.randrange(0, 3600)/10)
+            angles=f'0 {rng.randrange(0, 3600) / 10} 0'
         )
 
     return RES_EXHAUSTED
