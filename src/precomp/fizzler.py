@@ -8,6 +8,7 @@ from enum import Enum
 import utils
 import srctools.logger
 import srctools.vmf
+from precomp.tiling import TileType
 from srctools.vmf import VMF, Solid, Entity, Side, Output
 from srctools import Property, NoKeyError, Vec, Matrix, Angle
 from precomp import (
@@ -471,8 +472,12 @@ class Fizzler:
                         orig.color,
                     )
 
-    def _gen_fizz_border(self, vmf: VMF, seg_min: Vec, seg_max: Vec):
-        """Generate borders above/below fizzlers."""
+    def _edit_border_tiles(self, vmf: VMF, seg_min: Vec, seg_max: Vec, border: bool, blacken: bool) -> None:
+        """Modify tiles above/below fizzlers.
+
+        If the border is enabled, this adds those overlays.
+        If tile blackening is enabled, it makes the tiles black also.
+        """
         up = abs(self.up_axis)
         forward = (seg_max - seg_min).norm()
         norm_dir = self.normal().axis()
@@ -487,9 +492,32 @@ class Fizzler:
         min_pos = seg_min.copy()
         min_pos[norm_dir] = min_pos[norm_dir] // 128 * 128 + 64
 
+        u_ax, v_ax = Vec.INV_AXIS[up.axis()]
+        side_dir = Vec.dot(abs(Vec.cross(up, forward)), seg_min - min_pos)
+        side_ind = round((side_dir + 48) / 32, 2)  # 0/1/2/3 for the center of tiles.
+        # 4.5 -> [4, 5] and 4 -> [4].
+        pos_iter = sorted({round(side_ind - 0.25), round(side_ind + 0.25)})
+        if u_ax == forward.axis():
+            uv_pos = [
+                (u, v)
+                for u in range(4)
+                for v in pos_iter
+            ]
+        elif v_ax == forward.axis():
+            uv_pos = [
+                (u, v)
+                for u in pos_iter
+                for v in range(4)
+            ]
+        else:  # Should be impossible?
+            uv_pos = []
+
         for offset in range(64, overlay_len, 128):
-            # Each position on top or bottom, inset 64 from each end
+            # Each position on top or bottom, inset 64 from each end.
+            # First check if the tiles themselves are present, then check if any of the
+            # subtiles are present - blackening on the way if required.
             pos = min_pos + offset * forward
+            tile_cat = []
             try:
                 top_tile = tiling.TILES[
                     (pos + 128 * up).as_tuple(),
@@ -498,8 +526,7 @@ class Fizzler:
             except KeyError:
                 pass
             else:
-                if any(tile.is_tile for u, v, tile in top_tile):
-                    tiledefs_up.append(top_tile)
+                tile_cat.append((tiledefs_up, top_tile))
             try:
                 btm_tile = tiling.TILES[
                     (pos - 128 * up).as_tuple(),
@@ -508,10 +535,19 @@ class Fizzler:
             except KeyError:
                 pass
             else:
-                if any(tile.is_tile for u, v, tile in btm_tile):
-                    tiledefs_dn.append(btm_tile)
+                tile_cat.append((tiledefs_dn, btm_tile))
+            for tiledefs, tile in tile_cat:
+                found = False
+                for u, v in uv_pos:
+                    subtile = tile[u, v]
+                    if subtile.is_tile:
+                        found = True
+                        if blacken:
+                            tile[u, v] = subtile.as_black
+                if found:
+                    tiledefs.append(tile)
 
-        if not tiledefs_up and not tiledefs_dn:
+        if not border or (not tiledefs_up and not tiledefs_dn):
             return
 
         overlay_thickness = options.get(int, 'fizz_border_thickness')
@@ -1111,6 +1147,7 @@ def generate_fizzlers(vmf: VMF):
     However the model instances are now available for modification.
     """
     has_fizz_border = 'fizz_border' in texturing.SPECIAL
+    tile_blacken = options.get_itemconf(('VALVE_FIZZLER', 'BlackenTiles'), False)
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -1294,9 +1331,9 @@ def generate_fizzlers(vmf: VMF):
             min_inst.fixup.update(fizz.base_inst.fixup)
             instance_traits.get(min_inst).update(fizz_traits)
 
-            if has_fizz_border:
+            if has_fizz_border or tile_blacken:
                 # noinspection PyProtectedMember
-                fizz._gen_fizz_border(vmf, seg_min, seg_max)
+                fizz._edit_border_tiles(vmf, seg_min, seg_max, has_fizz_border, tile_blacken)
 
             if fizz.embedded:
                 fizz.set_tiles_behind_models(seg_min, forward, fizz_type.nodraw_behind)
