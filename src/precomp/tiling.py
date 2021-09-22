@@ -172,12 +172,29 @@ class TileType(Enum):
     @property
     def inverted(self) -> TileType:
         """Swap the color of a type."""
+        try:
+            col = self.color
+        except ValueError:
+            return self
+        if col is texturing.Portalable.WHITE:
+            return self.as_black
+        else:
+            return self.as_white
+
+    @property
+    def as_white(self) -> TileType:
+        """Force to the white version."""
         if self is self.GOO_SIDE:
             return self.WHITE_4x4
-        if self.name.startswith('WHITE'):
-            return getattr(self, f'BLACK{self.name[5:]}')
         if self.name.startswith('BLACK'):
             return getattr(self, f'WHITE{self.name[5:]}')
+        return self
+
+    @property
+    def as_black(self) -> TileType:
+        """Force to the black version."""
+        if self.is_white:
+            return getattr(self, f'BLACK{self.name[5:]}')
         return self
 
     @property
