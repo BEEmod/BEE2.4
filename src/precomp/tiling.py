@@ -463,7 +463,8 @@ class Panel:
         """Generate the panel brushes."""
         # We need to do the checks to handle multiple panels with shared
         # data.
-        if all(tile is TileType.VOID for tile in sub_tiles.values()):
+        if all(subtile is TileType.VOID for subtile in sub_tiles.values()):
+            LOGGER.debug('Placing panel failed at {} @ {}: {} = {}', tile.pos, tile.normal, self, tile.format_tiles())
             # The brush entity isn't used.
             if self.brush_ent in vmf.entities:
                 self.brush_ent.remove()
@@ -842,14 +843,14 @@ class TileDef:
             self.pos,
         )
 
-    def print_tiles(self) -> None:
+    def format_tiles(self) -> str:
         """Debug utility, log the subtile shape."""
         out = []
         for v in reversed(range(4)):
             for u in range(4):
                 out.append(TILETYPE_TO_CHAR[self[u, v]])
             out.append('\n')
-        LOGGER.info('Subtiles: \n{}', ''.join(out))
+        return ''.join(out)
 
     @classmethod
     def ensure(
