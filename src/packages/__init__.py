@@ -49,6 +49,8 @@ class SelitemData:
     desc: tkMarkdown.MarkdownData
     group: Optional[str]
     sort_key: str
+    # The packages used to define this, used for debugging.
+    packages: set[str] = attr.Factory(frozenset)
 
     @classmethod
     def parse(cls, info: Property, pack_id: str) -> SelitemData:
@@ -111,6 +113,7 @@ class SelitemData:
             desc,
             group,
             sort_key,
+            frozenset({pack_id}),
         )
 
     def __add__(self, other: SelitemData) -> SelitemData:
@@ -132,6 +135,7 @@ class SelitemData:
             tkMarkdown.join(self.desc, other.desc),
             other.group or self.group,
             other.sort_key or self.sort_key,
+            self.packages | other.packages,
         )
 
 

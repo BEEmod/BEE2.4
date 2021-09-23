@@ -309,6 +309,7 @@ class Item:
         'button',
         'snd_sample',
         'attrs',
+        'package',
         '_selector',
         '_context_lbl',
         '_context_ind',
@@ -329,12 +330,14 @@ class Item:
         sort_key: Optional[str] = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: Optional[str] = None,
+        package: str = '',
     ):
         self.name = name
         self.shortName = short_name
         self.group = group or ''
         self.longName = long_name or short_name
         self.sort_key = sort_key
+        self.package = package
         if len(self.longName) > 20:
             self._context_lbl = self.shortName
         else:
@@ -411,6 +414,7 @@ class Item:
             group=data.group,
             sort_key=data.sort_key,
             attributes=attrs,
+            package=', '.join(sorted(data.packages)),
         )
 
     def _on_click(self, _: Event = None) -> None:
@@ -448,6 +452,7 @@ class Item:
         item.snd_sample = self.snd_sample
         item._context_lbl = self._context_lbl
         item.attrs = self.attrs
+        item.package = self.package
 
         item._selector = item.button = None
         return item
@@ -1330,7 +1335,7 @@ class SelectorWin:
             if item is self.noneItem:
                 text = tkMarkdown.convert('**ID:** *NONE*', None)
             else:
-                text = tkMarkdown.convert(f'**ID:** {item.name}', None)
+                text = tkMarkdown.convert(f'**ID:** `{item.package}`{":" if item.package else ""}`{item.name}`', None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 tkMarkdown.MarkdownData.text('\n'),
