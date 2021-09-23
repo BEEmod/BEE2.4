@@ -206,6 +206,12 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         exc: Exception
         enum: EnumT
         for enum in cls:
+            # Put the class into the globals, so it can refer to itself.
+            try:
+                # noinspection PyUnresolvedReferences
+                value.fget.__globals__[cls.__name__] = cls
+            except AttributeError:
+                pass
             try:
                 res = value.fget(enum)
             except Exception as exc:
