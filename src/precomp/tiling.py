@@ -198,6 +198,15 @@ class TileType(Enum):
         return self
 
     @property
+    def as_4x4(self) -> TileType:
+        """Convert to a 4x4-forcing version."""
+        if self is TileType.WHITE:
+            return TileType.WHITE_4x4
+        elif self is TileType.BLACK:
+            return TileType.BLACK_4x4
+        return self
+
+    @property
     def tile_size(self) -> TileSize:
         """The size of the tile this should force."""
         if '4x4' in self.name:
