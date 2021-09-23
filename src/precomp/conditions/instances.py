@@ -234,7 +234,7 @@ def res_add_inst_var(inst: Entity, res: Property):
         res_add_suffix(inst, res)
 
 
-@make_result('setInstVar', 'assign')
+@make_result('setInstVar', 'assign', 'setFixupVar')
 def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
