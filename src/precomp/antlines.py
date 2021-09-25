@@ -236,6 +236,23 @@ class Antline:
 
         for seg in self.line:
             conf = floor_conf if seg.on_floor else wall_conf
+            # Check tiledefs in the voxels, and assign just in case.
+            # antline corner items don't have them defined, and some embedfaces don't work
+            # properly. But we keep any segments actually defined also.
+            mins, maxs = Vec.bbox(seg.start, seg.end)
+            norm_axis = seg.normal.axis()
+            u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+            for pos in Vec.iter_line(mins, maxs, 128):
+                pos[u_axis] = pos[u_axis] // 128 * 128 + 64
+                pos[v_axis] = pos[v_axis] // 128 * 128 + 64
+                pos -= 64 * seg.normal
+                try:
+                    tile = tiling.TILES[pos.as_tuple(), seg.normal.as_tuple()]
+                except KeyError:
+                    pass
+                else:
+                    seg.tiles.add(tile)
+
             rng = rand.seed(b'antline', seg.start, seg.end)
             if seg.type is SegType.CORNER:
                 mat: AntTex

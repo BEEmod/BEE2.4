@@ -488,23 +488,6 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
 
         segments += set(group.ant_seg.values())
         if group.type is NodeType.CORNER and segments:
-            # Assign tiledefs to the segments.
-            for seg in segments:
-                # Assign tiledefs.
-                mins, maxs = Vec.bbox(seg.start, seg.end)
-                norm_axis = seg.normal.axis()
-                u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-                for pos in Vec.iter_line(mins, maxs, 128):
-                    pos[u_axis] = pos[u_axis] // 128 * 128 + 64
-                    pos[v_axis] = pos[v_axis] // 128 * 128 + 64
-                    pos -= 64 * seg.normal
-                    try:
-                        tile = tiling.TILES[pos.as_tuple(), seg.normal.as_tuple()]
-                    except KeyError:
-                        pass
-                    else:
-                        seg.tiles.add(tile)
-
             group.item.antlines.add(antlines.Antline(group.item.name + '_antline', segments))
 
         if group.type is NodeType.LASER and beam_conf:
