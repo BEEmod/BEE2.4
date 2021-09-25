@@ -806,6 +806,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.disable_cmd,
                 item.config.invert_var,
                 item.config.spawn_fire,
+                '_prim_inv_rl',
             )
             add_item_inputs(
                 dummy_logic_ents,
@@ -817,6 +818,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.sec_disable_cmd,
                 item.config.sec_invert_var,
                 item.config.sec_spawn_fire,
+                '_sec_inv_rl',
             )
         else:
             add_item_inputs(
@@ -829,6 +831,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.disable_cmd,
                 item.config.invert_var,
                 item.config.spawn_fire,
+                '_inv_rl',
             )
 
     # Check/cross instances sometimes don't match the kind of timer delay.
@@ -1020,6 +1023,7 @@ def add_item_inputs(
     disable_cmd: Iterable[Output],
     invert_var: str,
     spawn_fire: FeatureMode,
+    inv_relay_name: str,
 ) -> None:
     """Handle either the primary or secondary inputs to an item."""
     item.inst.fixup[count_var] = len(inputs)
@@ -1191,7 +1195,7 @@ def add_item_inputs(
             # name in enable/disable_cmd.
             relay_cmd_name = ''
         else:
-            relay_cmd_name = '@' + item.name + '_inv_rl'
+            relay_cmd_name = f'@{item.name}{inv_relay_name}'
             spawn_relay = item.inst.map.create_ent(
                 classname='logic_relay',
                 targetname=relay_cmd_name,

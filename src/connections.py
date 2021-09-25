@@ -269,9 +269,9 @@ class Config:
             spawn_fire = FeatureMode.ALWAYS if spawn_fire_bool else FeatureMode.NEVER
 
         try:
-            sec_spawn_fire = FeatureMode(conf['spawnfire', 'never'].casefold())
+            sec_spawn_fire = FeatureMode(conf['sec_spawnfire', 'never'].casefold())
         except ValueError:  # Default to primary value.
-            sec_spawn_fire = spawn_fire
+            sec_spawn_fire = FeatureMode.NEVER
 
         if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
