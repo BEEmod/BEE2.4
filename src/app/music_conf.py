@@ -44,8 +44,6 @@ def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
         for channel in MusicChannel:
             if channel is MusicChannel.BASE:
                 continue
-            if sel_item:
-                WINDOWS[channel].sel_item_id('<none>')
             WINDOWS[channel].set_suggested()
     else:
         music = Music.by_id(music_id)
@@ -54,20 +52,35 @@ def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
                 continue
 
             sugg = music.get_suggestion(channel)
-            if sel_item:
-                WINDOWS[channel].sel_item_id(sugg)
             WINDOWS[channel].set_suggested(sugg)
 
 
 def export_data() -> Dict[MusicChannel, Optional[Music]]:
     """Return the data used to export this."""
-    return {
-        channel:
-            None if
-            win.chosen_id is None
-            else Music.by_id(win.chosen_id)
-        for channel, win in WINDOWS.items()
+    base_id = WINDOWS[MusicChannel.BASE].chosen_id
+    if base_id is not None:
+        base_track = Music.by_id(base_id)
+    else:
+        base_track = None
+    data: dict[MusicChannel, Optional[Music]] = {
+        MusicChannel.BASE: base_track,
     }
+    for channel, win in WINDOWS.items():
+        if channel is MusicChannel.BASE:
+            continue
+        # If collapsed, use the suggested track. Otherwise use the chosen one.
+        if is_collapsed:
+            if base_track is not None:
+                mus_id = base_track.get_suggestion(channel)
+            else:
+                mus_id = None
+        else:
+            mus_id = win.chosen_id
+        if mus_id is not None:
+            data[channel] = Music.by_id(mus_id)
+        else:
+            data[channel] = None
+    return data
 
 
 def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
