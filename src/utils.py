@@ -208,8 +208,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
-                # noinspection PyUnresolvedReferences
-                value.fget.__globals__[cls.__name__] = cls
+                value.fget.__globals__[cls.__name__] = cls  # type: ignore
             except AttributeError:
                 pass
             try:
