@@ -1140,7 +1140,8 @@ class SelectorWin:
             # Set a custom attribute to keep track of the menu's index.
             # The one at the end is the one we just added.
             menu._context_index = self.context_menu.index('end')
-        self.flow_items()
+        if self.win.winfo_ismapped():
+            self.flow_items()
 
     def exit(self, _: Event = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
