@@ -443,7 +443,7 @@ def set_screen_type() -> None:
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     else:
         UI['thumb_label'].grid_forget()
-    UI['thumb_label'].update()
+    UI['thumb_label'].update_idletasks()
     # Resize the pane to accommodate the shown/hidden image
     window.geometry('{}x{}'.format(
         window.winfo_width(),
