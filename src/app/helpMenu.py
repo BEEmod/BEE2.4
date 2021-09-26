@@ -10,6 +10,7 @@ import functools
 
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
+from localisation import gettext
 import utils
 
 # For version info
