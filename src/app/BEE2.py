@@ -1,14 +1,16 @@
 """Run the BEE2."""
 # BEE2_config creates this config file to allow easy cross-module access
-from BEE2_config import GEN_OPTS, get_package_locs
+import trio
 
-from app import gameMan, paletteLoader, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE
+from BEE2_config import GEN_OPTS, get_package_locs
+from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE
 import loadScreen
 import packages
 import utils
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger('BEE2')
+APP_NURSERY: trio.Nursery
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -48,71 +50,100 @@ DEFAULT_SETTINGS = {
     },
 }
 
-GEN_OPTS.load()
-GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
-# Special case, load in this early so it applies.
-utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')
-DEV_MODE.set(utils.DEV_MODE)
+async def init_app():
+    """Initialise the application."""
+    GEN_OPTS.load()
+    GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
-LOGGER.debug('Starting loading screen...')
-loadScreen.main_loader.set_length('UI', 15)
-loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
-loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
+    # Special case, load in this early so it applies.
+    utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')
+    DEV_MODE.set(utils.DEV_MODE)
 
-# OS X starts behind other windows, fix that.
-if utils.MAC:
-    TK_ROOT.lift()
+    LOGGER.debug('Starting loading screen...')
+    loadScreen.main_loader.set_length('UI', 15)
+    loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
+    loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
-logWindow.HANDLER.set_visible(GEN_OPTS.get_bool('Debug', 'show_log_win'))
-logWindow.HANDLER.setLevel(GEN_OPTS['Debug']['window_log_level'])
+    # OS X starts behind other windows, fix that.
+    if utils.MAC:
+        TK_ROOT.lift()
 
-LOGGER.debug('Loading settings...')
+    logWindow.HANDLER.set_visible(GEN_OPTS.get_bool('Debug', 'show_log_win'))
+    logWindow.HANDLER.setLevel(GEN_OPTS['Debug']['window_log_level'])
 
-UI.load_settings()
+    LOGGER.debug('Loading settings...')
 
-gameMan.load()
-gameMan.set_game_by_name(
-    GEN_OPTS.get_val('Last_Selected', 'Game', ''),
+    UI.load_settings()
+
+    gameMan.load()
+    gameMan.set_game_by_name(
+        GEN_OPTS.get_val('Last_Selected', 'Game', ''),
+        )
+    gameMan.scan_music_locs()
+
+    LOGGER.info('Loading Packages...')
+    package_sys = packages.load_packages(
+        list(get_package_locs()),
+        loader=loadScreen.main_loader,
+        log_item_fallbacks=GEN_OPTS.get_bool(
+            'Debug', 'log_item_fallbacks'),
+        log_missing_styles=GEN_OPTS.get_bool(
+            'Debug', 'log_missing_styles'),
+        log_missing_ent_count=GEN_OPTS.get_bool(
+            'Debug', 'log_missing_ent_count'),
+        log_incorrect_packfile=GEN_OPTS.get_bool(
+            'Debug', 'log_incorrect_packfile'),
+        has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
+        has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
     )
-gameMan.scan_music_locs()
 
-LOGGER.info('Loading Packages...')
-package_sys = packages.load_packages(
-    list(get_package_locs()),
-    loader=loadScreen.main_loader,
-    log_item_fallbacks=GEN_OPTS.get_bool(
-        'Debug', 'log_item_fallbacks'),
-    log_missing_styles=GEN_OPTS.get_bool(
-        'Debug', 'log_missing_styles'),
-    log_missing_ent_count=GEN_OPTS.get_bool(
-        'Debug', 'log_missing_ent_count'),
-    log_incorrect_packfile=GEN_OPTS.get_bool(
-        'Debug', 'log_incorrect_packfile'),
-    has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
-    has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
-)
+    # Load filesystems into various modules
+    music_conf.load_filesystems(package_sys.values())
+    img.load_filesystems(package_sys)
+    gameMan.load_filesystems(package_sys.values())
 
-# Load filesystems into various modules
-music_conf.load_filesystems(package_sys.values())
-img.load_filesystems(package_sys)
-gameMan.load_filesystems(package_sys.values())
+    UI.load_packages()
+    loadScreen.main_loader.step('UI')
+    LOGGER.info('Done!')
 
-UI.load_packages()
-loadScreen.main_loader.step('UI')
-LOGGER.info('Done!')
+    # Check games for Portal 2's basemodui.txt file, so we can translate items.
+    LOGGER.info('Loading Item Translations...')
+    for game in gameMan.all_games:
+        game.init_trans()
 
-# Check games for Portal 2's basemodui.txt file, so we can translate items.
-LOGGER.info('Loading Item Translations...')
-for game in gameMan.all_games:
-    game.init_trans()
+    LOGGER.info('Initialising UI...')
+    UI.init_windows()  # create all windows
+    LOGGER.info('UI initialised!')
 
-LOGGER.info('Initialising UI...')
-UI.init_windows()  # create all windows
-LOGGER.info('UI initialised!')
+    loadScreen.main_loader.destroy()
+    # Delay this until the loop has actually run.
+    # Directly run TK_ROOT.lift() in TCL, instead
+    # of building a callable.
+    TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
 
-loadScreen.main_loader.destroy()
-# Delay this until the loop has actually run.
-# Directly run TK_ROOT.lift() in TCL, instead
-# of building a callable.
-TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
+
+async def app_main() -> None:
+    """The main loop for Trio."""
+    global APP_NURSERY
+    LOGGER.debug('Opening nursery...')
+    async with trio.open_nursery() as nursery:
+        APP_NURSERY = nursery
+        await init_app()
+        await trio.sleep_forever()
+
+
+def done_callback(trio_main_outcome):
+    """The app finished, quit."""
+    from app import UI
+    UI.quit_application()
+
+
+def start_main() -> None:
+    LOGGER.debug('Starting Trio loop.')
+    trio.lowlevel.start_guest_run(
+        app_main,
+        run_sync_soon_threadsafe=TK_ROOT.after_idle,
+        done_callback=done_callback,
+    )
+    TK_ROOT.mainloop()

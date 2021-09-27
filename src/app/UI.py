@@ -416,8 +416,12 @@ class PalItem(Label):
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
     import sys, logging
-
+    from app import BEE2
     LOGGER.info('Shutting down application.')
+    try:
+        BEE2.APP_NURSERY.cancel_scope.cancel()
+    except AttributeError:
+        pass
 
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.

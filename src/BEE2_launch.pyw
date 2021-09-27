@@ -52,18 +52,19 @@ if __name__ == '__main__':
 
     if app_name == 'bee2':
         from app import BEE2
+        BEE2.start_main()
     elif app_name == 'backup':
         from app import backup
         backup.init_application()
+        TK_ROOT.mainloop()
     elif app_name == 'compilepane':
         from app import CompilerPane
         CompilerPane.init_application()
+        TK_ROOT.mainloop()
     elif app_name.startswith('test_'):
         import importlib
         mod = importlib.import_module('app.' + sys.argv[1][5:])
         mod.test()  # type: ignore
+        TK_ROOT.mainloop()
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
-
-    # Run the TK loop forever.
-    TK_ROOT.mainloop()
