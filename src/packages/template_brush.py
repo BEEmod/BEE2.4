@@ -1,5 +1,7 @@
 """Implements the parsing required for the app to identify all templates."""
 from __future__ import annotations
+
+import trio
 from atomicwrites import atomic_write
 import os
 
@@ -16,14 +18,14 @@ LOGGER = srctools.logger.get_logger(__name__)
 TEMPLATES: dict[str, PackagePath] = {}
 
 
-def parse_template(pak_id: str, file: File) -> None:
+async def parse_template(pak_id: str, file: File) -> None:
     """Parse the specified template file, extracting its ID."""
     path = f'{pak_id}:{file.path}'
-    temp_id = parse_template_fast(file, path)
+    temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, cancellable=True)
     if not temp_id:
         LOGGER.warning('Fast-parse failure on {}!', path)
         with file.open_str() as f:
-            props = Property.parse(f)
+            props = await trio.to_thread.run_sync(Property.parse, f, cancellable=True)
         conf_ents = list(VMF.parse(props).by_class['bee2_template_conf'])
         del props
         if len(conf_ents) > 1:

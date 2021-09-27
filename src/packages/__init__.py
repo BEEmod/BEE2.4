@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import attr
+import trio
 
 import srctools
 from app import tkMarkdown, img, lazy_conf
@@ -456,7 +457,7 @@ def no_packages_err(pak_dirs: list[Path], msg: str) -> NoReturn:
     sys.exit()
 
 
-def load_packages(
+async def load_packages(
     pak_dirs: list[Path],
     loader: LoadScreen,
     log_item_fallbacks=False,
@@ -497,16 +498,18 @@ def load_packages(
         obj_override[obj_type] = defaultdict(list)
         data[obj_type] = []
 
-    for pack in packages.values():
-        if not pack.enabled:
-            LOGGER.info('Package {id} disabled!', id=pack.id)
-            pack_count -= 1
-            loader.set_length("PAK", pack_count)
-            continue
+    async with trio.open_nursery() as nursery:
+        for pack in packages.values():
+            if not pack.enabled:
+                LOGGER.info('Package {id} disabled!', id=pack.id)
+                pack_count -= 1
+                loader.set_length("PAK", pack_count)
+                continue
 
-        with srctools.logger.context(pack.id):
-            parse_package(pack, obj_override, has_tag_music, has_mel_music)
-        loader.step("PAK")
+            nursery.start_soon(parse_package, nursery, pack, obj_override, loader, has_tag_music, has_mel_music)
+        LOGGER.debug('Submitted packages.')
+
+    LOGGER.debug('Parsed packages, now parsing items.')
 
     loader.set_length("OBJ", sum(
         len(obj_type)
@@ -514,66 +517,14 @@ def load_packages(
         all_obj.values()
     ))
 
-    for obj_class, objs in all_obj.items():
-        for obj_id, obj_data in objs.items():
-            # parse through the object and return the resultant class
-            try:
-                with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
-                    object_ = obj_class.parse(
-                        ParseData(
-                            obj_data.fsys,
-                            obj_id,
-                            obj_data.info_block,
-                            obj_data.pak_id,
-                            False,
-                        )
-                    )
-            except (NoKeyError, IndexError) as e:
-                reraise_keyerror(e, obj_id)
-                raise  # Never reached.
-            except TokenSyntaxError as e:
-                # Add the relevant package to the filename.
-                if e.file:
-                    e.file = f'{obj_data.pak_id}:{e.file}'
-                raise
-            except Exception as e:
-                raise ValueError(
-                    'Error occured parsing '
-                    f'{obj_data.pak_id}:{obj_id} item!'
-                ) from e
-
-            if not hasattr(object_, 'id'):
-                raise ValueError(
-                    '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
+    async with trio.open_nursery() as nursery:
+        for obj_class, objs in all_obj.items():
+            for obj_id, obj_data in objs.items():
+                overrides = obj_override[obj_class].get(obj_id, [])
+                nursery.start_soon(
+                    parse_object,
+                    obj_class, obj_id, obj_data, overrides, data, loader,
                 )
-
-            # Store in this database so we can find all objects for each type.
-            # noinspection PyProtectedMember
-            obj_class._id_to_obj[object_.id.casefold()] = object_
-
-            object_.pak_id = obj_data.pak_id
-            object_.pak_name = obj_data.disp_name
-            for override_data in obj_override[obj_class].get(obj_id, []):
-                try:
-                    with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
-                        override = obj_class.parse(override_data)
-                except (NoKeyError, IndexError) as e:
-                    reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
-                    raise  # Never reached.
-                except TokenSyntaxError as e:
-                    # Add the relevant package to the filename.
-                    if e.file:
-                        e.file = f'{override_data.pak_id}:{e.file}'
-                    raise
-                except Exception as e:
-                    raise ValueError(
-                        f'Error occured parsing {obj_id} override'
-                        f'from package {override_data.pak_id}!'
-                    ) from e
-
-                object_.add_over(override)
-            data[obj_class].append(object_)
-            loader.step("OBJ")
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
         '{:<15}: {}'.format(obj_type.__name__, len(objs))
@@ -594,9 +545,11 @@ def load_packages(
     return PACKAGE_SYS
 
 
-def parse_package(
+async def parse_package(
+    nursery: trio.Nursery,
     pack: Package,
     obj_override: dict[Type[PakObject], dict[str, list[ParseData]]],
+    loader: LoadScreen,
     has_tag: bool=False,
     has_mel: bool=False,
 ) -> None:
@@ -622,6 +575,7 @@ def parse_package(
     desc: list[str] = []
 
     for obj in pack.info:
+        await trio.sleep(0)
         if obj.name in ['prerequisites', 'id', 'name']:
             # Not object IDs.
             continue
@@ -690,8 +644,75 @@ def parse_package(
     pack.desc = '\n'.join(desc)
 
     for template in pack.fsys.walk_folder('templates'):
+        await trio.sleep(0)
         if template.path.casefold().endswith('.vmf'):
-            template_brush.parse_template(pack.id, template)
+            nursery.start_soon(template_brush.parse_template, pack.id, template)
+    loader.step('PAK')
+
+
+async def parse_object(
+    obj_class: Type[PakObject], obj_id: str, obj_data: ParseData, obj_override: list[ParseData],
+    data: dict[Type[PakObject], list[PakObject]],
+    loader: LoadScreen,
+) -> None:
+    """Parse through the object and store the resultant class."""
+    try:
+        with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
+            object_ = obj_class.parse(
+                ParseData(
+                    obj_data.fsys,
+                    obj_id,
+                    obj_data.info_block,
+                    obj_data.pak_id,
+                    False,
+                )
+            )
+    except (NoKeyError, IndexError) as e:
+        reraise_keyerror(e, obj_id)
+        raise  # Never reached.
+    except TokenSyntaxError as e:
+        # Add the relevant package to the filename.
+        if e.file:
+            e.file = f'{obj_data.pak_id}:{e.file}'
+        raise
+    except Exception as e:
+        raise ValueError(
+            'Error occured parsing '
+            f'{obj_data.pak_id}:{obj_id} item!'
+        ) from e
+
+    if not hasattr(object_, 'id'):
+        raise ValueError(
+            '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
+        )
+
+    # Store in this database so we can find all objects for each type.
+    # noinspection PyProtectedMember
+    obj_class._id_to_obj[object_.id.casefold()] = object_
+
+    object_.pak_id = obj_data.pak_id
+    object_.pak_name = obj_data.disp_name
+    for override_data in obj_override:
+        try:
+            with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
+                override = obj_class.parse(override_data)
+        except (NoKeyError, IndexError) as e:
+            reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
+            raise  # Never reached.
+        except TokenSyntaxError as e:
+            # Add the relevant package to the filename.
+            if e.file:
+                e.file = f'{override_data.pak_id}:{e.file}'
+            raise
+        except Exception as e:
+            raise ValueError(
+                f'Error occured parsing {obj_id} override'
+                f'from package {override_data.pak_id}!'
+            ) from e
+
+        object_.add_over(override)
+    data[obj_class].append(object_)
+    loader.step("OBJ")
 
 
 class Package:

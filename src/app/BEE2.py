@@ -83,7 +83,7 @@ async def init_app():
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
-    package_sys = packages.load_packages(
+    package_sys = await packages.load_packages(
         list(get_package_locs()),
         loader=loadScreen.main_loader,
         log_item_fallbacks=GEN_OPTS.get_bool(
