@@ -3,7 +3,7 @@
 import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
-from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE
+from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error
 import loadScreen
 import packages
 import utils
@@ -127,10 +127,14 @@ async def app_main() -> None:
     """The main loop for Trio."""
     global APP_NURSERY
     LOGGER.debug('Opening nursery...')
-    async with trio.open_nursery() as nursery:
-        APP_NURSERY = nursery
-        await init_app()
-        await trio.sleep_forever()
+    try:
+        async with trio.open_nursery() as nursery:
+            APP_NURSERY = nursery
+            await init_app()
+            await trio.sleep_forever()
+    except Exception as exc:
+        tk_error(type(exc), exc, exc.__traceback__)
+        raise
 
 
 def done_callback(trio_main_outcome):
