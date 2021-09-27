@@ -28,7 +28,7 @@ class Elevator(PakObject):
             self.vert_video = vert_video
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'Elevator':
+    async def parse(cls, data: ParseData) -> 'Elevator':
         """Read elevator videos from the package."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)

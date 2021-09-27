@@ -43,7 +43,7 @@ class Music(PakObject):
         self.has_synced_tbeam = synch_tbeam
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]

@@ -55,7 +55,7 @@ class SignageLegend(PakObject):
         self.blank = blank
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'SignageLegend':
+    async def parse(cls, data: ParseData) -> 'SignageLegend':
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
         else:
@@ -98,7 +98,7 @@ class Signage(PakObject, allow_mult=True):
         self.dnd_icon = None
 
     @classmethod
-    def parse(cls, data: ParseData) -> Signage:
+    async def parse(cls, data: ParseData) -> Signage:
         styles: dict[str, SignStyle] = {}
         for prop in data.info.find_children('styles'):
             sty_id = prop.name.upper()

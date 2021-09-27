@@ -107,7 +107,7 @@ class ItemVariant:
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    def modify(self, pak_id: str, props: Property, source: str) -> ItemVariant:
+    async def modify(self, pak_id: str, props: Property, source: str) -> ItemVariant:
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -402,7 +402,7 @@ class Item(PakObject):
         self.folders = folders
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Parse an item definition."""
         versions: dict[str, Version] = {}
         def_version: Version | None = None
@@ -692,7 +692,7 @@ class ItemConfig(PakObject, allow_mult=True):
         self.all_conf = all_conf
 
     @classmethod
-    def parse(cls, data: ParseData) -> ItemConfig:
+    async def parse(cls, data: ParseData) -> ItemConfig:
         """Parse from config files."""
         vers: dict[str, dict[str, lazy_conf.LazyConf]] = {}
         styles: dict[str, lazy_conf.LazyConf]
@@ -895,9 +895,10 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
     return new_conf
 
 
-def assign_styled_items(
+async def assign_styled_items(
     log_fallbacks: bool,
     log_missing_styles: bool,
+    item: Item,
 ) -> None:
     """Handle inheritance across item folders.
 
@@ -912,145 +913,144 @@ def assign_styled_items(
     """
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
-    for item in Item.all():
-        all_ver = list(item.versions.values())
+    all_ver = list(item.versions.values())
 
-        # Move default version to the beginning, so it's read first.
-        # that ensures it's got all styles set if we need to fallback.
-        all_ver.remove(item.def_ver)
-        all_ver.insert(0, item.def_ver)
+    # Move default version to the beginning, so it's read first.
+    # that ensures it's got all styles set if we need to fallback.
+    all_ver.remove(item.def_ver)
+    all_ver.insert(0, item.def_ver)
 
-        for vers in all_ver:
-            # We need to repeatedly loop to handle the chains of
-            # dependencies. This is a list of (style_id, UnParsed).
-            to_change: list[tuple[str, UnParsedItemVariant]] = []
-            styles: dict[str, UnParsedItemVariant | ItemVariant | None] = vers.styles
-            for sty_id, conf in styles.items():
-                to_change.append((sty_id, conf))
-                # Not done yet
-                styles[sty_id] = None
+    for vers in all_ver:
+        # We need to repeatedly loop to handle the chains of
+        # dependencies. This is a list of (style_id, UnParsed).
+        to_change: list[tuple[str, UnParsedItemVariant]] = []
+        styles: dict[str, UnParsedItemVariant | ItemVariant | None] = vers.styles
+        for sty_id, conf in styles.items():
+            to_change.append((sty_id, conf))
+            # Not done yet
+            styles[sty_id] = None
 
-            # If we have multiple versions, mention them.
-            vers_desc = f' with version {vers.id}' if len(all_ver) > 1 else ''
+        # If we have multiple versions, mention them.
+        vers_desc = f' with version {vers.id}' if len(all_ver) > 1 else ''
 
-            # Evaluate style lookups and modifications
-            while to_change:
-                # Needs to be done next loop.
-                deferred: list[tuple[str, UnParsedItemVariant]] = []
-                # UnParsedItemVariant options:
-                # filesys: FileSystem  # The original filesystem.
-                # folder: str  # If set, use the given folder from our package.
-                # style: str  # Inherit from a specific style (implies folder is None)
-                # config: Property  # Config for editing
-                for sty_id, conf in to_change:
-                    if conf.style:
-                        try:
-                            if ':' in conf.style:
-                                ver_id, base_style_id = conf.style.split(':', 1)
-                                start_data = item.versions[ver_id].styles[base_style_id]
-                            else:
-                                start_data = styles[conf.style]
-                        except KeyError:
-                            raise ValueError(
-                                f'Item {item.id}\'s {sty_id} style{vers_desc} '
-                                f'referenced invalid style "{conf.style}"'
-                            )
-                        if start_data is None:
-                            # Not done yet!
-                            deferred.append((sty_id, conf))
-                            continue
-                        # Can't have both!
-                        if conf.folder:
-                            raise ValueError(
-                                f'Item {item.id}\'s {sty_id} style has '
-                                f'both folder and style{vers_desc}!'
-                            )
-                    elif conf.folder:
-                        # Just a folder ref, we can do it immediately.
-                        # We know this dict should be set.
-                        try:
-                            start_data = item.folders[conf.filesys, conf.folder]
-                        except KeyError:
-                            LOGGER.info('Folders: {}', item.folders.keys())
-                            raise
-                    else:
-                        # No source for our data!
+        # Evaluate style lookups and modifications
+        while to_change:
+            # Needs to be done next loop.
+            deferred: list[tuple[str, UnParsedItemVariant]] = []
+            # UnParsedItemVariant options:
+            # filesys: FileSystem  # The original filesystem.
+            # folder: str  # If set, use the given folder from our package.
+            # style: str  # Inherit from a specific style (implies folder is None)
+            # config: Property  # Config for editing
+            for sty_id, conf in to_change:
+                if conf.style:
+                    try:
+                        if ':' in conf.style:
+                            ver_id, base_style_id = conf.style.split(':', 1)
+                            start_data = item.versions[ver_id].styles[base_style_id]
+                        else:
+                            start_data = styles[conf.style]
+                    except KeyError:
                         raise ValueError(
-                            f"Item {item.id}'s {sty_id} style has no data "
-                            f"source{vers_desc}!"
+                            f'Item {item.id}\'s {sty_id} style{vers_desc} '
+                            f'referenced invalid style "{conf.style}"'
                         )
-
-                    if conf.config is None:
-                        styles[sty_id] = start_data.copy()
-                    else:
-                        styles[sty_id] = start_data.modify(
-                            conf.pak_id,
-                            conf.config,
-                            f'<{item.id}:{vers.id}.{sty_id}>',
+                    if start_data is None:
+                        # Not done yet!
+                        deferred.append((sty_id, conf))
+                        continue
+                    # Can't have both!
+                    if conf.folder:
+                        raise ValueError(
+                            f'Item {item.id}\'s {sty_id} style has '
+                            f'both folder and style{vers_desc}!'
                         )
-
-                # If we defer all the styles, there must be a loop somewhere.
-                # We can't resolve that!
-                if len(deferred) == len(to_change):
-                    unresolved = '\n'.join(
-                        f'{conf.style} -> {sty_id}'
-                        for sty_id, conf in deferred
-                    )
-                    raise ValueError(
-                        f'Loop in style references for item {item.id}'
-                        f'{vers_desc}!\nNot resolved:\n{unresolved}'
-                    )
-                to_change = deferred
-
-            # Fix this reference to point to the actual value.
-            vers.def_style = styles[vers.def_style]
-
-            if DEV_MODE.get():
-                # Check each editoritem definition for some known issues.
-                for sty_id, variant in styles.items():
-                    assert isinstance(variant, ItemVariant), f'{item.id}:{sty_id} = {variant!r}!!'
-                    with srctools.logger.context(f'{item.id}:{sty_id}'):
-                        variant.editor.validate()
-                    for extra in variant.editor_extra:
-                        with srctools.logger.context(f'{item.id}:{sty_id} -> {extra.id}'):
-                            extra.validate()
-
-            for style in Style.all():
-                if style.id in styles:
-                    continue  # We already have a definition
-                for base_style in style.bases:
-                    if base_style.id in styles:
-                        # Copy the values for the parent to the child style
-                        styles[style.id] = styles[base_style.id]
-                        if log_fallbacks and not item.unstyled:
-                            LOGGER.warning(
-                                'Item "{item}" using parent '
-                                '"{rep}" for "{style}"!',
-                                item=item.id,
-                                rep=base_style.id,
-                                style=style.id,
-                            )
-                        break
+                elif conf.folder:
+                    # Just a folder ref, we can do it immediately.
+                    # We know this dict should be set.
+                    try:
+                        start_data = item.folders[conf.filesys, conf.folder]
+                    except KeyError:
+                        LOGGER.info('Folders: {}', item.folders.keys())
+                        raise
                 else:
-                    # No parent matches!
-                    if log_missing_styles and not item.unstyled:
-                        LOGGER.warning(
-                            'Item "{0.id}"{2} using '
-                            'inappropriate style for "{1.id}"!',
-                            item,
-                            style,
-                            vers_desc,
-                        )
-
-                    # If 'isolate versions' is set on the item,
-                    # we never consult other versions for matching styles.
-                    # There we just use our first style (Clean usually).
-                    # The default version is always isolated.
-                    # If not isolated, we get the version from the default
-                    # version. Note the default one is computed first,
-                    # so it's guaranteed to have a value.
-                    styles[style.id] = (
-                        vers.def_style if
-                        item.isolate_versions or vers.isolate
-                        else item.def_ver.styles[style.id]
+                    # No source for our data!
+                    raise ValueError(
+                        f"Item {item.id}'s {sty_id} style has no data "
+                        f"source{vers_desc}!"
                     )
+
+                if conf.config is None:
+                    styles[sty_id] = start_data.copy()
+                else:
+                    styles[sty_id] = await start_data.modify(
+                        conf.pak_id,
+                        conf.config,
+                        f'<{item.id}:{vers.id}.{sty_id}>',
+                    )
+
+            # If we defer all the styles, there must be a loop somewhere.
+            # We can't resolve that!
+            if len(deferred) == len(to_change):
+                unresolved = '\n'.join(
+                    f'{conf.style} -> {sty_id}'
+                    for sty_id, conf in deferred
+                )
+                raise ValueError(
+                    f'Loop in style references for item {item.id}'
+                    f'{vers_desc}!\nNot resolved:\n{unresolved}'
+                )
+            to_change = deferred
+
+        # Fix this reference to point to the actual value.
+        vers.def_style = styles[vers.def_style]
+
+        if DEV_MODE.get():
+            # Check each editoritem definition for some known issues.
+            for sty_id, variant in styles.items():
+                assert isinstance(variant, ItemVariant), f'{item.id}:{sty_id} = {variant!r}!!'
+                with srctools.logger.context(f'{item.id}:{sty_id}'):
+                    variant.editor.validate()
+                for extra in variant.editor_extra:
+                    with srctools.logger.context(f'{item.id}:{sty_id} -> {extra.id}'):
+                        extra.validate()
+
+        for style in Style.all():
+            if style.id in styles:
+                continue  # We already have a definition
+            for base_style in style.bases:
+                if base_style.id in styles:
+                    # Copy the values for the parent to the child style
+                    styles[style.id] = styles[base_style.id]
+                    if log_fallbacks and not item.unstyled:
+                        LOGGER.warning(
+                            'Item "{item}" using parent '
+                            '"{rep}" for "{style}"!',
+                            item=item.id,
+                            rep=base_style.id,
+                            style=style.id,
+                        )
+                    break
+            else:
+                # No parent matches!
+                if log_missing_styles and not item.unstyled:
+                    LOGGER.warning(
+                        'Item "{0.id}"{2} using '
+                        'inappropriate style for "{1.id}"!',
+                        item,
+                        style,
+                        vers_desc,
+                    )
+
+                # If 'isolate versions' is set on the item,
+                # we never consult other versions for matching styles.
+                # There we just use our first style (Clean usually).
+                # The default version is always isolated.
+                # If not isolated, we get the version from the default
+                # version. Note the default one is computed first,
+                # so it's guaranteed to have a value.
+                styles[style.id] = (
+                    vers.def_style if
+                    item.isolate_versions or vers.isolate
+                    else item.def_ver.styles[style.id]
+                )

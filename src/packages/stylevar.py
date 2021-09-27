@@ -36,7 +36,7 @@ class StyleVar(PakObject, allow_mult=True):
         return self.styles is None
 
     @classmethod
-    def parse(cls, data: ParseData) -> StyleVar:
+    async def parse(cls, data: ParseData) -> StyleVar:
         """Parse StyleVars from configs."""
         name = data.info['name', '']
 

@@ -257,7 +257,7 @@ class PakObject:
         cls.allow_mult = allow_mult
 
     @classmethod
-    def parse(cls: Type[PakT], data: ParseData) -> PakT:
+    async def parse(cls: Type[PakT], data: ParseData) -> PakT:
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
@@ -509,7 +509,7 @@ async def load_packages(
             nursery.start_soon(parse_package, nursery, pack, obj_override, loader, has_tag_music, has_mel_music)
         LOGGER.debug('Submitted packages.')
 
-    LOGGER.debug('Parsed packages, now parsing items.')
+    LOGGER.debug('Parsed packages, now parsing objects.')
 
     loader.set_length("OBJ", sum(
         len(obj_type)
@@ -538,10 +538,9 @@ async def load_packages(
 
     # This has to be done after styles.
     LOGGER.info('Allocating styled items...')
-    assign_styled_items(
-        log_item_fallbacks,
-        log_missing_styles,
-    )
+    async with trio.open_nursery() as nursery:
+        for it in Item.all():
+            nursery.start_soon(assign_styled_items, log_item_fallbacks, log_missing_styles, it)
     return PACKAGE_SYS
 
 
@@ -658,7 +657,7 @@ async def parse_object(
     """Parse through the object and store the resultant class."""
     try:
         with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
-            object_ = obj_class.parse(
+            object_ = await obj_class.parse(
                 ParseData(
                     obj_data.fsys,
                     obj_id,
@@ -667,6 +666,7 @@ async def parse_object(
                     False,
                 )
             )
+            await trio.sleep(0)
     except (NoKeyError, IndexError) as e:
         reraise_keyerror(e, obj_id)
         raise  # Never reached.
@@ -693,9 +693,10 @@ async def parse_object(
     object_.pak_id = obj_data.pak_id
     object_.pak_name = obj_data.disp_name
     for override_data in obj_override:
+        await trio.sleep(0)
         try:
             with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
-                override = obj_class.parse(override_data)
+                override = await obj_class.parse(override_data)
         except (NoKeyError, IndexError) as e:
             reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
             raise  # Never reached.
@@ -710,6 +711,7 @@ async def parse_object(
                 f'from package {override_data.pak_id}!'
             ) from e
 
+        await trio.sleep(0)
         object_.add_over(override)
     data[obj_class].append(object_)
     loader.step("OBJ")
@@ -819,7 +821,7 @@ class Style(PakObject):
         self.config = config
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Parse a style definition."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)
@@ -892,7 +894,7 @@ class Style(PakObject):
                 raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
-                items, renderables = EditorItem.parse(f)
+                items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f)
             vbsp = lazy_conf.from_file(
                 utils.PackagePath(data.pak_id, folder + '/vbsp_config.cfg'),
                 missing_ok=True,

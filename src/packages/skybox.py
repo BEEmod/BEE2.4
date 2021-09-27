@@ -25,7 +25,7 @@ class Skybox(PakObject):
         self.fog_color = fog_opts.vec('primarycolor', 255, 255, 255)
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Parse a skybox definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']

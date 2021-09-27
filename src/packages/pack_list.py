@@ -16,7 +16,7 @@ class PackList(PakObject, allow_mult=True):
         self.files = files
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'PackList':
+    async def parse(cls, data: ParseData) -> 'PackList':
         """Read pack lists from packages."""
         filesystem = data.fsys
         conf = data.info.find_key('Config', '')

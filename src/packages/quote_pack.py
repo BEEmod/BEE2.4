@@ -42,7 +42,7 @@ class QuotePack(PakObject):
         self.turret_hate = turret_hate
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'QuotePack':
+    async def parse(cls, data: ParseData) -> 'QuotePack':
         """Parse a voice line definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         chars = {

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import trio
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 from functools import lru_cache
@@ -134,8 +135,8 @@ class ConfigGroup(PakObject, allow_mult=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'PakObject':
-        props = data.info  # type: Property
+    async def parse(cls, data: ParseData) -> 'PakObject':
+        props = data.info
 
         if data.is_override:
             # Override doesn't have a name
@@ -149,6 +150,7 @@ class ConfigGroup(PakObject, allow_mult=True):
         multi_widgets = []  # type: List[Widget]
 
         for wid in props.find_all('Widget'):
+            await trio.sleep(0)
             try:
                 create_func = WidgetLookup[wid['type']]
             except KeyError:

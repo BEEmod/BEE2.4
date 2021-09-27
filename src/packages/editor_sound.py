@@ -16,11 +16,11 @@ class EditorSound(PakObject):
         data.name = self.id
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'EditorSound':
+    async def parse(cls, data: ParseData) -> 'EditorSound':
         """Parse editor sounds from the package."""
         return cls(
             snd_name=data.id,
-            data=data.info.find_key('keys', [])
+            data=data.info.find_key('keys', or_blank=True)
         )
 
     @staticmethod
