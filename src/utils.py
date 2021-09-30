@@ -444,6 +444,20 @@ def iter_grid(
             yield x, y
 
 
+def check_cython(report: Callable[[str], None] = print) -> None:
+    """Check if srctools has its Cython accellerators installed correctly."""
+    from srctools import math, tokenizer
+    if math.Cy_Vec is math.Py_Vec:
+        report('Cythonised vector lib is not installed, expect slow math.')
+    if tokenizer.Cy_Tokenizer is tokenizer.Py_Tokenizer:
+        report('Cythonised tokeniser is not installed, expect slow parsing.')
+
+    vtf = sys.modules.get('srctools.vtf', None)  # Don't import if not already.
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    if vtf is not None and vtf._cy_format_funcs is vtf._py_format_funcs:
+        report('Cythonised VTF functions is not installed, no DXT export!')
+
+
 DISABLE_ADJUST = False
 
 

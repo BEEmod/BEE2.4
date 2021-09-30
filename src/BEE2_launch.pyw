@@ -44,6 +44,9 @@ if __name__ == '__main__':
     LOGGER.info('Arguments: {}', sys.argv)
     LOGGER.info('Running "{}", version {}:', app_name, utils.BEE_VERSION)
 
+    # Warn if srctools Cython code isn't installed.
+    utils.check_cython(LOGGER.warning)
+
     import localisation
     localisation.setup(LOGGER)
 
