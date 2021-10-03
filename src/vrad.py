@@ -83,10 +83,6 @@ def run_vrad(args: List[str]) -> None:
         LOGGER.warning("VRAD failed! ({})", code)
         sys.exit(code)
 
-def lmp_hash(lmp: bytes) -> str:
-    import hashlib
-    return f'<{hashlib.sha256(lmp).hexdigest()}, len={len(lmp):x}>'
-
 
 def main(argv: List[str]) -> None:
     """Main VRAD script."""
@@ -157,15 +153,6 @@ def main(argv: List[str]) -> None:
 
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
-    lump_old_edges = bsp_file.lumps[BSP_LUMPS.EDGES].data
-    lump_old_surfedges = bsp_file.lumps[BSP_LUMPS.SURFEDGES].data
-    lump_old_verts = bsp_file.lumps[BSP_LUMPS.VERTEXES].data
-    LOGGER.info(
-        'Old lumps: edges={}, surfedges={}, verts={}',
-        lmp_hash(lump_old_edges),
-        lmp_hash(lump_old_surfedges),
-        lmp_hash(lump_old_verts),
-    )
 
     # If VBSP marked it as Hammer, trust that.
     if srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_peti']):
@@ -292,29 +279,6 @@ def main(argv: List[str]) -> None:
     LOGGER.info('Writing BSP...')
     bsp_file.save()
     LOGGER.info(' - BSP written!')
-
-    lump_new_edges = bsp_file.lumps[BSP_LUMPS.EDGES].data
-    lump_new_surfedges = bsp_file.lumps[BSP_LUMPS.SURFEDGES].data
-    lump_new_verts = bsp_file.lumps[BSP_LUMPS.VERTEXES].data
-    LOGGER.info(
-        'New lumps: edges={}, surfedges={}, verts={}',
-        lmp_hash(lump_new_edges),
-        lmp_hash(lump_new_surfedges),
-        lmp_hash(lump_new_verts),
-    )
-    folder = Path(r'F:\SteamLibrary\SteamApps\common\Portal 2\lump_test')
-    (folder / 'edges_old.lmp').write_bytes(lump_old_edges)
-    (folder / 'edges_new.lmp').write_bytes(lump_new_edges)
-    (folder / 'surfedges_old.lmp').write_bytes(lump_old_surfedges)
-    (folder / 'surfedges_new.lmp').write_bytes(lump_new_surfedges)
-    (folder / 'verts_old.lmp').write_bytes(lump_old_verts)
-    (folder / 'verts_new.lmp').write_bytes(lump_new_verts)
-    if lump_old_edges != lump_new_edges:
-        LOGGER.warning('Edges mismatch!')
-    if lump_old_surfedges != lump_new_surfedges:
-        LOGGER.warning('Surfedges mismatch!')
-    if lump_old_verts != lump_new_verts:
-        LOGGER.warning('Verts mismatch!')
 
     if is_peti:
         screenshot.modify(config, game.path)
