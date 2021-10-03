@@ -687,7 +687,7 @@ class Panel:
                 # We need to make a placement helper.
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=angled_normal.to_angle(),
+                    angles=Matrix.from_basis(z=tile.portal_helper_orient, x=tile.normal) @ rotation,
                     origin=top_center,
                     force_placement=int(force_helper),
                     snap_to_helper_angles=int(force_helper),
@@ -1185,13 +1185,10 @@ class TileDef:
             # We need to make a placement helper.
             vmf.create_ent(
                 'info_placement_helper',
-                angles=Matrix.from_basis(
-                    x=self.normal,
-                    z=self.portal_helper_orient,
-                ).to_angle(),
+                angles=Angle.from_basis(x=self.normal, z=self.portal_helper_orient),
                 origin=front_pos,
-                force_placement=int(force_helper),
-                snap_to_helper_angles=int(force_helper),
+                force_placement=force_helper,
+                snap_to_helper_angles=force_helper,
                 radius=64,
             )
         if self.use_bullseye():
@@ -2064,7 +2061,7 @@ def generate_brushes(vmf: VMF) -> None:
                 # Add the portal helper in directly.
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=Matrix.from_basis(x=tile.portal_helper_orient, z=tile.normal).to_angle(),
+                    angles=Angle.from_basis(x=tile.normal, z=tile.portal_helper_orient),
                     origin=pos,
                     force_placement=int(tile.has_oriented_portal_helper),
                     snap_to_helper_angles=int(tile.has_oriented_portal_helper),
