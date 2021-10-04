@@ -6,6 +6,7 @@ import pkgutil
 import os
 import sys
 
+workpath: str  # Injected by PyInstaller.
 
 # THe BEE2 modules cannot be imported inside the spec files.
 WIN = sys.platform.startswith('win')
@@ -104,8 +105,17 @@ INCLUDES += [
     pkgutil.iter_modules(['precomp/conditions'])
 ]
 
-
-bee_version = input('BEE2 Version ("x.y.z" or blank for dev): ')
+try:
+    with open('bee_version.txt', 'r') as f:
+        bee_version = f.read().strip()
+    print(f'Version from TXT: {bee_version!r}')
+except FileNotFoundError:
+    bee_version = input(
+        'Please enter the BEE2 Version number to build.'
+        'Use the form "2.4.x", or blank for dev.'
+        'Alternatively create bee_version.txt to bypass.\n'
+        '> '
+    )
 if bee_version:
     bee_version = '2 v' + bee_version
 
