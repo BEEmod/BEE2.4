@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-09-09 19:41+1000\n"
+"POT-Creation-Date: 2021-10-05 16:56+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -25,7 +25,7 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: app/UI.py loadScreen.py
+#: app/paletteUI.py loadScreen.py
 msgid "Clear"
 msgstr ""
 
@@ -574,42 +574,14 @@ msgid ""
 msgstr ""
 
 #: app/UI.py
-msgid "Delete Palette \"{}\""
-msgstr ""
-
-#: app/UI.py
-msgid "BEE2 - Save Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "Enter a name:"
-msgstr ""
-
-#: app/UI.py
-msgid "This palette already exists. Overwrite?"
-msgstr ""
-
-#: app/UI.py app/gameMan.py
-msgid "Are you sure you want to delete \"{}\"?"
-msgstr ""
-
-#: app/UI.py
-msgid "Clear Palette"
-msgstr ""
-
-#: app/UI.py app/UI.py
-msgid "Delete Palette"
-msgstr ""
-
-#: app/UI.py
 msgid "Save Palette..."
 msgstr ""
 
-#: app/UI.py app/UI.py
+#: app/UI.py app/paletteUI.py
 msgid "Save Palette As..."
 msgstr ""
 
-#: app/UI.py app/UI.py
+#: app/UI.py app/paletteUI.py
 msgid "Save Settings in Palettes"
 msgstr ""
 
@@ -685,14 +657,6 @@ msgstr ""
 
 #: app/UI.py
 msgid "Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "Fill Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "Save Palette"
 msgstr ""
 
 #: app/UI.py
@@ -1043,6 +1007,10 @@ msgstr ""
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
+msgstr ""
+
+#: app/gameMan.py app/paletteUI.py
+msgid "Are you sure you want to delete \"{}\"?"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1505,6 +1473,54 @@ msgstr ""
 #. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Clear Palette"
+msgstr ""
+
+#: app/paletteUI.py app/paletteUI.py
+msgid "Delete Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Change Palette Group..."
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Rename Palette..."
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Fill Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Save Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Builtin / Readonly"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Delete Palette \"{}\""
+msgstr ""
+
+#: app/paletteUI.py app/paletteUI.py
+msgid "BEE2 - Save Palette"
+msgstr ""
+
+#: app/paletteUI.py app/paletteUI.py
+msgid "Enter a name:"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "BEE2 - Change Palette Group"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
 #: app/richTextBox.py
