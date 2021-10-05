@@ -6,4 +6,5 @@ PyInstaller>=4.2
 pygtrie>=2.4.0
 atomicwrites>=1.4.0
 babel>=2.9.0
+versioningit>=0.3.0
 srctools @ git+https://github.com/TeamSpen210/srctools.git

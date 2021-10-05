@@ -18,20 +18,6 @@ from enum import Enum
 from types import TracebackType
 
 
-try:
-    # This module is generated when cx_freeze compiles the app.
-    from BUILD_CONSTANTS import BEE_VERSION  # type: ignore
-except ImportError:
-    # We're running from source!
-    BEE_VERSION = "(dev)"
-    FROZEN = False
-    DEV_MODE = True
-else:
-    FROZEN = True
-    # If blank, in dev mode.
-    DEV_MODE = not BEE_VERSION
-BEE_VERSION += ' 64-bit' if sys.maxsize > (2 << 48) else ' 32-bit'
-
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
 LINUX = sys.platform.startswith('linux')
@@ -88,14 +74,42 @@ else:
 if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
-if FROZEN:
-    # This special attribute is set by PyInstaller to our folder.
-    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
-else:
+
+def get_git_version(inst_path: Path | str) -> str:
+    """Load the version from Git history."""
+    import versioningit
+    return versioningit.get_version(
+        project_dir=inst_path,
+        config={
+            'vcs': {'method': 'git'},
+            'default-version': '(dev)',
+            'format': {
+                # Ignore dirtyness, we generate the translation files every time.
+                'distance': '{branch}#{rev}',
+                'dirty': '{version}',
+                'distance-dirty': '{branch}#{rev}',
+            },
+        },
+    )
+
+try:
+    # This module is generated when the app is compiled.
+    from _compiled_version import BEE_VERSION  # type: ignore
+except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from the file to its containing folder, then to the parent.
     _INSTALL_ROOT = Path(sys.argv[0]).resolve().parent.parent
 
+    BEE_VERSION = get_git_version(_INSTALL_ROOT)
+    FROZEN = False
+    DEV_MODE = True
+else:
+    FROZEN = True
+    # This special attribute is set by PyInstaller to our folder.
+    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
+    # Check if this was produced by above
+    DEV_MODE = '#' in BEE_VERSION
+BEE_VERSION += ' 64-bit' if sys.maxsize > (2 << 48) else ' 32-bit'
 
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""

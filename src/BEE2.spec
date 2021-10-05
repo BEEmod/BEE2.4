@@ -11,7 +11,9 @@ from babel.messages.mofile import write_mo
 
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
-workpath: str  # PyInstaller sets this.
+# Injected by PyInstaller.
+workpath: str
+SPECPATH: str
 
 
 # src -> build subfolder.
@@ -154,21 +156,12 @@ if sys.version_info >= (3, 7):
     # Only needed on 3.6, it's in the stdlib thereafter.
     EXCLUDES += ['importlib_resources']
 
-try:
-    with open('bee_version.txt', 'r') as f:
-        bee_version = f.read().strip()
-    print(f'Version from TXT: {bee_version!r}')
-except FileNotFoundError:
-    bee_version = input(
-        'Please enter the BEE2 Version number to build.'
-        'Use the form "2.4.x", or blank for dev.'
-        'Alternatively create bee_version.txt to bypass.\n'
-        '> '
-    )
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-version_val = 'BEE_VERSION=' + repr(bee_version)
+import utils
+version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
+print(version_val)
 version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
