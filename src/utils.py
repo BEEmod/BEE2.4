@@ -109,11 +109,16 @@ else:
     _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
-BEE_VERSION += ' 64-bit' if sys.maxsize > (2 << 48) else ' 32-bit'
+
+BITNESS = '64' if sys.maxsize > (2 << 48) else '32'
+BEE_VERSION += f' {BITNESS}-bit'
 
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
     return _INSTALL_ROOT / path
+
+
+LIB_PATH = install_path('lib-' + BITNESS).absolute()
 
 
 def conf_location(path: str) -> Path:
