@@ -178,7 +178,7 @@ def has_sound() -> bool:
 
 if utils.WIN:
     # Add a libs folder for FFmpeg dlls.
-    os.environ['PATH'] = f'{utils.LIB_PATH};{os.environ["PATH"]}'
+    os.environ['PATH'] = f'{utils.install_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
 
 sounds: NullSound
 try:

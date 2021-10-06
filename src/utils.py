@@ -118,9 +118,6 @@ def install_path(path: str) -> Path:
     return _INSTALL_ROOT / path
 
 
-LIB_PATH = install_path('lib-' + BITNESS).absolute()
-
-
 def conf_location(path: str) -> Path:
     """Return the full path to save settings to.
 
