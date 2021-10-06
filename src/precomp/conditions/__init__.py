@@ -30,8 +30,10 @@ closure.
 from __future__ import annotations
 import inspect
 import io
+import importlib
 import itertools
 import math
+import pkgutil
 import sys
 import typing
 import warnings
@@ -663,40 +665,16 @@ def import_conditions() -> None:
 
     This ensures everything gets registered.
     """
-    import importlib
-    import pkgutil
     # Find the modules in the conditions package.
-    # PyInstaller messes this up a bit.
-
-    modules: list[str]
-    if utils.FROZEN:
-        # This is the PyInstaller loader injected during bootstrap.
-        # See PyInstaller/loader/pyimod03_importers.py
-        # toc is a PyInstaller-specific attribute containing a set of
-        # all frozen modules.
-        loader = pkgutil.get_loader('precomp.conditions')
-        modules = [
-            module
-            for module in loader.toc  # type: ignore
-            if module.startswith('precomp.conditions.')
-        ]
-    else:
-        # We can grab them properly.
-        modules = [
-            'precomp.conditions.' + module
-            for loader, module, is_package in
-            pkgutil.iter_modules(__path__)
-        ]
-
-    for module in modules:
+    for _, module, _ in pkgutil.iter_modules(__path__):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing {} ...', module)
-        importlib.import_module(module)
+        LOGGER.debug('Importing precomp.conditions.{} ...', module)
+        importlib.import_module('precomp.conditions.' + module)
     LOGGER.info('Imported all conditions modules!')
 
-
+import pkg_resources
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
 DOC_META_COND = '''

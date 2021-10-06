@@ -36,26 +36,17 @@ if not transform_loc.exists():
 
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
-    'argparse',  # Used in __main__ of some modules
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
-    'distutils',  # Found in shutil, used if zipfile is not availible
-    'doctest',  # Used in __main__ of decimal and heapq
-    'optparse',  # Used in calendar.__main__
-    'pprint',  # From pickle, not needed
-    'textwrap',  # Used in zipfile.__main__
-
-    # We don't localise the compiler, but utils imports the modules.
-    'locale', 'gettext',
 
     # This isn't ever used in the compiler.
     'tkinter',
 
-    # We aren't using the Python 2 code, for obvious reasons.
-    'importlib_resources._py2',
+    # 3.6 backport
+    'importlib_resources',
 
     'win32api',
     'win32com',
-    'win32wnet'
+    'win32wnet',
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
