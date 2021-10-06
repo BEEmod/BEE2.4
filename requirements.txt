@@ -1,10 +1,10 @@
 attrs>=20.3.0
 mistletoe>=0.7.2
-Pillow>=8.1.1
-pyglet>=1.5.7
+Pillow>=8.3.2
+pyglet>=1.5.21
 PyInstaller>=4.5.1
 pygtrie>=2.4.0
 atomicwrites>=1.4.0
-babel>=2.9.0
+babel>=2.9.1
 versioningit>=0.3.0
 srctools @ git+https://github.com/TeamSpen210/srctools.git
