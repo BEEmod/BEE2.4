@@ -162,7 +162,7 @@ if sys.version_info >= (3, 7):
 import utils
 version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
 print(version_val)
-version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
+version_filename = os.path.join(workpath, '_compiled_version.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
     if f.read().strip() == version_val:
