@@ -40,22 +40,28 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 ## Building from Source ##
 
 ### Compilation ###
-First, grab the 3 git repositories you need:
 
-	git clone https://github.com/TeamSpen210/HammerAddons.git
-	git clone https://github.com/BEEmod/BEE2.4.git
+* You'll need Python 3.8 or later, for 32-bit / Windows 7 you need 3.8 specifically.
+* First, grab the 3 git repositories you need:
 
-Run `python -m pip install -r requirements.txt` to install the required packages. On Linux, 
+	    git clone https://github.com/TeamSpen210/HammerAddons.git
+	    git clone https://github.com/BEEmod/BEE2.4.git
+
+* Run `python -m pip install -r requirements.txt` to install the required packages. On Linux, 
 Pillow might need to be installed via the system package manager with the TK component: 
 `python-pillow`, `python-pillow.imagetk`.
 
-Finally, switch to the BEE2.4 repo and build the compiler, then the application:
+* To allow sound effects in the app, you need a copy of FFmpeg:
+	* In the `BEE2.4` folder, add `lib-32` and/or `lib-64/` folders.
+	* Download the [32-bit](https://github.com/sudo-nautilus/FFmpeg-Builds-Win32/releases) or [64-bit](https://github.com/BtbN/FFmpeg-Builds/releases) builds (`winXX-lgpl-shared`), then copy the contents of the `bin` folder into the appropriate `lib-XX` folder mentioned.
 
-	cd BEE2.4/src/
-	pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp compiler.spec
-	pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp BEE2.spec
+* Finally, switch to the BEE2.4 repo and build the compiler, then the application:
+
+	    cd BEE2.4/src/
+	    pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp compiler.spec
+	    pyinstaller --distpath ../dist/64bit/ --workpath ../build_tmp BEE2.spec
 	
-The built application is found in `BEE2.4/dist/64bit/BEE2/`.
+* The built application is found in `BEE2.4/dist/64bit/BEE2/`.
 To generate the packages zips, either manually zip the contents of each folder or 
 use the `compile_packages` script in BEE2-items. 
 This does the same thing, but additionally removes some unnessary content 
