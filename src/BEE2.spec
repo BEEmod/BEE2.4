@@ -9,6 +9,7 @@ import babel.messages.extract
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 
+import utils
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 # Injected by PyInstaller.
@@ -138,6 +139,7 @@ EXCLUDES = [
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
+    'importlib_resources',  # 3.6 backport.
 
     'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
 
@@ -152,14 +154,20 @@ EXCLUDES = [
     'argparse',
 ]
 
-if sys.version_info >= (3, 7):
-    # Only needed on 3.6, it's in the stdlib thereafter.
-    EXCLUDES += ['importlib_resources']
+binaries = []
+if utils.WIN:
+    lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
+    try:
+        for dll in lib_path.iterdir():
+            if dll.suffix == '.dll':
+                binaries.append((str(dll), '.'))
+    except FileNotFoundError:
+        lib_path.mkdir(exist_ok=True)
+        raise ValueError(f'FFmpeg dlls should be downloaded into "{lib_path}".')
 
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-import utils
 version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')
@@ -190,6 +198,7 @@ bee2_a = Analysis(
     hiddenimports=[
         'PIL._tkinter_finder',
     ],
+    binaries=binaries,
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
@@ -219,7 +228,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     windowed=True,
     icon='../BEE2.ico'

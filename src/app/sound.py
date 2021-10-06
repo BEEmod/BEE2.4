@@ -176,7 +176,7 @@ def has_sound() -> bool:
     """Return if the sound system is functional."""
     return isinstance(sounds, PygletSound)
 
-if utils.WIN:
+if utils.WIN and not utils.FROZEN:
     # Add a libs folder for FFmpeg dlls.
     os.environ['PATH'] = f'{utils.install_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
 
