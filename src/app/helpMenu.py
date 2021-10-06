@@ -89,6 +89,7 @@ Used software / libraries in the BEE2.4:
 * [pygtrie][pygtrie] by Michal Nazarewicz
 * [TKinter {tk_ver}/TTK {ttk_ver}/Tcl {tcl_ver}][tcl]
 * [Python {py_ver}][python]
+* [FFmpeg][ffmpeg] licensed under the [LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html). Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
 [pyglet]: https://bitbucket.org/pyglet/pyglet/wiki/Home
 [avbin]: https://avbin.github.io/AVbin/Home/Home.html
@@ -99,6 +100,8 @@ Used software / libraries in the BEE2.4:
 [pygtrie]: https://github.com/mina86/pygtrie
 [tcl]: https://tcl.tk/
 [python]: https://www.python.org/
+[FFmpeg]: https://ffmpeg.org/
+[ffmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
 
 -----
 
