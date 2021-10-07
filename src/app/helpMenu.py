@@ -12,11 +12,13 @@ from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 from localisation import gettext
 import utils
+import srctools
 
 # For version info
 import PIL
 import platform
 import mistletoe
+import pygtrie
 
 
 class ResIcon(Enum):
@@ -82,13 +84,14 @@ del Res, steam_url
 CREDITS_TEXT = '''\
 Used software / libraries in the BEE2.4:
 
-* [pyglet {pyglet_ver}][pyglet] by Alex Holkner and Contributors
-* [Pillow {pil_ver}][pillow] by Alex Clark and Contributors
-* [noise (2008-12-15)][perlin_noise] by Casey Duncan
-* [mistletoe {mstle_ver}][mistletoe] by Mi Yu and Contributors
-* [pygtrie][pygtrie] by Michal Nazarewicz
-* [TKinter {tk_ver}/TTK {ttk_ver}/Tcl {tcl_ver}][tcl]
-* [Python {py_ver}][python]
+* [srctools][srctools] `v{srctools_ver}` by TeamSpen210
+* [pyglet][pyglet] `{pyglet_ver}` by Alex Holkner and Contributors
+* [Pillow][pillow] `{pil_ver}` by Alex Clark and Contributors
+* [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
+* [mistletoe][mistletoe] `{mstle_ver}` by Mi Yu and Contributors
+* [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
+* [TKinter][tcl] `{tk_ver}`/[TTK][tcl] `{ttk_ver}`/[Tcl][tcl] `{tcl_ver}`
+* [Python][python] `{py_ver}`
 * [FFmpeg][ffmpeg] licensed under the [LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html). Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
 [pyglet]: https://bitbucket.org/pyglet/pyglet/wiki/Home
@@ -102,6 +105,7 @@ Used software / libraries in the BEE2.4:
 [python]: https://www.python.org/
 [FFmpeg]: https://ffmpeg.org/
 [ffmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
+[srctools]: https://github.com/TeamSpen210/srctools
 
 -----
 
@@ -424,7 +428,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     ttk_ver=ttk.__version__,
     pyglet_ver=sound.pyglet_version,
     mstle_ver=mistletoe.__version__,
+    pygtrie_ver=pygtrie.__version__,
     pil_ver=PIL.__version__,
+    srctools_ver=srctools.__version__,
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 

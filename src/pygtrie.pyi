@@ -5,7 +5,7 @@ from typing import (
     Generic, MutableMapping, overload, Mapping, Iterable, Callable,
 )
 
-
+__version__: str
 KeyT = TypeVar('KeyT')
 ValueT = TypeVar('ValueT')
 Key2T = TypeVar('Key2T')

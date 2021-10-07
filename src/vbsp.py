@@ -1750,7 +1750,7 @@ def main() -> None:
 
     """
     global MAP_RAND_SEED
-    LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
+    LOGGER.info("BEE{} VBSP hook initiallised, srctools v{}.", utils.BEE_VERSION, srctools.__version__)
 
     # Warn if srctools Cython code isn't installed.
     utils.check_cython(LOGGER.warning)

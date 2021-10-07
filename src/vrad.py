@@ -25,6 +25,7 @@ from srctools.packlist import PackList
 from srctools.game import find_gameinfo
 from srctools.bsp_transform import run_transformations
 from srctools.scripts.plugin import PluginFinder, Source as PluginSource
+from srctools.compiler import __version__ as version_haddons
 
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
@@ -86,7 +87,10 @@ def run_vrad(args: List[str]) -> None:
 
 def main(argv: List[str]) -> None:
     """Main VRAD script."""
-    LOGGER.info("BEE{} VRAD hook initiallised.", utils.BEE_VERSION)
+    LOGGER.info(
+        "BEE{} VRAD hook initiallised, srctools v{}, Hammer Addons v{}",
+        utils.BEE_VERSION, srctools.__version__, version_haddons,
+    )
 
     # Warn if srctools Cython code isn't installed.
     utils.check_cython(LOGGER.warning)
