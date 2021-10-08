@@ -142,6 +142,13 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                 else:
                     raise AssertionError(conf.antline)
 
+            # Transfer inputs and outputs to the first.
+            if index != 0:
+                for conn in list(node.item.outputs):
+                    conn.from_item = node_list[0].item
+                for conn in list(node.item.inputs):
+                    conn.to_item = node_list[0].item
+
             # If start/end, the other node.
             other_node: Optional[item_chain.Node[Config]] = None
             if node.prev is None:
