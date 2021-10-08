@@ -25,11 +25,14 @@ class AntlineHandling(Enum):
 @attr.define
 class Config:
     """Configuration for linked items."""
+    group: str  # For reporting.
     logic_start: Optional[str]
     logic_mid: Optional[str]
     logic_end: Optional[str]
+    logic_loop: Optional[str]
 
     antline: AntlineHandling
+    allow_loop: bool
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
@@ -60,9 +63,12 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
     Parameters:
     * Group: Should be set to a unique name. All calls with this name can be
       linked together. If not used, only this specific result call will link.
-    * StartLogic/MidLogic/EndLogic: These instances will be overlaid on the
+    * AllowLoop: If true, allow constructing a loop of items. In this situation, the
+      indexes will start at some item at random, and proceed around. The last will then
+      link to the first.
+    * StartLogic/MidLogic/EndLogic/LoopLogic: These instances will be overlaid on the
       instance, depending on whether it starts/ends or is in the middle of the
-      path.
+      path. If the item loops, all use LoopLogic.
     * Antlines: Controls what happens to antlines linking between the items.
       If one of the items outputs to a non-linked item, those antlines must be
       kept. Three behaviours are available:
@@ -96,9 +102,12 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
         ) from None
 
     conf = Config(
+        group=group,
         logic_start=resolve_optional(res, 'startlogic'),
         logic_mid=resolve_optional(res, 'midLogic'),
         logic_end=resolve_optional(res, 'endLogic'),
+        logic_loop=resolve_optional(res, 'loopLogic'),
+        allow_loop=res.bool('allowLoop'),
         antline=antline,
         scaff_endcap=resolve_optional(res, 'EndcapInst'),
         scaff_endcap_free_rot=res.bool('endcap_free_rotate'),
@@ -120,8 +129,15 @@ def link_items(vmf: VMF) -> None:
 
 def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
     """Link together a single group of items."""
-    chains = item_chain.chain(group, allow_loop=False)
+    chains = item_chain.chain(group, allow_loop=True)
     for group_counter, node_list in enumerate(chains):
+        is_looped = False
+        if node_list[0].prev is not None:  # It's looped, check if it's allowed.
+            if not all(node.conf.allow_loop for node in node_list):
+                LOGGER.warning('- Group is looped, but this is not allowed! Arbitarily breaking.')
+                node_list[0].prev = node_list[-1].next = None
+            else:
+                is_looped = True
         for index, node in enumerate(node_list):
             conf = node.conf
             is_floor = node.orient.up().z > 0.99
@@ -151,7 +167,10 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
 
             # If start/end, the other node.
             other_node: Optional[item_chain.Node[Config]] = None
-            if node.prev is None:
+            if is_looped:
+                node.inst.fixup['$type'] = 'loop'
+                logic_fname = conf.logic_loop
+            elif node.prev is None:
                 node.inst.fixup['$type'] = 'start'
                 logic_fname = conf.logic_start
                 other_node = node.next
@@ -167,7 +186,11 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
             node.inst.fixup['$group'] = group_counter
             node.inst.fixup['$ind'] = index
             if node.next is not None:
-                node.inst.fixup['$next'] = index + 1
+                # If looped, it might have to wrap around.
+                if node.next is node_list[0]:
+                    node.inst.fixup['$next'] = '0'
+                else:
+                    node.inst.fixup['$next'] = index + 1
 
             if logic_fname:
                 inst_logic = vmf.create_ent(
