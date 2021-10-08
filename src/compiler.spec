@@ -114,14 +114,6 @@ if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
-# Empty module to be the package __init__.
-transforms_stub = Path(workpath, 'transforms_stub.py')
-try:
-    with transforms_stub.open('x') as f:
-        f.write('__path__ = []\n')
-except FileExistsError:
-    pass
-
 # Finally, run the PyInstaller analysis process.
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
@@ -135,14 +127,32 @@ vbsp_vrad_an = Analysis(
 )
 
 # Force the BSP transforms to be included in their own location.
+# Map package -> module.
+names: 'dict[str, list[str]]' = {}
 for mod in transform_loc.rglob('*.py'):
     rel_path = mod.relative_to(transform_loc)
 
     if rel_path.name.casefold() == '__init__.py':
         rel_path = rel_path.parent
     mod_name = rel_path.with_suffix('')
-    dotted = str(mod_name).replace('\\', '.').replace('/', '.')
-    vbsp_vrad_an.pure.append(('postcomp.transforms.' + dotted, str(mod), 'PYMODULE'))
+    dotted = 'postcomp.transforms.' + str(mod_name).replace('\\', '.').replace('/', '.')
+    package, module = dotted.rsplit('.', 1)
+    names.setdefault(package, []).append(module)
+    vbsp_vrad_an.pure.append((dotted, str(mod), 'PYMODULE'))
+
+# The package's __init__, where we add the names of all the transforms.
+# Build up a bunch of import statements to import them all.
+transforms_stub = Path(workpath, 'transforms_stub.py')
+with transforms_stub.open('w') as f:
+    # Sort long first, then by name.
+    for pack, modnames in sorted(names.items(), key=lambda t: (-len(t[1]), t[0])):
+        if pack:
+            f.write(f'from {pack} import ')
+        else:
+            f.write('import ')
+        modnames.sort()
+        f.write(', '.join(modnames))
+        f.write('\n')
 
 vbsp_vrad_an.pure.append(('postcomp.transforms', str(transforms_stub), 'PYMODULE'))
 

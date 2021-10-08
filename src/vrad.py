@@ -8,13 +8,10 @@ from srctools.logger import init_logging
 LOGGER = init_logging('bee2/vrad.log')
 
 import os
-import shutil
 import sys
-import importlib
-import pkgutil
 from io import BytesIO
 from zipfile import ZipFile
-from typing import List, Set
+from typing import List
 from pathlib import Path
 
 import srctools.run
@@ -44,18 +41,10 @@ def load_transforms() -> None:
     We need to do this differently when frozen, since they're embedded in our
     executable.
     """
-    # Find the modules in the conditions package.
-    # PyInstaller messes this up a bit.
     if utils.FROZEN:
-        # This is the PyInstaller loader injected during bootstrap.
-        # See PyInstaller/loader/pyimod03_importers.py
-        # toc is a PyInstaller-specific attribute containing a set of
-        # all frozen modules.
-        loader = pkgutil.get_loader('postcomp.transforms')
-        for module in loader.toc:
-            if module.startswith('postcomp.transforms'):
-                LOGGER.debug('Importing transform {}', module)
-                sys.modules[module] = importlib.import_module(module)
+        # We embedded a copy of all the transforms in this package, which auto-imports the others.
+        # noinspection PyUnresolvedReferences
+        from postcomp import transforms
     else:
         # We can just delegate to the regular postcompiler finder.
         try:
