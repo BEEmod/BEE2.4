@@ -207,7 +207,7 @@ class SamplePlayer:
     ) -> None:
         """Initialise the sample-playing manager.
         """
-        self.sample: Optional[Source] = None
+        self.player: Optional[pyglet.media.Player] = None
         self.start_time: float = 0   # If set, the time to start the track at.
         self.after: Optional[str] = None
         self.start_callback = start_callback
@@ -221,7 +221,7 @@ class SamplePlayer:
     @property
     def is_playing(self) -> bool:
         """Is the player currently playing sounds?"""
-        return self.sample is not None
+        return self.player is not None
 
     def _close_handles(self) -> None:
         """Close down previous sounds."""
@@ -237,7 +237,7 @@ class SamplePlayer:
         if self.cur_file is None:
             return
 
-        if self.sample is not None:
+        if self.player is not None:
             self.stop()
             return
 
@@ -276,7 +276,7 @@ class SamplePlayer:
             except Exception:
                 LOGGER.exception('Cannot seek in "{}"!', self.cur_file)
 
-        self.sample = sound.play()
+        self.player = sound.play()
         self.after = TK_ROOT.after(
             int(sound.duration * 1000),
             self._finished,
@@ -285,13 +285,11 @@ class SamplePlayer:
 
     def stop(self) -> None:
         """Cancel the music, if it's playing."""
-        if self.sample is None:
-            return
-
-        self.sample.pause()
-        self.sample = None
-        self._close_handles()
-        self.stop_callback()
+        if self.player is not None:
+            self.player.pause()
+            self.player = None
+            self._close_handles()
+            self.stop_callback()
 
         if self.after is not None:
             TK_ROOT.after_cancel(self.after)
@@ -299,7 +297,7 @@ class SamplePlayer:
 
     def _finished(self) -> None:
         """Reset values after the sound has finished."""
-        self.sample = None
+        self.player = None
         self.after = None
         self._close_handles()
         self.stop_callback()
