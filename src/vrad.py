@@ -284,6 +284,7 @@ def main(argv: List[str]) -> None:
         run_vrad(fast_args)
     else:
         LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
+        run_vrad(full_args)
 
     LOGGER.info("BEE2 VRAD hook finished!")
 
