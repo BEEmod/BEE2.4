@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-10-05 16:56+1000\n"
+"POT-Creation-Date: 2021-10-08 16:27+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.9.1\n"
 
 #: loadScreen.py:209
 msgid "Skipped!"
@@ -783,6 +783,18 @@ msgstr "Opciones de Exportación"
 msgid "Fill empty spots in the palette with random items."
 msgstr "Rellenar espacios vacíos de la paleta con elementos aleatorios."
 
+#: app/__init__.py:105
+msgid "BEEMOD {} Error!"
+msgstr ""
+
+#: app/__init__.py:106
+msgid ""
+"An error occurred: \n"
+"{}\n"
+"\n"
+"This has been copied to the clipboard."
+msgstr ""
+
 #: app/backup.py:78
 msgid "Copying maps"
 msgstr "Copiando mapas"
@@ -1152,74 +1164,74 @@ msgstr ""
 "\n"
 " (BEE2 se cerrará, este es el último juego seleccionado!)"
 
-#: app/gameMan.py:1383 app/paletteUI.py:268
+#: app/gameMan.py:1383 app/paletteUI.py:272
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "¿Estas seguro que deseas borrar \"{}\"?"
 
-#: app/helpMenu.py:58
+#: app/helpMenu.py:60
 msgid "Wiki..."
 msgstr ""
 
-#: app/helpMenu.py:60
+#: app/helpMenu.py:62
 msgid "Original Items..."
 msgstr "Ítems Originales..."
 
 #. i18n: The chat program.
-#: app/helpMenu.py:65
+#: app/helpMenu.py:67
 msgid "Discord Server..."
 msgstr "Servidor de Discord..."
 
-#: app/helpMenu.py:66
+#: app/helpMenu.py:68
 msgid "aerond's Music Changer..."
 msgstr ""
 
-#: app/helpMenu.py:68
+#: app/helpMenu.py:70
 msgid "Application Repository..."
 msgstr "Repositorio de la Aplicación"
 
-#: app/helpMenu.py:69
+#: app/helpMenu.py:71
 msgid "Items Repository..."
 msgstr "Repositorio de los Ítems..."
 
-#: app/helpMenu.py:71
+#: app/helpMenu.py:73
 msgid "Submit Application Bugs..."
 msgstr "Reportar errores de la aplicación..."
 
-#: app/helpMenu.py:72
+#: app/helpMenu.py:74
 msgid "Submit Item Bugs..."
 msgstr "Reportar errores de Ítems..."
 
 #. i18n: Original Palette
-#: app/helpMenu.py:74 app/paletteLoader.py:36
+#: app/helpMenu.py:76 app/paletteLoader.py:36
 msgid "Portal 2"
 msgstr ""
 
 #. i18n: Aperture Tag's palette
-#: app/helpMenu.py:75 app/paletteLoader.py:38
+#: app/helpMenu.py:77 app/paletteLoader.py:38
 msgid "Aperture Tag"
 msgstr ""
 
-#: app/helpMenu.py:76
+#: app/helpMenu.py:78
 msgid "Portal Stories: Mel"
 msgstr ""
 
-#: app/helpMenu.py:77
+#: app/helpMenu.py:79
 msgid "Thinking With Time Machine"
 msgstr ""
 
-#: app/helpMenu.py:465 app/itemPropWin.py:354
+#: app/helpMenu.py:474 app/itemPropWin.py:354
 msgid "Close"
 msgstr "Cerrar"
 
-#: app/helpMenu.py:489
+#: app/helpMenu.py:498
 msgid "Help"
 msgstr "Ayuda"
 
-#: app/helpMenu.py:499
+#: app/helpMenu.py:508
 msgid "BEE2 Credits"
 msgstr "Créditos de BEE2"
 
-#: app/helpMenu.py:516
+#: app/helpMenu.py:525
 msgid "Credits..."
 msgstr "Créditos..."
 
@@ -1692,23 +1704,23 @@ msgstr "Guardar Paleta"
 msgid "Builtin / Readonly"
 msgstr ""
 
-#: app/paletteUI.py:242
+#: app/paletteUI.py:246
 msgid "Delete Palette \"{}\""
 msgstr "Borrar Paleta \"{}\""
 
-#: app/paletteUI.py:292 app/paletteUI.py:308
+#: app/paletteUI.py:296 app/paletteUI.py:312
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Guardar Paleta"
 
-#: app/paletteUI.py:292 app/paletteUI.py:308
+#: app/paletteUI.py:296 app/paletteUI.py:312
 msgid "Enter a name:"
 msgstr "Introduzca un nombre:"
 
-#: app/paletteUI.py:326
+#: app/paletteUI.py:330
 msgid "BEE2 - Change Palette Group"
 msgstr ""
 
-#: app/paletteUI.py:327
+#: app/paletteUI.py:331
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 

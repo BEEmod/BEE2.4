@@ -100,10 +100,13 @@ def on_error(
     # Put it onscreen.
     try:
         from tkinter import messagebox
+        from localisation import gettext
         messagebox.showinfo(
-            title='BEEMOD {} Error!'.format(utils.BEE_VERSION),
-            message='An error occurred: \n{}\n\nThis has '
-                    'been copied to the clipboard.'.format(err),
+            title=gettext('BEEMOD {} Error!').format(utils.BEE_VERSION),
+            message=gettext(
+                'An error occurred: \n{}\n\n'
+                'This has been copied to the clipboard.'
+            ).format(err),
             icon=messagebox.ERROR,
         )
     except Exception:
