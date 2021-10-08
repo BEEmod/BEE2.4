@@ -114,7 +114,7 @@ def main(argv: List[str]) -> None:
 
     # The path is the last argument to vrad
     # P2 adds wrong slashes sometimes, so fix that.
-    fast_args[-1] = path = os.path.normpath(argv[-1])  # type: str
+    fast_args[-1] = path = os.path.normpath(argv[-1])
 
     LOGGER.info("Map path is " + path)
 
@@ -181,6 +181,11 @@ def main(argv: List[str]) -> None:
             is_peti = edit_args = False
 
     LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
+    if not is_peti:
+        # Skip everything, if the user wants these features install the Hammer Addons postcompiler.
+        LOGGER.info("Hammer map detected! Skipping all transforms.")
+        run_vrad(full_args)
+        return
 
     # Grab the currently mounted filesystems in P2.
     game = find_gameinfo(argv)
@@ -223,9 +228,8 @@ def main(argv: List[str]) -> None:
         if soundscript.path.endswith('.txt'):
             packlist.load_soundscript(soundscript, always_include=False)
 
-    if is_peti:
-        LOGGER.info('Checking for music:')
-        music.generate(bsp_file.ents, packlist)
+    LOGGER.info('Checking for music:')
+    music.generate(bsp_file.ents, packlist)
 
     LOGGER.info('Run transformations...')
     run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
@@ -239,19 +243,19 @@ def main(argv: List[str]) -> None:
     packlist.write_manifest()
 
     # We need to disallow Valve folders.
-    pack_whitelist = set()  # type: Set[FileSystem]
-    pack_blacklist = set()  # type: Set[FileSystem]
-    if is_peti:
-        # Exclude absolutely everything except our folder.
-        for child_sys, _ in fsys.systems:
-            # Add 'bee2/' and 'bee2_dev/' only.
-            if (
-                isinstance(child_sys, RawFileSystem) and
-                'bee2' in os.path.basename(child_sys.path).casefold()
-            ):
-                pack_whitelist.add(child_sys)
-            else:
-                pack_blacklist.add(child_sys)
+    pack_whitelist: set[FileSystem] = set()
+    pack_blacklist: set[FileSystem] = set()
+
+    # Exclude absolutely everything except our folder.
+    for child_sys, _ in fsys.systems:
+        # Add 'bee2/' and 'bee2_dev/' only.
+        if (
+            isinstance(child_sys, RawFileSystem) and
+            'bee2' in os.path.basename(child_sys.path).casefold()
+        ):
+            pack_whitelist.add(child_sys)
+        else:
+            pack_blacklist.add(child_sys)
 
     if config.get_bool('General', 'packfile_dump_enable'):
         dump_loc = Path(config.get_val(
@@ -284,18 +288,13 @@ def main(argv: List[str]) -> None:
     bsp_file.save()
     LOGGER.info(' - BSP written!')
 
-    if is_peti:
-        screenshot.modify(config, game.path)
+    screenshot.modify(config, game.path)
 
     if edit_args:
         LOGGER.info("Forcing Cheap Lighting!")
         run_vrad(fast_args)
     else:
-        if is_peti:
-            LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
-        else:
-            LOGGER.info("Hammer map detected! Not forcing cheap lighting..")
-        run_vrad(full_args)
+        LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
 
     LOGGER.info("BEE2 VRAD hook finished!")
 
