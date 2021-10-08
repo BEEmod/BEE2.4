@@ -237,6 +237,10 @@ class PaletteUI:
         if existing:
             self.ui_treeview.delete(*existing)
 
+        # Select the currently selected UUID.
+        self.ui_treeview.selection_set('pal_' + self.selected.uuid.hex)
+        self.ui_treeview.see('pal_' + self.selected.uuid.hex)
+
         self.ui_menu.entryconfigure(
             self.ui_menu_delete_index,
             label=gettext('Delete Palette "{}"').format(self.selected.name),
@@ -336,10 +340,11 @@ class PaletteUI:
         """Called when the menu buttons are clicked."""
         uuid_hex = self.var_pal_select.get()
         self.select_palette(UUID(hex=uuid_hex))
-        self.ui_treeview.selection_set('pal_' + uuid_hex)
-        self.ui_treeview.see('pal_' + uuid_hex)
         self.set_items(self.selected)
-        self.update_state()
+        # If we remake the palette menus inside this event handler, it tries
+        # to select the old menu item (likely), so a crash occurs. Delay until
+        # another frame.
+        self.ui_treeview.after_idle(self.update_state)
 
     def event_select_tree(self, evt: tk.Event) -> None:
         """Called when palettes are selected on the treeview."""
