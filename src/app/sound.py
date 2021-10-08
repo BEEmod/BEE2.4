@@ -208,7 +208,6 @@ class SamplePlayer:
         """Initialise the sample-playing manager.
         """
         self.player: Optional[pyglet.media.Player] = None
-        self.start_time: float = 0   # If set, the time to start the track at.
         self.after: Optional[str] = None
         self.start_callback = start_callback
         self.stop_callback = stop_callback
@@ -269,12 +268,6 @@ class SamplePlayer:
             self.stop_callback()
             LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
             return  # Abort if music isn't found or can't be loaded.
-
-        if self.start_time:
-            try:
-                sound.seek(self.start_time)
-            except Exception:
-                LOGGER.exception('Cannot seek in "{}"!', self.cur_file)
 
         self.player = sound.play()
         self.after = TK_ROOT.after(
