@@ -90,9 +90,9 @@ class Music(PakObject):
                 else:
                     sample[channel] = None
         else:
-            # Single value, fill it into all channels we define.
+            # Single value, fill it into all channels.
             sample = {
-                channel: sample_block.value if sounds[channel] else None
+                channel: sample_block.value
                 for channel in MusicChannel
             }
 
