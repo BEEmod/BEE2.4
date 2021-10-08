@@ -243,33 +243,32 @@ class SamplePlayer:
 
         self._close_handles()
 
-        with self.system:
-            try:
-                file = self.system[self.cur_file]
-            except (KeyError, FileNotFoundError):
-                self.stop_callback()
-                LOGGER.error('Sound sample not found: "{}"', self.cur_file)
-                return  # Abort if music isn't found..
+        try:
+            file = self.system[self.cur_file]
+        except (KeyError, FileNotFoundError):
+            self.stop_callback()
+            LOGGER.error('Sound sample not found: "{}"', self.cur_file)
+            return  # Abort if music isn't found..
 
-            child_sys = self.system.get_system(file)
-            # Special case raw filesystems - Pyglet is more efficient
-            # if it can just open the file itself.
-            if isinstance(child_sys, RawFileSystem):
-                load_path = os.path.join(child_sys.path, file.path)
-                self._cur_sys = self._handle = None
-                LOGGER.debug('Loading music directly from {!r}', load_path)
-            else:
-                # Use the file objects directly.
-                load_path = self.cur_file
-                self._cur_sys = child_sys
-                self._handle = file.open_bin()
-                LOGGER.debug('Loading music via {!r}', self._handle)
-            try:
-                sound = pyglet.media.load(load_path, self._handle)
-            except Exception:
-                self.stop_callback()
-                LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
-                return  # Abort if music isn't found or can't be loaded.
+        child_sys = self.system.get_system(file)
+        # Special case raw filesystems - Pyglet is more efficient
+        # if it can just open the file itself.
+        if isinstance(child_sys, RawFileSystem):
+            load_path = os.path.join(child_sys.path, file.path)
+            self._cur_sys = self._handle = None
+            LOGGER.debug('Loading music directly from {!r}', load_path)
+        else:
+            # Use the file objects directly.
+            load_path = self.cur_file
+            self._cur_sys = child_sys
+            self._handle = file.open_bin()
+            LOGGER.debug('Loading music via {!r}', self._handle)
+        try:
+            sound = pyglet.media.load(load_path, self._handle)
+        except Exception:
+            self.stop_callback()
+            LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
+            return  # Abort if music isn't found or can't be loaded.
 
         if self.start_time:
             try:
