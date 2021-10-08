@@ -301,6 +301,7 @@ class Palette:
         props = Property(None, [
             Property('Name', self.name),
             Property('TransName', self.trans_name),
+            Property('Group', self.group),
             Property('ReadOnly', srctools.bool_as_int(self.readonly)),
             Property('UUID', self.uuid.hex),
             Property('Items', [
@@ -315,9 +316,6 @@ class Palette:
             props['Name'] = ''
         else:
             del props['TransName']
-
-        if not self.readonly:
-            del props['ReadOnly']
 
         if self.settings is not None:
             self.settings.name = 'Settings'
