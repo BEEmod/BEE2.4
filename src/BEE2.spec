@@ -1,7 +1,6 @@
 import os
 import sys
 from pathlib import Path
-import srctools
 import contextlib
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -191,7 +190,7 @@ data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
 
 bee2_a = Analysis(
     ['BEE2_launch.pyw'],
-    pathex=[workpath, os.path.dirname(srctools.__path__[0])],
+    pathex=[workpath],
     datas=data_files,
     hiddenimports=[
         'PIL._tkinter_finder',
