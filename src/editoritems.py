@@ -972,6 +972,17 @@ class Item:
         if not item.id:
             raise tok.error('No item ID (Type) set!')
 
+        # If the user defined a subtype property, that prop's default value should not be changed.
+        if item.subtype_prop is not None:
+            if isinstance(item.subtype_prop, str):
+                prop_name = item.subtype_prop
+            else:
+                prop_name = item.subtype_prop.id
+            try:
+                item.properties[prop_name.casefold()].allow_user_default = False
+            except KeyError:
+                LOGGER.warning('Subtype property of "{}" set, but property not present!', prop_name)
+
         # Parse the connections info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
             item.conn_config = ConnConfig.parse(item.id, connections)
