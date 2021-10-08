@@ -650,33 +650,32 @@ def calc_connections(
                     frame['renderorder'] = 1  # On top
 
 
-@conditions.make_result_setup('ChangeIOType')
-def res_change_io_type_parse(props: Property):
-    """Pre-parse all item types into an anonymous block."""
-    return Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
-
-
 @conditions.make_result('ChangeIOType')
-def res_change_io_type(inst: Entity, res: Property) -> None:
+def res_change_io_type_parse(props: Property):
     """Switch an item to use different inputs or outputs.
 
     Must be done before priority level -250.
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
-    try:
-        item = ITEMS[inst['targetname']]
-    except KeyError:
-        raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+    conf = Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
 
-    item.config = res.value
+    def change_item(inst: Entity) -> None:
+        try:
+            item = ITEMS[inst['targetname']]
+        except KeyError:
+            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
 
-    # Overwrite these as well.
-    item.enable_cmd = res.value.enable_cmd
-    item.disable_cmd = res.value.disable_cmd
+        item.config = conf
 
-    item.sec_enable_cmd = res.value.sec_enable_cmd
-    item.sec_disable_cmd = res.value.sec_disable_cmd
+        # Overwrite these as well.
+        item.enable_cmd = conf.enable_cmd
+        item.disable_cmd = conf.disable_cmd
+
+        item.sec_enable_cmd = conf.sec_enable_cmd
+        item.sec_disable_cmd = conf.sec_disable_cmd
+
+    return change_item
 
 
 def do_item_optimisation(vmf: VMF) -> None:
