@@ -92,7 +92,7 @@ class PygletSound(NullSound):
         path = str(utils.install_path('sounds/{}.ogg'.format(fname)))
         LOGGER.info('Loading sound "{}" -> {}', name, path)
         try:
-            src = pyglet.media.load(path, streaming=False)
+            src =  decoder.decode(None, path, streaming=False)
         except Exception:
             LOGGER.exception("Couldn't load sound {}:", name)
             LOGGER.info('UI sounds disabled.')
@@ -184,9 +184,11 @@ sounds: NullSound
 try:
     import pyglet.media
     from pyglet.media.codecs import Source
+    from pyglet.media.codecs.ffmpeg import FFmpegDecoder
     from pyglet import version as pyglet_version
     from pyglet.clock import tick
 
+    decoder = FFmpegDecoder()
     sounds = PygletSound()
     ticker_cmd = ('after', 150, TK_ROOT.register(ticker))
     TK_ROOT.tk.call(ticker_cmd)
@@ -263,7 +265,7 @@ class SamplePlayer:
             self._handle = file.open_bin()
             LOGGER.debug('Loading music via {!r}', self._handle)
         try:
-            sound = pyglet.media.load(load_path, self._handle)
+            sound = decoder.decode(self._handle, load_path)
         except Exception:
             self.stop_callback()
             LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
