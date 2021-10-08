@@ -144,6 +144,7 @@ for mod in transform_loc.rglob('*.py'):
 # Build up a bunch of import statements to import them all.
 transforms_stub = Path(workpath, 'transforms_stub.py')
 with transforms_stub.open('w') as f:
+    f.write(f'__path__ = []\n')  # Make it a package.
     # Sort long first, then by name.
     for pack, modnames in sorted(names.items(), key=lambda t: (-len(t[1]), t[0])):
         if pack:
