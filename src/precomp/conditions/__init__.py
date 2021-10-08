@@ -1001,73 +1001,56 @@ def remove_blank_inst(inst: Entity) -> None:
         inst.remove()
 
 
-@make_result_setup('timedRelay')
-def res_timed_relay_setup(res: Property):
-    var = res['variable', consts.FixupVars.TIM_DELAY]
-    name = res['targetname']
-    disabled = res['disabled', '0']
-    flags = res['spawnflags', '0']
-
-    final_outs = [
-        Output.parse(subprop)
-        for prop in res.find_all('FinalOutputs')
-        for subprop in prop
-    ]
-
-    rep_outs = [
-        Output.parse(subprop)
-        for prop in res.find_all('RepOutputs')
-        for subprop in prop
-    ]
-
-    # Never use the comma seperator in the final output for consistency.
-    for out in itertools.chain(rep_outs, final_outs):
-        out.comma_sep = False
-
-    return var, name, disabled, flags, final_outs, rep_outs
-
-
 @make_result('timedRelay')
-def res_timed_relay(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
     """
-    var, name, disabled, flags, final_outs, rep_outs = res.value
+    delay_var = res['variable', consts.FixupVars.TIM_DELAY]
+    name = res['targetname']
+    disabled_var = res['disabled', '0']
+    flags = res['spawnflags', '0']
 
-    relay = vmf.create_ent(
-        classname='logic_relay',
-        spawnflags=flags,
-        origin=inst['origin'],
-        targetname=local_name(inst, name),
-    )
+    final_outs = [
+        Output.parse(prop)
+        for prop in res.find_children('FinalOutputs')
+    ]
 
-    relay['StartDisabled'] = (
-        inst.fixup[disabled]
-        if disabled.startswith('$') else
-        disabled
-    )
+    rep_outs = [
+        Output.parse(prop)
+        for prop in res.find_children('RepOutputs')
+    ]
 
-    delay = srctools.conv_float(
-        inst.fixup[var, '0']
-        if var.startswith('$') else
-        var
-    )
+    def make_relay(inst: Entity) -> None:
+        """Places the relay."""
+        relay = vmf.create_ent(
+            classname='logic_relay',
+            spawnflags=flags,
+            origin=inst['origin'],
+            targetname=local_name(inst, name),
+        )
 
-    for off in range(int(math.ceil(delay))):
-        for out in rep_outs:
-            new_out = out.copy()  # type: Output
+        relay['StartDisabled'] = inst.fixup.substitute(disabled_var, allow_invert=True)
+
+        delay = srctools.conv_float(inst.fixup.substitute(delay_var))
+
+        for off in range(int(math.ceil(delay))):
+            for out in rep_outs:
+                new_out = out.copy()
+                new_out.target = local_name(inst, new_out.target)
+                new_out.delay += off
+                new_out.comma_sep = False
+                relay.add_out(new_out)
+
+        for out in final_outs:
+            new_out = out.copy()
             new_out.target = local_name(inst, new_out.target)
-            new_out.delay += off
+            new_out.delay += delay
             new_out.comma_sep = False
             relay.add_out(new_out)
 
-    for out in final_outs:
-        new_out = out.copy()
-        new_out.target = local_name(inst, new_out.target)
-        new_out.delay += delay
-        new_out.comma_sep = False
-        relay.add_out(new_out)
+    return make_relay
 
 
 @make_result('condition')
