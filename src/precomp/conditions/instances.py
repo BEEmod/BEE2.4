@@ -17,8 +17,14 @@ COND_MOD_NAME = 'Instances'
 @make_flag('instance')
 def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
     """Evaluates True if the instance matches the given file."""
-    inst_list = instanceLocs.resolve(flag.value)
-    return lambda inst: inst['file'].casefold() in inst_list
+    inst_list = set(instanceLocs.resolve(flag.value))
+
+    def check_inst(inst: Entity) -> bool:
+        """Each time, check if no matching instances exist, so we can skip conditions."""
+        if conditions.ALL_INST.isdisjoint(inst_list):
+            raise conditions.Unsatisfiable
+        return inst['file'].casefold() in inst_list
+    return check_inst
 
 
 @make_flag('instFlag', 'InstPart')
