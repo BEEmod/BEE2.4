@@ -851,7 +851,8 @@ def add_suffix(inst: Entity, suff: str) -> None:
     """
     file = inst['file']
     old_name, dot, ext = file.partition('.')
-    inst['file'] = ''.join((old_name, suff, dot, ext))
+    inst['file'] = new_filename = ''.join((old_name, suff, dot, ext))
+    ALL_INST.add(new_filename)
 
 
 def local_name(inst: Entity, name: str | Entity) -> str:
@@ -1247,6 +1248,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             val = instances['bottom_' + str(bottom_pos)]
             if val:  # Only if defined
                 ent['file'] = val
+                ALL_INST.add(val)
 
             logic_file = instances['logic_' + str(bottom_pos)]
             if logic_file:
@@ -1256,6 +1258,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
                 logic_ent = ent.copy()
                 logic_ent['file'] = logic_file
                 vmf.add_ent(logic_ent)
+                ALL_INST.add(logic_file)
                 # If no connections are present, set the 'enable' value in
                 # the logic to True so the piston can function
                 logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
@@ -1272,6 +1275,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             val = instances['static_' + str(pos)]
             if val:
                 ent['file'] = val
+                ALL_INST.add(val)
 
         # Add in the grating for the bottom as an overlay.
         # It's low to fit the piston at minimum, or higher if needed.
@@ -1283,6 +1287,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
         if grate:
             grate_ent = ent.copy()
             grate_ent['file'] = grate
+            ALL_INST.add(grate)
             vmf.add_ent(grate_ent)
     return make_static
 
@@ -1369,11 +1374,11 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
             loc.x += rng.randint(-offset, offset)
             loc.y += rng.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
-        vmf.create_ent(
-            classname='func_instance',
+        add_inst(
+            vmf,
             file=rand_fname,
-            origin=loc.join(' '),
-            angles=f'0 {rng.randrange(0, 3600) / 10} 0'
+            origin=loc,
+            angles=Angle(yaw=rng.randrange(0, 3600) / 10),
         )
 
     return RES_EXHAUSTED
