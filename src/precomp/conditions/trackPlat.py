@@ -24,7 +24,7 @@ def res_track_plat(vmf: VMF, res: Property):
     targetnames to a useful value. This should be run unconditionally, not
     once per item.
     Values:
-    
+
     * `orig_item`: The "<ITEM_ID>" for the track platform, with angle brackets.
       This is used to determine all the instance filenames.
     * `single_plat`: An instance used for the entire platform, if it's
@@ -100,10 +100,11 @@ def res_track_plat(vmf: VMF, res: Property):
             # Track is one block long, use a single-only instance and
             # remove track!
             plat_inst['file'] = single_plat_inst
+            conditions.ALL_INST.add(single_plat_inst.casefold())
             first_track.remove()
             continue  # Next platform
 
-        track_set = set()  # type: Set[Entity]
+        track_set: set[Entity] = set()
         if track_type == inst_top or track_type == inst_middle:
             # search left
             track_scan(

@@ -8,9 +8,8 @@ import attr
 from srctools import Vec, Property, Entity, VMF, Solid, Matrix, Angle
 import srctools.logger
 
-from precomp import tiling, instanceLocs, connections, template_brush
+from precomp import tiling, instanceLocs, conditions, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
-from precomp.conditions import make_result, meta_cond, RES_EXHAUSTED
 import utils
 
 COND_MOD_NAME = None
@@ -83,7 +82,7 @@ class Marker:
 VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
-@make_result('CustVactube')
+@conditions.make_result('CustVactube')
 def res_vactubes(vmf: VMF, res: Property):
     """Specialised result to parse vactubes from markers.
 
@@ -163,7 +162,7 @@ def res_vactubes(vmf: VMF, res: Property):
         """Create the vactubes."""
         if group not in VAC_CONFIGS:
             # We've already executed this config group
-            return RES_EXHAUSTED
+            return conditions.RES_EXHAUSTED
 
         del VAC_CONFIGS[group]  # Don't let this run twice
 
@@ -215,11 +214,11 @@ def res_vactubes(vmf: VMF, res: Property):
             if marker.no_prev:
                 VAC_TRACKS.append((marker, markers))
 
-        return RES_EXHAUSTED
+        return conditions.RES_EXHAUSTED
     return result
 
 
-@meta_cond(400)
+@conditions.meta_cond(400)
 def vactube_gen(vmf: VMF) -> None:
     """Generate the vactubes, after most conditions have run."""
     if not VAC_TRACKS:
@@ -233,11 +232,12 @@ def vactube_gen(vmf: VMF) -> None:
         vmf.add_ent(start_logic)
 
         if start_normal.z > 0:
-            start_logic['file'] = start.conf.inst_entry_ceil
+            start_logic['file'] = fname=start.conf.inst_entry_ceil
         elif start_normal.z < 0:
-            start_logic['file'] = start.conf.inst_entry_floor
+            start_logic['file'] = fname = start.conf.inst_entry_floor
         else:
-            start_logic['file'] = start.conf.inst_entry_wall
+            start_logic['file'] = fname = start.conf.inst_entry_wall
+        conditions.ALL_INST.add(fname.casefold())
 
         end = start
 
@@ -263,6 +263,7 @@ def vactube_gen(vmf: VMF) -> None:
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
             end_logic['file'] = end.conf.inst_exit
+            conditions.ALL_INST.add(end.conf.inst_exit.casefold())
 
 
 def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
@@ -334,8 +335,8 @@ def make_straight(
 
     off = 0
     for seg_dist in utils.fit(dist, config.inst_straight_sizes):
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             origin=origin + off * orient.forward(),
             angles=angles,
             file=config.inst_straight[seg_dist],
@@ -359,16 +360,16 @@ def make_straight(
                     continue
                 # Check all 4 center tiles are present.
                 if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
-                    vmf.create_ent(
-                        classname='func_instance',
+                    conditions.add_inst(
+                        vmf,
                         origin=position,
                         angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
                         file=config.inst_support,
                     )
                     placed_support = True
             if placed_support and config.inst_support_ring:
-                vmf.create_ent(
-                    classname='func_instance',
+                conditions.add_inst(
+                    vmf,
                     origin=position,
                     angles=angles,
                     file=config.inst_support_ring,
@@ -384,9 +385,9 @@ def make_corner(
     config: Config,
 ) -> None:
     """Place a corner."""
-    angles = Matrix.from_basis(z=start_dir, x=end_dir).to_angle()
-    vmf.create_ent(
-        classname='func_instance',
+    angles = Matrix.from_basis(z=start_dir, x=end_dir)
+    conditions.add_inst(
+        vmf,
         origin=origin,
         angles=angles,
         file=config.inst_corner[int(size)],

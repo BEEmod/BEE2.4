@@ -240,8 +240,8 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
                 face.scale = preview_scale
 
         if preview_inst_file:
-            pre_inst = vmf.create_ent(
-                classname='func_instance',
+            pre_inst = conditions.add_inst(
+                vmf,
                 targetname=targ + '_preview',
                 file=preview_inst_file,
                 # Put it at the second marker, since that's usually

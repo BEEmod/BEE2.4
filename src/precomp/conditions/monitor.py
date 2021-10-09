@@ -1,8 +1,7 @@
 import math
 
-from precomp.conditions import make_result, make_result_setup, meta_cond, local_name
-from precomp import instanceLocs, connections, options, faithplate, voice_line
-from srctools import Property, Vec, Entity, VMF, Output
+from precomp import instanceLocs, connections, conditions, options, faithplate, voice_line
+from srctools import Property, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
 from typing import List, NamedTuple
@@ -58,7 +57,7 @@ def scriptvar_set(
     )
 
 
-@make_result_setup('Monitor')
+@conditions.make_result_setup('Monitor')
 def res_monitor_setup(res: Property):
     """Pre-parse options for monitors."""
     return (
@@ -68,7 +67,7 @@ def res_monitor_setup(res: Property):
     )
 
 
-@make_result('Monitor')
+@conditions.make_result('Monitor')
 def res_monitor(inst: Entity, res: Property) -> None:
     """Result for the monitor component.
 
@@ -104,13 +103,13 @@ def res_monitor(inst: Entity, res: Property) -> None:
         loc = Vec(bullseye_loc)
         loc.localise(
             Vec.from_str(inst['origin']),
-            Vec.from_str(inst['angles']),
+            Angle.from_str(inst['angles']),
         )
-        bullseye_name = local_name(inst, bullseye_name)
+        bullseye_name = conditions.local_name(inst, bullseye_name)
         inst.map.create_ent(
             classname='npc_bullseye',
             targetname=bullseye_name,
-            parentname=local_name(inst, bullseye_parent),
+            parentname=conditions.local_name(inst, bullseye_parent),
             spawnflags=221186,  # Non-solid, invisible, etc..
             origin=loc,
         )
@@ -127,7 +126,7 @@ def res_monitor(inst: Entity, res: Property) -> None:
         MONITOR_RELATIONSHIP_ENTS.append(relation)
 
 
-@make_result_setup('Camera')
+@conditions.make_result_setup('Camera')
 def res_camera_setup(res: Property):
     """Pre-parse the data for cameras."""
     return {
@@ -143,8 +142,8 @@ def res_camera_setup(res: Property):
     }
 
 
-@make_result('Camera')
-def res_camera(inst: Entity, res: Property):
+@conditions.make_result('Camera')
+def res_camera(vmf: VMF, inst: Entity, res: Property):
     """Result for the camera item.
 
     Options:
@@ -204,11 +203,11 @@ def res_camera(inst: Entity, res: Property):
 
     pitch, yaw, _ = (target_loc - yaw_pos).to_angle()
 
-    inst.map.create_ent(
-        classname='func_instance',
+    conditions.add_inst(
+        vmf,
         targetname=inst['targetname'],
         file=conf['yaw_inst'],
-        angles='0 {:g} 0'.format(yaw),
+        angles=Angle(yaw=yaw),
         origin=yaw_pos,
     )
 
@@ -217,11 +216,11 @@ def res_camera(inst: Entity, res: Property):
     pitch_pos.rotate_by_str(inst['angles'])
     pitch_pos += yaw_pos
 
-    inst.map.create_ent(
-        classname='func_instance',
+    conditions.add_inst(
+        vmf,
         targetname=inst['targetname'],
         file=conf['pitch_inst'],
-        angles='{:g} {:g} 0'.format(pitch, yaw),
+        angles=Angle(pitch, yaw, 0.0),
         origin=pitch_pos,
     )
 
@@ -235,7 +234,7 @@ def res_camera(inst: Entity, res: Property):
     ALL_CAMERAS.append(Camera(inst, cam_pos, cam_angles))
 
 
-@meta_cond(priority=-275)
+@conditions.meta_cond(priority=-275)
 def mon_camera_link(vmf: VMF) -> None:
     """Link cameras to monitors."""
     import vbsp
@@ -386,11 +385,10 @@ def make_voice_studio(vmf: VMF) -> bool:
     loc = voice_line.get_studio_loc()
 
     if HAS_MONITOR and studio_file:
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             file=studio_file,
             origin=loc,
-            angles='0 0 0',
         )
         return True
     else:

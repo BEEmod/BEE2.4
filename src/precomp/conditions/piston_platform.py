@@ -7,7 +7,7 @@ from consts import FixupVars
 from precomp.conditions import make_result, make_result_setup, local_name
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
-from srctools import Entity, VMF, Property, Output, Vec
+from srctools import Entity, VMF, Property, Output, Vec, Angle
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -129,7 +129,8 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
             inst.fixup[FixupVars.PIST_TOP] = position
             static_inst = inst.copy()
             vmf.add_ent(static_inst)
-            static_inst['file'] = inst_filenames['fullstatic_' + str(position)]
+            static_inst['file'] = fname = inst_filenames['fullstatic_' + str(position)]
+            conditions.ALL_INST.add(fname)
             return
 
     init_script = 'SPAWN_UP <- {}'.format('true' if start_up else 'false')
@@ -166,8 +167,8 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
     )
 
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
-    off = Vec(z=128).rotate(*angles)
+    angles = Angle.from_str(inst['angles'])
+    off = Vec(z=128) @ angles
     move_ang = off.to_angle()
 
     # Index -> func_movelinear.
@@ -181,12 +182,12 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
 
         if pist_ind <= min_pos:
             # It's below the lowest position, so it can be static.
-            pist_ent['file'] = inst_filenames['static_' + str(pist_ind)]
+            pist_ent['file'] = fname = inst_filenames['static_' + str(pist_ind)]
             pist_ent['origin'] = brush_pos = origin + pist_ind * off
             temp_targ = static_ent
         else:
             # It's a moving component.
-            pist_ent['file'] = inst_filenames['dynamic_' + str(pist_ind)]
+            pist_ent['file'] = fname = inst_filenames['dynamic_' + str(pist_ind)]
             if pist_ind > max_pos:
                 # It's 'after' the highest position, so it never extends.
                 # So simplify by merging those all.
@@ -221,7 +222,9 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property) -> None:
                         pist_ent, 'pist' + str(pist_ind - 1),
                     )
 
-        if not pist_ent['file']:
+        if fname:
+            conditions.ALL_INST.add(fname.casefold())
+        else:
             # No actual instance, remove.
             pist_ent.remove()
 
