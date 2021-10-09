@@ -8,12 +8,7 @@ from precomp.connections import Item
 from srctools import Vec, Property, VMF, Entity, Output, Angle, Matrix
 import srctools.logger
 
-from precomp import instanceLocs, options, connections
-from precomp.conditions import (
-    meta_cond, make_result,
-    PETI_INST_ANGLE, RES_EXHAUSTED,
-    local_name,
-)
+from precomp import instanceLocs, options, connections, conditions
 from connections import Config
 from precomp.fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 import utils
@@ -26,9 +21,11 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 # Fizzler type ID for Gel Gun Activator.
 TAG_FIZZ_ID = 'TAG_GEL_GUN'
+# Special version with gel logic.
+TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
 
 
-@make_result('ATLAS_SpawnPoint')
+@conditions.make_result('ATLAS_SpawnPoint')
 def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
     """Create the spawn point for ATLAS in the entry corridor.
 
@@ -37,7 +34,7 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
     If `global` is set, the spawn point will be absolute instead of relative to the current instance.
     """
     if vbsp.GAME_MODE != 'COOP':
-        return RES_EXHAUSTED
+        return conditions.RES_EXHAUSTED
 
     is_tag = options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
 
@@ -90,13 +87,13 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
         enabled=1,
         StartingTeam=3,  # ATLAS
     )
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@meta_cond(priority=200, only_once=True)
+@conditions.meta_cond(priority=200, only_once=True)
 def ap_tag_modifications(vmf: VMF):
     """Perform modifications for Aperture Tag.
-    
+
     * Paint is always present in every map!
     * Suppress ATLAS's Portalgun in coop.
     * In singleplayer, override the transition ent instance to have the Gel Gun.
@@ -118,9 +115,9 @@ def ap_tag_modifications(vmf: VMF):
 
     transition_ents = instanceLocs.get_special_inst('transitionents')
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in transition_ents:
-            continue
-        inst['file'] = 'instances/bee2/transition_ents_tag.vmf'
+        if inst['file'].casefold() in transition_ents:
+            inst['file'] = TRANSITION_ENTS
+            conditions.ALL_INST.add(TRANSITION_ENTS.casefold())
 
     # Because of a bug in P2, these folders aren't created automatically.
     # We need a folder with the user's ID in portal2/maps/puzzlemaker.
@@ -140,7 +137,8 @@ def ap_tag_modifications(vmf: VMF):
                 exist_ok=True,
             )
 
-@make_result('TagFizzler')
+
+@conditions.make_result('TagFizzler')
 def res_make_tag_fizzler(vmf: VMF, res: Property):
     """Add an Aperture Tag Paint Gun activation fizzler.
 
@@ -238,6 +236,7 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
 
         if disable_other or (blue_enabled and oran_enabled):
             inst['file'] = inst_frame_double
+            conditions.ALL_INST.add(inst_frame_double.casefold())
             # On a wall, and pointing vertically
             if abs(inst_normal.z) < 0.01 and abs(inst_orient.left().z) > 0.01:
                 # They're vertical, make sure blue's on top!
@@ -253,6 +252,7 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
                 oran_loc = loc - offset
         else:
             inst['file'] = inst_frame_single
+            conditions.ALL_INST.add(inst_frame_single.casefold())
             # They're always centered
             blue_loc = loc
             oran_loc = loc
@@ -320,28 +320,28 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
                 raise AssertionError('Cannot be zero here!')
         else:
             # On a wall, face upright
-            sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
+            sign_angle = conditions.PETI_INST_ANGLE[inst_normal.as_tuple()]
 
         # If disable_other, we show off signs. Otherwise we don't use that sign.
         blue_sign = blue_sign_on if blue_enabled else blue_sign_off if disable_other else None
         oran_sign = oran_sign_on if oran_enabled else oran_sign_off if disable_other else None
 
         if blue_sign:
-            vmf.create_ent(
-                classname='func_instance',
+            conditions.add_inst(
+                vmf,
                 file=blue_sign,
                 targetname=inst['targetname'],
                 angles=sign_angle,
-                origin=blue_loc.join(' '),
+                origin=blue_loc,
             )
 
         if oran_sign:
-            vmf.create_ent(
-                classname='func_instance',
+            conditions.add_inst(
+                vmf,
                 file=oran_sign,
                 targetname=inst['targetname'],
                 angles=sign_angle,
-                origin=oran_loc.join(' '),
+                origin=oran_loc,
             )
 
         # Now modify the fizzler...
@@ -392,8 +392,8 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
         pos_trig['origin'] = neg_trig['origin'] = fizzler.base_inst['origin']
         pos_trig['spawnflags'] = neg_trig['spawnflags'] = '1'  # Clients Only
 
-        pos_trig['targetname'] = local_name(fizzler.base_inst, 'trig_pos')
-        neg_trig['targetname'] = local_name(fizzler.base_inst, 'trig_neg')
+        pos_trig['targetname'] = conditions.local_name(fizzler.base_inst, 'trig_pos')
+        neg_trig['targetname'] = conditions.local_name(fizzler.base_inst, 'trig_neg')
 
         pos_trig['startdisabled'] = neg_trig['startdisabled'] = (
             not fizzler.base_inst.fixup.bool('start_enabled')
@@ -456,7 +456,7 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
             # either side - use neg_trig for that purpose!
             # We want to get rid of pos_trig to save ents
             vmf.remove_ent(pos_trig)
-            neg_trig['targetname'] = local_name(fizzler.base_inst, 'trig_off')
+            neg_trig['targetname'] = conditions.local_name(fizzler.base_inst, 'trig_off')
             neg_trig.outputs.clear()
             neg_trig.add_out(Output(
                 output,
