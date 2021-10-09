@@ -17,6 +17,8 @@ from pathlib import Path
 from enum import Enum
 from types import TracebackType
 
+from srctools import Angle
+
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -170,10 +172,10 @@ class CONN_TYPES(Enum):
     triple = 4  # Points N-S-W
     all = 5  # Points N-S-E-W
 
-N = "0 90 0"
-S = "0 270 0"
-E = "0 0 0"
-W = "0 180 0"
+N = Angle(yaw=90)
+S = Angle(yaw=270)
+E = Angle(yaw=0)
+W = Angle(yaw=180)
 # Lookup values for joining things together.
 CONN_LOOKUP = {
     #N  S  E  W : (Type, Rotation)
