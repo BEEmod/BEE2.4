@@ -234,6 +234,8 @@ class ItemVariant:
                     )
                 if pal_icon is not None:
                     self.all_icon = pal_icon
+                    # If a previous BEE icon was present, remove so we use the VTF.
+                    self.icons.pop('all', None)
                 if pal_name is not None:
                     self.all_name = pal_name
                 if bee2_icon is not None:
@@ -271,6 +273,9 @@ class ItemVariant:
                         f'editoritems blocks in {source}!'
                     )
                 self.icons[item.name] = bee2_icon
+            elif pal_icon is not None:
+                # If a previous BEE icon was present, remove so we use the VTF.
+                self.icons.pop(item.name, None)
 
             if pal_name is not None:
                 subtype.pal_name = pal_name
