@@ -644,6 +644,8 @@ def check_all(vmf: VMF) -> None:
         vbsp.settings['has_attr'].items()
         if value
     ])
+    # '' is always present, which sorts first, conveniently adding a \n at the start.
+    LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
     # Dynamically added by lru_cache()
     # noinspection PyUnresolvedReferences
     LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve.cache_info())
