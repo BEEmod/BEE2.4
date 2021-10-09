@@ -31,7 +31,6 @@ from __future__ import annotations
 import inspect
 import io
 import importlib
-import itertools
 import math
 import pkgutil
 import sys
@@ -666,15 +665,14 @@ def import_conditions() -> None:
     This ensures everything gets registered.
     """
     # Find the modules in the conditions package.
-    for _, module, _ in pkgutil.iter_modules(__path__):
+    for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing precomp.conditions.{} ...', module)
-        importlib.import_module('precomp.conditions.' + module)
+        LOGGER.debug('Importing {} ...', module.name)
+        importlib.import_module(module.name)
     LOGGER.info('Imported all conditions modules!')
 
-import pkg_resources
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
 DOC_META_COND = '''
