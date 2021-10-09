@@ -1505,8 +1505,8 @@ def make_cube(
                 assert pair.dropper is not None
 
                 # Add the bounce painter. This is only on the dropper.
-                vmf.create_ent(
-                    classname='func_instance',
+                conditions.add_inst(
+                    vmf,
                     targetname=pair.dropper['targetname'],
                     origin=pair.dropper['origin'],
                     angles=pair.dropper['angles'],
@@ -1541,8 +1541,8 @@ def make_cube(
     for addon in pair.addons:
         if addon.inst:
             has_addon_inst = True
-            inst = vmf.create_ent(
-                classname='func_instance',
+            inst = conditions.add_inst(
+                vmf,
                 targetname=targ_inst['targetname'],
                 origin=origin,
                 # If out of dropper, spin to match the frankenturret box position.

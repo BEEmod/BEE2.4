@@ -813,11 +813,15 @@ def add_inst(
     angles: Angle | Matrix | str = '0 0 0',
     targetname: str='',
     fixup_style: int | str = '0',  # Default to Prefix.
+    no_fixup: bool = False,
 ) -> Entity:
     """Create and add a new instance at the specified position.
 
     This provides defaults for parameters, and adds the filename to ALL_INST.
     Values accept str in addition so they can be copied from existing keyvalues.
+
+    If no_fixup is set, it overrides fixup_style to None - this way it's a more clear
+    parameter for code.
     """
     ALL_INST.add(file.casefold())
     return vmf.create_ent(
