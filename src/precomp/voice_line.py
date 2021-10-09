@@ -142,7 +142,7 @@ def find_group_quotes(
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_flag(vmf, flag, fake_inst):
+            if not conditions.check_flag(flag, fake_inst):
                 valid_quote = False
                 break
 

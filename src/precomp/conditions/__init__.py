@@ -164,6 +164,13 @@ class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
+class Unsatisfiable(Exception):
+    """Raised by flags to indicate they currently will always be false with all instances.
+
+    For example, an instance result when that instance currently isn't present.
+    """
+    pass
+
 # Flag to indicate a result doesn't need to be executed anymore,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
@@ -241,10 +248,17 @@ class Condition:
             return cond_call(inst, res)
 
     def test(self, inst: Entity) -> None:
-        """Try to satisfy this condition on the given instance."""
+        """Try to satisfy this condition on the given instance.
+
+        If we find that no instance will succeed, raise Unsatisfiable.
+        """
         success = True
-        for flag in self.flags:
-            if not check_flag(inst.map, flag, inst):
+        # Only the first one can cause this condition to be skipped.
+        # We could have a situation where the first flag modifies the map
+        # such that it becomes satisfiable later, so this would be premature.
+        # If we have else results, we also can't skip because those could modify state.
+        for i, flag in enumerate(self.flags):
+            if not check_flag(flag, inst, can_skip=i==0 and not self.else_results):
                 success = False
                 break
         results = self.results if success else self.else_results
@@ -596,20 +610,26 @@ def check_all(vmf: VMF) -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     LOGGER.info('-----------------------')
+    skipped_cond = 0
     for condition in conditions:
         with srctools.logger.context(condition.source or ''):
             for inst in vmf.by_class['func_instance']:
                 try:
                     condition.test(inst)
                 except NextInstance:
-                    # This is raised to immediately stop running
+                    # NextInstance is raised to immediately stop running
                     # this condition, and skip to the next instance.
-                    pass
-                except EndCondition:
-                    # This is raised to immediately stop running
-                    # this condition, and skip to the next condtion.
+                    continue
+                except Unsatisfiable:
+                    # Unsatisfiable indicates this condition's flags will
+                    # never succeed, so just skip.
+                    skipped_cond += 1
                     break
-                except:
+                except EndCondition:
+                    # EndCondition is raised to immediately stop running
+                    # this condition, and skip to the next condition.
+                    break
+                except Exception:
                     # Print the source of the condition if if fails...
                     LOGGER.exception(
                         'Error in {}:',
@@ -636,7 +656,7 @@ def check_all(vmf: VMF) -> None:
                     )
 
     LOGGER.info('---------------------')
-    LOGGER.info('Conditions executed!')
+    LOGGER.info('Conditions executed, {}/{} skipped!', skipped_cond, len(conditions))
     import vbsp
     LOGGER.info('Map has attributes: {}', [
         key
@@ -653,12 +673,16 @@ def check_all(vmf: VMF) -> None:
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
-    """Determine the result for a condition flag."""
+def check_flag(flag: Property, inst: Entity, can_skip: bool = False) -> bool:
+    """Determine the result for a condition flag.
+
+    If can_skip is true, flags raising Unsatifiable will pass the exception through.
+    """
     name = flag.name
     # If starting with '!', invert the result.
     if name[:1] == '!':
         desired_result = False
+        can_skip = False  # This doesn't work.
         name = name[1:]
     else:
         desired_result = True
@@ -674,8 +698,15 @@ def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
             # Skip these conditions..
             return False
 
-    res = func(inst, flag)
-    return res == desired_result
+    try:
+        res = func(inst, flag)
+    except Unsatisfiable:
+        if can_skip:
+            raise
+        else:
+            return False
+    else:
+        return res is desired_result
 
 
 def import_conditions() -> None:
@@ -1104,7 +1135,15 @@ def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 @make_result('condition')
 def res_sub_condition(res: Property):
     """Check a different condition if the outer block is true."""
-    return Condition.parse(res).test
+    cond = Condition.parse(res)
+
+    def test_cond(inst: Entity) -> None:
+        """For child conditions, we need to check every time."""
+        try:
+            cond.test(inst)
+        except Unsatisfiable:
+            pass
+    return test_cond
 
 
 @make_result('nextInstance')
@@ -1180,7 +1219,7 @@ def res_switch(res: Property):
         run_default = True
         for flag, results in cases:
             # If not set, always succeed for the random situation.
-            if flag.real_name and not check_flag(inst.map, flag, inst):
+            if flag.real_name and not check_flag(flag, inst):
                 continue
             for sub_res in results:
                 Condition.test_result(inst, sub_res)

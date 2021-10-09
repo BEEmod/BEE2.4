@@ -189,7 +189,7 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
         pools = all_pools.copy()
         for (flags, value, potential_pools) in conf_selectors:
             for flag in flags:
-                if not conditions.check_flag(vmf, flag, inst):
+                if not conditions.check_flag(flag, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [

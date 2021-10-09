@@ -11,7 +11,7 @@ COND_MOD_NAME = 'Logic'
 def flag_and(vmf: VMF, inst: Entity, flag: Property):
     """The AND group evaluates True if all sub-flags are True."""
     for sub_flag in flag:
-        if not check_flag(vmf, sub_flag, inst):
+        if not check_flag(sub_flag, inst):
             return False
     return True
 
@@ -20,7 +20,7 @@ def flag_and(vmf: VMF, inst: Entity, flag: Property):
 def flag_or(vmf: VMF, inst: Entity, flag: Property):
     """The OR group evaluates True if any sub-flags are True."""
     for sub_flag in flag:
-        if check_flag(vmf, sub_flag, inst):
+        if check_flag(sub_flag, inst):
             return True
     return False
 
@@ -29,14 +29,14 @@ def flag_or(vmf: VMF, inst: Entity, flag: Property):
 def flag_not(vmf: VMF, inst: Entity, flag: Property):
     """The NOT group inverts the value of it's one sub-flag."""
     if len(flag.value) == 1:
-        return not check_flag(vmf, flag[0], inst)
+        return not check_flag(flag[0], inst)
     return False
 
 
 @make_flag('XOR')
 def flag_xor(vmf: VMF, inst: Entity, flag:Property):
     """The XOR group returns True if the number of true sub-flags is odd."""
-    return sum([check_flag(vmf, sub_flag, inst) for sub_flag in flag]) % 2 == 1
+    return sum([check_flag(sub_flag, inst) for sub_flag in flag]) % 2 == 1
 
 
 @make_flag('NOR')
