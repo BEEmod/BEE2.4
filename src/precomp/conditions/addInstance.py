@@ -39,10 +39,11 @@ def res_add_global_inst(vmf: VMF, res: Property):
         # if was already added - this is helpful for
         # items that add to original items, or to avoid
         # bugs.
+        file = instanceLocs.resolve_one(res['file'], error=True)
         new_inst = vmf.create_ent(
             classname="func_instance",
             targetname=res['name', ''],
-            file=instanceLocs.resolve_one(res['file'], error=True),
+            file=file,
             angles=res['angles', '0 0 0'],
             fixup_style=res['fixup_style', '0'],
         )
@@ -50,7 +51,8 @@ def res_add_global_inst(vmf: VMF, res: Property):
             new_inst['origin'] = res['position']
         except IndexError:
             new_inst['origin'] = options.get(Vec, 'global_ents_loc')
-        conditions.GLOBAL_INSTANCES.add(res['file'])
+        conditions.GLOBAL_INSTANCES.add(file)
+        conditions.ALL_INST.add(file)
         if new_inst['targetname'] == '':
             new_inst['targetname'] = "inst_"
             new_inst.make_unique()
@@ -115,6 +117,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
+    conditions.ALL_INST.add(filename.casefold())
     # Don't run if the fixup block exists..
     if srctools.conv_bool(res['copy_fixup', '1']):
         if 'fixup' not in res and 'localfixup' not in res:
@@ -197,6 +200,7 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
                 ]
                 name, filename = rng.choice(allowed_inst)
                 pools.remove((name, filename))
+                conditions.ALL_INST.add(filename.casefold())
                 vmf.create_ent(
                     'func_instance',
                     targetname=inst['targetname'],
