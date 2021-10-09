@@ -1,13 +1,12 @@
 """Implement cubes and droppers."""
 import itertools
 from contextlib import suppress
-from collections import namedtuple
 from weakref import WeakKeyDictionary
 
 from enum import Enum
 from typing import (
     Optional, Union, Tuple, NamedTuple,
-    Dict, List, Set, FrozenSet, Iterable, MutableMapping
+    Dict, List, Set, FrozenSet, MutableMapping
 )
 
 from precomp import brushLoc, options, packing, conditions
@@ -622,10 +621,11 @@ class CubePair:
         In this case, we ignore the custom model.
         """
         return (
+            not has_gel and
             self.cube_type.try_rusty and
             self.paint_type is None and
             self.tint is None and
-            CUBE_SKINS[self.cube_type].rusty is not None
+            CUBE_SKINS[self.cube_type.type].rusty is not None
         )
 
     def get_kv_setter(self, name: str) -> Entity:
@@ -1622,7 +1622,7 @@ def make_cube(
 
         if cust_model:
             ent['model'] = cust_model
-            
+
             if cube_type.model_swap_meth is ModelSwapMeth.CUBE_TYPE:
                 ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
             elif cube_type.model_swap_meth is ModelSwapMeth.SETMODEL:
