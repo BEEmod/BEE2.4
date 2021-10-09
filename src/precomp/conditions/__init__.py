@@ -50,7 +50,7 @@ import utils
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Angle,
+    VMF, Entity, Output, Solid, Angle, Matrix,
 )
 
 
@@ -803,6 +803,32 @@ def dump_func_docs(file: TextIO, func: Callable):
         print(docs, file=file)
     else:
         print('**No documentation!**', file=file)
+
+
+def add_inst(
+    vmf: VMF,
+    *,
+    file: str,
+    origin: Vec | str,
+    angles: Angle | Matrix | str = '0 0 0',
+    targetname: str='',
+    fixup_style: int | str = '0',  # Default to Prefix.
+) -> Entity:
+    """Create and add a new instance at the specified position.
+
+    This provides defaults for parameters, and adds the filename to ALL_INST.
+    Values accept str in addition so they can be copied from existing keyvalues.
+    """
+    ALL_INST.add(file.casefold())
+    return vmf.create_ent(
+        'func_instance',
+        origin=origin,
+        angles=angles,
+        targetname=targetname,
+        file=file,
+        fixup_style=fixup_style,
+    )
+
 
 
 def add_output(inst: Entity, prop: Property, target: str) -> None:
