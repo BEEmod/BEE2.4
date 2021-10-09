@@ -33,13 +33,13 @@ def res_add_global_inst(vmf: VMF, res: Property):
     """
     if not res.has_children():
         res = Property('AddGlobal', [Property('File', res.value)])
+    file = instanceLocs.resolve_one(res['file'], error=True)
 
-    if res.bool('allow_multiple') or res['file'] not in conditions.GLOBAL_INSTANCES:
+    if res.bool('allow_multiple') or file.casefold() not in conditions.GLOBAL_INSTANCES:
         # By default we will skip adding the instance
         # if was already added - this is helpful for
         # items that add to original items, or to avoid
         # bugs.
-        file = instanceLocs.resolve_one(res['file'], error=True)
         new_inst = vmf.create_ent(
             classname="func_instance",
             targetname=res['name', ''],
@@ -51,8 +51,8 @@ def res_add_global_inst(vmf: VMF, res: Property):
             new_inst['origin'] = res['position']
         except IndexError:
             new_inst['origin'] = options.get(Vec, 'global_ents_loc')
-        conditions.GLOBAL_INSTANCES.add(file)
-        conditions.ALL_INST.add(file)
+        conditions.GLOBAL_INSTANCES.add(file.casefold())
+        conditions.ALL_INST.add(file.casefold())
         if new_inst['targetname'] == '':
             new_inst['targetname'] = "inst_"
             new_inst.make_unique()

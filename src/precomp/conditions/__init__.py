@@ -852,7 +852,7 @@ def add_suffix(inst: Entity, suff: str) -> None:
     file = inst['file']
     old_name, dot, ext = file.partition('.')
     inst['file'] = new_filename = ''.join((old_name, suff, dot, ext))
-    ALL_INST.add(new_filename)
+    ALL_INST.add(new_filename.casefold())
 
 
 def local_name(inst: Entity, name: str | Entity) -> str:
@@ -1248,7 +1248,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             val = instances['bottom_' + str(bottom_pos)]
             if val:  # Only if defined
                 ent['file'] = val
-                ALL_INST.add(val)
+                ALL_INST.add(val.casefold())
 
             logic_file = instances['logic_' + str(bottom_pos)]
             if logic_file:
@@ -1258,7 +1258,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
                 logic_ent = ent.copy()
                 logic_ent['file'] = logic_file
                 vmf.add_ent(logic_ent)
-                ALL_INST.add(logic_file)
+                ALL_INST.add(logic_file.casefold())
                 # If no connections are present, set the 'enable' value in
                 # the logic to True so the piston can function
                 logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
@@ -1275,7 +1275,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             val = instances['static_' + str(pos)]
             if val:
                 ent['file'] = val
-                ALL_INST.add(val)
+                ALL_INST.add(val.casefold())
 
         # Add in the grating for the bottom as an overlay.
         # It's low to fit the piston at minimum, or higher if needed.
@@ -1287,7 +1287,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
         if grate:
             grate_ent = ent.copy()
             grate_ent['file'] = grate
-            ALL_INST.add(grate)
+            ALL_INST.add(grate.casefold())
             vmf.add_ent(grate_ent)
     return make_static
 

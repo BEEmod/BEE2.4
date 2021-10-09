@@ -846,7 +846,7 @@ def gen_item_outputs(vmf: VMF) -> None:
             pan['file'] = desired_panel_inst
             pan.fixup[consts.FixupVars.TIM_ENABLED] = item.timer is not None
         if item.ind_panels:
-            conditions.ALL_INST.add(desired_panel_inst)
+            conditions.ALL_INST.add(desired_panel_inst.casefold())
 
     logic_auto = vmf.create_ent(
         'logic_auto',
