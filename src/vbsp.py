@@ -1867,6 +1867,7 @@ def main() -> None:
         rand.init_seed(vmf)
 
         get_map_info(vmf)
+        change_ents(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
@@ -1885,7 +1886,6 @@ def main() -> None:
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)
 
-        change_ents(vmf)
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)
