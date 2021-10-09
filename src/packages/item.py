@@ -44,6 +44,7 @@ class ItemVariant:
 
     def __init__(
         self,
+        pak_id: str,
         editoritems: EditorItem,
         vbsp_config: lazy_conf.LazyConf,
         editor_extra: list[EditorItem],
@@ -60,6 +61,7 @@ class ItemVariant:
         self.editor = editoritems
         self.editor_extra = editor_extra
         self.vbsp_config = vbsp_config
+        self.pak_id = pak_id
         self.source = source  # Original location of configs
 
         self.authors = authors
@@ -76,6 +78,7 @@ class ItemVariant:
     def copy(self) -> ItemVariant:
         """Make a copy of all the data."""
         return ItemVariant(
+            self.pak_id,
             self.editor,
             self.vbsp_config,
             self.editor_extra.copy(),
@@ -158,6 +161,7 @@ class ItemVariant:
             tags = self.tags.copy()
 
         variant = ItemVariant(
+            pak_id,
             self.editor,
             vbsp_config,
             self.editor_extra.copy(),
@@ -807,6 +811,7 @@ def parse_item_folder(
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
             source=f'<{pak_id}>/items/{fold}',
+            pak_id=pak_id,
             vbsp_config=lazy_conf.BLANK,
 
             authors=sep_values(props['authors', '']),

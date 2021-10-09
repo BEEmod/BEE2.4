@@ -202,7 +202,7 @@ class Item:
             return img.Handle.error(64, 64)
 
         return img.Handle.file(utils.PackagePath(
-            self.pak_id, str(subtype.pal_icon)
+            self.data.pak_id, str(subtype.pal_icon)
         ), 64, 64)
 
     def properties(self):
