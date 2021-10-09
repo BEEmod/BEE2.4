@@ -1390,6 +1390,7 @@ def position_exit_signs(vmf: VMF) -> None:
         file=inst_filename,
         fixup_style='0',  # Prefix
     )
+    conditions.ALL_INST.add(inst_filename.casefold())
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
     if options.get(bool, "remove_exit_signs_dual"):
@@ -1432,6 +1433,7 @@ def change_overlays(vmf: VMF) -> None:
                 angles=over['angles', '0 0 0'],
                 file=sign_inst,
             )
+            conditions.ALL_INST.add(sign_inst.casefold())
             if sign_inst_pack:
                 packing.pack_list(vmf, sign_inst_pack)
             new_inst.fixup['mat'] = sign_type.name.lower()
@@ -1518,6 +1520,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
             file=pti_file,
             fixup_style='0',
             )
+        conditions.ALL_INST.add(pti_file.casefold())
 
         has_cave = srctools.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
