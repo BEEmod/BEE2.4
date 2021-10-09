@@ -109,15 +109,14 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         # Don't bother making a overlay which will be deleted.
         return None
 
-    overlay_inst = vmf.create_ent(
-        classname='func_instance',
+    overlay_inst = conditions.add_inst(
+        vmf,
         targetname=inst['targetname', ''],
         file=filename,
         angles=angles,
         origin=inst['origin'],
-        fixup_style=res['fixup_style', '0'],
+        fixup_style=res.int('fixup_style'),
     )
-    conditions.ALL_INST.add(filename.casefold())
     # Don't run if the fixup block exists..
     if srctools.conv_bool(res['copy_fixup', '1']):
         if 'fixup' not in res and 'localfixup' not in res:
@@ -200,14 +199,12 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
                 ]
                 name, filename = rng.choice(allowed_inst)
                 pools.remove((name, filename))
-                conditions.ALL_INST.add(filename.casefold())
-                vmf.create_ent(
-                    'func_instance',
+                conditions.add_inst(
+                    vmf,
                     targetname=inst['targetname'],
                     file=filename,
                     angles=inst['angles'],
                     origin=inst['origin'],
-                    fixup_style='0',
                 ).fixup[conf_variable] = value
     return add_group
 

@@ -270,12 +270,11 @@ def add_quote(
         name = prop.name.casefold()
 
         if name == 'file':
-            vmf.create_ent(
-                classname='func_instance',
-                targetname='',
+            conditions.add_inst(
+                vmf,
                 file=INST_PREFIX + prop.value,
                 origin=quote_loc,
-                fixup_style='2',  # No fixup
+                no_fixup=True,
             )
         elif name == 'choreo':
             # If the property has children, the children are a set of sequential
@@ -455,13 +454,11 @@ def add_voice(
     quote_loc = get_studio_loc()
     if quote_base:
         LOGGER.info('Adding Base instance!')
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             targetname='voice',
             file=INST_PREFIX + quote_base,
-            angles='0 0 0',
             origin=quote_loc,
-            fixup_style='0',
         )
 
     # Either box in with nodraw, or place the voiceline studio.
@@ -519,13 +516,11 @@ def add_voice(
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         if not file:
             continue
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             targetname='voice_event_' + str(ind),
             file=file,
-            angles='0 0 0',
             origin=quote_loc,
-            fixup_style='0',
         )
 
     # Determine the flags that enable/disable specific lines based on which
