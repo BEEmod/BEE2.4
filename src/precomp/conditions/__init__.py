@@ -58,9 +58,11 @@ COND_MOD_NAME = 'Main Conditions'
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
-# Stuff we get from VBSP in init()
+# The global instance filenames we add.
 GLOBAL_INSTANCES: set[str] = set()
-ALL_INST: set[str] = set()
+# All instances that have been placed in the map at any point.
+# Pretend empty-string is there, so we don't flag it.
+ALL_INST: set[str] = {''}
 
 conditions: list[Condition] = []
 FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
@@ -618,6 +620,19 @@ def check_all(vmf: VMF) -> None:
                 if not condition.results and not condition.else_results:
                     break  # Condition has run out of results, quit early
 
+        if utils.DEV_MODE:
+            # Check ALL_INST is correct.
+            extra = GLOBAL_INSTANCES - ALL_INST
+            if extra:
+                LOGGER.warning('Extra global inst not in all inst: {}', extra)
+            for inst in vmf.by_class['func_instance']:
+                if inst['file'].casefold() not in ALL_INST:
+                    LOGGER.warning(
+                        'Condition "{}" '
+                        "doesn't add to in all_inst: {}!",
+                        condition.source,
+                        inst['file'],
+                    )
     LOGGER.info('---------------------')
     LOGGER.info('Conditions executed!')
     import vbsp
