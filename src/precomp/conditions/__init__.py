@@ -576,9 +576,10 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(inst_list: set[str]) -> None:
+def init(vmf: VMF) -> None:
     """Initialise the Conditions system."""
-    ALL_INST.update(inst_list)
+    for inst in vmf.by_class['func_instance']:
+        ALL_INST.add(inst['file'].casefold())
 
     # Sort by priority, where higher = done later
     zero = Decimal(0)
@@ -633,6 +634,7 @@ def check_all(vmf: VMF) -> None:
                         condition.source,
                         inst['file'],
                     )
+
     LOGGER.info('---------------------')
     LOGGER.info('Conditions executed!')
     import vbsp

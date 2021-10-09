@@ -798,7 +798,7 @@ def set_elev_videos(vmf: VMF) -> None:
         )
 
 
-def get_map_info(vmf: VMF) -> Set[str]:
+def get_map_info(vmf: VMF) -> None:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -808,8 +808,6 @@ def get_map_info(vmf: VMF) -> Set[str]:
     - if in preview mode
     """
     global GAME_MODE, IS_PREVIEW
-
-    inst_files = set()  # Get a set of every instance in the map.
 
     file_coop_entry = instanceLocs.get_special_inst('coopEntry')
     file_coop_exit = instanceLocs.get_special_inst('coopExit')
@@ -943,8 +941,6 @@ def get_map_info(vmf: VMF) -> Set[str]:
             # The coop frame must be the exit door...
             exit_door_frame = item
 
-        inst_files.add(item['file'])
-
     LOGGER.debug('Instances present:\n{}', '\n'.join([
         f'- "{file}": {count}'
         for file, count in filenames.most_common()
@@ -1002,9 +998,6 @@ def get_map_info(vmf: VMF) -> Set[str]:
             exit_corr_type,
             exit_corr_name,
         )
-
-    # Return the set of all instances in the map.
-    return inst_files
 
 
 def mod_entryexit(
@@ -1870,14 +1863,14 @@ def main() -> None:
 
         rand.init_seed(vmf)
 
-        all_inst = get_map_info(vmf)
+        get_map_info(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
 
-        conditions.init(all_inst)
+        conditions.init(vmf)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
