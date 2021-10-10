@@ -632,16 +632,20 @@ def make_comp_widgets(frame: ttk.Frame):
     )
     UI['light_full'].grid(row=0, column=1)
 
+    light_conf_swap = gettext(
+        "You can hold down Shift during the start of the Lighting stage to invert this "
+        "configuration on the fly."
+    )
     add_tooltip(UI['light_fast'], gettext(
         "Compile with lower-quality, fast lighting. This speeds up compile "
         "times, but does not appear as good. Some shadows may appear "
         "wrong.\nWhen publishing, this is ignored."
-    ))
+    ) + "\n\n" + light_conf_swap)
     add_tooltip(UI['light_full'], gettext(
         "Compile with high-quality lighting. This looks correct, but takes "
         "longer to compute. Use if you're arranging lights.\nWhen "
         "publishing, this is always used."
-    ))
+    ) + "\n\n" + light_conf_swap)
 
     packfile_enable = ttk.Checkbutton(
         frame,
@@ -800,13 +804,17 @@ def make_map_widgets(frame: ttk.Frame):
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
+    elev_conf_swap = gettext(
+        "You can hold down Shift during the start of the Geometry stage to quickly swap which"
+        "location you spawn at on the fly."
+    )
     add_tooltip(elev_elevator, gettext(
         "When previewing in SP, spawn inside the entry elevator. Use this to "
         "examine the entry and exit corridors."
-    ))
+    ) + "\n\n" + elev_conf_swap)
     add_tooltip(elev_preview, gettext(
         "When previewing in SP, spawn just before the entry door."
-    ))
+    ) + "\n\n" + elev_conf_swap)
 
     corr_frame = ttk.LabelFrame(
         frame,

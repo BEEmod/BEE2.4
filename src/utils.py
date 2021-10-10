@@ -476,6 +476,24 @@ def check_cython(report: Callable[[str], None] = print) -> None:
         report('Cythonised VTF functions is not installed, no DXT export!')
 
 
+if WIN:
+    def check_shift() -> bool:
+        """Check if Shift is currently held."""
+        import ctypes
+        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getasynckeystate
+        GetAsyncKeyState = ctypes.windll.User32.GetAsyncKeyState
+        GetAsyncKeyState.returntype = ctypes.c_short
+        GetAsyncKeyState.argtypes = [ctypes.c_int]
+        VK_SHIFT = 0x10
+        # Most significant bit set if currently held.
+        return GetAsyncKeyState(VK_SHIFT) & 0b1000_0000_0000_0000 != 0
+else:
+    def check_shift() -> bool:
+        """Check if Shift is currently held."""
+        return False
+    print('Need implementation of utils.check_shift()!')
+
+
 DISABLE_ADJUST = False
 
 

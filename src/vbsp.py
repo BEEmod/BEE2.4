@@ -826,6 +826,10 @@ def get_map_info(vmf: VMF) -> Set[str]:
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
+    # If shift is held, this is reversed.
+    if utils.check_shift():
+        LOGGER.info('Shift held, inverting configured elevator/chamber spawn!')
+        elev_override = not elev_override
 
     if elev_override:
         # Make conditions set appropriately
@@ -833,7 +837,7 @@ def get_map_info(vmf: VMF) -> Set[str]:
         IS_PREVIEW = False
 
     # Door frames use the same instance for both the entry and exit doors,
-    # and it'd be useful to disinguish between them. Add an instvar to help.
+    # and it'd be useful to distinguish between them. Add an instvar to help.
     door_frames = []
     entry_origin = Vec(-999, -999, -999)
     exit_origin = Vec(-999, -999, -999)

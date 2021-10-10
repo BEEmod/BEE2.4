@@ -154,6 +154,10 @@ def main(argv: List[str]) -> None:
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
             edit_args = not config.get_bool('General', 'vrad_force_full')
+            # If shif is held, reverse.
+            if utils.check_shift():
+                LOGGER.info('Shift held, inverting configured lighting option!')
+                edit_args = not edit_args
         else:
             # publishing - always force full lighting.
             edit_args = False
