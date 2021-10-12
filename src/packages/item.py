@@ -595,7 +595,7 @@ class Item(PakObject):
             )
 
             exp_data.all_items.extend(items)
-            vbsp_config += apply_replacements(config_part())
+            vbsp_config += apply_replacements(config_part(), item.id)
 
             # Add auxiliary configs as well.
             try:
@@ -603,7 +603,7 @@ class Item(PakObject):
             except KeyError:
                 pass
             else:
-                vbsp_config += apply_replacements(aux_conf.all_conf())
+                vbsp_config += apply_replacements(aux_conf.all_conf(), item.id + ':aux_all')
                 try:
                     version_data = aux_conf.versions[ver_id]
                 except KeyError:
@@ -614,7 +614,8 @@ class Item(PakObject):
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
                             vbsp_config += apply_replacements(
-                                version_data[poss_style.id]()
+                                version_data[poss_style.id](),
+                                item.id + ':aux'
                             )
                             break
 
@@ -858,7 +859,7 @@ def parse_item_folder(
     return folders
 
 
-def apply_replacements(conf: Property) -> Property:
+def apply_replacements(conf: Property, item_id: str) -> Property:
     """Apply a set of replacement values to a config file, returning a new copy.
 
     The replacements are found in a 'Replacements' block in the property.
@@ -884,7 +885,7 @@ def apply_replacements(conf: Property) -> Property:
         try:
             return replace[var.casefold()]
         except KeyError:
-            raise ValueError(f'Unresolved variable: {var!r}\n{replace}')
+            raise ValueError(f'Unresolved variable in "{item_id}": {var!r}\nValid vars: {replace}')
 
     for prop in new_conf.iter_tree(blocks=True):
         prop.name = RE_PERCENT_VAR.sub(rep_func, prop.real_name)
