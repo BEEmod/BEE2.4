@@ -109,8 +109,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        quote_block.name = None
-        voice_line.QUOTE_DATA.append(quote_block)
+        voice_line.QUOTE_DATA.extend(quote_block)
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):

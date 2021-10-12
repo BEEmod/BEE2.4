@@ -922,7 +922,7 @@ class Item:
 
         This expects the "Item" token to have been read already.
         """
-        connections = Property(None, [])
+        connections = Property('Connections', [])
         tok.expect(Token.BRACE_OPEN)
         item = Item('')
 
@@ -959,7 +959,7 @@ class Item:
             elif tok_value == 'properties':
                 item._parse_properties_block(tok)
             elif tok_value == 'exporting':
-                connections += item._parse_export_block(tok)
+                item._parse_export_block(tok, connections)
             elif tok_value in ('author', 'description', 'filter'):
                 # These are BEE2.2 values, which are not used.
                 tok.expect(Token.STRING)
@@ -1095,11 +1095,12 @@ class Item:
                         default, prop_type.id,
                     )
 
-    def _parse_export_block(self, tok: Tokenizer) -> Property:
-        """Parse the export block of the item definitions. This returns the parsed connections info."""
-        # Accumulate here, since we want to parse the input/output block
-        # together.
-        connection = Property(None, [])
+    def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
+        """Parse the export block of the item definitions. This returns the parsed connections info.
+
+        Since the standard input/output blocks must be parsed in one group, we collect those in the
+        passed property.
+        """
 
         for key in tok.block('Exporting'):
             folded_key = key.casefold()
@@ -1124,12 +1125,11 @@ class Item:
             elif folded_key == 'overlay':
                 self._parse_overlay(tok)
             elif folded_key == 'inputs':
-                self._parse_connections(tok, connection, self.conn_inputs)
+                self._parse_connections(tok, connections, self.conn_inputs)
             elif folded_key == 'outputs':
-                self._parse_connections(tok, connection, self.conn_outputs)
+                self._parse_connections(tok, connections, self.conn_outputs)
             else:
                 raise tok.error('Unknown export option {}!', key)
-        return connection
 
     def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
         """Parse a section in the instances block."""

@@ -12,7 +12,7 @@ import utils
 LOGGER = logger.get_logger(__name__)
 LazyConf = Callable[[], Property]
 # Empty property.
-BLANK: LazyConf = lambda: Property(None, [])
+BLANK: LazyConf = lambda: Property.root()
 
 
 def raw_prop(block: Property, source: str= '') -> LazyConf:
@@ -79,12 +79,13 @@ def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	if b is BLANK:
 		return a
 
-	def concat() -> Property:
-		prop = Property(None, [])
+	def concat_inner() -> Property:
+		"""Resolve then merge the configs."""
+		prop = Property.root()
 		prop.extend(a())
 		prop.extend(b())
 		return prop
-	return concat
+	return concat_inner
 
 
 def replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> LazyConf:

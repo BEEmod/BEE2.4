@@ -696,8 +696,8 @@ class Game:
             os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
 
             # Start off with the style's data.
-            vbsp_config = Property(None, [])
-            vbsp_config += style.config()
+            vbsp_config = Property.root()
+            vbsp_config += style.config().copy()
 
             all_items = style.items.copy()
             renderables = style.renderables.copy()

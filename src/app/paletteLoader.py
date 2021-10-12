@@ -298,7 +298,7 @@ class Palette:
         versions). Otherwise those palettes always create a new file.
         """
         LOGGER.info('Saving "{}"!', self.name)
-        props = Property(None, [
+        props = Property.root(
             Property('Name', self.name),
             Property('TransName', self.trans_name),
             Property('Group', self.group),
@@ -308,7 +308,7 @@ class Palette:
                 Property(item_id, str(subitem))
                 for item_id, subitem in self.pos
             ])
-        ])
+        )
         # If default, don't include in the palette file.
         # Remove the translated name, in case it's not going to write
         # properly to the file.
