@@ -81,8 +81,8 @@ def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 
 	def concat() -> Property:
 		prop = Property(None, [])
-		prop += a()
-		prop += b()
+		prop.extend(a())
+		prop.extend(b())
 		return prop
 	return concat
 

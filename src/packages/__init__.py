@@ -343,7 +343,7 @@ def get_config(
     prop_block = prop_block.find_key(prop_name, "")
     if prop_block.has_children():
         prop = prop_block.copy()
-        prop.name = None
+        prop.name = ""
         return lazy_conf.raw_prop(prop, source=source)
 
     if prop_block.value == '':
