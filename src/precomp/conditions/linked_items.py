@@ -60,12 +60,21 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
     At priority level -300, the sequence of similarly-marked items this links
     to is grouped together, and given fixup values to allow linking them.
 
+    Every instance has `$type` set to `loop`, `start`, `mid` or `end` depending on its role.
+    For each group of linked items, `$group` is set to a unique number. Then for each item, `$ind`
+    is set to a unique index (starting at 1), and if it is not an endpoint `$next` is set to the
+    index of the next item. This should be used by naming items `@itemtype_track_$group_$ind`, and
+    then connecting that to `$itemtype_track_$group_$next`. See the Unstationary Scaffold package
+    for an example usage.
+
     Parameters:
     * Group: Should be set to a unique name. All calls with this name can be
       linked together. If not used, only this specific result call will link.
     * AllowLoop: If true, allow constructing a loop of items. In this situation, the
       indexes will start at some item at random, and proceed around. The last will then
       link to the first.
+    * TransferIO: If true (default), all inputs and outputs are transferred to the first
+      item (index = 1). This instance can then forward the results to the other items in the group.
     * StartLogic/MidLogic/EndLogic/LoopLogic: These instances will be overlaid on the
       instance, depending on whether it starts/ends or is in the middle of the
       path. If the item loops, all use LoopLogic.
@@ -108,6 +117,7 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
         logic_end=resolve_optional(res, 'endLogic'),
         logic_loop=resolve_optional(res, 'loopLogic'),
         allow_loop=res.bool('allowLoop'),
+        transfer_io=res.bool('transferIO', true),
         antline=antline,
         scaff_endcap=resolve_optional(res, 'EndcapInst'),
         scaff_endcap_free_rot=res.bool('endcap_free_rotate'),
@@ -159,7 +169,7 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                     raise AssertionError(conf.antline)
 
             # Transfer inputs and outputs to the first.
-            if index != 0:
+            if index != 0 and conf.transfer_io:
                 for conn in list(node.item.outputs):
                     conn.from_item = node_list[0].item
                 for conn in list(node.item.inputs):
