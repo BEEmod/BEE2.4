@@ -7,6 +7,7 @@ import operator
 import random
 import math
 
+import loadScreen
 from srctools import Property
 from app import TK_ROOT
 from app.itemPropWin import PROP_TYPES
@@ -433,6 +434,7 @@ def quit_application() -> None:
     # Destroy the TK windows, finalise logging, then quit.
     logging.shutdown()
     TK_ROOT.quit()
+    loadScreen.shutdown()
     sys.exit(0)
 
 gameMan.quit_application = quit_application

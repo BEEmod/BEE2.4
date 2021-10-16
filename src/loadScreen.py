@@ -195,6 +195,13 @@ class LoadScreen:
         self._send_msg('show')
 
 
+def shutdown() -> None:
+    """Instruct the daemon process to shutdown."""
+    try:
+        _PIPE_MAIN_SEND.send(('quit_daemon', None, None))
+    except BrokenPipeError:  # Already quit, don't care.
+        pass
+
 # Initialise the daemon.
 # noinspection PyProtectedMember
 BG_PROC = multiprocessing.Process(

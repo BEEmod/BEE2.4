@@ -778,6 +778,10 @@ def run_background(
                     is_main, title, stages = args
                     screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
                     SCREENS[scr_id] = screen
+                elif operation == 'quit_daemon':
+                    # Shutdown.
+                    TK_ROOT.quit()
+                    return
                 elif operation == 'set_force_ontop':
                     [force_ontop] = args
                     for screen in SCREENS.values():
