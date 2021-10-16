@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-10-08 16:27+1000\n"
+"POT-Creation-Date: 2021-10-16 16:09+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -232,6 +232,12 @@ msgstr "最佳画质"
 
 #: app/CompilerPane.py:635
 msgid ""
+"You can hold down Shift during the start of the Lighting stage to invert "
+"this configuration on the fly."
+msgstr ""
+
+#: app/CompilerPane.py:639
+msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
 "When publishing, this is ignored."
@@ -239,7 +245,7 @@ msgstr ""
 "使用低质量的光照以加快渲染，但将导致画面变得糟糕，部分阴影可能会导致失真。\n"
 "发布地图时，这个选项将被忽略。"
 
-#: app/CompilerPane.py:640
+#: app/CompilerPane.py:644
 #, fuzzy
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
@@ -250,11 +256,11 @@ msgstr ""
 "如果你希望布置酷炫的光线效果，请使用此选项。\n"
 "发布地图时，将始终使用此选项。"
 
-#: app/CompilerPane.py:648
+#: app/CompilerPane.py:652
 msgid "Dump packed files to:"
 msgstr "转储打包后的文件"
 
-#: app/CompilerPane.py:671
+#: app/CompilerPane.py:675
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -262,37 +268,37 @@ msgstr ""
 "编译时，转储地图会用到的所有数据包文件，用于Hammer编辑地图。\n"
 "（必须使用全英文路径，并建立新文件夹，转储数据时会清空同名文件夹内原有的内容）"
 
-#: app/CompilerPane.py:678
+#: app/CompilerPane.py:682
 msgid "Last Compile:"
 msgstr "编译数据统计"
 
-#: app/CompilerPane.py:688
+#: app/CompilerPane.py:692
 msgid "Entity"
 msgstr "实体"
 
-#: app/CompilerPane.py:708
+#: app/CompilerPane.py:712
 msgid "Overlay"
 msgstr "标记"
 
-#: app/CompilerPane.py:725
+#: app/CompilerPane.py:729
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
 msgstr "刷新数据统计。 执行编译后点击，以更新数据。"
 
-#: app/CompilerPane.py:732
+#: app/CompilerPane.py:736
 msgid "Brush"
 msgstr "画刷"
 
-#: app/CompilerPane.py:760
+#: app/CompilerPane.py:764
 msgid "Voicelines:"
 msgstr "声线选择"
 
-#: app/CompilerPane.py:767
+#: app/CompilerPane.py:771
 msgid "Use voiceline priorities"
 msgstr "使用高优先级声线"
 
-#: app/CompilerPane.py:771
+#: app/CompilerPane.py:775
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
@@ -301,19 +307,25 @@ msgstr ""
 "仅选择优先级最高的声线，这意味着当地图中测试元素很少时，仅能选择通用的声线。\n"
 "如果禁用，将可使用任何可选的声线。"
 
-#: app/CompilerPane.py:779
+#: app/CompilerPane.py:783
 msgid "Spawn at:"
 msgstr "出生位置"
 
-#: app/CompilerPane.py:789
+#: app/CompilerPane.py:793
 msgid "Entry Door"
 msgstr "入口"
 
-#: app/CompilerPane.py:795
+#: app/CompilerPane.py:799
 msgid "Elevator"
 msgstr "电梯"
 
-#: app/CompilerPane.py:803
+#: app/CompilerPane.py:807
+msgid ""
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap whichlocation you spawn at on the fly."
+msgstr ""
+
+#: app/CompilerPane.py:811
 #, fuzzy
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
@@ -323,52 +335,52 @@ msgstr ""
 "这会禁用到达出口后地图重新开始。\n"
 "使用此选项来检查入口走廊和出口走廊是否令人满意。"
 
-#: app/CompilerPane.py:807
+#: app/CompilerPane.py:815
 #, fuzzy
 msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
 "单人模式预览地图时，在入口前出生（跳过入口走廊）。\n"
 "当你到达出口时，地图将重新开始。（以便快速检查地图的谜题）"
 
-#: app/CompilerPane.py:814
+#: app/CompilerPane.py:822
 msgid "Corridor:"
 msgstr "走廊样式"
 
-#: app/CompilerPane.py:820
+#: app/CompilerPane.py:828
 msgid "Singleplayer Entry Corridor"
 msgstr ""
 
 #. i18n: corridor selector window title.
-#: app/CompilerPane.py:821
+#: app/CompilerPane.py:829
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
 #. i18n: corridor selector window title.
-#: app/CompilerPane.py:822
+#: app/CompilerPane.py:830
 msgid "Coop Exit Corridor"
 msgstr ""
 
-#: app/CompilerPane.py:832
+#: app/CompilerPane.py:840
 msgid "SP Entry:"
 msgstr "单人模式入口"
 
-#: app/CompilerPane.py:837
+#: app/CompilerPane.py:845
 msgid "SP Exit:"
 msgstr "单人模式出口"
 
-#: app/CompilerPane.py:842
+#: app/CompilerPane.py:850
 msgid "Coop Exit:"
 msgstr ""
 
-#: app/CompilerPane.py:848
+#: app/CompilerPane.py:856
 msgid "Player Model (SP):"
 msgstr "玩家模型（单人模式）"
 
-#: app/CompilerPane.py:879
+#: app/CompilerPane.py:887
 msgid "Compile Options"
 msgstr "编译选项"
 
-#: app/CompilerPane.py:897
+#: app/CompilerPane.py:905
 msgid "Compiler Options - {}"
 msgstr "开发者选项 - {}"
 

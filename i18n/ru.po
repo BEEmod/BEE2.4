@@ -3,13 +3,13 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-10-08 16:27+1000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"POT-Creation-Date: 2021-10-16 16:09+1000\n"
+"PO-Revision-Date: 2021-09-08 09:58+0000\n"
 "Last-Translator: \n"
 "Language: ru\n"
-"Language-Team: ru <LL@li.org>\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
-"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2)\n"
+"Language-Team: Russian\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10 >= 2 &&"
+" n%10<=4 &&(n%100<10||n%100 >= 20)? 1 : 2)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -103,7 +103,7 @@ msgid ""
 "high, it may help to reduce the size of the map or remove intricate "
 "shapes."
 msgstr ""
-"Щетки образуют стенки или другие части испытательной камеры. Если она "
+"Браши образуют стенки или другие части испытательной камеры. Если она "
 "высока, это может помочь уменьшить размер карты и удалить сложные фигуры."
 
 #. i18n: Progress bar description
@@ -133,8 +133,8 @@ msgid ""
 "this."
 msgstr ""
 "Оверлеи - это небольшие изображения, прикрепленные к поверхностям, таким "
-"как знаки или индикаторы. Сокрытие сложных антлайнов или установка их на "
-"вывеску уменьшит это."
+"как знаки или индикаторы. Скрытие сложных антлайнов или установка "
+"соединений в значки уменьшит это."
 
 #: app/CompilerPane.py:277
 msgid "Corridor"
@@ -161,8 +161,9 @@ msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
 msgstr ""
-"Настройки в этой панели могут быть изменены без экспорта или перезапуска "
-"игры."
+"Эти настройки могут быть \n"
+"изменены без экспорта или\n"
+"перезапуска игры"
 
 #: app/CompilerPane.py:512
 msgid "Map Settings"
@@ -174,7 +175,7 @@ msgstr "Настройки компиляции"
 
 #: app/CompilerPane.py:531
 msgid "Thumbnail"
-msgstr "Эскиз"
+msgstr "Превью"
 
 #: app/CompilerPane.py:539
 msgid "Auto"
@@ -215,9 +216,9 @@ msgid ""
 "select.\n"
 "Images will be converted to JPEGs if needed."
 msgstr ""
-"Использовать кастомное изображение для эскиза. Нажмите на скриншот, чтобы"
+"Использовать кастомное изображение для превью. Нажмите на скриншот, чтобы"
 " выбрать его.\n"
-"Изображения переконвертируются в JPEG, если это будет нужну"
+"Изображения переконвертируются в JPEG, если это будет нужно"
 
 #: app/CompilerPane.py:603
 msgid ""
@@ -241,6 +242,12 @@ msgstr "Полное"
 
 #: app/CompilerPane.py:635
 msgid ""
+"You can hold down Shift during the start of the Lighting stage to invert "
+"this configuration on the fly."
+msgstr ""
+
+#: app/CompilerPane.py:639
+msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
 "When publishing, this is ignored."
@@ -250,7 +257,7 @@ msgstr ""
 "казаться неправильными.\n"
 "При публикации это игнорируется."
 
-#: app/CompilerPane.py:640
+#: app/CompilerPane.py:644
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
 "to compute. Use if you're arranging lights.\n"
@@ -261,11 +268,11 @@ msgstr ""
 " освещением.\n"
 "При публикации это всегда используется."
 
-#: app/CompilerPane.py:648
+#: app/CompilerPane.py:652
 msgid "Dump packed files to:"
 msgstr "Дампить файлы пакетов в:"
 
-#: app/CompilerPane.py:671
+#: app/CompilerPane.py:675
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -273,19 +280,19 @@ msgstr ""
 "При компиляции дампить все файлы, которые были использованы в карте. "
 "Полезно, если вы собираетесь редактировать карты в Hammer."
 
-#: app/CompilerPane.py:678
+#: app/CompilerPane.py:682
 msgid "Last Compile:"
 msgstr "Последняя компиляция:"
 
-#: app/CompilerPane.py:688
+#: app/CompilerPane.py:692
 msgid "Entity"
 msgstr "Сущность"
 
-#: app/CompilerPane.py:708
+#: app/CompilerPane.py:712
 msgid "Overlay"
 msgstr "Оверлей"
 
-#: app/CompilerPane.py:725
+#: app/CompilerPane.py:729
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
@@ -293,19 +300,19 @@ msgstr ""
 "Обновление индикаторов компиляции. Нажмите после компиляции, чтобы "
 "отобразить новые значения."
 
-#: app/CompilerPane.py:732
+#: app/CompilerPane.py:736
 msgid "Brush"
-msgstr "Кисть"
+msgstr "Браш"
 
-#: app/CompilerPane.py:760
+#: app/CompilerPane.py:764
 msgid "Voicelines:"
 msgstr "Озвучка:"
 
-#: app/CompilerPane.py:767
+#: app/CompilerPane.py:771
 msgid "Use voiceline priorities"
 msgstr "Использовать приоритетную озвучку."
 
-#: app/CompilerPane.py:771
+#: app/CompilerPane.py:775
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
@@ -316,19 +323,25 @@ msgstr ""
 "тестовых элементов. Если отключено, будут использоваться любые возможные "
 "фразы."
 
-#: app/CompilerPane.py:779
+#: app/CompilerPane.py:783
 msgid "Spawn at:"
 msgstr "Спавниться в:"
 
-#: app/CompilerPane.py:789
+#: app/CompilerPane.py:793
 msgid "Entry Door"
 msgstr "Двери входа"
 
-#: app/CompilerPane.py:795
+#: app/CompilerPane.py:799
 msgid "Elevator"
 msgstr "Лифте"
 
-#: app/CompilerPane.py:803
+#: app/CompilerPane.py:807
+msgid ""
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap whichlocation you spawn at on the fly."
+msgstr ""
+
+#: app/CompilerPane.py:811
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
 "examine the entry and exit corridors."
@@ -336,49 +349,49 @@ msgstr ""
 "При одиночном предпросмотре, вы спавнитесь внутри лифта. Используйте это "
 "для изучения коридоров входа и выхода."
 
-#: app/CompilerPane.py:807
+#: app/CompilerPane.py:815
 msgid "When previewing in SP, spawn just before the entry door."
 msgstr "При одиночном предпросмотре, вы спавнитесь на входе."
 
-#: app/CompilerPane.py:814
+#: app/CompilerPane.py:822
 msgid "Corridor:"
 msgstr "Коридор:"
 
-#: app/CompilerPane.py:820
+#: app/CompilerPane.py:828
 msgid "Singleplayer Entry Corridor"
-msgstr ""
+msgstr "Коридор входа"
 
 #. i18n: corridor selector window title.
-#: app/CompilerPane.py:821
+#: app/CompilerPane.py:829
 msgid "Singleplayer Exit Corridor"
-msgstr ""
+msgstr "Коридор выхода"
 
 #. i18n: corridor selector window title.
-#: app/CompilerPane.py:822
+#: app/CompilerPane.py:830
 msgid "Coop Exit Corridor"
-msgstr ""
+msgstr "Коридор выхода в кооперативном режиме"
 
-#: app/CompilerPane.py:832
+#: app/CompilerPane.py:840
 msgid "SP Entry:"
-msgstr "Вход в одиночном режиме:"
+msgstr "Вход:"
 
-#: app/CompilerPane.py:837
+#: app/CompilerPane.py:845
 msgid "SP Exit:"
-msgstr "Вход в коопе"
+msgstr "Выход:"
 
-#: app/CompilerPane.py:842
+#: app/CompilerPane.py:850
 msgid "Coop Exit:"
 msgstr "Выход в коопе:"
 
-#: app/CompilerPane.py:848
+#: app/CompilerPane.py:856
 msgid "Player Model (SP):"
 msgstr "Моделька игрока:"
 
-#: app/CompilerPane.py:879
+#: app/CompilerPane.py:887
 msgid "Compile Options"
 msgstr "Опции компиляции"
 
-#: app/CompilerPane.py:897
+#: app/CompilerPane.py:905
 msgid "Compiler Options - {}"
 msgstr "Опции компилятора - {}"
 
@@ -392,7 +405,7 @@ msgstr "Проигрывать реплики Кейва Джонсона из �
 
 #: app/StyleVarPane.py:34
 msgid "Prevent Portal Bump (fizzler)"
-msgstr "Защита от порталов (распылитель)"
+msgstr "Защита от порталов (поле антиэкспроприации)"
 
 #: app/StyleVarPane.py:36
 msgid ""
@@ -400,13 +413,13 @@ msgid ""
 "edges. This can prevent placing portals in tight spaces near fizzlers, or"
 " fizzle portals on activation."
 msgstr ""
-"Добавляет хитбоксы, убирая возможность ставить порталы через распылитель."
-" Это предотвращает размещение порталов в узких пространствах между "
-"распылителями или во время их активации."
+"Добавляет хитбоксы, убирая возможность ставить порталы через поле "
+"антиэкспроприации. Это предотвращает размещение порталов в узких "
+"пространствах между полями антиэкспроприации или во время их активации."
 
 #: app/StyleVarPane.py:45
 msgid "Suppress Mid-Chamber Dialogue"
-msgstr "Хорош базарить"
+msgstr "Заглушить диалоги посередине карты"
 
 #: app/StyleVarPane.py:47
 msgid "Disable all voicelines other than entry and exit lines."
@@ -424,7 +437,7 @@ msgid ""
 "Observation Room. Use with caution, this can have weird results!"
 msgstr ""
 "Разрешить создание и удаление входа/выхода и большого зала наблюдения. "
-"Осторожно, может получиться что-то странное!"
+"Осторожно, удаления этих предметов может привести к странным результатам!"
 
 #: app/StyleVarPane.py:63
 msgid "Allow Adding Goo Mist"
@@ -567,15 +580,15 @@ msgid ""
 "The additional \"Multiverse\" Cave lines are controlled separately in "
 "Style Properties."
 msgstr ""
-"Выберите, какие дополнительные голоса будут воспроизводиться, когда игрок"
-" входит или выходит из камеры. Они выбираются в зависимости от того, "
-"какие элементы присутствуют на карте. Дополнительные линии Кейва "
+"Выберите, какая дополнительная озвучка будет воспроизводиться, когда "
+"игрок входит или выходит из камеры. Они выбираются в зависимости от того,"
+" какие элементы присутствуют на карте. Дополнительные линии Кейва "
 "Мультивселенной управляются отдельно в Свойствах стиля."
 
 #: app/UI.py:596
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr ""
-"Не добавлять дополнительную озвучку, только Кейва Мультивселенной, если "
+"Не добавлять дополнительную озвучку, только Кейва мультивселенной, если "
 "он включён."
 
 #: app/UI.py:598
@@ -646,7 +659,7 @@ msgstr "Несколько ориентаций"
 
 #: app/UI.py:806
 msgid "Selected Items and Style successfully exported!"
-msgstr "Выбранные предметы и стили удачно экспортированы!"
+msgstr "Выбранные предметы и стили успешно экспортированы!"
 
 #: app/UI.py:808
 msgid ""
@@ -655,20 +668,20 @@ msgid ""
 "Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
 "editor wall previews are changed."
 msgstr ""
-"Внимание: VPK-фалы не были экспортированы. Выйдите из Portal 2 и Hammer "
+"Внимание: VPK-файлы не были экспортированы. Выйдите из Portal 2 и Hammer "
 "для экспорта."
 
 #: app/UI.py:1103
 msgid "Save Palette..."
-msgstr "Сохранить набор..."
+msgstr "Сохранить палитру..."
 
 #: app/UI.py:1110 app/paletteUI.py:147
 msgid "Save Palette As..."
-msgstr "Сохранить набор как..."
+msgstr "Сохранить палитру как..."
 
 #: app/UI.py:1116 app/paletteUI.py:134
 msgid "Save Settings in Palettes"
-msgstr "Сохранить настройки в наборе"
+msgstr "Сохранить настройки в палитре"
 
 #: app/UI.py:1134 app/music_conf.py:222
 msgid "Music: "
@@ -728,7 +741,7 @@ msgstr "Убрать из выбранной игры"
 
 #: app/UI.py:1468
 msgid "Backup/Restore Puzzles..."
-msgstr "Резервирование/восстановление головоломок"
+msgstr "Бэкап/Восстановление головоломок..."
 
 #: app/UI.py:1472
 msgid "Manage Packages..."
@@ -744,7 +757,7 @@ msgstr "Выход"
 
 #: app/UI.py:1492
 msgid "Palette"
-msgstr "Набор"
+msgstr "Палитра"
 
 #: app/UI.py:1495
 msgid "View"
@@ -752,7 +765,7 @@ msgstr "Вид"
 
 #: app/UI.py:1605
 msgid "Palettes"
-msgstr "Наборы"
+msgstr "Палитры"
 
 #: app/UI.py:1640
 msgid "Export Options"
@@ -788,7 +801,7 @@ msgstr "Удаление карт"
 
 #: app/backup.py:139
 msgid "Failed to parse this puzzle file. It can still be backed up."
-msgstr "Не удалось прочитать файл паззла. Он всё ещё может быть зарезервирован."
+msgstr "Не удалось прочитать файл карты. Он всё ещё может быть помещен в бэкап."
 
 #: app/backup.py:143
 msgid "No description found."
@@ -804,11 +817,11 @@ msgstr "Один игрок"
 
 #: app/backup.py:336
 msgid "This filename is already in the backup.Do you wish to overwrite it? ({})"
-msgstr "Файл с таким именем уже зарезервирован. Вы хотите его перезаписать? ({})"
+msgstr "Бэкап с таким именем уже имеется. Вы хотите его перезаписать? ({})"
 
 #: app/backup.py:442
 msgid "BEE2 Backup"
-msgstr "Резервирование BEE2"
+msgstr "Бэкап BEE2"
 
 #: app/backup.py:443
 msgid "No maps were chosen to backup!"
@@ -826,7 +839,7 @@ msgstr "Загрузить бекап"
 
 #: app/backup.py:566 app/backup.py:625
 msgid "Backup zip"
-msgstr "Зарезервировать zip"
+msgstr "Бэкап"
 
 #: app/backup.py:599
 msgid "Unsaved Backup"
@@ -843,8 +856,8 @@ msgstr "Подтвердите удаление"
 #: app/backup.py:722
 msgid "Do you wish to delete {} map?\n"
 msgid_plural "Do you wish to delete {} maps?\n"
-msgstr[0] "Вы хотите удалить {} карту?"
-msgstr[1] "Вы хотите удалить {} карты?"
+msgstr[0] "Вы хотите удалить карту {}?"
+msgstr[1] "Вы хотите удалить карты {}?"
 msgstr[2] ""
 
 #: app/backup.py:759
@@ -853,7 +866,7 @@ msgstr "Восстановить:"
 
 #: app/backup.py:760
 msgid "Backup:"
-msgstr "Зарезервировать:"
+msgstr "Бэкап:"
 
 #: app/backup.py:797
 msgid "Checked"
@@ -865,7 +878,7 @@ msgstr "Удалить выбранные"
 
 #: app/backup.py:855
 msgid "BEEMOD {} - Backup / Restore Puzzles"
-msgstr "BEEMOD {} - Зарезервировать/Восстановить головоломки"
+msgstr "BEEMOD {} - Бэкап/Восстановление головоломок"
 
 #: app/backup.py:868 app/backup.py:996
 msgid "New Backup"
@@ -881,7 +894,7 @@ msgstr "Сохранить бекап"
 
 #: app/backup.py:878
 msgid "Remove Game"
-msgstr "Удалить бекап"
+msgstr "Удалить BEE2 из текущей игры"
 
 #: app/backup.py:881
 msgid "Game"
@@ -889,7 +902,7 @@ msgstr "Игра"
 
 #: app/backup.py:927
 msgid "Automatic Backup After Export"
-msgstr "Автоматически резервировать после сохранения"
+msgstr "Создавать авто-бэкап после экспортирования"
 
 #: app/backup.py:959
 msgid "Keep (Per Game):"
@@ -897,7 +910,7 @@ msgstr "Сохранять (в течение игры):"
 
 #: app/backup.py:977
 msgid "Backup/Restore Puzzles"
-msgstr "Зарезервировать/Восстановить головоломки"
+msgstr "Бэкап/Восстановление головоломок"
 
 #: app/contextWin.py:82
 msgid "This item may not be rotated."
@@ -929,7 +942,7 @@ msgstr "Этот предмет устанавливается с помощью
 
 #: app/contextWin.py:89
 msgid "This item positions the dropper to hit target locations."
-msgstr "Этот предмет создаёт выбрасыватель."
+msgstr "Этот предмет создаёт раздатчик."
 
 #: app/contextWin.py:91
 msgid "This item does not accept any inputs."
@@ -941,19 +954,21 @@ msgstr "К этому предмету можно подключать антл�
 
 #: app/contextWin.py:93
 msgid "This item has two input types (A and B), using the Input A and B items."
-msgstr "У этого предмета есть два типа входа (А и Б), он использует \"A/B Input\"."
+msgstr ""
+"У этого предмета есть два типа входящих соединений (А и Б), он использует"
+" \"A/B Input\"."
 
 #: app/contextWin.py:95
 msgid "This item does not output."
-msgstr "У этого предмета нет выходов."
+msgstr "У этого предмета нет исходящих соединений"
 
 #: app/contextWin.py:96
 msgid "This item has an output."
-msgstr "У этого предмета есть выходы."
+msgstr "У этого предмета есть исходящие соединения."
 
 #: app/contextWin.py:97
 msgid "This item has a timed output."
-msgstr "У этого предмета есть выходы с таймерами."
+msgstr "У этого предмета есть исходящие соединения с таймером"
 
 #: app/contextWin.py:99
 msgid "This item does not take up any space inside walls."
@@ -1001,7 +1016,9 @@ msgstr "Нет других версий"
 
 #: app/contextWin.py:321
 msgid "Excursion Funnels accept a on/off input and a directional input."
-msgstr "У экскурсионных воронок есть вкл/выкл входы и входы направления."
+msgstr ""
+"У экскурсионных воронок есть вкл/выкл переключение и переключение "
+"направления."
 
 #: app/contextWin.py:372
 msgid ""
@@ -1041,7 +1058,7 @@ msgstr "Больше информации>>"
 
 #: app/contextWin.py:564
 msgid "Change Defaults..."
-msgstr "Изменить умолчания..."
+msgstr "Изменить значения по умолчанию..."
 
 #: app/contextWin.py:570
 msgid "Change the default settings for this item when placed."
@@ -1056,14 +1073,15 @@ msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr ""
-"Файл компилятора {file} не найден. Закройте приложения Steam, нажмите ОК "
-"для подтверждения кэша игры. Вы можете экспортировать снова."
+"Файл компилятора {file} не найден. Закройте приложение Steam, затем "
+"нажмите ОК для проверки кэша игры. Затем, вы сможете экспортировать "
+"снова."
 
 #: app/gameMan.py:881
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
-"Не удалось скопировать файл компилсятора {file}. Необходимая игра не "
-"запущена."
+"Не удалось скопировать файл компилсятора {file}. Убедитесь, что игра "
+"{game} не запущена."
 
 #: app/gameMan.py:1187
 msgid ""
@@ -1075,7 +1093,7 @@ msgstr ""
 
 #: app/gameMan.py:1191
 msgid "BEE2 - Aperture Tag Files Missing"
-msgstr "BEE2 - не найдены файлы Aperture Tag"
+msgstr "BEE2 - Не найдены файлы Aperture Tag"
 
 #: app/gameMan.py:1305
 msgid "Select the folder where the game executable is located ({appname})..."
@@ -1096,7 +1114,7 @@ msgstr "Исполняемый файл"
 
 #: app/gameMan.py:1321
 msgid "This does not appear to be a valid game folder!"
-msgstr "Так, блэт. Это не похоже на допустимую папку с игрой!"
+msgstr "Это не похоже на верную папку с игрой"
 
 #: app/gameMan.py:1331
 msgid "Portal Stories: Mel doesn't have an editor!"
@@ -1120,7 +1138,7 @@ msgid ""
 " (BEE2 will quit, this is the last game set!)"
 msgstr ""
 "\n"
-"(BEE2 выйдет, это последний игровой набор!)"
+"(BEE2 закроется!)"
 
 #: app/gameMan.py:1383 app/paletteUI.py:272
 msgid "Are you sure you want to delete \"{}\"?"
@@ -1215,7 +1233,7 @@ msgstr "Нет доступных параметров!"
 
 #: app/itemPropWin.py:603
 msgid "Settings for \"{}\""
-msgstr ""
+msgstr "Настройки для \"{}\""
 
 #: app/itemPropWin.py:604
 msgid "BEE2 - {}"
@@ -1251,11 +1269,11 @@ msgstr ""
 
 #: app/music_conf.py:157
 msgid "Propulsion Gel SFX"
-msgstr "Эффект ускорения"
+msgstr "Звук ускорающего геля"
 
 #: app/music_conf.py:158
 msgid "Repulsion Gel SFX"
-msgstr "Эффект отскока"
+msgstr "Звук отталкивающего геля"
 
 #: app/music_conf.py:159
 msgid "Excursion Funnel Music"
@@ -1291,7 +1309,7 @@ msgstr "Не добавлять музыку при отскоке от геля
 
 #: app/music_conf.py:197
 msgid "Select Propulsion Gel Music"
-msgstr "Выберите музыку для проталкивающего геля"
+msgstr "Выберите музыку для ускоряющего геля"
 
 #: app/music_conf.py:198
 msgid ""
@@ -1363,19 +1381,19 @@ msgstr ""
 
 #: app/optionWindow.py:69
 msgid "BEE2 Options"
-msgstr "Опции BEE2"
+msgstr "Настройки BEE2"
 
 #: app/optionWindow.py:107
 msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
 msgstr ""
-"Время кэширования пакетов было сброшено. Они будут извлечены во время "
-"следующего экспорта."
+"Время кэширования пакетов было сброшено. Они будут загружены полностью во"
+" время следующего экспорта."
 
 #: app/optionWindow.py:124
 msgid "\"Preserve Game Resources\" has been disabled."
-msgstr "\"Сохранение игровых ресурсов\" отключено."
+msgstr "\"Предохранение игровых директорий\" отключено."
 
 #: app/optionWindow.py:136
 msgid "Packages Reset"
@@ -1407,7 +1425,7 @@ msgstr "Ничего не делать"
 
 #: app/optionWindow.py:307
 msgid "Minimise BEE2"
-msgstr "Свернуть шею BEE2"
+msgstr "Свернуть BEE2"
 
 #: app/optionWindow.py:313
 msgid "Quit BEE2"
@@ -1594,15 +1612,17 @@ msgstr "Дампить список объектов"
 
 #: app/optionWindow.py:502
 msgid "Reload Images"
-msgstr ""
+msgstr "Перезагрузить все изображения"
 
 #: app/optionWindow.py:505
 msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
+"Перезагрузить все изображения в приложении. От этого приложение зависнет "
+"ненадолго"
 
 #: app/packageMan.py:64
 msgid "BEE2 - Restart Required!"
-msgstr "BEE2 - Необходима перезагрузка!"
+msgstr "BEE2 - Необходим перезапуск!"
 
 #: app/packageMan.py:65
 msgid ""
@@ -1632,25 +1652,25 @@ msgstr "BEEMod"
 #. i18n: Default items merged together
 #: app/paletteLoader.py:33
 msgid "Portal 2 Collapsed"
-msgstr "Portal 2 вылетел"
+msgstr "Portal 2 был свернут"
 
 #: app/paletteUI.py:66
 msgid "Clear Palette"
-msgstr "Очистить набор"
+msgstr "Очистить палитру"
 
 #: app/paletteUI.py:92 app/paletteUI.py:109
 msgid "Delete Palette"
-msgstr "Удалить набор"
+msgstr "Удалить палитру"
 
 #: app/paletteUI.py:115
 #, fuzzy
 msgid "Change Palette Group..."
-msgstr "Сохранить набор как..."
+msgstr "Сохранить палитру как..."
 
 #: app/paletteUI.py:121
 #, fuzzy
 msgid "Rename Palette..."
-msgstr "Сохранить набор..."
+msgstr "Сохранить палитру..."
 
 #: app/paletteUI.py:127
 msgid "Fill Palette"
@@ -1658,7 +1678,7 @@ msgstr "Заполнить набор"
 
 #: app/paletteUI.py:141
 msgid "Save Palette"
-msgstr "Сохранить набор"
+msgstr "Сохранить палитру"
 
 #: app/paletteUI.py:187
 msgid "Builtin / Readonly"
@@ -1666,11 +1686,11 @@ msgstr ""
 
 #: app/paletteUI.py:246
 msgid "Delete Palette \"{}\""
-msgstr "Удалить набор \"{}\""
+msgstr "Удалить палитру \"{}\""
 
 #: app/paletteUI.py:296 app/paletteUI.py:312
 msgid "BEE2 - Save Palette"
-msgstr "BEE2 - Сохранить Набор"
+msgstr "BEE2 - Сохранить Палитру"
 
 #: app/paletteUI.py:296 app/paletteUI.py:312
 msgid "Enter a name:"
@@ -1690,7 +1710,7 @@ msgstr "Открыть \"{}\" в стандартном браузере?"
 
 #: app/selector_win.py:490
 msgid "{} Preview"
-msgstr ""
+msgstr "{} Превью"
 
 #. i18n: 'None' item description
 #: app/selector_win.py:555
@@ -1708,11 +1728,11 @@ msgstr "Предложенное"
 
 #: app/selector_win.py:806
 msgid "Play a sample of this item."
-msgstr "Воспроизвести пример этого предмета."
+msgstr "Воспроизвести сэмпл."
 
 #: app/selector_win.py:878
 msgid "Reset to Default"
-msgstr "Сбросить до умолчаний"
+msgstr "Сбросить до значений по умолчанию"
 
 #: app/selector_win.py:1074
 msgid "Other"
@@ -1723,7 +1743,7 @@ msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "Автор: {}"
 msgstr[1] "Авторы: {}"
-msgstr[2] ""
+msgstr[2] "Авторы: {}"
 
 #. i18n: Tooltip for colour swatch.
 #: app/selector_win.py:1387
@@ -1776,7 +1796,7 @@ msgstr "Смерть - Турели"
 
 #: app/voiceEditor.py:53
 msgid "Death - Crusher"
-msgstr "Смерть - Хрясь)))"
+msgstr "Смерть - Пресс"
 
 #: app/voiceEditor.py:54
 msgid "Death - LaserField"
@@ -1826,9 +1846,6 @@ msgstr "Нет имени!"
 msgid "No Name?"
 msgstr "Нет имени?"
 
-#~ msgid "Loading Images"
-#~ msgstr "Загрузка изображений"
-
 #~ msgid "This palette already exists. Overwrite?"
-#~ msgstr "Такой набор уже существует. Перезаписать?"
+#~ msgstr "Такая палитра уже существует. Перезаписать?"
 
