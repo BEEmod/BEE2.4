@@ -769,29 +769,35 @@ def run_background(
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
-        while PIPE_REC.poll():  # Pop off all the values.
-            had_values = True
-            operation, scr_id, args = PIPE_REC.recv()
-            if operation == 'init':
-                # Create a new loadscreen.
-                is_main, title, stages = args
-                screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
-                SCREENS[scr_id] = screen
-            elif operation == 'set_force_ontop':
-                [force_ontop] = args
-                for screen in SCREENS.values():
-                    screen.win.attributes('-topmost', force_ontop)
-            else:
-                try:
-                    func = getattr(SCREENS[scr_id], 'op_' + operation)
-                except AttributeError:
-                    raise ValueError(f'Bad command "{operation}"!')
-                try:
-                    func(*args)
-                except Exception:
-                    raise Exception(operation)
-        while log_pipe_rec.poll():
-            log_window.handle(log_pipe_rec.recv())
+        try:
+            while PIPE_REC.poll():  # Pop off all the values.
+                had_values = True
+                operation, scr_id, args = PIPE_REC.recv()
+                if operation == 'init':
+                    # Create a new loadscreen.
+                    is_main, title, stages = args
+                    screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
+                    SCREENS[scr_id] = screen
+                elif operation == 'set_force_ontop':
+                    [force_ontop] = args
+                    for screen in SCREENS.values():
+                        screen.win.attributes('-topmost', force_ontop)
+                else:
+                    try:
+                        func = getattr(SCREENS[scr_id], 'op_' + operation)
+                    except AttributeError:
+                        raise ValueError(f'Bad command "{operation}"!')
+                    try:
+                        func(*args)
+                    except Exception:
+                        raise Exception(operation)
+            while log_pipe_rec.poll():
+                log_window.handle(log_pipe_rec.recv())
+        except BrokenPipeError:
+            # A pipe failed, means the main app quit. Terminate ourselves.
+            print('BG: Lost pipe!')
+            TK_ROOT.quit()
+            return
 
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
