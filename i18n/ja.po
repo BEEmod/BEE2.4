@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-10-08 16:27+1000\n"
+"POT-Creation-Date: 2021-10-16 16:09+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -214,126 +214,138 @@ msgstr "完成"
 
 #: app/CompilerPane.py:635
 msgid ""
+"You can hold down Shift during the start of the Lighting stage to invert "
+"this configuration on the fly."
+msgstr ""
+
+#: app/CompilerPane.py:639
+msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
 "When publishing, this is ignored."
 msgstr ""
 
-#: app/CompilerPane.py:640
+#: app/CompilerPane.py:644
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
 "to compute. Use if you're arranging lights.\n"
 "When publishing, this is always used."
 msgstr ""
 
-#: app/CompilerPane.py:648
+#: app/CompilerPane.py:652
 msgid "Dump packed files to:"
 msgstr ""
 
-#: app/CompilerPane.py:671
+#: app/CompilerPane.py:675
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
 msgstr ""
 
-#: app/CompilerPane.py:678
+#: app/CompilerPane.py:682
 msgid "Last Compile:"
 msgstr "前のコンパイル："
 
-#: app/CompilerPane.py:688
+#: app/CompilerPane.py:692
 msgid "Entity"
 msgstr "エンティティ"
 
-#: app/CompilerPane.py:708
+#: app/CompilerPane.py:712
 msgid "Overlay"
 msgstr "オーバーレイ"
 
-#: app/CompilerPane.py:725
+#: app/CompilerPane.py:729
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
 msgstr ""
 
-#: app/CompilerPane.py:732
+#: app/CompilerPane.py:736
 msgid "Brush"
 msgstr "ブラシ"
 
-#: app/CompilerPane.py:760
+#: app/CompilerPane.py:764
 msgid "Voicelines:"
 msgstr ""
 
-#: app/CompilerPane.py:767
+#: app/CompilerPane.py:771
 msgid "Use voiceline priorities"
 msgstr ""
 
-#: app/CompilerPane.py:771
+#: app/CompilerPane.py:775
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
 "disabled any applicable lines will be used."
 msgstr ""
 
-#: app/CompilerPane.py:779
+#: app/CompilerPane.py:783
 msgid "Spawn at:"
 msgstr ""
 
-#: app/CompilerPane.py:789
+#: app/CompilerPane.py:793
 msgid "Entry Door"
 msgstr "入口"
 
-#: app/CompilerPane.py:795
+#: app/CompilerPane.py:799
 msgid "Elevator"
 msgstr "エレベーター"
 
-#: app/CompilerPane.py:803
+#: app/CompilerPane.py:807
+msgid ""
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap whichlocation you spawn at on the fly."
+msgstr ""
+
+#: app/CompilerPane.py:811
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
 "examine the entry and exit corridors."
 msgstr ""
 
-#: app/CompilerPane.py:807
+#: app/CompilerPane.py:815
 msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
 
-#: app/CompilerPane.py:814
+#: app/CompilerPane.py:822
 msgid "Corridor:"
 msgstr "廊下："
 
-#: app/CompilerPane.py:820
+#: app/CompilerPane.py:828
 msgid "Singleplayer Entry Corridor"
 msgstr ""
 
 #. i18n: corridor selector window title.
-#: app/CompilerPane.py:821
+#: app/CompilerPane.py:829
 msgid "Singleplayer Exit Corridor"
 msgstr ""
 
 #. i18n: corridor selector window title.
-#: app/CompilerPane.py:822
+#: app/CompilerPane.py:830
 msgid "Coop Exit Corridor"
 msgstr ""
 
-#: app/CompilerPane.py:832
+#: app/CompilerPane.py:840
 msgid "SP Entry:"
 msgstr "SP入口："
 
-#: app/CompilerPane.py:837
+#: app/CompilerPane.py:845
 msgid "SP Exit:"
 msgstr "SP出口："
 
-#: app/CompilerPane.py:842
+#: app/CompilerPane.py:850
 msgid "Coop Exit:"
 msgstr ""
 
-#: app/CompilerPane.py:848
+#: app/CompilerPane.py:856
 msgid "Player Model (SP):"
 msgstr ""
 
-#: app/CompilerPane.py:879
+#: app/CompilerPane.py:887
 msgid "Compile Options"
 msgstr ""
 
-#: app/CompilerPane.py:897
+#: app/CompilerPane.py:905
 msgid "Compiler Options - {}"
 msgstr ""
 
