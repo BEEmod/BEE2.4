@@ -9,15 +9,11 @@ from enum import Enum
 from typing import NamedTuple, MutableMapping
 
 from precomp import brushLoc, options, packing, conditions
-from precomp.conditions import meta_cond, make_result, make_flag, RES_EXHAUSTED
 from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst
-from srctools import (
-    Property, VMF, Entity, Vec, Output,
-    EmptyMapping, Matrix, Angle,
-)
+from srctools.vmf import VMF, Entity, EntityFixup, Output
+from srctools import EmptyMapping, Property, Vec, Matrix, Angle
 import srctools.logger
-from srctools.vmf import EntityFixup
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -907,8 +903,8 @@ def _make_multi_filter(
     return filter_ent['targetname']
 
 
-@make_flag('CubeType')
-def flag_cube_type(inst: Entity, res: Property):
+@conditions.make_flag('CubeType')
+def flag_cube_type(inst: Entity, res: Property) -> bool:
     """Check if an instance is/should be a cube.
 
     This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and items marked as
@@ -960,8 +956,8 @@ def flag_cube_type(inst: Entity, res: Property):
     return pair.cube_type.id == cube_type.upper()
 
 
-@make_flag('DropperColor')
-def flag_dropper_color(inst: Entity, res: Property):
+@conditions.make_flag('DropperColor')
+def flag_dropper_color(inst: Entity, res: Property) -> bool:
     """Detect the color of a cube on droppers.
 
     This is `True` if the cube is coloured. The value should be a `$fixup`
@@ -978,7 +974,7 @@ def flag_dropper_color(inst: Entity, res: Property):
     return data.tint is not None
 
 
-@make_result('CubeAddon', 'DropperAddon')
+@conditions.make_result('CubeAddon', 'DropperAddon')
 def res_dropper_addon(inst: Entity, res: Property):
     """Attach an addon to an item."""
     try:
@@ -995,7 +991,7 @@ def res_dropper_addon(inst: Entity, res: Property):
     pair.addons.add(addon)
 
 
-@make_result('SetDropperOffset')
+@conditions.make_result('SetDropperOffset')
 def res_set_dropper_off(inst: Entity, res: Property) -> None:
     """Update the position cubes will be spawned at for a dropper."""
     try:
@@ -1007,7 +1003,7 @@ def res_set_dropper_off(inst: Entity, res: Property) -> None:
             conditions.resolve_value(inst, res.value))
 
 
-@make_result('ChangeCubeType', 'SetCubeType')
+@conditions.make_result('ChangeCubeType', 'SetCubeType')
 def flag_cube_type(inst: Entity, res: Property):
     """Change the cube type of a cube item
 
@@ -1026,7 +1022,7 @@ def flag_cube_type(inst: Entity, res: Property):
         raise ValueError(f'Unknown cube type "{res.value}"!')
 
 
-@make_result('CubeFilter')
+@conditions.make_result('CubeFilter')
 def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     """Given a set of cube-type IDs, generate a filter for them.
 
@@ -1049,7 +1045,7 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     )
 
 
-@make_result('VScriptCubePredicate')
+@conditions.make_result('VScriptCubePredicate')
 def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> None:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
@@ -1106,10 +1102,10 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> None:
     for i, model in enumerate(model_names, 1):
         conf_ent[f'mdl{i:02}'] = model
 
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@meta_cond(priority=-750, only_once=True)
+@conditions.meta_cond(priority=-750, only_once=True)
 def link_cubes(vmf: VMF):
     """Determine the cubes set based on instance settings.
 
@@ -1648,7 +1644,7 @@ def make_cube(
     return has_addon_inst, ent
 
 
-@meta_cond(priority=750, only_once=True)
+@conditions.meta_cond(priority=750, only_once=True)
 def generate_cubes(vmf: VMF):
     """After other conditions are run, generate cubes."""
     from vbsp import settings
