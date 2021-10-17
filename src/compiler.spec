@@ -10,6 +10,9 @@ import sys
 workpath: str
 SPECPATH: str
 
+# Allow importing utils.
+sys.path.append(SPECPATH)
+
 # THe BEE2 modules cannot be imported inside the spec files.
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')

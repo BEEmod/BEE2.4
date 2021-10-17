@@ -8,13 +8,14 @@ import babel.messages.extract
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 
-import utils
-
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 # Injected by PyInstaller.
 workpath: str
 SPECPATH: str
 
+# Allow importing utils.
+sys.path.append(SPECPATH)
+import utils
 
 # src -> build subfolder.
 data_files = [
