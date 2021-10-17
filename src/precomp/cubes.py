@@ -48,8 +48,6 @@ CUBE_POS: dict[tuple[float, float, float], CubePair] = {}
 # Prevents duplicating different filter entities. A number of different keys are used depending on
 # exactly which kind of filter.
 CUBE_FILTERS: dict[object, str] = {}
-# Multi-filters are sequentially named.
-CUBE_FILTER_MULTI_IND = 0
 
 # Max number of ents in a multi filter.
 MULTI_FILTER_COUNT = 10
@@ -862,8 +860,6 @@ def _make_multi_filter(
 
     This reuses ents for duplicate calls, and recurses if needed.
     """
-    global CUBE_FILTER_MULTI_IND
-
     # Check for existing ents of the same type.
     key = frozenset(names), invert
     try:
@@ -879,15 +875,13 @@ def _make_multi_filter(
 
     # Names must now be 5 or less.
 
-    CUBE_FILTER_MULTI_IND += 1
     filter_ent = vmf.create_ent(
         classname='filter_multi',
         origin=pos,
-        targetname='@filter_multi_{:02}'.format(CUBE_FILTER_MULTI_IND),
         negated=invert,
         # If not inverted - OR (1), if inverted AND (0).
         filtertype=not invert,
-    )
+    ).make_unique('@filter_multi_')
 
     for ind, name in enumerate(names, start=1):
         filter_ent['Filter{:02}'.format(ind)] = name
@@ -903,14 +897,12 @@ def _make_multi_filter(
         except KeyError:
             pass
 
-        CUBE_FILTER_MULTI_IND += 1
         filter_ent = vmf.create_ent(
-            targetname='@filter_multi_{:02}'.format(CUBE_FILTER_MULTI_IND),
             classname='filter_multi',
             origin=pos,
             filtertype=0,  # AND
             filter01=inv_name,
-        )
+        ).make_unique('@filter_multi_')
         if has_cube_cls:
             filter_ent['filter02'] = FILTER_CUBE_CLS
         if has_monst_cls:
