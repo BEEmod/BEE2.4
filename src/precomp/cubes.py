@@ -1,4 +1,6 @@
 """Implement cubes and droppers."""
+from __future__ import annotations
+
 import itertools
 from contextlib import suppress
 from weakref import WeakKeyDictionary
@@ -6,7 +8,7 @@ from weakref import WeakKeyDictionary
 from enum import Enum
 from typing import (
     Optional, Union, Tuple, NamedTuple,
-    Dict, List, Set, FrozenSet, MutableMapping
+    Dict, List, Set, MutableMapping
 )
 
 from precomp import brushLoc, options, packing, conditions
@@ -41,11 +43,11 @@ DROPPERLESS_OFFSET = 22 - 64
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
-CUBE_POS: Dict[Tuple[float, float, float], 'CubePair'] = {}
+CUBE_POS: dict[tuple[float, float, float], CubePair] = {}
 
-# Prevents duplicating different filter entities.
-# It's either a frozenset of filter names, or a single model.
-CUBE_FILTERS: Dict[Union[str, FrozenSet[str]], str] = {}
+# Prevents duplicating different filter entities. A number of different keys are used depending on
+# exactly which kind of filter.
+CUBE_FILTERS: dict[object, str] = {}
 # Multi-filters are sequentially named.
 CUBE_FILTER_MULTI_IND = 0
 
@@ -797,14 +799,14 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
         children = inclusions
 
     # Models we need to include in the multi-filter -> name to use.
-    models = {}  # type: Dict[str, str]
+    models: dict[str, str] = {}
     # Names to use in the final filter
-    names = set()
+    names: set[str] = set()
 
     # Check if we have the two class types.
     has_cube_cls = has_monst_cls = False
 
-    for cube_type in children:  # type: CubeType
+    for cube_type in children:
         # Special case - no model, just by class.
         # FrankenTurrets don't have one model.
         if cube_type.type is CubeEntType.franken:
@@ -1135,14 +1137,14 @@ def link_cubes(vmf: VMF):
             inst_to_type[inst] = obj_type
 
     # Origin -> instances
-    dropper_pos = {}  # type: Dict[Tuple[float, float, float], Tuple[Entity, DropperType]]
+    dropper_pos: dict[tuple[float, float, float], tuple[Entity, DropperType]] = {}
     # Timer value -> instances if not 0.
-    dropper_timer = {}  # type: Dict[int, Tuple[Entity, DropperType]]
+    dropper_timer: dict[int, tuple[Entity, DropperType] | tuple[None, None]] = {}
     # Instance -> has a cube linked to this yet?
-    used_droppers = {}  # type: Dict[Entity, bool]
+    used_droppers: dict[Entity, bool] = {}
 
     # Cube items.
-    cubes = []  # type: List[Tuple[Entity, CubeType]]
+    cubes = []  # type: list[tuple[Entity, CubeType]]
 
     for inst in vmf.by_class['func_instance']:
         try:
