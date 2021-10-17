@@ -33,6 +33,7 @@ class Config:
 
     antline: AntlineHandling
     allow_loop: bool
+    transfer_io: bool
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
