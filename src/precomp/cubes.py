@@ -1161,11 +1161,15 @@ def link_cubes(vmf: VMF):
             # Infinite and 3 (default) are treated as off.
             if 3 < timer <= 30:
                 if timer in dropper_timer:
-                    raise ValueError(
+                    LOGGER.warning(
                         'Two droppers with the same '
-                        'timer value: ' + str(timer)
+                        'timer value: {}',
+                        timer,
                     )
-                dropper_timer[timer] = inst, inst_type
+                    # Disable this.
+                    dropper_timer[timer] = None, None
+                else:
+                    dropper_timer[timer] = inst, inst_type
             # For setup later.
             dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst, inst_type
             used_droppers[inst] = False
@@ -1188,16 +1192,22 @@ def link_cubes(vmf: VMF):
             try:
                 dropper, drop_type = dropper_timer[timer]
             except KeyError:
-                raise ValueError(
+                LOGGER.warning(
                     'Unknown cube "linkage" value ({}) in cube!\n'
                     'A cube has a timer set which doesn\'t match '
-                    'any droppers.'.format(timer)
-                ) from None
+                    'any droppers.',
+                    timer
+                )
+                continue
+            if dropper is None or drop_type is None:
+                # Two of these, it's ambigous. Already logged above.
+                continue
             if used_droppers[dropper]:
-                raise ValueError(
-                    'Dropper tried to link to two cubes! (timer={})'.format(
-                        timer
-                    )) from None
+                LOGGER.warning(
+                    'Dropper tried to link to two cubes! (timer={})',
+                    timer,
+                )
+                continue
             used_droppers[dropper] = True
 
             # Autodrop on the dropper shouldn't be on - that makes
