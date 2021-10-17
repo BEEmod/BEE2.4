@@ -117,7 +117,7 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
         logic_end=resolve_optional(res, 'endLogic'),
         logic_loop=resolve_optional(res, 'loopLogic'),
         allow_loop=res.bool('allowLoop'),
-        transfer_io=res.bool('transferIO', true),
+        transfer_io=res.bool('transferIO', True),
         antline=antline,
         scaff_endcap=resolve_optional(res, 'EndcapInst'),
         scaff_endcap_free_rot=res.bool('endcap_free_rotate'),
