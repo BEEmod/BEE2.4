@@ -64,7 +64,7 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
     For each group of linked items, `$group` is set to a unique number. Then for each item, `$ind`
     is set to a unique index (starting at 1), and if it is not an endpoint `$next` is set to the
     index of the next item. This should be used by naming items `@itemtype_track_$group_$ind`, and
-    then connecting that to `$itemtype_track_$group_$next`. See the Unstationary Scaffold package
+    then connecting that to `@itemtype_track_$group_$next`. See the Unstationary Scaffold package
     for an example usage.
 
     Parameters:
