@@ -595,7 +595,7 @@ class Item(PakObject):
             )
 
             exp_data.all_items.extend(items)
-            vbsp_config += apply_replacements(config_part(), item.id)
+            vbsp_config.extend(apply_replacements(config_part(), item.id))
 
             # Add auxiliary configs as well.
             try:
@@ -603,7 +603,7 @@ class Item(PakObject):
             except KeyError:
                 pass
             else:
-                vbsp_config += apply_replacements(aux_conf.all_conf(), item.id + ':aux_all')
+                vbsp_config.extend(apply_replacements(aux_conf.all_conf(), item.id + ':aux_all'))
                 try:
                     version_data = aux_conf.versions[ver_id]
                 except KeyError:
@@ -613,10 +613,10 @@ class Item(PakObject):
                     # that's defined for this config
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
-                            vbsp_config += apply_replacements(
+                            vbsp_config.extend(apply_replacements(
                                 version_data[poss_style.id](),
                                 item.id + ':aux'
-                            )
+                            ))
                             break
 
     def _get_export_data(
@@ -731,7 +731,7 @@ class ItemConfig(PakObject, allow_mult=True):
                 if sty_id not in our_styles:
                     our_styles[sty_id] = style
                 else:
-                    our_styles[sty_id] += lazy_conf.concat(our_styles[sty_id], style)
+                    our_styles[sty_id] = lazy_conf.concat(our_styles[sty_id], style)
 
     @staticmethod
     def export(exp_data: ExportData) -> None:
