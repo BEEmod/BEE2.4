@@ -10,45 +10,8 @@
             "embeds": [
               {
                 "title": "--------------- RULES ----------------",
-                "color": 16761704,
-                "fields": [
-                  {
-                    "name": ":one: Act mature.",
-                    "value": "> Occasional jokes are fine, but there is a line. This is not a meme server. Don’t be excessively childish or try to trick people into something. Don't start unnecessary drama. If an admin tells you to stop, then do so."
-                  },
-                  {
-                    "name": ":two: Keep discussion in English.",
-                    "value": "> We cannot moderate other languages. If you're talking to someone in a different language, please take the discussion to DMs."
-                  },
-                  {
-                    "name": ":three: Do not post any sort of NSFW content.",
-                    "value": "> This also includes things on your profile such as your avatar."
-                  },
-                  {
-                    "name": ":four: Don't spam.",
-                    "value": "> This one should be obvious, but don't post messages rapidly or use a load of emojis/reactions. A good rule is more than 5 is a waste."
-                  },
-                  {
-                    "name": ":five: Do not abuse mentions.",
-                    "value": "> Only ping the Central Core role when a user is breaking the rules. `@everyone` and `@here` are turned off, don't try to use them."
-                  },
-                  {
-                    "name": ":six: Don't ask to ask a question.",
-                    "value": "> Just ask it, we're here to help."
-                  },
-                  {
-                    "name": ":seven: Know what you're talking about when giving help",
-                    "value": "> For example: don't try to help people with Hammer unless you actually use hammer"
-                  },
-                  {
-                    "name": ":eight: Please do not use this server for bug reports or feature requests.",
-                    "value": "> This is not referring to diagnosing an issue or asking for help. Bug reports should be posted on the Issues page of the correct GitHub repositories (More information below). Don't beg or @ devs for help, a lot of us are busy and we will help when we are available."
-                  },
-                  {
-                    "name": ":nine: Use typing etiquette",
-                    "value": "> Keep messages easy to read. Don't rapidly post multiple messages, instead take time to type out your message in full. Don't roleplay or use typing quirks."
-                  }
-                ]
+                "description": ">>> :one: -  Listen to Staff.\n:two: - English discussion only.\n:three: - Do not post NSFW, hate speech, slurs, spam, or suspicious files/links.\n:four: - No low effort content, memes, or random/disruptive messages.\n:five: - Use your better judgement.",
+                "color": 16761704
               }
             ],
             "username": "BLoBDOS"
