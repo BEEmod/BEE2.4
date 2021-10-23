@@ -27,6 +27,10 @@
                   {
                     "name": "> Beta Testers",
                     "value": "> Beta Testers are people who receive beta builds of the app. Beta builds tend to be less stable so these testers catch any mistakes the development team might have made.  Beta Testers are hand picked by the development team, so don't ask to receive the role."
+                  },
+                  {
+                    "name": "> BEEmod Community",
+                    "value": "> The community section of the BEEmod discord is reserved for people who both want it and can follow the rules. Its a more relaxed section of the server where you can talk about more general stuff. In order to opt in, you must introduce yourself in <#901350687047315496>"
                   }
                 ]
               }
