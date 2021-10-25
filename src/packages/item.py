@@ -867,7 +867,7 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
     allows literal percents. Unassigned values are an error.
     """
     replace: dict[str, str] = {}
-    new_conf = Property(conf.real_name, [])
+    new_conf = Property.root() if conf.is_root() else Property(conf.real_name, [])
 
     # Strip the replacement blocks from the config, and save the values.
     for prop in conf:
