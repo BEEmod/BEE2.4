@@ -1,5 +1,5 @@
 """The result used to generate unstationary scaffolds."""
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 from enum import Enum
 import math
 
@@ -37,25 +37,19 @@ def get_config(
 ) -> Tuple[str, Vec]:
     """Compute the config values for a node."""
 
-    orient = (
-        'floor' if
-        Vec(0, 0, 1).rotate_by_str(node.inst['angles']) == (0, 0, 1)
-        else 'wall'
-    )
+    orient = ('floor' if abs(node.orient.up().z) > 0.9 else 'wall')
     # Find the offset used for the platform.
-    offset = (node.conf['off_' + orient]).copy()  # type: Vec
+    offset: Vec = (node.conf['off_' + orient]).copy()
     if node.conf['is_piston']:
         # Adjust based on the piston position
         offset.z += 128 * srctools.conv_int(
             node.inst.fixup[
                 '$top_level' if
-                node.inst.fixup[
-                    '$start_up'] == '1'
+                node.inst.fixup['$start_up'] == '1'
                 else '$bottom_level'
             ]
         )
-    offset = offset.rotate_by_str(node.inst['angles'])
-    offset += Vec.from_str(node.inst['origin'])
+    offset = offset @ node.orient + node.pos
     return orient, offset
 
 
@@ -154,12 +148,19 @@ def res_unst_scaffold(vmf: VMF, res: Property):
     inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
-    chains = item_chain.chain(vmf, inst_to_config.keys(), allow_loop=False)
+    # Don't bother typechecking this dict, legacy code.
+    nodes: list[item_chain.Node[dict[str, Any]]] = []
+    for inst in vmf.by_class['func_instance']:
+        try:
+            conf = inst_to_config[inst['file'].casefold()]
+        except KeyError:
+            continue
+        else:
+            nodes.append(item_chain.Node.from_inst(inst, conf))
 
     # We need to make the link entities unique for each scaffold set,
     # otherwise the AllVar property won't work.
-
-    for group_counter, node_list in enumerate(chains):
+    for group_counter, node_list in enumerate(item_chain.chain(nodes, allow_loop=False)):
         # Set all the instances and properties
         start_inst = node_list[0].item.inst
         for vals in LINKS.values():
