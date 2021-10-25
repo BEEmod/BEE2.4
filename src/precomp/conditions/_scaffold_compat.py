@@ -19,7 +19,7 @@ class LinkType(Enum):
 
 COND_MOD_NAME = None
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.scaffold')
+LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
 
 
 def scaff_scan(inst_list, start_ent):
@@ -132,18 +132,20 @@ def res_unst_scaffold_setup(res: Property):
 
 @make_result('UnstScaffold')
 def res_unst_scaffold(vmf: VMF, res: Property):
-    """The condition to generate Unstationary Scaffolds.
+    """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
-    This is executed once to modify all instances.
+    This has since been swapped to use the LinkedItems result, but this is kept for package
+    compatiblity.
     """
     # The instance types we're modifying
     if res.value not in SCAFFOLD_CONFIGS:
         # We've already executed this config group
         return RES_EXHAUSTED
 
-    LOGGER.info(
-        'Running Scaffold Generator ({})...',
-        res.value
+    LOGGER.warning(
+        'Running legacy scaffold generator for "{}"!'
+        'Items should now use the generic LinkedItem config, update your packages!',
+        res.value,
     )
     inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
