@@ -15,7 +15,8 @@ from enum import Enum
 import functools
 import operator
 import math
-from typing import Optional, Union, Iterable, Mapping, Callable, Any
+import random
+from typing import Optional, Union, Iterable, Mapping, Callable, Any, AbstractSet
 
 import attr
 
@@ -630,8 +631,12 @@ class SelectorWin:
             self.callback = None
             self.callback_params = ()
 
-        # Item object for the currently suggested item.
-        self.suggested = None
+        # Currently suggested item objects. This would be a set, but we want to randomly pick.
+        self.suggested: list[Item] = []
+        # While the user hovers over the "suggested" button, cycle through random items. But we
+        # want to apply that specific item when clicked.
+        self._suggested_rollover: Item | None = None
+        self._suggest_lbl: list[Label] = []
 
         # Should we have the 'reset to default' button?
         self.has_def = has_def
@@ -739,23 +744,6 @@ class SelectorWin:
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
 
         tk_tools.add_mousewheel(self.wid_canvas, self.win)
-
-        if utils.MAC:
-            # Labelframe doesn't look good here on OSX
-            self.sugg_lbl = ttk.Label(
-                self.pal_frame,
-                name='suggest_label',
-                # Draw lines with box drawing characters
-                text="\u250E\u2500" + gettext("Suggested") + "\u2500\u2512",
-            )
-        else:
-            self.sugg_lbl = ttk.LabelFrame(
-                self.pal_frame,
-                name='suggest_label',
-                text=gettext("Suggested"),
-                labelanchor=N,
-                height=50,
-            )
 
         # Holds all the widgets which provide info for the current item.
         self.prop_frm = ttk.Frame(self.pane_win, name='prop_frame', borderwidth=4, relief='raised')
@@ -874,8 +862,8 @@ class SelectorWin:
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
-                name='btn_reset',
-                text=gettext("Reset to Default"),
+                name='btn_suggest',
+                text=gettext("Select Suggested"),
                 command=self.sel_suggested,
             )
             self.prop_reset.grid(
@@ -904,7 +892,7 @@ class SelectorWin:
         self.sugg_font: tk_font.Font = self.norm_font.copy()
         self.sugg_font['weight'] = tk_font.BOLD
 
-        # Make a font for previewing the suggested item
+        # Make a font for previewing the suggested items
         self.mouseover_font: tk_font.Font = self.norm_font.copy()
         self.mouseover_font['slant'] = tk_font.ITALIC
 
@@ -1183,7 +1171,7 @@ class SelectorWin:
     def set_disp(self, _: Event = None) -> str:
         """Set the display textbox."""
         # Bold the text if the suggested item is selected (like the
-        # context menu). We check for truthness to ensure it's actually
+        # context menu). We check for truthiness to ensure it's actually
         # initialised.
         if self.display:
             if self.is_suggested():
@@ -1196,19 +1184,24 @@ class SelectorWin:
         else:
             self.chosen_id = self.selected.name
 
+        self._suggested_rollover = None  # Discard the rolled over item.
         self.disp_label.set(self.selected.context_lbl)
         self.orig_selected = self.selected
         self.context_var.set(self.selected.name)
         return "break"  # stop the entry widget from continuing with this event
 
     def rollover_suggest(self) -> None:
-        """Show the suggested item when the button is moused over."""
-        if self.is_suggested() or self.suggested is None:
-            # the suggested item is aready the suggested item
-            # or no suggested item
-            return
-        self.display['font'] = self.mouseover_font
-        self.disp_label.set(self.suggested.context_lbl)
+        """Pick a suggested item when the button is moused over, and keep cycling."""
+        if self.can_suggest():
+            self.display['font'] = self.mouseover_font
+            self._pick_suggested(force=True)
+
+    def _pick_suggested(self, force=False) -> None:
+        """Randomly select a suggested item."""
+        if self.suggested and (force or self._suggested_rollover is not None):
+            self._suggested_rollover = random.choice(self.suggested)
+            self.disp_label.set(self._suggested_rollover.context_lbl)
+            self.display.after(1000, self._pick_suggested)
 
     def _icon_clicked(self, _: Event) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
@@ -1279,8 +1272,20 @@ class SelectorWin:
 
     def sel_suggested(self) -> None:
         """Select the suggested item."""
-        if self.suggested is not None:
-            self.sel_item(self.suggested)
+        # Pick the hovered item.
+        if self._suggested_rollover is not None:
+            self.sel_item(self._suggested_rollover)
+        # Not hovering, but we have some, randomly pick.
+        elif self.suggested:
+            # Do not re-pick the same item if we can avoid it.
+            if self.selected in self.suggested and len(self.suggested) > 1:
+                pool = self.suggested.copy()
+                pool.remove(self.selected)
+            else:
+                pool = self.suggested
+            self.sel_item(random.choice(pool))
+        self.set_disp()
+        self.do_callback()
 
     def do_callback(self) -> None:
         """Call the callback function."""
@@ -1365,10 +1370,10 @@ class SelectorWin:
                 self.samp_button.state(('disabled',))
 
         if self.has_def:
-            if self.suggested is None or self.selected == self.suggested:
-                self.prop_reset.state(('disabled',))
-            else:
+            if self.can_suggest():
                 self.prop_reset.state(('!disabled',))
+            else:
+                self.prop_reset.state(('disabled',))
 
         if self.attr:
             # Set the attribute items.
@@ -1553,8 +1558,10 @@ class SelectorWin:
         # The offset for the current group
         y_off = 0
 
-        # Hide suggestion indicator if the item's not visible.
-        self.sugg_lbl.place_forget()
+        # Hide suggestion indicators if they end up unused.
+        for lbl in self._suggest_lbl:
+            lbl.place_forget()
+        suggest_ind = 0
 
         # If only the '' group is present, force it to be visible, and hide
         # the header.
@@ -1583,12 +1590,35 @@ class SelectorWin:
 
             # Place each item
             for i, item in enumerate(items):
-                if item == self.suggested:
-                    self.sugg_lbl.place(
+                if item in self.suggested:
+                    # Reuse an existing suggested label.
+                    try:
+                        sugg_lbl = self._suggest_lbl[suggest_ind]
+                    except IndexError:
+                        # Not enough, make more.
+                        if utils.MAC:
+                            # Labelframe doesn't look good here on OSX
+                            sugg_lbl = ttk.Label(
+                                self.pal_frame,
+                                name=f'suggest_label_{suggest_ind}',
+                                # Draw lines with box drawing characters
+                                text="\u250E\u2500" + gettext("Suggested") + "\u2500\u2512",
+                            )
+                        else:
+                            sugg_lbl = ttk.LabelFrame(
+                                self.pal_frame,
+                                name=f'suggest_label_{suggest_ind}',
+                                text=gettext("Suggested"),
+                                labelanchor=N,
+                                height=50,
+                            )
+                        self._suggest_lbl.append(sugg_lbl)
+                    suggest_ind += 1
+                    sugg_lbl.place(
                         x=(i % width) * ITEM_WIDTH + 1,
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
-                    self.sugg_lbl['width'] = item.button.winfo_width()
+                    sugg_lbl['width'] = item.button.winfo_width()
                 item.set_pos(
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
@@ -1642,54 +1672,71 @@ class SelectorWin:
             return False
 
     def is_suggested(self) -> bool:
-        """Return whether the current item is the suggested one."""
-        return self.suggested == self.selected
+        """Return whether the current item is a suggested one."""
+        return self.selected in self.suggested
 
-    def _set_context_font(self, item, new_font: tk_font.Font) -> None:
+    def can_suggest(self) -> bool:
+        """Check if a new item can be suggested."""
+        if not self.suggested:
+            return False
+        if len(self.suggested) > 1:
+            return True
+        # If we suggest one item which is selected, that's
+        # pointless.
+        return self.suggested != [self.selected]
+
+    # noinspection PyProtectedMember
+    def _set_context_font(self, item, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
-
+        if item._context_ind is None:
+            return
+        new_font = self.sugg_font if suggested else self.norm_font
         if item.group:
             group_key = item.group.casefold()
             menu = self.context_menus[group_key]
 
-            # Apply the font to the group header as well.
-            self.group_widgets[group_key].title['font'] = new_font
+            # Apply the font to the group header as well, if suggested.
+            if suggested:
+                self.group_widgets[group_key].title['font'] = new_font
 
-            # Also highlight the menu
-            # noinspection PyUnresolvedReferences, PyProtectedMember
-            self.context_menu.entryconfig(
-                menu._context_index,  # Use a custom attr to keep track of this...
-                font=new_font,
-            )
+                # Also highlight the menu
+                # noinspection PyUnresolvedReferences
+                self.context_menu.entryconfig(
+                    menu._context_index,  # Use a custom attr to keep track of this...
+                    font=new_font,
+                )
         else:
             menu = self.context_menu
-        # noinspection PyProtectedMember
         menu.entryconfig(item._context_ind, font=new_font)
 
-    def set_suggested(self, suggested: Optional[str] = None) -> None:
-        """Set the suggested item to the given ID.
+    def set_suggested(self, suggested: AbstractSet[str]=frozenset()) -> None:
+        """Set the suggested items to the set of IDs.
 
-        If the ID is None or does not exist, the suggested item will be cleared.
-        If the ID is "<NONE>", it will be set to the None item.
+        If it is empty, the suggested ID will be cleared.
+        If "<NONE>" is present, the None item will be included.
         """
-        if self.suggested is not None:
-            self._set_context_font(self.suggested, self.norm_font)
-            # Remove the font from the last suggested item
+        self.suggested.clear()
+        # Reset all the header fonts, if any item in that group is highlighted it'll
+        # re-bold it.
+        for group_key, header in self.group_widgets.items():
+            header.title['font'] = self.norm_font
+            try:
+                # noinspection PyProtectedMember, PyUnresolvedReferences
+                ind = self.context_menus[group_key]._context_index
+            except AttributeError:
+                pass
+            else:
+                self.context_menu.entryconfig(ind, font=self.norm_font)
 
-        if suggested is None or suggested == '':
-            self.suggested = None
-        elif suggested == "<NONE>":
-            self.suggested = self.noneItem
-        else:
-            for item in self.item_list:
-                if item.name == suggested:
-                    self.suggested = item
-                    break
-            else:  # Not found
-                self.suggested = None
+        self._set_context_font(self.noneItem, '<NONE>' in suggested)
 
-        if self.suggested is not None:
-            self._set_context_font(self.suggested, self.sugg_font)
+        for item in self.item_list:
+            if item.name in suggested:
+                self._set_context_font(item, True)
+                self.suggested.append(item)
+            else:
+                self._set_context_font(item, False)
+
         self.set_disp()  # Update the textbox if needed
         # Reposition all our items, but only if we're visible.
         if self.win.winfo_ismapped():
@@ -1770,7 +1817,7 @@ def test() -> None:
         ],
     )
     window.widget(TK_ROOT).grid(row=1, column=0, sticky='EW')
-    window.set_suggested("SKY_BLACK")
+    window.set_suggested({"SKY_BLACK"})
 
     def swap_read() -> None:
         """Toggle readonly."""

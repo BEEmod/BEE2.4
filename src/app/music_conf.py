@@ -53,7 +53,7 @@ def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
                 continue
 
             sugg = music.get_suggestion(channel)
-            WINDOWS[channel].set_suggested(sugg)
+            WINDOWS[channel].set_suggested({sugg} if sugg else set())
 
 
 def export_data() -> Dict[MusicChannel, Optional[Music]]:

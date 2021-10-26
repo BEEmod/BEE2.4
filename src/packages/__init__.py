@@ -758,6 +758,9 @@ class Package:
             return int(self.path.stat().st_mtime)
 
 
+DEFAULT_SUGGESTIONS = ({'<NONE>'}, {'<NONE>'}, {'SKY_BLACK'}, {'<NONE>'})
+
+
 class Style(PakObject):
     """Represents a style, specifying the era a test was built in."""
     def __init__(
@@ -768,7 +771,7 @@ class Style(PakObject):
         renderables: dict[RenderableType, Renderable],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         base_style: Optional[str]=None,
-        suggested: tuple[str, str, str, str]=None,
+        suggested: tuple[set[str], set[str], set[str], set[str]]=DEFAULT_SUGGESTIONS,
         has_video: bool=True,
         vpk_name: str='',
         corridors: dict[tuple[str, int], CorrDesc]=None,
@@ -781,7 +784,7 @@ class Style(PakObject):
         # Set by post_parse() after all objects are read.
         # this is a list of this style, plus parents in order.
         self.bases: list[Style] = []
-        self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
+        self.suggested = suggested or DEFAULT_SUGGESTIONS
         self.has_video = has_video
         self.vpk_name = vpk_name
         self.corridors: dict[tuple[str, int], CorrDesc] = {}
@@ -807,22 +810,31 @@ class Style(PakObject):
         )
         vpk_name = info['vpk_name', ''].casefold()
 
-        sugg = info.find_key('suggested', or_blank=True)
-        if data.is_override:
-            # For overrides, we default to no suggestion..
-            sugg = (
-                sugg['quote', ''],
-                sugg['music', ''],
-                sugg['skybox', ''],
-                sugg['elev', ''],
-            )
-        else:
-            sugg = (
-                sugg['quote', '<NONE>'],
-                sugg['music', '<NONE>'],
-                sugg['skybox', 'SKY_BLACK'],
-                sugg['elev', '<NONE>'],
-            )
+        sugg: dict[str, set[str]] = {
+            'quote': set(),
+            'music': set(),
+            'skybox': set(),
+            'elev': set(),
+        }
+        for prop in info.find_children('suggested'):
+            try:
+                sugg[prop.name].add(prop.value)
+            except KeyError:
+                LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, prop.name)
+
+        if not data.is_override:
+            # For non-overrides, add defaults if blank.
+            if not sugg['skybox']:
+                sugg['skybox'].add('SKY_BLACK')
+            for sugg_type in ['quote', 'music', 'elev']:
+                if not sugg[sugg_type]:
+                    sugg[sugg_type].add('<NONE>')
+        sugg_tup = (
+            sugg['quote'],
+            sugg['music'],
+            sugg['skybox'],
+            sugg['elev'],
+        )
 
         corr_conf = info.find_key('corridors', or_blank=True)
         corridors = {}
@@ -881,7 +893,7 @@ class Style(PakObject):
             renderables=renderables,
             config=vbsp,
             base_style=base,
-            suggested=sugg,
+            suggested=sugg_tup,
             has_video=has_video,
             corridors=corridors,
             vpk_name=vpk_name,

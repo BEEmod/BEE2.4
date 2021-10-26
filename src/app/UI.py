@@ -1138,22 +1138,22 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     music_frame = ttk.Labelframe(props, text=_('Music: '))
     music_win = music_conf.make_widgets(music_frame, pane)
 
-    def suggested_style_set():
-        """Set music, skybox, voices, etc to the settings defined for a style.
-
-        """
-        sugg = current_style().suggested
+    def suggested_style_set() -> None:
+        """Set music, skybox, voices, etc to the settings defined for a style."""
         win_types = (voice_win, music_win, skybox_win, elev_win)
-        for win, sugg_val in zip(win_types, sugg):
-            win.sel_item_id(sugg_val)
-        UI['suggested_style'].state(['disabled'])
+        has_suggest = False
+        for win in win_types:
+            win.sel_suggested()
+            if win.can_suggest():
+                has_suggest = True
+        UI['suggested_style'].state(('!disabled', ) if has_suggest else ('disabled', ))
 
-    def suggested_style_mousein(_):
+    def suggested_style_mousein(_: Event) -> None:
         """When mousing over the button, show the suggested items."""
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.rollover_suggest()
 
-    def suggested_style_mouseout(_):
+    def suggested_style_mouseout(_: Event) -> None:
         """Return text to the normal value on mouseout."""
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.set_disp()
