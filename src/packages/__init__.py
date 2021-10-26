@@ -289,7 +289,7 @@ class PakObject:
 
     @classmethod
     def post_parse(cls) -> None:
-        """Do processing after all objects have been fully parsed."""
+        """Do processing after all objects of this type have been fully parsed."""
         pass
 
     @classmethod
@@ -758,7 +758,6 @@ class Package:
             return int(self.path.stat().st_mtime)
 
 
-DEFAULT_SUGGESTIONS = ({'<NONE>'}, {'<NONE>'}, {'SKY_BLACK'}, {'<NONE>'})
 
 
 class Style(PakObject):
@@ -769,9 +768,9 @@ class Style(PakObject):
         selitem_data: SelitemData,
         items: list[EditorItem],
         renderables: dict[RenderableType, Renderable],
+        suggested: tuple[set[str], set[str], set[str], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         base_style: Optional[str]=None,
-        suggested: tuple[set[str], set[str], set[str], set[str]]=DEFAULT_SUGGESTIONS,
         has_video: bool=True,
         vpk_name: str='',
         corridors: dict[tuple[str, int], CorrDesc]=None,
@@ -784,7 +783,7 @@ class Style(PakObject):
         # Set by post_parse() after all objects are read.
         # this is a list of this style, plus parents in order.
         self.bases: list[Style] = []
-        self.suggested = suggested or DEFAULT_SUGGESTIONS
+        self.suggested = suggested
         self.has_video = has_video
         self.vpk_name = vpk_name
         self.corridors: dict[tuple[str, int], CorrDesc] = {}
@@ -822,13 +821,6 @@ class Style(PakObject):
             except KeyError:
                 LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, prop.name)
 
-        if not data.is_override:
-            # For non-overrides, add defaults if blank.
-            if not sugg['skybox']:
-                sugg['skybox'].add('SKY_BLACK')
-            for sugg_type in ['quote', 'music', 'elev']:
-                if not sugg[sugg_type]:
-                    sugg[sugg_type].add('<NONE>')
         sugg_tup = (
             sugg['quote'],
             sugg['music'],
@@ -907,20 +899,25 @@ class Style(PakObject):
         self.selitem_data += override.selitem_data
 
         self.has_video = self.has_video or override.has_video
-        # If overrides have suggested IDs, use those. Unset values = ''.
+        # If overrides have suggested IDs, add those.
         self.suggested = tuple(
-            over_sugg or self_sugg
+            over_sugg | self_sugg
             for self_sugg, over_sugg in
             zip(self.suggested, override.suggested)
         )
 
     @classmethod
     def post_parse(cls) -> None:
-        """Assign the bases lists for all styles."""
+        """Assign the bases lists for all styles, and set default suggested items."""
         all_styles: dict[str, Style] = {}
+
+        defaults = ['<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>']
 
         for style in cls.all():
             all_styles[style.id] = style
+            for default, sugg_set in zip(defaults, style.suggested):
+                if not sugg_set:
+                    sugg_set.add(default)
 
         for style in all_styles.values():
             base = []
