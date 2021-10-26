@@ -8,6 +8,7 @@ from __future__ import annotations
 from tkinter import Event
 from typing import IO, Optional, Callable
 import os
+import shutil
 import threading
 
 from app import TK_ROOT
@@ -24,6 +25,7 @@ __all__ = [
 ]
 
 LOGGER = srctools.logger.get_logger(__name__)
+SAMPLE_WRITE_PATH = utils.conf_location('music_sample/music')
 play_sound = True
 
 SOUNDS: dict[str, str] = {
@@ -199,6 +201,16 @@ except Exception:
     sounds = NullSound()
 
 
+def clean_sample_folder() -> None:
+    """Delete files used by the sample player."""
+    for file in SAMPLE_WRITE_PATH.parent.iterdir():
+        LOGGER.info('Cleaning up "{}"...', file)
+        try:
+            file.unlink()
+        except (PermissionError, FileNotFoundError):
+            pass
+
+
 class SamplePlayer:
     """Handles playing a single audio file, and allows toggling it on/off."""
     def __init__(
@@ -224,13 +236,7 @@ class SamplePlayer:
         """Is the player currently playing sounds?"""
         return self.player is not None
 
-    def _close_handles(self) -> None:
-        """Close down previous sounds."""
-        if self._handle is not None:
-            self._handle.close()
-        self._handle = self._cur_sys = None
-
-    def play_sample(self, e: Event=None) -> None:
+    def play_sample(self, _: Event=None) -> None:
         """Play a sample of music.
 
         If music is being played it will be stopped instead.
@@ -241,8 +247,6 @@ class SamplePlayer:
         if self.player is not None:
             self.stop()
             return
-
-        self._close_handles()
 
         try:
             file = self.system[self.cur_file]
@@ -256,16 +260,17 @@ class SamplePlayer:
         # if it can just open the file itself.
         if isinstance(child_sys, RawFileSystem):
             load_path = os.path.join(child_sys.path, file.path)
-            self._cur_sys = self._handle = None
             LOGGER.debug('Loading music directly from {!r}', load_path)
         else:
-            # Use the file objects directly.
-            load_path = self.cur_file
-            self._cur_sys = child_sys
-            self._handle = file.open_bin()
-            LOGGER.debug('Loading music via {!r}', self._handle)
+            # In a filesystem, we need to extract it.
+            # SAMPLE_WRITE_PATH + the appropriate extension.
+            sample_fname = SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1])
+            with file.open_bin() as fsrc, sample_fname.open('wb') as fdest:
+                shutil.copyfileobj(fsrc, fdest)
+            LOGGER.debug('Loading music {} as {}', self.cur_file, sample_fname)
+            load_path = str(sample_fname)
         try:
-            sound = decoder.decode(self._handle, load_path)
+            sound = decoder.decode(None, load_path)
         except Exception:
             self.stop_callback()
             LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
@@ -283,7 +288,6 @@ class SamplePlayer:
         if self.player is not None:
             self.player.pause()
             self.player = None
-            self._close_handles()
             self.stop_callback()
 
         if self.after is not None:
@@ -294,5 +298,4 @@ class SamplePlayer:
         """Reset values after the sound has finished."""
         self.player = None
         self.after = None
-        self._close_handles()
         self.stop_callback()

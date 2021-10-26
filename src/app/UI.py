@@ -430,6 +430,8 @@ def quit_application() -> None:
     item_opts.save_check()
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
+    # Clean this out.
+    snd.clean_sample_folder()
 
     # Destroy the TK windows, finalise logging, then quit.
     logging.shutdown()
