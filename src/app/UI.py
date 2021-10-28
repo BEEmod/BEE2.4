@@ -429,11 +429,20 @@ def quit_application() -> None:
         GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
         GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
-    BEE2_config.write_settings()
-    GEN_OPTS.save_check()
+    try:
+        BEE2_config.write_settings()
+    except Exception:
+        pass
+    try:
+        GEN_OPTS.save_check()
+    except Exception:
+        pass
     item_opts.save_check()
     CompilerPane.COMPILE_CFG.save_check()
-    gameMan.save()
+    try:
+        gameMan.save()
+    except Exception:
+        pass
     # Clean this out.
     snd.clean_sample_folder()
 

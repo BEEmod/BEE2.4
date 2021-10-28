@@ -3,6 +3,7 @@ import tkinter as tk
 from types import TracebackType
 from typing import Type
 import utils
+import trio  # Import first, so it monkeypatch traceback before us.
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
@@ -33,26 +34,26 @@ def tk_error(
     # The exception is caught inside the TK code.
     # We don't care about that, so try and move the traceback up
     # one level.
-    import sys
     import logging
     if exc_tb.tb_next:
         exc_tb = exc_tb.tb_next
 
     try:
         on_error(exc_type, exc_value, exc_tb)
-    except:
+    except Exception:
         pass
 
     logger = logging.getLogger('BEE2')
     logger.error(
-        msg='Uncaught Exception:',
+        msg='Uncaught Tk Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
 
-    # Since this isn't caught normally, it won't quit the application.
-    # Quit ourselves manually. to prevent TK just freezing.
-    TK_ROOT.quit()
-    sys.exit()
+    try:
+        import BEE2
+        BEE2.APP_NURSERY.cancel_scope.cancel()
+    except Exception:
+        pass
 
 TK_ROOT.report_callback_exception = tk_error
 
@@ -67,7 +68,6 @@ def on_error(
     # We don't want this to fail, so import everything here, and wrap in
     # except Exception.
     import traceback
-
     err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
     # Grab and release the grab so nothing else can block the error message.
@@ -77,18 +77,6 @@ def on_error(
 
         # Append traceback to the clipboard.
         TK_ROOT.clipboard_append(err)
-    except Exception:
-        pass
-
-    # Try and terminate background operations.
-    try:
-        import loadScreen
-        loadScreen.BG_PROC.kill()
-    except Exception:
-        pass
-    try:
-        from . import sound
-        sound.sounds = sound.NullSound()
     except Exception:
         pass
 
