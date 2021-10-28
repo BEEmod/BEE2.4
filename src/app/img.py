@@ -4,10 +4,14 @@ It handles loading them from disk and converting them to TK versions, and
 caching images so repeated requests are cheap.
 """
 from __future__ import annotations
+
+import itertools
 import time
 import threading
 from collections.abc import Sequence, Mapping
 from queue import Queue, Empty as EmptyQueue
+
+import trio.to_thread
 from PIL import ImageTk, Image, ImageDraw
 from weakref import ref as WeakRef
 import tkinter as tk
@@ -35,9 +39,6 @@ ArgT = TypeVar('ArgT')
 _handles: dict[tuple, Handle] = {}
 # Matches widgets to the handle they use.
 _wid_tk: dict[WeakRef[tkImgWidgets], Handle] = {}
-# Records handles with a loaded image, but no labels using it.
-# These will be cleaned up after some time passes.
-_pending_cleanup: dict[int, tuple[Handle, float]] = {}
 
 # TK images have unique IDs, so preserve discarded image objects.
 _unused_tk_img: dict[tuple[int, int], list[tk.PhotoImage]] = {}
@@ -52,9 +53,6 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 # Colour of the palette item background
 PETI_ITEM_BG = (229, 232, 233)
 PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
-
-_queue_load: Queue[Handle] = Queue()
-_queue_ui: Queue[Handle] = Queue()
 
 
 def _load_special(path: str) -> Image.Image:
@@ -87,7 +85,12 @@ ICONS['load_6'] = _load_icon.transpose(Image.ROTATE_90)
 del _load_icon, _load_icon_flip
 # Loader handles, which we want to cycle animate.
 _load_handles: dict[tuple[int, int], Handle] = {}
-_last_load_i = -1  # And the last index we used of those.
+
+# Once initialised, schedule here.
+_load_nursery: trio.Nursery | None = None
+# Load calls occuring before init. This is done so apply() can be called during import etc,
+# and it'll be deferred till later.
+_early_loads: list[Handle] = []
 
 
 def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
@@ -373,6 +376,8 @@ class Handle(Generic[ArgT]):
         # the loading lock.
         self._loading = False
         self.lock = threading.Lock()
+        # When no users are present, schedule cleaning up the handle's data to reuse.
+        self._cancel_cleanup: trio.CancelScope = trio.CancelScope()
 
     @classmethod
     def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: int | tuple[int, int], height: int) -> Handle[ArgT]:
@@ -586,8 +591,10 @@ class Handle(Generic[ArgT]):
                 # Force load, so it's always ready.
                 self._force_loaded = True
             elif not self._users:
-                # Loading something unused, schedule it to be cleaned.
-                _pending_cleanup[id(self)] = (self, time.monotonic())
+                # Loading something unused, schedule it to be cleaned soon.
+                self._cancel_cleanup.cancel()
+                self._cancel_cleanup = trio.CancelScope()
+                _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
             return self._load_pil()
 
     def get_tk(self) -> ImageTk.PhotoImage:
@@ -629,15 +636,19 @@ class Handle(Generic[ArgT]):
                 child._decref(self)
         elif self.type is TYP_CROP:
             cast(CropInfo, self.arg).source._decref(self)
-        if not self._users:
-            _pending_cleanup[id(self)] = (self, time.monotonic())
+        if not self._users and _load_nursery is not None:
+            # Schedule this handle to be cleaned up, and store a cancel scope so that
+            # can be aborted.
+            self._cancel_cleanup = trio.CancelScope()
+            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
 
     def _incref(self, ref: 'WeakRef[tkImgWidgets] | Handle') -> None:
         """Add a label to the list of those controlled by us."""
         if self._force_loaded:
             return
         self._users.add(ref)
-        _pending_cleanup.pop(id(self), None)
+        # Abort cleaning up if we were planning to.
+        self._cancel_cleanup.cancel()
         if self.type is TYP_COMP:
             for child in cast('Sequence[Handle]', self.arg):
                 child._incref(self)
@@ -657,8 +668,38 @@ class Handle(Generic[ArgT]):
                 return self._cached_tk
             if self._loading is False:
                 self._loading = True
-                _queue_load.put(self)
+                if _load_nursery is None:
+                    _early_loads.append(self)
+                else:
+                    _load_nursery.start_soon(self._load_task)
         return Handle.ico_loading(self.width, self.height).get_tk()
+
+    async def _load_task(self) -> None:
+        """Scheduled to load images then apply to the labels."""
+        await trio.to_thread.run_sync(self._load_pil)
+        self._loading = False
+        tk_ico = self._load_tk()
+        for label_ref in self._users:
+            if isinstance(label_ref, WeakRef):
+                label: tkImgWidgets | None = label_ref()
+                if label is not None:
+                    try:
+                        label['image'] = tk_ico
+                    except tk.TclError:
+                        # Can occur if the image has been removed/destroyed, but
+                        # the Python object still exists. Ignore, should be
+                        # cleaned up shortly.
+                        pass
+
+    async def _cleanup_task(self, scope: trio.CancelScope) -> None:
+        """Wait for the time to elapse, then clear the contents."""
+        with scope:
+            await trio.sleep(5)
+        # We weren't cancelled and are empty, cleanup.
+        if not scope.cancel_called and self._loading is not None and not self._users:
+            LOGGER.info('Cleanup: {}', self)
+            _discard_tk_img(self._cached_tk)
+            self._cached_tk = self._cached_pil = None
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
@@ -677,81 +718,40 @@ def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
 
 
 # noinspection PyProtectedMember
-def _background_task() -> None:
-    """Background task doing the actual loading."""
-    while True:
-        handle = _queue_load.get()
-        with handle.lock:
-            if handle._loading is True:
-                handle._load_pil()
-                handle._loading = False
-        _queue_ui.put(handle)
-
-
-# noinspection PyProtectedMember
-def _ui_task() -> None:
-    """Background task which does TK calls.
-
-    TK must run in the main thread, so we do UI loads here.
-    """
-    global _last_load_i
-    # Use the current time to set the frame also.
-    load_i = int((time.monotonic() % 1.0) * 8)
-    if load_i != _last_load_i:
-        _last_load_i = load_i
-        arg = f'load_{load_i}'
+async def _spin_load_icons() -> None:
+    """Cycle loading icons."""
+    fnames = [
+        f'load_{i}'
+        for i in range(8)
+    ]
+    for load_name in itertools.cycle(fnames):
+        await trio.sleep(0.125)
         for handle in _load_handles.values():
-            handle.arg = arg
+            handle.arg = load_name
             with handle.lock:
                 handle._cached_pil = None
                 if handle._cached_tk is not None:
                     # This updates the TK widget directly.
                     handle._cached_tk.paste(handle._load_pil())
 
-    timeout = time.monotonic()
-    # Run, but if we go over 100ms, abort so the rest of the UI loop can run.
-    while time.monotonic() - timeout < 0.1:
-        try:
-            handle = _queue_ui.get_nowait()
-        except EmptyQueue:
-            break
-        tk_ico = handle._load_tk()
-        for label_ref in handle._users:
-            if isinstance(label_ref, WeakRef):
-                label: tkImgWidgets | None = label_ref()
-                if label is not None:
-                    try:
-                        label['image'] = tk_ico
-                    except tk.TclError:
-                        # Can occur if the image has been removed/destroyed, but
-                        # the Python object still exists. Ignore, should be
-                        # cleaned up shortly.
-                        pass
 
-    for handle, use_time in list(_pending_cleanup.values()):
-        with handle.lock:
-            if use_time < timeout - 5.0 and handle._loading is not None and not handle._users:
-                del _pending_cleanup[id(handle)]
-                _discard_tk_img(handle._cached_tk)
-                handle._cached_tk = handle._cached_pil = None
-    TK_ROOT.tk.call(_ui_task_cmd)
-
-# Cache the registered ID, so we don't have to re-register.
-_ui_task_cmd = ('after', 100, TK_ROOT.register(_ui_task))
-_bg_thread = threading.Thread(name='imghandle_load', target=_background_task)
-_bg_thread.daemon = True
-
-
-def start_loading() -> None:
-    """Start the background loading threads."""
-    _bg_thread.start()
-    TK_ROOT.tk.call(_ui_task_cmd)
+# noinspection PyProtectedMember
+def start_loading(nursery: trio.Nursery) -> None:
+    """Start the background loading."""
+    global _load_nursery
+    for handle in _early_loads:
+        if handle._users:
+            nursery.start_soon(Handle._load_task, handle)
+    _early_loads.clear()
+    _load_nursery = nursery
+    nursery.start_soon(_spin_load_icons)
 
 
 # noinspection PyProtectedMember
 def refresh_all() -> None:
     """Force all images to reload."""
     LOGGER.info('Forcing all images to reload!')
+    done = 0
     for handle in list(_handles.values()):
         with handle.lock:
             # If force-loaded it's builtin UI etc we shouldn't reload.
@@ -759,14 +759,14 @@ def refresh_all() -> None:
             if not handle._force_loaded and not handle._loading:
                 _discard_tk_img(handle._cached_tk)
                 handle._cached_tk = handle._cached_pil = None
-                _queue_load.put(handle)
-                loading =  Handle.ico_loading(handle.width, handle.height).get_tk()
+                loading = handle._request_load()
+                done += 1
                 for label_ref in handle._users:
                     if isinstance(label_ref, WeakRef):
                         label: tkImgWidgets | None = label_ref()
                         if label is not None:
                             label['image'] = loading
-    LOGGER.info('Queued {} images to reload.', _queue_load.qsize())
+    LOGGER.info('Queued {} images to reload.', done)
 
 
 # noinspection PyProtectedMember

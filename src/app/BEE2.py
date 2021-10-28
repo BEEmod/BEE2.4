@@ -1,5 +1,5 @@
 """Run the BEE2."""
-# BEE2_config creates this config file to allow easy cross-module access
+import time
 import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
@@ -113,6 +113,7 @@ async def init_app():
         game.init_trans()
 
     LOGGER.info('Initialising UI...')
+    img.start_loading(APP_NURSERY)
     UI.init_windows()  # create all windows
     LOGGER.info('UI initialised!')
 
