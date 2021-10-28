@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import itertools
 import time
-import threading
 from collections.abc import Sequence, Mapping
-from queue import Queue, Empty as EmptyQueue
 
 import trio.to_thread
 from PIL import ImageTk, Image, ImageDraw
@@ -586,16 +584,15 @@ class Handle(Generic[ArgT]):
 
     def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
-        with self.lock:
-            if self.type.allow_raw:
-                # Force load, so it's always ready.
-                self._force_loaded = True
-            elif not self._users:
-                # Loading something unused, schedule it to be cleaned soon.
-                self._cancel_cleanup.cancel()
-                self._cancel_cleanup = trio.CancelScope()
-                _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
-            return self._load_pil()
+        if self.type.allow_raw:
+            # Force load, so it's always ready.
+            self._force_loaded = True
+        elif not self._users and _load_nursery is not None:
+            # Loading something unused, schedule it to be cleaned soon.
+            self._cancel_cleanup.cancel()
+            self._cancel_cleanup = trio.CancelScope()
+            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+        return self._load_pil()
 
     def get_tk(self) -> ImageTk.PhotoImage:
         """Load the TK image if required, then return it.
@@ -663,15 +660,14 @@ class Handle(Generic[ArgT]):
         """
         if self._loading is True:
             return Handle.ico_loading(self.width, self.height).get_tk()
-        with self.lock:
-            if self._cached_tk is not None:
-                return self._cached_tk
-            if self._loading is False:
-                self._loading = True
-                if _load_nursery is None:
-                    _early_loads.append(self)
-                else:
-                    _load_nursery.start_soon(self._load_task)
+        if self._cached_tk is not None:
+            return self._cached_tk
+        if self._loading is False:
+            self._loading = True
+            if _load_nursery is None:
+                _early_loads.append(self)
+            else:
+                _load_nursery.start_soon(self._load_task)
         return Handle.ico_loading(self.width, self.height).get_tk()
 
     async def _load_task(self) -> None:
@@ -728,11 +724,10 @@ async def _spin_load_icons() -> None:
         await trio.sleep(0.125)
         for handle in _load_handles.values():
             handle.arg = load_name
-            with handle.lock:
-                handle._cached_pil = None
-                if handle._cached_tk is not None:
-                    # This updates the TK widget directly.
-                    handle._cached_tk.paste(handle._load_pil())
+            handle._cached_pil = None
+            if handle._cached_tk is not None:
+                # This updates the TK widget directly.
+                handle._cached_tk.paste(handle._load_pil())
 
 
 # noinspection PyProtectedMember
@@ -753,19 +748,18 @@ def refresh_all() -> None:
     LOGGER.info('Forcing all images to reload!')
     done = 0
     for handle in list(_handles.values()):
-        with handle.lock:
-            # If force-loaded it's builtin UI etc we shouldn't reload.
-            # If already loading, no point.
-            if not handle._force_loaded and not handle._loading:
-                _discard_tk_img(handle._cached_tk)
-                handle._cached_tk = handle._cached_pil = None
-                loading = handle._request_load()
-                done += 1
-                for label_ref in handle._users:
-                    if isinstance(label_ref, WeakRef):
-                        label: tkImgWidgets | None = label_ref()
-                        if label is not None:
-                            label['image'] = loading
+        # If force-loaded it's builtin UI etc we shouldn't reload.
+        # If already loading, no point.
+        if not handle._force_loaded and not handle._loading:
+            _discard_tk_img(handle._cached_tk)
+            handle._cached_tk = handle._cached_pil = None
+            loading = handle._request_load()
+            done += 1
+            for label_ref in handle._users:
+                if isinstance(label_ref, WeakRef):
+                    label: tkImgWidgets | None = label_ref()
+                    if label is not None:
+                        label['image'] = loading
     LOGGER.info('Queued {} images to reload.', done)
 
 
