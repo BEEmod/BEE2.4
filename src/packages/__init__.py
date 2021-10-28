@@ -369,7 +369,7 @@ def set_cond_source(props: Property, source: str) -> None:
         cond['__src__'] = source
 
 
-def find_packages(pak_dir: Path) -> None:
+async def find_packages(nursery: trio.Nursery, pak_dir: Path) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     try:
@@ -389,9 +389,9 @@ def find_packages(pak_dir: Path) -> None:
         else:
             ext = name.suffix.casefold()
             if ext in ('.bee_pack', '.zip'):
-                filesys = ZipFileSystem(name)
+                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, cancellable=True)
             elif ext == '.vpk':
-                filesys = VPKFileSystem(name)
+                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, cancellable=True)
             else:
                 LOGGER.info('Extra file: {}', name)
                 continue
@@ -400,12 +400,12 @@ def find_packages(pak_dir: Path) -> None:
 
         # Valid packages must have an info.txt file!
         try:
-            info = filesys.read_prop('info.txt')
+            info = await trio.to_thread.run_sync(filesys.read_prop, 'info.txt', cancellable=True)
         except FileNotFoundError:
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name)
+                nursery.start_soon(find_packages, nursery, name)
             else:
                 LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
@@ -473,8 +473,9 @@ async def load_packages(
     Item.log_ent_count = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
 
-    for pak_dir in pak_dirs:
-        find_packages(pak_dir)
+    async with trio.open_nursery() as find_nurs:
+        for pak_dir in pak_dirs:
+            find_nurs.start_soon(find_packages, find_nurs, pak_dir)
 
     pack_count = len(packages)
     loader.set_length("PAK", pack_count)
