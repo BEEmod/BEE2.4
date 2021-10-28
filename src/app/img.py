@@ -5,26 +5,24 @@ caching images so repeated requests are cheap.
 """
 from __future__ import annotations
 
-import itertools
-import time
-from collections.abc import Sequence, Mapping
-
-import trio.to_thread
-from PIL import ImageTk, Image, ImageDraw
-from weakref import ref as WeakRef
-import tkinter as tk
-from tkinter import ttk
 from typing import Generic, TypeVar, Union, Callable, Type, cast
-from app import TK_ROOT
+from collections.abc import Sequence, Mapping
+from weakref import ref as WeakRef
+from tkinter import ttk
+import tkinter as tk
+import itertools
+import logging
 
+from PIL import ImageTk, Image, ImageDraw
 import attr
+import trio
 
 from srctools import Vec, Property
 from srctools.vtf import VTFFlags, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
-from utils import PackagePath
 import srctools.logger
-import logging
+
+from app import TK_ROOT
 import utils
 
 # Widgets with an image attribute that can be set.
@@ -134,13 +132,13 @@ def _discard_tk_img(img: ImageTk.PhotoImage | None) -> None:
 
 
 # Special paths which map to various images.
-PATH_BLANK = PackagePath('<special>', 'blank')
-PATH_ERROR = PackagePath('<special>', 'error')
-PATH_LOAD = PackagePath('<special>', 'load')
-PATH_NONE = PackagePath('<special>', 'none')
-PATH_BG = PackagePath('color', PETI_ITEM_BG_HEX[1:])
-PATH_BLACK = PackagePath('<color>', '000')
-PATH_WHITE = PackagePath('<color>', 'fff')
+PATH_BLANK = utils.PackagePath('<special>', 'blank')
+PATH_ERROR = utils.PackagePath('<special>', 'error')
+PATH_LOAD = utils.PackagePath('<special>', 'load')
+PATH_NONE = utils.PackagePath('<special>', 'none')
+PATH_BG = utils.PackagePath('color', PETI_ITEM_BG_HEX[1:])
+PATH_BLACK = utils.PackagePath('<color>', '000')
+PATH_WHITE = utils.PackagePath('<color>', 'fff')
 
 
 class ImageType(Generic[ArgT]):
@@ -177,7 +175,7 @@ def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
 
 def _load_file(
     fsys: FileSystem,
-    uri: PackagePath,
+    uri: utils.PackagePath,
     width: int, height: int,
     resize_algo: int,
     check_other_packages: bool=False,
@@ -245,7 +243,7 @@ def _load_file(
     return image
 
 
-def _pil_from_package(uri: PackagePath, width: int, height: int) -> Image.Image:
+def _pil_from_package(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
     """Load from a app package."""
     try:
         fsys = PACK_SYSTEMS[uri.package]
@@ -256,12 +254,12 @@ def _pil_from_package(uri: PackagePath, width: int, height: int) -> Image.Image:
     return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
 
 
-def _pil_load_builtin(uri: PackagePath, width: int, height: int) -> Image.Image:
+def _pil_load_builtin(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
     """Load from the builtin UI resources."""
     return _load_file(FSYS_BUILTIN, uri, width, height, Image.ANTIALIAS)
 
 
-def _pil_load_builtin_sprite(uri: PackagePath, width: int, height: int) -> Image.Image:
+def _pil_load_builtin_sprite(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
     """Load from the builtin UI resources, but use nearest-neighbour resizing."""
     return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
 
@@ -370,10 +368,8 @@ class Handle(Generic[ArgT]):
         self._force_loaded = False
         self._users: set[WeakRef[tkImgWidgets] | Handle] = set()
         # If None, get_tk()/get_pil() was used.
-        # If true, this is in the queue to load. Setting this requires
-        # the loading lock.
+        # If true, this is in the queue to load.
         self._loading = False
-        self.lock = threading.Lock()
         # When no users are present, schedule cleaning up the handle's data to reuse.
         self._cancel_cleanup: trio.CancelScope = trio.CancelScope()
 
@@ -426,12 +422,12 @@ class Handle(Generic[ArgT]):
                 ))
             return cls.composite(children, width, height)
 
-        return cls.parse_uri(PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
+        return cls.parse_uri(utils.PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
 
     @classmethod
     def parse_uri(
         cls,
-        uri: PackagePath,
+        uri: utils.PackagePath,
         width: int = 0, height: int = 0,
         *,
         subfolder: str='',
@@ -508,14 +504,14 @@ class Handle(Generic[ArgT]):
         return cls._get(typ, args, width, height)
 
     @classmethod
-    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle[PackagePath]:
+    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle[utils.PackagePath]:
         """Shortcut for getting a handle to a builtin UI image."""
-        return cls._get(TYP_BUILTIN, PackagePath('<bee2>', path + '.png'), width, height)
+        return cls._get(TYP_BUILTIN, utils.PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
-    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle[PackagePath]:
+    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle[utils.PackagePath]:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
-        return cls._get(TYP_BUILTIN_SPR, PackagePath('<bee2>', path + '.png'), width, height)
+        return cls._get(TYP_BUILTIN_SPR, utils.PackagePath('<bee2>', path + '.png'), width, height)
 
     @classmethod
     def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle[Sequence[Handle]]:
@@ -545,7 +541,7 @@ class Handle(Generic[ArgT]):
         return Handle(TYP_CROP, CropInfo(self, bounds, transpose), width, height)
 
     @classmethod
-    def file(cls, path: PackagePath, width: int, height: int) -> Handle[PackagePath]:
+    def file(cls, path: utils.PackagePath, width: int, height: int) -> Handle[utils.PackagePath]:
         """Shortcut for getting a handle to file path."""
         return cls._get(TYP_FILE, path, width, height)
 
