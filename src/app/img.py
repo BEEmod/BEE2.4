@@ -5,6 +5,7 @@ caching images so repeated requests are cheap.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Generic, TypeVar, Union, Callable, Type, cast
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
@@ -28,13 +29,14 @@ import utils
 # Widgets with an image attribute that can be set.
 tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button)
+WidgetWeakRef = Union['WeakRef[tk.Label], WeakRef[ttk.Label], WeakRef[tk.Button], WeakRef[ttk.Button]']
 
 ArgT = TypeVar('ArgT')
 
 # Used to keep track of the used handles, so we can deduplicate them.
 _handles: dict[tuple, Handle] = {}
 # Matches widgets to the handle they use.
-_wid_tk: dict[WeakRef[tkImgWidgets], Handle] = {}
+_wid_tk: dict[WidgetWeakRef, Handle] = {}
 
 # TK images have unique IDs, so preserve discarded image objects.
 _unused_tk_img: dict[tuple[int, int], list[tk.PhotoImage]] = {}
@@ -366,7 +368,7 @@ class Handle(Generic[ArgT]):
         self._cached_pil = None
         self._cached_tk = None
         self._force_loaded = False
-        self._users: set[WeakRef[tkImgWidgets] | Handle] = set()
+        self._users: set[WidgetWeakRef | Handle] = set()
         # If None, get_tk()/get_pil() was used.
         # If true, this is in the queue to load.
         self._loading = False
@@ -619,7 +621,7 @@ class Handle(Generic[ArgT]):
             self._cached_tk.paste(res)
         return self._cached_tk
 
-    def _decref(self, ref: 'WeakRef[tkImgWidgets] | Handle') -> None:
+    def _decref(self, ref: 'WidgetWeakRef | Handle') -> None:
         """A label was no longer set to this handle."""
         if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
             return
@@ -635,7 +637,7 @@ class Handle(Generic[ArgT]):
             self._cancel_cleanup = trio.CancelScope()
             _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
 
-    def _incref(self, ref: 'WeakRef[tkImgWidgets] | Handle') -> None:
+    def _incref(self, ref: 'WidgetWeakRef | Handle') -> None:
         """Add a label to the list of those controlled by us."""
         if self._force_loaded:
             return
@@ -694,7 +696,7 @@ class Handle(Generic[ArgT]):
             self._cached_tk = self._cached_pil = None
 
 
-def _label_destroyed(ref: WeakRef[tkImgWidgets]) -> None:
+def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
     """Finaliser for _wid_tk keys.
 
     Removes them from the dict, and decreases the usage count on the handle.
@@ -816,7 +818,7 @@ def make_splash_screen(
     import random
     folder = utils.install_path('images/splash_screen')
     user_folder = folder / 'user'
-    path = '<nothing>'
+    path = Path('<nothing>')
     if user_folder.exists():
         folder = user_folder
     try:
