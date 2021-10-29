@@ -466,6 +466,29 @@ class ConnSide(Enum):
                 return ConnSide.RIGHT
         raise error_func('Unknown connection side ({}, {}, 0)', x, y)
 
+    @property
+    def x(self) -> int:
+        """Return the X coordinate."""
+        return self.value.x
+
+    @property
+    def y(self) -> int:
+        """Return the X coordinate."""
+        return self.value.y
+
+    @property
+    def yaw(self) -> int:
+        """Return the yaw direction."""
+        if self is ConnSide.LEFT:
+            return 180
+        if self is ConnSide.RIGHT:
+            return 0
+        if self is ConnSide.UP:
+            return 270
+        if self is ConnSide.DOWN:
+            return 90
+        raise AssertionError(f'Unknown value {self!r}')
+
 
 @attr.frozen
 class AntlinePoint:

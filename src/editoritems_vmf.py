@@ -1,6 +1,7 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
-from typing import Callable, Iterator
+
+from typing import Callable, Iterator, Dict
 from srctools import Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity, ValidKVs
 
@@ -9,7 +10,8 @@ from editoritems import Item, ConnSide, AntlinePoint, Coord
 
 LOGGER = logger.get_logger(__name__)
 LOAD_FUNCS: dict[str, Callable[[Item, Entity], None]] = {}
-SAVE_FUNCS: list[tuple[str, Callable[[Item], Iterator[dict[str, ValidKVs]]]]] = []
+SaveResult = Iterator[Dict[str, ValidKVs]]
+SAVE_FUNCS: list[tuple[str, Callable[[Item], SaveResult]]] = []
 
 
 def load(item: Item, vmf: VMF) -> None:
@@ -34,12 +36,17 @@ def save(item: Item) -> VMF:
     return vmf
 
 
-CONNECTION_OFFSETS = {
+SKIN_TO_CONN_OFFSETS = {
     # Skin -> antline offset.
     '1': Vec(+0.5, +0.5),
     '2': Vec(+0.5, -0.5),
     '3': Vec(-0.5, +0.5),
     '4': Vec(-0.5, -0.5),
+}
+# Opposite transform.
+CONN_OFFSET_TO_SKIN = {
+    (2 * vec).as_tuple(): skin
+    for skin, vec in SKIN_TO_CONN_OFFSETS.items()
 }
 
 
@@ -68,7 +75,7 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
     center.z = 0
     center.y = -center.y
     try:
-        offset = CONNECTION_OFFSETS[ent['skin']] @ orient
+        offset = SKIN_TO_CONN_OFFSETS[ent['skin']] @ orient
     except KeyError:
         LOGGER.warning('Connection Point at {} has invalid skin "{}"!', origin)
         return
@@ -83,6 +90,34 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
         conv_int(ent['priority']),
         int(group_str) if group_str.strip() else None
     ))
+
+
+def save_connectionpoint(item: Item) -> SaveResult:
+    """Write connectionpoints to a VMF."""
+    for side, points in item.antline_points.items():
+        yaw = side.yaw
+        orient = Matrix.from_yaw(yaw)
+        inv_orient = Matrix.from_yaw(-yaw)
+        for point in points:
+            ant_pos = Vec(point.pos.x, -point.pos.y, -64)
+            sign_pos = Vec(point.sign_off.x, -point.sign_off.y, -64)
+
+            offset = (ant_pos - sign_pos) @ inv_orient
+            offset.x = -offset.x
+            try:
+                skin = CONN_OFFSET_TO_SKIN[offset.as_tuple()]
+            except KeyError:
+                LOGGER.warning('Pos=({}), Sign=({}) -> ({}) is not a valid offset for signs!', point.pos, point.sign_off, offset)
+                continue
+            pos: Vec = round((ant_pos + sign_pos) / 2.0 * 16.0, 0)
+
+            yield {
+                'origin': Vec(pos.x - 56, pos.y + 56, -64),
+                'angles': f'0 {yaw} 0',
+                'skin': skin,
+                'priority': point.priority,
+                'group_id': '' if point.group is None else point.group,
+            }
 
 
 LOAD_FUNCS.update({
