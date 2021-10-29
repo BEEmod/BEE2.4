@@ -5,7 +5,7 @@ from typing import Callable, Iterator, Dict
 from srctools import Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity, ValidKVs
 
-from editoritems import Item, ConnSide, AntlinePoint, Coord
+from editoritems import Item, ConnSide, CollType, AntlinePoint, Coord, OccupiedVoxel
 
 
 LOGGER = logger.get_logger(__name__)
@@ -18,10 +18,13 @@ def load(item: Item, vmf: VMF) -> None:
     """Search the map for important entities, and apply it to the item."""
     with logger.context(item.id):
         for ent in vmf.entities:
+            classname = ent['classname'].casefold()
+            if not classname.startswith('bee2_editor_'):
+                continue
             try:
-                func = LOAD_FUNCS[ent['classname'].casefold()]
+                func = LOAD_FUNCS[classname]
             except KeyError:
-                LOGGER.warning('Unknown item configuration entity "{}"!', ent['classname'])
+                LOGGER.warning('Unknown item configuration entity "{}"!', classname)
             else:
                 func(item, ent)
 
@@ -48,6 +51,20 @@ CONN_OFFSET_TO_SKIN = {
     (2 * vec).as_tuple(): skin
     for skin, vec in SKIN_TO_CONN_OFFSETS.items()
 }
+
+
+def parse_colltype(value: str) -> CollType:
+    """Parse a collide type specification from the VMF."""
+    val = CollType.NOTHING
+    for word in value.split():
+        word = word.upper()
+        if word.startswith('COLLIDE_'):
+            word = word[8:]
+        try:
+            val |= CollType[word]
+        except KeyError:
+            LOGGER.warning('Unknown collide type "{}"', word)
+    return val
 
 
 def load_connectionpoint(item: Item, ent: Entity) -> None:
@@ -96,7 +113,6 @@ def save_connectionpoint(item: Item) -> SaveResult:
     """Write connectionpoints to a VMF."""
     for side, points in item.antline_points.items():
         yaw = side.yaw
-        orient = Matrix.from_yaw(yaw)
         inv_orient = Matrix.from_yaw(-yaw)
         for point in points:
             ant_pos = Vec(point.pos.x, -point.pos.y, -64)
@@ -120,6 +136,20 @@ def save_connectionpoint(item: Item) -> SaveResult:
             }
 
 
+def load_occupied_subvoxel(item: Item, ent: Entity) -> None:
+    """Parse subvoxels embedded in the VMF."""
+    origin = Vec.from_str(ent['origin'])
+    voxel = round(origin / 128, 0)
+    subpos = (origin - voxel * 128 + (48, 48, 48)) / 32
+    item.occupy_voxels.add(OccupiedVoxel(
+        parse_colltype(ent['coll_type']),
+        parse_colltype(ent['coll_against']),
+        Coord(round(voxel.x), round(voxel.y), round(voxel.z)),
+        Coord(round(subpos.x), round(subpos.y), round(subpos.z)),
+        normal=None,
+    ))
+
+
 def save_occupied_subvoxel(item: Item) -> SaveResult:
     """Save occupied subvoxel volumes."""
     for voxel in item.occupy_voxels:
@@ -131,6 +161,18 @@ def save_occupied_subvoxel(item: Item) -> SaveResult:
                 'coll_type': str(voxel.type).replace('COLLIDE_', ''),
                 'coll_against': str(voxel.against).replace('COLLIDE_', ''),
             }
+
+
+def load_occupied_voxel(item: Item, ent: Entity) -> None:
+    """Parse full-voxel collisions embedded in the VMF."""
+    origin = Vec.from_str(ent['origin']) / 128
+    item.occupy_voxels.add(OccupiedVoxel(
+        parse_colltype(ent['coll_type']),
+        parse_colltype(ent['coll_against']),
+        Coord(round(origin.x), round(origin.y), round(origin.z)),
+        subpos=None,
+        normal=None,
+    ))
 
 
 def save_occupied_voxel(item: Item) -> SaveResult:
