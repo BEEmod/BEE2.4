@@ -307,6 +307,11 @@ class Coord:
         yield self.z
 
     @classmethod
+    def from_vec(cls, vec: Vec) -> 'Coord':
+        """Round a vector to grid coordinates."""
+        return cls(round(vec.x), round(vec.y), round(vec.z))
+
+    @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
         """Parse from a string, using the function to raise errors."""
         parts = value.split()

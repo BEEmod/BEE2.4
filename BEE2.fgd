@@ -151,13 +151,19 @@
 		]
 	]
 
-@PointClass size(-16 -16 -16, 16 16 16) = bee2_editor_occupied_subvoxel: "Defines a region the item takes up. This is a 32x32x32 cube segment"
+@PointClass size(-16 -16 -16, 16 16 16) = bee2_editor_occupied_subvoxel: "Defines a region the item takes up. This is a 32x32x32 cube segment, and must be aligned to that grid."
 	[
 	coll_type(string) : "Collide Type" : "SOLID" : "Type of collision for this voxel." 
 	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
 	]
 
-@PointClass size(-64 -64 -64, 64 64 64) = bee2_editor_occupied_voxel: "Defines a region the item takes up."
+@PointClass size(-64 -64 -64, 64 64 64) = bee2_editor_occupied_voxel: "Defines a region the item takes up. This is a full 128x128x128 voxel."
+	[
+	coll_type(string) : "Collide Type" : "SOLID" : "Type of collision for this voxel." 
+	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
+	]
+
+@PointClass base(Angles) size(-64 -64 0, 64 64 1) = bee2_editor_occupied_surface: "Defines a region the item takes up. This is a side of a voxel, and should face inward."
 	[
 	coll_type(string) : "Collide Type" : "SOLID" : "Type of collision for this voxel." 
 	coll_against(string) : "Collide Against" : "" : "Types this collides against." 

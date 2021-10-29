@@ -144,8 +144,8 @@ def load_occupied_subvoxel(item: Item, ent: Entity) -> None:
     item.occupy_voxels.add(OccupiedVoxel(
         parse_colltype(ent['coll_type']),
         parse_colltype(ent['coll_against']),
-        Coord(round(voxel.x), round(voxel.y), round(voxel.z)),
-        Coord(round(subpos.x), round(subpos.y), round(subpos.z)),
+        Coord.from_vec(voxel),
+        Coord.from_vec(subpos),
         normal=None,
     ))
 
@@ -155,7 +155,6 @@ def save_occupied_subvoxel(item: Item) -> SaveResult:
     for voxel in item.occupy_voxels:
         if voxel.subpos is not None and voxel.normal is None:
             pos = Vec(voxel.pos) * 128 + Vec(voxel.subpos) * 32 - (48, 48, 48)
-            pos.y = -pos.y
             yield {
                 'origin': pos,
                 'coll_type': str(voxel.type).replace('COLLIDE_', ''),
@@ -169,7 +168,7 @@ def load_occupied_voxel(item: Item, ent: Entity) -> None:
     item.occupy_voxels.add(OccupiedVoxel(
         parse_colltype(ent['coll_type']),
         parse_colltype(ent['coll_against']),
-        Coord(round(origin.x), round(origin.y), round(origin.z)),
+        Coord.from_vec(origin),
         subpos=None,
         normal=None,
     ))
@@ -180,9 +179,41 @@ def save_occupied_voxel(item: Item) -> SaveResult:
     for voxel in item.occupy_voxels:
         if voxel.subpos is None and voxel.normal is None:
             pos = Vec(voxel.pos) * 128
-            pos.y = -pos.y
             yield {
                 'origin': pos,
+                'coll_type': str(voxel.type).replace('COLLIDE_', ''),
+                'coll_against': str(voxel.against).replace('COLLIDE_', ''),
+            }
+
+
+def load_occupied_surface(item: Item, ent: Entity) -> None:
+    """Parse full-surface occupied surfaces."""
+    origin = Vec.from_str(ent['origin'])
+    normal = Vec(z=1) @ Angle.from_str(ent['angles'])
+
+    voxel = round((origin + 64 * normal) / 128, 0)
+    item.occupy_voxels.add(OccupiedVoxel(
+        parse_colltype(ent['coll_type']),
+        parse_colltype(ent['coll_against']),
+        Coord.from_vec(voxel),
+        subpos=None,
+        normal=Coord.from_vec(normal),
+    ))
+
+
+def save_occupied_surface(item: Item) -> SaveResult:
+    """Save full-surface occupied surfaces."""
+    for voxel in item.occupy_voxels:
+        if voxel.subpos is None and voxel.normal is not None:
+            norm = Vec(voxel.normal)
+            pos = Vec(voxel.pos) * 128 - 64 * norm
+            if voxel.normal.z:
+                ang = Matrix.from_basis(x=Vec(x=1), z=norm)
+            else:
+                ang = Matrix.from_basis(x=Vec(z=1), z=norm)
+            yield {
+                'origin': pos,
+                'angle': ang.to_angle(),
                 'coll_type': str(voxel.type).replace('COLLIDE_', ''),
                 'coll_against': str(voxel.against).replace('COLLIDE_', ''),
             }
