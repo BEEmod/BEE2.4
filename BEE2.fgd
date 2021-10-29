@@ -151,6 +151,18 @@
 		]
 	]
 
+@PointClass size(-16 -16 -16, 16 16 16) = bee2_editor_occupied_subvoxel: "Defines a region the item takes up. This is a 32x32x32 cube segment"
+	[
+	coll_type(string) : "Collide Type" : "SOLID" : "Type of collision for this voxel." 
+	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
+	]
+
+@PointClass size(-64 -64 -64, 64 64 64) = bee2_editor_occupied_voxel: "Defines a region the item takes up."
+	[
+	coll_type(string) : "Collide Type" : "SOLID" : "Type of collision for this voxel." 
+	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
+	]
+
 // Entities added to the finished map to pass information to VRAD.
 	
 @PointClass

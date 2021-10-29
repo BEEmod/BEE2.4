@@ -120,6 +120,32 @@ def save_connectionpoint(item: Item) -> SaveResult:
             }
 
 
+def save_occupied_subvoxel(item: Item) -> SaveResult:
+    """Save occupied subvoxel volumes."""
+    for voxel in item.occupy_voxels:
+        if voxel.subpos is not None and voxel.normal is None:
+            pos = Vec(voxel.pos) * 128 + Vec(voxel.subpos) * 32 - (48, 48, 48)
+            pos.y = -pos.y
+            yield {
+                'origin': pos,
+                'coll_type': str(voxel.type).replace('COLLIDE_', ''),
+                'coll_against': str(voxel.against).replace('COLLIDE_', ''),
+            }
+
+
+def save_occupied_voxel(item: Item) -> SaveResult:
+    """Save occupied full-voxel volumes."""
+    for voxel in item.occupy_voxels:
+        if voxel.subpos is None and voxel.normal is None:
+            pos = Vec(voxel.pos) * 128
+            pos.y = -pos.y
+            yield {
+                'origin': pos,
+                'coll_type': str(voxel.type).replace('COLLIDE_', ''),
+                'coll_against': str(voxel.against).replace('COLLIDE_', ''),
+            }
+
+
 LOAD_FUNCS.update({
     'bee2_editor' + name[4:]: func
     for name, func in globals().items()
