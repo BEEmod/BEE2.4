@@ -419,10 +419,24 @@ _BLANK_INST = [InstCount(FSPath(), 0, 0, 0)]
 
 class ConnSide(Enum):
     """Sides of an item, where antlines connect to."""
-    LEFT = Coord(1, 0, 0)
-    RIGHT = Coord(-1, 0, 0)
+    LEFT = Coord(-1, 0, 0)
+    RIGHT= Coord(1, 0, 0)
     UP = Coord(0, 1, 0)
     DOWN = Coord(0, -1, 0)
+
+    @classmethod
+    def from_yaw(cls, value: int) -> 'ConnSide':
+        """Return the the side pointing in this yaw direction."""
+        value %= 360
+        if value == 0:
+            return ConnSide.LEFT
+        elif value == 90:
+            return ConnSide.DOWN
+        elif value == 180:
+            return ConnSide.RIGHT
+        elif value == 270:
+            return ConnSide.UP
+        raise ValueError(f'Invalid yaw {value}!')
 
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
@@ -446,9 +460,9 @@ class ConnSide(Enum):
             elif y == -1:
                 return ConnSide.DOWN
         elif y == 0:
-            if x == 1:
+            if x == -1:
                 return ConnSide.LEFT
-            elif x == -1:
+            elif x == 1:
                 return ConnSide.RIGHT
         raise error_func('Unknown connection side ({}, {}, 0)', x, y)
 
