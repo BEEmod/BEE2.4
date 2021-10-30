@@ -39,10 +39,10 @@ def save(item: Item) -> VMF:
 
 SKIN_TO_CONN_OFFSETS = {
     # Skin -> antline offset.
-    '1': Vec(+0.5, +0.5),
-    '2': Vec(+0.5, -0.5),
-    '3': Vec(-0.5, +0.5),
-    '4': Vec(-0.5, -0.5),
+    '1': Vec(-0.5, +0.5),
+    '2': Vec(-0.5, -0.5),
+    '3': Vec(+0.5, +0.5),
+    '4': Vec(+0.5, -0.5),
 }
 # Opposite transform.
 CONN_OFFSET_TO_SKIN = {
@@ -94,8 +94,8 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
     except KeyError:
         LOGGER.warning('Connection Point at {} has invalid skin "{}"!', origin)
         return
-    ant_pos = Coord(round(center.x - offset.x), round(center.y - offset.y), 0)
-    sign_pos = Coord(round(center.x + offset.x), round(center.y + offset.y), 0)
+    ant_pos = Coord(round(center.x + offset.x), round(center.y + offset.y), 0)
+    sign_pos = Coord(round(center.x - offset.x), round(center.y - offset.y), 0)
 
     group_str = ent['group_id']
 
