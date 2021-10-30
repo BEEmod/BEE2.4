@@ -539,41 +539,41 @@ def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[tuple[Coord, Coord]]:
         x1, y1, z1 = x2, y2, z2 = todo.pop()
         # X+:
         for x in range(x1 + 1, x1 + EXTENT):
-            if (x, y1, z1) in todo:
+            if Coord(x, y1, z1) in todo:
                 x2 = x
             else:
                 break
         # X-:
         for x in range(x1 - 1, x1 - EXTENT, -1):
-            if (x, y1, z1) in todo:
+            if Coord(x, y1, z1) in todo:
                 x1 = x
             else:
                 break
 
         # Y+:
         for y in range(y1 + 1, y1 + EXTENT):
-            if all((x, y, z1) in todo for x in range(x1, x2+1)):
+            if all(Coord(x, y, z1) in todo for x in range(x1, x2+1)):
                 y2 = y
             else:
                 break
 
         # Y-:
         for y in range(y1 - 1, y1 - EXTENT, -1):
-            if all((x, y, z1) in todo for x in range(x1, x2+1)):
+            if all(Coord(x, y, z1) in todo for x in range(x1, x2+1)):
                 y1 = y
             else:
                 break
 
         # Y+:
         for z in range(z1 + 1, z1 + EXTENT):
-            if all((x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
+            if all(Coord(x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
                 z2 = z
             else:
                 break
 
         # Y-:
         for z in range(z1 - 1, z1 - EXTENT, -1):
-            if all((x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
+            if all(Coord(x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
                 z1 = z
             else:
                 break
