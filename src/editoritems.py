@@ -309,7 +309,15 @@ class Coord:
     @classmethod
     def from_vec(cls, vec: Vec) -> 'Coord':
         """Round a vector to grid coordinates."""
-        return cls(round(vec.x), round(vec.y), round(vec.z))
+        x = round(vec.x)
+        y = round(vec.y)
+        z = round(vec.z)
+        try:
+            return _coord_cache[x, y, z]
+        except KeyError:
+            result = cls(x, y, z)
+            _coord_cache[x, y, z] = result
+            return result
 
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
