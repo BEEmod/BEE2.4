@@ -19,7 +19,7 @@ def load(item: Item, vmf: VMF) -> None:
     with logger.context(item.id):
         for ent in vmf.entities:
             classname = ent['classname'].casefold()
-            if not classname.startswith('bee2_editor_'):
+            if not classname.startswith('bee2_editor_') or ent.hidden:
                 continue
             try:
                 func = LOAD_FUNCS[classname]
@@ -136,20 +136,6 @@ def save_connectionpoint(item: Item) -> SaveResult:
             }
 
 
-def load_occupied_subvoxel(item: Item, ent: Entity) -> None:
-    """Parse subvoxels embedded in the VMF."""
-    origin = Vec.from_str(ent['origin'])
-    voxel = round(origin / 128, 0)
-    subpos = (origin - voxel * 128 + (48, 48, 48)) / 32
-    item.occupy_voxels.add(OccupiedVoxel(
-        parse_colltype(ent['coll_type']),
-        parse_colltype(ent['coll_against']),
-        Coord.from_vec(voxel),
-        Coord.from_vec(subpos),
-        normal=None,
-    ))
-
-
 def save_occupied_subvoxel(item: Item) -> SaveResult:
     """Save occupied subvoxel volumes."""
     for voxel in item.occupy_voxels:
@@ -162,16 +148,43 @@ def save_occupied_subvoxel(item: Item) -> SaveResult:
             }
 
 
-def load_occupied_voxel(item: Item, ent: Entity) -> None:
-    """Parse full-voxel collisions embedded in the VMF."""
-    origin = Vec.from_str(ent['origin']) / 128
-    item.occupy_voxels.add(OccupiedVoxel(
-        parse_colltype(ent['coll_type']),
-        parse_colltype(ent['coll_against']),
-        Coord.from_vec(origin),
-        subpos=None,
-        normal=None,
-    ))
+def load_occupiedvoxel(item: Item, ent: Entity) -> None:
+    """Parse voxel collisions embedded in the VMF."""
+    bbox_min, bbox_max = ent.get_bbox()
+    bbox_min = round(bbox_min, 0)
+    bbox_max = round(bbox_max, 0)
+    center = (bbox_min + bbox_max) / 2.0
+    size = round(bbox_max - bbox_min, 0)
+
+    coll_type = parse_colltype(ent['coll_type'])
+    coll_against = parse_colltype(ent['coll_against'])
+
+    if bbox_min % 128 == (64.0, 64.0, 64.0) and bbox_max % 128 == (64.0, 64.0, 64.0):
+        # Full voxels.
+        for voxel in Vec.iter_grid(
+            (bbox_min + (64, 64, 64)) / 128,
+            (bbox_max - (64, 64, 64)) / 128,
+        ):
+            item.occupy_voxels.add(OccupiedVoxel(
+                coll_type, coll_against,
+                Coord.from_vec(voxel),
+            ))
+    elif bbox_min % 32 == (0.0, 0.0, 0.0) and bbox_max % 32 == (0.0, 0.0, 0.0):
+        # Subvoxel sections.
+        for subvoxel in Vec.iter_grid(
+            bbox_min / 32,
+            (bbox_max - (32.0, 32.0, 32.0)) / 32,
+        ):
+            item.occupy_voxels.add(OccupiedVoxel(
+                coll_type, coll_against,
+                Coord.from_vec((subvoxel + (2, 2, 2)) // 4),
+                Coord.from_vec((subvoxel - (2, 2, 2)) % 4),
+            ))
+    else:
+        LOGGER.warning(
+            'Unknown occupied voxel definition: ({}) - ({}), type="{}", against="{}"',
+            *ent.get_bbox(), ent['coll_type'], ent['coll_against'],
+        )
 
 
 def save_occupied_voxel(item: Item) -> SaveResult:

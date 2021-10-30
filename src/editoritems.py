@@ -514,8 +514,8 @@ class OccupiedVoxel:
     type: CollType
     against: CollType | None  # TODO: Don't know what the default is.
     pos: Coord
-    subpos: Coord | None
-    normal: Coord | None
+    subpos: Coord | None = None
+    normal: Coord | None = None
 
 
 def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[tuple[Coord, Coord]]:
