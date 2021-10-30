@@ -94,8 +94,8 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
     except KeyError:
         LOGGER.warning('Connection Point at {} has invalid skin "{}"!', origin)
         return
-    ant_pos = Coord(round(center.x + offset.x), round(center.y + offset.y), 0)
-    sign_pos = Coord(round(center.x - offset.x), round(center.y - offset.y), 0)
+    ant_pos = Coord(round(center.x + offset.x), round(center.y - offset.y), 0)
+    sign_pos = Coord(round(center.x - offset.x), round(center.y + offset.y), 0)
 
     group_str = ent['group_id']
 
@@ -117,7 +117,6 @@ def save_connectionpoint(item: Item, vmf: VMF) -> None:
             sign_pos = Vec(point.sign_off.x, -point.sign_off.y, -64)
 
             offset = (ant_pos - sign_pos) @ inv_orient
-            offset.x = -offset.x
             try:
                 skin = CONN_OFFSET_TO_SKIN[offset.as_tuple()]
             except KeyError:

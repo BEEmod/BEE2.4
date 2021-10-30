@@ -499,11 +499,11 @@ class ConnSide(Enum):
         """Return the yaw direction."""
         if self is ConnSide.LEFT:
             return 0
+        if self is ConnSide.DOWN:
+            return 90
         if self is ConnSide.RIGHT:
             return 180
         if self is ConnSide.UP:
-            return 90
-        if self is ConnSide.DOWN:
             return 270
         raise AssertionError(f'Unknown value {self!r}')
 
