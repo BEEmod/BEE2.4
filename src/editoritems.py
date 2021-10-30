@@ -432,11 +432,15 @@ _BLANK_INST = [InstCount(FSPath(), 0, 0, 0)]
 
 
 class ConnSide(Enum):
-    """Sides of an item, where antlines connect to."""
-    LEFT = Coord(-1, 0, 0)
-    RIGHT= Coord(1, 0, 0)
-    UP = Coord(0, 1, 0)
-    DOWN = Coord(0, -1, 0)
+    """Sides of an item, where antlines connect to.
+
+    The name is the side of the item it attaches, the vector is the direction the end points - so
+    they're reversed compared to each other.
+    """
+    LEFT = Coord(1, 0, 0)
+    RIGHT = Coord(-1, 0, 0)
+    UP = Coord(0, -1, 0)
+    DOWN = Coord(0, 1, 0)
 
     @classmethod
     def from_yaw(cls, value: int) -> 'ConnSide':
@@ -475,9 +479,9 @@ class ConnSide(Enum):
                 return ConnSide.DOWN
         elif y == 0:
             if x == -1:
-                return ConnSide.LEFT
-            elif x == 1:
                 return ConnSide.RIGHT
+            elif x == 1:
+                return ConnSide.LEFT
         raise error_func('Unknown connection side ({}, {}, 0)', x, y)
 
     @property
@@ -494,13 +498,13 @@ class ConnSide(Enum):
     def yaw(self) -> int:
         """Return the yaw direction."""
         if self is ConnSide.LEFT:
-            return 180
-        if self is ConnSide.RIGHT:
             return 0
+        if self is ConnSide.RIGHT:
+            return 180
         if self is ConnSide.UP:
-            return 270
-        if self is ConnSide.DOWN:
             return 90
+        if self is ConnSide.DOWN:
+            return 270
         raise AssertionError(f'Unknown value {self!r}')
 
 
