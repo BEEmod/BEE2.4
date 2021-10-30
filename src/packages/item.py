@@ -8,10 +8,10 @@ import operator
 import re
 import copy
 from typing import NamedTuple, Match, cast
-
-import utils
-from srctools import FileSystem, Property, EmptyMapping
 from pathlib import PurePosixPath as FSPath
+
+from srctools import FileSystem, Property, EmptyMapping, VMF
+from srctools.tokenizer import Tokenizer, Token
 import srctools.logger
 
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
@@ -21,7 +21,8 @@ from packages import (
 )
 from editoritems import Item as EditorItem, InstCount
 from connections import Config as ConnConfig
-from srctools.tokenizer import Tokenizer, Token
+import editoritems_vmf
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -786,6 +787,13 @@ def parse_item_folder(
                 f'"{pak_id}:items/{fold}/editoritems.txt has no '
                 '"Item" block!'
             )
+
+        try:
+            editor_vmf = VMF.parse(filesystem.read_prop(editor_path[:-3] + 'vmf'))
+        except FileNotFoundError:
+            pass
+        else:
+            editoritems_vmf.load(first_item, editor_vmf)
 
         # extra_items is any extra blocks (offset catchers, extent items).
         # These must not have a palette section - it'll override any the user
