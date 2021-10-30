@@ -5,7 +5,7 @@ from typing import Callable, Iterator, Dict
 from srctools import Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity, ValidKVs
 
-from editoritems import Item, ConnSide, CollType, AntlinePoint, Coord, OccupiedVoxel
+from editoritems import Item, ConnSide, CollType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
 
 
 LOGGER = logger.get_logger(__name__)
@@ -133,6 +133,36 @@ def save_connectionpoint(item: Item, vmf: VMF) -> None:
                 priority=point.priority,
                 group_id='' if point.group is None else point.group,
             )
+
+
+def load_embeddedvoxel(item: Item, ent: Entity) -> None:
+    """Parse embed definitions contained in the VMF."""
+    bbox_min, bbox_max = ent.get_bbox()
+    bbox_min = round(bbox_min, 0)
+    bbox_max = round(bbox_max, 0)
+
+    if bbox_min % 128 != (64.0, 64.0, 64.0) or bbox_max % 128 != (64.0, 64.0, 64.0):
+        LOGGER.warning(
+            'Embedded voxel definition ({}) - ({}) is not aligned to grid!',
+            bbox_min, bbox_max,
+        )
+        return
+
+    item.embed_voxels.update(map(Coord.from_vec, Vec.iter_grid(
+        (bbox_min + (64, 64, 64)) / 128,
+        (bbox_max - (64, 64, 64)) / 128,
+    )))
+
+
+def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
+    """Save embedded voxel volumes."""
+    for bbox_min, bbox_max in bounding_boxes(item.embed_voxels):
+        vmf.create_ent('bee2_editor_embeddedvoxel').solids.append(vmf.make_prism(
+            Vec(bbox_min) * 128 + (-64.0, -64.0, -192.0),
+            Vec(bbox_max) * 128 + (+64.0, +64.0, -64.0),
+            # Entirely ignored, but makes it easier to distinguish.
+            'tools/toolshint',
+        ).solid)
 
 
 def load_occupiedvoxel(item: Item, ent: Entity) -> None:
