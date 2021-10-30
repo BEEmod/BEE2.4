@@ -10,8 +10,7 @@ from editoritems import Item, ConnSide, CollType, AntlinePoint, Coord, OccupiedV
 
 LOGGER = logger.get_logger(__name__)
 LOAD_FUNCS: dict[str, Callable[[Item, Entity], None]] = {}
-SaveResult = Iterator[Dict[str, ValidKVs]]
-SAVE_FUNCS: list[tuple[str, Callable[[Item], SaveResult]]] = []
+SAVE_FUNCS: list[Callable[[Item, VMF], None]] = []
 
 
 def load(item: Item, vmf: VMF) -> None:
@@ -33,9 +32,8 @@ def save(item: Item) -> VMF:
     """Export out relevant item options into a VMF."""
     vmf = VMF()
     with logger.context(item.id):
-        for ent_class, func in SAVE_FUNCS:
-            for ent_data in func(item):
-                vmf.create_ent(ent_class, **ent_data)
+        for func in SAVE_FUNCS:
+            func(item, vmf)
     return vmf
 
 
@@ -109,7 +107,7 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
     ))
 
 
-def save_connectionpoint(item: Item) -> SaveResult:
+def save_connectionpoint(item: Item, vmf: VMF) -> None:
     """Write connectionpoints to a VMF."""
     for side, points in item.antline_points.items():
         yaw = side.yaw
@@ -127,25 +125,14 @@ def save_connectionpoint(item: Item) -> SaveResult:
                 continue
             pos: Vec = round((ant_pos + sign_pos) / 2.0 * 16.0, 0)
 
-            yield {
-                'origin': Vec(pos.x - 56, pos.y + 56, -64),
-                'angles': f'0 {yaw} 0',
-                'skin': skin,
-                'priority': point.priority,
-                'group_id': '' if point.group is None else point.group,
-            }
-
-
-def save_occupied_subvoxel(item: Item) -> SaveResult:
-    """Save occupied subvoxel volumes."""
-    for voxel in item.occupy_voxels:
-        if voxel.subpos is not None and voxel.normal is None:
-            pos = Vec(voxel.pos) * 128 + Vec(voxel.subpos) * 32 - (48, 48, 48)
-            yield {
-                'origin': pos,
-                'coll_type': str(voxel.type).replace('COLLIDE_', ''),
-                'coll_against': str(voxel.against).replace('COLLIDE_', ''),
-            }
+            vmf.create_ent(
+                'bee2_editor_connectionpoint',
+                origin=Vec(pos.x - 56, pos.y + 56, -64),
+                angles=f'0 {yaw} 0',
+                skin=skin,
+                priority=point.priority,
+                group_id='' if point.group is None else point.group,
+            )
 
 
 def load_occupiedvoxel(item: Item, ent: Entity) -> None:
@@ -222,49 +209,39 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
     )
 
 
-def save_occupied_voxel(item: Item) -> SaveResult:
-    """Save occupied full-voxel volumes."""
+def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
+    """Save occupied voxel volumes."""
     for voxel in item.occupy_voxels:
-        if voxel.subpos is None and voxel.normal is None:
-            pos = Vec(voxel.pos) * 128
-            yield {
-                'origin': pos,
-                'coll_type': str(voxel.type).replace('COLLIDE_', ''),
-                'coll_against': str(voxel.against).replace('COLLIDE_', ''),
-            }
+        pos = Vec(voxel.pos) * 128
 
+        if voxel.subpos is not None:
+            pos += Vec(voxel.subpos) * 32 - (48, 48, 48)
+            p1 = pos - (16.0, 16.0, 16.0)
+            p2 = pos + (16.0, 16.0, 16.0)
+            norm_dist = 32.0 - 4.0
+        else:
+            p1 = pos - (64.0, 64.0, 64.0)
+            p2 = pos + (64.0, 64.0, 64.0)
+            norm_dist = 128.0 - 4.0
 
-def load_occupied_surface(item: Item, ent: Entity) -> None:
-    """Parse full-surface occupied surfaces."""
-    origin = Vec.from_str(ent['origin'])
-    normal = Vec(z=1) @ Angle.from_str(ent['angles'])
+        if voxel.normal is not None:
+            for axis in ['x', 'y', 'z']:
+                val = getattr(voxel.normal, axis)
+                if val == +1:
+                    p2[axis] -= norm_dist
+                elif val == -1:
+                    p1[axis] += norm_dist
 
-    voxel = round((origin + 64 * normal) / 128, 0)
-    item.occupy_voxels.add(OccupiedVoxel(
-        parse_colltype(ent['coll_type']),
-        parse_colltype(ent['coll_against']),
-        Coord.from_vec(voxel),
-        subpos=None,
-        normal=Coord.from_vec(normal),
-    ))
-
-
-def save_occupied_surface(item: Item) -> SaveResult:
-    """Save full-surface occupied surfaces."""
-    for voxel in item.occupy_voxels:
-        if voxel.subpos is None and voxel.normal is not None:
-            norm = Vec(voxel.normal)
-            pos = Vec(voxel.pos) * 128 - 64 * norm
-            if voxel.normal.z:
-                ang = Matrix.from_basis(x=Vec(x=1), z=norm)
-            else:
-                ang = Matrix.from_basis(x=Vec(z=1), z=norm)
-            yield {
-                'origin': pos,
-                'angle': ang.to_angle(),
-                'coll_type': str(voxel.type).replace('COLLIDE_', ''),
-                'coll_against': str(voxel.against).replace('COLLIDE_', ''),
-            }
+        vmf.create_ent(
+            'bee2_editor_occupiedvoxel',
+            coll_type=str(voxel.type).replace('COLLIDE_', ''),
+            coll_against=str(voxel.against).replace('COLLIDE_', ''),
+        ).solids.append(vmf.make_prism(
+            p1, p2,
+            # Use clip for voxels, invisible for normals.
+            # Entirely ignored, but makes it easier to use.
+            'tools/toolsclip' if voxel.normal is None else 'tools/toolsinvisible',
+        ).solid)
 
 
 LOAD_FUNCS.update({
@@ -273,7 +250,7 @@ LOAD_FUNCS.update({
     if name.startswith('load_')
 })
 SAVE_FUNCS.extend([
-    ('bee2_editor' + name[4:], func)
+    func
     for name, func in globals().items()
     if name.startswith('save_')
 ])
