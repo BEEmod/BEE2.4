@@ -439,8 +439,8 @@ class ConnSide(Enum):
     """
     LEFT = Coord(1, 0, 0)
     RIGHT = Coord(-1, 0, 0)
-    UP = Coord(0, -1, 0)
-    DOWN = Coord(0, 1, 0)
+    UP = Coord(0, 1, 0)
+    DOWN = Coord(0, -1, 0)
 
     @classmethod
     def from_yaw(cls, value: int) -> 'ConnSide':
