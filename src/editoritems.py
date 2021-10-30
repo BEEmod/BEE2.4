@@ -144,6 +144,7 @@ class CollType(Flag):
     EVERYTHING = 0b1111111
 
     GRATE = GRATING
+    NONE = NOTHING
     # If unset, everything but physics collides.
     DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 

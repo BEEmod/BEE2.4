@@ -136,13 +136,16 @@ def save_connectionpoint(item: Item, vmf: VMF) -> None:
 
 
 def load_occupiedvoxel(item: Item, ent: Entity) -> None:
-    """Parse voxel collisions embedded in the VMF."""
+    """Parse voxel collisions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
     bbox_max = round(bbox_max, 0)
 
     coll_type = parse_colltype(ent['coll_type'])
-    coll_against = parse_colltype(ent['coll_against'])
+    if ent['coll_against']:
+        coll_against = parse_colltype(ent['coll_against'])
+    else:
+        coll_against = None
 
     if bbox_min % 128 == (64.0, 64.0, 64.0) and bbox_max % 128 == (64.0, 64.0, 64.0):
         # Full voxels.
@@ -232,10 +235,15 @@ def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
                 elif val == -1:
                     p1[axis] += norm_dist
 
+        if voxel.against is not None:
+            against = str(voxel.against).replace('COLLIDE_', '')
+        else:
+            against = ''
+
         vmf.create_ent(
             'bee2_editor_occupiedvoxel',
             coll_type=str(voxel.type).replace('COLLIDE_', ''),
-            coll_against=str(voxel.against).replace('COLLIDE_', ''),
+            coll_against=against,
         ).solids.append(vmf.make_prism(
             p1, p2,
             # Use clip for voxels, invisible for normals.
