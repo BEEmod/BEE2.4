@@ -153,8 +153,6 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
     bbox_max = round(bbox_max, 0)
-    center = (bbox_min + bbox_max) / 2.0
-    size = round(bbox_max - bbox_min, 0)
 
     coll_type = parse_colltype(ent['coll_type'])
     coll_against = parse_colltype(ent['coll_against'])
@@ -169,6 +167,7 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
                 coll_type, coll_against,
                 Coord.from_vec(voxel),
             ))
+        return
     elif bbox_min % 32 == (0.0, 0.0, 0.0) and bbox_max % 32 == (0.0, 0.0, 0.0):
         # Subvoxel sections.
         for subvoxel in Vec.iter_grid(
@@ -180,11 +179,47 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
                 Coord.from_vec((subvoxel + (2, 2, 2)) // 4),
                 Coord.from_vec((subvoxel - (2, 2, 2)) % 4),
             ))
-    else:
-        LOGGER.warning(
-            'Unknown occupied voxel definition: ({}) - ({}), type="{}", against="{}"',
-            *ent.get_bbox(), ent['coll_type'], ent['coll_against'],
-        )
+        return
+    # else, is this a surface definition?
+    size = round(bbox_max - bbox_min, 0)
+    for axis in ['x', 'y', 'z']:
+        if size[axis] < 8:
+            u, v = Vec.INV_AXIS[axis]
+            # Figure out if we're aligned to the min or max side of the voxel.
+            # Compute the normal, then flatten to zero thick.
+            if bbox_min[axis] % 32 == 0:
+                norm = +1
+                plane_dist = bbox_max[axis] = bbox_min[axis]
+            elif bbox_max[axis] % 32 == 0:
+                norm = -1
+                plane_dist = bbox_min[axis] = bbox_max[axis]
+            else:
+                # Both faces aren't aligned to the grid, skip to error.
+                break
+
+            if bbox_min[u] % 128 == bbox_min[v] % 128 == bbox_max[v] % 128 == bbox_max[v] % 128 == 64.0:
+                # Full voxel surface definitions.
+                for voxel in Vec.iter_grid(
+                    Vec.with_axes(u, bbox_min[u] + 64, v, bbox_min[v] + 64, axis, plane_dist + 64 * norm) / 128,
+                    Vec.with_axes(u, bbox_max[u] - 64, v, bbox_max[v] - 64, axis, plane_dist + 64 * norm) / 128,
+                ):
+                    item.occupy_voxels.add(OccupiedVoxel(
+                        coll_type, coll_against,
+                        Coord.from_vec(voxel),
+                        normal=Coord.from_vec(Vec.with_axes(axis, norm)),
+                    ))
+                return
+            elif bbox_min[u] % 32 == bbox_min[v] % 32 == bbox_max[v] % 32 == bbox_max[v] % 32 == 0.0:
+                # Subvoxel surface definitions.
+                return
+            else:
+                # Not aligned to grid, skip to error.
+                break
+
+    LOGGER.warning(
+        'Unknown occupied voxel definition: ({}) - ({}), type="{}", against="{}"',
+        bbox_min, bbox_max, ent['coll_type'], ent['coll_against'],
+    )
 
 
 def save_occupied_voxel(item: Item) -> SaveResult:
