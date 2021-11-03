@@ -154,7 +154,7 @@ def main(argv: List[str]) -> None:
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
             edit_args = not config.get_bool('General', 'vrad_force_full')
-            # If shif is held, reverse.
+            # If shift is held, reverse.
             if utils.check_shift():
                 LOGGER.info('Shift held, inverting configured lighting option!')
                 edit_args = not edit_args
@@ -185,8 +185,7 @@ def main(argv: List[str]) -> None:
     root_folder = game.path.parent
     fsys = game.get_filesystem()
 
-    # Special case - move the BEE2 fsys FIRST, so we always pack files found
-    # there.
+    # Special case - move the BEE2 filesystem FIRST, so we always pack files found there.
     for child_sys in fsys.systems[:]:
         if 'bee2' in child_sys[0].path.casefold():
             fsys.systems.remove(child_sys)
@@ -209,17 +208,22 @@ def main(argv: List[str]) -> None:
     fgd = FGD.engine_dbase()
 
     packlist = PackList(fsys)
+    LOGGER.info('Reading soundscripts...')
     packlist.load_soundscript_manifest(
         str(root_folder / 'bin/bee2/sndscript_cache.vdf')
     )
-
-    load_transforms()
 
     # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
     for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
         if soundscript.path.endswith('.txt'):
             packlist.load_soundscript(soundscript, always_include=False)
+
+    LOGGER.info('Reading particles....')
+    packlist.load_particle_manifest()
+
+    LOGGER.info('Loading transforms...')
+    load_transforms()
 
     LOGGER.info('Checking for music:')
     music.generate(bsp_file.ents, packlist)
@@ -233,7 +237,8 @@ def main(argv: List[str]) -> None:
     packlist.eval_dependencies()
     LOGGER.info('Done!')
 
-    packlist.write_manifest()
+    packlist.write_soundscript_manifest()
+    packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
 
     # We need to disallow Valve folders.
     pack_whitelist: set[FileSystem] = set()
@@ -275,7 +280,6 @@ def main(argv: List[str]) -> None:
         LOGGER.info('Packed files:\n{}', '\n'.join(
             set(bsp_file.pakfile.namelist()) - existing
         ))
-
 
     LOGGER.info('Writing BSP...')
     bsp_file.save()
