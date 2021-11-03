@@ -290,7 +290,6 @@ class PalItem(Label):
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
-        self.load_data()
 
         self.bind(tk_tools.EVENTS['LEFT'], drag_start)
         self.bind(tk_tools.EVENTS['LEFT_SHIFT'], drag_fast)
@@ -368,7 +367,6 @@ class PalItem(Label):
 
         Call whenever the style changes, so the icons update.
         """
-        self.img = self.item.get_icon(self.subKey, self.is_pre)
         try:
             self.name = gameMan.translate(self.item.data.editor.subtypes[self.subKey].name)
         except IndexError:
@@ -377,7 +375,7 @@ class PalItem(Label):
                 self.id, selected_style,
             )
             self.name = '??'
-        img.apply(self, self.img)
+        img.apply(self, self.item.get_icon(self.subKey, self.is_pre))
 
     def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
