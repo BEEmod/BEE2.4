@@ -88,7 +88,7 @@ _load_handles: dict[tuple[int, int], Handle] = {}
 _load_nursery: trio.Nursery | None = None
 # Load calls occuring before init. This is done so apply() can be called during import etc,
 # and it'll be deferred till later.
-_early_loads: list[Handle] = []
+_early_loads: set[Handle] = set()
 
 
 def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
@@ -663,7 +663,7 @@ class Handle(Generic[ArgT]):
         if self._loading is False:
             self._loading = True
             if _load_nursery is None:
-                _early_loads.append(self)
+                _early_loads.add(self)
             else:
                 _load_nursery.start_soon(self._load_task)
         return Handle.ico_loading(self.width, self.height).get_tk()
@@ -732,11 +732,12 @@ async def _spin_load_icons() -> None:
 def start_loading(nursery: trio.Nursery) -> None:
     """Start the background loading."""
     global _load_nursery
-    for handle in _early_loads:
+    _load_nursery = nursery
+    LOGGER.debug('Early loads: {}', _early_loads)
+    while _early_loads:
+        handle = _early_loads.pop()
         if handle._users:
             nursery.start_soon(Handle._load_task, handle)
-    _early_loads.clear()
-    _load_nursery = nursery
     nursery.start_soon(_spin_load_icons)
 
 
