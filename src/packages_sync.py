@@ -8,7 +8,6 @@ they will be copied to any packages with those resources.
 The destination will be 'Portal 2/bee2_dev/' if that exists, or 'Portal 2/bee2/'
 otherwise.
 """
-
 import utils
 import gettext
 from srctools.filesys import RawFileSystem
@@ -25,10 +24,11 @@ gettext.NullTranslations().install(['gettext', 'ngettext'])
 import os
 import sys
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
-import shutil
+import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
 from packages import (
@@ -40,9 +40,6 @@ from packages import (
 # If true, user said * for packages - use last for all.
 PACKAGE_REPEAT: Optional[RawFileSystem] = None
 SKIPPED_FILES: List[str] = []
-
-# If enabled, ignore anything not in packages and that needs prompting.
-NO_PROMPT = False
 
 
 def get_package(file: Path) -> RawFileSystem:
@@ -68,10 +65,14 @@ def get_package(file: Path) -> RawFileSystem:
 
         if pack_id == '*' and last_package:
             try:
-                PACKAGE_REPEAT = PACKAGES[last_package].fsys
+                fsys = PACKAGES[last_package].fsys
             except KeyError:
                 continue
-            return PACKAGE_REPEAT
+            if isinstance(fsys, RawFileSystem):
+                PACKAGE_REPEAT = fsys
+                return PACKAGE_REPEAT
+            else:
+                print('Packages must be folders, not zips!')
         elif not pack_id and last_package:
             pack_id = last_package
 
@@ -79,10 +80,12 @@ def get_package(file: Path) -> RawFileSystem:
             fsys = PACKAGES[pack_id.casefold()].fsys
         except KeyError:
             continue
-        else:
+        if isinstance(fsys, RawFileSystem):
             GEN_OPTS['Last_Selected']['Package_sync_id'] = pack_id
             GEN_OPTS.save_check()
             return fsys
+        else:
+            print('Packages must be folders, not zips!')
 
 
 def check_file(file: Path, portal2: Path, packages: Path) -> None:
@@ -143,9 +146,6 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
                 target_systems.append(package.fsys)
 
         if not target_systems:
-            if NO_PROMPT:
-                EXTRA_FILES.append(rel_loc)
-                return
             # This file is totally new.
             try:
                 target_systems.append(get_package(rel_loc))
@@ -170,7 +170,7 @@ def print_package_ids() -> None:
     print()
 
 
-def main(files: List[str]) -> int:
+async def main(files: List[str]) -> int:
     """Run the transfer."""
     if not files:
         LOGGER.error('No files to copy!')
@@ -193,8 +193,9 @@ def main(files: List[str]) -> int:
 
     # Disable logging of package info.
     packages_logger.setLevel(logging.ERROR)
-    for loc in get_package_locs():
-        find_packages(loc)
+    async with trio.open_nursery() as nursery:
+        for loc in get_package_locs():
+            await find_packages(nursery, loc)
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
@@ -203,12 +204,12 @@ def main(files: List[str]) -> int:
 
     package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
 
-    file_list = []  # type: List[Path]
+    file_list: list[Path] = []
 
     for file in files:
         file_path = Path(file)
         if file_path.is_dir():
-            for sub_file in file_path.glob('**/*'):  # type: Path
+            for sub_file in file_path.glob('**/*'):
                 if sub_file.is_file():
                     file_list.append(sub_file)
         else:
@@ -217,7 +218,7 @@ def main(files: List[str]) -> int:
     files_to_check = set()
 
     for file_path in file_list:
-        if file_path.suffix.casefold() in ('.vmx', '.log', '.bsp', '.prt', '.lin'):
+        if file_path.suffix.casefold() in {'.vmx', '.log', '.bsp', '.prt', '.lin'}:
             # Ignore these file types.
             continue
         files_to_check.add(file_path)
@@ -242,4 +243,4 @@ def main(files: List[str]) -> int:
 
 if __name__ == '__main__':
     LOGGER.info('BEE{} packages syncer, args={}', utils.BEE_VERSION, sys.argv[1:])
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(trio.run(main, sys.argv[1:]))
