@@ -1,5 +1,5 @@
 """Main UI module, brings everything together."""
-from tkinter import *  # ui library
+import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
 import itertools
@@ -60,15 +60,15 @@ style_win: SelectorWin
 elev_win: SelectorWin
 
 # Items chosen for the palette.
-pal_picked = []   # type: List[PalItem]
+pal_picked: List['PalItem'] = []
 # Array of the "all items" icons
-pal_items = []  # type: List[PalItem]
+pal_items: List['PalItem'] = []
 # Labels used for the empty palette positions
-pal_picked_fake = []  # type: List[ttk.Label]
+pal_picked_fake: List[ttk.Label] = []
 # Labels for empty picker positions
-pal_items_fake = []  # type: List[ttk.Label]
+pal_items_fake: List[ttk.Label] = []
 # The current filtering state.
-cur_filter: Optional[Set[Tuple[str, int]]] = None\
+cur_filter: Optional[Set[Tuple[str, int]]] = None
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -80,10 +80,10 @@ IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 selected_style = "BEE2_CLEAN"
 # Variable used for export button (changes to include game name)
-EXPORT_CMD_VAR = StringVar(value=gettext('Export...'))
+EXPORT_CMD_VAR = tk.StringVar(value=gettext('Export...'))
 
 # Maps item IDs to our wrapper for the object.
-item_list = {}  # type: Dict[str, Item]
+item_list: Dict[str, 'Item'] = {}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -279,7 +279,7 @@ class Item:
         ]
 
 
-class PalItem(Label):
+class PalItem(tk.Label):
     """The icon and associated data for a single subitem."""
     def __init__(self, frame, item: Item, sub: int, is_pre):
         """Create a label to show an item onscreen."""
@@ -296,7 +296,7 @@ class PalItem(Label):
         self.bind("<Enter>", self.rollover)
         self.bind("<Leave>", self.rollout)
 
-        self.info_btn = Label(
+        self.info_btn = tk.Label(
             self,
             relief='ridge',
             width=12,
@@ -326,7 +326,7 @@ class PalItem(Label):
         self.info_btn.place(
             x=self.winfo_width() - padding,
             y=self.winfo_height() - padding,
-            anchor=SE,
+            anchor='se',
         )
 
     def rollout(self, _):
@@ -885,7 +885,7 @@ def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
     )
 
 
-def drag_start(e: Event) -> None:
+def drag_start(e: tk.Event) -> None:
     """Start dragging a palette item."""
     drag_win = windows['drag_win']
     drag_win.drag_item = e.widget
@@ -1114,7 +1114,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     pane.rowconfigure(0, weight=1)
 
     frame = ttk.Frame(pane)
-    frame.grid(row=0, column=0, sticky=NSEW)
+    frame.grid(row=0, column=0, sticky='nsew')
     frame.columnconfigure(0, weight=1)
 
     pal_save = ttk.Button(
@@ -1163,12 +1163,12 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
                 has_suggest = True
         UI['suggested_style'].state(('!disabled', ) if has_suggest else ('disabled', ))
 
-    def suggested_style_mousein(_: Event) -> None:
+    def suggested_style_mousein(_: tk.Event) -> None:
         """When mousing over the button, show the suggested items."""
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.rollover_suggest()
 
-    def suggested_style_mouseout(_: Event) -> None:
+    def suggested_style_mouseout(_: tk.Event) -> None:
         """Return text to the normal value on mouseout."""
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.set_disp()
@@ -1183,7 +1183,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     UI['suggested_style'].bind('<Enter>', suggested_style_mousein)
     UI['suggested_style'].bind('<Leave>', suggested_style_mouseout)
 
-    def configure_voice():
+    def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
             chosen_voice = packages.QuotePack.by_id(voice_win.chosen_id)
@@ -1263,12 +1263,12 @@ def flow_preview() -> None:
     UI['pre_sel_line'].lift()
 
 
-def init_preview(f: Frame) -> None:
+def init_preview(f: tk.Frame) -> None:
     """Generate the preview pane.
 
      This shows the items that will export to the palette.
     """
-    UI['pre_bg_img'] = Label(f, bg=ItemsBG)
+    UI['pre_bg_img'] = tk.Label(f, bg=ItemsBG)
     UI['pre_bg_img'].grid(row=0, column=0)
     img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 271, 573))
 
@@ -1279,7 +1279,7 @@ def init_preview(f: Frame) -> None:
         )
     UI['pre_disp_name'].place(x=10, y=554)
 
-    UI['pre_sel_line'] = Label(
+    UI['pre_sel_line'] = tk.Label(
         f,
         bg="#F0F0F0",
         borderwidth=0,
@@ -1297,7 +1297,7 @@ def init_preview(f: Frame) -> None:
     flow_preview()
 
 
-def init_picker(f: Frame) -> None:
+def init_picker(f: tk.Frame) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
     ttk.Label(
@@ -1318,7 +1318,7 @@ def init_picker(f: Frame) -> None:
     f.rowconfigure(1, weight=1)
     f.columnconfigure(0, weight=1)
 
-    pal_canvas = Canvas(cframe)
+    pal_canvas = tk.Canvas(cframe)
     # need to use a canvas to allow scrolling
     pal_canvas.grid(row=0, column=0, sticky="NSEW")
     cframe.rowconfigure(0, weight=1)
@@ -1326,7 +1326,7 @@ def init_picker(f: Frame) -> None:
 
     scroll = tk_tools.HidingScroll(
         cframe,
-        orient=VERTICAL,
+        orient=tk.VERTICAL,
         command=pal_canvas.yview,
     )
     scroll.grid(column=1, row=0, sticky="NS")
@@ -1407,7 +1407,7 @@ def flow_picker(e=None) -> None:
 
 def init_drag_icon() -> None:
     """Create the window for rendering held items."""
-    drag_win = Toplevel(TK_ROOT)
+    drag_win = tk.Toplevel(TK_ROOT)
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
     drag_win.overrideredirect(True)
@@ -1416,7 +1416,7 @@ def init_drag_icon() -> None:
     drag_win.transient(master=TK_ROOT)
     drag_win.withdraw()  # starts hidden
     drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], drag_stop)
-    UI['drag_lbl'] = Label(drag_win)
+    UI['drag_lbl'] = ttk.Label(drag_win)
     img.apply(UI['drag_lbl'], IMG_BLANK)
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
@@ -1446,20 +1446,20 @@ def set_game(game: 'gameMan.Game') -> None:
     EXPORT_CMD_VAR.set(text)
 
 
-def init_menu_bar(win: Toplevel, export: Callable[[], None]) -> Tuple[Menu, Menu]:
+def init_menu_bar(win: tk.Toplevel, export: Callable[[], None]) -> Tuple[tk.Menu, tk.Menu]:
     """Create the top menu bar.
 
     This returns the View and palette menus, for later population.
     """
-    bar = Menu(win)
+    bar = tk.Menu(win)
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
     win.option_add('*tearOff', '0')
     if utils.MAC:
         # Name is used to make this the special 'BEE2' menu item
-        file_menu = menus['file'] = Menu(bar, name='apple')
+        file_menu = menus['file'] = tk.Menu(bar, name='apple')
     else:
-        file_menu = menus['file'] = Menu(bar)
+        file_menu = menus['file'] = tk.Menu(bar)
 
     bar.add_cascade(menu=file_menu, label=gettext('File'))
 
@@ -1505,11 +1505,11 @@ def init_menu_bar(win: Toplevel, export: Callable[[], None]) -> Tuple[Menu, Menu
     gameMan.add_menu_opts(menus['file'], callback=set_game)
     gameMan.game_menu = menus['file']
 
-    pal_menu = menus['pal'] = Menu(bar)
+    pal_menu = menus['pal'] = tk.Menu(bar)
     # Menu name
     bar.add_cascade(menu=pal_menu, label=gettext('Palette'))
 
-    view_menu = Menu(bar)
+    view_menu = tk.Menu(bar)
     bar.add_cascade(menu=view_menu, label=gettext('View'))
 
     helpMenu.make_help_menu(bar)
@@ -1532,7 +1532,7 @@ def init_windows() -> None:
         # OS X has a special quit menu item.
         TK_ROOT.createcommand('tk::mac::Quit', quit_application)
 
-    ui_bg = Frame(TK_ROOT, bg=ItemsBG)
+    ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
@@ -1544,7 +1544,7 @@ def init_windows() -> None:
     style.configure('BG.TButton', background=ItemsBG)
     style.configure('Preview.TLabel', background='#F4F5F5')
 
-    frames['preview'] = Frame(ui_bg, bg=ItemsBG)
+    frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG)
     frames['preview'].grid(
         row=0,
         column=3,
@@ -1563,7 +1563,7 @@ def init_windows() -> None:
 
     ttk.Separator(
         ui_bg,
-        orient=VERTICAL,
+        orient='vertical',
     ).grid(
         row=0,
         column=4,
@@ -1572,7 +1572,7 @@ def init_windows() -> None:
         pady=10,
     )
 
-    picker_split_frame = Frame(ui_bg, bg=ItemsBG)
+    picker_split_frame = tk.Frame(ui_bg, bg=ItemsBG)
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
     ui_bg.columnconfigure(5, weight=1)
 
@@ -1609,7 +1609,7 @@ def init_windows() -> None:
 
     loader.step('UI')
 
-    frames['toolMenu'] = Frame(
+    frames['toolMenu'] = tk.Frame(
         frames['preview'],
         bg=ItemsBG,
         width=192,
