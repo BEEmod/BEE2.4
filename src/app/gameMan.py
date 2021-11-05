@@ -1285,7 +1285,6 @@ def load():
                 LOGGER.warning("Can't parse game: ", exc_info=True)
                 continue
             all_games.append(new_game)
-            new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen.main_loader.suppress()
@@ -1362,7 +1361,6 @@ def add_game(e=None, refresh_menu=True):
                 break
 
         new_game = Game(name, gm_id, folder, {})
-        new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
         if refresh_menu:
             add_menu_opts(game_menu)
