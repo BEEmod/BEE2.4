@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-10-16 16:09+1000\n"
+"POT-Creation-Date: 2021-11-05 17:20+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1565,16 +1565,12 @@ msgstr ""
 msgid "<None>"
 msgstr ""
 
-#: app/selector_win.py app/selector_win.py
-msgid "Suggested"
-msgstr ""
-
 #: app/selector_win.py
 msgid "Play a sample of this item."
 msgstr ""
 
 #: app/selector_win.py
-msgid "Reset to Default"
+msgid "Select Suggested"
 msgstr ""
 
 #: app/selector_win.py
@@ -1590,6 +1586,10 @@ msgstr[1] ""
 #. i18n: Tooltip for colour swatch.
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
+msgstr ""
+
+#: app/selector_win.py app/selector_win.py
+msgid "Suggested"
 msgstr ""
 
 #: app/signage_ui.py app/signage_ui.py

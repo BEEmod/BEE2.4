@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-10-16 16:09+1000\n"
+"POT-Creation-Date: 2021-11-05 17:20+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -14,60 +14,60 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.1\n"
 
-#: loadScreen.py:209
+#: loadScreen.py:216
 msgid "Skipped!"
 msgstr "跳过！"
 
-#: loadScreen.py:210
+#: loadScreen.py:217
 msgid "Version: "
 msgstr "版本："
 
-#: app/optionWindow.py:258 app/packageMan.py:116 app/selector_win.py:890
-#: loadScreen.py:211
+#: app/optionWindow.py:258 app/packageMan.py:116 app/selector_win.py:878
+#: loadScreen.py:218
 msgid "Cancel"
 msgstr "取消"
 
-#: app/paletteUI.py:104 loadScreen.py:212
+#: app/paletteUI.py:104 loadScreen.py:219
 msgid "Clear"
 msgstr "清空模板"
 
-#: loadScreen.py:213
+#: loadScreen.py:220
 msgid "Copy"
 msgstr "复制"
 
-#: loadScreen.py:214
+#: loadScreen.py:221
 msgid "Show:"
 msgstr "显示："
 
-#: loadScreen.py:215
+#: loadScreen.py:222
 msgid "Logs - {}"
 msgstr "日志 - {}"
 
-#: loadScreen.py:217
+#: loadScreen.py:224
 msgid "Debug messages"
 msgstr "调试信息"
 
-#: loadScreen.py:218
+#: loadScreen.py:225
 msgid "Default"
 msgstr "默认值"
 
-#: loadScreen.py:219
+#: loadScreen.py:226
 msgid "Warnings Only"
 msgstr "仅记录警告"
 
-#: loadScreen.py:229
+#: loadScreen.py:236
 msgid "Packages"
 msgstr "资源包"
 
-#: loadScreen.py:230
+#: loadScreen.py:237
 msgid "Loading Objects"
 msgstr "正在载入对象"
 
-#: loadScreen.py:231
+#: loadScreen.py:238
 msgid "Initialising UI"
 msgstr "初始化界面"
 
-#: loadScreen.py:232
+#: loadScreen.py:239
 msgid "Better Extended Editor for Portal 2"
 msgstr "更棒的传送门2扩展编辑器"
 
@@ -143,7 +143,7 @@ msgid ""
 " change."
 msgstr "随机选择一个走廊，被随机选中的走廊将保存在地图编辑器中且不会再次变更。"
 
-#: app/CompilerPane.py:322 app/UI.py:641
+#: app/CompilerPane.py:322 app/UI.py:660
 msgid "Random"
 msgstr "随机"
 
@@ -525,34 +525,34 @@ msgstr "物品属性"
 msgid "Hide/Show the \"{}\" window."
 msgstr "隐藏/显示 \"{}\" 窗口。"
 
-#: app/UI.py:82
+#: app/UI.py:83
 msgid "Export..."
 msgstr "导出到..."
 
-#: app/UI.py:572
+#: app/UI.py:587
 msgid "Select Skyboxes"
 msgstr "选择天空布景"
 
-#: app/UI.py:573
+#: app/UI.py:588
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers)."
 msgstr "天空布景决定了实验室外部空间的样子。它选择天空的颜色（在某些项目中可见），底板悬空的风格（如果存在）以及“雾”的颜色（在较大的实验室可见）。"
 
-#: app/UI.py:581
+#: app/UI.py:597
 msgid "3D Skybox"
 msgstr "3D天空布景"
 
-#: app/UI.py:582
+#: app/UI.py:598
 msgid "Fog Color"
 msgstr "迷雾颜色"
 
-#: app/UI.py:590
+#: app/UI.py:606
 msgid "Select Additional Voice Lines"
 msgstr "选择其它语音声线"
 
-#: app/UI.py:591
+#: app/UI.py:607
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -563,31 +563,31 @@ msgstr ""
 "它们会根据地图中存在哪些物品来选择播放哪一段语音。\n"
 "附加的“Cave谈论平行宇宙”的语音在“风格属性”中单独控制。"
 
-#: app/UI.py:596
+#: app/UI.py:613
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "不添加额外的声线，仅使用Cave关于多元宇宙的谈话。（如果它被勾选）"
 
-#: app/UI.py:598
+#: app/UI.py:615
 msgid "<Multiverse Cave only>"
 msgstr "<仅使用平行宇宙的凯文>"
 
-#: app/UI.py:602
+#: app/UI.py:619
 msgid "Characters"
 msgstr "角色"
 
-#: app/UI.py:603
+#: app/UI.py:620
 msgid "Turret Shoot Monitor"
 msgstr "炮塔会射击显示器"
 
-#: app/UI.py:604
+#: app/UI.py:621
 msgid "Monitor Visuals"
 msgstr "显示器视觉效果"
 
-#: app/UI.py:612
+#: app/UI.py:629
 msgid "Select Style"
 msgstr "选择风格"
 
-#: app/UI.py:613
+#: app/UI.py:630
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -596,15 +596,15 @@ msgid ""
 "The style broadly defines the time period a chamber is set in."
 msgstr "地图的风格决定了墙壁的材质，出入口的外观，大多数物品的外观以及其它设置。"
 
-#: app/UI.py:624
+#: app/UI.py:642
 msgid "Elevator Videos"
 msgstr "电梯间墙壁上播放的影像"
 
-#: app/UI.py:632
+#: app/UI.py:650
 msgid "Select Elevator Video"
 msgstr "选择电梯间播放的影响"
 
-#: app/UI.py:633
+#: app/UI.py:651
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -613,23 +613,23 @@ msgstr ""
 "设置现代光圈科技电梯间墙壁上播放的影像，并非所有风格都有这个影像。\n"
 "如果设置为无，将在每次载入地图时随机选择影像，就像默认编辑器里的一样。"
 
-#: app/UI.py:637
+#: app/UI.py:656
 msgid "This style does not have a elevator video screen."
 msgstr "这种风格的电梯间没有影像屏幕。"
 
-#: app/UI.py:642
+#: app/UI.py:661
 msgid "Choose a random video."
 msgstr "随机选择一个影像。"
 
-#: app/UI.py:646
+#: app/UI.py:665
 msgid "Multiple Orientations"
 msgstr "多种方向"
 
-#: app/UI.py:806
+#: app/UI.py:825
 msgid "Selected Items and Style successfully exported!"
 msgstr "所选物品和风格已成功导出！"
 
-#: app/UI.py:808
+#: app/UI.py:827
 msgid ""
 "\n"
 "\n"
@@ -640,113 +640,113 @@ msgstr ""
 "\n"
 "警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
 
-#: app/UI.py:1103
+#: app/UI.py:1122
 msgid "Save Palette..."
 msgstr "保存模板..."
 
-#: app/UI.py:1110 app/paletteUI.py:147
+#: app/UI.py:1129 app/paletteUI.py:147
 msgid "Save Palette As..."
 msgstr "另存为模板..."
 
-#: app/UI.py:1116 app/paletteUI.py:134
+#: app/UI.py:1135 app/paletteUI.py:134
 msgid "Save Settings in Palettes"
 msgstr "在模板中保存配置"
 
-#: app/UI.py:1134 app/music_conf.py:222
+#: app/UI.py:1153 app/music_conf.py:222
 msgid "Music: "
 msgstr "音乐选择："
 
-#: app/UI.py:1160
+#: app/UI.py:1179
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} 使用推荐配置 {arr}"
 
-#: app/UI.py:1176
+#: app/UI.py:1195
 msgid "Style: "
 msgstr "物品风格"
 
-#: app/UI.py:1178
+#: app/UI.py:1197
 msgid "Voice: "
 msgstr "旁白语音"
 
-#: app/UI.py:1179
+#: app/UI.py:1198
 msgid "Skybox: "
 msgstr "天空布景"
 
-#: app/UI.py:1180
+#: app/UI.py:1199
 msgid "Elev Vid: "
 msgstr "电梯视频"
 
-#: app/UI.py:1198
+#: app/UI.py:1217
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "启用或禁用特定的台词，以防止添加它们。"
 
-#: app/UI.py:1287
+#: app/UI.py:1305
 msgid "All Items: "
 msgstr "所有物品："
 
-#: app/UI.py:1418
+#: app/UI.py:1436
 msgid "Export to \"{}\"..."
 msgstr "导出到 \"{}\"..."
 
-#: app/UI.py:1446 app/backup.py:873
+#: app/UI.py:1464 app/backup.py:873
 msgid "File"
 msgstr "文件"
 
-#: app/UI.py:1453
+#: app/UI.py:1471
 msgid "Export"
 msgstr "导出"
 
-#: app/UI.py:1460 app/backup.py:877
+#: app/UI.py:1478 app/backup.py:877
 msgid "Add Game"
 msgstr "添加游戏"
 
-#: app/UI.py:1464
+#: app/UI.py:1482
 msgid "Uninstall from Selected Game"
 msgstr "删除选中的游戏"
 
-#: app/UI.py:1468
+#: app/UI.py:1486
 msgid "Backup/Restore Puzzles..."
 msgstr "备份/恢复 谜题..."
 
-#: app/UI.py:1472
+#: app/UI.py:1490
 msgid "Manage Packages..."
 msgstr "管理资源包..."
 
-#: app/UI.py:1477
+#: app/UI.py:1495
 msgid "Options"
 msgstr "设置"
 
-#: app/UI.py:1482 app/gameMan.py:1130
+#: app/UI.py:1500 app/gameMan.py:1130
 msgid "Quit"
 msgstr "退出"
 
-#: app/UI.py:1492
+#: app/UI.py:1510
 msgid "Palette"
 msgstr "模板"
 
-#: app/UI.py:1495
+#: app/UI.py:1513
 msgid "View"
 msgstr ""
 
-#: app/UI.py:1605
+#: app/UI.py:1623
 msgid "Palettes"
 msgstr "模板列表"
 
-#: app/UI.py:1640
+#: app/UI.py:1658
 msgid "Export Options"
 msgstr "导出设置"
 
-#: app/UI.py:1672
+#: app/UI.py:1690
 msgid "Fill empty spots in the palette with random items."
 msgstr "随机选择物品填充物品栏中的空位。"
 
-#: app/__init__.py:105
+#: app/__init__.py:93
 msgid "BEEMOD {} Error!"
 msgstr ""
 
-#: app/__init__.py:106
+#: app/__init__.py:94
 msgid ""
 "An error occurred: \n"
 "{}\n"
@@ -1052,44 +1052,44 @@ msgstr ""
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: app/gameMan.py:1305
+#: app/gameMan.py:1304
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件的路径 {appname}"
 
-#: app/gameMan.py:1309 app/gameMan.py:1324 app/gameMan.py:1334
-#: app/gameMan.py:1341 app/gameMan.py:1350 app/gameMan.py:1359
+#: app/gameMan.py:1308 app/gameMan.py:1323 app/gameMan.py:1333
+#: app/gameMan.py:1340 app/gameMan.py:1349 app/gameMan.py:1358
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: app/gameMan.py:1312
+#: app/gameMan.py:1311
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: app/gameMan.py:1313
+#: app/gameMan.py:1312
 msgid "Executable"
 msgstr "可执行文件"
 
-#: app/gameMan.py:1321
+#: app/gameMan.py:1320
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: app/gameMan.py:1331
+#: app/gameMan.py:1330
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: app/gameMan.py:1342
+#: app/gameMan.py:1341
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: app/gameMan.py:1349
+#: app/gameMan.py:1348
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: app/gameMan.py:1358
+#: app/gameMan.py:1357
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: app/gameMan.py:1377
+#: app/gameMan.py:1375
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1097,7 +1097,7 @@ msgstr ""
 "\n"
 "（BEE2即将退出，这是最后一次修改游戏的配置！）"
 
-#: app/gameMan.py:1383 app/paletteUI.py:272
+#: app/gameMan.py:1381 app/paletteUI.py:272
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
@@ -1200,7 +1200,7 @@ msgstr ""
 msgid "Search:"
 msgstr ""
 
-#: app/itemconfig.py:620
+#: app/itemconfig.py:622
 msgid "Choose a Color"
 msgstr "选择一种颜色"
 
@@ -1354,7 +1354,7 @@ msgstr "窗口"
 msgid "Development"
 msgstr "开发者选项"
 
-#: app/optionWindow.py:253 app/packageMan.py:110 app/selector_win.py:866
+#: app/optionWindow.py:253 app/packageMan.py:110 app/selector_win.py:854
 msgid "OK"
 msgstr "确定"
 
@@ -1635,45 +1635,46 @@ msgstr ""
 msgid "Open \"{}\" in the default browser?"
 msgstr "在默认浏览器中打开 \"{}\" ？"
 
-#: app/selector_win.py:490
+#: app/selector_win.py:491
 msgid "{} Preview"
 msgstr ""
 
 #. i18n: 'None' item description
-#: app/selector_win.py:555
+#: app/selector_win.py:556
 msgid "Do not add anything."
 msgstr "不要添加任何东西。"
 
 #. i18n: 'None' item name.
-#: app/selector_win.py:559
+#: app/selector_win.py:560
 msgid "<None>"
 msgstr "<无>"
 
-#: app/selector_win.py:749 app/selector_win.py:755
-msgid "Suggested"
-msgstr "建议"
-
-#: app/selector_win.py:806
+#: app/selector_win.py:794
 msgid "Play a sample of this item."
 msgstr "播放该物品的示例"
 
-#: app/selector_win.py:878
-msgid "Reset to Default"
-msgstr "重置为默认值"
+#: app/selector_win.py:866
+#, fuzzy
+msgid "Select Suggested"
+msgstr "建议"
 
-#: app/selector_win.py:1074
+#: app/selector_win.py:1062
 msgid "Other"
 msgstr "其它"
 
-#: app/selector_win.py:1319
+#: app/selector_win.py:1324
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "作者: {}"
 
 #. i18n: Tooltip for colour swatch.
-#: app/selector_win.py:1387
+#: app/selector_win.py:1392
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "颜色: R={r}, G={g}, B={b}"
+
+#: app/selector_win.py:1605 app/selector_win.py:1611
+msgid "Suggested"
+msgstr "建议"
 
 #: app/signage_ui.py:134 app/signage_ui.py:270
 msgid "Configure Signage"
@@ -1817,4 +1818,7 @@ msgstr "没有名称？"
 
 #~ msgid "This palette already exists. Overwrite?"
 #~ msgstr "已经存在同名模板，是否覆盖？"
+
+#~ msgid "Reset to Default"
+#~ msgstr "重置为默认值"
 

@@ -22,7 +22,7 @@ from app import img
 from app import itemconfig
 import utils
 import consts
-from localisation import gettext as _
+from localisation import gettext
 from app import (
     tk_tools,
     SubPane,
@@ -80,7 +80,7 @@ IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 selected_style = "BEE2_CLEAN"
 # Variable used for export button (changes to include game name)
-EXPORT_CMD_VAR = StringVar(value=_('Export...'))
+EXPORT_CMD_VAR = StringVar(value=gettext('Export...'))
 
 # Maps item IDs to our wrapper for the object.
 item_list = {}  # type: Dict[str, Item]
@@ -584,17 +584,18 @@ def load_packages() -> None:
         TK_ROOT,
         sky_list,
         save_id='skyboxes',
-        title=_('Select Skyboxes'),
-        desc=_('The skybox decides what the area outside the chamber is like.'
-               ' It chooses the colour of sky (seen in some items), the style'
-               ' of bottomless pit (if present), as well as color of "fog" '
-               '(seen in larger chambers).'),
+        title=gettext('Select Skyboxes'),
+        desc=gettext(
+            'The skybox decides what the area outside the chamber is like. It chooses the colour '
+            'of sky (seen in some items), the style of bottomless pit (if present), as well as '
+            'color of "fog" (seen in larger chambers).'
+        ),
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
         attributes=[
-            SelAttr.bool('3D', _('3D Skybox'), False),
-            SelAttr.color('COLOR', _('Fog Color')),
+            SelAttr.bool('3D', gettext('3D Skybox'), False),
+            SelAttr.color('COLOR', gettext('Fog Color')),
         ],
     )
 
@@ -602,21 +603,22 @@ def load_packages() -> None:
         TK_ROOT,
         voice_list,
         save_id='voicelines',
-        title=_('Select Additional Voice Lines'),
-        desc=_('Voice lines choose which extra voices play as the player enters'
-               ' or exits a chamber. They are chosen based on which items are'
-               ' present in the map. The additional "Multiverse" Cave lines'
-               ' are controlled separately in Style Properties.'),
+        title=gettext('Select Additional Voice Lines'),
+        desc=gettext(
+            'Voice lines choose which extra voices play as the player enters or exits a chamber. '
+            'They are chosen based on which items are present in the map. The additional '
+            '"Multiverse" Cave lines are controlled separately in Style Properties.'
+        ),
         has_none=True,
-        none_desc=_('Add no extra voice lines, only Multiverse Cave if enabled.'),
+        none_desc=gettext('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
-            'CHAR': [_('<Multiverse Cave only>')],
+            'CHAR': [gettext('<Multiverse Cave only>')],
         },
         callback=voice_callback,
         attributes=[
-            SelAttr.list('CHAR', _('Characters'), ['??']),
-            SelAttr.bool('TURRET', _('Turret Shoot Monitor'), False),
-            SelAttr.bool('MONITOR', _('Monitor Visuals'), False),
+            SelAttr.list('CHAR', gettext('Characters'), ['??']),
+            SelAttr.bool('TURRET', gettext('Turret Shoot Monitor'), False),
+            SelAttr.bool('MONITOR', gettext('Monitor Visuals'), False),
         ],
     )
 
@@ -624,11 +626,12 @@ def load_packages() -> None:
         TK_ROOT,
         style_list,
         save_id='styles',
-        title=_('Select Style'),
-        desc=_('The Style controls many aspects of the map. It decides the '
-               'materials used for walls, the appearance of entrances and '
-               'exits, the design for most items as well as other settings.\n\n'
-               'The style broadly defines the time period a chamber is set in.'),
+        title=gettext('Select Style'),
+        desc=gettext(
+            'The Style controls many aspects of the map. It decides the materials used for walls, '
+            'the appearance of entrances and exits, the design for most items as well as other '
+            'settings.\n\nThe style broadly defines the time period a chamber is set in.'
+        ),
         has_none=False,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
@@ -636,7 +639,7 @@ def load_packages() -> None:
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
-            SelAttr.bool('VID', _('Elevator Videos'), default=True),
+            SelAttr.bool('VID', gettext('Elevator Videos'), default=True),
         ]
     )
 
@@ -644,21 +647,22 @@ def load_packages() -> None:
         TK_ROOT,
         elev_list,
         save_id='elevators',
-        title=_('Select Elevator Video'),
-        desc=_('Set the video played on the video screens in modern Aperture '
-               'elevator rooms. Not all styles feature these. If set to '
-               '"None", a random video will be selected each time the map is '
-               'played, like in the default PeTI.'),
-        readonly_desc=_('This style does not have a elevator video screen.'),
+        title=gettext('Select Elevator Video'),
+        desc=gettext(
+            'Set the video played on the video screens in modern Aperture elevator rooms. Not all '
+            'styles feature these. If set to "None", a random video will be selected each time the '
+            'map is played, like in the default PeTI.'
+        ),
+        readonly_desc=gettext('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=_('Random'),
-        none_desc=_('Choose a random video.'),
+        none_name=gettext('Random'),
+        none_desc=gettext('Choose a random video.'),
         callback=win_callback,
         callback_params=['Elevator'],
         attributes=[
-            SelAttr.bool('ORIENT', _('Multiple Orientations')),
+            SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
         ]
     )
 
@@ -818,9 +822,9 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         item_opts.save_check()
         BEE2_config.write_settings()
 
-        message = _('Selected Items and Style successfully exported!')
+        message = gettext('Selected Items and Style successfully exported!')
         if not vpk_success:
-            message += _(
+            message += gettext(
                 '\n\nWarning: VPK files were not exported, quit Portal 2 and '
                 'Hammer to ensure editor wall previews are changed.'
             )
@@ -1115,20 +1119,20 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
 
     pal_save = ttk.Button(
         frame,
-        text=_("Save Palette..."),
+        text=gettext("Save Palette..."),
         command=pal_ui.event_save,
     )
     pal_save.grid(row=0, sticky="EW", padx=5)
     pal_ui.save_btn_state = pal_save.state
     ttk.Button(
         frame,
-        text=_("Save Palette As..."),
+        text=gettext("Save Palette As..."),
         command=pal_ui.event_save_as,
     ).grid(row=1, sticky="EW", padx=5)
 
     ttk.Checkbutton(
         frame,
-        text=_('Save Settings in Palettes'),
+        text=gettext('Save Settings in Palettes'),
         variable=pal_ui.var_save_settings,
         command=pal_ui.event_save_settings_changed,
     ).grid(row=2, sticky="EW", padx=5)
@@ -1146,7 +1150,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.columnconfigure(1, weight=1)
     props.grid(row=5, sticky="EW")
 
-    music_frame = ttk.Labelframe(props, text=_('Music: '))
+    music_frame = ttk.Labelframe(props, text=gettext('Music: '))
     music_win = music_conf.make_widgets(music_frame, pane)
 
     def suggested_style_set() -> None:
@@ -1172,7 +1176,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     UI['suggested_style'] = ttk.Button(
         props,
         # '\u2193' is the downward arrow symbol.
-        text=_("{arr} Use Suggested {arr}").format(arr='\u2193'),
+        text=gettext("{arr} Use Suggested {arr}").format(arr='\u2193'),
         command=suggested_style_set,
         )
     UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
@@ -1188,11 +1192,11 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         else:
             voiceEditor.show(chosen_voice)
     for ind, name in enumerate([
-            _("Style: "),
+            gettext("Style: "),
             None,
-            _("Voice: "),
-            _("Skybox: "),
-            _("Elev Vid: "),
+            gettext("Voice: "),
+            gettext("Skybox: "),
+            gettext("Elev Vid: "),
             ]):
         if name is None:
             # This is the "Suggested" button!
@@ -1210,8 +1214,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
         UI['conf_voice'],
-        _('Enable or disable particular voice lines, to prevent them from '
-          'being added.'),
+        gettext('Enable or disable particular voice lines, to prevent them from being added.'),
     )
 
     if utils.WIN:
@@ -1299,7 +1302,7 @@ def init_picker(f: Frame) -> None:
     global frmScroll, pal_canvas
     ttk.Label(
         f,
-        text=_("All Items: "),
+        text=gettext("All Items: "),
         anchor="center",
     ).grid(
         row=0,
@@ -1430,7 +1433,7 @@ def set_game(game: 'gameMan.Game') -> None:
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
-    text = _('Export to "{}"...').format(game.name)
+    text = gettext('Export to "{}"...').format(game.name)
 
     if game.cache_invalid():
         # Mark that it needs extractions
@@ -1458,43 +1461,43 @@ def init_menu_bar(win: Toplevel, export: Callable[[], None]) -> Tuple[Menu, Menu
     else:
         file_menu = menus['file'] = Menu(bar)
 
-    bar.add_cascade(menu=file_menu, label=_('File'))
+    bar.add_cascade(menu=file_menu, label=gettext('File'))
 
     # Assign the bar as the main window's menu.
     # Must be done after creating the apple menu.
     win['menu'] = bar
 
     file_menu.add_command(
-        label=_("Export"),
+        label=gettext("Export"),
         command=export,
         accelerator=tk_tools.ACCEL_EXPORT,
     )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
     file_menu.add_command(
-        label=_("Add Game"),
+        label=gettext("Add Game"),
         command=gameMan.add_game,
     )
     file_menu.add_command(
-        label=_("Uninstall from Selected Game"),
+        label=gettext("Uninstall from Selected Game"),
         command=gameMan.remove_game,
         )
     file_menu.add_command(
-        label=_("Backup/Restore Puzzles..."),
+        label=gettext("Backup/Restore Puzzles..."),
         command=backup_win.show_window,
     )
     file_menu.add_command(
-        label=_("Manage Packages..."),
+        label=gettext("Manage Packages..."),
         command=packageMan.show,
     )
     file_menu.add_separator()
     file_menu.add_command(
-        label=_("Options"),
+        label=gettext("Options"),
         command=optionWindow.show,
     )
     if not utils.MAC:
         file_menu.add_command(
-            label=_("Quit"),
+            label=gettext("Quit"),
             command=quit_application,
             )
     file_menu.add_separator()
@@ -1504,10 +1507,10 @@ def init_menu_bar(win: Toplevel, export: Callable[[], None]) -> Tuple[Menu, Menu
 
     pal_menu = menus['pal'] = Menu(bar)
     # Menu name
-    bar.add_cascade(menu=pal_menu, label=_('Palette'))
+    bar.add_cascade(menu=pal_menu, label=gettext('Palette'))
 
     view_menu = Menu(bar)
-    bar.add_cascade(menu=view_menu, label=_('View'))
+    bar.add_cascade(menu=view_menu, label=gettext('View'))
 
     helpMenu.make_help_menu(bar)
 
@@ -1617,7 +1620,7 @@ def init_windows() -> None:
 
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
-        title=_('Palettes'),
+        title=gettext('Palettes'),
         name='pal',
         menu_bar=view_menu,
         resize_x=True,
@@ -1652,7 +1655,7 @@ def init_windows() -> None:
 
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
-        title=_('Export Options'),
+        title=gettext('Export Options'),
         name='opt',
         menu_bar=view_menu,
         resize_x=True,
@@ -1684,7 +1687,7 @@ def init_windows() -> None:
     )
     tooltip.add_tooltip(
         UI['shuffle_pal'],
-        _('Fill empty spots in the palette with random items.'),
+        gettext('Fill empty spots in the palette with random items.'),
     )
 
     # Make scrollbar work globally

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2021-10-16 16:09+1000\n"
+"POT-Creation-Date: 2021-11-05 17:20+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -14,60 +14,60 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.1\n"
 
-#: loadScreen.py:209
+#: loadScreen.py:216
 msgid "Skipped!"
 msgstr "Sauté !"
 
-#: loadScreen.py:210
+#: loadScreen.py:217
 msgid "Version: "
 msgstr "Version: "
 
-#: app/optionWindow.py:258 app/packageMan.py:116 app/selector_win.py:890
-#: loadScreen.py:211
+#: app/optionWindow.py:258 app/packageMan.py:116 app/selector_win.py:878
+#: loadScreen.py:218
 msgid "Cancel"
 msgstr "Annuler"
 
-#: app/paletteUI.py:104 loadScreen.py:212
+#: app/paletteUI.py:104 loadScreen.py:219
 msgid "Clear"
 msgstr "Vider"
 
-#: loadScreen.py:213
+#: loadScreen.py:220
 msgid "Copy"
 msgstr "Copier"
 
-#: loadScreen.py:214
+#: loadScreen.py:221
 msgid "Show:"
 msgstr "Montrer:"
 
-#: loadScreen.py:215
+#: loadScreen.py:222
 msgid "Logs - {}"
 msgstr "Logs - {}"
 
-#: loadScreen.py:217
+#: loadScreen.py:224
 msgid "Debug messages"
 msgstr "Messages de débug"
 
-#: loadScreen.py:218
+#: loadScreen.py:225
 msgid "Default"
 msgstr "Par défaut"
 
-#: loadScreen.py:219
+#: loadScreen.py:226
 msgid "Warnings Only"
 msgstr "Avertissements seulement"
 
-#: loadScreen.py:229
+#: loadScreen.py:236
 msgid "Packages"
 msgstr "Paquets"
 
-#: loadScreen.py:230
+#: loadScreen.py:237
 msgid "Loading Objects"
 msgstr "Chargement des objets"
 
-#: loadScreen.py:231
+#: loadScreen.py:238
 msgid "Initialising UI"
 msgstr "Initialisation de l'interface"
 
-#: loadScreen.py:232
+#: loadScreen.py:239
 msgid "Better Extended Editor for Portal 2"
 msgstr "Better Extended Editor pour Portal 2"
 
@@ -149,7 +149,7 @@ msgstr ""
 "Choisit un couloir aléatoire. Ceci est sauvegardé dans le data du puzzle "
 "et ne va pas changer."
 
-#: app/CompilerPane.py:322 app/UI.py:641
+#: app/CompilerPane.py:322 app/UI.py:660
 msgid "Random"
 msgstr "Aléatoire"
 
@@ -547,15 +547,15 @@ msgstr "Objets"
 msgid "Hide/Show the \"{}\" window."
 msgstr "Cacher/Montrer la fenêtre \"{}\""
 
-#: app/UI.py:82
+#: app/UI.py:83
 msgid "Export..."
 msgstr "Export..."
 
-#: app/UI.py:572
+#: app/UI.py:587
 msgid "Select Skyboxes"
 msgstr "Sélectionnez une skybox"
 
-#: app/UI.py:573
+#: app/UI.py:588
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
@@ -566,19 +566,19 @@ msgstr ""
 "sans fond (si présents) tout comme la couleur du \"brouillard\" (vu dans "
 "les grandes salles)."
 
-#: app/UI.py:581
+#: app/UI.py:597
 msgid "3D Skybox"
 msgstr "Skybox 3D"
 
-#: app/UI.py:582
+#: app/UI.py:598
 msgid "Fog Color"
 msgstr "Couleur du brouillard"
 
-#: app/UI.py:590
+#: app/UI.py:606
 msgid "Select Additional Voice Lines"
 msgstr "Sélectionnez les répliques additionnelles"
 
-#: app/UI.py:591
+#: app/UI.py:607
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -590,31 +590,31 @@ msgstr ""
 "dans la salle. Les répliques additionnelles de Cave du multivers sont "
 "contrôlées séparément dans les propriétés de style."
 
-#: app/UI.py:596
+#: app/UI.py:613
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "N'ajoute aucune réplique supplémentaire."
 
-#: app/UI.py:598
+#: app/UI.py:615
 msgid "<Multiverse Cave only>"
 msgstr "<Cave du Multivers seulement>"
 
-#: app/UI.py:602
+#: app/UI.py:619
 msgid "Characters"
 msgstr "Personnages"
 
-#: app/UI.py:603
+#: app/UI.py:620
 msgid "Turret Shoot Monitor"
 msgstr "Les tourelles tirent sur les moniteurs"
 
-#: app/UI.py:604
+#: app/UI.py:621
 msgid "Monitor Visuals"
 msgstr "Visuels des moniteurs"
 
-#: app/UI.py:612
+#: app/UI.py:629
 msgid "Select Style"
 msgstr "Sélectionnez un style"
 
-#: app/UI.py:613
+#: app/UI.py:630
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -628,15 +628,15 @@ msgstr ""
 "\n"
 "Le style définit de façon large l'époque où se place la salle."
 
-#: app/UI.py:624
+#: app/UI.py:642
 msgid "Elevator Videos"
 msgstr "Vidéos d'ascenseur"
 
-#: app/UI.py:632
+#: app/UI.py:650
 msgid "Select Elevator Video"
 msgstr "Sélectionnez une vidéo d'ascenceur"
 
-#: app/UI.py:633
+#: app/UI.py:651
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -647,23 +647,23 @@ msgstr ""
 "est choisit, une vidéo aléatoire sera sélectionnée chaque fois que la "
 "carte sera jouée, comme avec le style PeTI par défaut."
 
-#: app/UI.py:637
+#: app/UI.py:656
 msgid "This style does not have a elevator video screen."
 msgstr "Ce style n'a aucune vidéo d'ascenseur."
 
-#: app/UI.py:642
+#: app/UI.py:661
 msgid "Choose a random video."
 msgstr "Choisit une vidéo aléatoire."
 
-#: app/UI.py:646
+#: app/UI.py:665
 msgid "Multiple Orientations"
 msgstr "Orientations multiples"
 
-#: app/UI.py:806
+#: app/UI.py:825
 msgid "Selected Items and Style successfully exported!"
 msgstr "Le style et les objets sélectionnés ont été exportés avec succès !"
 
-#: app/UI.py:808
+#: app/UI.py:827
 msgid ""
 "\n"
 "\n"
@@ -676,43 +676,43 @@ msgstr ""
 "Hammer pour assurer le rafraîchissement des apparences des murs en "
 "prévisualisation."
 
-#: app/UI.py:1103
+#: app/UI.py:1122
 msgid "Save Palette..."
 msgstr "Enregistrer la palette..."
 
-#: app/UI.py:1110 app/paletteUI.py:147
+#: app/UI.py:1129 app/paletteUI.py:147
 msgid "Save Palette As..."
 msgstr "Enregistrer la palette sous..."
 
-#: app/UI.py:1116 app/paletteUI.py:134
+#: app/UI.py:1135 app/paletteUI.py:134
 msgid "Save Settings in Palettes"
 msgstr ""
 
-#: app/UI.py:1134 app/music_conf.py:222
+#: app/UI.py:1153 app/music_conf.py:222
 msgid "Music: "
 msgstr "Musique: "
 
-#: app/UI.py:1160
+#: app/UI.py:1179
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Utiliser les suggestions {arr}"
 
-#: app/UI.py:1176
+#: app/UI.py:1195
 msgid "Style: "
 msgstr "Style: "
 
-#: app/UI.py:1178
+#: app/UI.py:1197
 msgid "Voice: "
 msgstr "Voix: "
 
-#: app/UI.py:1179
+#: app/UI.py:1198
 msgid "Skybox: "
 msgstr "Skybox: "
 
-#: app/UI.py:1180
+#: app/UI.py:1199
 msgid "Elev Vid: "
 msgstr "Vid Asc: "
 
-#: app/UI.py:1198
+#: app/UI.py:1217
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
@@ -720,71 +720,71 @@ msgstr ""
 "Activer ou désactiver certaines répliques pour les empêcher d'être "
 "ajoutées."
 
-#: app/UI.py:1287
+#: app/UI.py:1305
 msgid "All Items: "
 msgstr "Tous les objets: "
 
-#: app/UI.py:1418
+#: app/UI.py:1436
 msgid "Export to \"{}\"..."
 msgstr "Exporter vers \"{}\"..."
 
-#: app/UI.py:1446 app/backup.py:873
+#: app/UI.py:1464 app/backup.py:873
 msgid "File"
 msgstr "Fichier"
 
-#: app/UI.py:1453
+#: app/UI.py:1471
 msgid "Export"
 msgstr "Exporter"
 
-#: app/UI.py:1460 app/backup.py:877
+#: app/UI.py:1478 app/backup.py:877
 msgid "Add Game"
 msgstr "Ajouter le jeu"
 
-#: app/UI.py:1464
+#: app/UI.py:1482
 msgid "Uninstall from Selected Game"
 msgstr "Désinstaller du jeu sélectionné"
 
-#: app/UI.py:1468
+#: app/UI.py:1486
 msgid "Backup/Restore Puzzles..."
 msgstr "Sauvegarder/Restaurer les puzzles..."
 
-#: app/UI.py:1472
+#: app/UI.py:1490
 msgid "Manage Packages..."
 msgstr "Gérer les paquets..."
 
-#: app/UI.py:1477
+#: app/UI.py:1495
 msgid "Options"
 msgstr "Options"
 
-#: app/UI.py:1482 app/gameMan.py:1130
+#: app/UI.py:1500 app/gameMan.py:1130
 msgid "Quit"
 msgstr "Quitter"
 
-#: app/UI.py:1492
+#: app/UI.py:1510
 msgid "Palette"
 msgstr "Palette"
 
-#: app/UI.py:1495
+#: app/UI.py:1513
 msgid "View"
 msgstr ""
 
-#: app/UI.py:1605
+#: app/UI.py:1623
 msgid "Palettes"
 msgstr "Palettes"
 
-#: app/UI.py:1640
+#: app/UI.py:1658
 msgid "Export Options"
 msgstr "Options d'export"
 
-#: app/UI.py:1672
+#: app/UI.py:1690
 msgid "Fill empty spots in the palette with random items."
 msgstr "Remplir les emplacements vides de la palette avec des objets aléatoires."
 
-#: app/__init__.py:105
+#: app/__init__.py:93
 msgid "BEEMOD {} Error!"
 msgstr ""
 
-#: app/__init__.py:106
+#: app/__init__.py:94
 msgid ""
 "An error occurred: \n"
 "{}\n"
@@ -1108,44 +1108,44 @@ msgstr ""
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
-#: app/gameMan.py:1305
+#: app/gameMan.py:1304
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "Sélectionnez le dossier où l'exécutable du jeu est localisé ({appname})..."
 
-#: app/gameMan.py:1309 app/gameMan.py:1324 app/gameMan.py:1334
-#: app/gameMan.py:1341 app/gameMan.py:1350 app/gameMan.py:1359
+#: app/gameMan.py:1308 app/gameMan.py:1323 app/gameMan.py:1333
+#: app/gameMan.py:1340 app/gameMan.py:1349 app/gameMan.py:1358
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - Ajouter un jeu"
 
-#: app/gameMan.py:1312
+#: app/gameMan.py:1311
 msgid "Find Game Exe"
 msgstr "Trouvez l'exécutable du jeu"
 
-#: app/gameMan.py:1313
+#: app/gameMan.py:1312
 msgid "Executable"
 msgstr "Exécutable"
 
-#: app/gameMan.py:1321
+#: app/gameMan.py:1320
 msgid "This does not appear to be a valid game folder!"
 msgstr "Cela ne semble pas être un dossier de jeu valide."
 
-#: app/gameMan.py:1331
+#: app/gameMan.py:1330
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "Portal Stories: Mel n'a pas d'éditeur."
 
-#: app/gameMan.py:1342
+#: app/gameMan.py:1341
 msgid "Enter the name of this game:"
 msgstr "Entrez le nom de ce jeu:"
 
-#: app/gameMan.py:1349
+#: app/gameMan.py:1348
 msgid "This name is already taken!"
 msgstr "Ce nom est déjà pris !"
 
-#: app/gameMan.py:1358
+#: app/gameMan.py:1357
 msgid "Please enter a name for this game!"
 msgstr "Veuillez entrer un nom pour ce jeu."
 
-#: app/gameMan.py:1377
+#: app/gameMan.py:1375
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1153,7 +1153,7 @@ msgstr ""
 "\n"
 "(BEE2 va se fermer.)"
 
-#: app/gameMan.py:1383 app/paletteUI.py:272
+#: app/gameMan.py:1381 app/paletteUI.py:272
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
 
@@ -1256,7 +1256,7 @@ msgstr ""
 msgid "Search:"
 msgstr ""
 
-#: app/itemconfig.py:620
+#: app/itemconfig.py:622
 msgid "Choose a Color"
 msgstr "Choisissez une couleur"
 
@@ -1420,7 +1420,7 @@ msgstr "Windows"
 msgid "Development"
 msgstr "Développement"
 
-#: app/optionWindow.py:253 app/packageMan.py:110 app/selector_win.py:866
+#: app/optionWindow.py:253 app/packageMan.py:110 app/selector_win.py:854
 msgid "OK"
 msgstr "OK"
 
@@ -1723,46 +1723,47 @@ msgstr ""
 msgid "Open \"{}\" in the default browser?"
 msgstr "Ouvrir \"{}\" dans le navigateur par défaut ?"
 
-#: app/selector_win.py:490
+#: app/selector_win.py:491
 msgid "{} Preview"
 msgstr ""
 
 #. i18n: 'None' item description
-#: app/selector_win.py:555
+#: app/selector_win.py:556
 msgid "Do not add anything."
 msgstr "Ne rien ajouter."
 
 #. i18n: 'None' item name.
-#: app/selector_win.py:559
+#: app/selector_win.py:560
 msgid "<None>"
 msgstr "<Rien>"
 
-#: app/selector_win.py:749 app/selector_win.py:755
-msgid "Suggested"
-msgstr "Suggéré"
-
-#: app/selector_win.py:806
+#: app/selector_win.py:794
 msgid "Play a sample of this item."
 msgstr "Jouer un échantillon de cet objet"
 
-#: app/selector_win.py:878
-msgid "Reset to Default"
-msgstr "Réinitialiser aux valeurs par défaut"
+#: app/selector_win.py:866
+#, fuzzy
+msgid "Select Suggested"
+msgstr "Suggéré"
 
-#: app/selector_win.py:1074
+#: app/selector_win.py:1062
 msgid "Other"
 msgstr "Autre"
 
-#: app/selector_win.py:1319
+#: app/selector_win.py:1324
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "Auteur: {}"
 msgstr[1] "Auteurs: {}"
 
 #. i18n: Tooltip for colour swatch.
-#: app/selector_win.py:1387
+#: app/selector_win.py:1392
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "Couleur: R={r}, V={g}, B={b}"
+
+#: app/selector_win.py:1605 app/selector_win.py:1611
+msgid "Suggested"
+msgstr "Suggéré"
 
 #: app/signage_ui.py:134 app/signage_ui.py:270
 msgid "Configure Signage"
@@ -1891,4 +1892,7 @@ msgstr "Sans nom ?"
 
 #~ msgid "This palette already exists. Overwrite?"
 #~ msgstr "Cette palette existe déjà. Remplacer ?"
+
+#~ msgid "Reset to Default"
+#~ msgstr "Réinitialiser aux valeurs par défaut"
 
