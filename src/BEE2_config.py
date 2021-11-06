@@ -10,7 +10,7 @@ Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
-from typing import Any, List, Mapping, Optional, Callable, Iterator
+from typing import Any, Mapping, Optional, Callable, Iterator
 from threading import Lock, Event
 from atomicwrites import atomic_write
 
@@ -28,9 +28,9 @@ OPTION_LOAD: utils.FuncLookup[Callable[[Property], None]] = utils.FuncLookup('Lo
 OPTION_SAVE: utils.FuncLookup[Callable[[], Property]] = utils.FuncLookup('SaveHandler', attrs=['to_palette'])
 
 
-def get_curr_settings(*, is_palette: bool) -> List[Property]:
+def get_curr_settings(*, is_palette: bool) -> Property:
     """Return a property tree defining the current options."""
-    props: list[Property] = []
+    props = Property.root()
 
     for opt_id, opt_func in OPTION_SAVE.items():
         # Skip if it opts out of being on the palette.
