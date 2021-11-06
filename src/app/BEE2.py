@@ -2,7 +2,7 @@
 import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
-from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error
+from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error, sound
 import loadScreen
 import packages
 import utils
@@ -113,6 +113,7 @@ async def init_app():
 
     LOGGER.info('Initialising UI...')
     APP_NURSERY.start_soon(img.start_loading)
+    APP_NURSERY.start_soon(sound.sound_task)
     UI.init_windows()  # create all windows
     LOGGER.info('UI initialised!')
 
