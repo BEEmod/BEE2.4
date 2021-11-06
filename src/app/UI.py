@@ -1746,17 +1746,14 @@ def init_windows() -> None:
                 '+' + str(TK_ROOT.winfo_rooty())
                 )
         else:
-            TK_ROOT.geometry(
-                '+' + str(TK_ROOT.winfo_rootx()) +
-                '+' + str(TK_ROOT.winfo_rooty())
-                )
+            TK_ROOT.geometry(f'{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
     else:
         start_x, start_y = utils.adjust_inside_screen(
             start_x,
             start_y,
             win=TK_ROOT,
             )
-        TK_ROOT.geometry('+' + str(start_x) + '+' + str(start_y))
+        TK_ROOT.geometry(f'+{start_x}+{start_y}')
     TK_ROOT.update_idletasks()
 
     # First move to default positions, then load the config.
