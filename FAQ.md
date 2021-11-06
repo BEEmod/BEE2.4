@@ -64,6 +64,9 @@ As an example, Portal 1 is a style that fits this criteria, as most of Portal 2'
 
 If your suggested style is a simple variant of an existing style (e.g. Original Clean, which just changes wall textures), it may be added. Custom packages can also add their own styles, so feel free to implement a new style yourself.
 
+### Can you add style mixing / changing of items to different styles?
+No.
+
 ### Why doesn't Portal 1 GLaDOS have any lines?
 
 The P1 GLaDOS lines aren't in Portal 2 by default, and as stated below, it's not possible to pack voice lines into maps. In the next release, existing lines which are similar to the P1 dialogue will be used.
