@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
-from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable
+from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any
 import itertools
 import operator
 import random
@@ -202,13 +202,13 @@ class Item:
             self.data.pak_id, str(subtype.pal_icon)
         ), 64, 64)
 
-    def properties(self):
+    def properties(self) -> Iterator[str]:
         """Iterate through all properties for this item."""
         for prop_name, prop in self.data.editor.properties.items():
             if prop.allow_user_default:
                 yield prop_name
 
-    def get_properties(self):
+    def get_properties(self) -> dict[str, Any]:
         """Return a dictionary of properties and the current value for them.
 
         """
@@ -232,15 +232,13 @@ class Item:
                 )
         return result
 
-    def set_properties(self, props):
+    def set_properties(self, props: dict[str, Any]) -> None:
         """Apply the properties to the item."""
         for prop, value in props.items():
             item_opts[self.id]['PROP_' + prop] = str(value)
 
-    def refresh_subitems(self):
-        """Call load_data() on all our subitems, so they reload icons and names.
-
-        """
+    def refresh_subitems(self) -> None:
+        """Call load_data() on all our subitems, so they reload icons and names."""
         for refresh_cmd, subitem_list in [
                 (flow_preview, pal_picked),
                 (flow_picker, pal_items),
@@ -250,7 +248,7 @@ class Item:
                     item.load_data()
             refresh_cmd()
 
-    def change_version(self, version):
+    def change_version(self, version: str) -> None:
         item_opts[self.id]['sel_version'] = version
         self.selected_ver = version
         self.load_data()
@@ -277,7 +275,7 @@ class Item:
 
 class PalItem:
     """The icon and associated data for a single subitem."""
-    def __init__(self, frame, item: Item, sub: int, is_pre):
+    def __init__(self, frame, item: Item, sub: int, is_pre: bool) -> None:
         """Create a label to show an item onscreen."""
         self.item = item
         self.subKey = sub
