@@ -6,6 +6,7 @@ from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable
 import itertools
 import operator
 import random
+import functools
 import math
 
 from srctools import Property
@@ -105,7 +106,6 @@ class Item:
         'pak_id',
         'pak_name',
         'names',
-        'url',
         ]
 
     def __init__(self, item: packages.Item) -> None:
@@ -122,7 +122,7 @@ class Item:
             self.selected_ver = item.def_ver.id
 
         self.item = item
-        self.def_data = self.item.def_ver.def_style
+        self.def_data = item.def_ver.def_style
         # The indexes of subtypes that are actually visible.
         self.visual_subtypes = [
             ind
@@ -135,16 +135,11 @@ class Item:
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
 
-        self.load_data()
+        self.data = item.versions[self.selected_ver].styles.get(selected_style, self.def_data)
 
     def load_data(self) -> None:
-        """Load data from the item."""
-        version = self.item.versions[self.selected_ver]
-        self.data = version.styles.get(
-            selected_style,
-            self.def_data,
-        )
-        self.url = self.data.url
+        """Reload data from the item."""
+        self.data = self.item.versions[self.selected_ver].styles.get(selected_style, self.def_data)
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
@@ -280,25 +275,31 @@ class Item:
         ]
 
 
-class PalItem(tk.Label):
+class PalItem:
     """The icon and associated data for a single subitem."""
     def __init__(self, frame, item: Item, sub: int, is_pre):
         """Create a label to show an item onscreen."""
-        super().__init__(frame)
         self.item = item
         self.subKey = sub
         self.id = item.id
+        # Cached translated palette name.
+        self.name = '??'
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
 
-        self.bind(tk_tools.EVENTS['LEFT'], drag_start)
-        self.bind(tk_tools.EVENTS['LEFT_SHIFT'], drag_fast)
-        self.bind("<Enter>", self.rollover)
-        self.bind("<Leave>", self.rollout)
+        # Location this item was present at previously when dragging it.
+        self.pre_x = self.pre_y = -1
+
+        self.label = lbl = tk.Label(frame)
+
+        lbl.bind(tk_tools.EVENTS['LEFT'], functools.partial(drag_start, self))
+        lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], functools.partial(drag_fast, self))
+        lbl.bind("<Enter>", self.rollover)
+        lbl.bind("<Leave>", self.rollout)
 
         self.info_btn = tk.Label(
-            self,
+            lbl,
             relief='ridge',
             width=12,
             height=12,
@@ -306,7 +307,7 @@ class PalItem(tk.Label):
         img.apply(self.info_btn, ICO_GEAR)
 
         click_func = contextWin.open_event(self)
-        tk_tools.bind_rightclick(self, click_func)
+        tk_tools.bind_rightclick(lbl, click_func)
 
         @tk_tools.bind_leftclick(self.info_btn)
         def info_button_click(e):
@@ -318,25 +319,25 @@ class PalItem(tk.Label):
         # Rightclick does the same as the icon.
         tk_tools.bind_rightclick(self.info_btn, click_func)
 
-    def rollover(self, _):
+    def rollover(self, _: tk.Event) -> None:
         """Show the name of a subitem and info button when moused over."""
         set_disp_name(self)
-        self.lift()
-        self['relief'] = 'ridge'
+        self.label.lift()
+        self.label['relief'] = 'ridge'
         padding = 2 if utils.WIN else 0
         self.info_btn.place(
-            x=self.winfo_width() - padding,
-            y=self.winfo_height() - padding,
+            x=self.label.winfo_width() - padding,
+            y=self.label.winfo_height() - padding,
             anchor='se',
         )
 
-    def rollout(self, _):
+    def rollout(self, _: tk.Event) -> None:
         """Reset the item name display and hide the info button when the mouse leaves."""
         clear_disp_name()
-        self['relief'] = 'flat'
+        self.label['relief'] = 'flat'
         self.info_btn.place_forget()
 
-    def change_subtype(self, ind):
+    def change_subtype(self, ind) -> None:
         """Change the subtype of this icon.
 
         This removes duplicates from the palette if needed.
@@ -346,10 +347,10 @@ class PalItem(tk.Label):
                 item.kill()
         self.subKey = ind
         self.load_data()
-        self.master.update()  # Update the frame
+        self.label.master.update()  # Update the frame
         flow_preview()
 
-    def open_menu_at_sub(self, ind):
+    def open_menu_at_sub(self, ind: int) -> None:
         """Make the contextWin open itself at the indicated subitem.
 
         """
@@ -375,8 +376,8 @@ class PalItem(tk.Label):
                 'Item <{}> in <{}> style has mismatched subtype count!',
                 self.id, selected_style,
             )
-            self.name = '??'
-        img.apply(self, self.item.get_icon(self.subKey, self.is_pre))
+            self.name = '???'
+        img.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
 
     def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
@@ -394,9 +395,11 @@ class PalItem(tk.Label):
 
     def kill(self) -> None:
         """Hide and destroy this widget."""
-        if self in pal_picked:
-            pal_picked.remove(self)
-        self.place_forget()
+        for i, item in enumerate(pal_picked):
+            if item is self:
+                del pal_picked[i]
+                break
+        self.label.place_forget()
 
     def on_pal(self) -> bool:
         """Determine if this item is on the palette."""
@@ -408,8 +411,8 @@ class PalItem(tk.Label):
     def copy(self, frame):
         return PalItem(frame, self.item, self.subKey, self.is_pre)
 
-    def __repr__(self):
-        return '<' + str(self.id) + ":" + str(self.subKey) + '>'
+    def __repr__(self) -> str:
+        return f'<{self.id}:{self.subKey}>'
 
 
 def quit_application() -> None:
@@ -886,11 +889,11 @@ def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
     )
 
 
-def drag_start(e: tk.Event) -> None:
+def drag_start(drag_item: PalItem, e: tk.Event) -> None:
     """Start dragging a palette item."""
     drag_win = windows['drag_win']
-    drag_win.drag_item = e.widget
-    set_disp_name(drag_win.drag_item)
+    drag_win.drag_item = drag_item
+    set_disp_name(drag_item)
     snd.fx('config')
     drag_win.passed_over_pal = False
     if drag_win.drag_item.is_pre:  # is the cursor over the preview pane?
@@ -996,7 +999,7 @@ def drag_move(e):
                     # special label for this.
                     # The group item refresh will return this if nothing
                     # changes.
-                    img.apply(item, ICO_MOVING)
+                    img.apply(item.label, ICO_MOVING)
                     break
 
         drag_win.passed_over_pal = True
@@ -1008,14 +1011,14 @@ def drag_move(e):
         UI['pre_sel_line'].place_forget()
 
 
-def drag_fast(e):
+def drag_fast(drag_item: PalItem, e: tk.Event) -> None:
     """Implement shift-clicking.
 
      When shift-clicking, an item will be immediately moved to the
      palette or deleted from it.
     """
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
-    e.widget.clear()
+    drag_item.clear()
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
@@ -1023,7 +1026,7 @@ def drag_fast(e):
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
-            new_item = e.widget.copy(frames['preview'])
+            new_item = drag_item.copy(frames['preview'])
             new_item.is_pre = True
             pal_picked.append(new_item)
         else:
@@ -1143,7 +1146,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     UI['pal_export'] = ttk.Button(
         frame,
         textvariable=EXPORT_CMD_VAR,
-        command=lambda: export_editoritems(pal_ui),
+        command=functools.partial(export_editoritems, pal_ui),
     )
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
@@ -1249,10 +1252,10 @@ def flow_preview() -> None:
         # these can be referred to to figure out where it is
         item.pre_x = i % 4
         item.pre_y = i // 4
-        item.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
+        item.label.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
         # Check to see if this should use the single-icon
         item.load_data()
-        item.lift()
+        item.label.lift()
 
     item_count = len(pal_picked)
     for ind, fake in enumerate(pal_picked_fake):
@@ -1376,13 +1379,13 @@ def flow_picker(e=None) -> None:
 
         if visible:
             item.is_pre = False
-            item.place(
+            item.label.place(
                 x=((i % width) * 65 + 1),
                 y=((i // width) * 65 + 1),
                 )
             i += 1
         else:
-            item.place_forget()
+            item.label.place_forget()
 
     num_items = i
 

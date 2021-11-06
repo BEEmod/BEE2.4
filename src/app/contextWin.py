@@ -304,11 +304,11 @@ def load_item_data() -> None:
 
     version_lookup[:] = set_version_combobox(wid['variant'], selected_item)
 
-    if selected_item.url is None:
+    if selected_item.data.url is None:
         wid['moreinfo'].state(['disabled'])
     else:
         wid['moreinfo'].state(['!disabled'])
-    tooltip.set_tooltip(wid['moreinfo'], selected_item.url)
+    tooltip.set_tooltip(wid['moreinfo'], selected_item.data.url)
 
     editor = item_data.editor
     has_timer = any(isinstance(prop, TimerDelay) for prop in editor.properties)
@@ -403,12 +403,12 @@ def adjust_position(e=None) -> None:
 
     loc_x, loc_y = utils.adjust_inside_screen(
         x=(
-            selected_sub_item.winfo_rootx()
+            selected_sub_item.label.winfo_rootx()
             + window.winfo_rootx()
             - icon_widget.winfo_rootx()
         ),
         y=(
-            selected_sub_item.winfo_rooty()
+            selected_sub_item.label.winfo_rooty()
             + window.winfo_rooty()
             - icon_widget.winfo_rooty()
         ),
@@ -521,7 +521,7 @@ def init_widgets() -> None:
 
     def show_more_info() -> None:
         """Show the 'more info' URL."""
-        url = selected_item.url
+        url = selected_item.data.url
         if url is not None:
             try:
                 webbrowser.open_new_tab(url)
