@@ -114,7 +114,7 @@ async def init_app():
     LOGGER.info('Initialising UI...')
     APP_NURSERY.start_soon(img.start_loading)
     APP_NURSERY.start_soon(sound.sound_task)
-    UI.init_windows()  # create all windows
+    await UI.init_windows()  # create all windows
     LOGGER.info('UI initialised!')
 
     loadScreen.main_loader.destroy()

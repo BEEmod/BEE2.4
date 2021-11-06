@@ -2,19 +2,22 @@
 import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
+from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable
 import itertools
 import operator
 import random
 import math
 
-import loadScreen
 from srctools import Property
+import srctools.logger
+import trio
+
+import loadScreen
 from app import TK_ROOT
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
-import srctools.logger
 from app import sound as snd
 import BEE2_config
 import packages
@@ -41,8 +44,6 @@ from app import (
     paletteUI,
     music_conf,
 )
-
-from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -1517,7 +1518,7 @@ def init_menu_bar(win: tk.Toplevel, export: Callable[[], None]) -> Tuple[tk.Menu
     return view_menu, pal_menu
 
 
-def init_windows() -> None:
+async def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
@@ -1559,6 +1560,7 @@ def init_windows() -> None:
         height=frames['preview'].winfo_reqheight()+5,
     )  # Prevent making the window smaller than the preview pane
 
+    await trio.sleep(0)
     loader.step('UI', 'preview')
 
     ttk.Separator(
@@ -1594,6 +1596,7 @@ def init_windows() -> None:
 
     item_search.init(search_frame, update_filter)
 
+    await trio.sleep(0)
     loader.step('UI', 'filter')
 
     frames['picker'] = ttk.Frame(
@@ -1607,6 +1610,7 @@ def init_windows() -> None:
     picker_split_frame.columnconfigure(0, weight=1)
     init_picker(frames['picker'])
 
+    await trio.sleep(0)
     loader.step('UI', 'picker')
 
     frames['toolMenu'] = tk.Frame(
@@ -1647,10 +1651,12 @@ def init_windows() -> None:
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as)
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui))
 
+    await trio.sleep(0)
     loader.step('UI', 'palette')
 
     packageMan.make_window()
 
+    await trio.sleep(0)
     loader.step('UI', 'packageman')
 
     windows['opt'] = SubPane.SubPane(
@@ -1700,9 +1706,12 @@ def init_windows() -> None:
     tk_tools.bind_leftclick(windows['opt'], contextWin.hide_context)
     tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
 
+    await trio.sleep(0)
     backup_win.init_toplevel()
+    await trio.sleep(0)
     loader.step('UI', 'backup')
     voiceEditor.init_widgets()
+    await trio.sleep(0)
     loader.step('UI', 'voiceline')
     contextWin.init_widgets()
     loader.step('UI', 'contextwin')
@@ -1710,6 +1719,7 @@ def init_windows() -> None:
     loader.step('UI', 'optionwindow')
     init_drag_icon()
     loader.step('UI', 'drag_icon')
+    await trio.sleep(0)
 
     optionWindow.reset_all_win = reset_panes
 
@@ -1727,11 +1737,7 @@ def init_windows() -> None:
     if utils.MAC:
         TK_ROOT.lift()  # Raise to the top of the stack
 
-    TK_ROOT.update_idletasks()
-    StyleVarPane.window.update_idletasks()
-    CompilerPane.window.update_idletasks()
-    windows['opt'].update_idletasks()
-    windows['pal'].update_idletasks()
+    await trio.sleep(0.1)
 
     # Position windows according to remembered settings:
     try:
