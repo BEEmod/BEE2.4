@@ -1020,8 +1020,6 @@ def init_toplevel() -> None:
     ).grid(row=0, column=3)
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
-
-    TK_ROOT.update()
     ui_new_backup()
 
 
