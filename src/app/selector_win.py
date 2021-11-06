@@ -805,10 +805,6 @@ class SelectorWin:
         else:
             self.sampler = None
 
-        # If we have a sound sampler, hold the system open while the window
-        # is so it doesn't snap open/closed while finding files.
-        self.sampler_held_open = False
-
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
         self.prop_author.grid(row=2, column=0, columnspan=4)
 
@@ -1142,11 +1138,6 @@ class SelectorWin:
         if self.sampler is not None:
             self.sampler.stop()
 
-            # And close the reference we opened in open_win().
-            if self.sampler_held_open is True:
-                self.sampler_held_open = False
-                self.sampler.system.close_ref()
-
         for item in self.item_list:
             if item.button is not None:
                 img.apply(item.button, None)
@@ -1251,12 +1242,6 @@ class SelectorWin:
         if self.modal:
             self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
-
-        # If we have a sound sampler, hold the system open while the window
-        # is so it doesn't snap open/closed while finding files.
-        if self.sampler is not None and self.sampler_held_open is False:
-            self.sampler_held_open = True
-            self.sampler.system.open_ref()
 
         utils.center_win(self.win, parent=self.parent)
 
