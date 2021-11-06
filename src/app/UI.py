@@ -1559,7 +1559,7 @@ def init_windows() -> None:
         height=frames['preview'].winfo_reqheight()+5,
     )  # Prevent making the window smaller than the preview pane
 
-    loader.step('UI')
+    loader.step('UI', 'preview')
 
     ttk.Separator(
         ui_bg,
@@ -1594,7 +1594,7 @@ def init_windows() -> None:
 
     item_search.init(search_frame, update_filter)
 
-    loader.step('UI')
+    loader.step('UI', 'filter')
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
@@ -1607,7 +1607,7 @@ def init_windows() -> None:
     picker_split_frame.columnconfigure(0, weight=1)
     init_picker(frames['picker'])
 
-    loader.step('UI')
+    loader.step('UI', 'picker')
 
     frames['toolMenu'] = tk.Frame(
         frames['preview'],
@@ -1647,11 +1647,11 @@ def init_windows() -> None:
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as)
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui))
 
-    loader.step('UI')
+    loader.step('UI', 'palette')
 
     packageMan.make_window()
 
-    loader.step('UI')
+    loader.step('UI', 'packageman')
 
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
@@ -1665,15 +1665,15 @@ def init_windows() -> None:
     )
     init_option(windows['opt'], pal_ui)
 
-    loader.step('UI')
+    loader.step('UI', 'options')
 
     StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
 
-    loader.step('UI')
+    loader.step('UI', 'stylevar')
 
     CompilerPane.make_pane(frames['toolMenu'], view_menu)
 
-    loader.step('UI')
+    loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
         frame=frames['toolMenu'],
@@ -1701,15 +1701,15 @@ def init_windows() -> None:
     tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
 
     backup_win.init_toplevel()
-    loader.step('UI')
+    loader.step('UI', 'backup')
     voiceEditor.init_widgets()
-    loader.step('UI')
+    loader.step('UI', 'voiceline')
     contextWin.init_widgets()
-    loader.step('UI')
+    loader.step('UI', 'contextwin')
     optionWindow.init_widgets()
-    loader.step('UI')
+    loader.step('UI', 'optionwindow')
     init_drag_icon()
-    loader.step('UI')
+    loader.step('UI', 'drag_icon')
 
     optionWindow.reset_all_win = reset_panes
 

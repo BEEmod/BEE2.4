@@ -61,7 +61,7 @@ async def init_app():
     DEV_MODE.set(utils.DEV_MODE)
 
     LOGGER.debug('Starting loading screen...')
-    loadScreen.main_loader.set_length('UI', 15)
+    loadScreen.main_loader.set_length('UI', 16)
     loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
     loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
 
@@ -102,9 +102,9 @@ async def init_app():
     music_conf.load_filesystems(package_sys.values())
     img.load_filesystems(package_sys)
     gameMan.load_filesystems(package_sys.values())
-
+    loadScreen.main_loader.step('UI', 'pre_ui')
     UI.load_packages()
-    loadScreen.main_loader.step('UI')
+    loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 
     # Check games for Portal 2's basemodui.txt file, so we can translate items.

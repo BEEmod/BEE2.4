@@ -8,9 +8,9 @@ The id() of the main-process object is used to identify loadscreens.
 from types import TracebackType
 from tkinter import commondialog
 from weakref import WeakSet
-from abc import abstractmethod
 import contextlib
 import multiprocessing
+import time
 
 from app import logWindow
 from localisation import gettext
@@ -98,6 +98,7 @@ class LoadScreen:
         is_splash: bool=False,
     ):
         self.active = False
+        self._time = 0.0
         self.stage_ids = {st_id for st_id, title in stages}
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
@@ -156,21 +157,28 @@ class LoadScreen:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._send_msg('set_length', stage, num)
 
-    def step(self, stage: str) -> None:
+    def step(self, stage: str, disp_name: str='') -> None:
         """Increment the specified stage."""
         if stage not in self.stage_ids:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
+        cur = time.perf_counter()
+        diff = cur - self._time
+        if diff > 0.1:
+            LOGGER.debug('{}: "{}" = {:.3}s', stage, disp_name, diff)
+        self._time = cur
         self._send_msg('step', stage)
 
     def skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         if stage not in self.stage_ids:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
+        self._time = time.perf_counter()
         self._send_msg('skip_stage', stage)
 
     def show(self) -> None:
         """Display the loading screen."""
         self.active = True
+        self._time = time.perf_counter()
         self._send_msg('show')
 
     def reset(self) -> None:
