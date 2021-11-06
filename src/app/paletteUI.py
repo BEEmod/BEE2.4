@@ -300,6 +300,10 @@ class PaletteUI:
         pal = Palette(name, self.get_items())
         while pal.uuid in self.palettes:  # Should be impossible.
             pal.uuid = paletteLoader.uuid4()
+
+        if self.var_save_settings.get():
+            pal.settings = BEE2_config.get_curr_settings(is_palette=True)
+
         pal.save()
         self.palettes[pal.uuid] = pal
         self.select_palette(pal.uuid)
