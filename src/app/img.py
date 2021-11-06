@@ -691,7 +691,6 @@ class Handle(Generic[ArgT]):
             await trio.sleep(5)
         # We weren't cancelled and are empty, cleanup.
         if not scope.cancel_called and self._loading is not None and not self._users:
-            LOGGER.info('Cleanup: {}', self)
             _discard_tk_img(self._cached_tk)
             self._cached_tk = self._cached_pil = None
 
@@ -729,16 +728,17 @@ async def _spin_load_icons() -> None:
 
 
 # noinspection PyProtectedMember
-def start_loading(nursery: trio.Nursery) -> None:
+async def start_loading() -> None:
     """Start the background loading."""
     global _load_nursery
-    _load_nursery = nursery
-    LOGGER.debug('Early loads: {}', _early_loads)
-    while _early_loads:
-        handle = _early_loads.pop()
-        if handle._users:
-            nursery.start_soon(Handle._load_task, handle)
-    nursery.start_soon(_spin_load_icons)
+    async with trio.open_nursery() as _load_nursery:
+        LOGGER.debug('Early loads: {}', _early_loads)
+        while _early_loads:
+            handle = _early_loads.pop()
+            if handle._users:
+                _load_nursery.start_soon(Handle._load_task, handle)
+        _load_nursery.start_soon(_spin_load_icons)
+        await trio.sleep_forever()
 
 
 # noinspection PyProtectedMember
