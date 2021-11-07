@@ -208,7 +208,7 @@ class Item:
             if prop.allow_user_default:
                 yield prop_name
 
-    def get_properties(self) -> dict[str, Any]:
+    def get_properties(self) -> Dict[str, Any]:
         """Return a dictionary of properties and the current value for them.
 
         """
@@ -232,7 +232,7 @@ class Item:
                 )
         return result
 
-    def set_properties(self, props: dict[str, Any]) -> None:
+    def set_properties(self, props: Dict[str, Any]) -> None:
         """Apply the properties to the item."""
         for prop, value in props.items():
             item_opts[self.id]['PROP_' + prop] = str(value)
