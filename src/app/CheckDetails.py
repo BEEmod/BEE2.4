@@ -401,6 +401,9 @@ class CheckDetails(ttk.Frame):
         Must be called when self.items is changed,
         or when window is resized.
         """
+        # Don't bother if the window isn't actually visible.
+        if not self.winfo_ismapped():
+            return
         header_sizes = [
             (head.winfo_x(), head.winfo_width())
             for head in
