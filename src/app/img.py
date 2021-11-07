@@ -91,17 +91,6 @@ _load_nursery: trio.Nursery | None = None
 _early_loads: set[Handle] = set()
 
 
-def load_filesystems(systems: Mapping[str, FileSystem]) -> None:
-    """Load in the filesystems used in packages."""
-    PACK_SYSTEMS.clear()
-    for pak_id, sys in systems.items():
-        PACK_SYSTEMS[pak_id] = FileSystemChain(
-            (sys, 'resources/BEE2/'),
-            (sys, 'resources/materials/'),
-            (sys, 'resources/materials/models/props_map_editor/'),
-        )
-
-
 def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
     """Return an xy tuple given a size or tuple."""
     if isinstance(size, tuple):
@@ -728,9 +717,18 @@ async def _spin_load_icons() -> None:
 
 
 # noinspection PyProtectedMember
-async def start_loading() -> None:
-    """Start the background loading."""
+async def init(filesystems: Mapping[str, FileSystem]) -> None:
+    """Load in the filesystems used in package and start the background loading."""
     global _load_nursery
+
+    PACK_SYSTEMS.clear()
+    for pak_id, sys in filesystems.items():
+        PACK_SYSTEMS[pak_id] = FileSystemChain(
+            (sys, 'resources/BEE2/'),
+            (sys, 'resources/materials/'),
+            (sys, 'resources/materials/models/props_map_editor/'),
+        )
+
     async with trio.open_nursery() as _load_nursery:
         LOGGER.debug('Early loads: {}', _early_loads)
         while _early_loads:

@@ -96,12 +96,13 @@ async def init_app():
         has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
         has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
     )
+    loadScreen.main_loader.step('UI', 'pre_ui')
+    APP_NURSERY.start_soon(img.init, package_sys)
+    APP_NURSERY.start_soon(sound.sound_task)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
-    img.load_filesystems(package_sys)
     gameMan.load_filesystems(package_sys.values())
-    loadScreen.main_loader.step('UI', 'pre_ui')
     UI.load_packages()
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
@@ -112,8 +113,6 @@ async def init_app():
         game.init_trans()
 
     LOGGER.info('Initialising UI...')
-    APP_NURSERY.start_soon(img.start_loading)
-    APP_NURSERY.start_soon(sound.sound_task)
     await UI.init_windows()  # create all windows
     LOGGER.info('UI initialised!')
 
