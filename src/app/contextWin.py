@@ -189,7 +189,7 @@ def show_prop(widget, warp_cursor=False):
     else:
         off_x, off_y = None, None
     window.deiconify()
-    window.lift(TK_ROOT)
+    window.lift()
     selected_item = widget.item
     selected_sub_item = widget
 

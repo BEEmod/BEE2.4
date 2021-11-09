@@ -169,6 +169,7 @@ enable_pist_callback = True
 
 win = tk.Toplevel(TK_ROOT)
 win.transient(TK_ROOT)
+win.wm_attributes('-topmost', True)
 win.withdraw()
 
 
