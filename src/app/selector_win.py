@@ -1140,6 +1140,8 @@ class SelectorWin:
 
         for item in self.item_list:
             if item.button is not None:
+                # Unpress everything.
+                item.button.state(('!alternate', '!pressed', '!active'))
                 img.apply(item.button, None)
 
         if not self.first_open:  # We've got state to store.
