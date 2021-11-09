@@ -13,6 +13,7 @@ import stat
 import shutil
 import copyreg
 import sys
+import zipfile
 from pathlib import Path
 from enum import Enum
 from types import TracebackType
@@ -261,6 +262,20 @@ def _exc_freeze(
             exc, tb = data_exc[value]
             raise exc.with_traceback(tb) from None
     return getter
+
+
+# Patch zipfile to fix an issue with it not being threadsafe.
+# See https://bugs.python.org/issue42369
+if hasattr(zipfile, '_SharedFile'):
+    # noinspection PyProtectedMember
+    class _SharedZipFile(zipfile._SharedFile):  # type: ignore
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            # tell() reads the actual file position, but that may have been
+            # changed by another thread - instead keep our own private value.
+            self.tell = lambda: self._pos
+
+    zipfile._SharedFile = _SharedZipFile  # type: ignore
 
 
 class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
