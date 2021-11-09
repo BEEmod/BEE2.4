@@ -562,7 +562,7 @@ class Game:
                 if start_folder == 'instances':
                     dest = self.abs_path(INST_PATH + '/' + path)
                 elif start_folder in ('bee2', 'music_samp'):
-                    screen_func('RES')
+                    screen_func('RES', start_folder)
                     continue  # Skip app icons and music samples.
                 else:
                     # Preserve original casing.
@@ -570,14 +570,14 @@ class Game:
 
                 # Already copied from another package.
                 if dest in already_copied:
-                    screen_func('RES')
+                    screen_func('RES', dest)
                     continue
                 already_copied.add(dest)
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
                     shutil.copyfileobj(fsrc, fdest)
-                screen_func('RES')
+                screen_func('RES', file.path)
 
         LOGGER.info('Cache copied.')
 
@@ -703,7 +703,7 @@ class Game:
             renderables = style.renderables.copy()
             resources: dict[str, bytes] = {}
 
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'style-conf')
 
             vpk_success = True
 
@@ -728,10 +728,10 @@ class Game:
                     # Raised by StyleVPK to indicate it failed to copy.
                     vpk_success = False
 
-                export_screen.step('EXP')
+                export_screen.step('EXP', obj_type.__name__)
 
             packages.template_brush.write_templates(self)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'template_brush')
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
@@ -802,7 +802,7 @@ class Game:
                 if should_backup:
                     LOGGER.info('Backing up original {}!', name)
                     shutil.copy(item_path, backup_path)
-                export_screen.step('BACK')
+                export_screen.step('BACK', name)
 
             # Backup puzzles, if desired
             backup.auto_backup(selected_game, export_screen)
@@ -823,32 +823,32 @@ class Game:
 
             LOGGER.info('Editing Gameinfo...')
             self.edit_gameinfo(True)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'gameinfo')
 
             if not GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'fgd')
 
             # atomicwrites writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
             with atomic_write(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), overwrite=True, encoding='utf8') as editor_file:
                 editoritems.Item.export(editor_file, all_items, renderables)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'editoritems')
 
             LOGGER.info('Writing Editoritems database...')
             with open(self.abs_path('bin/bee2/editor.bin'), 'wb') as inst_file:
                 pick = pickletools.optimize(pickle.dumps(all_items))
                 inst_file.write(pick)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'editoritems_db')
 
             LOGGER.info('Writing VBSP Config!')
             os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
             with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w', encoding='utf8') as vbsp_file:
                 for line in vbsp_config.export():
                     vbsp_file.write(line)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'vbsp_config')
 
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
@@ -886,7 +886,7 @@ class Game:
                             master=TK_ROOT,
                         )
                         return False, vpk_success
-                    export_screen.step('COMP')
+                    export_screen.step('COMP', str(comp_file))
 
             if should_refresh:
                 LOGGER.info('Copying Resources!')
@@ -895,12 +895,12 @@ class Game:
 
             LOGGER.info('Optimizing editor models...')
             self.clean_editor_models(all_items)
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'editor_models')
 
             LOGGER.info('Writing fizzler sides...')
             self.generate_fizzler_sides(vbsp_config)
             resource_gen.make_cube_colourizer_legend(Path(self.abs_path('bee2')))
-            export_screen.step('EXP')
+            export_screen.step('EXP', 'fizzler_sides')
 
             # Write generated resources, after the regular ones have been copied.
             for filename, data in resources.items():
