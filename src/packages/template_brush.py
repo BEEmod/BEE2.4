@@ -6,7 +6,7 @@ from atomicwrites import atomic_write
 import os
 
 from srctools import VMF, Property, KeyValError
-from srctools.filesys import File, RawFileSystem, ZipFileSystem, VPKFileSystem
+from srctools.filesys import File
 from srctools.dmx import Element as DMXElement, ValueType as DMXValue, Attribute as DMXAttr
 import srctools.logger
 
@@ -26,8 +26,9 @@ async def parse_template(pak_id: str, file: File) -> None:
         LOGGER.warning('Fast-parse failure on {}!', path)
         with file.open_str() as f:
             props = await trio.to_thread.run_sync(Property.parse, f, cancellable=True)
-        conf_ents = list(VMF.parse(props).by_class['bee2_template_conf'])
+        vmf = await trio.to_thread.run_sync(VMF.parse, props, cancellable=True)
         del props
+        conf_ents = list(vmf.by_class['bee2_template_conf'])
         if len(conf_ents) > 1:
             raise KeyValError(f'Multiple configuration entities in template!', path, None)
         elif not conf_ents:
