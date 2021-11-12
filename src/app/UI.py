@@ -894,11 +894,11 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
     set_disp_name(drag_item)
     snd.fx('config')
     drag_win.passed_over_pal = False
-    if drag_win.drag_item.is_pre:  # is the cursor over the preview pane?
-        drag_win.drag_item.kill()
+    if drag_item.is_pre:  # is the cursor over the preview pane?
+        drag_item.kill()
         UI['pre_moving'].place(
-            x=drag_win.drag_item.pre_x*65 + 4,
-            y=drag_win.drag_item.pre_y*65 + 32,
+            x=drag_item.pre_x*65 + 4,
+            y=drag_item.pre_y*65 + 32,
         )
         drag_win.from_pal = True
 
@@ -907,14 +907,14 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
                 item.load_data()
 
         # When dragging off, switch to the single-only icon
-        img.apply(UI['drag_lbl'], drag_win.drag_item.item.get_icon(
-            drag_win.drag_item.subKey,
+        img.apply(UI['drag_lbl'], drag_item.item.get_icon(
+            drag_item.subKey,
             allow_single=False,
         ))
     else:
         drag_win.from_pal = False
-        img.apply(UI['drag_lbl'], drag_win.drag_item.item.get_icon(
-            drag_win.drag_item.subKey,
+        img.apply(UI['drag_lbl'], drag_item.item.get_icon(
+            drag_item.subKey,
             allow_single=True,
             single_num=0,
         ))
@@ -930,7 +930,7 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
     UI['pre_sel_line'].lift()
 
 
-def drag_stop(e) -> None:
+def drag_stop(e: tk.Event) -> None:
     """User released the mouse button, complete the drag."""
     drag_win = windows['drag_win']
 
@@ -974,7 +974,7 @@ def drag_stop(e) -> None:
     drag_win.drag_item = None
 
 
-def drag_move(e):
+def drag_move(e: tk.Event) -> None:
     """Update the position of dragged items as they move around."""
     drag_win = windows['drag_win']
 
