@@ -919,7 +919,7 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
             single_num=0,
         ))
     drag_win.deiconify()
-    drag_win.lift(TK_ROOT)
+    drag_win.lift()
     # grab makes this window the only one to receive mouse events, so
     # it is guaranteed that it'll drop when the mouse is released.
     drag_win.grab_set_global()
