@@ -120,6 +120,8 @@ def read_configs(conf: Property) -> None:
     # In Aperture Tag, we don't have portals. For fizzler types which block
     # portals (trigger_portal_cleanser), additionally fizzle paint.
     for fizz in FIZZ_TYPES.values():
+        if not fizz.blocks_portals:
+            continue
         for brush in fizz.brushes:
             if brush.keys['classname'].casefold() == 'trigger_portal_cleanser':
                 brush_name = brush.name
@@ -208,6 +210,17 @@ class FizzlerType:
         self.temp_max = temp_max
         self.temp_min = temp_min
         self.temp_brush_keys = temp_brush_keys
+
+        self.blocks_portals = False
+        self.fizzles_portals = False
+        # We want to know which fizzlers block or fizzle portals.
+        for br in brushes:
+            if br.keys['classname'].casefold() == 'trigger_portal_cleanser':
+                # Fizzlers always block.
+                self.blocks_portals = True
+                if srctools.conv_int(br.keys.get('spawnflags', 0)) & 1:
+                    self.fizzles_portals = True
+        LOGGER.debug('{}: blocks={}, fizzles={}', fizz_id, self.blocks_portals, self.fizzles_portals)
 
     @classmethod
     def parse(cls, conf: Property):
@@ -1147,7 +1160,7 @@ def generate_fizzlers(vmf: VMF) -> None:
     However the model instances are now available for modification.
     """
     has_fizz_border = 'fizz_border' in texturing.SPECIAL
-    tile_blacken = options.get_itemconf(('VALVE_FIZZLER', 'BlackenTiles'), False)
+    conf_tile_blacken = options.get_itemconf(('VALVE_FIZZLER', 'BlackenTiles'), False)
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -1164,6 +1177,7 @@ def generate_fizzlers(vmf: VMF) -> None:
             fizz.base_inst.fixup.int('$connectioncount', 0) == 0
             and fizz.base_inst.fixup.bool('$start_enabled', 1)
         )
+        tile_blacken = conf_tile_blacken and fizz.fizz_type.blocks_portals
 
         pack_list = (
             fizz.fizz_type.pack_lists_static
