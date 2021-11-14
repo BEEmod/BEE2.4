@@ -59,6 +59,8 @@ EXCLUDES = [
 
     # Imported in utils, but not required in compiler.
     'bg_daemon',
+    # We don't need to actually run versioning at runtime.
+    'versioningit',
 ]
 
 # The modules made available for plugins to use.
@@ -69,7 +71,7 @@ INCLUDES = [
     'io', 'itertools', 'json', 'math', 'random', 're',
     'statistics', 'string', 'struct',
 ]
-INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'test' not in name and 'script' not in name)
+INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
