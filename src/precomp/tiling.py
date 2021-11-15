@@ -1981,11 +1981,11 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
     for brush in panel:
         for side in brush:
             norm = side.normal()
-            if norm.axis() == norm_axis:
+            if abs(Vec.dot(norm, normal)) > 0.99:
                 continue  # Front or back
 
             u_off, v_off = (side.get_origin() - pos).other_axes(norm_axis)
-            if abs(u_off) == 64 or abs(v_off) == 64:
+            if abs(round(u_off)) == 64 or abs(round(v_off)) == 64:
                 side.translate(2 * norm)
                 # Snap squarebeams to each other.
                 side.vaxis.offset = 0
