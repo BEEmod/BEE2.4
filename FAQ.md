@@ -120,9 +120,9 @@ The bottomless pits originally featured in BEEmod had significant problems, so t
 
 ### What happened to BTS style?
 
-The BTS style was made in the early days of the BEE2, before we had figured out what direction we wanted to take things in. We made the decision to remove BTS because it's fundamentally incompatible with the way normal test chambers (and by extension Puzzlemaker maps) are built. Test chambers are made up of modular, reusable test elements; BTS on the other hand has much more specialized machines, such as the turret production line from the campaign. In some ways, BTS maps are more similar to Half-Life's environmental puzzles than Portal's test chambers.
+The BTS style was made in the early days of the BEE2, before we had really figured out our scope. We made the decision to remove BTS because it's fundamentally incompatible with the way normal test chambers (and by extension Puzzlemaker maps) are built. Test chambers are made up of modular, reusable test elements; BTS on the other hand has much more specialized machines, such as the turret production line from the campaign. In some ways, BTS maps are more similar to Half-Life's environmental puzzles than Portal's test chambers.
 
-Building a BTS map following the structure of a test chamber results in something which doesn't feel like a BTS map, it just feels like a test chamber with a skin on top of it - which is really all BEEmod styles are. That works fine when the thing you're skinning it to is also a test chamber (or an equivalent), but if it's not, then the skin becomes extremely obvious.
+Building a BTS map following the structure of a test chamber results in something which doesn't feel like a BTS map, it just feels like a test chamber with a skin on top of it - which is really all BEEmod styles are. That works fine when the skin is also a test chamber (or an equivalent), but if it's not, then the fact that it's just a skin becomes extremely obvious.
 
 ### Will you add Desolation's Industrial style to BEE2.4?
 
