@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import itertools
 import os
-import random
 from collections import defaultdict
-from typing import Union, Callable, Optional, Tuple, Mapping, Iterable, Iterator
+from typing import Union, Optional, Tuple, Mapping, Iterable, Iterator
 
 from decimal import Decimal
 from enum import Enum
@@ -21,7 +20,7 @@ import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
-from . import tiling, texturing, options
+from . import tiling, texturing, options, rand
 import consts
 
 
@@ -151,7 +150,7 @@ TEMPLATE_RETEXTURE: dict[str, Union[
     'tile/white_wall_tile003f': (GenCat.NORMAL, TileSize.TILE_4x4, W),
 
     'tile/white_wall_tile004j': (GenCat.PANEL, TileSize.TILE_1x1, W),
-    
+
     # No black portal-placement texture, so use the bullseye instead
     'metal/black_floor_metal_bullseye_001': (GenCat.PANEL, TileSize.TILE_1x1, B),
     'tile/white_wall_tile_bullseye': (GenCat.PANEL, TileSize.TILE_1x1, W),
@@ -228,6 +227,7 @@ class Template:
     def __init__(
         self,
         temp_id: str,
+        visgroup_names: set[str],
         world: dict[str, list[Solid]],
         detail: dict[str, list[Solid]],
         overlays: dict[str, list[Entity]],
@@ -243,14 +243,14 @@ class Template:
         self._data = {}
 
         # We ensure the '' group is always present.
-        all_groups = {''}
-        all_groups.update(world)
-        all_groups.update(detail)
-        all_groups.update(overlays)
+        visgroup_names.add('')
+        visgroup_names.update(world)
+        visgroup_names.update(detail)
+        visgroup_names.update(overlays)
         for ent in itertools.chain(color_pickers, tile_setters, voxel_setters):
-            all_groups.update(ent.visgroups)
+            visgroup_names.update(ent.visgroups)
 
-        for group in all_groups:
+        for group in visgroup_names:
             self._data[group] = (
                 world.get(group, []),
                 detail.get(group, []),
@@ -444,10 +444,10 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         else:
             raise ValueError(f'Unknown filesystem type for "{loc.pak_path}"!')
 
-    with filesys, filesys[loc.path].open_str() as f:
+    with filesys[loc.path].open_str() as f:
         props = Property.parse(f, f'{loc.pak_path}:{loc.path}')
     vmf = srctools.VMF.parse(props, preserve_ids=True)
-    del props, filesys, f
+    del props, filesys, f  # Discard all this data.
 
     # visgroup -> list of brushes/overlays
     detail_ents: dict[str, list[Solid]] = defaultdict(list)
@@ -607,6 +607,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     return Template(
         loc.id,
+        set(visgroup_names.values()),
         world_ents,
         detail_ents,
         overlay_ents,
@@ -643,8 +644,8 @@ def import_template(
     force_type: TEMP_TYPES=TEMP_TYPES.default,
     add_to_map: bool=True,
     additional_visgroups: Iterable[str]=(),
-    visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     bind_tile_pos: Iterable[Vec]=(),
+    align_bind: bool=False,
 ) -> ExportedTemplate:
     """Import the given template at a location.
 
@@ -658,11 +659,10 @@ def import_template(
 
     If targetname is set, it will be used to localise overlay names.
     add_to_map sets whether to add the brushes and func_detail to the map.
-    visgroup_choose is a callback used to determine if visgroups should be
-    added - it's passed a list of names, and should return a list of ones to use.
 
     If any bound_tile_pos are provided, these are offsets to tiledefs which
     should have all the overlays in this template bound to them, and vice versa.
+    If align_bind is set, these will be first aligned to grid.
     """
     import vbsp
     if isinstance(temp_name, Template):
@@ -673,7 +673,6 @@ def import_template(
         template = get_template(temp_name)
 
     chosen_groups.update(additional_visgroups)
-    chosen_groups.update(visgroup_choose(template.visgroups))
     chosen_groups.add('')
 
     orig_world, orig_detail, orig_over = template.visgrouped(chosen_groups)
@@ -762,6 +761,11 @@ def import_template(
         for tile_off in bind_tile_pos:
             tile_off = tile_off.copy()
             tile_off.localise(origin, orient)
+            for axis in ('xyz' if align_bind else ''):
+                # Don't realign things in the normal's axis -
+                # those are already fine.
+                if abs(tile_norm[axis]) < 1e-6:
+                    tile_off[axis] = tile_off[axis] // 128 * 128 + 64
             try:
                 tile = tiling.TILES[tile_off.as_tuple(), tile_norm.as_tuple()]
             except KeyError:
@@ -1107,7 +1111,6 @@ def retexture_template(
             folded_mat = face.mat.casefold()
 
             norm = face.normal()
-            random.seed(rand_prefix + norm.join('_'))
 
             if orig_id in template.realign_faces:
                 try:
@@ -1154,7 +1157,7 @@ def retexture_template(
 
             if override_mat is not None:
                 # Replace_tex overrides everything.
-                mat = random.choice(override_mat)
+                mat =  rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
                 if mat.startswith('<') and mat.endswith('>'):
@@ -1229,7 +1232,8 @@ def retexture_template(
         mat = over['material'].casefold()
 
         if mat in replace_tex:
-            mat = random.choice(replace_tex[mat])
+            rng = rand.seed(b'temp', template_data.template.id, over_pos, mat)
+            mat = rng.choice(replace_tex[mat])
             if mat[:1] == '$' and fixup is not None:
                 mat = fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):

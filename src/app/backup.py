@@ -19,10 +19,9 @@ import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
-from tkinter import filedialog
-from tkinter import messagebox
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 from app.tooltip import add_tooltip
+from localisation import gettext, ngettext
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -76,32 +75,32 @@ game_name = tk.StringVar()
 # Loadscreens used as basic progress bars
 copy_loader = loadScreen.LoadScreen(
     ('COPY', ''),
-    title_text=_('Copying maps'),
+    title_text=gettext('Copying maps'),
 )
 
 reading_loader = loadScreen.LoadScreen(
     ('READ', ''),
-    title_text=_('Loading maps'),
+    title_text=gettext('Loading maps'),
 )
 
 deleting_loader = loadScreen.LoadScreen(
     ('DELETE', ''),
-    title_text=_('Deleting maps'),
+    title_text=gettext('Deleting maps'),
 )
 
 
 class P2C:
     """A PeTI map."""
     def __init__(
-            self,
-            filename,
-            zip_file,
-            create_time,
-            mod_time,
-            title='<untitled>',
-            desc='',
-            is_coop=False,
-            ):
+        self,
+        filename,
+        zip_file,
+        create_time,
+        mod_time,
+        title='<untitled>',
+        desc='',
+        is_coop=False,
+    ) -> None:
         self.filename = filename
         self.zip_file = zip_file
         self.create_time = create_time
@@ -334,7 +333,7 @@ def backup_maps(maps):
                 ):
             if not messagebox.askyesno(
                     title='Overwrite File?',
-                    message=_('This filename is already in the backup.'
+                    message=gettext('This filename is already in the backup.'
                               'Do you wish to overwrite it? '
                               '({})').format(p2c.title),
                     parent=window,
@@ -440,8 +439,8 @@ def save_backup():
 
     if not maps:
         messagebox.showerror(
-            _('BEE2 Backup'),
-            _('No maps were chosen to backup!'),
+            gettext('BEE2 Backup'),
+            gettext('No maps were chosen to backup!'),
         )
         return
 
@@ -501,7 +500,7 @@ def restore_maps(maps: List[P2C]):
                     ):
                 if not messagebox.askyesno(
                         title='Overwrite File?',
-                        message=_('This map is already in the game directory.'
+                        message=gettext('This map is already in the game directory.'
                                   'Do you wish to overwrite it? '
                                   '({})').format(p2c.title),
                         parent=window,
@@ -563,8 +562,8 @@ def show_window() -> None:
 def ui_load_backup() -> None:
     """Prompt and load in a backup file."""
     file = filedialog.askopenfilename(
-        title=_('Load Backup'),
-        filetypes=[(_('Backup zip'), '.zip')],
+        title=gettext('Load Backup'),
+        filetypes=[(gettext('Backup zip'), '.zip')],
     )
     if not file:
         return
@@ -597,7 +596,7 @@ def ui_new_backup() -> None:
     BACKUPS['back'].clear()
     BACKUPS['backup_name'] = None
     BACKUPS['backup_path'] = None
-    backup_name.set(_('Unsaved Backup'))
+    backup_name.set(gettext('Unsaved Backup'))
     BACKUPS['unsaved_file'] = unsaved = BytesIO()
     BACKUPS['backup_zip'] = ZipFile(
         unsaved,
@@ -622,8 +621,8 @@ def ui_save_backup() -> None:
 def ui_save_backup_as() -> None:
     """Prompt for a name, and then save a backup."""
     path = filedialog.asksaveasfilename(
-        title=_('Save Backup As'),
-        filetypes=[(_('Backup zip'), '.zip')],
+        title=gettext('Save Backup As'),
+        filetypes=[(gettext('Backup zip'), '.zip')],
     )
     if not path:
         return
@@ -719,7 +718,7 @@ def ui_delete_game() -> None:
         return
     map_count = len(to_delete)
     if not messagebox.askyesno(
-        _('Confirm Deletion'),
+        gettext('Confirm Deletion'),
         ngettext(
             'Do you wish to delete {} map?\n',
             'Do you wish to delete {} maps?\n',
@@ -757,8 +756,8 @@ def ui_delete_game() -> None:
 def init() -> None:
     """Initialise all widgets in the given window."""
     for cat, btn_text in [
-            ('back_', _('Restore:')),
-            ('game_', _('Backup:')),
+            ('back_', gettext('Restore:')),
+            ('game_', gettext('Backup:')),
             ]:
         UI[cat + 'frame'] = frame = ttk.Frame(
             window,
@@ -795,7 +794,7 @@ def init() -> None:
         )
         UI[cat + 'btn_sel'] = ttk.Button(
             button_frame,
-            text=_('Checked'),
+            text=gettext('Checked'),
             width=8,
         )
         UI[cat + 'btn_all'].grid(row=0, column=1)
@@ -803,7 +802,7 @@ def init() -> None:
 
         UI[cat + 'btn_del'] = ttk.Button(
             button_frame,
-            text=_('Delete Checked'),
+            text=gettext('Delete Checked'),
             width=14,
         )
         UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
@@ -853,7 +852,7 @@ def init_application() -> None:
     global window
     window = TK_ROOT
     TK_ROOT.title(
-        _('BEEMOD {} - Backup / Restore Puzzles').format(utils.BEE_VERSION)
+        gettext('BEEMOD {} - Backup / Restore Puzzles').format(utils.BEE_VERSION)
     )
 
     init()
@@ -866,20 +865,20 @@ def init_application() -> None:
         file_menu = menus['file'] = tk.Menu(bar, name='apple')
     else:
         file_menu = menus['file'] = tk.Menu(bar)
-    file_menu.add_command(label=_('New Backup'), command=ui_new_backup)
-    file_menu.add_command(label=_('Open Backup'), command=ui_load_backup)
-    file_menu.add_command(label=_('Save Backup'), command=ui_save_backup)
-    file_menu.add_command(label=_('Save Backup As'), command=ui_save_backup_as)
+    file_menu.add_command(label=gettext('New Backup'), command=ui_new_backup)
+    file_menu.add_command(label=gettext('Open Backup'), command=ui_load_backup)
+    file_menu.add_command(label=gettext('Save Backup'), command=ui_save_backup)
+    file_menu.add_command(label=gettext('Save Backup As'), command=ui_save_backup_as)
 
-    bar.add_cascade(menu=file_menu, label=_('File'))
+    bar.add_cascade(menu=file_menu, label=gettext('File'))
 
     game_menu = menus['game'] = tk.Menu(bar)
 
-    game_menu.add_command(label=_('Add Game'), command=gameMan.add_game)
-    game_menu.add_command(label=_('Remove Game'), command=gameMan.remove_game)
+    game_menu.add_command(label=gettext('Add Game'), command=gameMan.add_game)
+    game_menu.add_command(label=gettext('Remove Game'), command=gameMan.remove_game)
     game_menu.add_separator()
 
-    bar.add_cascade(menu=game_menu, label=_('Game'))
+    bar.add_cascade(menu=game_menu, label=gettext('Game'))
     gameMan.game_menu = game_menu
 
     from app import helpMenu
@@ -925,7 +924,7 @@ def init_backup_settings() -> None:
     )
     UI['auto_enable'] = enable_check = ttk.Checkbutton(
         frame,
-        text=_('Automatic Backup After Export'),
+        text=gettext('Automatic Backup After Export'),
         variable=check_var,
         command=check_callback,
     )
@@ -957,7 +956,7 @@ def init_backup_settings() -> None:
     count_frame.grid(row=0, column=1)
     ttk.Label(
         count_frame,
-        text=_('Keep (Per Game):'),
+        text=gettext('Keep (Per Game):'),
     ).grid(row=0, column=0)
 
     count = tk_tools.ttk_Spinbox(
@@ -975,7 +974,7 @@ def init_toplevel() -> None:
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
-    window.title(_('Backup/Restore Puzzles'))
+    window.title(gettext('Backup/Restore Puzzles'))
 
     def quit_command():
         from BEE2_config import GEN_OPTS
@@ -994,21 +993,21 @@ def init_toplevel() -> None:
     )
     ttk.Button(
         toolbar_frame,
-        text=_('New Backup'),
+        text=gettext('New Backup'),
         command=ui_new_backup,
         width=14,
     ).grid(row=0, column=0)
 
     ttk.Button(
         toolbar_frame,
-        text=_('Open Backup'),
+        text=gettext('Open Backup'),
         command=ui_load_backup,
         width=13,
     ).grid(row=0, column=1)
 
     ttk.Button(
         toolbar_frame,
-        text=_('Save Backup'),
+        text=gettext('Save Backup'),
         command=ui_save_backup,
         width=11,
     ).grid(row=0, column=2)
@@ -1021,8 +1020,6 @@ def init_toplevel() -> None:
     ).grid(row=0, column=3)
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
-
-    TK_ROOT.update()
     ui_new_backup()
 
 
@@ -1033,4 +1030,3 @@ def deinit() -> None:
         obj = BACKUPS[name]
         if obj is not None:
             obj.close()
-

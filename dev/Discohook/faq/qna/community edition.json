@@ -9,7 +9,7 @@
             "content": null,
             "embeds": [
               {
-                "title": "What about Portal 2: Community Edition? Will BEE2.4 be compatible with that, will it make any new things possible?",
+                "title": "Will BEE2.4 be compatible with Portal 2: Community Edition, will that make any new things possible?",
                 "description": "Theoretically, P2CE would expand what is possible with BEEmod; however, the P2CE developers were unable to obtain the Puzzlemaker source code from Valve, so it won't be included. They will likely implement their own puzzlemaker from scratch at some point in the future, but it is not currently being worked on and would likely be incompatible with BEE.",
                 "color": 16761704
               }

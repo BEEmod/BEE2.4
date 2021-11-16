@@ -69,6 +69,12 @@ reports/
 # Localisation files:
 *.mo
 
+# Specifies the version for compilation.
+src/bee_version.txt
 
 # PyInstaller temporary file directory
 /build_tmp/
+
+# Folders for DLLs we need.
+lib-32/
+lib-64/

@@ -151,6 +151,15 @@
 		]
 	]
 
+@SolidClass = bee2_editor_occupiedvoxel: "Defines a region the item takes up. Depending on the resultant option, this can be positioned in a variety of ways: \n" +
+	"- Align to the 128x128 grid, to specify full voxels.\n" +
+	"- Make it thinner than 8 units, aligned to the side of a voxel to indicate a side.\n" +
+	"- Make it a multiple of 32 units to specify a set of 1/4 voxels."
+	[
+	coll_type(string) : "Collide Type" : "SOLID" : "Types of collision for this item." 
+	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
+	]
+
 // Entities added to the finished map to pass information to VRAD.
 	
 @PointClass

@@ -1,18 +1,13 @@
 """Conditions related to specific kinds of entities."""
-import random
-from collections import defaultdict
-from typing import List, Dict, Tuple
-
 from srctools import Property, Vec, VMF, Entity, Angle
 import srctools.logger
 
-from precomp import tiling, texturing, template_brush, conditions
+from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.conditions import make_result, make_result_setup
 from precomp.template_brush import TEMP_TYPES
 
 COND_MOD_NAME = 'Entities'
-
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
@@ -34,7 +29,7 @@ def res_insert_overlay(vmf: VMF, res: Property):
     orig_norm = Vec.from_str(res['normal', '0 0 1'])
 
     replace_tex: dict[str, list[str]] = {}
-    for prop in res.find_key('replace', []):
+    for prop in res.find_children('replace'):
         replace_tex.setdefault(prop.name.replace('\\', '/'), []).append(prop.value)
 
     offset = Vec.from_str(res['offset', '0 0 0'])
@@ -80,20 +75,22 @@ def res_insert_overlay(vmf: VMF, res: Property):
             force_type=TEMP_TYPES.detail,
         )
 
-        for over in temp.overlay:  # type: Entity
-            random.seed('TEMP_OVERLAY_' + over['basisorigin'])
+        for over in temp.overlay:
+            pos = Vec.from_str(over['basisorigin'])
             mat = over['material']
             try:
-                mat = random.choice(replace_tex[mat.casefold().replace('\\', '/')])
+                replace = replace_tex[mat.casefold().replace('\\', '/')]
             except KeyError:
                 pass
+            else:
+                mat = rand.seed(b'temp_over', temp_id, pos).choice(replace)
 
             if mat[:1] == '$':
                 mat = inst.fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):
                 # Lookup in the texture data.
                 gen, mat = texturing.parse_name(mat[1:-1])
-                mat = gen.get(Vec.from_str(over['basisorigin']), mat)
+                mat = gen.get(pos, mat)
             over['material'] = mat
             tiledef.bind_overlay(over)
 
@@ -176,14 +173,13 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
 
     if calc_type == 'track_platform':
         lin_off = srctools.conv_int(inst.fixup['$travel_distance'])
-        travel_ang = inst.fixup['$travel_direction']
+        travel_ang = Angle.from_str(inst.fixup['$travel_direction'])
         start_pos = srctools.conv_float(inst.fixup['$starting_position'])
         if start_pos:
             start_pos = round(start_pos * lin_off)
-            pos1 += Vec(x=-start_pos).rotate_by_str(travel_ang)
+            pos1 += Vec(x=-start_pos) @ travel_ang
 
-        pos2 = Vec(x=lin_off).rotate_by_str(travel_ang)
-        pos2 += pos1
+        pos2 = Vec(x=lin_off) @ travel_ang + pos1
     elif calc_type.startswith('piston'):
         # Use piston-platform offsetting.
         # The number is the highest offset to move to.
@@ -200,7 +196,7 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
         pos2 = Vec.from_str(conditions.resolve_value(inst, pos2))
 
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    angles = Angle.from_str(inst['angles'])
     splash_pos.localise(origin, angles)
     pos1.localise(origin, angles)
     pos2.localise(origin, angles)
@@ -278,7 +274,7 @@ def res_make_funnel_light(inst: Entity) -> None:
             need_blue = True
 
     loc = Vec(0, 0, -56)
-    loc.localise(Vec.from_str(inst['origin']), Vec.from_str(inst['angles']))
+    loc.localise(Vec.from_str(inst['origin']), Angle.from_str(inst['angles']))
 
     if need_blue:
         inst.map.create_ent(

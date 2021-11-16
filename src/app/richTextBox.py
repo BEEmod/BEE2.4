@@ -8,7 +8,7 @@ import webbrowser
 
 from app import tkMarkdown
 from app.tk_tools import Cursors
-import utils
+from localisation import gettext
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -16,7 +16,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 class tkRichText(tkinter.Text):
     """A version of the TK Text widget which allows using special formatting."""
-    def __init__(self, parent, width=10, height=4, font="TkDefaultFont"):
+    def __init__(self, parent, width=10, height=4, font="TkDefaultFont", **kargs):
         # Setup all our configuration for inserting text.
         self.font = nametofont(font)
         self.bold_font = self.font.copy()
@@ -26,7 +26,7 @@ class tkRichText(tkinter.Text):
         self.italic_font['slant'] = 'italic'
 
         # URL -> tag name and callback ID.
-        self._link_commands: Dict[str, Tuple[str, int]] = {}
+        self._link_commands: Dict[str, Tuple[str, str]] = {}
 
         super().__init__(
             parent,
@@ -36,10 +36,11 @@ class tkRichText(tkinter.Text):
             font=self.font,
             # We only want the I-beam cursor over text.
             cursor=Cursors.REGULAR,
+            **kargs,
         )
 
         self.heading_font = {}
-        cur_size = self.font['size']
+        cur_size: float = self.font['size']
         for size in range(6, 0, -1):
             self.heading_font[size] = font = self.font.copy()
             cur_size /= 0.8735
@@ -111,12 +112,12 @@ class tkRichText(tkinter.Text):
         self.tag_bind(
             "link",
             "<Enter>",
-            lambda e: self.configure(cursor=Cursors.LINK),
+            lambda e: self.__setitem__('cursor', Cursors.LINK),
         )
         self.tag_bind(
             "link",
             "<Leave>",
-            lambda e: self.configure(cursor=Cursors.REGULAR),
+            lambda e: self.__setitem__('cursor', Cursors.REGULAR),
         )
 
         self['state'] = "disabled"
@@ -125,6 +126,8 @@ class tkRichText(tkinter.Text):
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')
 
+    # noinspection PyUnresolvedReferences
+    # noinspection PyProtectedMember
     def set_text(self, text_data: Union[str, tkMarkdown.MarkdownData]) -> None:
         """Write the rich-text into the textbox.
 
@@ -145,8 +148,19 @@ class tkRichText(tkinter.Text):
             super().insert("end", text_data)
             return
 
+        # Strip newlines from the start and end of text.
+        if text_data._unstripped and len(text_data.blocks) > 1:
+            first = text_data.blocks[0]
+            if isinstance(first, tkMarkdown.TextSegment) and first.text.startswith('\n'):
+                text_data.blocks[0] = tkMarkdown.TextSegment(first.text.lstrip('\n'), first.tags, first.url)
+
+            last = text_data.blocks[-1]
+            if isinstance(last, tkMarkdown.TextSegment) and last.text.endswith('\n'):
+                text_data.blocks[-1] = tkMarkdown.TextSegment(last.text.rstrip('\n'), last.tags, last.url)
+            text_data._unstripped = True
+
         segment: tkMarkdown.TextSegment
-        for block in text_data.blocks:
+        for i, block in enumerate(text_data.blocks):
             if isinstance(block, tkMarkdown.TextSegment):
                 if block.url:
                     try:
@@ -180,7 +194,7 @@ class tkRichText(tkinter.Text):
         def callback(e):
             if askokcancel(
                 title='BEE2 - Open URL?',
-                message=_('Open "{}" in the default browser?').format(url),
+                message=gettext('Open "{}" in the default browser?').format(url),
                 parent=self,
             ):
                 webbrowser.open(url)

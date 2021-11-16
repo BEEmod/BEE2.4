@@ -7,7 +7,7 @@ from enum import Enum
 from collections import defaultdict
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
-from srctools import VMF, Entity, Output, Property, conv_bool, Vec
+from srctools import VMF, Entity, Output, Property, conv_bool, Vec, Angle
 from precomp.antlines import Antline, AntType
 from precomp import (
     instance_traits, instanceLocs,
@@ -26,15 +26,15 @@ COND_MOD_NAME = "Item Connections"
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-ITEM_TYPES = {}  # type: Dict[str, Optional[Config]]
+ITEM_TYPES: Dict[str, Optional[Config]] = {}
 
 # Targetname -> item
-ITEMS = {}  # type: Dict[str, Item]
+ITEMS: Dict[str, 'Item'] = {}
 
 # We need different names for each kind of input type, so they don't
 # interfere with each other. We use the 'inst_local' pattern not 'inst-local'
 # deliberately so the actual item can't affect the IO input.
-COUNTER_NAME = {
+COUNTER_NAME: Dict[str, str] = {
     consts.FixupVars.CONN_COUNT: '_counter',
     consts.FixupVars.CONN_COUNT_TBEAM: '_counter_polarity',
     consts.FixupVars.BEE_CONN_COUNT_A: '_counter_a',
@@ -151,6 +151,7 @@ class Item:
         self,
         inst: Entity,
         item_type: Config,
+        *,  # Don't mix up antlines!
         ant_floor_style: AntType,
         ant_wall_style: AntType,
         panels: Iterable[Entity]=(),
@@ -445,6 +446,7 @@ def calc_connections(
     antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
+    *,  # Don't mix up antlines!
     antline_wall: AntType,
     antline_floor: AntType,
 ) -> None:
@@ -648,33 +650,32 @@ def calc_connections(
                     frame['renderorder'] = 1  # On top
 
 
-@conditions.make_result_setup('ChangeIOType')
-def res_change_io_type_parse(props: Property):
-    """Pre-parse all item types into an anonymous block."""
-    return Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
-
-
 @conditions.make_result('ChangeIOType')
-def res_change_io_type(inst: Entity, res: Property) -> None:
+def res_change_io_type_parse(props: Property):
     """Switch an item to use different inputs or outputs.
 
     Must be done before priority level -250.
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
-    try:
-        item = ITEMS[inst['targetname']]
-    except KeyError:
-        raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+    conf = Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
 
-    item.config = res.value
+    def change_item(inst: Entity) -> None:
+        try:
+            item = ITEMS[inst['targetname']]
+        except KeyError:
+            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
 
-    # Overwrite these as well.
-    item.enable_cmd = res.value.enable_cmd
-    item.disable_cmd = res.value.disable_cmd
+        item.config = conf
 
-    item.sec_enable_cmd = res.value.sec_enable_cmd
-    item.sec_disable_cmd = res.value.sec_disable_cmd
+        # Overwrite these as well.
+        item.enable_cmd = conf.enable_cmd
+        item.disable_cmd = conf.disable_cmd
+
+        item.sec_enable_cmd = conf.sec_enable_cmd
+        item.sec_disable_cmd = conf.sec_disable_cmd
+
+    return change_item
 
 
 def do_item_optimisation(vmf: VMF) -> None:
@@ -736,7 +737,8 @@ def gen_item_outputs(vmf: VMF) -> None:
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
-    auto_logic = []
+    # For logic items without inputs, collect the instances to fix up later.
+    dummy_logic_ents: list[Entity] = []
 
     # Apply input A/B types to connections.
     # After here, all connections are primary or secondary only.
@@ -782,44 +784,6 @@ def gen_item_outputs(vmf: VMF) -> None:
             else:
                 add_item_indicators(item, pan_switching_timer, pan_timer_type)
 
-        # Special case - spawnfire items with no inputs need to fire
-        # off the outputs. There's no way to control those, so we can just
-        # fire it off.
-        if not item.inputs and item.config.spawn_fire is FeatureMode.ALWAYS:
-            if item.is_logic:
-                # Logic gates need to trigger their outputs.
-                # Make a logic_auto temporarily for this to collect the
-                # outputs we need.
-
-                item.inst.clear_keys()
-                item.inst['classname'] = 'logic_auto'
-
-                auto_logic.append(item.inst)
-            else:
-                is_inverted = conv_bool(conditions.resolve_value(
-                    item.inst,
-                    item.config.invert_var,
-                ))
-                logic_auto = vmf.create_ent(
-                    'logic_auto',
-                    origin=item.inst['origin'],
-                    spawnflags=1,
-                )
-                for cmd in (item.enable_cmd if is_inverted else item.disable_cmd):
-                    logic_auto.add_out(
-                        Output(
-                            'OnMapSpawn',
-                            conditions.local_name(
-                                item.inst,
-                                conditions.resolve_value(item.inst, cmd.target),
-                            ) or item.inst,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            delay=cmd.delay,
-                            only_once=True,
-                        )
-                    )
-
         if item.config.input_type is InputType.DUAL:
             prim_inputs = [
                 conn
@@ -832,6 +796,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 if conn.type is ConnType.SECONDARY or conn.type is ConnType.BOTH
             ]
             add_item_inputs(
+                dummy_logic_ents,
                 item,
                 InputType.AND,
                 prim_inputs,
@@ -839,8 +804,11 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.enable_cmd,
                 item.disable_cmd,
                 item.config.invert_var,
+                item.config.spawn_fire,
+                '_prim_inv_rl',
             )
             add_item_inputs(
+                dummy_logic_ents,
                 item,
                 InputType.AND,
                 sec_inputs,
@@ -848,9 +816,12 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.sec_enable_cmd,
                 item.sec_disable_cmd,
                 item.config.sec_invert_var,
+                item.config.sec_spawn_fire,
+                '_sec_inv_rl',
             )
         else:
             add_item_inputs(
+                dummy_logic_ents,
                 item,
                 item.config.input_type,
                 list(item.inputs),
@@ -858,6 +829,8 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.enable_cmd,
                 item.disable_cmd,
                 item.config.invert_var,
+                item.config.spawn_fire,
+                '_inv_rl',
             )
 
     # Check/cross instances sometimes don't match the kind of timer delay.
@@ -878,7 +851,7 @@ def gen_item_outputs(vmf: VMF) -> None:
         origin=options.get(Vec, 'global_ents_loc')
     )
 
-    for ent in auto_logic:
+    for ent in dummy_logic_ents:
         # Condense all these together now.
         # User2 is the one that enables the target.
         ent.remove()
@@ -970,7 +943,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         relay_loc = item.config.timer_sound_pos.copy()
         relay_loc.localise(
             Vec.from_str(item.inst['origin']),
-            Vec.from_str(item.inst['angles']),
+            Angle.from_str(item.inst['angles']),
         )
         relay['origin'] = relay_loc
     else:
@@ -1040,6 +1013,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
 
 
 def add_item_inputs(
+    dummy_logic_ents: List[Entity],
     item: Item,
     logic_type: InputType,
     inputs: List[Connection],
@@ -1047,11 +1021,48 @@ def add_item_inputs(
     enable_cmd: Iterable[Output],
     disable_cmd: Iterable[Output],
     invert_var: str,
+    spawn_fire: FeatureMode,
+    inv_relay_name: str,
 ) -> None:
     """Handle either the primary or secondary inputs to an item."""
     item.inst.fixup[count_var] = len(inputs)
 
     if len(inputs) == 0:
+        # Special case - spawnfire items with no inputs need to fire
+        # off the outputs. There's no way to control those, so we can just
+        # fire it off.
+        if spawn_fire is FeatureMode.ALWAYS:
+            if item.is_logic:
+                # Logic gates need to trigger their outputs.
+                # Make this item a logic_auto temporarily, then we'll fix them
+                # them up into an OnMapSpawn output properly at the end.
+                item.inst.clear_keys()
+                item.inst['classname'] = 'logic_auto'
+                dummy_logic_ents.append(item.inst)
+            else:
+                is_inverted = conv_bool(conditions.resolve_value(
+                    item.inst,
+                    invert_var,
+                ))
+                logic_auto = item.inst.map.create_ent(
+                    'logic_auto',
+                    origin=item.inst['origin'],
+                    spawnflags=1,
+                )
+                for cmd in (enable_cmd if is_inverted else disable_cmd):
+                    logic_auto.add_out(
+                        Output(
+                            'OnMapSpawn',
+                            conditions.local_name(
+                                item.inst,
+                                conditions.resolve_value(item.inst, cmd.target),
+                            ) or item.inst,
+                            conditions.resolve_value(item.inst, cmd.input),
+                            conditions.resolve_value(item.inst, cmd.params),
+                            delay=cmd.delay,
+                            only_once=True,
+                        )
+                    )
         return  # The rest of this function requires at least one input.
 
     if logic_type is InputType.DEFAULT:
@@ -1166,7 +1177,7 @@ def add_item_inputs(
 
     # The relay allows cancelling the 'disable' output that fires shortly after
     # spawning.
-    if item.config.spawn_fire is not FeatureMode.NEVER:
+    if spawn_fire is not FeatureMode.NEVER:
         if logic_type.is_logic:
             # We have to handle gates specially, and make us the instance
             # so future evaluation applies to this.
@@ -1183,7 +1194,7 @@ def add_item_inputs(
             # name in enable/disable_cmd.
             relay_cmd_name = ''
         else:
-            relay_cmd_name = '@' + item.name + '_inv_rl'
+            relay_cmd_name = f'@{item.name}{inv_relay_name}'
             spawn_relay = item.inst.map.create_ent(
                 classname='logic_relay',
                 targetname=relay_cmd_name,
@@ -1196,7 +1207,7 @@ def add_item_inputs(
         else:
             enable_user = 'User2'
             disable_user = 'User1'
-            
+
         spawn_relay['spawnflags'] = '0'
         spawn_relay['startdisabled'] = '0'
 

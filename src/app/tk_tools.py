@@ -3,12 +3,13 @@ General code used for tkinter portions.
 
 """
 import functools
+import sys
 from enum import Enum
 from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Literal
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, simpledialog
+from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
@@ -163,32 +164,35 @@ if utils.WIN:
         REGULAR = 'arrow'
         LINK = 'hand2'
         WAIT = 'watch'
+        ZOOM_IN = 'size_nw_se'
         STRETCH_VERT = 'sb_v_double_arrow'
         STRETCH_HORIZ = 'sb_h_double_arrow'
-        MOVE_ITEM = 'plus'
+        MOVE_ITEM = 'fleur'
         DESTROY_ITEM = 'x_cursor'
         INVALID_DRAG = 'no'
 elif utils.MAC:
-    class Cursors(str, Enum):
+    class Cursors(str, Enum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
         REGULAR = 'arrow'
         LINK = 'pointinghand'
         WAIT = 'spinning'
+        ZOOM_IN = 'zoom-in'
         STRETCH_VERT = 'resizeupdown'
         STRETCH_HORIZ = 'resizeleftright'
-        MOVE_ITEM = 'plus'
+        MOVE_ITEM = 'movearrow'
         DESTROY_ITEM = 'poof'
         INVALID_DRAG = 'notallowed'
 elif utils.LINUX:
-    class Cursors(str, Enum):
+    class Cursors(str, Enum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
         REGULAR = 'arrow'
         LINK = 'hand1'
         WAIT = 'watch'
+        ZOOM_IN = 'sizing'
         STRETCH_VERT = 'bottom_side'
         STRETCH_HORIZ = 'right_side'
-        MOVE_ITEM = 'crosshair'
-        DESTROY_ITEM = 'X_cursor'
+        MOVE_ITEM = 'fleur'
+        DESTROY_ITEM = 'x_cursor'
         INVALID_DRAG = 'circle'
 else:
     raise AssertionError
@@ -198,52 +202,34 @@ else:
 def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: """..."""
 @overload
 def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: """..."""
+def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
+    """Add events so scrolling anywhere in a frame will scroll a target.
 
-if utils.WIN:
-    def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
-        """Add events so scrolling anywhere in a frame will scroll a target.
+    frames should be the TK objects to bind to - mainly Frame or
+    Toplevel objects.
+    Set orient to 'x' or 'y'.
+    This is needed since different platforms handle mousewheel events
+    differently:
+     - Windows needs the delta value to be divided by 120.
+     - OS X needs the delta value passed unmodified.
+      - Linux uses Button-4 and Button-5 events instead of
+        a MouseWheel event.
+    """
+    scroll_func = getattr(target, orient + 'view_scroll')
 
-        frames should be the TK objects to bind to - mainly Frame or
-        Toplevel objects.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - Windows needs the delta value to be divided by 120.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
+    if utils.WIN:
         def mousewheel_handler(event: tk.Event) -> None:
             """Handle mousewheel events."""
             scroll_func(int(event.delta / -120), "units")
         for frame in frames:
             frame.bind('<MouseWheel>', mousewheel_handler, add=True)
-elif utils.MAC:
-    def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frame should be a sequence of any TK objects, like a Toplevel or Frame.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - OS X needs the delta value passed unmodified.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
+    elif utils.MAC:
         def mousewheel_handler(event: tk.Event) -> None:
             """Handle mousewheel events."""
             scroll_func(-event.delta, "units")
         for frame in frames:
             frame.bind('<MouseWheel>', mousewheel_handler, add=True)
-elif utils.LINUX:
-    def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
-        """Add events so scrolling anywhere in a frame will scroll a target.
-
-        frame should be a sequence of any TK objects, like a Toplevel or Frame.
-        Set orient to 'x' or 'y'.
-        This is needed since different platforms handle mousewheel events
-        differently - Linux uses Button-4 and Button-5 events instead of
-        a MouseWheel event.
-        """
-        scroll_func = getattr(target, orient + 'view_scroll')
-
+    elif utils.LINUX:
         def scroll_up(event: tk.Event) -> None:
             """Handle scrolling up."""
             scroll_func(-1, "units")
@@ -255,29 +241,32 @@ elif utils.LINUX:
         for frame in frames:
             frame.bind('<Button-4>', scroll_up, add=True)
             frame.bind('<Button-5>', scroll_down, add=True)
+    else:
+        raise AssertionError('Unknown platform ' + sys.platform)
 
 
-EventFuncT = TypeVar('EventFuncT', bound=Callable[[tk.Event], Any])
+EventFunc = Callable[[tk.Event], Any]
+EventFuncT = TypeVar('EventFuncT', bound=EventFunc)
 
 
 class _Binder(Protocol):
     @overload
-    def __call__(self, wid: tk.Misc, add: bool=False) -> Callable[[EventFuncT], EventFuncT]:
+    def __call__(self, wid: tk.Misc, *, add: bool=False) -> Callable[[EventFuncT], EventFuncT]:
         pass
     @overload
-    def __call__(self, wid: tk.Misc, func: EventFuncT, add: bool=False) -> str:
+    def __call__(self, wid: tk.Misc, func: EventFunc, *, add: bool=False) -> str:
         pass
-    def __call__(self, wid: tk.Misc, func: Optional[EventFuncT]=None, add: bool=False):
+    def __call__(self, wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Union[Callable[[EventFuncT], EventFuncT], str]:
         pass
 
 
-def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFuncT, bool], None]) -> _Binder:
+def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -> _Binder:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
-    def deco(wid, func=None, add=False):
+    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False):
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
             def deco_2(func):
@@ -344,21 +333,80 @@ def event_cancel(*args, **kwargs) -> str:
     return 'break'
 
 
-class QueryShim(simpledialog._QueryString):
-    """Replicate the new API with the old simpledialog code."""
-    def __init__(self, parent, title, message, text0):
-        super().__init__(title, message, initialvalue=text0, parent=parent)
+def _default_validator(value) -> str:
+    if not value.strip():
+        raise ValueError("A value must be provided!")
+    return value
+
+
+class BasicQueryValidator(simpledialog.Dialog):
+    """Implement the dialog with the simpledialog code."""
+    def __init__(
+        self,
+        parent: tk.Misc,
+        title: str, message: str, initial: str,
+        validator: Callable[[str], str] = _default_validator,
+    ) -> None:
+        self.__validator = validator
+        self.__title = title
+        self.__message = message
+        self.__initial = initial
+        super().__init__(parent, title)
 
     def body(self, master):
-        """Ensure the window icon is changed."""
+        """Ensure the window icon is changed, and copy code from askstring's internals."""
         super().body(master)
         set_window_icon(self)
+        w = ttk.Label(master, text=self.__message, justify='left')
+        w.grid(row=0, padx=5, sticky='w')
+
+        self.entry = ttk.Entry(master, name="entry")
+        self.entry.grid(row=1, padx=5, sticky='we')
+
+        if self.__initial:
+            self.entry.insert(0, self.__initial)
+            self.entry.select_range(0, 'end')
+
+        return self.entry
+
+    def validate(self) -> bool:
+        try:
+            self.result = self.__validator(self.entry.get())
+        except ValueError as exc:
+            messagebox.showwarning(self.__title, exc.args[0], parent=self)
+            return False
+        else:
+            return True
+
+Query = None
+if Query is not None:
+    class QueryValidator(Query):
+        """Implement using IDLE's better code for this."""
+        def __init__(
+            self,
+            parent: tk.Misc,
+            title: str, message: str, initial: str,
+            validator: Callable[[str], str] = _default_validator,
+        ) -> None:
+            self.__validator = validator
+            super().__init__(parent, title, message, text0=initial)
+
+        def entry_ok(self) -> Optional[str]:
+            """Return non-blank entry or None."""
+            try:
+                return self.__validator(self.entry.get())
+            except ValueError as exc:
+                self.showerror(exc.args[0])
+                return None
+else:
+    QueryValidator = BasicQueryValidator
 
 
 def prompt(
     title: str, message: str,
     initialvalue: str='',
     parent: tk.Misc= TK_ROOT,
+    validator: Callable[[str], str] = _default_validator,
 ) -> Optional[str]:
     """Ask the user to enter a string."""
     from loadScreen import suppress_screens
@@ -370,14 +418,10 @@ def prompt(
         if Query is None or (utils.WIN and (
             not _main_loop_running or not TK_ROOT.winfo_viewable()
         )):
-            query_cls = QueryShim
+            query_cls = BasicQueryValidator
         else:
-            query_cls = Query
-        return query_cls(
-            parent,
-            title, message,
-            text0=initialvalue,
-        ).result
+            query_cls = QueryValidator
+        return query_cls(parent, title, message, initialvalue, validator).result
 
 
 class HidingScroll(ttk.Scrollbar):
@@ -439,12 +483,12 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     @property
     def value(self) -> int:
         """Get the value of the spinbox."""
-        return self.tk.call(self._w, 'get')
+        return self.tk.call(self._w, 'get')  # type: ignore
 
     @value.setter
     def value(self, value: int) -> None:
         """Set the spinbox to a value."""
-        self.tk.call(self._w, 'set', value)
+        self.tk.call(self._w, 'set', value)  # type: ignore
 
     def validate(self) -> bool:
         """Values must be integers."""
@@ -452,7 +496,7 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
             self.old_val = int(self.value)
             return True
         except ValueError:
-            self.value = str(self.old_val)
+            self.value = self.old_val
             return False
 
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
@@ -517,10 +561,14 @@ class FileField(ttk.Frame):
         self.browse_btn = ttk.Button(
             self,
             text="...",
-            width=1.5,
             command=self.browse,
         )
         self.browse_btn.grid(row=0, column=1)
+        # It should be this narrow, but perhaps this doesn't accept floats?
+        try:
+            self.browse_btn['width'] = 1.5
+        except tk.TclError:
+            self.browse_btn['width'] = 2
 
         self._text_var.set(self._truncate(loc))
 

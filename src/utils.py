@@ -13,23 +13,13 @@ import stat
 import shutil
 import copyreg
 import sys
+import zipfile
 from pathlib import Path
 from enum import Enum
 from types import TracebackType
 
+from srctools import Angle
 
-try:
-    # This module is generated when cx_freeze compiles the app.
-    from BUILD_CONSTANTS import BEE_VERSION  # type: ignore
-except ImportError:
-    # We're running from source!
-    BEE_VERSION = "(dev)"
-    FROZEN = False
-    DEV_MODE = True
-else:
-    FROZEN = True
-    # If blank, in dev mode.
-    DEV_MODE = not BEE_VERSION
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -82,19 +72,49 @@ else:
     # Defer the error until used, so it goes in logs and whatnot.
     # Utils is early, so it'll get lost in stderr.
     _SETTINGS_ROOT = None  # type: ignore
-    
+
 # We always go in a BEE2 subfolder
 if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
-if FROZEN:
-    # This special attribute is set by PyInstaller to our folder.
-    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
-else:
+
+def get_git_version(inst_path: Path | str) -> str:
+    """Load the version from Git history."""
+    import versioningit
+    return versioningit.get_version(
+        project_dir=inst_path,
+        config={
+            'vcs': {'method': 'git'},
+            'default-version': '(dev)',
+            'format': {
+                # Ignore dirtyness, we generate the translation files every time.
+                'distance': '{version}.dev+{rev}',
+                'dirty': '{version}',
+                'distance-dirty': '{version}.dev+{rev}',
+            },
+        },
+    )
+
+try:
+    # This module is generated when the app is compiled.
+    from _compiled_version import BEE_VERSION  # type: ignore
+except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from the file to its containing folder, then to the parent.
     _INSTALL_ROOT = Path(sys.argv[0]).resolve().parent.parent
 
+    BEE_VERSION = get_git_version(_INSTALL_ROOT)
+    FROZEN = False
+    DEV_MODE = True
+else:
+    FROZEN = True
+    # This special attribute is set by PyInstaller to our folder.
+    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
+    # Check if this was produced by above
+    DEV_MODE = '#' in BEE_VERSION
+
+BITNESS = '64' if sys.maxsize > (2 << 48) else '32'
+BEE_VERSION += f' {BITNESS}-bit'
 
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
@@ -103,7 +123,7 @@ def install_path(path: str) -> Path:
 
 def conf_location(path: str) -> Path:
     """Return the full path to save settings to.
-    
+
     The passed-in path is relative to the settings folder.
     Any additional subfolders will be created if necessary.
     If it ends with a '/' or '\', it is treated as a folder.
@@ -112,7 +132,7 @@ def conf_location(path: str) -> Path:
         raise FileNotFoundError("Don't know a good config directory!")
 
     loc = _SETTINGS_ROOT / path
-    
+
     if path.endswith(('\\', '/')) and not loc.suffix:
         folder = loc
     else:
@@ -153,10 +173,10 @@ class CONN_TYPES(Enum):
     triple = 4  # Points N-S-W
     all = 5  # Points N-S-E-W
 
-N = "0 90 0"
-S = "0 270 0"
-E = "0 0 0"
-W = "0 180 0"
+N = Angle(yaw=90)
+S = Angle(yaw=270)
+E = Angle(yaw=0)
+W = Angle(yaw=180)
 # Lookup values for joining things together.
 CONN_LOOKUP = {
     #N  S  E  W : (Type, Rotation)
@@ -188,10 +208,9 @@ del N, S, E, W
 RetT = TypeVar('RetT')
 FuncT = TypeVar('FuncT', bound=Callable)
 EnumT = TypeVar('EnumT', bound=Enum)
-EnumTypeT = TypeVar('EnumTypeT', bound=Type[Enum])
 
 
-def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
+def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
     """Make a enum with property getters more efficent.
 
     Call the getter on each member, and then replace it with a dict lookup.
@@ -204,7 +223,13 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
         data_exc = {}
 
         exc: Exception
+        enum: EnumT
         for enum in cls:
+            # Put the class into the globals, so it can refer to itself.
+            try:
+                value.fget.__globals__[cls.__name__] = cls  # type: ignore
+            except AttributeError:
+                pass
             try:
                 res = value.fget(enum)
             except Exception as exc:
@@ -218,7 +243,7 @@ def freeze_enum_props(cls: EnumTypeT) -> EnumTypeT:
                 data[enum] = res
         if data_exc:
             func = _exc_freeze(data, data_exc)
-        else: # If we don't raise, we can use the C-func
+        else:  # If we don't raise, we can use the C-func
             func = data.get
         setattr(cls, name, property(fget=func, doc=value.__doc__))
     return cls
@@ -239,7 +264,21 @@ def _exc_freeze(
     return getter
 
 
-class FuncLookup(Generic[FuncT], Mapping[str, Callable[..., FuncT]]):
+# Patch zipfile to fix an issue with it not being threadsafe.
+# See https://bugs.python.org/issue42369
+if hasattr(zipfile, '_SharedFile'):
+    # noinspection PyProtectedMember
+    class _SharedZipFile(zipfile._SharedFile):  # type: ignore
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            # tell() reads the actual file position, but that may have been
+            # changed by another thread - instead keep our own private value.
+            self.tell = lambda: self._pos
+
+    zipfile._SharedFile = _SharedZipFile  # type: ignore
+
+
+class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
     """A dict for holding callback functions.
 
     Functions are added by using this as a decorator. Positional arguments
@@ -267,7 +306,10 @@ class FuncLookup(Generic[FuncT], Mapping[str, Callable[..., FuncT]]):
 
         bad_keywords = kwargs.keys() - self.allowed_attrs
         if bad_keywords:
-            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+            raise TypeError(
+                f'Invalid keywords: {", ".join(bad_keywords)}. '
+                f'Allowed: {", ".join(self.allowed_attrs)}'
+            )
 
         def callback(func: FuncT) -> FuncT:
             """Decorator to do the work of adding the function."""
@@ -433,6 +475,38 @@ def iter_grid(
     for x in range(min_x, max_x, stride):
         for y in range(min_y, max_y, stride):
             yield x, y
+
+
+def check_cython(report: Callable[[str], None] = print) -> None:
+    """Check if srctools has its Cython accellerators installed correctly."""
+    from srctools import math, tokenizer
+    if math.Cy_Vec is math.Py_Vec:
+        report('Cythonised vector lib is not installed, expect slow math.')
+    if tokenizer.Cy_Tokenizer is tokenizer.Py_Tokenizer:
+        report('Cythonised tokeniser is not installed, expect slow parsing.')
+
+    vtf = sys.modules.get('srctools.vtf', None)  # Don't import if not already.
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    if vtf is not None and vtf._cy_format_funcs is vtf._py_format_funcs:
+        report('Cythonised VTF functions is not installed, no DXT export!')
+
+
+if WIN:
+    def check_shift() -> bool:
+        """Check if Shift is currently held."""
+        import ctypes
+        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getasynckeystate
+        GetAsyncKeyState = ctypes.windll.User32.GetAsyncKeyState
+        GetAsyncKeyState.returntype = ctypes.c_short
+        GetAsyncKeyState.argtypes = [ctypes.c_int]
+        VK_SHIFT = 0x10
+        # Most significant bit set if currently held.
+        return GetAsyncKeyState(VK_SHIFT) & 0b1000_0000_0000_0000 != 0
+else:
+    def check_shift() -> bool:
+        """Check if Shift is currently held."""
+        return False
+    print('Need implementation of utils.check_shift()!')
 
 
 DISABLE_ADJUST = False
@@ -645,101 +719,3 @@ def merge_tree(
             errors.append((src, dst, str(why)))
     if errors:
         raise shutil.Error(errors)
-
-
-def setup_localisations(logger: logging.Logger) -> None:
-    """Setup gettext localisations."""
-    from srctools.property_parser import PROP_FLAGS_DEFAULT
-    import gettext
-    import locale
-
-    # Get the 'en_US' style language code
-    lang_code = locale.getdefaultlocale()[0]
-
-    # Allow overriding through command line.
-    if len(sys.argv) > 1:
-        for arg in sys.argv[1:]:
-            if arg.casefold().startswith('lang='):
-                lang_code = arg[5:]
-                break
-
-    # Expands single code to parent categories.
-    expanded_langs = gettext._expand_lang(lang_code)
-
-    logger.info('Language: {!r}', lang_code)
-    logger.debug('Language codes: {!r}', expanded_langs)
-
-    # Add these to Property's default flags, so config files can also
-    # be localised.
-    for lang in expanded_langs:
-        PROP_FLAGS_DEFAULT['lang_' + lang] = True
-
-    lang_folder = install_path('i18n')
-
-    trans: gettext.NullTranslations
-
-    for lang in expanded_langs:
-        try:
-            file = open(lang_folder / (lang + '.mo').format(lang), 'rb')
-        except FileNotFoundError:
-            continue
-        with file:
-            trans = gettext.GNUTranslations(file)
-            break
-    else:
-        # To help identify missing translations, replace everything with
-        # something noticeable.
-        if lang_code == 'dummy':
-            class DummyTranslations(gettext.NullTranslations):
-                """Dummy form for identifying missing translation entries."""
-                def gettext(self, message: str) -> str:
-                    """Generate placeholder of the right size."""
-                    # We don't want to leave {arr} intact.
-                    return ''.join([
-                        '#' if s.isalnum() or s in '{}' else s
-                        for s in message
-                    ])
-
-                def ngettext(self, msgid1: str, msgid2: str, n: int) -> str:
-                    """Generate placeholder of the right size for plurals."""
-                    return self.gettext(msgid1 if n == 1 else msgid2)
-
-                lgettext = gettext
-                lngettext = ngettext
-
-            trans = DummyTranslations()
-        # No translations, fallback to English.
-        # That's fine if the user's language is actually English.
-        else:
-            if 'en' not in expanded_langs:
-                logger.warning(
-                    "Can't find translation for codes: {!r}!",
-                    expanded_langs,
-                )
-            trans = gettext.NullTranslations()
-
-    # Add these functions to builtins, plus _=gettext
-    trans.install(['gettext', 'ngettext'])
-
-    # Some lang-specific overrides..
-
-    if trans.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
-        # For Japanese/Chinese, we want a 'sans-serif' / gothic font
-        # style.
-        try:
-            from tkinter import font
-        except ImportError:
-            return
-        font_names = [
-            'TkDefaultFont',
-            'TkHeadingFont',
-            'TkTooltipFont',
-            'TkMenuFont',
-            'TkTextFont',
-            'TkCaptionFont',
-            'TkSmallCaptionFont',
-            'TkIconFont',
-            # Note - not fixed-width...
-        ]
-        for font_name in font_names:
-            font.nametofont(font_name).configure(family='sans-serif')

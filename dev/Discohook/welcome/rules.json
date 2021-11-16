@@ -10,58 +10,9 @@
             "embeds": [
               {
                 "title": "--------------- RULES ----------------",
-                "color": 16761704,
-                "fields": [
-                  {
-                    "name": ":zero::one: Act mature.",
-                    "value": "> Use your better judgement, just because you can post something doesn't mean you should. Don’t be excessively childish or try to trick people into something. Don't start unnecessary drama."
-                  },
-                  {
-                    "name": ":zero::two: Post with purpose",
-                    "value": "> No low effort posts. We like jokes here and try to keep the atmosphere light; however, this is not a meme server. Do not post messages or media with no context or purpose. Try not to post content outside of their respective channels. Posting low effort media with no context will result in a soft mute. You can request to be unmuted after a day if you show you have an understanding of why you were soft muted."
-                  },
-                  {
-                    "name": ":zero::three: Listen to moderators",
-                    "value": "> If a moderator tells you to stop doing something then stop doing it, now and in the future. We try to keep this discord well organized as its main purpose is help and feedback for BEEmod. Do not backseat moderate. Its fine to explain to someone if they are breaking a rule or might be posting in the wrong channel, but do not act like you have authority. If someone is breaking rules then ping @ CentralCore as that is our moderation team."
-                  },
-                  {
-                    "name": ":zero::four: Keep discussion in English.",
-                    "value": "> We cannot moderate other languages. If you're talking to someone in a different language, take the discussion to DMs."
-                  },
-                  {
-                    "name": ":zero::five: Do not post any sort of NSFW content.",
-                    "value": "> This also includes things on your profile such as your avatar. Nudity, gore, or topics that are not safe for work should absolutely never shown here."
-                  },
-                  {
-                    "name": ":zero::six: Do not spam.",
-                    "value": "> This one should be obvious, but don't post messages rapidly or use a load of emojis/reactions. A good rule is more than 5 is a waste. If you are found to have spammed something in multiple discords, or DM people in the discord randomly or without consent, you will be banned. Showcasing content in multiple discords is fine, as long as you are being respectful and posting in the right channels."
-                  },
-                  {
-                    "name": ":zero::seven: Do not abuse mentions.",
-                    "value": "> Only ping the Central Core role when a user is breaking the rules. `@everyone` and `@here` are turned off, don't try to use them."
-                  },
-                  {
-                    "name": ":zero::eight: Know what you're talking about when giving help",
-                    "value": "> Do not try help someone if you do not have experience. \n> For example: don't try to help people with Hammer unless you actually use hammer."
-                  },
-                  {
-                    "name": ":zero::nine: This is not an issue tracker",
-                    "value": "> Do not use this server for bug reports or feature requests. This is not referring to diagnosing an issue or asking for help. Bug reports should be posted on the Issues page of the correct GitHub repositories (More information below). Don't beg or @ devs for help, a lot of us are busy and we will help when we are available. You are expected to be open to help, if you refuse to listen then we will not help you."
-                  },
-                  {
-                    "name": ":one::zero: Use typing etiquette",
-                    "value": "> Keep messages easy to read. Don't rapidly post multiple messages, instead take time to type out your message in full. Don't roleplay or use typing quirks."
-                  },
-                  {
-                    "name": ":one::one: Feedback is expected",
-                    "value": "If you showcase content, it is under the assumption that you're looking for feedback or help. Try to be open minded and listen to people. If you are giving feedback; do not attack people for their skill level, quality of work, or how they choose to map. Be respectful of the other person while giving feedback."
-                  },
-                  {
-                    "name": ":one::two: Rules are rules",
-                    "value": "You are expected to have read all the rules when you join the server or when they have been updated. Claiming to not have read the rules is not an excuse. Repeat offenders will be muted, kicked or banned. Punishments are usually case by case and decided by moderators."
-                  }
-                ]
-              }
+                "description": ">>> :one: -  Listen to Staff.\n:two: - English discussion only.\n:three: - Do not post NSFW, hate speech, slurs, spam, or suspicious files/links.\n:four: - No low effort content, memes, or random/disruptive messages.\n:five: - Use your better judgement.",
+                "color": 16761704
+            }
             ],
             "username": "BLoBDOS"
           },

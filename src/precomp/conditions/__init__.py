@@ -30,22 +30,20 @@ closure.
 from __future__ import annotations
 import inspect
 import io
-import itertools
+import importlib
 import math
-import random
+import pkgutil
 import sys
 import typing
 import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
+from typing import Generic, TypeVar, Any, Callable, TextIO
 
-from typing import (
-    Union, Generic, TypeVar, Any, Callable,
-    Iterable, Optional, Dict, List, Tuple, Set, TextIO,
-)
+import attr
 
-from precomp import instanceLocs
+from precomp import instanceLocs, rand
 import consts
 import srctools.logger
 import utils
@@ -61,8 +59,8 @@ COND_MOD_NAME = 'Main Conditions'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
-GLOBAL_INSTANCES = set()  # type: Set[str]
-ALL_INST = set()  # type: Set[str]
+GLOBAL_INSTANCES: set[str] = set()
+ALL_INST: set[str] = set()
 
 conditions: list[Condition] = []
 FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
@@ -72,8 +70,8 @@ RESULT_LOOKUP: dict[str, CondCall[object]] = {}
 RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
 # Used to dump a list of the flags, results, meta-conditions
-ALL_FLAGS: list[tuple[str, Iterable[str], CondCall[bool]]] = []
-ALL_RESULTS: list[tuple[str, Iterable[str], CondCall[bool]]] = []
+ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
 
 
@@ -169,42 +167,21 @@ class EndCondition(Exception):
 RES_EXHAUSTED = object()
 
 
+@attr.define
 class Condition:
     """A single condition which may be evaluated."""
-    __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
-
-    def __init__(
-        self,
-        flags: List[Property]=None,
-        results: List[Property]=None,
-        else_results: List[Property]=None,
-        priority: Decimal=Decimal(),
-        source: str=None,
-    ) -> None:
-        self.flags = flags or []
-        self.results = results or []
-        self.else_results = else_results or []
-        self.priority = priority
-        self.source = source
-
-    def __repr__(self) -> str:
-        return (
-            'Condition(flags={!r}, '
-            'results={!r}, else_results={!r}, '
-            'priority={!r}'
-        ).format(
-            self.flags,
-            self.results,
-            self.else_results,
-            self.priority,
-        )
+    flags: list[Property] = attr.Factory(list)
+    results: list[Property] = attr.Factory(list)
+    else_results: list[Property] = attr.Factory(list)
+    priority: Decimal = Decimal()
+    source: str = None
 
     @classmethod
-    def parse(cls, prop_block: Property) -> 'Condition':
+    def parse(cls, prop_block: Property) -> Condition:
         """Create a condition from a Property block."""
-        flags = []  # type: List[Property]
-        results = []  # type: List[Property]
-        else_results = []  # type: List[Property]
+        flags: list[Property] = []
+        results: list[Property] = []
+        else_results: list[Property] = []
         priority = Decimal()
         source = None
         for prop in prop_block:
@@ -234,7 +211,7 @@ class Condition:
             else:
                 flags.append(prop)
 
-        return cls(
+        return Condition(
             flags,
             results,
             else_results,
@@ -243,7 +220,7 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(inst: Entity, res: Property) -> Union[bool, object]:
+    def test_result(inst: Entity, res: Property) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -281,7 +258,7 @@ AnnCallT = TypeVar('AnnCallT')
 def annotation_caller(
     func: Callable[..., AnnCallT],
     *parms: type,
-) -> Tuple[Callable[..., AnnCallT], List[type]]:
+) -> tuple[Callable[..., AnnCallT], list[type]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
@@ -324,7 +301,7 @@ def annotation_caller(
     ann_order: list[type] = []
 
     # type -> parameter name.
-    type_to_parm: dict[type, Optional[str]] = dict.fromkeys(parms, None)
+    type_to_parm: dict[type, str | None] = dict.fromkeys(parms, None)
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
         ann = parm.annotation
@@ -429,14 +406,11 @@ class CondCall(Generic[CallResultT]):
     This should be called to execute it.
     """
     __slots__ = ['func', 'group', '_cback', '_setup_data']
-    _setup_data: Optional[dict[int, Callable[[Entity], CallResultT]]]
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
 
     def __init__(
         self,
-        func: Callable[..., Union[
-            CallResultT,
-            Callable[[Entity], CallResultT],
-        ]],
+        func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
         group: str,
     ):
         self.func = func
@@ -475,7 +449,7 @@ class CondCall(Generic[CallResultT]):
             return cback(ent)
 
     @property
-    def __doc__(self) -> Optional[str]:
+    def __doc__(self) -> str | None:
         """Description of the callback's behaviour."""
         return self.func.__doc__
 
@@ -490,7 +464,7 @@ def _get_cond_group(func: Any) -> str:
         return group
 
 
-def add_meta(func, priority: Union[Decimal, int], only_once=True):
+def add_meta(func, priority: Decimal | int, only_once=True):
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -557,9 +531,10 @@ def make_result(orig_name: str, *aliases: str):
         """Create the result when the function is supplied."""
         # Legacy setup func support.
         try:
-            setup_func = RESULT_SETUP[orig_name.casefold()]
+            setup_func = RESULT_SETUP.pop(orig_name.casefold())
         except KeyError:
             func = result_func
+            setup_func = None
         else:
             # Combine the legacy functions into one using a closure.
             func = conv_setup_pair(setup_func, result_func)
@@ -568,6 +543,10 @@ def make_result(orig_name: str, *aliases: str):
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
             RESULT_LOOKUP[name.casefold()] = wrapper
+        if setup_func is not None:
+            for name in aliases:
+                alias_setup = RESULT_SETUP.pop(name.casefold())
+                assert alias_setup is setup_func, alias_setup
         ALL_RESULTS.append((orig_name, aliases, wrapper))
         return func
     return x
@@ -595,16 +574,19 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: Set[str]) -> None:
+def init(inst_list: set[str]) -> None:
     """Initialise the Conditions system."""
-    # Get a bunch of values from VBSP
-    global MAP_RAND_SEED
-    MAP_RAND_SEED = seed
     ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later
     zero = Decimal(0)
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
+    # Check if any make_result_setup calls were done with no matching result.
+    if utils.DEV_MODE and RESULT_SETUP:
+        raise ValueError('Extra result_setup calls:\n' + '\n'.join([
+            f' - "{name}": {getattr(func, "__module__", "?")}.{func.__qualname__}()'
+            for name, func in RESULT_SETUP.items()
+        ]))
 
 
 def check_all(vmf: VMF) -> None:
@@ -682,38 +664,14 @@ def import_conditions() -> None:
 
     This ensures everything gets registered.
     """
-    import importlib
-    import pkgutil
     # Find the modules in the conditions package.
-    # PyInstaller messes this up a bit.
-
-    if utils.FROZEN:
-        # This is the PyInstaller loader injected during bootstrap.
-        # See PyInstaller/loader/pyimod03_importers.py
-        # toc is a PyInstaller-specific attribute containing a set of
-        # all frozen modules.
-        loader = pkgutil.get_loader('precomp.conditions')
-        modules = [
-            module
-            for module in loader.toc
-            if module.startswith('precomp.conditions.')
-        ]  # type: List[str]
-    else:
-        # We can grab them properly.
-        modules = [
-            'precomp.conditions.' + module
-            for loader, module, is_package in
-            pkgutil.iter_modules(__path__)
-        ]
-
-    for module in modules:
+    for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing {} ...', module)
-        importlib.import_module(module)
+        LOGGER.debug('Importing {} ...', module.name)
+        importlib.import_module(module.name)
     LOGGER.info('Imported all conditions modules!')
-
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
@@ -767,19 +725,21 @@ def dump_conditions(file: TextIO) -> None:
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
-        file.write('#### `{}` ({}):\n\n'.format(flag_key, priority))
+        file.write(f'#### `{flag_key}` ({priority}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 
     for lookup, name in [
-            (ALL_FLAGS, 'Flags'),
-            (ALL_RESULTS, 'Results'),
-            ]:
+        (ALL_FLAGS, 'Flags'),
+        (ALL_RESULTS, 'Results'),
+    ]:
         print('<!------->', file=file)
-        print('# ' + name, file=file)
+        print(f'# {name}', file=file)
         print('<!------->', file=file)
 
-        lookup_grouped = defaultdict(list)  # type: Dict[str, List[Tuple[str, Tuple[str, ...], CondCall]]]
+        lookup_grouped: dict[str, list[
+            tuple[str, tuple[str, ...], CondCall]
+        ]] = defaultdict(list)
 
         for flag_key, aliases, func in lookup:
             group = getattr(func, 'group', 'ERROR')
@@ -807,14 +767,14 @@ def dump_conditions(file: TextIO) -> None:
             if group == '00special':
                 print(DOC_SPECIAL_GROUP, file=file)
             else:
-                print('### ' + group + '\n', file=file)
+                print(f'### {group}\n', file=file)
 
             LOGGER.info('Doing {} group...', group)
 
             for flag_key, aliases, func in funcs:
-                print('#### `{}`:\n'.format(flag_key), file=file)
+                print(f'#### `{flag_key}`:\n', file=file)
                 if aliases:
-                    print('**Aliases:** `' + '`, `'.join(aliases) + '`' + '  \n', file=file)
+                    print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
                 dump_func_docs(file, func)
                 file.write('\n')
 
@@ -826,41 +786,6 @@ def dump_func_docs(file: TextIO, func: Callable):
         print(docs, file=file)
     else:
         print('**No documentation!**', file=file)
-
-
-def weighted_random(count: int, weights: str) -> List[int]:
-    """Generate random indexes with weights.
-
-    This produces a list intended to be fed to random.choice(), with
-    repeated indexes corresponding to the comma-separated weight values.
-    """
-    if weights == '':
-        # Empty = equal weighting.
-        return list(range(count))
-    if ',' not in weights:
-        LOGGER.warning('Invalid weight! ({})', weights)
-        return list(range(count))
-
-    # Parse the weight
-    vals = weights.split(',')
-    weight = []
-    if len(vals) == count:
-        for i, val in enumerate(vals):
-            val = val.strip()
-            if val.isdecimal():
-                # repeat the index the correct number of times
-                weight.extend(
-                    [i] * int(val)
-                )
-            else:
-                # Abandon parsing
-                break
-    if len(weight) == 0:
-        LOGGER.warning('Failed parsing weight! ({!s})',weight)
-        weight = list(range(count))
-    # random.choice(weight) will now give an index with the correct
-    # probabilities.
-    return weight
 
 
 def add_output(inst: Entity, prop: Property, target: str) -> None:
@@ -882,7 +807,7 @@ def add_suffix(inst: Entity, suff: str) -> None:
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
-def local_name(inst: Entity, name: Union[str, Entity]) -> str:
+def local_name(inst: Entity, name: str | Entity) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
@@ -914,7 +839,7 @@ def local_name(inst: Entity, name: Union[str, Entity]) -> str:
         raise ValueError('Unknown fixup style {}!'.format(fixup))
 
 
-def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=None):
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=None):
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.
@@ -964,9 +889,9 @@ def set_ent_keys(
     block_name lets you change the 'keys' suffix on the prop_block name.
     ent can be any mapping.
     """
-    for prop in prop_block.find_key(block_name, []):
+    for prop in prop_block.find_block(block_name, or_blank=True):
         ent[prop.real_name] = resolve_value(inst, prop.value)
-    for prop in prop_block.find_key('Local' + block_name, []):
+    for prop in prop_block.find_block('Local' + block_name, or_blank=True):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -979,7 +904,7 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
+def resolve_value(inst: Entity, value: str | T) -> str | T:
     """If a value contains '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
@@ -1037,27 +962,6 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     return offset
 
 
-def set_random_seed(inst: Entity, seed: str) -> None:
-    """Compute and set a random seed for a specific entity."""
-    from precomp import instance_traits
-
-    name = inst['targetname']
-    # The global instances like elevators always get the same name, or
-    # none at all so we cannot use those for the seed. Instead use the global
-    # seed.
-    if name == '' or 'preplaced' in instance_traits.get(inst):
-        import vbsp
-        random.seed('{}{}{}{}'.format(
-            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
-        ))
-    else:
-        # We still need to use angles and origin, since things like
-        # fizzlers might not get unique names.
-        random.seed('{}{}{}{}'.format(
-            inst['targetname'], seed, inst['origin'], inst['angles']
-        ))
-
-
 @make_flag('debug')
 @make_result('debug')
 def debug_flag(inst: Entity, props: Property):
@@ -1095,73 +999,56 @@ def remove_blank_inst(inst: Entity) -> None:
         inst.remove()
 
 
-@make_result_setup('timedRelay')
-def res_timed_relay_setup(res: Property):
-    var = res['variable', consts.FixupVars.TIM_DELAY]
-    name = res['targetname']
-    disabled = res['disabled', '0']
-    flags = res['spawnflags', '0']
-
-    final_outs = [
-        Output.parse(subprop)
-        for prop in res.find_all('FinalOutputs')
-        for subprop in prop
-    ]
-
-    rep_outs = [
-        Output.parse(subprop)
-        for prop in res.find_all('RepOutputs')
-        for subprop in prop
-    ]
-
-    # Never use the comma seperator in the final output for consistency.
-    for out in itertools.chain(rep_outs, final_outs):
-        out.comma_sep = False
-
-    return var, name, disabled, flags, final_outs, rep_outs
-
-
 @make_result('timedRelay')
-def res_timed_relay(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
     """
-    var, name, disabled, flags, final_outs, rep_outs = res.value
+    delay_var = res['variable', consts.FixupVars.TIM_DELAY]
+    name = res['targetname']
+    disabled_var = res['disabled', '0']
+    flags = res['spawnflags', '0']
 
-    relay = vmf.create_ent(
-        classname='logic_relay',
-        spawnflags=flags,
-        origin=inst['origin'],
-        targetname=local_name(inst, name),
-    )
+    final_outs = [
+        Output.parse(prop)
+        for prop in res.find_children('FinalOutputs')
+    ]
 
-    relay['StartDisabled'] = (
-        inst.fixup[disabled]
-        if disabled.startswith('$') else
-        disabled
-    )
+    rep_outs = [
+        Output.parse(prop)
+        for prop in res.find_children('RepOutputs')
+    ]
 
-    delay = srctools.conv_float(
-        inst.fixup[var, '0']
-        if var.startswith('$') else
-        var
-    )
+    def make_relay(inst: Entity) -> None:
+        """Places the relay."""
+        relay = vmf.create_ent(
+            classname='logic_relay',
+            spawnflags=flags,
+            origin=inst['origin'],
+            targetname=local_name(inst, name),
+        )
 
-    for off in range(int(math.ceil(delay))):
-        for out in rep_outs:
-            new_out = out.copy()  # type: Output
+        relay['StartDisabled'] = inst.fixup.substitute(disabled_var, allow_invert=True)
+
+        delay = srctools.conv_float(inst.fixup.substitute(delay_var))
+
+        for off in range(int(math.ceil(delay))):
+            for out in rep_outs:
+                new_out = out.copy()
+                new_out.target = local_name(inst, new_out.target)
+                new_out.delay += off
+                new_out.comma_sep = False
+                relay.add_out(new_out)
+
+        for out in final_outs:
+            new_out = out.copy()
             new_out.target = local_name(inst, new_out.target)
-            new_out.delay += off
+            new_out.delay += delay
             new_out.comma_sep = False
             relay.add_out(new_out)
 
-    for out in final_outs:
-        new_out = out.copy()
-        new_out.target = local_name(inst, new_out.target)
-        new_out.delay += delay
-        new_out.comma_sep = False
-        relay.add_out(new_out)
+    return make_relay
 
 
 @make_result('condition')
@@ -1189,29 +1076,29 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch_setup(res: Property):
+def res_switch(res: Property):
     """Run the same flag multiple times with different arguments.
 
-    'method' is the way the search is done - first, last, random, or all.
-    'flag' is the name of the flag.
-    'seed' sets the randomisation seed for this block, for the random mode.
+    `method` is the way the search is done - `first`, `last`, `random`, or `all`.
+    `flag` is the name of the flag.
+    `seed` sets the randomisation seed for this block, for the random mode.
     Each property group is a case to check - the property name is the flag
     argument, and the contents are the results to execute in that case.
-    The special group "<default>" is only run if no other flag is valid.
-    For 'random' mode, you can omit the flag to choose from all objects. In
+    The special group `"<default>"` is only run if no other flag is valid.
+    For `random` mode, you can omit the flag to choose from all objects. In
     this case the flag arguments are ignored.
     """
     flag_name = ''
     method = SWITCH_TYPE.FIRST
-    cases = []
+    raw_cases = []
     default = []
     rand_seed = ''
     for prop in res:
         if prop.has_children():
             if prop.name == '<default>':
-                default.append(prop)
+                default.extend(prop)
             else:
-                cases.append(prop)
+                raw_cases.append(prop)
         else:
             if prop.name == 'flag':
                 flag_name = prop.value
@@ -1225,22 +1112,27 @@ def res_switch_setup(res: Property):
                 rand_seed = prop.value
 
     if method is SWITCH_TYPE.LAST:
-        cases[:] = cases[::-1]
+        raw_cases.reverse()
+
+    conf_cases: list[tuple[Property, list[Property]]] = [
+        (Property(flag_name, case.real_name), list(case))
+        for case in raw_cases
+    ]
 
     def apply_switch(inst: Entity) -> None:
         """Execute a switch."""
         if method is SWITCH_TYPE.RANDOM:
-            set_random_seed(inst, rand_seed)
-            random.shuffle(cases)
+            cases = conf_cases.copy()
+            rand.seed(b'switch', rand_seed, inst).shuffle(cases)
+        else:  # Won't change.
+            cases = conf_cases
 
         run_default = True
-
-        for case in cases:
-            if flag_name:
-                flag = Property(flag_name, case.real_name)
-                if not check_flag(inst.map, flag, inst):
-                    continue
-            for sub_res in case:
+        for flag, results in cases:
+            # If not set, always succeed for the random situation.
+            if flag.real_name and not check_flag(inst.map, flag, inst):
+                continue
+            for sub_res in results:
                 Condition.test_result(inst, sub_res)
             run_default = False
             if method is not SWITCH_TYPE.ALL:
@@ -1252,40 +1144,8 @@ def res_switch_setup(res: Property):
     return apply_switch
 
 
-@make_result_setup('staticPiston')
-def make_static_pist_setup(res: Property):
-    instances = (
-        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
-        'logic_0', 'logic_1', 'logic_2', 'logic_3',
-        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
-        'grate_low', 'grate_high',
-    )
-
-    if res.has_children():
-        # Pull from config
-        return {
-            name: instanceLocs.resolve_one(
-                res[name, ''],
-                error=False,
-            ) for name in instances
-        }
-    else:
-        # Pull from editoritems
-        if ':' in res.value:
-            from_item, prefix = res.value.split(':', 1)
-        else:
-            from_item = res.value
-            prefix = ''
-        return {
-            name: instanceLocs.resolve_one(
-                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
-                error=False,
-            ) for name in instances
-        }
-
-
 @make_result('staticPiston')
-def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
+def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], None]:
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1297,56 +1157,87 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     Alternatively, specify all instances via editoritems, by setting the value
     to the item ID optionally followed by a :prefix.
     """
+    inst_keys = (
+        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
+        'logic_0', 'logic_1', 'logic_2', 'logic_3',
+        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        'grate_low', 'grate_high',
+    )
 
-    bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
-
-    if (
-        ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
-        ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
-    ):  # can it move?
-        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
-
-        # Use instances based on the height of the bottom position.
-        val = res.value['bottom_' + str(bottom_pos)]
-        if val:  # Only if defined
-            ent['file'] = val
-
-        logic_file = res.value['logic_' + str(bottom_pos)]
-        if logic_file:
-            # Overlay an additional logic file on top of the original
-            # piston. This allows easily splitting the piston logic
-            # from the styled components
-            logic_ent = ent.copy()
-            logic_ent['file'] = logic_file
-            vmf.add_ent(logic_ent)
-            # If no connections are present, set the 'enable' value in
-            # the logic to True so the piston can function
-            logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
-                ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
-            )
-    else:  # we are static
-        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
-        if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
-            pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
+    if res.has_children():
+        # Pull from config
+        instances = {
+            name: instanceLocs.resolve_one(
+                res[name, ''],
+                error=False,
+            ) for name in inst_keys
+        }
+    else:
+        # Pull from editoritems
+        if ':' in res.value:
+            from_item, prefix = res.value.split(':', 1)
         else:
-            pos = bottom_pos
-        ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
+            from_item = res.value
+            prefix = ''
+        instances = {
+            name: instanceLocs.resolve_one(
+                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
+                error=False,
+            ) for name in inst_keys
+        }
 
-        val = res.value['static_' + str(pos)]
-        if val:
-            ent['file'] = val
+    def make_static(ent: Entity) -> None:
+        """Make a piston static."""
+        bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
 
-    # Add in the grating for the bottom as an overlay.
-    # It's low to fit the piston at minimum, or higher if needed.
-    grate = res.value[
-        'grate_high'
-        if bottom_pos > 0 else
-        'grate_low'
-    ]
-    if grate:
-        grate_ent = ent.copy()
-        grate_ent['file'] = grate
-        vmf.add_ent(grate_ent)
+        if (
+            ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
+            ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
+        ):  # can it move?
+            ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
+
+            # Use instances based on the height of the bottom position.
+            val = instances['bottom_' + str(bottom_pos)]
+            if val:  # Only if defined
+                ent['file'] = val
+
+            logic_file = instances['logic_' + str(bottom_pos)]
+            if logic_file:
+                # Overlay an additional logic file on top of the original
+                # piston. This allows easily splitting the piston logic
+                # from the styled components
+                logic_ent = ent.copy()
+                logic_ent['file'] = logic_file
+                vmf.add_ent(logic_ent)
+                # If no connections are present, set the 'enable' value in
+                # the logic to True so the piston can function
+                logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
+                    ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
+                )
+        else:  # we are static
+            ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
+            if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
+                pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
+            else:
+                pos = bottom_pos
+            ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
+
+            val = instances['static_' + str(pos)]
+            if val:
+                ent['file'] = val
+
+        # Add in the grating for the bottom as an overlay.
+        # It's low to fit the piston at minimum, or higher if needed.
+        grate = instances[
+            'grate_high'
+            if bottom_pos > 0 else
+            'grate_low'
+        ]
+        if grate:
+            grate_ent = ent.copy()
+            grate_ent['file'] = grate
+            vmf.add_ent(grate_ent)
+    return make_static
 
 
 @make_result('GooDebris')
@@ -1367,13 +1258,14 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
 
     space = res.int('spacing', 1)
     rand_count = res.int('number', None)
+    rand_list: list[int] | None
     if rand_count:
-        rand_list = weighted_random(
+        rand_list = rand.parse_weights(
             rand_count,
             res['weights', ''],
         )
     else:
-        rand_list = None  # type: Optional[List[int]]
+        rand_list = None
     chance = res.int('chance', 30) / 100
     file = res['file']
     offset = res.int('offset', 0)
@@ -1416,24 +1308,25 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
         len(goo_top_locs),
     )
 
-    suff = ''
     for loc in possible_locs:
-        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
-        if random.random() > chance:
+        rng = rand.seed(b'goo_debris', loc)
+        if rng.random() > chance:
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list) + 1)
+            rand_fname = f'{file}_{rng.choice(rand_list) + 1}.vmf'
+        else:
+            rand_fname = file + '.vmf'
 
         if offset > 0:
-            loc.x += random.randint(-offset, offset)
-            loc.y += random.randint(-offset, offset)
+            loc.x += rng.randint(-offset, offset)
+            loc.y += rng.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
         vmf.create_ent(
             classname='func_instance',
-            file=file + suff + '.vmf',
+            file=rand_fname,
             origin=loc.join(' '),
-            angles='0 {} 0'.format(random.randrange(0, 3600)/10)
+            angles=f'0 {rng.randrange(0, 3600) / 10} 0'
         )
 
     return RES_EXHAUSTED

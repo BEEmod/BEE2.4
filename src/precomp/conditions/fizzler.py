@@ -96,8 +96,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         fizz_item = connections.Item(
             base_inst,
             connections.ITEM_TYPES['item_barrier_hazard'],
-            shape_item.ant_floor_style,
-            shape_item.ant_wall_style,
+            ant_floor_style=shape_item.ant_floor_style,
+            ant_wall_style=shape_item.ant_wall_style,
         )
         connections.ITEMS[shape_name] = fizz_item
 

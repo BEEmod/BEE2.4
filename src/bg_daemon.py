@@ -144,8 +144,11 @@ class BaseLoadScreen:
 
     def op_set_length(self, stage: str, num: int) -> None:
         """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.update_stage(stage)
+        if num == 0:
+            self.op_skip_stage(stage)
+        else:
+            self.maxes[stage] = num
+            self.update_stage(stage)
 
     def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
@@ -473,14 +476,18 @@ class SplashScreen(BaseLoadScreen):
                 )
 
     def update_stage(self, stage):
-        text = '{}: ({}/{})'.format(
-            self.names[stage],
-            self.values[stage],
-            self.maxes[stage],
-        )
+        if self.maxes[stage] == 0:
+            text = f'{self.names[stage]}: (0/0)'
+            self.set_bar(stage, 1)
+        else:
+            text = (
+                f'{self.names[stage]}: '
+                f'({self.values[stage]}/{self.maxes[stage]})'
+            )
+            self.set_bar(stage, self.values[stage] / self.maxes[stage])
+
         self.sml_canvas.itemconfig('text_' + stage, text=text)
         self.lrg_canvas.itemconfig('text_' + stage, text=text)
-        self.set_bar(stage, self.values[stage] / self.maxes[stage])
 
     def set_bar(self, stage, fraction):
         """Set a progress bar to this fractional length."""
@@ -504,7 +511,7 @@ class SplashScreen(BaseLoadScreen):
             canvas.delete('tick_' + stage)
 
             if num == 0:
-                return  # No ticks
+                continue  # No ticks
 
             # Draw the ticks in...
             _, y1, _, y2 = canvas.coords('bar_' + stage)
@@ -762,34 +769,44 @@ def run_background(
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
-        while PIPE_REC.poll():  # Pop off all the values.
-            had_values = True
-            operation, scr_id, args = PIPE_REC.recv()
-            if operation == 'init':
-                # Create a new loadscreen.
-                is_main, title, stages = args
-                screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
-                SCREENS[scr_id] = screen
-            elif operation == 'set_force_ontop':
-                [force_ontop] = args
-                for screen in SCREENS.values():
-                    screen.win.attributes('-topmost', force_ontop)
-            else:
-                try:
-                    func = getattr(SCREENS[scr_id], 'op_' + operation)
-                except AttributeError:
-                    raise ValueError(f'Bad command "{operation}"!')
-                try:
-                    func(*args)
-                except Exception:
-                    raise Exception(operation)
-        while log_pipe_rec.poll():
-            log_window.handle(log_pipe_rec.recv())
+        try:
+            while PIPE_REC.poll():  # Pop off all the values.
+                had_values = True
+                operation, scr_id, args = PIPE_REC.recv()
+                if operation == 'init':
+                    # Create a new loadscreen.
+                    is_main, title, stages = args
+                    screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
+                    SCREENS[scr_id] = screen
+                elif operation == 'quit_daemon':
+                    # Shutdown.
+                    TK_ROOT.quit()
+                    return
+                elif operation == 'set_force_ontop':
+                    [force_ontop] = args
+                    for screen in SCREENS.values():
+                        screen.win.attributes('-topmost', force_ontop)
+                else:
+                    try:
+                        func = getattr(SCREENS[scr_id], 'op_' + operation)
+                    except AttributeError:
+                        raise ValueError(f'Bad command "{operation}"!')
+                    try:
+                        func(*args)
+                    except Exception:
+                        raise Exception(operation)
+            while log_pipe_rec.poll():
+                log_window.handle(log_pipe_rec.recv())
+        except BrokenPipeError:
+            # A pipe failed, means the main app quit. Terminate ourselves.
+            print('BG: Lost pipe!')
+            TK_ROOT.quit()
+            return
 
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
         # Otherwise we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
-    
+
     TK_ROOT.after(10, check_queue)
     TK_ROOT.mainloop()  # Infinite loop, until the entire process tree quits.

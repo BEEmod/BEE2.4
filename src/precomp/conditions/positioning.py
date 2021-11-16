@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Dict, Set
+from typing import Tuple, Dict, Set, Callable
 
 from precomp.conditions import (
     make_flag, make_result, resolve_offset,
@@ -29,7 +29,7 @@ TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
     'dir',
     'direction',
 )
-def flag_angles(inst: Entity, flag: Property):
+def flag_angles(flag: Property) -> Callable[[Entity], bool]:
     """Check that a instance is pointed in a direction.
 
     The value should be either just the angle to check, or a block of
@@ -42,7 +42,6 @@ def flag_angles(inst: Entity, flag: Property):
     - `Allow_inverse`: If true, this also returns True if the instance is
         pointed the opposite direction .
     """
-    angle = inst['angles', '0 0 0']
 
     if flag.has_children():
         targ_angle = flag['direction', '0 0 0']
@@ -57,20 +56,23 @@ def flag_angles(inst: Entity, flag: Property):
         from_dir = Vec(0, 0, 1)
         allow_inverse = False
 
-    normal = DIRECTIONS.get(targ_angle.casefold(), None)
-    if normal is None:
-        return False  # If it's not a special angle,
-        # so it failed the exact match
+    try:
+        normal = DIRECTIONS[targ_angle.casefold()]
+    except KeyError:
+        normal = Vec.from_str(targ_angle)
 
-    inst_normal = from_dir.rotate_by_str(angle)
+    def check_orient(inst: Entity) -> bool:
+        """Check the orientation against the instance."""
+        inst_normal = from_dir @ Angle.from_str(inst['angles'])
 
-    if normal == 'WALL':
-        # Special case - it's not on the floor or ceiling
-        return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
-    else:
-        return inst_normal == normal or (
-            allow_inverse and -inst_normal == normal
-        )
+        if normal == 'WALL':
+            # Special case - it's not on the floor or ceiling
+            return abs(inst_normal.z) < 1e-6
+        else:
+            return inst_normal == normal or (
+                allow_inverse and -inst_normal == normal
+            )
+    return check_orient
 
 
 def brush_at_loc(
@@ -433,17 +435,40 @@ def res_force_upright(inst: Entity):
     The result angle will have pitch and roll set to 0. Vertical
     instances are unaffected.
     """
-    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
     if normal.z != 0:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
     inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
 
 
+@make_result('switchOrientation')
+def res_alt_orientation(res: Property) -> Callable[[Entity], None]:
+    """Apply an alternate orientation.
+
+    "wall" makes the attaching surface in the -X direction, making obs rooms,
+    corridors etc easier to build. The Z axis points in the former +X direction.
+    "ceiling" flips the instance, making items such as droppers easier to build.
+    The X axis remains unchanged.
+    """
+    val = res.value.casefold()
+    if val == 'wall':
+        pose = Matrix.from_angle(-90, 180, 0)
+    elif val in ('ceil', 'ceiling'):
+        pose = Matrix.from_roll(180)
+    else:
+        raise ValueError(f'Unknown orientation type "{res.value}"!')
+
+    def swap_orient(inst: Entity) -> None:
+        """Apply the new orientation."""
+        inst['angles'] = pose @ Angle.from_str(inst['angles'])
+    return swap_orient
+
+
 @make_result('setAngles')
 def res_set_angles(inst: Entity, res: Property):
     """Set the orientation of an instance to a certain angle."""
-    inst['angles'] = res.value
+    inst['angles'] = inst.fixup.substitute(res.value)
 
 
 @make_result('OffsetInst', 'offsetinstance')
@@ -506,7 +531,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
     inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
 
 
-@make_result('RotateInst')
+@make_result('RotateInst', 'RotateInstance')
 def res_rotate_inst(inst: Entity, res: Property) -> None:
     """Rotate the instance around an axis.
 
@@ -514,6 +539,9 @@ def res_rotate_inst(inst: Entity, res: Property) -> None:
     be rotated `angle` degrees around it.
     Otherwise, `angle` is a pitch-yaw-roll angle which is applied.
     `around` can be a point (local, pre-rotation) which is used as the origin.
+
+    Tip: If you want to match angled panels, rotate with an axis of `0 -1 0`
+    and an around value of `0 -64 -64`.
     """
     angles = Angle.from_str(inst['angles'])
     if 'axis' in res:
@@ -526,7 +554,7 @@ def res_rotate_inst(inst: Entity, res: Property) -> None:
 
     try:
         offset = Vec.from_str(inst.fixup.substitute(res['around']))
-    except NoKeyError:
+    except LookupError:
         pass
     else:
         origin = Vec.from_str(inst['origin'])

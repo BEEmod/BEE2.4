@@ -7,6 +7,7 @@ from BEE2_config import GEN_OPTS
 from app import tooltip
 from app import tk_tools
 from app.img import Handle as ImgHandle, apply as apply_img
+from localisation import gettext
 import utils
 import srctools
 from app import sound
@@ -83,7 +84,7 @@ class SubPane(tk.Toplevel):
         )
         tooltip.add_tooltip(
             self.tool_button,
-            text=_('Hide/Show the "{}" window.').format(title))
+            text=gettext('Hide/Show the "{}" window.').format(title))
         menu_bar.add_checkbutton(
             label=title,
             variable=self.visible,
@@ -96,7 +97,7 @@ class SubPane(tk.Toplevel):
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)
-        parent.bind('<Configure>', self.follow_main, add='+')
+        parent.bind('<Configure>', self.follow_main, add=True)
         self.bind('<Configure>', self.snap_win)
         self.bind('<FocusIn>', self.enable_snap)
 

@@ -28,7 +28,7 @@ No. This was the case with the High Energy Pellet items in the original BEEmod, 
 
 BEE2.4 supports Portal 2 and Aperture Tag. Thinking With Time Machine support is planned, but not yet implemented. (BEE2.4 can be used with TWTM, but you will not have the time machine and several other things will be broken.) Destroyed Aperture support is also planned once that mod is released.
 
-### What about Portal 2: Community Edition? Will BEE2.4 be compatible with that, will it make any new things possible?
+### Will BEE2.4 be compatible with Portal 2: Community Edition, will that make any new things possible?
 
 Theoretically, P2CE would expand what is possible with BEEmod; however, the P2CE developers were unable to obtain the Puzzlemaker source code from Valve, so it won't be included. They will likely implement their own puzzlemaker from scratch at some point in the future, but it is not currently being worked on and would likely be incompatible with BEE.
 
@@ -111,8 +111,12 @@ The Source engine has very strict limits on toggleable lights. Only two dynamic 
 
 `puzzlemaker_export` does not work with BEEmod, as the custom compiler isn't able to modify the map and make it actually functional. Before reading on however, keep in mind that exporting Puzzlemaker maps to Hammer is usually not the best idea. If you want to make extensive modifications to a map, or are just starting out learning Hammer, it's generally easier to build a map from scratch, as Puzzlemaker maps are generated in a complex way making them difficult to edit by hand. Only consider exporting if you just want to make small adjustments to a map, and already have experience using Hammer.
 
-If this is still what you want to do, first set Spawn Point to Elevator and disable Restart When Reaching Exit in the BEE2 app. Compile your map in Puzzlemaker, then open `maps/styled/preview.vmf` in Hammer and resave it to a different location so it doesn't get overwritten. Additionally, check your Build Programs settings to make sure that you're using the BEE2 version of VRAD (simply called `vrad.exe`), as this is needed for some features such as music to work.
+If this is still what you want to do, first go into the BEE2 app and set Spawn Point to Elevator and disable Restart When Reaching Exit. Compile your map in Puzzlemaker, then open `maps/styled/preview.vmf` in Hammer and resave it to a different location so it doesn't get overwritten. Additionally, check your Build Programs settings to make sure that you're using the BEE2 version of VRAD (simply called `vrad.exe`), as this is needed for some features such as music to work.
 
 ### Why is BTS being removed?
 
 The BTS style was made back before BEE2.4, and our direction has long since changed. The style doesn't work in the Puzzlemaker and it has become increasingly difficult to maintain and develop. As such, we've decided that it's best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it, but it would likely take on a different form, and nothing regarding this is being worked on right now.
+
+### Will you add Desolation's Industrial style to BEE2.4?
+
+No. The Industrial style is fairly complex and would be difficult to implement in the Puzzlemaker, requiring lots of compiler modifications. It also relies on many custom assets which would need to be packed into the map, increasing its file size substantially. Even if ways around both of these things were found, the style also makes use of custom features of Desolation's engine, which can't be replicated in standard Portal 2.\n\nImplementing the style within Desolation itself would solve the latter two issues, but Desolation won't be able to use Valve's puzzlemaker for technical reasons, and the developers currently have no plans to write their own. It also wouldn't solve the first problem, which is actually generating Industrial maps.\n\nAdditionally, see the question above about new styles in general.

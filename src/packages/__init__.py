@@ -2,12 +2,14 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-import os
 from collections import defaultdict
+from pathlib import Path
+
 import attr
+import trio
 
 import srctools
-from app import tkMarkdown, img
+from app import tkMarkdown, img, lazy_conf
 import utils
 import consts
 from app.packageMan import PACK_CONFIG
@@ -44,9 +46,12 @@ class SelitemData:
     auth: list[str]  # List of authors.
     icon: Optional[img.Handle]  # Small square icon.
     large_icon: Optional[img.Handle]  # Larger, landscape icon.
+    previews: list[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
     group: Optional[str]
     sort_key: str
+    # The packages used to define this, used for debugging.
+    packages: set[str] = attr.Factory(frozenset)
 
     @classmethod
     def parse(cls, info: Property, pack_id: str) -> SelitemData:
@@ -71,13 +76,33 @@ class SelitemData:
         except LookupError:
             icon = None
         try:
+            large_key = info.find_key('iconLarge')
+        except LookupError:
+            large_icon = large_key = None
+        else:
             large_icon = img.Handle.parse(
-                info.find_key('iconlarge'),
+                large_key,
                 pack_id,
                 *consts.SEL_ICON_SIZE_LRG,
             )
+        try:
+            preview_block = info.find_block('previews')
         except LookupError:
-            large_icon = None
+            # Use the large icon, if present.
+            if large_key is not None:
+                previews = [img.Handle.parse(
+                    large_key,
+                    pack_id,
+                    0, 0,
+                )]
+            else:
+                previews = []
+        else:
+            previews = [img.Handle.parse(
+                prop,
+                pack_id,
+                0, 0,
+            ) for prop in preview_block]
 
         return cls(
             name,
@@ -85,9 +110,11 @@ class SelitemData:
             auth,
             icon,
             large_icon,
+            previews,
             desc,
             group,
             sort_key,
+            frozenset({pack_id}),
         )
 
     def __add__(self, other: SelitemData) -> SelitemData:
@@ -105,9 +132,11 @@ class SelitemData:
             self.auth + other.auth,
             other.icon or self.icon,
             other.large_icon or self.large_icon,
+            self.previews + other.previews,
             tkMarkdown.join(self.desc, other.desc),
             other.group or self.group,
             other.sort_key or self.sort_key,
+            self.packages | other.packages,
         )
 
 
@@ -228,7 +257,7 @@ class PakObject:
         cls.allow_mult = allow_mult
 
     @classmethod
-    def parse(cls: Type[PakT], data: ParseData) -> PakT:
+    async def parse(cls: Type[PakT], data: ParseData) -> PakT:
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
@@ -261,7 +290,7 @@ class PakObject:
 
     @classmethod
     def post_parse(cls) -> None:
-        """Do processing after all objects have been fully parsed."""
+        """Do processing after all objects of this type have been fully parsed."""
         pass
 
     @classmethod
@@ -296,42 +325,37 @@ def reraise_keyerror(err: BaseException, obj_id: str) -> NoReturn:
 
 
 def get_config(
-        prop_block: Property,
-        fsys: FileSystem,
-        folder: str,
-        pak_id='',
-        prop_name='config',
-        extension='.cfg',
-        ):
-    """Extract a config file referred to by the given property block.
+    prop_block: Property,
+    folder: str,
+    pak_id: str,
+    prop_name: str='config',
+    extension: str='.cfg',
+    source: str='',
+) -> lazy_conf.LazyConf:
+    """Lazily extract a config file referred to by the given property block.
 
     Looks for the prop_name key in the given prop_block.
     If the keyvalue has a value of "", an empty tree is returned.
-    If it has children, a copy of them is returned.
+    If it has children, a copy of them will be returned.
     Otherwise the value is a filename in the zip which will be parsed.
+
+    If source is supplied, set_cond_source() will be run.
     """
     prop_block = prop_block.find_key(prop_name, "")
     if prop_block.has_children():
         prop = prop_block.copy()
-        prop.name = None
-        return prop
+        prop.name = ""
+        return lazy_conf.raw_prop(prop, source=source)
 
     if prop_block.value == '':
-        return Property(None, [])
+        return lazy_conf.BLANK
 
     # Zips must use '/' for the separator, even on Windows!
-    path = folder + '/' + prop_block.value
+    path = f'{folder}/{prop_block.value}'
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
-    try:
-        return fsys.read_prop(path)
-    except FileNotFoundError:
-        LOGGER.warning('"{id}:{path}" not in zip!', id=pak_id, path=path)
-        return Property(None, [])
-    except UnicodeDecodeError:
-        LOGGER.exception('Unable to read "{id}:{path}"', id=pak_id, path=path)
-        raise
+    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=source)
 
 
 def set_cond_source(props: Property, source: str) -> None:
@@ -345,57 +369,48 @@ def set_cond_source(props: Property, source: str) -> None:
         cond['__src__'] = source
 
 
-def find_packages(pak_dir: str) -> None:
+async def find_packages(nursery: trio.Nursery, pak_dir: Path) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
-    for name in os.listdir(pak_dir):  # Both files and dirs
-        name = os.path.join(pak_dir, name)
-        folded = name.casefold()
+    try:
+        contents = list(pak_dir.iterdir())
+    except FileNotFoundError:
+        LOGGER.warning('Package search location "{}" does not exist!', pak_dir)
+        return
+
+    for name in contents:  # Both files and dirs
+        folded = name.stem.casefold()
         if folded.endswith('.vpk') and not folded.endswith('_dir.vpk'):
             # _000.vpk files, useless without the directory
             continue
 
-        if os.path.isdir(name):
+        if name.is_dir():
             filesys = RawFileSystem(name)
         else:
-            ext = os.path.splitext(folded)[1]
+            ext = name.suffix.casefold()
             if ext in ('.bee_pack', '.zip'):
-                filesys = ZipFileSystem(name)
+                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, cancellable=True)
             elif ext == '.vpk':
-                filesys = VPKFileSystem(name)
+                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, cancellable=True)
             else:
                 LOGGER.info('Extra file: {}', name)
                 continue
 
-        LOGGER.debug('Reading package "' + name + '"')
-
-        # Gain a persistent hold on the filesystem's handle.
-        # That means we don't need to reopen the zip files constantly.
-        filesys.open_ref()
+        LOGGER.debug('Reading package "{}"', name)
 
         # Valid packages must have an info.txt file!
         try:
-            info = filesys.read_prop('info.txt')
+            info = await trio.to_thread.run_sync(filesys.read_prop, 'info.txt', cancellable=True)
         except FileNotFoundError:
-            # Close the ref we've gotten, since it's not in the dict
-            # it won't be done by load_packages().
-            filesys.close_ref()
-
-            if os.path.isdir(name):
+            if name.is_dir():
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name)
+                nursery.start_soon(find_packages, nursery, name)
             else:
                 LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
             continue
-        try:
-            pak_id = info['ID']
-        except IndexError:
-            # Close the ref we've gotten, since it's not in the dict
-            # it won't be done by load_packages().
-            filesys.close_ref()
-            raise
+        pak_id = info['ID']
 
         if pak_id.casefold() in packages:
             raise ValueError(
@@ -417,24 +432,33 @@ def find_packages(pak_dir: str) -> None:
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dir: str, msg: str) -> NoReturn:
+def no_packages_err(pak_dirs: list[Path], msg: str) -> NoReturn:
     """Show an error message indicating no packages are present."""
     from tkinter import messagebox
     import sys
     # We don't have a packages directory!
+    if len(pak_dirs) == 1:
+        trailer = str(pak_dirs[0])
+    else:
+        trailer = (
+            'one of the following locations:\n' +
+            '\n'.join(f' - {fold}' for fold in pak_dirs)
+        )
+    message = (
+        f'{msg}\nGet the packages from '
+        '"https://github.com/BEEmod/BEE2-items" '
+        f'and place them in {trailer}'
+    )
+    LOGGER.error(message)
     messagebox.showerror(
         title='BEE2 - Invalid Packages Directory!',
-        message=(
-            '{}\nGet the packages from '
-            '"https://github.com/BEEmod/BEE2-items" '
-            'and place them in "{}".').format(msg, pak_dir + os.path.sep),
-        # Add slash to the end to indicate it's a folder.
+        message=message,
     )
     sys.exit()
 
 
-def load_packages(
-    pak_dir: str,
+async def load_packages(
+    pak_dirs: list[Path],
     loader: LoadScreen,
     log_item_fallbacks=False,
     log_missing_styles=False,
@@ -445,41 +469,37 @@ def load_packages(
 ) -> Mapping[str, FileSystem]:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
-    pak_dir = os.path.abspath(pak_dir)
-
-    if not os.path.isdir(pak_dir):
-        no_packages_err(pak_dir, 'The given packages directory is not present!')
 
     Item.log_ent_count = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
 
-    # If we fail we want to clean up our filesystems.
-    should_close_filesystems = True
-    try:
-        find_packages(pak_dir)
+    async with trio.open_nursery() as find_nurs:
+        for pak_dir in pak_dirs:
+            find_nurs.start_soon(find_packages, find_nurs, pak_dir)
 
-        pack_count = len(packages)
-        loader.set_length("PAK", pack_count)
+    pack_count = len(packages)
+    loader.set_length("PAK", pack_count)
 
-        if pack_count == 0:
-            no_packages_err(pak_dir, 'No packages found!')
+    if pack_count == 0:
+        no_packages_err(pak_dirs, 'No packages found!')
 
-        # We must have the clean style package.
-        if CLEAN_PACKAGE not in packages:
-            no_packages_err(
-                pak_dir,
-                'No Clean Style package! This is required for some '
-                'essential resources and objects.'
-            )
+    # We must have the clean style package.
+    if CLEAN_PACKAGE not in packages:
+        no_packages_err(
+            pak_dirs,
+            'No Clean Style package! This is required for some '
+            'essential resources and objects.'
+        )
 
-        data: dict[Type[PakT], list[PakT]] = {}
-        obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
+    data: dict[Type[PakT], list[PakT]] = {}
+    obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
 
-        for obj_type in OBJ_TYPES.values():
-            all_obj[obj_type] = {}
-            obj_override[obj_type] = defaultdict(list)
-            data[obj_type] = []
+    for obj_type in OBJ_TYPES.values():
+        all_obj[obj_type] = {}
+        obj_override[obj_type] = defaultdict(list)
+        data[obj_type] = []
 
+    async with trio.open_nursery() as nursery:
         for pack in packages.values():
             if not pack.enabled:
                 LOGGER.info('Package {id} disabled!', id=pack.id)
@@ -487,82 +507,25 @@ def load_packages(
                 loader.set_length("PAK", pack_count)
                 continue
 
-            with srctools.logger.context(pack.id):
-                parse_package(pack, obj_override, has_tag_music, has_mel_music)
-            loader.step("PAK")
+            nursery.start_soon(parse_package, nursery, pack, obj_override, loader, has_tag_music, has_mel_music)
+        LOGGER.debug('Submitted packages.')
 
-        loader.set_length("OBJ", sum(
-            len(obj_type)
-            for obj_type in
-            all_obj.values()
-        ))
+    LOGGER.debug('Parsed packages, now parsing objects.')
 
+    loader.set_length("OBJ", sum(
+        len(obj_type)
+        for obj_type in
+        all_obj.values()
+    ))
+
+    async with trio.open_nursery() as nursery:
         for obj_class, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
-                # parse through the object and return the resultant class
-                try:
-                    with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
-                        object_ = obj_class.parse(
-                            ParseData(
-                                obj_data.fsys,
-                                obj_id,
-                                obj_data.info_block,
-                                obj_data.pak_id,
-                                False,
-                            )
-                        )
-                except (NoKeyError, IndexError) as e:
-                    reraise_keyerror(e, obj_id)
-                    raise  # Never reached.
-                except TokenSyntaxError as e:
-                    # Add the relevant package to the filename.
-                    if e.file:
-                        e.file = f'{obj_data.pak_id}:{e.file}'
-                    raise
-                except Exception as e:
-                    raise ValueError(
-                        'Error occured parsing '
-                        f'{obj_data.pak_id}:{obj_id} item!'
-                    ) from e
-
-                if not hasattr(object_, 'id'):
-                    raise ValueError(
-                        '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
-                    )
-
-                # Store in this database so we can find all objects for each type.
-                # noinspection PyProtectedMember
-                obj_class._id_to_obj[object_.id.casefold()] = object_
-
-                object_.pak_id = obj_data.pak_id
-                object_.pak_name = obj_data.disp_name
-                for override_data in obj_override[obj_class].get(obj_id, []):
-                    try:
-                        with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
-                            override = obj_class.parse(override_data)
-                    except (NoKeyError, IndexError) as e:
-                        reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
-                        raise  # Never reached.
-                    except TokenSyntaxError as e:
-                        # Add the relevant package to the filename.
-                        if e.file:
-                            e.file = f'{override_data.pak_id}:{e.file}'
-                        raise
-                    except Exception as e:
-                        raise ValueError(
-                            f'Error occured parsing {obj_id} override'
-                            f'from package {override_data.pak_id}!'
-                        ) from e
-
-                    object_.add_over(override)
-                data[obj_class].append(object_)
-                loader.step("OBJ")
-
-        should_close_filesystems = False
-    finally:
-        if should_close_filesystems:
-            for sys in PACKAGE_SYS.values():
-                sys.close_ref()
+                overrides = obj_override[obj_class].get(obj_id, [])
+                nursery.start_soon(
+                    parse_object,
+                    obj_class, obj_id, obj_data, overrides, data, loader,
+                )
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
         '{:<15}: {}'.format(obj_type.__name__, len(objs))
@@ -576,16 +539,17 @@ def load_packages(
 
     # This has to be done after styles.
     LOGGER.info('Allocating styled items...')
-    assign_styled_items(
-        log_item_fallbacks,
-        log_missing_styles,
-    )
+    async with trio.open_nursery() as nursery:
+        for it in Item.all():
+            nursery.start_soon(assign_styled_items, log_item_fallbacks, log_missing_styles, it)
     return PACKAGE_SYS
 
 
-def parse_package(
+async def parse_package(
+    nursery: trio.Nursery,
     pack: Package,
     obj_override: dict[Type[PakObject], dict[str, list[ParseData]]],
+    loader: LoadScreen,
     has_tag: bool=False,
     has_mel: bool=False,
 ) -> None:
@@ -611,6 +575,7 @@ def parse_package(
     desc: list[str] = []
 
     for obj in pack.info:
+        await trio.sleep(0)
         if obj.name in ['prerequisites', 'id', 'name']:
             # Not object IDs.
             continue
@@ -679,8 +644,78 @@ def parse_package(
     pack.desc = '\n'.join(desc)
 
     for template in pack.fsys.walk_folder('templates'):
+        await trio.sleep(0)
         if template.path.casefold().endswith('.vmf'):
-            template_brush.parse_template(pack.id, template)
+            nursery.start_soon(template_brush.parse_template, pack.id, template)
+    loader.step('PAK')
+
+
+async def parse_object(
+    obj_class: Type[PakObject], obj_id: str, obj_data: ParseData, obj_override: list[ParseData],
+    data: dict[Type[PakObject], list[PakObject]],
+    loader: LoadScreen,
+) -> None:
+    """Parse through the object and store the resultant class."""
+    try:
+        with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
+            object_ = await obj_class.parse(
+                ParseData(
+                    obj_data.fsys,
+                    obj_id,
+                    obj_data.info_block,
+                    obj_data.pak_id,
+                    False,
+                )
+            )
+            await trio.sleep(0)
+    except (NoKeyError, IndexError) as e:
+        reraise_keyerror(e, obj_id)
+        raise  # Never reached.
+    except TokenSyntaxError as e:
+        # Add the relevant package to the filename.
+        if e.file:
+            e.file = f'{obj_data.pak_id}:{e.file}'
+        raise
+    except Exception as e:
+        raise ValueError(
+            'Error occured parsing '
+            f'{obj_data.pak_id}:{obj_id} item!'
+        ) from e
+
+    if not hasattr(object_, 'id'):
+        raise ValueError(
+            '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
+        )
+
+    # Store in this database so we can find all objects for each type.
+    # noinspection PyProtectedMember
+    obj_class._id_to_obj[object_.id.casefold()] = object_
+
+    object_.pak_id = obj_data.pak_id
+    object_.pak_name = obj_data.disp_name
+    for override_data in obj_override:
+        await trio.sleep(0)
+        try:
+            with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
+                override = await obj_class.parse(override_data)
+        except (NoKeyError, IndexError) as e:
+            reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
+            raise  # Never reached.
+        except TokenSyntaxError as e:
+            # Add the relevant package to the filename.
+            if e.file:
+                e.file = f'{override_data.pak_id}:{e.file}'
+            raise
+        except Exception as e:
+            raise ValueError(
+                f'Error occured parsing {obj_id} override'
+                f'from package {override_data.pak_id}!'
+            ) from e
+
+        await trio.sleep(0)
+        object_.add_over(override)
+    data[obj_class].append(object_)
+    loader.step("OBJ")
 
 
 class Package:
@@ -690,7 +725,7 @@ class Package:
         pak_id: str,
         filesystem: FileSystem,
         info: Property,
-        name: str,
+        path: Path,
     ) -> None:
         disp_name = info['Name', None]
         if disp_name is None:
@@ -700,14 +735,14 @@ class Package:
         self.id = pak_id
         self.fsys = filesystem
         self.info = info
-        self.name = name
+        self.path = path
         self.disp_name = disp_name
         self.desc = ''  # Filled in by parse_package.
 
     @property
     def enabled(self) -> bool:
         """Should this package be loaded?"""
-        if self.id == CLEAN_PACKAGE:
+        if self.id.casefold() == CLEAN_PACKAGE:
             # The clean style package is special!
             # It must be present.
             return True
@@ -717,7 +752,7 @@ class Package:
     @enabled.setter
     def enabled(self, value: bool) -> None:
         """Enable or disable the package."""
-        if self.id == CLEAN_PACKAGE:
+        if self.id.casefold() == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
@@ -729,7 +764,7 @@ class Package:
             LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
 
-        zip_modtime = int(os.stat(self.name).st_mtime)
+        zip_modtime = int(self.path.stat().st_mtime)
 
         # If zero, it's never extracted...
         if zip_modtime != mod_time or mod_time == 0:
@@ -744,7 +779,9 @@ class Package:
             # No modification time
             return 0
         else:
-            return int(os.stat(self.name).st_mtime)
+            return int(self.path.stat().st_mtime)
+
+
 
 
 class Style(PakObject):
@@ -755,9 +792,9 @@ class Style(PakObject):
         selitem_data: SelitemData,
         items: list[EditorItem],
         renderables: dict[RenderableType, Renderable],
-        config=None,
+        suggested: tuple[set[str], set[str], set[str], set[str]],
+        config: lazy_conf.LazyConf = lazy_conf.BLANK,
         base_style: Optional[str]=None,
-        suggested: tuple[str, str, str, str]=None,
         has_video: bool=True,
         vpk_name: str='',
         corridors: dict[tuple[str, int], CorrDesc]=None,
@@ -770,7 +807,7 @@ class Style(PakObject):
         # Set by post_parse() after all objects are read.
         # this is a list of this style, plus parents in order.
         self.bases: list[Style] = []
-        self.suggested = suggested or ('<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>')
+        self.suggested = suggested
         self.has_video = has_video
         self.vpk_name = vpk_name
         self.corridors: dict[tuple[str, int], CorrDesc] = {}
@@ -782,15 +819,10 @@ class Style(PakObject):
                 except KeyError:
                     self.corridors[group, i] = CorrDesc()
 
-        if config is None:
-            self.config = Property(None, [])
-        else:
-            self.config = config
-
-        set_cond_source(self.config, 'Style <{}>'.format(style_id))
+        self.config = config
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Parse a style definition."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)
@@ -801,32 +833,34 @@ class Style(PakObject):
         )
         vpk_name = info['vpk_name', ''].casefold()
 
-        sugg = info.find_key('suggested', [])
-        if data.is_override:
-            # For overrides, we default to no suggestion..
-            sugg = (
-                sugg['quote', ''],
-                sugg['music', ''],
-                sugg['skybox', ''],
-                sugg['elev', ''],
-            )
-        else:
-            sugg = (
-                sugg['quote', '<NONE>'],
-                sugg['music', '<NONE>'],
-                sugg['skybox', 'SKY_BLACK'],
-                sugg['elev', '<NONE>'],
-            )
+        sugg: dict[str, set[str]] = {
+            'quote': set(),
+            'music': set(),
+            'skybox': set(),
+            'elev': set(),
+        }
+        for prop in info.find_children('suggested'):
+            try:
+                sugg[prop.name].add(prop.value)
+            except KeyError:
+                LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, prop.name)
 
-        corr_conf = info.find_key('corridors', [])
+        sugg_tup = (
+            sugg['quote'],
+            sugg['music'],
+            sugg['skybox'],
+            sugg['elev'],
+        )
+
+        corr_conf = info.find_key('corridors', or_blank=True)
         corridors = {}
 
         icon_folder = corr_conf['icon_folder', '']
 
         for group, length in CORRIDOR_COUNTS.items():
-            group_prop = corr_conf.find_key(group, [])
+            group_prop = corr_conf.find_key(group, or_blank=True)
             for i in range(1, length + 1):
-                prop = group_prop.find_key(str(i), '')  # type: Property
+                prop = group_prop.find_key(str(i), '')
 
                 if icon_folder:
                     icon = utils.PackagePath(data.pak_id, 'corr/{}/{}/{}.jpg'.format(icon_folder, group, i))
@@ -850,23 +884,23 @@ class Style(PakObject):
             base = None
         try:
             folder = 'styles/' + info['folder']
-        except IndexError:
+        except LookupError:
             # It's OK for override styles to be missing their 'folder'
             # value.
             if data.is_override:
                 items = []
                 renderables = {}
-                vbsp = None
+                vbsp = lazy_conf.BLANK
             else:
                 raise ValueError(f'Style "{data.id}" missing configuration folder!')
         else:
-            with data.fsys:
-                with data.fsys[folder + '/items.txt'].open_str() as f:
-                    items, renderables = EditorItem.parse(f)
-                try:
-                    vbsp = data.fsys.read_prop(folder + '/vbsp_config.cfg')
-                except FileNotFoundError:
-                    vbsp = None
+            with data.fsys[folder + '/items.txt'].open_str() as f:
+                items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f)
+            vbsp = lazy_conf.from_file(
+                utils.PackagePath(data.pak_id, folder + '/vbsp_config.cfg'),
+                missing_ok=True,
+                source=f'Style <{data.id}>',
+            )
 
         return cls(
             style_id=data.id,
@@ -875,7 +909,7 @@ class Style(PakObject):
             renderables=renderables,
             config=vbsp,
             base_style=base,
-            suggested=sugg,
+            suggested=sugg_tup,
             has_video=has_video,
             corridors=corridors,
             vpk_name=vpk_name,
@@ -885,24 +919,29 @@ class Style(PakObject):
         """Add the additional commands to ourselves."""
         self.items.extend(override.items)
         self.renderables.update(override.renderables)
-        self.config += override.config
+        self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data
 
         self.has_video = self.has_video or override.has_video
-        # If overrides have suggested IDs, use those. Unset values = ''.
+        # If overrides have suggested IDs, add those.
         self.suggested = tuple(
-            over_sugg or self_sugg
+            over_sugg | self_sugg
             for self_sugg, over_sugg in
             zip(self.suggested, override.suggested)
         )
 
     @classmethod
     def post_parse(cls) -> None:
-        """Assign the bases lists for all styles."""
+        """Assign the bases lists for all styles, and set default suggested items."""
         all_styles: dict[str, Style] = {}
+
+        defaults = ['<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>']
 
         for style in cls.all():
             all_styles[style.id] = style
+            for default, sugg_set in zip(defaults, style.suggested):
+                if not sugg_set:
+                    sugg_set.add(default)
 
         for style in all_styles.values():
             base = []
@@ -927,7 +966,7 @@ class Style(PakObject):
         This is a special case, since styles should go first in the lists.
         """
         vbsp_config = Property(None, [])
-        vbsp_config += self.config.copy()
+        vbsp_config += self.config()
 
         return self.items, self.renderables, vbsp_config
 

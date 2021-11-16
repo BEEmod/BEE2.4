@@ -1,7 +1,8 @@
 """Results for customising the behaviour of certain items - antlines, faith plates,
 
 """
-from typing import Optional, Tuple
+from __future__ import annotations
+from typing import Callable
 from srctools import Property, Entity
 import srctools.logger
 
@@ -13,31 +14,8 @@ COND_MOD_NAME = 'Custom Items'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.custItems')
 
 
-@conditions.make_result_setup('custAntline')
-def res_cust_antline_setup(res: Property):
-    if 'wall' in res:
-        wall_type = antlines.AntType.parse(res.find_key('wall'))
-    else:
-        wall_type = None
-
-    if 'floor' in res:
-        floor_type = antlines.AntType.parse(res.find_key('floor'))
-    else:
-        floor_type = wall_type
-
-    return (
-        wall_type,
-        floor_type,
-        res.bool('remove_signs'),
-        res['toggle_var', ''],
-    )
-
-CustAntValue = Tuple[Optional[antlines.AntType], Optional[
-    antlines.AntType], bool, str]
-
-
 @conditions.make_result('custAntline')
-def res_cust_antline(inst: Entity, res: Property):
+def res_cust_antline_setup(res: Property) -> Callable[[Entity], None]:
     """Customise the output antlines.
 
     Options:
@@ -51,21 +29,37 @@ def res_cust_antline(inst: Entity, res: Property):
         antlines. This is a fixup var which will be set to the name of the
         overlays, for user control.
     """
-    wall_style, floor_style, remove_signs, toggle_var = res.value  # type: CustAntValue
+    wall_style: antlines.AntType | None
+    floor_type: antlines.AntType | None
+    if 'wall' in res:
+        wall_style = antlines.AntType.parse(res.find_key('wall'))
+    else:
+        wall_style = None
 
-    item = connections.ITEMS[inst['targetname']]
-    if wall_style is not None:
-        item.ant_wall_style = wall_style
-    if floor_style is not None:
-        item.ant_floor_style = floor_style
+    if 'floor' in res:
+        floor_style = antlines.AntType.parse(res.find_key('floor'))
+    else:
+        floor_style = wall_style
 
-    if remove_signs:
-        for sign in item.ind_panels:
-            sign.remove()
-        item.ind_panels.clear()
+    remove_signs = res.bool('remove_signs')
+    toggle_var = res['toggle_var', '']
 
-    if toggle_var:
-        item.ant_toggle_var = toggle_var
+    def change_antlines(inst: Entity) -> None:
+        """Change the antlines of an item."""
+        item = connections.ITEMS[inst['targetname']]
+        if wall_style is not None:
+            item.ant_wall_style = wall_style
+        if floor_style is not None:
+            item.ant_floor_style = floor_style
+
+        if remove_signs:
+            for sign in item.ind_panels:
+                sign.remove()
+            item.ind_panels.clear()
+
+        if toggle_var:
+            item.ant_toggle_var = toggle_var
+    return change_antlines
 
 
 @conditions.make_result('changeOutputs')

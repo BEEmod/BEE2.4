@@ -21,9 +21,9 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 @make_result('ResizeableTrigger')
 def res_resizeable_trigger(vmf: VMF, res: Property):
-    """Replace two markers with a trigger brush.  
+    """Replace two markers with a trigger brush.
 
-    This is run once to affect all of an item.  
+    This is run once to affect all of an item.
     Options:
 
     * `markerInst`: <ITEM_ID:1,2> value referencing the marker instances, or a filename.
@@ -183,8 +183,8 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
             item = connections.Item(
                 out_ent,
                 conn_conf_coop,
-                mark1.ant_floor_style,
-                mark1.ant_wall_style,
+                ant_floor_style=mark1.ant_floor_style,
+                ant_wall_style=mark1.ant_wall_style,
             )
 
             if coop_only_once:
@@ -203,8 +203,8 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
             item = connections.Item(
                 trig_ent,
                 conn_conf_sp,
-                mark1.ant_floor_style,
-                mark1.ant_wall_style,
+                ant_floor_style=mark1.ant_floor_style,
+                ant_wall_style=mark1.ant_wall_style,
             )
 
         # Register, and copy over all the antlines.

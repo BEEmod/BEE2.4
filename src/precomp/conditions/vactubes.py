@@ -1,6 +1,7 @@
 """Implements the cutomisable vactube items.
 """
-from typing import Optional, Dict, Tuple, List, Iterator, Iterable
+from __future__ import annotations
+from collections.abc import Iterator, Iterable
 
 import attr
 
@@ -10,6 +11,7 @@ import srctools.logger
 from precomp import tiling, instanceLocs, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.conditions import make_result, meta_cond, RES_EXHAUSTED
+import utils
 
 COND_MOD_NAME = None
 
@@ -19,22 +21,31 @@ PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
-PUSH_TRIGS: Dict[Tuple[float, float, float], Entity] = {}
-VAC_TRACKS: List[Tuple['Marker', Dict[str, 'Marker']]] = []  # Tuples of (start, group)
+PUSH_TRIGS: dict[tuple[float, float, float], Entity] = {}
+VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
 
 
 @attr.define
 class Config:
     """Configuration for a vactube item set."""
-    inst_corner: List[str]
-    temp_corner: List[Tuple[Optional[template_brush.Template], Iterable[str]]]
-    inst_straight: str
-    inst_support: str
+    inst_corner: list[str]
+    temp_corner: list[tuple[template_brush.Template | None, Iterable[str]]]
+    trig_radius: int
+    inst_support: str  # Placed on each side with an adjacent wall.
+    inst_support_ring: str  # If any support is placed, this is placed.
     inst_exit: str
 
     inst_entry_floor: str
     inst_entry_wall: str
     inst_entry_ceil: str
+
+    # For straight instances, a size (multiple of 128) -> instance.
+    inst_straight: dict[int, str]
+    # And those sizes from large to small.
+    inst_straight_sizes: list[int] = attr.ib(init=False)
+    @inst_straight_sizes.default
+    def _straight_size(self) -> list[int]:
+        return sorted(self.inst_straight.keys(), reverse=True)
 
 
 @attr.define
@@ -44,7 +55,7 @@ class Marker:
     conf: Config
     size: int
     no_prev: bool = True
-    next: Optional[str] = None
+    next: str | None = None
     orient: Matrix = attr.ib(init=False, on_setattr=attr.setters.frozen)
 
     # noinspection PyUnresolvedReferences
@@ -54,7 +65,7 @@ class Marker:
         rot = Matrix.from_angle(Angle.from_str(self.ent['angles']))
         return Matrix.from_yaw(180) @ rot
 
-    def follow_path(self, vac_list: Dict[str, 'Marker']) -> Iterator[Tuple['Marker', 'Marker']]:
+    def follow_path(self, vac_list: dict[str, Marker]) -> Iterator[tuple[Marker, Marker]]:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:
@@ -69,7 +80,7 @@ class Marker:
 # Store the configs for vactube items so we can
 # join them together - multiple item types can participate in the same
 # vactube track.
-VAC_CONFIGS: Dict[str, Dict[str, Tuple[Config, int]]] = {}
+VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
 @make_result('CustVactube')
@@ -88,7 +99,7 @@ def res_vactubes(vmf: VMF, res: Property):
         # Grab the already-filled values, and add to them
         inst_config = VAC_CONFIGS[group]
 
-    def get_temp(key: str) -> Tuple[Optional[template_brush.Template], Iterable[str]]:
+    def get_temp(key: str) -> tuple[template_brush.Template | None, Iterable[str]]:
         """Read the template, handling errors."""
         try:
             temp_name = block['temp_' + key]
@@ -103,6 +114,14 @@ def res_vactubes(vmf: VMF, res: Property):
 
     for block in res.find_all("Instance"):
         # Configuration info for each instance set..
+        straight_block = block.find_key('straight_inst', '')
+        if straight_block.has_children():
+            straight = {
+                int(prop.name): prop.value
+                for prop in straight_block
+            }
+        else:
+            straight = {128: straight_block.value}
         conf = Config(
             # The three sizes of corner instance
             inst_corner=[
@@ -115,11 +134,13 @@ def res_vactubes(vmf: VMF, res: Property):
                 get_temp('corner_medium'),
                 get_temp('corner_large'),
             ],
-            # Straight instances connected to the next part
-            inst_straight=block['straight_inst', ''],
+            trig_radius=block.float('trig_size', 64.0) / 2.0,
+            inst_straight=straight,
             # Supports attach to the 4 sides of the straight part,
             # if there's a brush there.
             inst_support=block['support_inst', ''],
+            # If a support is placed, this is also placed once.
+            inst_support_ring=block['support_ring_inst', ''],
             inst_entry_floor=block['entry_floor_inst'],
             inst_entry_wall=block['entry_inst'],
             inst_entry_ceil=block['entry_ceil_inst'],
@@ -146,7 +167,7 @@ def res_vactubes(vmf: VMF, res: Property):
 
         del VAC_CONFIGS[group]  # Don't let this run twice
 
-        markers: Dict[str, Marker] = {}
+        markers: dict[str, Marker] = {}
 
         # Find all our markers, so we can look them up by targetname.
         for inst in vmf.by_class['func_instance']:
@@ -238,13 +259,13 @@ def vactube_gen(vmf: VMF) -> None:
 
         # If the end is placed in goo, don't add logic - it isn't visible, and
         # the object is on a one-way trip anyway.
-        if BLOCK_POS['world': end_loc].is_goo and end_norm.z < 0:
+        if not (BLOCK_POS['world': end_loc].is_goo and end_norm.z < -1e-6):
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
             end_logic['file'] = end.conf.inst_exit
 
 
-def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
+def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
     """Generate the push trigger for these solids."""
     # We only need one trigger per direction, for now.
     try:
@@ -256,8 +277,8 @@ def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: List[Solid]) -> None:
             # The z-direction is reversed..
             pushdir=normal.to_angle(),
             speed=(
-                UP_PUSH_SPEED if normal.z > 0 else
-                DN_PUSH_SPEED if normal.z < 0 else
+                UP_PUSH_SPEED if normal.z > 1e-6 else
+                DN_PUSH_SPEED if normal.z < -1e-6 else
                 PUSH_SPEED
             ),
             spawnflags='1103',  # Clients, Physics, Everything
@@ -293,55 +314,64 @@ def make_straight(
     is_start=False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
+    angles = round(normal, 6).to_angle()
+    orient = Matrix.from_angle(angles)
 
-    # 32 added to the other directions, plus extended dist in the direction
-    # of the normal - 1
-    p1 = origin + (normal * ((dist // 128 * 128) - 96))
-    # The starting brush needs to
-    # stick out a bit further, to cover the
+    # The starting brush needs to stick out a bit further, to cover the
     # point_push entity.
-    p2 = origin - (normal * (96 if is_start else 32))
+    start_off = -96 if is_start else -64
 
-    # bbox before +- 32 to ensure the above doesn't wipe it out
-    p1, p2 = Vec.bbox(p1, p2)
+    p1, p2 = Vec.bbox(
+        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+    )
 
-    solid = vmf.make_prism(
-        # Expand to 64x64 in the other two directions
-        p1 - 32, p2 + 32,
-        mat='tools/toolstrigger',
-    ).solid
+    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
     motion_trigger(vmf, solid.copy())
 
     push_trigger(vmf, origin, normal, [solid])
 
-    angles = normal.to_angle()
-    orient = Matrix.from_angle(angles)
-
-    for off in range(0, int(dist), 128):
-        position = origin + off * normal
+    off = 0
+    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
         vmf.create_ent(
             classname='func_instance',
-            origin=position,
-            angles=orient.to_angle(),
-            file=config.inst_straight,
+            origin=origin + off * orient.forward(),
+            angles=angles,
+            file=config.inst_straight[seg_dist],
         )
-
-        for supp_dir in [orient.up(), orient.left(), -orient.left(), -orient.up()]:
-            try:
-                tile = tiling.TILES[
-                    (position - 128 * supp_dir).as_tuple(),
-                    supp_dir.norm().as_tuple()
-                ]
-            except KeyError:
-                continue
-            # Check all 4 center tiles are present.
-            if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+        off += seg_dist
+    # Supports.
+    if config.inst_support:
+        for off in range(0, int(dist), 128):
+            position = origin + off * normal
+            placed_support = False
+            for supp_dir in [
+                orient.up(), orient.left(),
+                -orient.left(), -orient.up()
+            ]:
+                try:
+                    tile = tiling.TILES[
+                        (position - 128 * supp_dir).as_tuple(),
+                        supp_dir.norm().as_tuple()
+                    ]
+                except KeyError:
+                    continue
+                # Check all 4 center tiles are present.
+                if all(tile[u, v].is_tile for u in (1, 2) for v in (1, 2)):
+                    vmf.create_ent(
+                        classname='func_instance',
+                        origin=position,
+                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        file=config.inst_support,
+                    )
+                    placed_support = True
+            if placed_support and config.inst_support_ring:
                 vmf.create_ent(
                     classname='func_instance',
                     origin=position,
-                    angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
-                    file=config.inst_support,
+                    angles=angles,
+                    file=config.inst_support_ring,
                 )
 
 
@@ -396,7 +426,7 @@ def make_bend(
     # limited by the user's setting and the distance we have in each direction
     corner_size = int(min(
         first_movement // 128, sec_movement // 128,
-        3, max_size,
+        3, max_size + 1,
     ))
 
     straight_a = first_movement - (corner_size - 1) * 128
@@ -594,7 +624,7 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
 
     if norm_a == norm_b:
         # Either straight-line, or s-bend.
-        dist = (origin_a - origin_b).mag()
+        dist = round((origin_a - origin_b).mag())
 
         if origin_a + (norm_a * dist) == origin_b:
             make_straight(

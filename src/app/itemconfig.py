@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import trio
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 from functools import lru_cache
@@ -15,6 +16,7 @@ from app.tooltip import add_tooltip
 import utils
 import srctools.logger
 from app import signage_ui, UI, tkMarkdown, sound, img, tk_tools
+from localisation import gettext
 
 from typing import Union, Callable, List, Tuple, Optional
 
@@ -56,43 +58,45 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     return r, g, b
 
 
-@BEE2_config.option_handler('ItemVar')
-def save_load_itemvar(prop: Property=None) -> Optional[Property]:
-    """Save or load item variables into the palette."""
-    if prop is None:
-        prop = Property('', [])
-        for group in CONFIG_ORDER:
-            conf = Property(group.id, [])
-            for widget in group.widgets:
-                if widget.has_values:
-                    conf.append(Property(widget.id, widget.values.get()))
-            for widget in group.multi_widgets:
-                conf.append(Property(widget.id, [
-                    Property(str(tim_val), var.get())
-                    for tim_val, var in
-                    widget.values
-                ]))
-            prop.append(conf)
-        return prop
-    else:
-        # Loading.
-        for group in CONFIG_ORDER:
-            conf = prop.find_key(group.id, [])
-            for widget in group.widgets:
-                if widget.has_values:
-                    try:
-                        widget.values.set(conf[widget.id])
-                    except LookupError:
-                        pass
+@BEE2_config.OPTION_SAVE('ItemVar')
+def save_itemvar() -> Property:
+    """Save item variables into the palette."""
+    prop = Property('', [])
+    for group in CONFIG_ORDER:
+        conf = Property(group.id, [])
+        for widget in group.widgets:
+            if widget.has_values:
+                conf.append(Property(widget.id, widget.values.get()))
+        for widget in group.multi_widgets:
+            conf.append(Property(widget.id, [
+                Property(str(tim_val), var.get())
+                for tim_val, var in
+                widget.values
+            ]))
+        prop.append(conf)
+    return prop
 
-            for widget in group.multi_widgets:
-                time_conf = conf.find_key(widget.id, [])
-                for tim_val, var in widget.values:
-                    try:
-                        var.set(time_conf[str(tim_val)])
-                    except LookupError:
-                        pass
-        return None
+
+@BEE2_config.OPTION_LOAD('ItemVar')
+def load_itemvar(prop: Property) -> None:
+    """Load item variables into the palette."""
+    for group in CONFIG_ORDER:
+        conf = prop.find_block(group.id, or_blank=True)
+        for widget in group.widgets:
+            if widget.has_values:
+                try:
+                    widget.values.set(conf[widget.id])
+                except LookupError:
+                    pass
+
+        for widget in group.multi_widgets:
+            time_conf = conf.find_block(widget.id, or_blank=True)
+            for tim_val, var in widget.values:
+                try:
+                    var.set(time_conf[str(tim_val)])
+                except LookupError:
+                    pass
+    return None
 
 
 @attr.define
@@ -131,8 +135,8 @@ class ConfigGroup(PakObject, allow_mult=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'PakObject':
-        props = data.info  # type: Property
+    async def parse(cls, data: ParseData) -> 'PakObject':
+        props = data.info
 
         if data.is_override:
             # Override doesn't have a name
@@ -146,6 +150,7 @@ class ConfigGroup(PakObject, allow_mult=True):
         multi_widgets = []  # type: List[Widget]
 
         for wid in props.find_all('Widget'):
+            await trio.sleep(0)
             try:
                 create_func = WidgetLookup[wid['type']]
             except KeyError:
@@ -322,9 +327,14 @@ def make_pane(parent: ttk.Frame):
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
 
+                try:
+                    widget = wid.create_func(wid_frame, wid.values, wid.config)
+                except Exception:
+                    LOGGER.exception('Could not construct widget {}.{}', config.id, wid.id)
+                    continue
+
                 label = ttk.Label(wid_frame, text=wid.name + ': ')
                 label.grid(row=0, column=0)
-                widget = wid.create_func(wid_frame, wid.values, wid.config)
                 widget.grid(row=0, column=1, sticky='e')
 
                 if wid.tooltip:
@@ -609,7 +619,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
         new_color, tk_color = askcolor(
             color=(r, g, b),
             parent=parent.winfo_toplevel(),
-            title=_('Choose a Color'),
+            title=gettext('Choose a Color'),
         )
         if new_color is not None:
             r, g, b = map(int, new_color)  # Returned as floats, which is wrong.

@@ -19,7 +19,8 @@ from packages import CORRIDOR_COUNTS, CorrDesc
 from app import selector_win, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
 from app import tkMarkdown, SubPane, img, tk_tools
-from BEE2_config import ConfigFile, option_handler
+from localisation import gettext
+import BEE2_config
 import utils
 
 
@@ -29,7 +30,7 @@ LOGGER = get_logger(__name__)
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR: dict[str, selector_win.selWin] = {}
+CORRIDOR: dict[str, selector_win.SelectorWin] = {}
 CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
 
 CORRIDOR_DESC = tkMarkdown.convert('', None)
@@ -43,7 +44,7 @@ COMPILE_DEFAULTS = {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        'use_voice_priority': '1',
+        'voiceline_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
     },
@@ -66,15 +67,15 @@ COMPILE_DEFAULTS = {
 }
 
 PLAYER_MODELS = {
-    'ATLAS': _('ATLAS'),
-    'PBODY': _('P-Body'),
-    'SP': _('Chell'),
-    'PETI': _('Bendy'),
+    'ATLAS': gettext('ATLAS'),
+    'PBODY': gettext('P-Body'),
+    'SP': gettext('Chell'),
+    'PETI': gettext('Bendy'),
 }
 PLAYER_MODEL_ORDER = ['PETI', 'SP', 'ATLAS', 'PBODY']
 PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
 
-COMPILE_CFG = ConfigFile('compile.cfg')
+COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: Union[SubPane.SubPane, tk.Tk, None] = None
 UI: dict[str, tk.Widget] = {}
@@ -87,7 +88,7 @@ tk_screenshot = None  # The preview image shown
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
-VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True))
+VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
 player_model_var = tk.StringVar(
     value=PLAYER_MODELS.get(
@@ -100,6 +101,9 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
 
 packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
+
+default_lrg_icon = img.Handle.builtin('BEE2/corr_generic', selector_win.ICON_SIZE, selector_win.ICON_SIZE)
+default_sml_icon = default_lrg_icon.crop(selector_win.ICON_CROP_SHRINK)
 
 count_brush = tk.IntVar(value=0)
 count_entity = tk.IntVar(value=0)
@@ -116,26 +120,32 @@ COUNT_CATEGORIES = [
     (
         count_brush, 'brush', 8192,
         # i18n: Progress bar description
-        _("Brushes form the walls or other parts of the test chamber. If this "
-          "is high, it may help to reduce the size of the map or remove "
-          "intricate shapes.")
+        gettext(
+            "Brushes form the walls or other parts of the test chamber. If this "
+            "is high, it may help to reduce the size of the map or remove "
+            "intricate shapes."
+        )
     ),
     (
         count_entity, 'entity', 2048,
         # i18n: Progress bar description
-        _("Entities are the things in the map that have functionality. Removing "
-          "complex moving items will help reduce this. Items have their entity "
-          "count listed in the item description window.\n\n"
-          "This isn't completely accurate, some entity types are counted here "
-          "but don't affect the ingame limit, while others may generate additional "
-          "entities at runtime."),
+        gettext(
+            "Entities are the things in the map that have functionality. "
+            "Removing complex moving items will help reduce this. Items have "
+            "their entity count listed in the item description window.\n\nThis "
+            "isn't completely accurate, some entity types are counted here but "
+            "don't affect the ingame limit, while others may generate "
+            "additional entities at runtime."
+        ),
     ),
     (
         count_overlay, 'overlay', 512,
         # i18n: Progress bar description
-        _("Overlays are smaller images affixed to surfaces, like signs or "
-          "indicator lights. Hiding complex antlines or setting them to signage "
-          "will reduce this.")
+        gettext(
+            "Overlays are smaller images affixed to surfaces, like signs or "
+            "indicator lights. Hiding complex antlines or setting them to "
+            "signage will reduce this."
+        )
     ),
 ]
 
@@ -143,48 +153,49 @@ vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_fu
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
-@option_handler('CompilerPane')
-def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]:
-    """Save/load compiler options from the palette.
+@BEE2_config.OPTION_SAVE('CompilerPane')
+def save_handler() -> Property:
+    """Save the compiler pane to the palette.
 
     Note: We specifically do not save/load the following:
         - packfile dumping
         - compile counts
     This is because these are more system-dependent than map dependent.
     """
-    if props is None:  # Saving
-        corr_prop = Property('corridor', [])
-        props = Property('', [
-            Property('sshot_type', chosen_thumb.get()),
-            Property('sshot_cleanup', str(cleanup_screenshot.get())),
-            Property('spawn_elev', str(start_in_elev.get())),
-            Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
-            Property('use_voice_priority', str(VOICE_PRIORITY_VAR.get())),
-            corr_prop,
-        ])
-        for group, win in CORRIDOR.items():
-            corr_prop[group] = win.chosen_id or '<NONE>'
+    corr_prop = Property('corridor', [])
+    props = Property('', [
+        Property('sshot_type', chosen_thumb.get()),
+        Property('sshot_cleanup', str(cleanup_screenshot.get())),
+        Property('spawn_elev', str(start_in_elev.get())),
+        Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
+        Property('voiceline_priority', str(VOICE_PRIORITY_VAR.get())),
+        corr_prop,
+    ])
+    for group, win in CORRIDOR.items():
+        corr_prop[group] = win.chosen_id or '<NONE>'
 
-        # Embed the screenshot in so we can load it later.
-        if chosen_thumb.get() == 'CUST':
-            # encodebytes() splits it into multiple lines, which we write
-            # in individual blocks to prevent having a massively long line
-            # in the file.
-            with open(SCREENSHOT_LOC, 'rb') as f:
-                screenshot_data = base64.encodebytes(f.read())
-            props.append(Property(
-                'sshot_data',
-                [
-                    Property('b64', data)
-                    for data in
-                    screenshot_data.decode('ascii').splitlines()
-                ]
-            ))
+    # Embed the screenshot in so we can load it later.
+    if chosen_thumb.get() == 'CUST':
+        # encodebytes() splits it into multiple lines, which we write
+        # in individual blocks to prevent having a massively long line
+        # in the file.
+        with open(SCREENSHOT_LOC, 'rb') as f:
+            screenshot_data = base64.encodebytes(f.read())
+        props.append(Property(
+            'sshot_data',
+            [
+                Property('b64', data)
+                for data in
+                screenshot_data.decode('ascii').splitlines()
+            ]
+        ))
 
-        return props
+    return props
 
-    # else: Loading
 
+@BEE2_config.OPTION_LOAD('CompilerPane')
+def load_handler(props: Property) -> None:
+    """Load compiler options from the palette."""
     chosen_thumb.set(props['sshot_type', chosen_thumb.get()])
     cleanup_screenshot.set(props.bool('sshot_cleanup', cleanup_screenshot.get()))
 
@@ -212,9 +223,9 @@ def save_load_compile_pane(props: Optional[Property]=None) -> Optional[Property]
         player_model_var.set(PLAYER_MODELS[player_mdl])
         COMPILE_CFG['General']['player_model'] = player_mdl
 
-    VOICE_PRIORITY_VAR.set(props.bool('use_voice_priority', VOICE_PRIORITY_VAR.get()))
+    VOICE_PRIORITY_VAR.set(props.bool('voiceline_priority', VOICE_PRIORITY_VAR.get()))
 
-    corr_prop = props.find_key('corridor', [])
+    corr_prop = props.find_block('corridor', or_blank=True)
     for group, win in CORRIDOR.items():
         try:
             sel_id = corr_prop[group]
@@ -247,8 +258,6 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
     CORRIDOR_DATA.clear()
     CORRIDOR_DATA.update(config)
 
-    default_icon = img.Handle.builtin('BEE2/corr_generic', 64, 64)
-
     corridor_conf = COMPILE_CFG['CorridorNames']
 
     for group, length in CORRIDOR_COUNTS.items():
@@ -265,7 +274,7 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
             corridor_conf['{}_{}_icon'.format(group, ind)] = str(data.icon)
 
             # Note: default corridor description
-            desc = data.name or _('Corridor')
+            desc = data.name or gettext('Corridor')
             item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
 
             if data.icon:
@@ -273,12 +282,10 @@ def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
                     data.icon,
                     *selector_win.ICON_SIZE_LRG,
                 )
-                item.icon = img.Handle.parse_uri(
-                    data.icon,
-                    selector_win.ICON_SIZE, selector_win.ICON_SIZE,
-                )
+                item.icon = None
             else:
-                item.icon = item.large_icon = default_icon
+                item.icon = default_sml_icon
+                item.large_icon = default_lrg_icon
 
             if data.desc:
                 item.desc = tkMarkdown.convert(data.desc, None)
@@ -295,7 +302,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
     """Create the corridor widget and items."""
     length = CORRIDOR_COUNTS[corr_name]
 
-    CORRIDOR[corr_name] = sel = selector_win.selWin(
+    CORRIDOR[corr_name] = sel = selector_win.SelectorWin(
         TK_ROOT,
         [
             selector_win.Item(
@@ -304,14 +311,15 @@ def make_corr_wid(corr_name: str, title: str) -> None:
             )
             for i in range(1, length + 1)
         ],
+        save_id='corr_' + corr_name,
         title=title,
-        none_desc=_(
+        none_desc=gettext(
             'Randomly choose a corridor. '
             'This is saved in the puzzle data '
             'and will not change.'
         ),
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=_('Random'),
+        none_name=gettext('Random'),
         callback=sel_corr_callback,
         callback_params=[corr_name],
     )
@@ -414,8 +422,8 @@ def find_screenshot(e=None) -> None:
         title='Find Screenshot',
         filetypes=[
             # note: File type description
-            (_('Image Files'), '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
-                               '*.tiff *.tga *.ico *.psd'),
+            (gettext('Image Files'), '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
+                                     '*.tiff *.tga *.ico *.psd'),
         ],
         initialdir='C:',
     )
@@ -435,7 +443,7 @@ def set_screen_type() -> None:
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     else:
         UI['thumb_label'].grid_forget()
-    UI['thumb_label'].update()
+    UI['thumb_label'].update_idletasks()
     # Resize the pane to accommodate the shown/hidden image
     window.geometry('{}x{}'.format(
         window.winfo_width(),
@@ -481,12 +489,12 @@ def make_widgets() -> None:
     """Create the compiler options pane.
 
     """
-    make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR)
+    make_setter('General', 'voiceline_priority', VOICE_PRIORITY_VAR)
     make_setter('General', 'spawn_elev', start_in_elev)
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
     make_setter('General', 'vrad_force_full', vrad_light_type)
 
-    ttk.Label(window, justify='center', text=_(
+    ttk.Label(window, justify='center', text=gettext(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
     )).grid(row=0, column=0, sticky='ew', padx=2, pady=2)
@@ -501,12 +509,12 @@ def make_widgets() -> None:
 
     map_frame = ttk.Frame(nbook)
     # note: Tab name
-    nbook.add(map_frame, text=_('Map Settings'))
+    nbook.add(map_frame, text=gettext('Map Settings'))
     make_map_widgets(map_frame)
 
     comp_frame = ttk.Frame(nbook)
     # note: Tab name
-    nbook.add(comp_frame, text=_('Compile Settings'))
+    nbook.add(comp_frame, text=gettext('Compile Settings'))
     make_comp_widgets(comp_frame)
 
 
@@ -520,7 +528,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     thumb_frame = ttk.LabelFrame(
         frame,
-        text=_('Thumbnail'),
+        text=gettext('Thumbnail'),
         labelanchor=tk.N,
     )
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
@@ -528,7 +536,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_auto'] = ttk.Radiobutton(
         thumb_frame,
-        text=_('Auto'),
+        text=gettext('Auto'),
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen_type,
@@ -536,7 +544,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_peti'] = ttk.Radiobutton(
         thumb_frame,
-        text=_('PeTI'),
+        text=gettext('PeTI'),
         value='PETI',
         variable=chosen_thumb,
         command=set_screen_type,
@@ -544,7 +552,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_custom'] = ttk.Radiobutton(
         thumb_frame,
-        text=_('Custom:'),
+        text=gettext('Custom:'),
         value='CUST',
         variable=chosen_thumb,
         command=set_screen_type,
@@ -559,7 +567,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_cleanup'] = ttk.Checkbutton(
         thumb_frame,
-        text=_('Cleanup old screenshots'),
+        text=gettext('Cleanup old screenshots'),
         variable=cleanup_screenshot,
     )
 
@@ -567,19 +575,17 @@ def make_comp_widgets(frame: ttk.Frame):
     UI['thumb_peti'].grid(row=0, column=1, sticky='W')
     UI['thumb_custom'].grid(row=1, column=0, columnspan=2, sticky='NEW')
     UI['thumb_cleanup'].grid(row=3, columnspan=2, sticky='W')
-    add_tooltip(
-        UI['thumb_auto'],
-        _("Override the map image to use a screenshot automatically taken "
-          "from the beginning of a chamber. Press F5 to take a new "
-          "screenshot. If the map has not been previewed recently "
-          "(within the last few hours), the default PeTI screenshot "
-          "will be used instead.")
-    )
+    add_tooltip(UI['thumb_auto'], gettext(
+        "Override the map image to use a screenshot automatically taken from "
+        "the beginning of a chamber. Press F5 to take a new screenshot. If the "
+        "map has not been previewed recently (within the last few hours), the "
+        "default PeTI screenshot will be used instead."
+    ))
     add_tooltip(
         UI['thumb_peti'],
-        _("Use the normal editor view for the map preview image.")
+        gettext("Use the normal editor view for the map preview image.")
     )
-    custom_tooltip = _(
+    custom_tooltip = gettext(
         "Use a custom image for the map preview image. Click the "
         "screenshot to select.\n"
         "Images will be converted to JPEGs if needed."
@@ -594,11 +600,10 @@ def make_comp_widgets(frame: ttk.Frame):
         custom_tooltip,
     )
 
-    add_tooltip(
-        UI['thumb_cleanup'],
-        _('Automatically delete unused Automatic screenshots. '
-          'Disable if you want to keep things in "portal2/screenshots". ')
-    )
+    add_tooltip(UI['thumb_cleanup'], gettext(
+        'Automatically delete unused Automatic screenshots. Disable if you want '
+        'to keep things in "portal2/screenshots". '
+    ))
 
     if chosen_thumb.get() == 'CUST':
         # Show this if the user has set it before
@@ -607,43 +612,44 @@ def make_comp_widgets(frame: ttk.Frame):
 
     vrad_frame = ttk.LabelFrame(
         frame,
-        text=_('Lighting:'),
+        text=gettext('Lighting:'),
         labelanchor='n',
     )
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
-        text=_('Fast'),
+        text=gettext('Fast'),
         value=0,
         variable=vrad_light_type,
     )
     UI['light_fast'].grid(row=0, column=0)
     UI['light_full'] = ttk.Radiobutton(
         vrad_frame,
-        text=_('Full'),
+        text=gettext('Full'),
         value=1,
         variable=vrad_light_type,
     )
     UI['light_full'].grid(row=0, column=1)
 
-    add_tooltip(
-        UI['light_fast'],
-        _("Compile with lower-quality, fast lighting. This speeds "
-          "up compile times, but does not appear as good. Some "
-          "shadows may appear wrong.\n"
-          "When publishing, this is ignored.")
+    light_conf_swap = gettext(
+        "You can hold down Shift during the start of the Lighting stage to invert this "
+        "configuration on the fly."
     )
-    add_tooltip(
-        UI['light_full'],
-        _("Compile with high-quality lighting. This looks correct, "
-          "but takes longer to compute. Use if you're arranging lights.\n"
-          "When publishing, this is always used.")
-    )
+    add_tooltip(UI['light_fast'], gettext(
+        "Compile with lower-quality, fast lighting. This speeds up compile "
+        "times, but does not appear as good. Some shadows may appear "
+        "wrong.\nWhen publishing, this is ignored."
+    ) + "\n\n" + light_conf_swap)
+    add_tooltip(UI['light_full'], gettext(
+        "Compile with high-quality lighting. This looks correct, but takes "
+        "longer to compute. Use if you're arranging lights.\nWhen "
+        "publishing, this is always used."
+    ) + "\n\n" + light_conf_swap)
 
     packfile_enable = ttk.Checkbutton(
         frame,
-        text=_('Dump packed files to:'),
+        text=gettext('Dump packed files to:'),
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
     )
@@ -666,15 +672,14 @@ def make_comp_widgets(frame: ttk.Frame):
 
     set_pack_dump_enabled()
 
-    add_tooltip(
-        packfile_enable,
-        _("When compiling, dump all files which were packed into the map. Useful"
-          " if you're intending to edit maps in Hammer.")
-    )
+    add_tooltip(packfile_enable, gettext(
+        "When compiling, dump all files which were packed into the map. "
+        "Useful if you're intending to edit maps in Hammer."
+    ))
 
     count_frame = ttk.LabelFrame(
         frame,
-        text=_('Last Compile:'),
+        text=gettext('Last Compile:'),
         labelanchor='n',
     )
 
@@ -684,7 +689,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     ttk.Label(
         count_frame,
-        text=_('Entity'),
+        text=gettext('Entity'),
         anchor='n',
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
 
@@ -704,7 +709,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     ttk.Label(
         count_frame,
-        text=_('Overlay'),
+        text=gettext('Overlay'),
         anchor='center',
     ).grid(row=2, column=0, sticky='ew')
     UI['count_overlay'] = ttk.Progressbar(
@@ -721,15 +726,14 @@ def make_comp_widgets(frame: ttk.Frame):
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
-    add_tooltip(
-        UI['refresh_counts'],
-        _("Refresh the compile progress bars. Press after a compile has been "
-          "performed to show the new values."),
-    )
+    add_tooltip(UI['refresh_counts'],gettext(
+        "Refresh the compile progress bars. Press after a compile has been "
+        "performed to show the new values."
+    ))
 
     ttk.Label(
         count_frame,
-        text=_('Brush'),
+        text=gettext('Brush'),
         anchor='center',
     ).grid(row=2, column=2, sticky=tk.EW)
     UI['count_brush'] = ttk.Progressbar(
@@ -757,27 +761,26 @@ def make_map_widgets(frame: ttk.Frame):
 
     voice_frame = ttk.LabelFrame(
         frame,
-        text=_('Voicelines:'),
+        text=gettext('Voicelines:'),
         labelanchor='nw',
     )
     voice_frame.grid(row=1, column=0, sticky='ew')
 
     voice_priority = ttk.Checkbutton(
         voice_frame,
-        text=_("Use voiceline priorities"),
+        text=gettext("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
     )
     voice_priority.grid(row=0, column=0)
-    add_tooltip(
-        voice_priority,
-        _("Only choose the highest-priority voicelines. This means more "
-          "generic lines will can only be chosen if few test elements are in "
-          "the map. If disabled any applicable lines will be used."),
-    )
+    add_tooltip(voice_priority, gettext(
+        "Only choose the highest-priority voicelines. This means more generic "
+        "lines will can only be chosen if few test elements are in the map. "
+        "If disabled any applicable lines will be used."
+    ))
 
     elev_frame = ttk.LabelFrame(
         frame,
-        text=_('Spawn at:'),
+        text=gettext('Spawn at:'),
         labelanchor='n',
     )
 
@@ -787,13 +790,13 @@ def make_map_widgets(frame: ttk.Frame):
 
     elev_preview = ttk.Radiobutton(
         elev_frame,
-        text=_('Entry Door'),
+        text=gettext('Entry Door'),
         value=0,
         variable=start_in_elev,
     )
     elev_elevator = ttk.Radiobutton(
         elev_frame,
-        text=_('Elevator'),
+        text=gettext('Elevator'),
         value=1,
         variable=start_in_elev,
     )
@@ -801,28 +804,30 @@ def make_map_widgets(frame: ttk.Frame):
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
-    add_tooltip(
-        elev_elevator,
-        _("When previewing in SP, spawn inside the entry elevator. "
-          "Use this to examine the entry and exit corridors.")
+    elev_conf_swap = gettext(
+        "You can hold down Shift during the start of the Geometry stage to quickly swap which"
+        "location you spawn at on the fly."
     )
-    add_tooltip(
-        elev_preview,
-        _("When previewing in SP, spawn just before the entry door.")
-    )
+    add_tooltip(elev_elevator, gettext(
+        "When previewing in SP, spawn inside the entry elevator. Use this to "
+        "examine the entry and exit corridors."
+    ) + "\n\n" + elev_conf_swap)
+    add_tooltip(elev_preview, gettext(
+        "When previewing in SP, spawn just before the entry door."
+    ) + "\n\n" + elev_conf_swap)
 
     corr_frame = ttk.LabelFrame(
         frame,
         width=18,
-        text=_('Corridor:'),
+        text=gettext('Corridor:'),
         labelanchor='n',
     )
     corr_frame.grid(row=3, column=0, sticky='ew')
     corr_frame.columnconfigure(1, weight=1)
 
-    make_corr_wid('sp_entry', _('Singleplayer Entry Corridor'))  # i18n: corridor selector window title.
-    make_corr_wid('sp_exit', _('Singleplayer Exit Corridor'))  # i18n: corridor selector window title.
-    make_corr_wid('coop', _('Coop Exit Corridor'))  # i18n: corridor selector window title.
+    make_corr_wid('sp_entry', gettext('Singleplayer Entry Corridor'))  # i18n: corridor selector window title.
+    make_corr_wid('sp_exit', gettext('Singleplayer Exit Corridor'))  # i18n: corridor selector window title.
+    make_corr_wid('coop', gettext('Coop Exit Corridor'))  # i18n: corridor selector window title.
 
     load_corridors()
 
@@ -832,23 +837,23 @@ def make_map_widgets(frame: ttk.Frame):
 
     ttk.Label(
         corr_frame,
-        text=_('SP Entry:'),
+        text=gettext('SP Entry:'),
         anchor='e',
     ).grid(row=0, column=0, sticky='ew', padx=2)
     ttk.Label(
         corr_frame,
-        text=_('SP Exit:'),
+        text=gettext('SP Exit:'),
         anchor='e',
     ).grid(row=1, column=0, sticky='ew', padx=2)
     ttk.Label(
         corr_frame,
-        text=_('Coop Exit:'),
+        text=gettext('Coop Exit:'),
         anchor='e',
     ).grid(row=2, column=0, sticky='ew', padx=2)
 
     model_frame = ttk.LabelFrame(
         frame,
-        text=_('Player Model (SP):'),
+        text=gettext('Player Model (SP):'),
         labelanchor='n',
     )
     model_frame.grid(row=4, column=0, sticky='ew')
@@ -879,7 +884,7 @@ def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     global window
     window = SubPane.SubPane(
         TK_ROOT,
-        title=_('Compile Options'),
+        title=gettext('Compile Options'),
         name='compiler',
         menu_bar=menu_bar,
         resize_x=True,
@@ -897,7 +902,7 @@ def init_application() -> None:
     """Initialise when standalone."""
     global window
     window = TK_ROOT
-    window.title(_('Compiler Options - {}').format(utils.BEE_VERSION))
+    window.title(gettext('Compiler Options - {}').format(utils.BEE_VERSION))
     window.resizable(True, False)
 
     make_widgets()

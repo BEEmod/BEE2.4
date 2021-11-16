@@ -1,13 +1,13 @@
 """Manages the list of textures used for brushes, and how they are applied."""
 import itertools
-from collections import namedtuple
+import abc
 from enum import Enum
 from pathlib import Path
 
-import random
-import abc
+import attr
 
 import srctools.logger
+from precomp import rand
 from srctools import Property, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
@@ -38,8 +38,6 @@ GEN_CLASSES: utils.FuncLookup['Generator'] = utils.FuncLookup('Generators')
 # These can just be looked up directly.
 SPECIAL: 'Generator'
 OVERLAYS: 'Generator'
-
-Clump = namedtuple('Clump', 'x1 y1 z1 x2 y2 z2 seed')
 
 
 class GenCat(Enum):
@@ -198,17 +196,17 @@ TEX_DEFAULTS: Dict[
 ] = {
     # Signage overlays.
     GenCat.OVERLAYS: {
-        'exit': consts.Signage.EXIT, 
-        'arrow': consts.Signage.ARROW, 
-        'dot': consts.Signage.SHAPE_DOT, 
-        'moon': consts.Signage.SHAPE_MOON, 
-        'triangle': consts.Signage.SHAPE_TRIANGLE, 
-        'cross': consts.Signage.SHAPE_CROSS, 
-        'square': consts.Signage.SHAPE_SQUARE, 
-        'circle': consts.Signage.SHAPE_CIRCLE, 
-        'sine': consts.Signage.SHAPE_SINE, 
-        'slash': consts.Signage.SHAPE_SLASH, 
-        'star': consts.Signage.SHAPE_STAR, 
+        'exit': consts.Signage.EXIT,
+        'arrow': consts.Signage.ARROW,
+        'dot': consts.Signage.SHAPE_DOT,
+        'moon': consts.Signage.SHAPE_MOON,
+        'triangle': consts.Signage.SHAPE_TRIANGLE,
+        'cross': consts.Signage.SHAPE_CROSS,
+        'square': consts.Signage.SHAPE_SQUARE,
+        'circle': consts.Signage.SHAPE_CIRCLE,
+        'sine': consts.Signage.SHAPE_SINE,
+        'slash': consts.Signage.SHAPE_SLASH,
+        'star': consts.Signage.SHAPE_STAR,
         'wavy': consts.Signage.SHAPE_WAVY,
 
         # If set and enabled, adds frames for >10 sign pairs
@@ -217,6 +215,8 @@ TEX_DEFAULTS: Dict[
 
         # Faith Plate bullseye for non-moving surfaces.
         'bullseye': consts.Special.BULLSEYE,
+        # Tideline overlay around the outside of goo pits.
+        'tideline': consts.Goo.TIDELINE,
     },
     # Misc textures.
     GenCat.SPECIAL: {
@@ -631,7 +631,7 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
+def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     """Do various setup steps, needed for generating textures.
 
     - Set randomisation seed on all the generators.
@@ -643,7 +643,6 @@ def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> Non
     antigel_loc.mkdir(parents=True, exist_ok=True)
 
     fsys = game.get_filesystem()
-    fsys.open_ref()
 
     # Basetexture -> material name
     tex_to_antigel: Dict[str, str] = {}
@@ -670,21 +669,8 @@ def setup(game: Game, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> Non
         tex_to_antigel[texture.casefold()] = mat_name
         antigel_mats.add(vmt_file.stem)
 
-    gen_key_str: Union[GenCat, str]
-    for gen_key, generator in GENERATORS.items():
-        # Compute a unique string for randomisation
-        if isinstance(gen_key, tuple):
-            gen_cat, gen_orient, gen_portal = gen_key
-            gen_key_str = '{}.{}.{}'.format(
-                gen_cat.value,
-                gen_portal.value,
-                gen_orient,
-            )
-        else:
-            gen_key_str = gen_key
-
-        generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key_str)
-        generator.setup(vmf, global_seed, tiles)
+    for generator in GENERATORS.values():
+        generator.setup(vmf, tiles)
 
         # No need to convert if it's overlay, or it's bullseye and those
         # are incompatible.
@@ -761,10 +747,6 @@ class Generator(abc.ABC):
         self.options = options
         self.textures = textures
 
-        self._random = random.Random()
-        # When set, add the position to that and use to seed the RNG.
-        self.map_seed = ''
-
         # Tells us the category each generator matches to.
         self.category = category
         self.orient = orient
@@ -791,11 +773,6 @@ class Generator(abc.ABC):
         if self.category is GenCat.NORMAL and self.orient is Orient.WALL and BLOCK_TYPE[grid_loc].is_goo:
             tex_name = TileSize.GOO_SIDE
 
-        if self.map_seed:
-            self._random.seed(self.map_seed + str(loc))
-        else:
-            LOGGER.warning('Choosing texture ("{}") without seed!', tex_name)
-
         try:
             texture = self._get(loc, tex_name)
         except KeyError as exc:
@@ -810,7 +787,7 @@ class Generator(abc.ABC):
 
         return texture
 
-    def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and setup the generator."""
 
     def _missing_error(self, tex_name: str):
@@ -868,7 +845,19 @@ class GenRandom(Generator):
                 raise ValueError(
                     f'Unknown enum value {tex_name!r} '
                     f'for generator type {self.category}!') from None
-        return self._random.choice(self.textures[tex_name])
+        return rand.seed(b'tex_rand', loc).choice(self.textures[tex_name])
+
+
+@attr.define
+class Clump:
+    """Represents a region of map, used to create rectangular sections with the same pattern."""
+    x1: float
+    y1: float
+    z1: float
+    x2: float
+    y2: float
+    z2: float
+    seed: bytes
 
 
 @GEN_CLASSES('CLUMP')
@@ -881,11 +870,11 @@ class GenClump(Generator):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        # A seed only unique to this generator, in int form.
-        self.gen_seed = 0
-        self._clump_locs = []  # type: List[Clump]
+        # A seed only unique to this generator.
+        self.gen_seed = b''
+        self._clump_locs: list[Clump] = []
 
-    def setup(self, vmf: VMF, global_seed: str, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
         """Build the list of clump locations."""
         assert self.portal is not None
         assert self.orient is not None
@@ -893,12 +882,11 @@ class GenClump(Generator):
         # Convert the generator key to a generator-specific seed.
         # That ensures different surfaces don't end up reusing the same
         # texture indexes.
-        self.gen_seed = int.from_bytes(
-            self.category.name.encode() +
-            self.portal.name.encode() +
+        self.gen_seed = b''.join([
+            self.category.name.encode(),
+            self.portal.name.encode(),
             self.orient.name.encode(),
-            'big',
-        )
+        ])
 
         LOGGER.info('Generating texture clumps...')
 
@@ -913,7 +901,7 @@ class GenClump(Generator):
         }
 
         # A global RNG for picking clump positions.
-        clump_rand = random.Random(global_seed + '_clumping')
+        clump_rand = rand.seed(b'clump_pos')
 
         pos_min = Vec()
         pos_max = Vec()
@@ -959,7 +947,7 @@ class GenClump(Generator):
                 pos_max.x, pos_max.y, pos_max.z,
                 # We use this to reseed an RNG, giving us the same textures
                 # each time for the same clump.
-                clump_rand.getrandbits(32),
+                clump_rand.getrandbits(64).to_bytes(8, 'little'),
             ))
             if debug_visgroup is not None:
                 # noinspection PyUnboundLocalVariable
@@ -988,24 +976,20 @@ class GenClump(Generator):
             # No clump found - return the gap texture.
             # But if the texture is GOO_SIDE, do that instead.
             # If we don't have a gap texture, just use any one.
-            self._random.seed(self.gen_seed ^ hash(loc.as_tuple()))
+            rng = rand.seed(b'tex_clump_side', loc)
             if tex_name == TileSize.GOO_SIDE or TileSize.CLUMP_GAP not in self:
-                return self._random.choice(self.textures[tex_name])
+                return rng.choice(self.textures[tex_name])
             else:
-                return self._random.choice(self.textures[TileSize.CLUMP_GAP])
+                return rng.choice(self.textures[TileSize.CLUMP_GAP])
 
         # Mix these three values together to determine the texture.
         # The clump seed makes each clump different, and adding the texture
         # name makes sure different surface types don't copy each other's
         # indexes.
-        self._random.seed(
-            self.gen_seed ^
-            int.from_bytes(tex_name.encode(), 'big') ^
-            clump_seed
-        )
-        return self._random.choice(self.textures[tex_name])
+        rng = rand.seed(b'tex_clump_side', self.gen_seed, tex_name, clump_seed)
+        return rng.choice(self.textures[tex_name])
 
-    def _find_clump(self, loc: Vec) -> Optional[int]:
+    def _find_clump(self, loc: Vec) -> Optional[bytes]:
         """Return the clump seed matching a location."""
         for clump in self._clump_locs:
             if (

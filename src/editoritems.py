@@ -1,19 +1,19 @@
 """Parses the Puzzlemaker's item format."""
+from __future__ import annotations
 import sys
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import (
-    Optional, Type, Callable, NamedTuple,
-    List, Dict, Tuple, Set,
-    Iterable, IO, Iterator, Mapping,
-)
+from typing import Type, Callable, ClassVar, Protocol, Any
 from pathlib import PurePosixPath as FSPath
+
+import attr
 
 from srctools import Vec, logger, conv_int, conv_bool, Property, Output
 from srctools.tokenizer import Tokenizer, Token
 
 from connections import Config as ConnConfig, InputType, OutNames
-from editoritems_props import ItemProp, PROP_TYPES
+from editoritems_props import ItemProp, UnknownProp, PROP_TYPES
 
 
 LOGGER = logger.get_logger(__name__)
@@ -21,7 +21,16 @@ LOGGER = logger.get_logger(__name__)
 
 class ItemClass(Enum):
     """PeTI item classes."""
-    # Value: (ID, instance count, models per subitem)
+    # Value:
+    # -  The ID used in the configs.
+    # - The number of instances items of this type have, at maximum.
+    # - The number of models to provide for each subtype.
+
+    def __init__(self, name: str, inst_count: int, models: int) -> None:
+        """Initialise attributes."""
+        self.id = name
+        self.inst_count = inst_count
+        self.mdl_per_subtype = models
 
     # Default
     UNCLASSED = ('ItemBase', 1, 1)
@@ -42,7 +51,7 @@ class ItemClass(Enum):
     FAITH_PLATE = 'ItemCatapult', 1, 1
 
     CUBE_DROPPER = 'ItemCubeDropper', 1, 1
-    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper', 1, 1
+    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper', 1, 4
     FAITH_TARGET = 'ItemCatapultTarget', 1, 1
 
     # Input-less items
@@ -60,7 +69,7 @@ class ItemClass(Enum):
     # Extent/handle pseudo-items
     HANDLE_FIZZLER = 'ItemBarrierHazardExtent', 0, 1
     HANDLE_GLASS = 'ItemBarrierExtent', 0, 1
-    HANDLE_PISTON_PLATFORM = 'ItemPistonPlatformExtent', 0, 1
+    HANDLE_PISTON_PLATFORM = 'ItemPistonPlatformExtent', 0, 2
     HANDLE_TRACK_PLATFORM = 'ItemRailPlatformExtent', 0, 1
 
     # Entry/Exit corridors
@@ -68,21 +77,6 @@ class ItemClass(Enum):
     DOOR_ENTRY_COOP = 'ItemCoopEntranceDoor', 5, 1
     DOOR_EXIT_SP = 'ItemExitDoor', 6, 2
     DOOR_EXIT_COOP = 'ItemCoopExitDoor', 6, 2
-
-    @property
-    def id(self) -> str:
-        """The ID used in the configs."""
-        return self.value[0]
-
-    @property
-    def inst_count(self) -> int:
-        """The number of intances items of this type have, at maximum."""
-        return self.value[1]
-
-    @property
-    def models_per_subtype(self) -> int:
-        """The number of models to provide for each subtype."""
-        return self.value[2]
 
 
 CLASS_BY_NAME = {
@@ -150,11 +144,13 @@ class CollType(Flag):
     EVERYTHING = 0b1111111
 
     GRATE = GRATING
+    NONE = NOTHING
     # If unset, everything but physics collides.
     DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 
     @classmethod
     def parse(cls, tok: Tokenizer) -> 'CollType':
+        """Parse the collision type value."""
         coll = cls.NOTHING
         for part in tok.expect(Token.STRING).split():
             try:
@@ -227,7 +223,7 @@ class Anim(Enum):
     BAD_PLACE_HIDE = 'ANIM_ICON_HIDE'
 
     @classmethod
-    def parse_block(cls, anims: Dict['Anim', int], tok: Tokenizer) -> None:
+    def parse_block(cls, anims: dict[Anim, int], tok: Tokenizer) -> None:
         """Parse a block of animation definitions."""
         for anim_name in tok.block('Animations'):
             try:
@@ -251,14 +247,21 @@ class ConnTypes(Enum):
     FIZZ = 'CONNECTION_HAZARD'  # Output from base.
 
 
-class Connection(NamedTuple):
-    """Activate/deactivate pair defined for connections."""
-    act_name: Optional[str]
-    activate: str  # Input/output used to activate.
-    deact_name: Optional[str]
-    deactivate: str  # Input/output used to deactivate.
+class _TextFile(Protocol):
+    """The functions we require in order to write text to a file."""
+    def write(self, __text: str) -> Any:
+        """We simply need a write() method, and ignore the return value."""
 
-    def write(self, f: IO[str], conn_type: str) -> None:
+
+@attr.define
+class Connection:
+    """Activate/deactivate pair defined for connections."""
+    act_name: str | None
+    activate: str | None  # Input/output used to activate.
+    deact_name: str | None
+    deactivate: str | None  # Input/output used to deactivate.
+
+    def write(self, f: _TextFile, conn_type: str) -> None:
         """Produce the activate/deactivate keys."""
         if self.activate is None and self.deactivate is None:
             return
@@ -277,15 +280,18 @@ class Connection(NamedTuple):
         f.write('\t\t\t\t}\n')
 
 
-class InstCount(NamedTuple):
+@attr.define
+class InstCount:
     """Instances have several associated counts."""
-    inst: FSPath  # The actual filename.
-    ent_count: int
-    brush_count: int
-    face_count: int
+    # The actual filename.
+    inst: FSPath = attr.ib(converter=FSPath)
+    ent_count: int = 0
+    brush_count: int = 0
+    face_count: int = 0
 
 
-class Coord(NamedTuple):
+@attr.frozen
+class Coord:
     """Integer coordinates."""
     x: int
     y: int
@@ -294,6 +300,25 @@ class Coord(NamedTuple):
     def __str__(self) -> str:
         """The string form has no delimiters."""
         return f'{self.x} {self.y} {self.z}'
+
+    def __iter__(self) -> Iterator[int]:
+        """Return each coordinate in order."""
+        yield self.x
+        yield self.y
+        yield self.z
+
+    @classmethod
+    def from_vec(cls, vec: Vec) -> 'Coord':
+        """Round a vector to grid coordinates."""
+        x = round(vec.x)
+        y = round(vec.y)
+        z = round(vec.z)
+        try:
+            return _coord_cache[x, y, z]
+        except KeyError:
+            result = cls(x, y, z)
+            _coord_cache[x, y, z] = result
+            return result
 
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
@@ -336,14 +361,16 @@ class Coord(NamedTuple):
                     yield result
 
 
-class EmbedFace(NamedTuple):
+@attr.define
+class EmbedFace:
     """A face generated by the editor."""
     center: Vec  # Center point, Z always is 128.
     size: Vec  # Size of the tile.
     type: FaceType  # Surface material.
 
 
-class Overlay(NamedTuple):
+@attr.define
+class Overlay:
     """An overlay placed by the editor on the ground."""
     material: str  # Material to show.
     center: Vec  # Center point.
@@ -352,7 +379,7 @@ class Overlay(NamedTuple):
 
 
 # Cache these coordinates, since most items are going to be near the origin.
-_coord_cache: Dict[Tuple[int, int, int], Coord] = {}
+_coord_cache: dict[tuple[int, int, int], Coord] = {}
 
 NORMALS = {
     Coord(0, 0, -1),
@@ -362,22 +389,25 @@ NORMALS = {
     Coord(-1, 0, 0),
     Coord(+1, 0, 0),
 }
-_coord_cache.update(zip(map(tuple, NORMALS), NORMALS))
+_coord_cache.update({
+    (c.x, c.y, c.z): c
+    for c in NORMALS
+})
 # Cache the computed value shapes.
-_coll_type_str: Dict[int, str] = {
+_coll_type_str: dict[int, str] = {
     CollType.NOTHING.value: 'COLLIDE_NOTHING',
     CollType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
 }
 
-ITEM_CLASSES: Dict[str, ItemClass] = {
+ITEM_CLASSES: dict[str, ItemClass] = {
     cls.id.casefold(): cls
     for cls in ItemClass
 }
-FACE_TYPES: Dict[str, FaceType] = {
+FACE_TYPES: dict[str, FaceType] = {
     face.value.casefold(): face
     for face in FaceType
 }
-COLL_TYPES: Dict[str, CollType] = {
+COLL_TYPES: dict[str, CollType] = {
     'COLLIDE_' + coll.name: coll
     for coll in CollType
 }
@@ -398,15 +428,33 @@ DEFAULT_SOUNDS = {
     Sound.CREATE: 'P2Editor.PlaceOther',
     Sound.DELETE: 'P2Editor.RemoveOther',
 }
-_BLANK_INST = [ InstCount(FSPath(), 0, 0, 0) ]
+_BLANK_INST = [InstCount(FSPath(), 0, 0, 0)]
 
 
 class ConnSide(Enum):
-    """Sides of an item, where antlines connect to."""
+    """Sides of an item, where antlines connect to.
+
+    The name is the side of the item it attaches, the vector is the direction the end points - so
+    they're reversed compared to each other.
+    """
     LEFT = Coord(1, 0, 0)
     RIGHT = Coord(-1, 0, 0)
     UP = Coord(0, 1, 0)
     DOWN = Coord(0, -1, 0)
+
+    @classmethod
+    def from_yaw(cls, value: int) -> 'ConnSide':
+        """Return the the side pointing in this yaw direction."""
+        value %= 360
+        if value == 0:
+            return ConnSide.LEFT
+        elif value == 90:
+            return ConnSide.DOWN
+        elif value == 180:
+            return ConnSide.RIGHT
+        elif value == 270:
+            return ConnSide.UP
+        raise ValueError(f'Invalid yaw {value}!')
 
     @classmethod
     def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
@@ -430,35 +478,60 @@ class ConnSide(Enum):
             elif y == -1:
                 return ConnSide.DOWN
         elif y == 0:
-            if x == 1:
-                return ConnSide.LEFT
-            elif x == -1:
+            if x == -1:
                 return ConnSide.RIGHT
+            elif x == 1:
+                return ConnSide.LEFT
         raise error_func('Unknown connection side ({}, {}, 0)', x, y)
 
+    @property
+    def x(self) -> int:
+        """Return the X coordinate."""
+        return self.value.x
 
-class AntlinePoint(NamedTuple):
+    @property
+    def y(self) -> int:
+        """Return the X coordinate."""
+        return self.value.y
+
+    @property
+    def yaw(self) -> int:
+        """Return the yaw direction."""
+        if self is ConnSide.LEFT:
+            return 0
+        if self is ConnSide.DOWN:
+            return 90
+        if self is ConnSide.RIGHT:
+            return 180
+        if self is ConnSide.UP:
+            return 270
+        raise AssertionError(f'Unknown value {self!r}')
+
+
+@attr.frozen
+class AntlinePoint:
     """Locations antlines can connect to."""
     pos: Coord
     sign_off: Coord
     priority: int
-    group: Optional[int]
+    group: int | None
 
 
-class OccupiedVoxel(NamedTuple):
+@attr.frozen
+class OccupiedVoxel:
     """Represents the collision information for an item.
 
     If normal is not None, this is a side and not a cube.
     If subpos is not None, this is a 32x32 cube and not a full voxel.
     """
     type: CollType
-    against: Optional[CollType]  # TODO: Don't know what the default is.
+    against: CollType | None  # TODO: Don't know what the default is.
     pos: Coord
-    subpos: Optional[Coord]
-    normal: Optional[Coord]
+    subpos: Coord | None = None
+    normal: Coord | None = None
 
 
-def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[Tuple[Coord, Coord]]:
+def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[tuple[Coord, Coord]]:
     """Decompose a bunch of points into a small list of bounding boxes enclosing them.
 
     This is used to determine a good set of Volume definitions to write out.
@@ -471,41 +544,41 @@ def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[Tuple[Coord, Coord]]:
         x1, y1, z1 = x2, y2, z2 = todo.pop()
         # X+:
         for x in range(x1 + 1, x1 + EXTENT):
-            if (x, y1, z1) in todo:
+            if Coord(x, y1, z1) in todo:
                 x2 = x
             else:
                 break
         # X-:
         for x in range(x1 - 1, x1 - EXTENT, -1):
-            if (x, y1, z1) in todo:
+            if Coord(x, y1, z1) in todo:
                 x1 = x
             else:
                 break
 
         # Y+:
         for y in range(y1 + 1, y1 + EXTENT):
-            if all((x, y, z1) in todo for x in range(x1, x2+1)):
+            if all(Coord(x, y, z1) in todo for x in range(x1, x2+1)):
                 y2 = y
             else:
                 break
 
         # Y-:
         for y in range(y1 - 1, y1 - EXTENT, -1):
-            if all((x, y, z1) in todo for x in range(x1, x2+1)):
+            if all(Coord(x, y, z1) in todo for x in range(x1, x2+1)):
                 y1 = y
             else:
                 break
 
         # Y+:
         for z in range(z1 + 1, z1 + EXTENT):
-            if all((x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
+            if all(Coord(x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
                 z2 = z
             else:
                 break
 
         # Y-:
         for z in range(z1 - 1, z1 - EXTENT, -1):
-            if all((x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
+            if all(Coord(x, y, z) in todo for x in range(x1, x2+1) for y in range(y1, y2+1)):
                 z1 = z
             else:
                 break
@@ -517,25 +590,21 @@ def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[Tuple[Coord, Coord]]:
         yield Coord(x1, y1, z1), Coord(x2, y2, z2)
 
 
+@attr.define
 class Renderable:
     """Simpler definition used for the heart and error icons."""
-    _types = {r.value.casefold(): r for r in RenderableType}
-    def __init__(
-        self,
-        typ: RenderableType,
-        model: str,
-        animations: Dict[Anim, int],
-    ):
-        self.type = typ
-        self.model = model
-        self.animations = animations
+    _types: ClassVar = {r.value.casefold(): r for r in RenderableType}
+
+    type: RenderableType
+    model: str
+    animations: dict[Anim, int]
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> 'Renderable':
+    def parse(cls, tok: Tokenizer) -> Renderable:
         """Parse a renderable."""
-        kind: Optional[RenderableType] = None
+        kind: RenderableType | None = None
         model = ''
-        anims = {}
+        anims: dict[Anim, int] = {}
 
         for key in tok.block("Renderable Item"):
             if key.casefold() == "type":
@@ -555,46 +624,29 @@ class Renderable:
         return Renderable(kind, model, anims)
 
 
+@attr.define
 class SubType:
     """Represents a single sub-item component of an overall item.
 
     Should not be constructed directly.
     """
     # The name, shown on remove connection windows.
-    name: str
+    name: str = ''
     # The models this uses, in order. The editoritems format includes
     # a texture name for each of these, but it's never used.
-    models: List[FSPath]
+    models: list[FSPath] = attr.Factory(list)
     # For each sound type, the soundscript to use.
-    sounds: Dict[Sound, str]
+    sounds: dict[Sound, str] = attr.Factory(DEFAULT_SOUNDS.copy)
     # For each animation category, the sequence index.
-    anims: Dict[Anim, int]
+    anims: dict[Anim, int] = attr.Factory(dict)
 
     # The capitalised name to display in the bottom of the palette window.
     # If not on the palette, set to ''.
-    pal_name: str
+    pal_name: str = ''
     # X/Y position on the palette, or None if not on the palette
-    pal_pos: Optional[Tuple[int, int]]
+    pal_pos: tuple[int, int] | None = None
     # The path to the icon VTF, in 'models/props_map_editor'.
-    pal_icon: Optional[FSPath]
-
-    def __init__(
-        self,
-        name: str,
-        models: List[FSPath],
-        sounds: Dict[Sound, str],
-        anims: Dict[Anim, int],
-        pal_name: str,
-        pal_pos: Optional[Tuple[int, int]],
-        pal_icon: Optional[FSPath],
-    ) -> None:
-        self.name = name
-        self.models = models
-        self.sounds = sounds
-        self.anims = anims
-        self.pal_name = pal_name
-        self.pal_pos = pal_pos
-        self.pal_icon = pal_icon
+    pal_icon: FSPath | None = None
 
     def copy(self) -> 'SubType':
         """Duplicate this subtype."""
@@ -610,7 +662,7 @@ class SubType:
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: Optional[dict] = None) -> 'SubType':
+    def __deepcopy__(self, memodict: dict | None = None) -> SubType:
         """Duplicate this subtype.
 
         We don't need to deep-copy the contents of the containers,
@@ -640,7 +692,7 @@ class SubType:
             self.name,
             list(map(str, self.models)),
             # These are mostly the same, intern so it deduplicates.
-            [sys.intern(self.sounds.get(snd, None)) for snd in Sound],
+            [sys.intern(self.sounds.get(snd, '')) for snd in Sound],
             anim,
             self.pal_name,
             x, y,
@@ -653,7 +705,7 @@ class SubType:
         self.sounds = {
             snd: sndscript
             for snd, sndscript in zip(Sound, snds)
-            if sndscript is not None
+            if sndscript
         }
         self.anims = {
             anim: ind
@@ -666,9 +718,9 @@ class SubType:
             self.pal_pos = None
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> 'SubType':
+    def parse(cls, tok: Tokenizer) -> SubType:
         """Parse a subtype from editoritems."""
-        subtype: SubType = cls('', [], DEFAULT_SOUNDS.copy(), {}, '', None, None)
+        subtype = SubType()
         for key in tok.block('Subtype'):
             folded_key = key.casefold()
             if folded_key == 'name':
@@ -677,7 +729,7 @@ class SubType:
                 # In the original file this is a block, but allow a name
                 # since the texture is unused.
                 token, tok_value = next(tok.skipping_newlines())
-                model_name: Optional[FSPath] = None
+                model_name: FSPath | None = None
                 if token is Token.STRING:
                     model_name = FSPath(tok_value)
                 elif token is Token.BRACE_OPEN:
@@ -732,7 +784,7 @@ class SubType:
                 raise tok.error('Unknown subtype option "{}"!', key)
         return subtype
 
-    def export(self, f: IO[str]) -> None:
+    def export(self, f: _TextFile) -> None:
         """Write the subtype to a file."""
         f.write('\t\t"SubType"\n\t\t\t{\n')
         if self.name:
@@ -768,84 +820,64 @@ class SubType:
         f.write('\t\t\t}\n')
 
 
+@attr.define
 class Item:
     """A specific item."""
     id: str  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
-    cls: ItemClass
-    subtype_prop: Optional[Type[ItemProp]]
+    cls: ItemClass = ItemClass.UNCLASSED
+    # Type if known, or string if unknown property.
+    subtype_prop: Type[ItemProp] | str | None = None
+    subtypes: list[SubType] = attr.Factory(list)  # Each subtype in order.
     # Movement handle
-    handle: Handle
-    facing: DesiredFacing
-    invalid_surf: Set[Surface]
-    animations: Dict[Anim, int]  # Anim name to sequence index.
+    handle: Handle = Handle.NONE
+    facing: DesiredFacing = DesiredFacing.NONE
+    invalid_surf: set[Surface] = attr.ib(factory=set, converter=set)
+    # Anim name to sequence index.
+    animations: dict[Anim, int] = attr.ib(factory=dict)
 
-    anchor_barriers: bool
-    anchor_goo: bool
-    occupies_voxel: bool
-    copiable: bool
-    deletable: bool
+    anchor_barriers: bool = False
+    anchor_goo: bool = False
+    occupies_voxel: bool = False
+    pseudo_handle: bool = False
+    copiable: bool = True
+    deletable: bool = True
 
-    subtypes: List[SubType]  # Each subtype in order.
+    targetname: str = ''
+    # The default is 0 0 0, but this isn't useful since the rotation point
+    # is wrong. So just make it the useful default, users can override.
+    offset: Vec = attr.Factory(lambda: Vec(64, 64, 64))
 
-    def __init__(
-        self,
-        item_id: str,
-        cls: ItemClass,
-        subtype_prop: Optional[Type[ItemProp]] = None,
-        movement_handle: Handle = Handle.NONE,
-        desired_facing: DesiredFacing = DesiredFacing.NONE,
-        invalid_surf: Iterable[Surface] = (),
-        anchor_on_barriers: bool = False,
-        anchor_on_goo: bool = False,
-        occupies_voxel: bool = False
-    ) -> None:
-        self.animations = {}
-        self.id = item_id
-        self.cls = cls
-        self.subtype_prop = subtype_prop
-        self.subtypes = []
-        self.properties: Dict[str, ItemProp] = {}
-        self.handle = movement_handle
-        self.facing = desired_facing
-        self.invalid_surf = set(invalid_surf)
-        self.anchor_barriers = anchor_on_barriers
-        self.anchor_goo = anchor_on_goo
-        self.occupies_voxel = occupies_voxel
-        self.copiable = True
-        self.deletable = True
-        self.pseduo_handle = False
-        # The default is 0 0 0, but this isn't useful since the rotation point
-        # is wrong. So just make it the useful default, users can override.
-        self.offset = Vec(64, 64, 64)
-        self.targetname = ''
+    properties: dict[str, ItemProp] = attr.Factory(dict)
 
-        # The instances used by the editor, then custom slots used by
-        # conditions. For the latter we don't care about the counts.
-        self.instances: List[InstCount] = []
-        self.cust_instances: Dict[str, FSPath] = {}
-        self.antline_points: Dict[ConnSide, List[AntlinePoint]] = {
-            side: [] for side in ConnSide
-        }
-        # The points this collides with.
-        self.occupy_voxels: Set[OccupiedVoxel] = set()
-        # The voxels this hollows out inside the floor.
-        self.embed_voxels: Set[Coord] = set()
-        # Brushes automatically created
-        self.embed_faces: List[EmbedFace] = []
-        # Overlays automatically placed
-        self.overlays: List[Overlay] = []
+    # The instances used by the editor, then custom slots used by
+    # conditions. For the latter we don't care about the counts.
+    instances: list[InstCount] = attr.Factory(list)
+    cust_instances: dict[str, FSPath] = attr.Factory(dict)
 
-        # Connection types that don't represent item I/O, like for droppers
-        # or fizzlers.
-        self.conn_inputs: Dict[ConnTypes, Connection] = {}
-        self.conn_outputs: Dict[ConnTypes, Connection] = {}
+    antline_points: dict[ConnSide, list[AntlinePoint]] = attr.Factory(lambda: {
+        side: [] for side in ConnSide
+    })
+    # The points this collides with.
+    occupy_voxels: set[OccupiedVoxel] = attr.Factory(set)
+    # The voxels this hollows out inside the floor.
+    embed_voxels: set[Coord] = attr.Factory(set)
+    # Brushes automatically created
+    embed_faces: list[EmbedFace] = attr.Factory(list)
+    # Overlays automatically placed
+    overlays: list[Overlay] = attr.Factory(list)
 
-        # The configuration for actual item I/O.
-        self.conn_config: Optional[ConnConfig] = None
-        # If we want to force this item to have inputs/outputs,
-        # like for linking together items.
-        self.force_input = self.force_output = False
+    # Connection types that don't represent item I/O, like for droppers
+    # or fizzlers.
+    conn_inputs: dict[ConnTypes, Connection] = attr.Factory(dict)
+    conn_outputs: dict[ConnTypes, Connection] = attr.Factory(dict)
+
+    # The configuration for actual item I/O.
+    conn_config: ConnConfig | None = None
+    # If we want to force this item to have inputs/outputs,
+    # like for linking together items.
+    force_input: bool = False
+    force_output: bool = False
 
     def has_prim_input(self) -> bool:
         """Check whether this item has a primary input."""
@@ -888,15 +920,15 @@ class Item:
     def parse(
         cls,
         file: Iterable[str],
-        filename: Optional[str] = None,
-    ) -> Tuple[List['Item'], Dict[RenderableType, Renderable]]:
+        filename: str | None = None,
+    ) -> tuple[list[Item], dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file.
 
         The "ItemData" {} wrapper may optionally be included.
         """
-        known_ids: Set[str] = set()
-        items: List[Item] = []
-        icons: Dict[RenderableType, Renderable] = {}
+        known_ids: set[str] = set()
+        items: list[Item] = []
+        icons: dict[RenderableType, Renderable] = {}
         tok = Tokenizer(file, filename)
 
         # Check for the itemdata header.
@@ -940,14 +972,14 @@ class Item:
         return items, icons
 
     @classmethod
-    def parse_one(cls, tok: Tokenizer) -> 'Item':
+    def parse_one(cls, tok: Tokenizer) -> Item:
         """Parse an item.
 
         This expects the "Item" token to have been read already.
         """
-        connections = Property(None, [])
+        connections = Property('Connections', [])
         tok.expect(Token.BRACE_OPEN)
-        item: Item = cls('', ItemClass.UNCLASSED)
+        item = Item('')
 
         for token, tok_value in tok:
             if token is Token.BRACE_CLOSE:
@@ -982,7 +1014,7 @@ class Item:
             elif tok_value == 'properties':
                 item._parse_properties_block(tok)
             elif tok_value == 'exporting':
-                connections += item._parse_export_block(tok)
+                item._parse_export_block(tok, connections)
             elif tok_value in ('author', 'description', 'filter'):
                 # These are BEE2.2 values, which are not used.
                 tok.expect(Token.STRING)
@@ -994,6 +1026,17 @@ class Item:
         # Done, check we're not missing critical stuff.
         if not item.id:
             raise tok.error('No item ID (Type) set!')
+
+        # If the user defined a subtype property, that prop's default value should not be changed.
+        if item.subtype_prop is not None:
+            if isinstance(item.subtype_prop, str):
+                prop_name = item.subtype_prop
+            else:
+                prop_name = item.subtype_prop.id
+            try:
+                item.properties[prop_name.casefold()].allow_user_default = False
+            except KeyError:
+                LOGGER.warning('Subtype property of "{}" set, but property not present!', prop_name)
 
         # Parse the connections info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
@@ -1026,35 +1069,47 @@ class Item:
                 try:
                     self.handle = Handle(handle_str.upper())
                 except ValueError:
-                    raise tok.error('Unknown handle type {}', handle_str)
+                    LOGGER.warning(
+                        'Unknown movement handle "{}"  in ({}:{})',
+                        handle_str, tok.filename, tok.line_num,
+                    )
             elif folded_key == 'invalidsurface':
                 for word in tok.expect(Token.STRING).split():
                     try:
                         self.invalid_surf.add(Surface[word.upper()])
                     except KeyError:
-                        raise tok.error('Unknown surface type {}', word)
+                        LOGGER.warning(
+                            'Unknown invalid surface "{}"  in ({}:{})',
+                            word, tok.filename, tok.line_num,
+                        )
             elif folded_key == 'subtypeproperty':
                 subtype_prop = tok.expect(Token.STRING)
                 try:
                     self.subtype_prop = PROP_TYPES[subtype_prop.casefold()]
                 except ValueError:
-                    raise tok.error('Unknown property {}', subtype_prop)
+                    LOGGER.warning('Unknown subtype property "{}"!', subtype_prop)
+                    self.subtype_prop = subtype_prop
             elif folded_key == 'desiredfacing':
                 desired_facing = tok.expect(Token.STRING)
                 try:
                     self.facing = DesiredFacing(desired_facing.upper())
                 except ValueError:
-                    raise tok.error('Unknown desired facing {}', desired_facing)
+                    LOGGER.warning(
+                        'Unknown desired facing {}, assuming ANYTHING in ({}:{})',
+                        desired_facing, tok.filename, tok.line_num,
+                    )
+                    self.facing = DesiredFacing.NONE
             elif folded_key == 'rendercolor':
                 # Rendercolor is on catapult targets, and is useless.
                 tok.expect(Token.STRING)
             else:
+                # These flag keyvalues can be handled the same way.
                 try:
-                    attr = self._BOOL_ATTRS[folded_key]
+                    conf_attr = self._BOOL_ATTRS[folded_key]
                 except KeyError:
                     raise tok.error('Unknown editor option {}', key)
                 else:
-                    setattr(self, attr, conv_bool(tok.expect(Token.STRING)))
+                    setattr(self, conf_attr, conv_bool(tok.expect(Token.STRING)))
 
     def _parse_properties_block(self, tok: Tokenizer) -> None:
         """Parse the properties block of the item definitions."""
@@ -1062,7 +1117,8 @@ class Item:
             try:
                 prop_type = PROP_TYPES[prop_str.casefold()]
             except KeyError:
-                raise tok.error(f'Unknown property "{prop_str}"!')
+                LOGGER.warning('Unknown property "{}"!', prop_str)
+                prop_type = UnknownProp
 
             default = ''
             index = 0
@@ -1075,18 +1131,31 @@ class Item:
                     index = conv_int(tok.expect(Token.STRING))
                 elif prop_value == 'bee2_ignore':
                     user_default = conv_bool(tok.expect(Token.STRING), user_default)
+                    if prop_type is UnknownProp:
+                        LOGGER.warning('Unknown properties cannot have defaults set!')
                 else:
                     raise tok.error('Unknown property option "{}"!', prop_value)
-            try:
-                self.properties[prop_type.id.casefold()] = prop_type(default, index, user_default)
-            except ValueError:
-                raise tok.error('Default value {} is not valid for {} properties!', default, prop_type.id)
+            if prop_type is UnknownProp:
+                self.properties[prop_str.casefold()] = UnknownProp(
+                    prop_str, default, index,
+                )
+            else:
+                try:
+                    self.properties[prop_type.id.casefold()] = prop_type(
+                        default, index, user_default,
+                    )
+                except ValueError:
+                    raise tok.error(
+                        'Default value {} is not valid for {} properties!',
+                        default, prop_type.id,
+                    )
 
-    def _parse_export_block(self, tok: Tokenizer) -> Property:
-        """Parse the export block of the item definitions. This returns the parsed connections info."""
-        # Accumulate here, since we want to parse the input/output block
-        # together.
-        connection = Property(None, [])
+    def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
+        """Parse the export block of the item definitions. This returns the parsed connections info.
+
+        Since the standard input/output blocks must be parsed in one group, we collect those in the
+        passed property.
+        """
 
         for key in tok.block('Exporting'):
             folded_key = key.casefold()
@@ -1111,17 +1180,16 @@ class Item:
             elif folded_key == 'overlay':
                 self._parse_overlay(tok)
             elif folded_key == 'inputs':
-                self._parse_connections(tok, connection, self.conn_inputs)
+                self._parse_connections(tok, connections, self.conn_inputs)
             elif folded_key == 'outputs':
-                self._parse_connections(tok, connection, self.conn_outputs)
+                self._parse_connections(tok, connections, self.conn_outputs)
             else:
                 raise tok.error('Unknown export option {}!', key)
-        return connection
 
     def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
         """Parse a section in the instances block."""
-        inst_ind: Optional[int]
-        inst_file: Optional[str]
+        inst_ind: int | None
+        inst_file: str | None
         try:
             inst_ind = int(inst_name)
         except ValueError:
@@ -1152,10 +1220,9 @@ class Item:
                     raise tok.error('Unknown instance option {}', block_key)
             if inst_file is None:
                 raise tok.error('No instance filename provided!')
-            inst = InstCount(FSPath(inst_file), ent_count, brush_count,
-                             side_count)
+            inst = InstCount(inst_file, ent_count, brush_count, side_count)
         elif block_tok is Token.STRING:
-            inst = InstCount(FSPath(inst_file), 0, 0, 0)
+            inst = InstCount(inst_file)
         else:
             raise tok.error(block_tok)
         if inst_ind is not None:
@@ -1167,7 +1234,7 @@ class Item:
         self,
         tok: Tokenizer,
         prop_block: Property,
-        target: Dict[ConnTypes, Connection],
+        target: dict[ConnTypes, Connection],
     ) -> None:
         """Parse either an inputs or outputs block.
 
@@ -1180,7 +1247,7 @@ class Item:
             try:
                 conn_type = ConnTypes(conn_name.upper())
             except ValueError:
-                # Our custom BEEmod options.
+                # Our custom BEEMOD options.
                 if conn_name.casefold() in ('bee', 'bee2'):
                     for key in tok.block(conn_name):
                         value = tok.expect(Token.STRING, skip_newline=False)
@@ -1196,10 +1263,10 @@ class Item:
                 else:
                     raise tok.error('Unknown connection type "{}"!', conn_name)
 
-            act_name: Optional[str] = None
-            activate: Optional[str] = None
-            deact_name: Optional[str] = None
-            deactivate: Optional[str] = None
+            act_name: str | None = None
+            activate: str | None = None
+            deact_name: str | None = None
+            deactivate: str | None = None
             for conn_key in tok.block(conn_name):
                 if conn_key.casefold() == 'activate':
                     value = tok.expect(Token.STRING, skip_newline=False)
@@ -1294,10 +1361,10 @@ class Item:
         for point_key in tok.block('ConnectionPoints'):
             if point_key.casefold() != 'point':
                 raise tok.error('Unknown connection point "{}"!', point_key)
-            direction: Optional[ConnSide] = None
-            pos: Optional[Coord] = None
-            sign_pos: Optional[Coord] = None
-            group_id: Optional[int] = None
+            direction: ConnSide | None = None
+            pos: Coord | None = None
+            sign_pos: Coord | None = None
+            group_id: int | None = None
             priority = 0
             for conn_key in tok.block('Point'):
                 folded_key = conn_key.casefold()
@@ -1325,16 +1392,16 @@ class Item:
         """Parse occupied voxel definitions. We add on the volume variant for convienience."""
         for occu_key in tok.block('OccupiedVoxels'):
             collide_type = CollType.DEFAULT
-            collide_against: Optional[CollType] = None
+            collide_against: CollType | None = None
             pos1 = Coord(0, 0, 0)
-            pos2: Optional[Coord] = None
-            normal: Optional[Coord] = None
+            pos2: Coord | None = None
+            normal: Coord | None = None
 
             # If no directions are specified, this is a full voxel.
-            added_parts: Set[Tuple[Optional[Coord], Optional[Coord]]] = set()
+            added_parts: set[tuple[Coord | None, Coord | None]] = set()
             # Extension, specify pairs of subpos points to bounding box include
             # all of them.
-            subpos_pairs: List[Coord] = []
+            subpos_pairs: list[Coord] = []
 
             occu_type = occu_key.casefold()
             if occu_type not in ('voxel', 'surfacevolume', 'volume'):
@@ -1357,8 +1424,8 @@ class Item:
                 elif folded_key in ('subpos', 'subpos1', 'subpos2'):
                     subpos_pairs.append(Coord.parse(tok.expect(Token.STRING), tok.error))
                 elif folded_key == 'surface':
-                    sub_normal: Optional[Coord] = None
-                    sub_pos: Optional[Coord] = None
+                    sub_normal: Coord | None = None
+                    sub_pos: Coord | None = None
                     for surf_key in tok.block('Surface'):
                         folded_key = surf_key.casefold()
                         if folded_key == 'pos':
@@ -1379,6 +1446,7 @@ class Item:
             if not added_parts:
                 # Default to a single voxel.
                 added_parts.add((None, None))
+            volume: Iterable[Coord]
             if pos2 is None:
                 volume = [pos1]
             else:
@@ -1397,8 +1465,8 @@ class Item:
         for embed_key in tok.block('EmbeddedVoxels'):
             folded_key = embed_key.casefold()
             if folded_key == 'volume':
-                pos_1: Optional[Coord] = None
-                pos_2: Optional[Coord] = None
+                pos_1: Coord | None = None
+                pos_2: Coord | None = None
                 for pos_key in tok.block('EmbeddedVolume'):
                     if pos_key.casefold() == 'pos1':
                         pos_1 = Coord.parse(tok.expect(Token.STRING), tok.error)
@@ -1426,8 +1494,8 @@ class Item:
         for solid_key in tok.block('EmbedFace'):
             if solid_key.casefold() != 'solid':
                 raise tok.error('Unknown Embed Face type "{}"!', solid_key)
-            center: Optional[Vec] = None
-            size: Optional[Vec] = None
+            center: Vec | None = None
+            size: Vec | None = None
             grid = FaceType.NORMAL
             for opt_key in tok.block('Solid'):
                 folded_key = opt_key.casefold()
@@ -1451,8 +1519,8 @@ class Item:
 
     def _parse_overlay(self, tok: Tokenizer) -> None:
         """Parse overlay definitions, which place overlays."""
-        center: Optional[Vec] = None
-        size: Optional[Vec] = None
+        center: Vec | None = None
+        size: Vec | None = None
         material = ''
         rotation = 0
         for opt_key in tok.block('Overlay'):
@@ -1474,7 +1542,7 @@ class Item:
         self.overlays.append(Overlay(material, center, size, rotation))
 
     @classmethod
-    def export(cls, f: IO[str], items: Iterable['Item'], renderables: Mapping[RenderableType, Renderable]) -> None:
+    def export(cls, f: _TextFile, items: Iterable[Item], renderables: Mapping[RenderableType, Renderable]) -> None:
         """Write a full editoritems file out."""
         f.write('"ItemData"\n{\n')
         for item in items:
@@ -1492,7 +1560,7 @@ class Item:
             f.write('\t}\n')
         f.write('}\n')
 
-    def export_one(self, f: IO[str]) -> None:
+    def export_one(self, f: _TextFile) -> None:
         """Write a single item out to a file."""
         f.write('"Item"\n\t{\n')
         if self.cls is not ItemClass.UNCLASSED:
@@ -1502,7 +1570,10 @@ class Item:
             f.write(f'\t"Type" "{self.id}"\n')
         f.write('\t"Editor"\n\t\t{\n')
         if self.subtype_prop is not None:
-            f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
+            if isinstance(self.subtype_prop, str):
+                f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop}"\n')
+            else:
+                f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
         for subtype in self.subtypes:
             subtype.export(f)
         f.write(f'\t\t"MovementHandle" "{self.handle.value}"\n')
@@ -1523,7 +1594,7 @@ class Item:
             f.write(f'\t\t"Copyable"  "0"\n')
         if not self.deletable:
             f.write(f'\t\t"Deletable" "0"\n')
-        if self.pseduo_handle:
+        if self.pseudo_handle:
             f.write(f'\t\t"PseudoHandle" "1"\n')
         f.write('\t\t}\n')
 
@@ -1654,11 +1725,11 @@ class Item:
         f.write('\t\t}\n')
         f.write('\t}\n')
 
-    def _export_occupied_voxels(self, f: IO[str]) -> None:
+    def _export_occupied_voxels(self, f: _TextFile) -> None:
         """Write occupied voxels to a file."""
-        voxel_groups: Dict[Tuple[Coord, CollType, CollType], List[OccupiedVoxel]] = defaultdict(list)
+        voxel_groups: dict[tuple[Coord, CollType, CollType | None], list[OccupiedVoxel]] = defaultdict(list)
         voxel: OccupiedVoxel
-        voxels: List[OccupiedVoxel]
+        voxels: list[OccupiedVoxel]
         for voxel in self.occupy_voxels:
             voxel_groups[voxel.pos, voxel.type, voxel.against].append(voxel)
 
@@ -1710,7 +1781,7 @@ class Item:
             self.occupies_voxel,
             self.copiable,
             self.deletable,
-            self.pseduo_handle,
+            self.pseudo_handle,
             self.offset,
             self.targetname,
             self.instances,
@@ -1728,6 +1799,8 @@ class Item:
         )
 
     def __setstate__(self, state: tuple) -> None:
+        props: list[ItemProp]
+        antline_points: list[list[AntlinePoint]]
         (
             self.id,
             self.cls,
@@ -1743,7 +1816,7 @@ class Item:
             self.occupies_voxel,
             self.copiable,
             self.deletable,
-            self.pseduo_handle,
+            self.pseudo_handle,
             self.offset,
             self.targetname,
             self.instances,
@@ -1759,11 +1832,40 @@ class Item:
             self.force_input,
             self.force_output,
         ) = state
-        props: List[ItemProp]
-        antline_points: List[List[AntlinePoint]]
 
         self.properties = {
-            prop.id: prop
+            prop.id.casefold(): prop
             for prop in props
         }
         self.antline_points = dict(zip(ConnSide, antline_points))
+
+    def validate(self) -> None:
+        """Look through the item and check for potential mistakes in configuration."""
+        for i, subtype in enumerate(self.subtypes, 1):
+            if len(subtype.models) != self.cls.mdl_per_subtype:
+                # Suppress, this is a Reflection Gel hack.
+                if len(subtype.models) == 5 and self.cls is ItemClass.PAINT_DROPPER:
+                    continue
+
+                LOGGER.warning(
+                    '{} items expect {} models, but subtype {} has {} models!',
+                    self.cls.id, self.cls.mdl_per_subtype,
+                    i, len(subtype.models),
+                )
+        if 'buttontype' in self.properties and self.cls is not ItemClass.FLOOR_BUTTON:
+            LOGGER.warning(
+                'The ButtonType property does nothing if the '
+                'item class is not ItemButtonFloor, only instance 0 is shown.'
+            )
+        if self.has_prim_input() and 'connectioncount' not in self.properties:
+            LOGGER.warning(
+                'Items with inputs must have ConnectionCount to work!'
+            )
+        # Track platform is a special case, it has hardcoded connections for
+        # each track segment.
+        if (
+            (self.has_prim_input() or self.has_sec_input() or self.has_output())
+            and not self.antline_points
+            and self.cls is not ItemClass.TRACK_PLATFORM
+        ):
+            LOGGER.warning('Items with inputs or outputs need ConnectionPoints definition!')

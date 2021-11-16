@@ -1,44 +1,49 @@
+"""Defines the palette data structure and file saving/loading logic."""
+from __future__ import annotations
+from typing import IO, Iterator
 import os
 import shutil
 import zipfile
 import random
+import io
+from uuid import UUID, uuid4, uuid5
 import utils
 
 import srctools.logger
-import BEE2_config
 from srctools import Property, NoKeyError, KeyValError
 
-from typing import List, Tuple, Optional, Dict
+from localisation import gettext
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
 PAL_DIR = utils.conf_location('palettes/')
-
+GROUP_BUILTIN = '<BUILTIN>'
 PAL_EXT = '.bee2_palette'
 
-pal_list: List['Palette'] = []
-
 # Allow translating the names of the built-in palettes
-TRANS_NAMES: Dict[str, str] = {
+TRANS_NAMES: dict[str, str] = {
     # i18n: Last exported items
-    'LAST_EXPORT': _('<Last Export>'),
+    'LAST_EXPORT': gettext('<Last Export>'),
     # i18n: Empty palette name
-    'EMPTY': _('Blank'),
+    'EMPTY': gettext('Blank'),
 
     # i18n: BEEmod 1 palette.
-    'BEEMOD': _('BEEMod'),
+    'BEEMOD': gettext('BEEMod'),
     # i18n: Default items merged together
-    'P2_COLLAPSED': _('Portal 2 Collapsed'),
+    'P2_COLLAPSED': gettext('Portal 2 Collapsed'),
 
     # i18n: Original Palette
-    'PORTAL2': _('Portal 2'),
+    'PORTAL2': gettext('Portal 2'),
     # i18n: Aperture Tag's palette
-    'APTAG': _('Aperture Tag'),
+    'APTAG': gettext('Aperture Tag'),
 }
+DEFAULT_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')
+UUID_PORTAL2 = uuid5(DEFAULT_NS, 'PORTAL2')
+UUID_EXPORT = uuid5(DEFAULT_NS, 'LAST_EXPORT')
+UUID_BLANK = uuid5(DEFAULT_NS, 'EMPTY')
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
-DEFAULT_PALETTES: Dict[str, List[Tuple[str, int]]] = {
+DEFAULT_PALETTES: dict[str, list[tuple[str, int]]] = {
     'EMPTY': [],
     'PORTAL2': [
         ("ITEM_BUTTON_PEDESTAL", 0),
@@ -198,13 +203,15 @@ class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
     def __init__(
         self,
-        name,
-        pos: List[Tuple[str, int]],
-        trans_name='',
-        prevent_overwrite=False,
-        filename: str=None,
-        settings: Optional[Property]=None,
-    ):
+        name: str,
+        pos: list[tuple[str, int]],
+        trans_name: str = '',
+        readonly: bool = False,
+        group: str = '',
+        filename: str = None,
+        settings: Property | None = None,
+        uuid: UUID = None,
+    ) -> None:
         # Name of the palette
         self.name = name
         self.trans_name = trans_name
@@ -214,6 +221,15 @@ class Palette:
             except KeyError:
                 LOGGER.warning('Unknown translated palette "{}', trans_name)
 
+        # Group to show the palette in.
+        self.group = group
+
+        # ID unique to this palette.
+        if uuid is not None:
+            self.uuid = uuid
+        else:
+            self.uuid = uuid4()
+
         # If loaded from a file, the path to use.
         # None determines a filename automatically.
         self.filename = filename
@@ -221,17 +237,20 @@ class Palette:
         self.pos = pos
         # If true, prevent overwriting the original file
         # (premade palettes or <LAST EXPORT>)
-        self.prevent_overwrite = prevent_overwrite
+        self.readonly = readonly
+        if readonly:
+            self.group = GROUP_BUILTIN
 
         # If not None, settings associated with the palette.
         self.settings = settings
 
-    def __str__(self):
-        return self.name
-
+    def __repr__(self) -> str:
+        return f'<Palette {self.name!r} @ {self.uuid}>'
 
     @classmethod
-    def parse(cls, path: str):
+    def parse(cls, path: str) -> Palette:
+        """Parse a palette from a file."""
+        needs_save = False
         with open(path, encoding='utf8') as f:
             props = Property.parse(f, path)
         name = props['Name', '??']
@@ -240,38 +259,56 @@ class Palette:
             items.append((item.real_name, int(item.value)))
 
         trans_name = props['TransName', '']
+        if trans_name:
+            # Builtin, force a fixed uuid. This is mainly for LAST_EXPORT.
+            uuid = uuid5(DEFAULT_NS, trans_name)
+        else:
+            try:
+                uuid = UUID(hex=props['UUID'])
+            except (ValueError, LookupError):
+                uuid = uuid4()
+                needs_save = True
 
+        settings: Property | None
         try:
             settings = props.find_key('Settings')
         except NoKeyError:
             settings = None
 
-        return Palette(
+        pal = Palette(
             name,
             items,
             trans_name=trans_name,
-            prevent_overwrite=props.bool('readonly'),
+            group=props['group', ''],
+            readonly=props.bool('readonly'),
             filename=os.path.basename(path),
+            uuid=uuid,
             settings=settings,
         )
+        if needs_save:
+            LOGGER.info('Resaving older palette file {}', pal.filename)
+            pal.save()
+        return pal
 
-    def save(self, ignore_readonly=False):
+    def save(self, ignore_readonly: bool = False) -> None:
         """Save the palette file into the specified location.
 
-        If ignore_readonly is true, this will ignore the `prevent_overwrite`
+        If ignore_readonly is true, this will ignore the `readonly`
         property of the palette (allowing resaving those properties over old
         versions). Otherwise those palettes always create a new file.
         """
         LOGGER.info('Saving "{}"!', self.name)
-        props = Property(None, [
+        props = Property.root(
             Property('Name', self.name),
             Property('TransName', self.trans_name),
-            Property('ReadOnly', srctools.bool_as_int(self.prevent_overwrite)),
+            Property('Group', self.group),
+            Property('ReadOnly', srctools.bool_as_int(self.readonly)),
+            Property('UUID', self.uuid.hex),
             Property('Items', [
                 Property(item_id, str(subitem))
                 for item_id, subitem in self.pos
             ])
-        ])
+        )
         # If default, don't include in the palette file.
         # Remove the translated name, in case it's not going to write
         # properly to the file.
@@ -279,9 +316,6 @@ class Palette:
             props['Name'] = ''
         else:
             del props['TransName']
-
-        if not self.prevent_overwrite:
-            del props['ReadOnly']
 
         if self.settings is not None:
             self.settings.name = 'Settings'
@@ -291,7 +325,7 @@ class Palette:
         # Use a hash to ensure it's a valid path (without '-' if negative)
         # If a conflict occurs, add ' ' and hash again to get a different
         # value.
-        if self.filename is None or (self.prevent_overwrite and not ignore_readonly):
+        if self.filename is None or (self.readonly and not ignore_readonly):
             hash_src = self.name
             while True:
                 hash_filename = str(abs(hash(hash_src))) + PAL_EXT
@@ -308,33 +342,37 @@ class Palette:
             for line in props.export():
                 file.write(line)
 
-    def delete_from_disk(self):
+    def delete_from_disk(self) -> None:
         """Delete this palette from disk."""
         if self.filename is not None:
             os.remove(os.path.join(PAL_DIR, self.filename))
 
 
-def load_palettes():
-    """Scan and read in all palettes in the specified directory."""
+def load_palettes() -> Iterator[Palette]:
+    """Scan and read in all palettes. Legacy files will be converted in the process."""
 
     # Load our builtin palettes.
     for name, items in DEFAULT_PALETTES.items():
         LOGGER.info('Loading builtin "{}"', name)
-        pal_list.append(Palette(
+        yield Palette(
             name,
             items,
             name,
-            prevent_overwrite=True,
-        ))
+            readonly=True,
+            group=GROUP_BUILTIN,
+            uuid=uuid5(DEFAULT_NS, name),
+        )
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
         path = os.path.join(PAL_DIR, name)
-        pos_file, prop_file = None, None
+
+        pos_file: IO[str] | None = None
+        prop_file: IO[str] | None = None
         try:
             if name.endswith(PAL_EXT):
                 try:
-                    pal_list.append(Palette.parse(path))
+                    yield Palette.parse(path)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
@@ -343,8 +381,8 @@ def load_palettes():
             elif name.endswith('.zip'):
                 # Extract from a zip
                 with zipfile.ZipFile(path) as zip_file:
-                    pos_file = zip_file.open('positions.txt')
-                    prop_file = zip_file.open('properties.txt')
+                    pos_file = io.TextIOWrapper(zip_file.open('positions.txt'), encoding='ascii', errors='ignore')
+                    prop_file = io.TextIOWrapper(zip_file.open('properties.txt'), encoding='ascii', errors='ignore')
             elif os.path.isdir(path):
                 # Open from the subfolder
                 pos_file = open(os.path.join(path, 'positions.txt'))
@@ -360,7 +398,9 @@ def load_palettes():
             # Legacy parsing of BEE2.2 files..
             pal = parse_legacy(pos_file, prop_file, name)
             if pal is not None:
-                pal_list.append(pal)
+                yield pal
+            else:
+                continue
         finally:
             if pos_file:
                 pos_file.close()
@@ -374,16 +414,12 @@ def load_palettes():
             os.remove(path)
         else:
             # Folders can't be overwritten...
-            pal.prevent_overwrite = True
+            pal.readonly = True
             pal.save()
             shutil.rmtree(path)
 
-    # Ensure the list has a defined order..
-    pal_list.sort(key=str)
-    return pal_list
 
-
-def parse_legacy(posfile, propfile, path):
+def parse_legacy(posfile, propfile, path) -> Palette | None:
     """Parse the original BEE2.2 palette format."""
     props = Property.parse(propfile, path + ':properties.txt')
     name = props['name', 'Unnamed']
@@ -398,41 +434,13 @@ def parse_legacy(posfile, propfile, path):
                 val = line.split('",')
                 if len(val) == 2:
                     pos.append((
-                        val[0][1:], # Item ID
-                        int(val[1].strip()), # Item subtype
+                        val[0][1:],  # Item ID
+                        int(val[1].strip()),  # Item subtype
                         ))
                 else:
                     LOGGER.warning('Malformed row "{}"!', line)
                     return None
     return Palette(name, pos)
-
-
-def save_pal(items, name: str, include_settings: bool):
-    """Save a palette under the specified name."""
-    for pal in pal_list:
-        if pal.name == name and not pal.prevent_overwrite:
-            pal.pos = list(items)
-            break
-    else:
-        pal = Palette(name, list(items))
-        pal_list.append(pal)
-
-    if include_settings:
-        pal.settings = BEE2_config.get_curr_settings()
-    else:
-        pal.settings = None
-
-    pal.save()
-    return pal
-
-
-def check_exists(name):
-    """Check if a palette with the given name exists."""
-    for pal in pal_list:
-        if pal.name == name:
-            return True
-    return False
-
 
 if __name__ == '__main__':
     results = load_palettes()

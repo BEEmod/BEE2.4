@@ -1,8 +1,11 @@
 """Various constant values (Mainly texture names.)"""
+from __future__ import annotations
+from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
 from enum import Enum, EnumMeta
 from srctools import Side
 
 
+T = TypeVar('T')
 __all__ = [
     'MaterialGroup',
 
@@ -15,30 +18,53 @@ __all__ = [
     'FixupVars',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
     'COUNTER_OR_ON', 'COUNTER_OR_OFF',
-    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG',
+    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG', 'SEL_ICON_CROP_SHRINK',
 ]
+
+
+class _MaterialGroupNS(MutableMapping[str, Any]):
+    """Wraps around the enum mapping, to lowercase the values."""
+    def __init__(self, orig: MutableMapping[str, Any]) -> None:
+        self.mapping = orig
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Make string objects lowercase when set."""
+        if isinstance(value, str):
+            value = value.casefold()
+        self.mapping[key] = value
+
+    def __delitem__(self, value: str) -> None:
+        del self.mapping[value]
+
+    def __getitem__(self, key: str) -> Any:
+        return self.mapping[key]
+
+    def __len__(self) -> int:
+        return len(self.mapping)
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self.mapping)
 
 
 class MaterialGroupMeta(EnumMeta):
     """Metaclass for MaterialGroup, to implement some of its features."""
+    _value2member_map_: dict[str, Any]  # Enum defines.
+
     @classmethod
-    def __prepare__(mcs, cls, bases):
+    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> MutableMapping[str, Any]:
         """Override Enum class-dict type.
-        
+
         This makes string-values lowercase when set.
         """
-        # The original class is private - grab it via prepare, and make
-        # a subclass right here.
-        namespace = super().__prepare__(cls, bases)
+        namespace = super().__prepare__(name, bases, **kwargs)
+        return _MaterialGroupNS(cast(MutableMapping[str, Any], namespace))
 
-        class RepDict(type(namespace)):
-            def __setitem__(self, key, value):
-                if isinstance(value, str):
-                    value = value.casefold()
-                super().__setitem__(key, value)
+    def __new__(mcs, cls: type, bases: tuple[type, ...], classdict: _MaterialGroupNS, **kwds: Any) -> EnumMeta:
+        """Unpack the dict type back to the original for EnumMeta.
 
-        namespace.__type__ = RepDict
-        return namespace
+        It accesses attributes, so it can't have our wrapper.
+        """
+        return super().__new__(mcs, cls, bases, classdict.mapping, **kwds)
 
     def __contains__(cls, value) -> bool:
         """MaterialGroup can check if strings are equal to a member."""
@@ -47,13 +73,13 @@ class MaterialGroupMeta(EnumMeta):
         elif isinstance(value, Side):
             return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
-        
-    def __call__(cls, value, *args, **kwargs):
-        if args or kwargs:
-            return super().__call__(value, *args, **kwargs)
-        return cls.__new__(cls, value.casefold())
 
-    __call__.__doc__ = EnumMeta.__call__.__doc__
+    # Need to ignore types here, EnumMeta does not match type's signature.
+    def __call__(cls: Type[T], value: str, *args, **kwargs) -> T:  # type: ignore
+        """Find the existing member with this name."""
+        if args or kwargs:
+            return super().__call__(value, *args, **kwargs)  # type: ignore
+        return cls.__new__(cls, value.casefold())  # type: ignore
 
 
 class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
@@ -174,6 +200,7 @@ class Special(MaterialGroup):
 class Goo(MaterialGroup):
     REFLECTIVE = "nature/toxicslime_a2_bridge_intro"
     CHEAP = "nature/toxicslime_puzzlemaker_cheap"
+    TIDELINE = "overlays/tideline01b"
 
 
 class Antlines(MaterialGroup):
@@ -186,18 +213,18 @@ class Tools(MaterialGroup):
     NODRAW = 'tools/toolsnodraw'
     INVISIBLE = 'tools/toolsinvisible'
     TRIGGER = 'tools/toolstrigger'
-    
+
     AREAPORTAL = 'tools/toolsareaportal'
-    SKIP = 'tools/toolsskip' 
+    SKIP = 'tools/toolsskip'
     HINT = 'tools/toolshint'
     OCCLUDER = 'tools/toolsoccluder'
-    
+
     CLIP = 'tools/toolsclip'
     BLOCK_LOS = 'tools/toolsblock_los'
     BLOCK_LIGHT = 'tools/toolsblocklight'
     BLOCK_BULLETS = 'tools/toolsblockbullets'
     PLAYER_CLIP = 'tools/toolsplayerclip'
-    
+
     SKYBOX = 'tools/toolsskybox'
     BLACK = 'tools/toolsblack'
 
@@ -231,3 +258,4 @@ COUNTER_OR_OFF = 'OnHitMin'
 
 SEL_ICON_SIZE = 96  # Size of the selector win icons
 SEL_ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.
+SEL_ICON_CROP_SHRINK = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.

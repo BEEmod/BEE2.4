@@ -1,14 +1,17 @@
 """Manages parsing and regenerating antlines."""
-import random
-from collections import namedtuple
-
-from srctools import Vec, Property, conv_float, VMF, logger
-from srctools.vmf import overlay_bounds, make_overlay
-import consts
+from __future__ import annotations
 from collections import defaultdict
-from typing import List, Dict, Tuple, TYPE_CHECKING, Iterator, Optional, Set
-
+from collections.abc import Iterator
 from enum import Enum
+import math
+
+import attr
+
+from srctools import Vec, Angle, Matrix, Property, conv_float, logger
+from srctools.vmf import VMF, overlay_bounds, make_overlay
+
+from precomp import tiling, rand
+import consts
 
 
 LOGGER = logger.get_logger(__name__)
@@ -20,8 +23,13 @@ class SegType(Enum):
     CORNER = 1
 
 
-class AntTex(namedtuple('AntTex', ['texture', 'scale', 'static'])):
+@attr.define
+class AntTex:
     """Represents a single texture, and the parameters it has."""
+    texture: str
+    scale: float
+    static: bool
+
     @staticmethod
     def parse(prop: Property):
         """Parse from property values.
@@ -59,6 +67,7 @@ class AntTex(namedtuple('AntTex', ['texture', 'scale', 'static'])):
         return AntTex(tex, scale, static)
 
 
+@attr.define(eq=False)
 class AntType:
     """Defines the style of antline to use.
 
@@ -67,43 +76,43 @@ class AntType:
 
     Corners can be omitted, if corner/straight antlines are the same.
     """
-    def __init__(
-        self,
-        tex_straight: List[AntTex],
-        tex_corner: List[AntTex],
-        broken_straight: List[AntTex],
-        broken_corner: List[AntTex],
-        broken_chance: float,
-    ) -> None:
-        self.tex_straight = tex_straight
-        self.tex_corner = tex_corner
+    tex_straight: list[AntTex] = attr.ib()
+    tex_corner: list[AntTex] = attr.ib()
 
-        if broken_chance == 0:
-            broken_corner: List[AntTex] = []
-            broken_straight: List[AntTex] = []
-
-        # Cannot have broken corners if corners/straights are the same.
-        if not tex_corner:
-            broken_corner: List[AntTex] = []
-
-        self.broken_corner = broken_corner
-        self.broken_straight = broken_straight
-        self.broken_chance = broken_chance
+    broken_straight: list[AntTex] = attr.ib()
+    broken_corner: list[AntTex] = attr.ib()
+    broken_chance: float
 
     @classmethod
-    def parse(cls, prop: Property) -> 'AntType':
+    def parse(cls, prop: Property) -> AntType:
         """Parse this from a property block."""
         broken_chance = prop.float('broken_chance')
-        tex_straight: List[AntTex] = []
-        tex_corner: List[AntTex] = []
-        brok_straight: List[AntTex] = []
-        brok_corner: List[AntTex] = []
+        tex_straight: list[AntTex] = []
+        tex_corner: list[AntTex] = []
+        brok_straight: list[AntTex] = []
+        brok_corner: list[AntTex] = []
         for ant_list, name in zip(
             [tex_straight, tex_corner, brok_straight, brok_corner],
             ('straight', 'corner', 'broken_straight', 'broken_corner'),
         ):
             for sub_prop in prop.find_all(name):
                 ant_list.append(AntTex.parse(sub_prop))
+
+        if broken_chance < 0.0:
+            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', prop['broken_chance'])
+            broken_chance = 0.0
+        if broken_chance > 100.0:
+            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', prop['broken_chance'])
+            broken_chance = 100.0
+
+        if broken_chance == 0.0:
+            brok_straight.clear()
+            brok_corner.clear()
+
+        # Cannot have broken corners if corners/straights are the same.
+        if not tex_corner:
+            brok_corner.clear()
+
         return cls(
             tex_straight,
             tex_corner,
@@ -113,64 +122,56 @@ class AntType:
         )
 
     @classmethod
-    def default(cls) -> 'AntType':
+    def default(cls) -> AntType:
         """Make a copy of the original PeTI antline config."""
-        return cls(
+        return AntType(
             [AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
             [AntTex(consts.Antlines.CORNER, 1, False)],
             [], [], 0,
         )
 
 
+@attr.define(eq=False)
 class Segment:
     """A single section of an antline - a straight section or corner.
 
     For corners, start == end.
     """
-    __slots__ = ['type', 'normal', 'start', 'end', 'tiles']
-
-    def __init__(
-        self,
-        typ: SegType,
-        normal: Vec,
-        start: Vec,
-        end: Vec,
-    ):
-        self.type = typ
-        self.normal = normal
-        # Note, start is end for corners.
-        self.start = start
-        self.end = end
-        # The brushes this segment is attached to.
-        self.tiles = set()  # type: Set['TileDef']
+    type: SegType
+    normal: Vec
+    start: Vec
+    end: Vec
+    # The brushes this segment is attached to.
+    tiles: set[tiling.TileDef] = attr.ib(factory=set)
 
     @property
     def on_floor(self) -> bool:
         """Return if this segment is on the floor/wall."""
-        return self.normal.z != 0
+        return abs(self.normal.z) > 1e-6
 
     def broken_iter(
         self,
         chance: float,
-    ) -> Iterator[Tuple[Vec, Vec, bool]]:
+    ) -> Iterator[tuple[Vec, Vec, bool]]:
         """Iterator to compute positions for straight segments.
 
         This produces point pairs which fill the space from 0-dist.
         Neighbouring sections will be merged when they have the same
         type.
         """
+        rng = rand.seed(b'ant_broken', self.start, self.end, chance)
         offset = self.end - self.start
         dist = offset.mag() // 16
         norm = 16 * offset.norm()
 
         if dist < 3 or chance == 0:
             # Short antlines always are either on/off.
-            yield self.start, self.end, (random.randrange(100) < chance)
+            yield self.start, self.end, (rng.randrange(100) < chance)
         else:
             run_start = self.start
-            last_type = random.randrange(100) < chance
+            last_type = rng.randrange(100) < chance
             for i in range(1, int(dist)):
-                next_type = random.randrange(100) < chance
+                next_type = rng.randrange(100) < chance
                 if next_type != last_type:
                     yield run_start, self.start + i * norm, last_type
                     last_type = next_type
@@ -178,25 +179,22 @@ class Segment:
             yield run_start, self.end, last_type
 
 
+@attr.define(eq=False)
 class Antline:
     """A complete antline."""
-    def __init__(
-        self,
-        name: str,
-        line: List[Segment],
-    ):
-        self.line = line
-        self.name = name
+    name: str
+    line: list[Segment]
 
-    def export(self, vmf: VMF, wall_conf: AntType, floor_conf: AntType) -> None:
+    def export(self, vmf: VMF, *, wall_conf: AntType, floor_conf: AntType) -> None:
         """Add the antlines into the map."""
 
         # First, do some optimisation. If corners aren't defined, try and
         # optimise those antlines out by merging the straight segment
         # before/after it into the corners.
 
+        collapse_line: list[Segment | None]
         if not wall_conf.tex_corner or not floor_conf.tex_corner:
-            collapse_line = list(self.line)  # type: List[Optional[Segment]]
+            collapse_line = list(self.line)
             for i, seg in enumerate(collapse_line):
                 if seg is None or seg.type is not SegType.STRAIGHT:
                     continue
@@ -238,30 +236,50 @@ class Antline:
 
         for seg in self.line:
             conf = floor_conf if seg.on_floor else wall_conf
-            random.seed('ant {} {}'.format(seg.start, seg.end))
+            # Check tiledefs in the voxels, and assign just in case.
+            # antline corner items don't have them defined, and some embedfaces don't work
+            # properly. But we keep any segments actually defined also.
+            mins, maxs = Vec.bbox(seg.start, seg.end)
+            norm_axis = seg.normal.axis()
+            u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+            for pos in Vec.iter_line(mins, maxs, 128):
+                pos[u_axis] = pos[u_axis] // 128 * 128 + 64
+                pos[v_axis] = pos[v_axis] // 128 * 128 + 64
+                pos -= 64 * seg.normal
+                try:
+                    tile = tiling.TILES[pos.as_tuple(), seg.normal.as_tuple()]
+                except KeyError:
+                    pass
+                else:
+                    seg.tiles.add(tile)
+
+            rng = rand.seed(b'antline', seg.start, seg.end)
             if seg.type is SegType.CORNER:
                 mat: AntTex
-                if random.randrange(100) < conf.broken_chance:
-                    mat = random.choice(conf.broken_corner or conf.broken_straight)
+                if rng.randrange(100) < conf.broken_chance:
+                    mat = rng.choice(conf.broken_corner or conf.broken_straight)
                 else:
-                    mat = random.choice(conf.tex_corner or conf.tex_straight)
+                    mat = rng.choice(conf.tex_corner or conf.tex_straight)
 
-                axis_u, axis_v = Vec.INV_AXIS[seg.normal.axis()]
+                # Because we can, apply a random rotation to mix up the texture.
+                orient = Matrix.from_angle(seg.normal.to_angle(
+                    rng.choice((0.0, 90.0, 180.0, 270.0))
+                ))
                 self._make_overlay(
                     vmf,
                     seg,
                     seg.start,
-                    Vec.with_axes(axis_u, 16),
-                    16 * seg.normal.cross(Vec.with_axes(axis_u, 1)),
+                    16.0 * orient.left(),
+                    16.0 * orient.up(),
                     mat,
                 )
             else:  # Straight
                 # TODO: Break up these segments.
                 for a, b, is_broken in seg.broken_iter(conf.broken_chance):
                     if is_broken:
-                        mat = random.choice(conf.broken_straight)
+                        mat = rng.choice(conf.broken_straight)
                     else:
-                        mat = random.choice(conf.tex_straight)
+                        mat = rng.choice(conf.tex_straight)
                     self._make_straight(
                         vmf,
                         seg,
@@ -324,9 +342,9 @@ class Antline:
         )
 
 
-def parse_antlines(vmf: VMF) -> Tuple[
-    Dict[str, List[Antline]],
-    Dict[int, List[Segment]]
+def parse_antlines(vmf: VMF) -> tuple[
+    dict[str, list[Antline]],
+    dict[int, list[Segment]]
 ]:
     """Convert overlays in the map into Antline objects.
 
@@ -339,26 +357,26 @@ def parse_antlines(vmf: VMF) -> Tuple[
     LOGGER.info('Parsing antlines...')
 
     # segment -> found neighbours of it.
-    overlay_joins = defaultdict(set)  # type: Dict[Segment, Set[Segment]]
+    overlay_joins: defaultdict[Segment, set[Segment]] = defaultdict(set)
 
-    segment_to_name = {}  # type: Dict[Segment, str]
+    segment_to_name: dict[Segment, str] = {}
 
     # Points on antlines where two can connect. For corners that's each side,
     # for straight it's each end. Combine that with the targetname
     # so we only join related antlines.
-    join_points = {}  # type: Dict[Tuple[str, float, float, float], Segment]
+    join_points: dict[tuple[str, float, float, float], Segment] = {}
 
     mat_straight = consts.Antlines.STRAIGHT
     mat_corner = consts.Antlines.CORNER
 
-    side_to_seg = {}  # type: Dict[int, List[Segment]]
-    antlines = {}  # type: Dict[str, List[Antline]]
+    side_to_seg: dict[int, list[Segment]] = {}
+    antlines: dict[str, list[Antline]] = {}
 
     for over in vmf.by_class['info_overlay']:
         mat = over['material']
         origin = Vec.from_str(over['basisorigin'])
         normal = Vec.from_str(over['basisnormal'])
-        u, v = Vec.INV_AXIS[normal.axis()]
+        orient = Matrix.from_angle(Angle.from_str(over['angles']))
 
         if mat == mat_corner:
             seg_type = SegType.CORNER
@@ -366,27 +384,27 @@ def parse_antlines(vmf: VMF) -> Tuple[
 
             # One on each side - we know the size.
             points = [
-                origin + Vec.with_axes(u, +8),
-                origin + Vec.with_axes(u, -8),
-                origin + Vec.with_axes(v, +8),
-                origin + Vec.with_axes(v, -8),
+                origin + orient.left(-8.0),
+                origin + orient.left(+8.0),
+                origin + orient.forward(-8.0),
+                origin + orient.forward(+8.0),
             ]
         elif mat == mat_straight:
             seg_type = SegType.STRAIGHT
 
             # We want to determine the length first.
-            long_axis = Vec(y=1).rotate_by_str(over['angles']).axis()
-            side_axis = Vec(x=1).rotate_by_str(over['angles']).axis()
+            long_axis = orient.left()
+            side_axis = orient.forward()
 
             # The order of these isn't correct, but we need the neighbours to
             # fix that.
             start, end = overlay_bounds(over)
             # For whatever reason, Valve sometimes generates antlines which are
             # shortened by 1 unit. So snap those to grid.
-            start = round(start / 16) * 16
-            end = round(end / 16) * 16
+            start = round(start / 16, 0) * 16
+            end = round(end / 16, 0) * 16
 
-            if end[long_axis] - start[long_axis] == 16:
+            if math.isclose(Vec.dot(end - start, long_axis), 16.0):
                 # Special case.
                 # 1-wide antlines don't have the correct
                 # rotation, pointing always in the U axis.
@@ -395,7 +413,7 @@ def parse_antlines(vmf: VMF) -> Tuple[
                 start = end = origin
                 points = []
             else:
-                offset = Vec.with_axes(side_axis, 8)
+                offset: Vec = round(abs(8 * side_axis), 0)
                 start += offset
                 end -= offset
 
@@ -414,7 +432,7 @@ def parse_antlines(vmf: VMF) -> Tuple[
             # Lookup the point to see if we've already checked it.
             # If not, write us into that spot.
             neighbour = join_points.setdefault(
-                (over_name, point.x, point.y, point.z),
+                (over_name, ) + point.as_tuple(),
                 seg,
             )
             if neighbour is seg:
@@ -432,16 +450,16 @@ def parse_antlines(vmf: VMF) -> Tuple[
             fix_single_straight(seg, over_name, join_points, overlay_joins)
 
     # Now, finally compute each continuous section.
-    for segment, over_name in segment_to_name.items():
+    for start_seg, over_name in segment_to_name.items():
         try:
-            neighbours = overlay_joins[segment]
+            neighbours = overlay_joins[start_seg]
         except KeyError:
             continue  # Done already.
 
         if len(neighbours) != 1:
             continue
         # Found a start point!
-        segments = [segment]
+        segments = [start_seg]
 
         for segment in segments:
             neighbours = overlay_joins.pop(segment)
@@ -459,25 +477,24 @@ def parse_antlines(vmf: VMF) -> Tuple[
 def fix_single_straight(
     seg: Segment,
     over_name: str,
-    join_points: Dict[Tuple[str, float, float, float], Segment],
-    overlay_joins: Dict[Segment, Set[Segment]],
+    join_points: dict[tuple[str, float, float, float], Segment],
+    overlay_joins: dict[Segment, set[Segment]],
 ) -> None:
     """Figure out the correct rotation for 1-long straight antlines."""
     # Check the U and V axis, to see if there's another antline on both
     # sides. If there is that's the correct orientation.
-    axis_u, axis_v = Vec.INV_AXIS[seg.normal.axis()]
+    orient = Matrix.from_angle(seg.normal.to_angle())
 
     center = seg.start.copy()
 
     for off in [
-        Vec.with_axes(axis_u, -8),
-        Vec.with_axes(axis_u, +8),
-        Vec.with_axes(axis_v, -8),
-        Vec.with_axes(axis_v, +8),
+        orient.left(-8.0),
+        orient.left(+8.0),
+        orient.up(-8.0),
+        orient.up(+8.0),
     ]:
-        pos = center + off
         try:
-            neigh = join_points[over_name, pos.x, pos.y, pos.z]
+            neigh = join_points[(over_name, ) + (center + off).as_tuple()]
         except KeyError:
             continue
 
@@ -497,8 +514,7 @@ def fix_single_straight(
         elif seg.start != off_min or seg.end != off_max:
             # The other side is also present. Only override if we are on both
             # sides.
-            opposite = center - off
-            if (over_name, opposite.x, opposite.y, opposite.z) in join_points:
+            if (over_name, ) + (center - off).as_tuple() in join_points:
                 seg.start = off_min
                 seg.end = off_max
         # Else: Both equal, we're fine.

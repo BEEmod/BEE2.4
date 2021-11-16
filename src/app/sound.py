@@ -8,7 +8,10 @@ from __future__ import annotations
 from tkinter import Event
 from typing import IO, Optional, Callable
 import os
-import threading
+import functools
+import shutil
+
+import trio
 
 from app import TK_ROOT
 from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
@@ -24,7 +27,10 @@ __all__ = [
 ]
 
 LOGGER = srctools.logger.get_logger(__name__)
+SAMPLE_WRITE_PATH = utils.conf_location('music_sample/music')
 play_sound = True
+# Nursery to hold sound-related tasks. We can cancel this to shutdown sound logic.
+_nursery: trio.Nursery | None = None
 
 SOUNDS: dict[str, str] = {
     'select': 'rollover',
@@ -53,29 +59,39 @@ _todo = list(SOUNDS)
 class NullSound:
     """Sound implementation which does nothing."""
     def __init__(self) -> None:
-        self._play_fx = True
+        self._block_count = 0
 
     def _unblock_fx(self) -> None:
         """Reset the ability to use fx_blockable()."""
         self._play_fx = True
 
-    def block_fx(self) -> None:
+    async def block_fx(self) -> None:
         """Block fx_blockable for a short time."""
-        self._play_fx = False
-        TK_ROOT.after(50, self._unblock_fx)
+        self._block_count += 1
+        try:
+            await trio.sleep(0.50)
+        finally:
+            self._block_count -= 1
 
-    def fx_blockable(self, sound: str) -> None:
+    async def load(self, name: str) -> Optional[Source]:
+        """Load and do nothing."""
+        return None
+
+    async def fx_blockable(self, sound: str) -> None:
         """Play a sound effect.
 
         This waits for a certain amount of time between retriggering sounds
         so they don't overlap.
         """
-        if play_sound and self._play_fx:
-            self.fx(sound)
-            self._play_fx = False
-            TK_ROOT.after(75, self._unblock_fx)
+        if play_sound and self._block_count == 0:
+            self._block_count += 1
+            try:
+                await self.fx(sound)
+                await trio.sleep(0.75)
+            finally:
+                self._block_count -= 1
 
-    def fx(self, sound: str) -> None:
+    async def fx(self, sound: str) -> None:
         """Play a sound effect."""
 
 
@@ -85,77 +101,83 @@ class PygletSound(NullSound):
         super().__init__()
         self.sources: dict[str, Source] = {}
 
-    def load(self, name: str) -> Source:
+    async def load(self, name: str) -> Optional[Source]:
         """Load the given UI sound into a source."""
         global sounds
         fname = SOUNDS[name]
         path = str(utils.install_path('sounds/{}.ogg'.format(fname)))
         LOGGER.info('Loading sound "{}" -> {}', name, path)
         try:
-            src = pyglet.media.load(path, streaming=False)
+            src = await trio.to_thread.run_sync(functools.partial(
+                decoder.decode,
+                file=None,
+                filename=path,
+                streaming=False,
+            ))
         except Exception:
             LOGGER.exception("Couldn't load sound {}:", name)
             LOGGER.info('UI sounds disabled.')
             sounds = NullSound()
+            _nursery.cancel_scope.cancel()
+            return None
         else:
             self.sources[name] = src
             return src
 
-    def fx(self, sound: str) -> None:
+    async def fx(self, sound: str) -> None:
         """Play a sound effect."""
         global sounds
         if play_sound:
             try:
                 snd = self.sources[sound]
             except KeyError:
-                # We were called before the BG thread loaded em, load it
-                # synchronously.
+                # We were called before the BG thread loaded em, load it now.
                 LOGGER.warning('Sound "{}" couldn\'t be loaded in time!', sound)
-                snd = self.load(sound)
+                snd = await self.load(sound)
             try:
-                snd.play()
+                if snd is not None:
+                    snd.play()
             except Exception:
                 LOGGER.exception("Couldn't play sound {}:", sound)
                 LOGGER.info('UI sounds disabled.')
+                _nursery.cancel_scope.cancel()
                 sounds = NullSound()
 
 
-def ticker() -> None:
-    """We need to constantly trigger pyglet.clock.tick().
+async def sound_task() -> None:
+    """Task run to manage the sound system.
 
-    Instead of re-registering this, cache off the command name.
+    We need to constantly trigger pyglet.clock.tick(). This also provides a nursery for
+    triggering sound tasks, and gradually loads background sounds.
     """
-    if isinstance(sounds, PygletSound):
-        try:
-            tick(True)  # True = don't sleep().
-        except Exception:
-            LOGGER.exception('Pyglet tick failed:')
-        else:  # Succeeded, do this again soon.
-            TK_ROOT.tk.call(ticker_cmd)
-
-
-def load_fx() -> None:
-    """Load the FX sounds in the background.
-
-    We don't bother locking, we only modify the shared sound
-    dict at the end.
-    If we happen to hit a race condition with the main
-    thread, all that can happen is we load it twice.
-    """
-    for sound in SOUNDS:
-        # Copy locally, so this instance check stays valid.
-        snd = sounds
-        if isinstance(snd, PygletSound):
+    global _nursery
+    async with trio.open_nursery() as _nursery:
+        # Send off sound tasks.
+        for sound in SOUNDS:
+            _nursery.start_soon(_load_bg, sound)
+        while True:
             try:
-                snd.load(sound)
+                tick(True)  # True = don't sleep().
             except Exception:
-                LOGGER.exception('Failed to load sound:')
-                return
+                LOGGER.exception('Pyglet tick failed:')
+                _nursery.cancel_scope.cancel()
+                break
+            await trio.sleep(0.1)
+
+
+async def _load_bg(sound: str) -> None:
+    """Load the FX sounds gradually in the background."""
+    try:
+        await sounds.load(sound)
+    except Exception:
+        LOGGER.exception('Failed to load sound:')
+        return _nursery.cancel_scope.cancel()
 
 
 def fx(name) -> None:
     """Play a sound effect stored in the sounds{} dict."""
-    sounds.fx(name)
+    if _nursery is not None and not _nursery.cancel_scope.cancel_called:
+        _nursery.start_soon(sounds.fx, name)
 
 
 def fx_blockable(sound: str) -> None:
@@ -164,34 +186,48 @@ def fx_blockable(sound: str) -> None:
     This waits for a certain amount of time between retriggering sounds
     so they don't overlap.
     """
-    sounds.fx_blockable(sound)
+    if _nursery is not None and not _nursery.cancel_scope.cancel_called:
+        _nursery.start_soon(sounds.fx_blockable, sound)
 
 
 def block_fx() -> None:
     """Block fx_blockable() for a short time."""
-    sounds.block_fx()
+    if _nursery is not None and not _nursery.cancel_scope.cancel_called:
+        _nursery.start_soon(sounds.block_fx)
 
 
 def has_sound() -> bool:
     """Return if the sound system is functional."""
     return isinstance(sounds, PygletSound)
 
+if utils.WIN and not utils.FROZEN:
+    # Add a libs folder for FFmpeg dlls.
+    os.environ['PATH'] = f'{utils.install_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
 
 sounds: NullSound
 try:
     import pyglet.media
     from pyglet.media.codecs import Source
+    from pyglet.media.codecs.ffmpeg import FFmpegDecoder
     from pyglet import version as pyglet_version
     from pyglet.clock import tick
 
+    decoder = FFmpegDecoder()
     sounds = PygletSound()
-    ticker_cmd = ('after', 150, TK_ROOT.register(ticker))
-    TK_ROOT.tk.call(ticker_cmd)
-    threading.Thread(target=load_fx, name='BEE2.sound.load', daemon=True).start()
 except Exception:
     LOGGER.exception('Pyglet not importable:')
     pyglet_version = '(Not installed)'
     sounds = NullSound()
+
+
+def clean_sample_folder() -> None:
+    """Delete files used by the sample player."""
+    for file in SAMPLE_WRITE_PATH.parent.iterdir():
+        LOGGER.info('Cleaning up "{}"...', file)
+        try:
+            file.unlink()
+        except (PermissionError, FileNotFoundError):
+            pass
 
 
 class SamplePlayer:
@@ -204,8 +240,7 @@ class SamplePlayer:
     ) -> None:
         """Initialise the sample-playing manager.
         """
-        self.sample: Optional[Source] = None
-        self.start_time: float = 0   # If set, the time to start the track at.
+        self.player: Optional[pyglet.media.Player] = None
         self.after: Optional[str] = None
         self.start_callback = start_callback
         self.stop_callback = stop_callback
@@ -218,17 +253,9 @@ class SamplePlayer:
     @property
     def is_playing(self) -> bool:
         """Is the player currently playing sounds?"""
-        return self.sample is not None
+        return self.player is not None
 
-    def _close_handles(self) -> None:
-        """Close down previous sounds."""
-        if self._handle is not None:
-            self._handle.close()
-        if self._cur_sys is not None:
-            self._cur_sys.close_ref()
-        self._handle = self._cur_sys = None
-
-    def play_sample(self, e: Event=None) -> None:
+    def play_sample(self, _: Event=None) -> None:
         """Play a sample of music.
 
         If music is being played it will be stopped instead.
@@ -236,48 +263,39 @@ class SamplePlayer:
         if self.cur_file is None:
             return
 
-        if self.sample is not None:
+        if self.player is not None:
             self.stop()
             return
 
-        self._close_handles()
+        try:
+            file = self.system[self.cur_file]
+        except (KeyError, FileNotFoundError):
+            self.stop_callback()
+            LOGGER.error('Sound sample not found: "{}"', self.cur_file)
+            return  # Abort if music isn't found..
 
-        with self.system:
-            try:
-                file = self.system[self.cur_file]
-            except (KeyError, FileNotFoundError):
-                self.stop_callback()
-                LOGGER.error('Sound sample not found: "{}"', self.cur_file)
-                return  # Abort if music isn't found..
+        child_sys = self.system.get_system(file)
+        # Special case raw filesystems - Pyglet is more efficient
+        # if it can just open the file itself.
+        if isinstance(child_sys, RawFileSystem):
+            load_path = os.path.join(child_sys.path, file.path)
+            LOGGER.debug('Loading music directly from {!r}', load_path)
+        else:
+            # In a filesystem, we need to extract it.
+            # SAMPLE_WRITE_PATH + the appropriate extension.
+            sample_fname = SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1])
+            with file.open_bin() as fsrc, sample_fname.open('wb') as fdest:
+                shutil.copyfileobj(fsrc, fdest)
+            LOGGER.debug('Loading music {} as {}', self.cur_file, sample_fname)
+            load_path = str(sample_fname)
+        try:
+            sound = decoder.decode(None, load_path)
+        except Exception:
+            self.stop_callback()
+            LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
+            return  # Abort if music isn't found or can't be loaded.
 
-            child_sys = self.system.get_system(file)
-            # Special case raw filesystems - Pyglet is more efficient
-            # if it can just open the file itself.
-            if isinstance(child_sys, RawFileSystem):
-                load_path = os.path.join(child_sys.path, file.path)
-                self._cur_sys = self._handle = None
-                LOGGER.debug('Loading music directly from {!r}', load_path)
-            else:
-                # Use the file objects directly.
-                load_path = self.cur_file
-                self._cur_sys = child_sys
-                self._cur_sys.open_ref()
-                self._handle = file.open_bin()
-                LOGGER.debug('Loading music via {!r}', self._handle)
-            try:
-                sound = pyglet.media.load(load_path, self._handle)
-            except Exception:
-                self.stop_callback()
-                LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
-                return  # Abort if music isn't found or can't be loaded.
-
-        if self.start_time:
-            try:
-                sound.seek(self.start_time)
-            except Exception:
-                LOGGER.exception('Cannot seek in "{}"!', self.cur_file)
-
-        self.sample = sound.play()
+        self.player = sound.play()
         self.after = TK_ROOT.after(
             int(sound.duration * 1000),
             self._finished,
@@ -286,13 +304,10 @@ class SamplePlayer:
 
     def stop(self) -> None:
         """Cancel the music, if it's playing."""
-        if self.sample is None:
-            return
-
-        self.sample.pause()
-        self.sample = None
-        self._close_handles()
-        self.stop_callback()
+        if self.player is not None:
+            self.player.pause()
+            self.player = None
+            self.stop_callback()
 
         if self.after is not None:
             TK_ROOT.after_cancel(self.after)
@@ -300,7 +315,6 @@ class SamplePlayer:
 
     def _finished(self) -> None:
         """Reset values after the sound has finished."""
-        self.sample = None
+        self.player = None
         self.after = None
-        self._close_handles()
         self.stop_callback()

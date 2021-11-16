@@ -13,6 +13,7 @@ import functools
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
+from localisation import gettext
 
 from typing import List, Iterator, Optional
 
@@ -216,7 +217,7 @@ class CheckDetails(ttk.Frame):
         )
         self.wid_head_check.grid(row=0, column=0)
 
-        add_tooltip(self.wid_head_check, _("Toggle all checkboxes."))
+        add_tooltip(self.wid_head_check, gettext("Toggle all checkboxes."))
 
         def checkbox_enter(e):
             """When hovering over the 'all' checkbox, highlight the others."""
@@ -400,6 +401,9 @@ class CheckDetails(ttk.Frame):
         Must be called when self.items is changed,
         or when window is resized.
         """
+        # Don't bother if the window isn't actually visible.
+        if not self.winfo_ismapped():
+            return
         header_sizes = [
             (head.winfo_x(), head.winfo_width())
             for head in

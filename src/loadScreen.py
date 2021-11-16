@@ -8,11 +8,12 @@ The id() of the main-process object is used to identify loadscreens.
 from types import TracebackType
 from tkinter import commondialog
 from weakref import WeakSet
-from abc import abstractmethod
 import contextlib
 import multiprocessing
+import time
 
 from app import logWindow
+from localisation import gettext
 from BEE2_config import GEN_OPTS
 import utils
 import srctools.logger
@@ -79,7 +80,7 @@ def suppress_screens() -> Any:
 # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
 # so patching .show() will fix them all.
 # contextlib managers can also be used as decorators.
-commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)
+commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
 class LoadScreen:
@@ -97,6 +98,7 @@ class LoadScreen:
         is_splash: bool=False,
     ):
         self.active = False
+        self._time = 0.0
         self.stage_ids = {st_id for st_id, title in stages}
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
@@ -155,21 +157,28 @@ class LoadScreen:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._send_msg('set_length', stage, num)
 
-    def step(self, stage: str) -> None:
+    def step(self, stage: str, disp_name: str='') -> None:
         """Increment the specified stage."""
         if stage not in self.stage_ids:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
+        cur = time.perf_counter()
+        diff = cur - self._time
+        if diff > 0.1:
+            LOGGER.debug('{}: "{}" = {:.3}s', stage, disp_name, diff)
+        self._time = cur
         self._send_msg('step', stage)
 
     def skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         if stage not in self.stage_ids:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
+        self._time = time.perf_counter()
         self._send_msg('skip_stage', stage)
 
     def show(self) -> None:
         """Display the loading screen."""
         self.active = True
+        self._time = time.perf_counter()
         self._send_msg('show')
 
     def reset(self) -> None:
@@ -194,6 +203,13 @@ class LoadScreen:
         self._send_msg('show')
 
 
+def shutdown() -> None:
+    """Instruct the daemon process to shutdown."""
+    try:
+        _PIPE_MAIN_SEND.send(('quit_daemon', None, None))
+    except BrokenPipeError:  # Already quit, don't care.
+        pass
+
 # Initialise the daemon.
 # noinspection PyProtectedMember
 BG_PROC = multiprocessing.Process(
@@ -205,17 +221,17 @@ BG_PROC = multiprocessing.Process(
         logWindow.PIPE_DAEMON_REC,
         # Pass translation strings.
         {
-            'skip': _('Skipped!'),
-            'version': _('Version: ') + utils.BEE_VERSION,
-            'cancel': _('Cancel'),
-            'clear': _('Clear'),
-            'copy': _('Copy'),
-            'log_show': _('Show:'),
-            'log_title': _('Logs - {}').format(utils.BEE_VERSION),
+            'skip': gettext('Skipped!'),
+            'version': gettext('Version: ') + utils.BEE_VERSION,
+            'cancel': gettext('Cancel'),
+            'clear': gettext('Clear'),
+            'copy': gettext('Copy'),
+            'log_show': gettext('Show:'),
+            'log_title': gettext('Logs - {}').format(utils.BEE_VERSION),
             'level_text': [
-                _('Debug messages'),
-                _('Default'),
-                _('Warnings Only'),
+                gettext('Debug messages'),
+                gettext('Default'),
+                gettext('Warnings Only'),
             ],
         }
     ),
@@ -225,9 +241,9 @@ BG_PROC = multiprocessing.Process(
 BG_PROC.start()
 
 main_loader = LoadScreen(
-    ('PAK', _('Packages')),
-    ('OBJ', _('Loading Objects')),
-    ('UI', _('Initialising UI')),
-    title_text=_('Better Extended Editor for Portal 2'),
+    ('PAK', gettext('Packages')),
+    ('OBJ', gettext('Loading Objects')),
+    ('UI', gettext('Initialising UI')),
+    title_text=gettext('Better Extended Editor for Portal 2'),
     is_splash=True,
 )

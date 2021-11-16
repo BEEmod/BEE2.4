@@ -15,9 +15,9 @@ from enum import Enum
 from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
 import attr
-import random
 
-from srctools import Vec, VMF, Entity, Side, Solid, Output, Angle, Matrix
+from srctools import Vec, Angle, Matrix
+from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
@@ -29,7 +29,7 @@ from . import (
     options,
     antlines,
     template_brush,
-    conditions,
+    conditions, rand,
 )
 import utils
 import consts
@@ -46,17 +46,6 @@ TILE_TEMP: dict[
     tuple[float, float, float],
     dict[Union[str, tuple[int, int, int, bool]], Side]
 ] = {}
-
-# Maps normals to the index in PrismFace.
-PRISM_NORMALS: dict[tuple[float, float, float], int] = {
-    # 0 = solid
-    Vec.top: 1,
-    Vec.bottom: 2,
-    Vec.north: 3,
-    Vec.south: 4,
-    Vec.east: 5,
-    Vec.west: 6,
-}
 
 NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
 # Specific angles, these ensure the textures align to world once done.
@@ -127,40 +116,40 @@ class TileType(Enum):
     BLACK_4x4 = 3
 
     GOO_SIDE = 4  # Black sides of goo pits.
-     
+
     NODRAW = 10  # Covered, so it should be set to nodraw
 
     # Air - used for embedFace sections.
     VOID = 11
 
-    # 3 unit recess,  with backpanels or props/plastic behind. 
-    # _BROKEN is ignored when allocating patterns - it wasn't there when the 
-    #  tiles were installed. 
+    # 3 unit recess,  with backpanels or props/plastic behind.
+    # _BROKEN is ignored when allocating patterns - it wasn't there when the
+    #  tiles were installed.
     # _PARTIAL is not, it's for WIP chambers.
     # If the skybox is 3D, _PARTIAL uses tools/skybox.
     CUTOUT_TILE_BROKEN = 22
     CUTOUT_TILE_PARTIAL = 23
-    
+
     @property
     def is_recess(self) -> bool:
         """Should this recess the surface?"""
         return self.name.startswith('CUTOUT_TILE')
-     
-    @property   
+
+    @property
     def is_nodraw(self) -> bool:
         """Should this swap to nodraw?"""
         return self is self.NODRAW
-        
+
     @property
     def blocks_pattern(self) -> bool:
         """Does this affect patterns?"""
         return self is not self.CUTOUT_TILE_BROKEN
-        
+
     @property
     def is_tile(self) -> bool:
         """Is this a regular tile (white/black)."""
         return self.value < 10
-        
+
     @property
     def is_white(self) -> bool:
         """Is this portalable?"""
@@ -183,12 +172,38 @@ class TileType(Enum):
     @property
     def inverted(self) -> TileType:
         """Swap the color of a type."""
+        try:
+            col = self.color
+        except ValueError:
+            return self
+        if col is texturing.Portalable.WHITE:
+            return self.as_black
+        else:
+            return self.as_white
+
+    @property
+    def as_white(self) -> TileType:
+        """Force to the white version."""
         if self is self.GOO_SIDE:
             return self.WHITE_4x4
-        if self.name.startswith('WHITE'):
-            return getattr(self, f'BLACK{self.name[5:]}')
         if self.name.startswith('BLACK'):
             return getattr(self, f'WHITE{self.name[5:]}')
+        return self
+
+    @property
+    def as_black(self) -> TileType:
+        """Force to the black version."""
+        if self.is_white:
+            return getattr(self, f'BLACK{self.name[5:]}')
+        return self
+
+    @property
+    def as_4x4(self) -> TileType:
+        """Convert to a 4x4-forcing version."""
+        if self is TileType.WHITE:
+            return TileType.WHITE_4x4
+        elif self is TileType.BLACK:
+            return TileType.BLACK_4x4
         return self
 
     @property
@@ -312,7 +327,7 @@ class Pattern:
             assert 0 <= vmin < vmax <= 4, tile_tex
             assert (umax - umin) % tile_u == 0, tile_tex
             assert (vmax - vmin) % tile_v == 0, tile_tex
-            
+
     def __repr__(self) -> str:
         return 'Pattern({!r}, {}{}'.format(
             self.tex,
@@ -474,7 +489,8 @@ class Panel:
         """Generate the panel brushes."""
         # We need to do the checks to handle multiple panels with shared
         # data.
-        if all(tile is TileType.VOID for tile in sub_tiles.values()):
+        if all(subtile is TileType.VOID for subtile in sub_tiles.values()):
+            LOGGER.debug('Placing panel failed at {} @ {}: {} = {}', tile.pos, tile.normal, self, tile.format_tiles())
             # The brush entity isn't used.
             if self.brush_ent in vmf.entities:
                 self.brush_ent.remove()
@@ -626,19 +642,15 @@ class Panel:
             # We can just produce any plane that is the correct
             # orientation and let VBSP sort out the geometry.
 
-            # So construct a box, and grab the side pointing "down".
-            clip_template: Side = vmf.make_prism(
-                tile.pos + 64 + 128 * tile.normal,
-                tile.pos - 64 + 128 * tile.normal,
-            )[PRISM_NORMALS[(-tile.normal).as_tuple()]]
-
-            front_normal: Vec = round(orient.forward(), 6)
-
+            front_normal = orient.forward()
             for brush in all_brushes:
                 clip_face = None
+                # Find the face at the edge pointing in the front normal direction.
+                # That's the face we're replacing. There should be only one in
+                # each brush, but it could be not there - if it's split for tiles.
                 for face in brush:
                     if (
-                        face.normal() == front_normal
+                        Vec.dot(face.normal(), front_normal) > 0.99
                         and math.isclose(
                             face.get_origin().dot(front_normal),
                             panel_offset.dot(front_normal)
@@ -646,12 +658,19 @@ class Panel:
                     ):
                         clip_face = face
                         break
+                # Move to put 0 0 0 at the hinge point, then rotate and return.
                 brush.localise(-panel_offset)
                 brush.localise(panel_offset, rotation)
                 if clip_face is not None:
-                    clip_face.uaxis = clip_template.uaxis.copy()
-                    clip_face.vaxis = clip_template.vaxis.copy()
-                    clip_face.planes = [p.copy() for p in clip_template.planes]
+                    # Figure out the appropriate face info. We don't really
+                    # care about texture scaling etc.
+                    clip_face.uaxis = UVAxis(*orient.left())
+                    clip_face.vaxis = UVAxis(*orient.up())
+                    clip_face.planes = [
+                        panel_offset + Vec(0, 64, -64) @ orient,
+                        panel_offset + Vec(0, 64, 64) @ orient,
+                        panel_offset + Vec(0, -64, 64) @ orient,
+                    ]
                     clip_face.mat = consts.Tools.NODRAW
 
             # Helpfully the angled surfaces are always going to be forced
@@ -668,7 +687,7 @@ class Panel:
                 # We need to make a placement helper.
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=angled_normal.to_angle(),
+                    angles=Matrix.from_basis(z=tile.portal_helper_orient, x=tile.normal) @ rotation,
                     origin=top_center,
                     force_placement=int(force_helper),
                     snap_to_helper_angles=int(force_helper),
@@ -755,7 +774,7 @@ class Panel:
 
 class TileDef:
     """Represents one 128 block side.
-    
+
     Attributes:
         pos: Vec for the center of the block.
         normal: The direction out of the block, towards the face.
@@ -804,7 +823,7 @@ class TileDef:
 
     def __init__(
         self,
-        pos: Vec, 
+        pos: Vec,
         normal: Vec,
         base_type: TileType,
         subtiles: dict[tuple[int, int], TileType]=None,
@@ -850,14 +869,14 @@ class TileDef:
             self.pos,
         )
 
-    def print_tiles(self) -> None:
+    def format_tiles(self) -> str:
         """Debug utility, log the subtile shape."""
         out = []
         for v in reversed(range(4)):
             for u in range(4):
                 out.append(TILETYPE_TO_CHAR[self[u, v]])
             out.append('\n')
-        LOGGER.info('Subtiles: \n{}', ''.join(out))
+        return ''.join(out)
 
     @classmethod
     def ensure(
@@ -893,7 +912,7 @@ class TileDef:
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
             raise IndexError(u, v)
-        
+
         if self._sub_tiles is None:
             return self.base_type
         else:
@@ -904,7 +923,7 @@ class TileDef:
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
             raise IndexError(u, v)
-        
+
         if self._sub_tiles is None:
             self._sub_tiles = {
                 (x, y): value if u == x and v == y else self.base_type
@@ -1166,13 +1185,10 @@ class TileDef:
             # We need to make a placement helper.
             vmf.create_ent(
                 'info_placement_helper',
-                angles=Matrix.from_basis(
-                    x=self.normal,
-                    z=self.portal_helper_orient,
-                ).to_angle(),
+                angles=Angle.from_basis(x=self.normal, z=self.portal_helper_orient),
                 origin=front_pos,
-                force_placement=int(force_helper),
-                snap_to_helper_angles=int(force_helper),
+                force_placement=force_helper,
+                snap_to_helper_angles=force_helper,
                 radius=64,
             )
         if self.use_bullseye():
@@ -1211,7 +1227,7 @@ class TileDef:
         The specified bevels are a set of UV points around the tile. If a tile
         neighbours one of these points, it will be bevelled. If interior_bevel
         is true, VOID tiles also are treated as this.
-        
+
         If face_output is set, it will be filled with (u, v) -> top face.
         """
         brushes = []
@@ -1478,8 +1494,8 @@ def edit_quarter_tile(
 
 def make_tile(
     vmf: VMF,
-    origin: Vec, 
-    normal: Vec, 
+    origin: Vec,
+    normal: Vec,
     top_surf: str,
     back_surf: str=consts.Tools.NODRAW.value,
     *,
@@ -1493,10 +1509,10 @@ def make_tile(
     v_align: int=512,
     antigel: Optional[bool] = None,
 ) -> tuple[Solid, Side]:
-    """Generate a tile. 
-    
+    """Generate a tile.
+
     This uses UV coordinates, which equal xy, xz, or yz depending on normal.
-    
+
     Parameters:
         vmf: The map to add the tile to.
         origin: Location of the center of the tile, on the block surface.
@@ -1884,6 +1900,9 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
     norm = Vec(z=1) @ Angle.from_str(panel_ent['angles'])
     grid_pos -= 128*norm
 
+    # To match the editor model, flip around the orientation.
+    panel_ent['spawnflags'] = srctools.conv_int(panel_ent['spawnflags']) ^ 2
+
     TILES[grid_pos.as_tuple(), norm.as_tuple()] = tile = TileDef(
         grid_pos,
         norm,
@@ -1962,11 +1981,11 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
     for brush in panel:
         for side in brush:
             norm = side.normal()
-            if norm.axis() == norm_axis:
+            if abs(Vec.dot(norm, normal)) > 0.99:
                 continue  # Front or back
 
             u_off, v_off = (side.get_origin() - pos).other_axes(norm_axis)
-            if abs(u_off) == 64 or abs(v_off) == 64:
+            if abs(round(u_off)) == 64 or abs(round(v_off)) == 64:
                 side.translate(2 * norm)
                 # Snap squarebeams to each other.
                 side.vaxis.offset = 0
@@ -2042,7 +2061,7 @@ def generate_brushes(vmf: VMF) -> None:
                 # Add the portal helper in directly.
                 vmf.create_ent(
                     'info_placement_helper',
-                    angles=Matrix.from_basis(x=tile.portal_helper_orient, z=tile.normal).to_angle(),
+                    angles=Angle.from_basis(x=tile.normal, z=tile.portal_helper_orient),
                     origin=pos,
                     force_placement=int(tile.has_oriented_portal_helper),
                     snap_to_helper_angles=int(tile.has_oriented_portal_helper),
@@ -2146,11 +2165,20 @@ def generate_brushes(vmf: VMF) -> None:
     LOGGER.info('Generating goop...')
     generate_goo(vmf)
 
+    nodraw = consts.Tools.NODRAW
     for over, over_tiles in OVERLAY_BINDS.items():
+        # Keep already set sides.
         faces = set(over['sides', ''].split())
+        # We don't want to include nodraw, since that doesn't accept
+        # overlays anyway.
         for tile in over_tiles:
-            faces.update(str(f.id) for f in tile.brush_faces)
+            faces.update(
+                str(f.id)
+                for f in tile.brush_faces
+                if f.mat != nodraw
+            )
 
+        # If it turns out there's no faces for this, discard the overlay.
         if faces:
             over['sides'] = ' '.join(sorted(faces))
         else:
@@ -2216,13 +2244,14 @@ def generate_goo(vmf: VMF) -> None:
                 try:
                     tideline = tideline_over[key]
                 except KeyError:
+                    ent_pos = voxel_center + 32 * Vec(x, y, 1)
                     tideline = tideline_over[key] = Tideline(
                         vmf.create_ent(
                             'info_overlay',
-                            material='overlays/tideline01b',
+                            material=texturing.OVERLAYS.get(ent_pos, 'tideline'),
                             angles='0 0 0',
-                            origin=voxel_center + (0, 0, 32),
-                            basisOrigin=voxel_center + (0, 0, 32),
+                            origin=ent_pos,
+                            basisOrigin=ent_pos,
                             basisNormal=f'{x} {y} 0',
                             basisU=side,
                             basisV='0 0 1',
@@ -2239,15 +2268,14 @@ def generate_goo(vmf: VMF) -> None:
                     tideline.max = max(tideline.max, off)
                     OVERLAY_BINDS[tideline.over].append(tile)
 
-    tideline_rand = random.Random()
     for tideline in tideline_over.values():
         tide_min = tideline.min - tideline.mid - 64
         tide_max = tideline.max - tideline.mid + 64
-        tideline_rand.seed(f'{tideline.over["origin"]}:{tide_min}:{tide_max}')
+        rng = rand.seed(b'tideline', tide_min, tide_max)
 
         width = (tide_max - tide_min) / 128.0
         # Randomly flip around
-        if tideline_rand.choice((False, True)):
+        if rng.choice((False, True)):
             tideline.over['startu'] = 0
             tideline.over['endu'] = width
         else:
@@ -2255,10 +2283,10 @@ def generate_goo(vmf: VMF) -> None:
             tideline.over['startu'] = width
 
         # Vary the ends up/down from 32, to distort a little.
-        tideline.over['uv0'] = f'{tide_min} {random.randint(-36, -28)} 0'
-        tideline.over['uv1'] = f'{tide_min} {random.randint(28, 32)} 0'
-        tideline.over['uv2'] = f'{tide_max} {random.randint(28, 32)} 0'
-        tideline.over['uv3'] = f'{tide_max} {random.randint(-36, -28)} 0'
+        tideline.over['uv0'] = f'{tide_min} {rng.randint(-36, -28)} 0'
+        tideline.over['uv1'] = f'{tide_min} {rng.randint(28, 32)} 0'
+        tideline.over['uv2'] = f'{tide_max} {rng.randint(28, 32)} 0'
+        tideline.over['uv3'] = f'{tide_max} {rng.randint(-36, -28)} 0'
 
     # No goo.
     if not goo_pos or pos is None:

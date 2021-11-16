@@ -6,12 +6,13 @@ import tkinter
 from srctools import FileSystemChain, FileSystem
 import srctools.logger
 
-from app.selector_win import Item as SelItem, selWin as SelectorWin, AttrDef as SelAttr
+from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
 from app import TK_ROOT
 from BEE2_config import GEN_OPTS
 from consts import MusicChannel
 from packages import Music
+from localisation import gettext
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
@@ -44,8 +45,6 @@ def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
         for channel in MusicChannel:
             if channel is MusicChannel.BASE:
                 continue
-            if sel_item:
-                WINDOWS[channel].sel_item_id('<none>')
             WINDOWS[channel].set_suggested()
     else:
         music = Music.by_id(music_id)
@@ -54,20 +53,35 @@ def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
                 continue
 
             sugg = music.get_suggestion(channel)
-            if sel_item:
-                WINDOWS[channel].sel_item_id(sugg)
-            WINDOWS[channel].set_suggested(sugg)
+            WINDOWS[channel].set_suggested({sugg} if sugg else set())
 
 
 def export_data() -> Dict[MusicChannel, Optional[Music]]:
     """Return the data used to export this."""
-    return {
-        channel:
-            None if
-            win.chosen_id is None
-            else Music.by_id(win.chosen_id)
-        for channel, win in WINDOWS.items()
+    base_id = WINDOWS[MusicChannel.BASE].chosen_id
+    if base_id is not None:
+        base_track = Music.by_id(base_id)
+    else:
+        base_track = None
+    data: dict[MusicChannel, Optional[Music]] = {
+        MusicChannel.BASE: base_track,
     }
+    for channel, win in WINDOWS.items():
+        if channel is MusicChannel.BASE:
+            continue
+        # If collapsed, use the suggested track. Otherwise use the chosen one.
+        if is_collapsed:
+            if base_track is not None:
+                mus_id = base_track.get_suggestion(channel)
+            else:
+                mus_id = None
+        else:
+            mus_id = win.chosen_id
+        if mus_id is not None:
+            data[channel] = Music.by_id(mus_id)
+        else:
+            data[channel] = None
+    return data
 
 
 def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
@@ -129,46 +143,49 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
-        title=_('Select Background Music - Base'),
-        desc=_('This controls the background music used for a map. Expand '
-               'the dropdown to set tracks for specific test elements.'),
+        save_id='music_base',
+        title=gettext('Select Background Music - Base'),
+        desc=gettext('This controls the background music used for a map. Expand the dropdown to set '
+                     'tracks for specific test elements.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=_('Add no music to the map at all. Testing Element-specific '
-                    'music may still be added.'),
+        none_desc=gettext('Add no music to the map at all. Testing Element-specific music may still '
+                          'be added.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.BASE],
         attributes=[
-            SelAttr.bool('SPEED', _('Propulsion Gel SFX')),
-            SelAttr.bool('BOUNCE', _('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', _('Excursion Funnel Music')),
-            SelAttr.bool('TBEAM_SYNC', _('Synced Funnel Music')),
+            SelAttr.bool('SPEED', gettext('Propulsion Gel SFX')),
+            SelAttr.bool('BOUNCE', gettext('Repulsion Gel SFX')),
+            SelAttr.bool('TBEAM', gettext('Excursion Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
         ],
     )
 
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.TBEAM),
-        title=_('Select Excursion Funnel Music'),
-        desc=_('Set the music used while inside Excursion Funnels.'),
+        save_id='music_tbeam',
+        title=gettext('Select Excursion Funnel Music'),
+        desc=gettext('Set the music used while inside Excursion Funnels.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=_('Have no music playing when inside funnels.'),
+        none_desc=gettext('Have no music playing when inside funnels.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.TBEAM],
         attributes=[
-            SelAttr.bool('TBEAM_SYNC', _('Synced Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
         ],
     )
 
     WINDOWS[MusicChannel.BOUNCE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BOUNCE),
-        title=_('Select Repulsion Gel Music'),
-        desc=_('Select the music played when players jump on Repulsion Gel.'),
+        save_id='music_bounce',
+        title=gettext('Select Repulsion Gel Music'),
+        desc=gettext('Select the music played when players jump on Repulsion Gel.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=_('Add no music when jumping on Repulsion Gel.'),
+        none_desc=gettext('Add no music when jumping on Repulsion Gel.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.BOUNCE],
     )
@@ -176,11 +193,12 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     WINDOWS[MusicChannel.SPEED] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.SPEED),
-        title=_('Select Propulsion Gel Music'),
-        desc=_('Select music played when players have large amounts of horizontal velocity.'),
+        save_id='music_speed',
+        title=gettext('Select Propulsion Gel Music'),
+        desc=gettext('Select music played when players have large amounts of horizontal velocity.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=_('Add no music while running fast.'),
+        none_desc=gettext('Add no music while running fast.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.SPEED],
     )
@@ -201,11 +219,11 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         global is_collapsed
         is_collapsed = True
         GEN_OPTS['Last_Selected']['music_collapsed'] = '1'
-        base_lbl['text'] = _('Music: ')
+        base_lbl['text'] = gettext('Music: ')
         toggle_btn_exit()
 
         # Set all music to the children - so those are used.
-        set_suggested(WINDOWS[MusicChannel.BASE].chosen_id, sel_item=True)
+        set_suggested(WINDOWS[MusicChannel.BASE].chosen_id)
 
         for wid in exp_widgets:
             wid.grid_remove()
@@ -215,7 +233,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         global is_collapsed
         is_collapsed = False
         GEN_OPTS['Last_Selected']['music_collapsed'] = '0'
-        base_lbl['text'] = _('Base: ')
+        base_lbl['text'] = gettext('Base: ')
         toggle_btn_exit()
         for wid in exp_widgets:
             wid.grid()
@@ -248,9 +266,9 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         btn.grid(row=row, column=2, sticky='EW')
 
     for row, text in enumerate([
-        _('Funnel:'),
-        _('Bounce:'),
-        _('Speed:'),
+        gettext('Funnel:'),
+        gettext('Bounce:'),
+        gettext('Speed:'),
     ], start=1):
         label = ttk.Label(frame, text=text)
         exp_widgets.append(label)

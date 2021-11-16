@@ -315,7 +315,7 @@ class Manager(Generic[ItemT]):
         sound.fx('config')
 
         self._drag_win.deiconify()
-        self._drag_win.lift(slot._lbl.winfo_toplevel())
+        self._drag_win.lift()
         # grab makes this window the only one to receive mouse events, so
         # it is guaranteed that it'll drop when the mouse is released.
         self._drag_win.grab_set_global()

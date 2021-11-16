@@ -38,7 +38,7 @@ class SignageLegend(PakObject):
     The background texture if specified is added to the upper-left of the image.
     It is useful to provide a backing, or to fill in unset signages.
     If provided, the blank image is inserted instead of unset signage.
-    
+
     Finally the overlay is composited on top, to allow setting the unwrapped
     model parts.
     """
@@ -55,7 +55,7 @@ class SignageLegend(PakObject):
         self.blank = blank
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'SignageLegend':
+    async def parse(cls, data: ParseData) -> 'SignageLegend':
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
         else:
@@ -98,7 +98,7 @@ class Signage(PakObject, allow_mult=True):
         self.dnd_icon = None
 
     @classmethod
-    def parse(cls, data: ParseData) -> Signage:
+    async def parse(cls, data: ParseData) -> Signage:
         styles: dict[str, SignStyle] = {}
         for prop in data.info.find_children('styles'):
             sty_id = prop.name.upper()
@@ -291,7 +291,16 @@ def build_texture(
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
     vtf.flags |= vtf.flags.ANISOTROPIC
-    with BytesIO() as buf:
-        vtf.save(buf)
-        return buf.getvalue()
 
+    buf = BytesIO()
+    try:
+        vtf.save(buf)
+    except NotImplementedError:
+        LOGGER.warning('No DXT compressor, using BGRA8888.')
+        # No libsquish, so DXT compression doesn't work.
+        vtf.format = vtf.low_format = ImageFormats.BGRA4444
+
+        buf = BytesIO()
+        vtf.save(buf)
+
+    return buf.getvalue()

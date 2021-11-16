@@ -82,6 +82,12 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
     """
     marker_filenames = instanceLocs.resolve(res['markeritem'])
 
+    # TODO: Reimplement cutout tiles.
+    for inst in vmf.by_class['func_instance']:
+        if inst['file'].casefold() in marker_filenames:
+            inst.remove()
+    return
+
     x: float
     y: float
     max_x: float
@@ -198,8 +204,6 @@ def res_cutout_tile(vmf: srctools.VMF, res: Property):
         # Remove all traces of this item (other than in connections lists).
         inst.remove()
         del connections.ITEMS[targ]
-
-    return  # TODO: Reimplement cutout tiles.
 
     for start_floor, end_floor in FLOOR_IO:
         box_min = Vec(INST_LOCS[start_floor])
@@ -498,14 +502,13 @@ def make_tile(vmf: VMF, p1: Vec, p2: Vec, top_mat, bottom_mat, beam_mat):
 
     """
     prism = vmf.make_prism(p1, p2)
-    brush, t, b, n, s, e, w = prism
-    t.mat = top_mat
-    b.mat = bottom_mat
+    prism.top.mat = top_mat
+    prism.bottom.mat = bottom_mat
 
-    n.mat = beam_mat
-    s.mat = beam_mat
-    e.mat = beam_mat
-    w.mat = beam_mat
+    prism.north.mat = beam_mat
+    prism.south.mat = beam_mat
+    prism.east.mat = beam_mat
+    prism.west.mat = beam_mat
 
     thickness = abs(p1.z - p2.z)
 
@@ -524,19 +527,19 @@ def make_tile(vmf: VMF, p1: Vec, p2: Vec, top_mat, bottom_mat, beam_mat):
             '(expected 1 or 2, got {})'.format(thickness)
         )
 
-    n.uaxis = UVAxis(
+    prism.north.uaxis = UVAxis(
         0, 0, 1, offset=z_off)
-    n.vaxis = UVAxis(
+    prism.north.vaxis = UVAxis(
         1, 0, 0, offset=0)
-    s.uaxis = n.uaxis.copy()
-    s.vaxis = n.vaxis.copy()
+    prism.south.uaxis = prism.north.uaxis.copy()
+    prism.south.vaxis = prism.north.vaxis.copy()
 
-    e.uaxis = UVAxis(
+    prism.east.uaxis = UVAxis(
         0, 0, 1, offset=z_off)
-    e.vaxis = UVAxis(
+    prism.east.vaxis = UVAxis(
         0, 1, 0, offset=0)
-    w.uaxis = e.uaxis.copy()
-    w.vaxis = e.vaxis.copy()
+    prism.west.uaxis = prism.east.uaxis.copy()
+    prism.west.vaxis = prism.east.vaxis.copy()
 
     return prism
 

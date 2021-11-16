@@ -15,9 +15,10 @@ COND_MOD_NAME = 'Instances'
 
 
 @make_flag('instance')
-def flag_file_equal(inst: Entity, flag: Property) -> bool:
+def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
     """Evaluates True if the instance matches the given file."""
-    return inst['file'].casefold() in instanceLocs.resolve(flag.value)
+    inst_list = instanceLocs.resolve(flag.value)
+    return lambda inst: inst['file'].casefold() in inst_list
 
 
 @make_flag('instFlag', 'InstPart')
@@ -233,7 +234,7 @@ def res_add_inst_var(inst: Entity, res: Property):
         res_add_suffix(inst, res)
 
 
-@make_result('setInstVar', 'assign')
+@make_result('setInstVar', 'assign', 'setFixupVar')
 def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
@@ -329,8 +330,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
 
     conditions.set_ent_keys(new_ent, inst, res)
 
-    origin.localise(Vec.from_str(new_ent['origin']), angles)
-    new_ent['origin'] = origin
+    new_ent['origin'] = Vec.from_str(new_ent['origin']) @ angles + origin
     new_ent['angles'] = angles
     new_ent['targetname'] = inst['targetname']
 
@@ -365,8 +365,8 @@ def res_global_input_setup(res: Property) -> tuple[str, Output]:
 def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
     """Trigger an input either on map spawn, or when a relay is triggered.
 
-    Arguments:  
-    
+    Arguments:
+
     - `Input`: the input to use, either a name or an `instance:` command.
     - `Target`: If set, a local name to send commands to. Otherwise, the instance itself.
     - `Delay`: Number of seconds to delay the input.
