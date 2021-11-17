@@ -1,10 +1,11 @@
 """Configures which signs are defined for the Signage item."""
-from typing import Optional, Tuple, List, Dict
+from typing import Mapping, Optional, Sequence, Tuple, List, Dict
 import tkinter as tk
 from tkinter import ttk
 
 from srctools import Property
 import srctools.logger
+import attr
 
 from app import dragdrop, img, TK_ROOT
 from app import tk_tools
@@ -20,6 +21,8 @@ window.withdraw()
 
 drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
+# The valid timer indexes for signs.
+SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
@@ -55,37 +58,51 @@ def export_data() -> List[Tuple[str, str]]:
     ]
 
 
-@BEE2_config.OPTION_SAVE('Signage')
-def save_signage() -> Property:
-    """Save the signage info to settings or a palette."""
-    props = Property('Signage', [])
-    for timer, slot in SLOTS_SELECTED.items():
-        props.append(Property(
-            str(timer),
-            '' if slot.contents is None
-            else slot.contents.id,
-        ))
-    return props
+@BEE2_config.register('Signage')
+@attr.frozen
+class Layout:
+    """A layout of selected signs."""
+    signs: Mapping[int, str]  # Readonly.
 
-
-@BEE2_config.OPTION_LOAD('Signage')
-def load_signage(props: Property) -> None:
-    """Load the signage info from settings or a palette."""
-    for child in props:
-        try:
-            slot = SLOTS_SELECTED[int(child.name)]
-        except (ValueError, TypeError):
-            LOGGER.warning('Non-numeric timer value "{}"!', child.name)
-            continue
-        except KeyError:
-            LOGGER.warning('Invalid timer value {}!', child.name)
-            continue
-
-        if child.value:
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'Layout':
+        """Parse DMX config values."""
+        sign = dict.fromkeys(SIGN_IND, '')
+        for child in data:
             try:
-                slot.contents = Signage.by_id(child.value)
+                timer = int(child.name)
+            except (ValueError, TypeError):
+                LOGGER.warning('Non-numeric timer value "{}"!', child.name)
+                continue
+
+            if timer not in sign:
+                LOGGER.warning('Invalid timer value {}!', child.name)
+                continue
+            sign[timer] = child.value
+        return cls(sign)
+
+    def export_kv1(self) -> Property:
+        """Generate keyvalues for saving signages."""
+        props = Property('Signage', [])
+        for timer, sign in self.signs.items():
+            props.append(Property(str(timer), sign))
+        return props
+
+
+async def apply_config(data: Layout) -> None:
+    """Apply saved signage info to the UI."""
+    for timer, value in data.signs.items():
+        try:
+            slot = SLOTS_SELECTED[timer]
+        except KeyError:
+            LOGGER.warning('Invalid timer value {}!', timer)
+            continue
+
+        if value:
+            try:
+                slot.contents = Signage.by_id(value)
             except KeyError:
-                LOGGER.warning('No signage with id "{}"!', child.value)
+                LOGGER.warning('No signage with id "{}"!', value)
         else:
             slot.contents = None
 
