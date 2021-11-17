@@ -109,6 +109,7 @@ async def apply_config(data: Layout) -> None:
 
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
+    icon: Optional[img.Handle]
     for sign in Signage.all():
         for potential_style in new_style.bases:
             try:
@@ -142,12 +143,11 @@ def style_changed(new_style: Style) -> None:
 
 async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
-
-    If no signages are defined, this returns None.
     """
 
     if not any(Signage.all()):
-        return ttk.Label(master)
+        # There's no signage, disable the configurator. This will be invisible basically.
+        return ttk.Frame(master)
 
     window.resizable(True, True)
     window.title(gettext('Configure Signage'))
@@ -242,7 +242,7 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
     drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
 
-    for i in range(3, 31):
+    for i in SIGN_IND:
         SLOTS_SELECTED[i] = slot = drag_man.slot(
             frame_selected,
             source=False,
@@ -272,6 +272,11 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
 
     def hide_window() -> None:
         """Hide the window."""
+        # Store off the configured signage.
+        BEE2_config.store_conf(Layout({
+            timer: slt.contents.id if slt.contents is not None else ''
+            for timer, slt in SLOTS_SELECTED.items()
+        }))
         window.withdraw()
         drag_man.unload_icons()
         img.apply(preview_left, IMG_BLANK)
@@ -284,6 +289,7 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         utils.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
+    await BEE2_config.set_callback(Layout, apply_config)
     return ttk.Button(
         master,
         text=gettext('Configure Signage'),
