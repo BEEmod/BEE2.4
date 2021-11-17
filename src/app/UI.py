@@ -1808,6 +1808,4 @@ async def init_windows() -> None:
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     set_palette(pal_ui.selected)
-    # Set_palette needs to run first, so it can fix invalid palette indexes.
-    BEE2_config.read_settings()
     pal_ui.update_state()

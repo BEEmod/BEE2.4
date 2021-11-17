@@ -1,11 +1,12 @@
 """Run the BEE2."""
 import trio
 
-from BEE2_config import GEN_OPTS, get_package_locs
+from BEE2_config import GEN_OPTS
 from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error, sound
 import loadScreen
 import packages
 import utils
+import BEE2_config
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger('BEE2')
@@ -54,6 +55,7 @@ async def init_app():
     """Initialise the application."""
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
+    BEE2_config.read_settings()
 
     # Special case, load in this early so it applies.
     utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')
@@ -83,7 +85,7 @@ async def init_app():
 
     LOGGER.info('Loading Packages...')
     package_sys = await packages.load_packages(
-        list(get_package_locs()),
+        list(BEE2_config.get_package_locs()),
         loader=loadScreen.main_loader,
         log_item_fallbacks=GEN_OPTS.get_bool(
             'Debug', 'log_item_fallbacks'),
