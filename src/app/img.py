@@ -29,7 +29,8 @@ import utils
 # Widgets with an image attribute that can be set.
 tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button)
-WidgetWeakRef = Union['WeakRef[tk.Label], WeakRef[ttk.Label], WeakRef[tk.Button], WeakRef[ttk.Button]']
+# WeakRef is only generic in stubs!
+WidgetWeakRef = Union['WeakRef[tk.Label]', 'WeakRef[ttk.Label]', 'WeakRef[tk.Button]', 'WeakRef[ttk.Button]']
 
 ArgT = TypeVar('ArgT')
 
