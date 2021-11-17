@@ -140,7 +140,7 @@ def style_changed(new_style: Style) -> None:
         drag_man.load_icons()
 
 
-def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
+async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
 
     If no signages are defined, this returns None.

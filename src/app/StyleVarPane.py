@@ -225,7 +225,7 @@ def refresh(selected_style: Style) -> None:
         UI['stylevar_other_none'].grid_remove()
 
 
-def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]) -> None:
+async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]) -> None:
     """Create the styleVar pane.
 
     update_item_vis is the callback fired whenever change defaults changes.
@@ -359,4 +359,4 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
 
     item_config_frame = ttk.Frame(nbook)
     nbook.add(item_config_frame, text=gettext('Items'))
-    itemconfig.make_pane(item_config_frame)
+    await itemconfig.make_pane(item_config_frame)

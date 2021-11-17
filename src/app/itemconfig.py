@@ -283,7 +283,7 @@ class ConfigGroup(PakObject, allow_mult=True):
         CONFIG.save_check()
 
 
-def make_pane(parent: ttk.Frame):
+async def make_pane(parent: ttk.Frame):
     """Create all the widgets we use."""
     CONFIG_ORDER.sort(key=lambda grp: grp.name)
 
@@ -307,7 +307,7 @@ def make_pane(parent: ttk.Frame):
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)
 
-    sign_button = signage_ui.init_widgets(canvas_frame)
+    sign_button = await signage_ui.init_widgets(canvas_frame)
     if sign_button is not None:
         sign_button.grid(row=0, column=0, sticky='ew')
 

@@ -1674,7 +1674,7 @@ async def init_windows() -> None:
 
     loader.step('UI', 'options')
 
-    StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
+    await StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
 
     loader.step('UI', 'stylevar')
 
