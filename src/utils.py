@@ -2,10 +2,10 @@
 from __future__ import annotations
 from collections import deque
 from typing import (
-    TypeVar, Any, NoReturn, Generic, Type,
+    TypeVar, Any, NoReturn, Generic, Type, Optional, Tuple,
     SupportsInt, Union, Callable,
-    Sequence, Iterator, Iterable, Mapping,
-    KeysView, ValuesView, ItemsView, Generator,
+    Sequence, Iterator, Iterable, Mapping, Dict, Generator,
+    KeysView, ValuesView, ItemsView
 )
 import logging
 import os
@@ -62,6 +62,7 @@ copyreg.add_extension('srctools.property_parser', 'Property', 244)
 
 
 # Appropriate locations to store config options for each OS.
+_SETTINGS_ROOT: Optional[Path]
 if WIN:
     _SETTINGS_ROOT = Path(os.environ['APPDATA'])
 elif MAC:
@@ -71,10 +72,10 @@ elif LINUX:
 else:
     # Defer the error until used, so it goes in logs and whatnot.
     # Utils is early, so it'll get lost in stderr.
-    _SETTINGS_ROOT = None  # type: ignore
+    _SETTINGS_ROOT = None
 
 # We always go in a BEE2 subfolder
-if _SETTINGS_ROOT:
+if _SETTINGS_ROOT is not None:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
 
@@ -220,10 +221,11 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
             continue
         data = {}
-        data_exc = {}
+        data_exc: Dict[EnumT, Tuple[BaseException, Optional[TracebackType]]] = {}
 
         exc: Exception
         enum: EnumT
+        tb: Optional[TracebackType]
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
@@ -235,9 +237,15 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
             except Exception as exc:
                 # The getter raised an exception, so we want to replicate
                 # that. So grab the traceback, and go back one frame to exclude
-                # ourselves from that. Then we can reraise making it look like
+                # ourselves from that. Then we can re-raise making it look like
                 # it came from the original getter.
-                data_exc[enum] = (exc, exc.__traceback__.tb_next)
+                if exc.__traceback__ is not None:
+                    tb = exc.__traceback__
+                    if tb.tb_next is not None:
+                        tb = tb.tb_next
+                else:
+                    tb = None
+                data_exc[enum] = (exc, tb)
                 exc.__traceback__ = None
             else:
                 data[enum] = res
@@ -251,7 +259,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, tuple[BaseException, TracebackType]],
+    data_exc: Mapping[EnumT, Tuple[BaseException, Optional[TracebackType]]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
