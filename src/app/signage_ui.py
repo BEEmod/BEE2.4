@@ -289,7 +289,7 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         utils.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
-    await BEE2_config.set_callback(Layout, apply_config)
+    await BEE2_config.set_and_run_ui_callback(Layout, apply_config)
     return ttk.Button(
         master,
         text=gettext('Configure Signage'),

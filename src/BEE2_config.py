@@ -105,7 +105,6 @@ def write_settings() -> None:
                 file.write(line)
 
 
-
 DataT = TypeVar('DataT', bound='Data')
 
 
@@ -128,7 +127,11 @@ class ConfType(Generic[DataT]):
     name: str
     version: int
     palette_stores: bool  # If this is save/loaded by palettes.
+    # The current data loaded from the config file.
     data: Optional[DataT] = None
+    # After the relevant UI is initialised, this is set to an async func which
+    # applies the data to the UI. This way we know it can be done safely now.
+    # If data was loaded from the config, the callback is immediately awaited.
     callback: Optional[Callable[[DataT], Awaitable]] = None
 
 
@@ -156,7 +159,7 @@ def register(
     return deco
 
 
-async def set_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> None:
+async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> None:
     """Set the callback used to apply this config type to the UI.
 
     If the configs have been loaded, it will immediately be called. Whenever new configs
