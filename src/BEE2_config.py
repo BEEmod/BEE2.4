@@ -102,7 +102,7 @@ DataT = TypeVar('DataT', bound='Data')
 class Data(Protocol):
     """Data which can be saved to the config. These should be immutable."""
     @classmethod
-    def parse_kv1(cls: Type[DataT], version: int) -> DataT:
+    def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
         """Parse DMX config values."""
         raise NotImplementedError
 
@@ -125,7 +125,7 @@ _NAME_TO_CONFIG: Dict[str, ConfData] = {}
 _TYPE_TO_CONFIG: Dict[Type[Data], ConfData] = {}
 
 
-def register(name: str, version: int=1) -> Callable[[Type[DataT]], Type[DataT]]:
+def register(name: str, *, version: int=1) -> Callable[[Type[DataT]], Type[DataT]]:
     """Register a config data type. The name must be unique.
 
     The version is the latest version of this config, and should increment each time it changes
