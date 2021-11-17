@@ -10,8 +10,13 @@ Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
-from typing import Any, Mapping, Optional, Callable, Iterator
+from typing import (
+    TypeVar, Generic, Protocol, Any, Optional, Callable, Awaitable, Type,
+    Mapping, Iterator, Dict,
+)
 from threading import Lock, Event
+
+import attr
 from atomicwrites import atomic_write
 
 from srctools import Property, KeyValError
@@ -46,6 +51,7 @@ def get_curr_settings(*, is_palette: bool) -> Property:
 def apply_settings(props: Property, *, is_palette: bool) -> None:
     """Given a property tree, apply it to the widgets."""
     for opt_prop in props:
+        assert opt_prop.name is not None
         try:
             func = OPTION_LOAD[opt_prop.name]
         except KeyError:
@@ -88,6 +94,63 @@ def write_settings() -> None:
         for prop in props:
             for line in prop.export():
                 file.write(line)
+
+
+DataT = TypeVar('DataT', bound='Data')
+
+
+class Data(Protocol):
+    """Data which can be saved to the config. These should be immutable."""
+    @classmethod
+    def parse_kv1(cls: Type[DataT], version: int) -> DataT:
+        """Parse DMX config values."""
+        raise NotImplementedError
+
+    def export_kv1(self) -> Property:
+        """Generate keyvalues for saving configuration."""
+        raise NotImplementedError
+
+
+@attr.define
+class ConfData(Generic[DataT]):
+    """Holds configuration data."""
+    cls: Type[DataT]
+    name: str
+    version: int
+    data: Optional[DataT] = None
+    callback: Optional[Callable[[DataT], Awaitable]] = None
+
+
+_NAME_TO_CONFIG: Dict[str, ConfData] = {}
+_TYPE_TO_CONFIG: Dict[Type[Data], ConfData] = {}
+
+
+def register(name: str, version: int=1) -> Callable[[Type[DataT]], Type[DataT]]:
+    """Register a config data type. The name must be unique.
+
+    The version is the latest version of this config, and should increment each time it changes
+    in a backwards-incompatible way.
+    """
+    def deco(cls: Type[DataT]) -> Type[DataT]:
+        """Register the class."""
+        assert name.casefold() not in _NAME_TO_CONFIG, name
+        _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = ConfData(cls, name, version)
+        return cls
+    return deco
+
+
+async def set_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> None:
+    """Set the callback used to apply this config type to the UI.
+
+    If the configs have been loaded, it will immediately be called. Whenever new configs
+    are loaded, it will be re-applied regardless.
+    """
+    info: ConfData[DataT] = _TYPE_TO_CONFIG[typ]
+    if info.callback is not None:
+        raise ValueError(f'Cannot set callback for {info.cls}="{info.name}" twice!')
+    info.callback = func
+    if info.data is not None:
+        await func(info.data)
 
 
 def get_package_locs() -> Iterator[Path]:
