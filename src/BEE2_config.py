@@ -122,8 +122,8 @@ class Data(Protocol):
 
 
 @attr.define
-class ConfData(Generic[DataT]):
-    """Holds configuration data."""
+class ConfType(Generic[DataT]):
+    """Holds information about a type of configuration data."""
     cls: Type[DataT]
     name: str
     version: int
@@ -131,8 +131,8 @@ class ConfData(Generic[DataT]):
     callback: Optional[Callable[[DataT], Awaitable]] = None
 
 
-_NAME_TO_CONFIG: Dict[str, ConfData] = {}
-_TYPE_TO_CONFIG: Dict[Type[Data], ConfData] = {}
+_NAME_TO_CONFIG: Dict[str, ConfType] = {}
+_TYPE_TO_CONFIG: Dict[Type[Data], ConfType] = {}
 
 
 def register(name: str, *, version: int=1) -> Callable[[Type[DataT]], Type[DataT]]:
@@ -145,7 +145,7 @@ def register(name: str, *, version: int=1) -> Callable[[Type[DataT]], Type[DataT
         """Register the class."""
         assert name.casefold() not in _NAME_TO_CONFIG, name
         assert cls not in _TYPE_TO_CONFIG, cls
-        _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = ConfData(cls, name, version)
+        _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = ConfType(cls, name, version)
         return cls
     return deco
 
@@ -156,7 +156,7 @@ async def set_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> 
     If the configs have been loaded, it will immediately be called. Whenever new configs
     are loaded, it will be re-applied regardless.
     """
-    info: ConfData[DataT] = _TYPE_TO_CONFIG[typ]
+    info: ConfType[DataT] = _TYPE_TO_CONFIG[typ]
     if info.callback is not None:
         raise ValueError(f'Cannot set callback for {info.cls}="{info.name}" twice!')
     info.callback = func
@@ -166,7 +166,7 @@ async def set_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> 
 
 async def apply_conf(typ: Type[DataT]) -> None:
     """Apply the current settings for this config type."""
-    info: ConfData[DataT] = _TYPE_TO_CONFIG[typ]
+    info: ConfType[DataT] = _TYPE_TO_CONFIG[typ]
     if info.callback is not None and info.data is not None:
         await info.callback(info.data)
 
