@@ -127,6 +127,7 @@ class ConfType(Generic[DataT]):
     cls: Type[DataT]
     name: str
     version: int
+    palette_stores: bool  # If this is save/loaded by palettes.
     data: Optional[DataT] = None
     callback: Optional[Callable[[DataT], Awaitable]] = None
 
@@ -135,7 +136,11 @@ _NAME_TO_CONFIG: Dict[str, ConfType] = {}
 _TYPE_TO_CONFIG: Dict[Type[Data], ConfType] = {}
 
 
-def register(name: str, *, version: int=1) -> Callable[[Type[DataT]], Type[DataT]]:
+def register(
+    name: str, *,
+    version: int = 1,
+    palette_stores: bool = True,
+) -> Callable[[Type[DataT]], Type[DataT]]:
     """Register a config data type. The name must be unique.
 
     The version is the latest version of this config, and should increment each time it changes
@@ -143,9 +148,10 @@ def register(name: str, *, version: int=1) -> Callable[[Type[DataT]], Type[DataT
     """
     def deco(cls: Type[DataT]) -> Type[DataT]:
         """Register the class."""
-        assert name.casefold() not in _NAME_TO_CONFIG, name
-        assert cls not in _TYPE_TO_CONFIG, cls
-        _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = ConfType(cls, name, version)
+        info = ConfType(cls, name, version, palette_stores)
+        assert name.casefold() not in _NAME_TO_CONFIG, info
+        assert cls not in _TYPE_TO_CONFIG, info
+        _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = info
         return cls
     return deco
 
