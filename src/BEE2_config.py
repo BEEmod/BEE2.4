@@ -11,8 +11,8 @@ Most functions are also altered to allow defaults instead of erroring.
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import (
-    TypeVar, Generic, Protocol, Any, Optional, Callable, Awaitable, Type,
-    Mapping, Iterator, Dict,
+    TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
+    Awaitable, Iterable, Iterator, Dict, Mapping,
 )
 from threading import Lock, Event
 
@@ -80,12 +80,21 @@ def read_settings() -> None:
             path.replace(path.with_suffix('.err.vdf'))
         except IOError:
             pass
-    apply_settings(props, is_palette=False)
+
+    conf = parse_conf(props)
+    for obj in conf.values():
+        info = _TYPE_TO_CONFIG[type(obj)]
+        info.data = obj
 
 
 def write_settings() -> None:
     """Write the settings to disk."""
-    props = get_curr_settings(is_palette=False)
+    props = Property.root()
+    props.extend(build_conf(
+        info.data
+        for info in _NAME_TO_CONFIG.values()
+        if info.data is not None
+    ))
     with atomic_write(
         utils.conf_location('config/config.vdf'),
         encoding='utf8',
@@ -151,6 +160,42 @@ async def set_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> 
     info.callback = func
     if info.data is not None:
         await func(info.data)
+
+
+def parse_conf(props: Property) -> Dict[str, Data]:
+    """Parse a configuration file into individual data."""
+    conf = {}
+    for child in props:
+        try:
+            info = _NAME_TO_CONFIG[child.name]
+        except KeyError:
+            LOGGER.warning('Unknown config option "{}"!', child.real_name)
+            continue
+        version = child.int('_version', 0)
+        try:
+            del child['_version']
+        except LookupError:
+            pass
+        if version > info.version:
+            LOGGER.warning(
+                'Config option "{}" has version {}, '
+                'which is higher than the supported version ({})!',
+                info.name, version, info.version
+            )
+            # Don't try to parse, it'll be invalid.
+            continue
+        conf[child.name] = info.cls.parse_kv1(child, version)
+    return conf
+
+
+def build_conf(data: Iterable[Data]) -> Iterator[Property]:
+    """Build out a configuration file from some data."""
+    for obj in data:
+        info = _TYPE_TO_CONFIG[type(obj)]
+        prop = obj.export_kv1()
+        prop[0:0] = [Property('_version', str(info.version))]
+        prop.name = info.name
+        yield prop
 
 
 def get_package_locs() -> Iterator[Path]:
