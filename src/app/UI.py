@@ -1032,7 +1032,7 @@ def drag_fast(drag_item: PalItem, e: tk.Event) -> None:
     flow_preview()
 
 
-def set_palette(chosen_pal: paletteUI.Palette) -> None:
+async def set_palette(chosen_pal: paletteUI.Palette) -> None:
     """Select a palette."""
     pal_clear()
     for item, sub in chosen_pal.pos:
@@ -1804,5 +1804,5 @@ async def init_windows() -> None:
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
-    set_palette(pal_ui.selected)
+    await set_palette(pal_ui.selected)
     pal_ui.update_state()

@@ -1,6 +1,6 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
-from typing import Callable
+from typing import Awaitable, Callable
 from uuid import UUID
 
 import tkinter as tk
@@ -8,7 +8,7 @@ from tkinter import ttk, messagebox
 
 import BEE2_config
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
-from app import tk_tools, paletteLoader, TK_ROOT, img
+from app import tk_tools, paletteLoader, TK_ROOT, img, BEE2
 from localisation import gettext
 
 import srctools.logger
@@ -32,7 +32,7 @@ class PaletteUI:
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],
         get_items: Callable[[], list[tuple[str, int]]],
-        set_items: Callable[[Palette], None],
+        set_items: Callable[[Palette], Awaitable[None]],
     ) -> None:
         """Initialises the palette pane.
 
@@ -69,7 +69,11 @@ class PaletteUI:
 
         self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
         self.ui_treeview.grid(row=1, sticky="NSEW")
-        self.ui_treeview.tag_bind(TREE_TAG_PALETTES, '<ButtonPress>', self.event_select_tree)
+        # We need to delay this a frame, so the selection completes.
+        self.ui_treeview.tag_bind(
+            TREE_TAG_PALETTES, '<ButtonPress>',
+            lambda e: BEE2.APP_NURSERY.start_soon(self.event_select_tree),
+        )
 
         # Avoid re-registering the double-lambda, just do it here.
         # This makes clicking the groups return selection to the palette.
@@ -211,7 +215,10 @@ class PaletteUI:
                 grp_menu.add_radiobutton(
                     label=pal.name,
                     value=pal.uuid.hex,
-                    command=self.event_select_menu,
+                    # If we remake the palette menus inside this event handler, it tries
+                    # to select the old menu item (likely), so a crash occurs. Delay until
+                    # another frame.
+                    command=lambda: BEE2.APP_NURSERY.start_soon(self.event_select_menu),
                     variable=self.var_pal_select,
                     image=gear_img,
                     compound='left',
@@ -275,7 +282,7 @@ class PaletteUI:
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
         self.select_palette(paletteLoader.UUID_PORTAL2)
-        self.set_items(self.selected)
+        BEE2.APP_NURSERY.start_soon(self.set_items, self.selected)
 
     def event_save(self) -> None:
         """Save the current palette over the original name."""
@@ -321,7 +328,7 @@ class PaletteUI:
         self.update_state()
 
     def select_palette(self, uuid: UUID) -> None:
-        """Select a new palette, and update state. This does not update items/settings!"""
+        """Select a new palette. This does not update items/settings!"""
         pal = self.palettes[uuid]
         self.selected_uuid = uuid
         BEE2_config.GEN_OPTS['Last_Selected']['palette_uuid'] = uuid.hex
@@ -340,23 +347,22 @@ class PaletteUI:
             self.selected.save()
             self.update_state()
 
-    def event_select_menu(self) -> None:
+    async def event_select_menu(self) -> None:
         """Called when the menu buttons are clicked."""
         uuid_hex = self.var_pal_select.get()
         self.select_palette(UUID(hex=uuid_hex))
-        self.set_items(self.selected)
-        # If we remake the palette menus inside this event handler, it tries
-        # to select the old menu item (likely), so a crash occurs. Delay until
-        # another frame.
-        self.ui_treeview.after_idle(self.update_state)
+        await self.set_items(self.selected)
+        self.update_state()
 
-    def event_select_tree(self, evt: tk.Event) -> None:
+    async def event_select_tree(self) -> None:
         """Called when palettes are selected on the treeview."""
-        # We're called just before it actually changes, so look up by the cursor pos.
-        uuid_hex = self.ui_treeview.identify('item', evt.x, evt.y)[4:]
+        try:
+            uuid_hex = self.ui_treeview.selection()[0][4:]
+        except IndexError:  # No selection, exit.
+            return
         self.var_pal_select.set(uuid_hex)
         self.select_palette(UUID(hex=uuid_hex))
-        self.set_items(self.selected)
+        await self.set_items(self.selected)
         self.update_state()
 
     def treeview_reselect(self) -> None:
