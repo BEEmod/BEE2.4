@@ -1196,7 +1196,7 @@ class SelectorWin:
         if self.first_open:
             self.first_open = False
             try:
-                state = BEE2_config.get_info_by_type(WindowState).data[self.save_id]
+                state = BEE2_config.get_cur_conf(WindowState, self.save_id)
             except KeyError:
                 pass
             else:

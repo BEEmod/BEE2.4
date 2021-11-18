@@ -11,7 +11,7 @@ Most functions are also altered to allow defaults instead of erroring.
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import (
-    TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
+    NewType, TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
     Awaitable, Iterator, Dict, Mapping,
 )
 from threading import Lock, Event
@@ -83,17 +83,15 @@ def read_settings() -> None:
             pass
 
     conf = parse_conf(props)
+    _CUR_CONFIG.clear()
     for info, obj_map in conf.items():
-        info.data = obj_map
+        _CUR_CONFIG[info] = obj_map
 
 
 def write_settings() -> None:
     """Write the settings to disk."""
     props = Property.root()
-    props.extend(build_conf({
-        info: info.data
-        for info in _NAME_TO_TYPE.values()
-    }))
+    props.extend(build_conf(_CUR_CONFIG))
     with atomic_write(
         utils.conf_location('config/config.vdf'),
         encoding='utf8',
@@ -127,17 +125,19 @@ class ConfType(Generic[DataT]):
     version: int
     palette_stores: bool  # If this is save/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
-    # The current data loaded from the config file. This maps an ID to each value, or
-    # is {'': data} if no key is used.
-    data: Dict[str, DataT] = attr.Factory(dict)
     # After the relevant UI is initialised, this is set to an async func which
     # applies the data to the UI. This way we know it can be done safely now.
     # If data was loaded from the config, the callback is immediately awaited.
+    # One is provided independently for each ID, so it can be sent to the right object.
     callback: Dict[str, Callable[[DataT], Awaitable]] = attr.Factory(dict)
 
 
 _NAME_TO_TYPE: Dict[str, ConfType] = {}
 _TYPE_TO_TYPE: Dict[Type[Data], ConfType] = {}
+# The current data loaded from the config file. This maps an ID to each value, or
+# is {'': data} if no key is used.
+Config = NewType('Config', Dict[ConfType, Dict[str, Data]])
+_CUR_CONFIG: Config = Config({})
 
 
 def get_info_by_name(name: str) -> ConfType:
@@ -183,8 +183,9 @@ async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awai
     if data_id in info.callback:
         raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
     info.callback[data_id] = func
-    if data_id in info.data:
-        await func(info.data[data_id])
+    data_map = _CUR_CONFIG[info]
+    if data_id in data_map:
+        await func(data_map[data_id])
 
 
 async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
@@ -197,15 +198,15 @@ async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
         if not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         try:
+            data = _CUR_CONFIG[info][data_id]
             cb = info.callback[data_id]
-            data = info.data[data_id]
         except KeyError:
             pass
         else:
             await cb(data)
     else:
         async with trio.open_nursery() as nursery:
-            for dat_id, data in info.data.items():
+            for dat_id, data in _CUR_CONFIG[info].items():
                 try:
                     cb = info.callback[dat_id]
                 except KeyError:
@@ -214,20 +215,29 @@ async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
                     nursery.start_soon(cb, data)
 
 
-def store_conf(data: DataT, data_id: str='') -> None:
-    """Update the current data for this ID. """
-    info = _TYPE_TO_TYPE[type(data)]
+def get_cur_conf(data: Type[DataT], data_id: str='') -> DataT:
+    """Fetch the currently active config for this ID."""
+    info: ConfType[DataT] = _TYPE_TO_TYPE[data]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    info.data[data_id] = data
+    LOGGER.debug('Config: {}', _CUR_CONFIG)
+    return _CUR_CONFIG[info][data_id]
 
 
-def parse_conf(props: Property) -> Dict[ConfType, Dict[str, Data]]:
+def store_conf(data: DataT, data_id: str='') -> None:
+    """Update the current data for this ID. """
+    info: ConfType[DataT] = _TYPE_TO_TYPE[type(data)]
+    if data_id and not info.uses_id:
+        raise ValueError(f'Data type "{info.name}" does not support IDs!')
+    _CUR_CONFIG[info][data_id] = data
+
+
+def parse_conf(props: Property) -> Config:
     """Parse a configuration file into individual data.
 
     The data is in the form {conf_type: {id: data}}.
     """
-    conf = {}
+    conf = Config({})
     for child in props:
         try:
             info = _NAME_TO_TYPE[child.name]
@@ -257,7 +267,7 @@ def parse_conf(props: Property) -> Dict[ConfType, Dict[str, Data]]:
     return conf
 
 
-def build_conf(data: Dict[ConfType, Dict[str, Data]]) -> Iterator[Property]:
+def build_conf(data: Config) -> Iterator[Property]:
     """Build out a configuration file from some data.
 
     The data is in the form {conf_type: {id: data}}.
