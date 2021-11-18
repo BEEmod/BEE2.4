@@ -94,13 +94,14 @@ class Layout:
 
 async def apply_config(data: Layout) -> None:
     """Apply saved signage info to the UI."""
-    for timer, value in data.signs.items():
+    for timer in SIGN_IND:
         try:
             slot = SLOTS_SELECTED[timer]
         except KeyError:
             LOGGER.warning('Invalid timer value {}!', timer)
             continue
 
+        value = data.signs.get(timer, '')
         if value:
             try:
                 slot.contents = Signage.by_id(value)
