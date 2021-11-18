@@ -1,14 +1,16 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
+from typing import Callable, Optional
 from tkinter import *
 from tkinter import ttk
 
-from typing import Callable, Optional
 import operator
 import itertools
 
-from srctools import Property
+from srctools import Property, bool_as_int, conv_bool
 from srctools.logger import get_logger
+import attr
+
 from packages import Style, StyleVar
 from app.SubPane import SubPane
 from app import tooltip, TK_ROOT, itemconfig, tk_tools
@@ -103,9 +105,6 @@ STYLES: dict[str, Style] = {}
 window: Optional[SubPane] = None
 
 UI = {}
-# Callback triggered whenever we reload vars. This is used to update items
-# to show/hide the defaults.
-_load_cback: Optional[Callable[[], None]] = None
 
 
 def mandatory_unlocked() -> bool:
@@ -116,25 +115,21 @@ def mandatory_unlocked() -> bool:
         return False
 
 
-@BEE2_config.OPTION_SAVE('StyleVar')
-def save_handler() -> Property:
-    """Save variables to configs."""
-    props = Property('', [])
-    for var_id, var in sorted(tk_vars.items()):
-        props[var_id] = str(int(var.get()))
-    return props
+@BEE2_config.register('StyleVar', uses_id=True)
+@attr.frozen
+class StyleVarState:
+    """Holds style var state stored in configs."""
+    value: bool
 
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'StyleVarState':
+        """Parse KV1-formatted stylevar states."""
+        assert version == 1, version
+        return cls(conv_bool(data.value))
 
-@BEE2_config.OPTION_LOAD('StyleVar')
-def load_handler(props: Property) -> None:
-    """Load variables from configs."""
-    for prop in props:
-        try:
-            tk_vars[prop.real_name].set(prop.value)
-        except KeyError:
-            LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
-    if _load_cback is not None:
-        _load_cback()
+    def export_kv1(self) -> Property:
+        """Export the stylevars in KV1 format."""
+        return Property('', bool_as_int(self.value))
 
 
 def export_data(chosen_style: Style) -> dict[str, bool]:
@@ -230,8 +225,7 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
 
     update_item_vis is the callback fired whenever change defaults changes.
     """
-    global window, _load_cback
-    _load_cback = update_item_vis
+    global window
 
     window = SubPane(
         TK_ROOT,
@@ -299,26 +293,46 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
         font='TkMenuFont',
         justify='center',
         )
-
     VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
+
+    async def add_state_syncers(var_id: str, check: ttk.Checkbutton, tk_var: IntVar) -> None:
+        """Makes functions for syncing stylevar state. """
+        async def apply_state(state: StyleVarState) -> None:
+            """Applies the given state."""
+            tk_var.set(state.value)
+        await BEE2_config.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
+        check['command'] = lambda: BEE2_config.store_conf(StyleVarState(tk_var.get() != 0), var_id)
 
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = int_var = IntVar(value=var.default)
-        checkbox_all[var.id] = ttk.Checkbutton(
+        checkbox_all[var.id] = chk = ttk.Checkbutton(
             frame_all,
             variable=int_var,
             text=var.name,
         )
-        checkbox_all[var.id].grid(row=all_pos, column=0, sticky="W", padx=3)
+        chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+        tooltip.add_tooltip(chk, make_desc(var))
 
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
         if var.id == 'UnlockDefault':
-            checkbox_all[var.id]['command'] = lambda: update_item_vis()
+            def on_unlock_default_set() -> None:
+                """Update item filters when this is changed by the user."""
+                BEE2_config.store_conf(StyleVarState(unlock_def_var.get() != 0), 'UnlockDefault')
+                update_item_vis()
 
-        tooltip.add_tooltip(checkbox_all[var.id], make_desc(var))
+            async def apply_unlock_default(state: StyleVarState) -> None:
+                """Update item filters when this is changed by config."""
+                unlock_def_var.set(state.value)
+                update_item_vis()
+
+            unlock_def_var = int_var
+            chk['command'] = on_unlock_default_set
+            await BEE2_config.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
+        else:
+            await add_state_syncers(var.id, chk, int_var)
 
     for var in VAR_LIST:
         tk_vars[var.id] = IntVar(value=var.enabled)
@@ -331,9 +345,9 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
             # Available in all styles - put with the hardcoded variables.
             all_pos += 1
 
-            checkbox_all[var.id] = check = ttk.Checkbutton(frame_all, **args)
-            check.grid(row=all_pos, column=0, sticky="W", padx=3)
-            tooltip.add_tooltip(check, desc)
+            checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, **args)
+            chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+            tooltip.add_tooltip(chk, desc)
         else:
             # Swap between checkboxes depending on style.
             checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
