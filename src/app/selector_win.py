@@ -98,62 +98,40 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list')
 
 
-AttrValues =  Union[str, list, bool, Vec]
+AttrValues = Union[str, list, bool, Vec]
 
 
-@attr.define
+@BEE2_config.register('SelectorWindow', palette_stores=False, uses_id=True)
+@attr.frozen
 class WindowState:
-    """The window state stored in config files for restoration next launch."""
-    open_groups: dict[str, bool]
+    """The immutable window state stored in config files for restoration next launch."""
+    open_groups: Mapping[str, bool]
     width: int
     height: int
 
     @classmethod
-    def parse(cls, props: Property) -> WindowState:
+    def parse_kv1(cls, data: Property, version: int) -> 'WindowState':
         """Parse from keyvalues."""
+        assert version == 1
         open_groups = {
             prop.name: srctools.conv_bool(prop.value)
-            for prop in props.find_children('Groups')
+            for prop in data.find_children('Groups')
         }
         return WindowState(
             open_groups,
-            props.int('width', -1), props.int('height', -1),
+            data.int('width', -1), data.int('height', -1),
         )
 
-    def export(self) -> Property:
+    def export_kv1(self) -> Property:
         """Generate keyvalues."""
-        props = Property('', [
-            Property('width', str(self.width)),
-            Property('height', str(self.height)),
-        ])
+        props = Property('', [])
         with props.build() as builder:
+            builder.width(str(self.width))
+            builder.height(str(self.height))
             with builder.Groups:
                 for name, is_open in self.open_groups.items():
                     builder[name](srctools.bool_as_int(is_open))
         return props
-
-
-# The saved window states. When windows open they read from here, then write
-# when closing.
-SAVED_STATE: dict[str, WindowState] = {}
-
-
-@BEE2_config.OPTION_SAVE('SelectorWindow', to_palette=False)
-def save_handler() -> Property:
-    """Save properties to the config for next launch."""
-    props = Property('', [])
-    for save_id, state in SAVED_STATE.items():
-        prop = state.export()
-        prop.name = save_id
-        props.append(prop)
-    return props
-
-
-@BEE2_config.OPTION_LOAD('SelectorWindow', from_palette=False)
-def load_handler(props: Property) -> None:
-    """Load properties to the config from last launch."""
-    for prop in props:
-        SAVED_STATE[prop.name] = WindowState.parse(prop)
 
 
 @attr.define
@@ -1145,7 +1123,7 @@ class SelectorWin:
                 img.apply(item.button, None)
 
         if not self.first_open:  # We've got state to store.
-            SAVED_STATE[self.save_id] = state = WindowState(
+            state = WindowState(
                 open_groups={
                     grp_id: grp.visible
                     for grp_id, grp in self.group_widgets.items()
@@ -1153,6 +1131,7 @@ class SelectorWin:
                 width=self.win.winfo_width(),
                 height=self.win.winfo_height(),
             )
+            BEE2_config.store_conf(state, self.save_id)
             LOGGER.debug('Storing window state "{}" = {}', self.save_id, state)
 
         if self.modal:
@@ -1217,7 +1196,7 @@ class SelectorWin:
         if self.first_open:
             self.first_open = False
             try:
-                state = SAVED_STATE[self.save_id]
+                state = BEE2_config.get_info_by_type(WindowState).data[self.save_id]
             except KeyError:
                 pass
             else:
