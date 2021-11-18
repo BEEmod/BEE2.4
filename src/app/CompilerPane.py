@@ -169,7 +169,7 @@ class CompilePaneState:
     """
     sshot_type: str = 'AUTO'
     sshot_cleanup: bool = False
-    sshot_cust: bytes = b''
+    sshot_cust: bytes = attr.ib(repr=False, default=b'')
     spawn_elev: bool = False
     player_mdl: str = 'PETI'
     use_voice_priority: bool = False
