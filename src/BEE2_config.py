@@ -92,7 +92,7 @@ def write_settings() -> None:
     props = Property.root()
     props.extend(build_conf({
         info: info.data
-        for info in _NAME_TO_CONFIG.values()
+        for info in _NAME_TO_TYPE.values()
     }))
     with atomic_write(
         utils.conf_location('config/config.vdf'),
@@ -136,18 +136,18 @@ class ConfType(Generic[DataT]):
     callback: Dict[str, Callable[[DataT], Awaitable]] = attr.Factory(dict)
 
 
-_NAME_TO_CONFIG: Dict[str, ConfType] = {}
-_TYPE_TO_CONFIG: Dict[Type[Data], ConfType] = {}
+_NAME_TO_TYPE: Dict[str, ConfType] = {}
+_TYPE_TO_TYPE: Dict[Type[Data], ConfType] = {}
 
 
 def get_info_by_name(name: str) -> ConfType:
     """Lookup the data type for this class."""
-    return _NAME_TO_CONFIG[name.casefold()]
+    return _NAME_TO_TYPE[name.casefold()]
 
 
 def get_info_by_type(data: Type[DataT]) -> ConfType[DataT]:
     """Lookup the data type for this class."""
-    return _TYPE_TO_CONFIG[data]
+    return _TYPE_TO_TYPE[data]
 
 
 def register(
@@ -164,9 +164,9 @@ def register(
     def deco(cls: Type[DataT]) -> Type[DataT]:
         """Register the class."""
         info = ConfType(cls, name, version, palette_stores, uses_id)
-        assert name.casefold() not in _NAME_TO_CONFIG, info
-        assert cls not in _TYPE_TO_CONFIG, info
-        _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = info
+        assert name.casefold() not in _NAME_TO_TYPE, info
+        assert cls not in _TYPE_TO_TYPE, info
+        _NAME_TO_TYPE[name.casefold()] = _TYPE_TO_TYPE[cls] = info
         return cls
     return deco
 
@@ -177,7 +177,7 @@ async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awai
     If the configs have been loaded, it will immediately be called. Whenever new configs
     are loaded, it will be re-applied regardless.
     """
-    info: ConfType[DataT] = _TYPE_TO_CONFIG[typ]
+    info: ConfType[DataT] = _TYPE_TO_TYPE[typ]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
     if data_id in info.callback:
@@ -192,7 +192,7 @@ async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
 
     If the data_id is not passed, all settings will be applied.
     """
-    info: ConfType[DataT] = _TYPE_TO_CONFIG[typ]
+    info: ConfType[DataT] = _TYPE_TO_TYPE[typ]
     if data_id:
         if not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
@@ -216,7 +216,7 @@ async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
 
 def store_conf(data: DataT, data_id: str='') -> None:
     """Update the current data for this ID. """
-    info = _TYPE_TO_CONFIG[type(data)]
+    info = _TYPE_TO_TYPE[type(data)]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
     info.data[data_id] = data
@@ -230,7 +230,7 @@ def parse_conf(props: Property) -> Dict[ConfType, Dict[str, Data]]:
     conf = {}
     for child in props:
         try:
-            info = _NAME_TO_CONFIG[child.name]
+            info = _NAME_TO_TYPE[child.name]
         except KeyError:
             LOGGER.warning('Unknown config option "{}"!', child.real_name)
             continue
