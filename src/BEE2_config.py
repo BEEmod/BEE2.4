@@ -249,7 +249,7 @@ def parse_conf(props: Property) -> Config:
         except KeyError:
             LOGGER.warning('Unknown config option "{}"!', child.real_name)
             continue
-        version = child.int('_version', 0)
+        version = child.int('_version', 1)
         try:
             del child['_version']
         except LookupError:
