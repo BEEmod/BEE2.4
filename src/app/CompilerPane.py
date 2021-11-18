@@ -3,23 +3,27 @@
 These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
-import tkinter as tk
+
+from typing import Mapping, Union
 from tkinter import filedialog
 from tkinter import ttk
-from typing import Optional, Union
+import tkinter as tk
 import base64
+import functools
+import io
 
 from PIL import Image, ImageTk
 from atomicwrites import atomic_write
+import attr
 
-from srctools import Property
+from srctools import Property, bool_as_int
 from srctools.logger import get_logger
 
-from packages import CORRIDOR_COUNTS, CorrDesc
-from app import selector_win, TK_ROOT
+from app import SubPane, img, tkMarkdown, tk_tools
+from app import TK_ROOT, selector_win
 from app.tooltip import add_tooltip, set_tooltip
-from app import tkMarkdown, SubPane, img, tk_tools
 from localisation import gettext
+from packages import CORRIDOR_COUNTS, CorrDesc
 import BEE2_config
 import utils
 
@@ -153,90 +157,118 @@ vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_fu
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
-@BEE2_config.OPTION_SAVE('CompilerPane')
-def save_handler() -> Property:
-    """Save the compiler pane to the palette.
+@BEE2_config.register('CompilerPane')
+@attr.frozen
+class CompilePaneState:
+    """State saved in palettes.
 
     Note: We specifically do not save/load the following:
         - packfile dumping
         - compile counts
     This is because these are more system-dependent than map dependent.
     """
-    corr_prop = Property('corridor', [])
-    props = Property('', [
-        Property('sshot_type', chosen_thumb.get()),
-        Property('sshot_cleanup', str(cleanup_screenshot.get())),
-        Property('spawn_elev', str(start_in_elev.get())),
-        Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
-        Property('voiceline_priority', str(VOICE_PRIORITY_VAR.get())),
-        corr_prop,
-    ])
-    for group, win in CORRIDOR.items():
-        corr_prop[group] = win.chosen_id or '<NONE>'
+    sshot_type: str = 'AUTO'
+    sshot_cleanup: bool = False
+    sshot_cust: bytes = b''
+    spawn_elev: bool = False
+    player_mdl: str = 'PETI'
+    use_voice_priority: bool = False
+    sel_corridors: Mapping[str, str] = attr.Factory({group: '<NONE>' for group in CORRIDOR}.copy)
 
-    # Embed the screenshot in so we can load it later.
-    if chosen_thumb.get() == 'CUST':
-        # encodebytes() splits it into multiple lines, which we write
-        # in individual blocks to prevent having a massively long line
-        # in the file.
-        with open(SCREENSHOT_LOC, 'rb') as f:
-            screenshot_data = base64.encodebytes(f.read())
-        props.append(Property(
-            'sshot_data',
-            [
-                Property('b64', data)
-                for data in
-                screenshot_data.decode('ascii').splitlines()
-            ]
-        ))
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'CompilePaneState':
+        """Parse Keyvalues1 format data."""
+        if 'sshot_data' in data:
+            screenshot_parts = b'\n'.join([
+                prop.value.encode('ascii')
+                for prop in
+                data.find_children('sshot_data')
+            ])
+            screenshot_data = base64.decodebytes(screenshot_parts)
+        else:
+            screenshot_data = b''
 
-    return props
+        corr_prop = data.find_block('corridor', or_blank=True)
 
+        sshot_type = data['sshot_type', 'AUTO'].upper()
+        if sshot_type not in ['AUTO', 'CUST', 'PETI']:
+            LOGGER.warning('Unknown screenshot type "{}"!', sshot_type)
+            sshot_type = 'AUTO'
 
-@BEE2_config.OPTION_LOAD('CompilerPane')
-def load_handler(props: Property) -> None:
-    """Load compiler options from the palette."""
-    chosen_thumb.set(props['sshot_type', chosen_thumb.get()])
-    cleanup_screenshot.set(props.bool('sshot_cleanup', cleanup_screenshot.get()))
+        player_mdl = data['player_model', 'PETI'].upper()
+        if player_mdl not in PLAYER_MODEL_ORDER:
+            LOGGER.warning('Unknown player model "{}"!', player_mdl)
+            player_mdl = 'PETI'
 
-    if 'sshot_data' in props:
-        screenshot_parts = b'\n'.join([
-            prop.value.encode('ascii')
-            for prop in
-            props.find_children('sshot_data')
+        return CompilePaneState(
+            sshot_type=sshot_type,
+            sshot_cleanup=data.bool('sshot_cleanup', False),
+            sshot_cust=screenshot_data,
+            spawn_elev=data.bool('spawn_elev', False),
+            player_model=player_mdl,
+            use_voice_priority=data.bool('voiceline_priority', False),
+            sel_corridors={
+                group: corr_prop[group, '<NONE>']
+                for group in CORRIDOR
+            }
+        )
+
+    def export_kv1(self) -> Property:
+        """Generate keyvalues1 format data."""
+        corr_prop = Property('corridor', [])
+        props = Property('', [
+            Property('sshot_type', self.sshot_type),
+            Property('sshot_cleanup', self.sshot_cleanup),
+            Property('spawn_elev', self.spawn_elev),
+            Property('player_model', self.player_mdl),
+            Property('voiceline_priority', self.use_voice_priority),
+            corr_prop,
         ])
-        screenshot_data = base64.decodebytes(screenshot_parts)
+        # PLAYER_MODELS_REV[player_model_var.get()]
+        for group in CORRIDOR:
+            corr_prop[group] = self.sel_corridors.get(group, '<NONE>')
+
+        # Embed the screenshot in so we can load it later.
+        if self.sshot_type == 'CUST':
+            # encodebytes() splits it into multiple lines, which we write
+            # in individual blocks to prevent having a massively long line
+            # in the file.
+            props.append(Property(
+                'sshot_data',
+                [
+                    Property('b64', data) for data in
+                    base64.encodebytes(self.sshot_cust).decode('ascii').splitlines()
+                ]
+            ))
+        return props
+
+
+async def apply_state(state: CompilePaneState) -> None:
+    """Apply saved state to the UI and compile config."""
+    chosen_thumb.set(state.sshot_type)
+    cleanup_screenshot.set(state.sshot_cleanup)
+
+    if state.sshot_type == 'CUST' and state.sshot_cust:
         with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
-            f.write(screenshot_data)
+            f.write(state.sshot_cust)
 
     # Refresh these.
     set_screen_type()
     set_screenshot()
 
-    start_in_elev.set(props.bool('spawn_elev', start_in_elev.get()))
+    start_in_elev.set(state.spawn_elev)
+    player_model_var.set(PLAYER_MODELS[state.player_mdl])
+    VOICE_PRIORITY_VAR.set(state.use_voice_priority)
 
-    try:
-        player_mdl = props['player_model']
-    except LookupError:
-        pass
-    else:
-        player_model_var.set(PLAYER_MODELS[player_mdl])
-        COMPILE_CFG['General']['player_model'] = player_mdl
+    COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
+    COMPILE_CFG['General']['player_model'] = state.player_mdl
+    COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
 
-    VOICE_PRIORITY_VAR.set(props.bool('voiceline_priority', VOICE_PRIORITY_VAR.get()))
-
-    corr_prop = props.find_block('corridor', or_blank=True)
     for group, win in CORRIDOR.items():
-        try:
-            sel_id = corr_prop[group]
-        except LookupError:
-            "No config option, ok."
-        else:
-            win.sel_item_id(sel_id)
-            COMPILE_CFG['Corridor'][group] = '0' if sel_id == '<NONE>' else sel_id
-
+        sel_id = state.sel_corridors[group]
+        win.sel_item_id(sel_id)
+        COMPILE_CFG['Corridor'][group] = '0' if sel_id == '<NONE>' else sel_id
     COMPILE_CFG.save_check()
-    return None
 
 
 def load_corridors() -> None:
@@ -429,10 +461,18 @@ def find_screenshot(e=None) -> None:
     )
     if file_name:
         image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
+        buf = io.BytesIO()
+        image.save(buf, 'png')
+        with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
+            f.write(buf.getvalue())
+
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-        image.save(SCREENSHOT_LOC)
+        BEE2_config.store_conf(attr.evolve(
+            BEE2_config.get_cur_conf(CompilePaneState),
+            sshot_cust=buf.getvalue(),
+        ))
         set_screenshot(image)
-    COMPILE_CFG.save_check()
+        COMPILE_CFG.save_check()
 
 
 def set_screen_type() -> None:
@@ -449,7 +489,10 @@ def set_screen_type() -> None:
         window.winfo_width(),
         window.winfo_reqheight(),
     ))
-
+    BEE2_config.store_conf(attr.evolve(
+        BEE2_config.get_cur_conf(CompilePaneState),
+        sshot_type=chosen,
+    ))
     COMPILE_CFG.save_check()
 
 
@@ -475,7 +518,7 @@ def set_screenshot(image: Image=None) -> None:
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def make_setter(section: str, config: str, variable: tk.Variable) -> None:
+def make_setter(section: str, config: str, variable: tk.Variable, state_var: str='') -> None:
     """Create a callback which sets the given config from a variable."""
     def callback(var_name: str, var_ind: str, cback_name: str) -> None:
         """Automatically called when the variable is written to."""
@@ -489,8 +532,6 @@ def make_widgets() -> None:
     """Create the compiler options pane.
 
     """
-    make_setter('General', 'voiceline_priority', VOICE_PRIORITY_VAR)
-    make_setter('General', 'spawn_elev', start_in_elev)
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
     make_setter('General', 'vrad_force_full', vrad_light_type)
 
@@ -766,10 +807,20 @@ def make_map_widgets(frame: ttk.Frame):
     )
     voice_frame.grid(row=1, column=0, sticky='ew')
 
+    def set_voice_priority() -> None:
+        """Called when the voiceline priority is changed."""
+        BEE2_config.store_conf(attr.evolve(
+            BEE2_config.get_cur_conf(CompilePaneState),
+            use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
+        ))
+        COMPILE_CFG['General']['voiceline_priority'] = str(VOICE_PRIORITY_VAR.get())
+        COMPILE_CFG.save_check()
+
     voice_priority = ttk.Checkbutton(
         voice_frame,
         text=gettext("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
+        command=set_voice_priority,
     )
     voice_priority.grid(row=0, column=0)
     add_tooltip(voice_priority, gettext(
@@ -788,17 +839,28 @@ def make_map_widgets(frame: ttk.Frame):
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
+    def elev_changed(state: bool) -> None:
+        """Called when an elevator is selected."""
+        BEE2_config.store_conf(attr.evolve(
+            BEE2_config.get_cur_conf(CompilePaneState),
+            spawn_elev=state,
+        ))
+        COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state)
+        COMPILE_CFG.save_check()
+
     elev_preview = ttk.Radiobutton(
         elev_frame,
         text=gettext('Entry Door'),
         value=0,
         variable=start_in_elev,
+        command=functools.partial(elev_changed, False),
     )
     elev_elevator = ttk.Radiobutton(
         elev_frame,
         text=gettext('Elevator'),
         value=1,
         variable=start_in_elev,
+        command=functools.partial(elev_changed, True),
     )
 
     elev_preview.grid(row=0, column=0, sticky='w')
@@ -870,8 +932,12 @@ def make_map_widgets(frame: ttk.Frame):
 
     def set_model(e: tk.Event) -> None:
         """Save the selected player model."""
-        text = player_model_var.get()
-        COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
+        model = PLAYER_MODELS_REV[player_model_var.get()]
+        BEE2_config.store_conf(attr.evolve(
+            BEE2_config.get_cur_conf(CompilePaneState),
+            player_mdl=model,
+        ))
+        COMPILE_CFG['General']['player_model'] = model
         COMPILE_CFG.save()
 
     player_mdl.bind('<<ComboboxSelected>>', set_model)
@@ -879,7 +945,7 @@ def make_map_widgets(frame: ttk.Frame):
     model_frame.columnconfigure(0, weight=1)
 
 
-def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
+async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
@@ -896,6 +962,7 @@ def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     make_widgets()
+    await BEE2_config.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
 def init_application() -> None:

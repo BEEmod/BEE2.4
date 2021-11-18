@@ -1671,15 +1671,12 @@ async def init_windows() -> None:
         tool_col=2,
     )
     init_option(windows['opt'], pal_ui)
-
     loader.step('UI', 'options')
 
     await StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
-
     loader.step('UI', 'stylevar')
 
-    CompilerPane.make_pane(frames['toolMenu'], view_menu)
-
+    await CompilerPane.make_pane(frames['toolMenu'], view_menu)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
