@@ -261,9 +261,23 @@ def parse_conf(props: Property) -> Config:
         conf[info] = data_map
         if info.uses_id:
             for data_prop in child:
-                data_map[data_prop.real_name] = info.cls.parse_kv1(data_prop, version)
+                try:
+                    data_map[data_prop.real_name] = info.cls.parse_kv1(data_prop, version)
+                except Exception:
+                    LOGGER.warning(
+                        'Failed to parse config {}[{}]:',
+                        info.name, data_prop.real_name,
+                        exc_info=True,
+                    )
         else:
-            data_map[''] = info.cls.parse_kv1(child, version)
+            try:
+                data_map[''] = info.cls.parse_kv1(child, version)
+            except Exception:
+                LOGGER.warning(
+                    'Failed to parse config {}:',
+                    info.name,
+                    exc_info=True,
+                )
     return conf
 
 
