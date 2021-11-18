@@ -173,7 +173,9 @@ class CompilePaneState:
     spawn_elev: bool = False
     player_mdl: str = 'PETI'
     use_voice_priority: bool = False
-    sel_corridors: Mapping[str, str] = attr.Factory({group: '<NONE>' for group in CORRIDOR}.copy)
+    corr_sp_entry: int = 0
+    corr_sp_exit: int = 0
+    corr_coop: int = 0
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'CompilePaneState':
@@ -205,28 +207,28 @@ class CompilePaneState:
             sshot_cleanup=data.bool('sshot_cleanup', False),
             sshot_cust=screenshot_data,
             spawn_elev=data.bool('spawn_elev', False),
-            player_model=player_mdl,
+            player_mdl=player_mdl,
             use_voice_priority=data.bool('voiceline_priority', False),
-            sel_corridors={
-                group: corr_prop[group, '<NONE>']
-                for group in CORRIDOR
-            }
+
+            corr_sp_entry=corr_prop.int('sp_entry', 0),
+            corr_sp_exit=corr_prop.int('sp_exit', 0),
+            corr_coop=corr_prop.int('coop', 0),
         )
 
     def export_kv1(self) -> Property:
         """Generate keyvalues1 format data."""
-        corr_prop = Property('corridor', [])
         props = Property('', [
             Property('sshot_type', self.sshot_type),
             Property('sshot_cleanup', self.sshot_cleanup),
             Property('spawn_elev', self.spawn_elev),
             Property('player_model', self.player_mdl),
             Property('voiceline_priority', self.use_voice_priority),
-            corr_prop,
+            Property('corridor', [
+                Property('sp_entry', self.corr_sp_entry),
+                Property('sp_exit', self.corr_sp_exit),
+                Property('coop', self.corr_coop),
+            ]),
         ])
-        # PLAYER_MODELS_REV[player_model_var.get()]
-        for group in CORRIDOR:
-            corr_prop[group] = self.sel_corridors.get(group, '<NONE>')
 
         # Embed the screenshot in so we can load it later.
         if self.sshot_type == 'CUST':
@@ -265,9 +267,9 @@ async def apply_state(state: CompilePaneState) -> None:
     COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
 
     for group, win in CORRIDOR.items():
-        sel_id = state.sel_corridors[group]
-        win.sel_item_id(sel_id)
-        COMPILE_CFG['Corridor'][group] = '0' if sel_id == '<NONE>' else sel_id
+        sel_id = getattr(state, 'corr_' + group)
+        win.sel_item_id('<NONE>' if sel_id == '0' else sel_id)
+        COMPILE_CFG['Corridor'][group] = str(sel_id)
     COMPILE_CFG.save_check()
 
 
@@ -365,6 +367,10 @@ def make_corr_wid(corr_name: str, title: str) -> None:
 
 def sel_corr_callback(sel_item: str, corr_name: str) -> None:
     """Callback for saving the result of selecting a corridor."""
+    BEE2_config.store_conf(attr.evolve(
+        BEE2_config.get_cur_conf(CompilePaneState),
+        **{'corr_' + corr_name: 0 if sel_item is None else int(sel_item)},
+    ))
     COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
     COMPILE_CFG.save_check()
 
