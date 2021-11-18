@@ -292,7 +292,7 @@ class PaletteUI:
         else:
             self.selected.pos = self.get_items()
             if self.var_save_settings.get():
-                self.selected.settings = BEE2_config.get_curr_settings(is_palette=True)
+                self.selected.settings = BEE2_config.get_pal_conf()
             else:
                 self.selected.settings = None
             self.selected.save(ignore_readonly=True)
@@ -309,7 +309,7 @@ class PaletteUI:
             pal.uuid = paletteLoader.uuid4()
 
         if self.var_save_settings.get():
-            pal.settings = BEE2_config.get_curr_settings(is_palette=True)
+            pal.settings = BEE2_config.get_pal_conf()
 
         pal.save()
         self.palettes[pal.uuid] = pal

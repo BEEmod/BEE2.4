@@ -1057,7 +1057,8 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
         ))
 
     if chosen_pal.settings is not None:
-        BEE2_config.apply_settings(chosen_pal.settings, is_palette=True)
+        LOGGER.info('Settings: {}', chosen_pal.settings)
+        await BEE2_config.apply_pal_conf(chosen_pal.settings)
 
     flow_preview()
 
