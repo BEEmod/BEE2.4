@@ -313,10 +313,12 @@ async def apply_pal_conf(conf: Config) -> None:
     """Apply a config provided from the palette."""
     # First replace all the configs to be atomic, then apply.
     for info, opt_map in conf.items():
-        _CUR_CONFIG[info] = opt_map.copy()
+        if info.palette_stores:  # Double-check, in case it's added to the file.
+            _CUR_CONFIG[info] = opt_map.copy()
     async with trio.open_nursery() as nursery:
         for info in conf:
-            nursery.start_soon(apply_conf, info.cls)
+            if info.palette_stores:
+                nursery.start_soon(apply_conf, info)
 
 
 def get_package_locs() -> Iterator[Path]:
