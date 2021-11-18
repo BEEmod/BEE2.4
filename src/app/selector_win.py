@@ -105,9 +105,9 @@ AttrValues = Union[str, list, bool, Vec]
 @attr.frozen
 class WindowState:
     """The immutable window state stored in config files for restoration next launch."""
-    open_groups: Mapping[str, bool]
-    width: int
-    height: int
+    open_groups: Mapping[str, bool] = attr.Factory({}.copy)
+    width: int = 0
+    height: int = 0
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'WindowState':

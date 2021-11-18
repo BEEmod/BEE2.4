@@ -119,7 +119,7 @@ def mandatory_unlocked() -> bool:
 @attr.frozen
 class StyleVarState:
     """Holds style var state stored in configs."""
-    value: bool
+    value: bool = False
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'StyleVarState':

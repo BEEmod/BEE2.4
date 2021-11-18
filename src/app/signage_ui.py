@@ -62,7 +62,10 @@ def export_data() -> List[Tuple[str, str]]:
 @attr.frozen
 class Layout:
     """A layout of selected signs."""
-    signs: Mapping[int, str]  # Readonly.
+    signs: Mapping[int, str] = attr.Factory({
+        tim: DEFAULT_IDS.get(tim, '')
+        for tim in SIGN_IND
+    }.copy)
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'Layout':

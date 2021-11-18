@@ -225,8 +225,11 @@ def get_cur_conf(data: Type[DataT], data_id: str='') -> DataT:
     info: ConfType[DataT] = _TYPE_TO_TYPE[data]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    LOGGER.debug('Config: {}', _CUR_CONFIG)
-    return _CUR_CONFIG[info][data_id]
+    try:
+        return _CUR_CONFIG[info][data_id]
+    except KeyError:
+        # Return a default value.
+        return info.cls()
 
 
 def store_conf(data: DataT, data_id: str='') -> None:
@@ -234,6 +237,7 @@ def store_conf(data: DataT, data_id: str='') -> None:
     info: ConfType[DataT] = _TYPE_TO_TYPE[type(data)]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
+    LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
     _CUR_CONFIG[info][data_id] = data
 
 
