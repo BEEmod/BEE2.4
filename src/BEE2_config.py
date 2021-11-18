@@ -12,11 +12,12 @@ from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import (
     TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
-    Awaitable, Iterable, Iterator, Dict, Mapping,
+    Awaitable, Iterator, Dict, Mapping,
 )
 from threading import Lock, Event
 
 import attr
+import trio
 from atomicwrites import atomic_write
 
 from srctools import Property, KeyValError
@@ -82,19 +83,17 @@ def read_settings() -> None:
             pass
 
     conf = parse_conf(props)
-    for obj in conf.values():
-        info = _TYPE_TO_CONFIG[type(obj)]
-        info.data = obj
+    for info, obj_map in conf.items():
+        info.data = obj_map
 
 
 def write_settings() -> None:
     """Write the settings to disk."""
     props = Property.root()
-    props.extend(build_conf(
-        info.data
+    props.extend(build_conf({
+        info: info.data
         for info in _NAME_TO_CONFIG.values()
-        if info.data is not None
-    ))
+    }))
     with atomic_write(
         utils.conf_location('config/config.vdf'),
         encoding='utf8',
@@ -120,29 +119,42 @@ class Data(Protocol):
         raise NotImplementedError
 
 
-@attr.define
+@attr.define(eq=False)
 class ConfType(Generic[DataT]):
     """Holds information about a type of configuration data."""
     cls: Type[DataT]
     name: str
     version: int
     palette_stores: bool  # If this is save/loaded by palettes.
-    # The current data loaded from the config file.
-    data: Optional[DataT] = None
+    uses_id: bool  # If we manage individual configs for each of these IDs.
+    # The current data loaded from the config file. This maps an ID to each value, or
+    # is {'': data} if no key is used.
+    data: Dict[str, DataT] = attr.Factory(dict)
     # After the relevant UI is initialised, this is set to an async func which
     # applies the data to the UI. This way we know it can be done safely now.
     # If data was loaded from the config, the callback is immediately awaited.
-    callback: Optional[Callable[[DataT], Awaitable]] = None
+    callback: Dict[str, Callable[[DataT], Awaitable]] = attr.Factory(dict)
 
 
 _NAME_TO_CONFIG: Dict[str, ConfType] = {}
 _TYPE_TO_CONFIG: Dict[Type[Data], ConfType] = {}
 
 
+def get_info_by_name(name: str) -> ConfType:
+    """Lookup the data type for this class."""
+    return _NAME_TO_CONFIG[name.casefold()]
+
+
+def get_info_by_type(data: Type[DataT]) -> ConfType[DataT]:
+    """Lookup the data type for this class."""
+    return _TYPE_TO_CONFIG[data]
+
+
 def register(
     name: str, *,
     version: int = 1,
     palette_stores: bool = True,
+    uses_id: bool = False,
 ) -> Callable[[Type[DataT]], Type[DataT]]:
     """Register a config data type. The name must be unique.
 
@@ -151,7 +163,7 @@ def register(
     """
     def deco(cls: Type[DataT]) -> Type[DataT]:
         """Register the class."""
-        info = ConfType(cls, name, version, palette_stores)
+        info = ConfType(cls, name, version, palette_stores, uses_id)
         assert name.casefold() not in _NAME_TO_CONFIG, info
         assert cls not in _TYPE_TO_CONFIG, info
         _NAME_TO_CONFIG[name.casefold()] = _TYPE_TO_CONFIG[cls] = info
@@ -159,34 +171,62 @@ def register(
     return deco
 
 
-async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable]) -> None:
+async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable], data_id: str='') -> None:
     """Set the callback used to apply this config type to the UI.
 
     If the configs have been loaded, it will immediately be called. Whenever new configs
     are loaded, it will be re-applied regardless.
     """
     info: ConfType[DataT] = _TYPE_TO_CONFIG[typ]
-    if info.callback is not None:
-        raise ValueError(f'Cannot set callback for {info.cls}="{info.name}" twice!')
-    info.callback = func
-    if info.data is not None:
-        await func(info.data)
+    if data_id and not info.uses_id:
+        raise ValueError(f'Data type "{info.name}" does not support IDs!')
+    if data_id in info.callback:
+        raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
+    info.callback[data_id] = func
+    if data_id in info.data:
+        await func(info.data[data_id])
 
 
-async def apply_conf(typ: Type[DataT]) -> None:
-    """Apply the current settings for this config type."""
+async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
+    """Apply the current settings for this config type and ID.
+
+    If the data_id is not passed, all settings will be applied.
+    """
     info: ConfType[DataT] = _TYPE_TO_CONFIG[typ]
-    if info.callback is not None and info.data is not None:
-        await info.callback(info.data)
+    if data_id:
+        if not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        try:
+            cb = info.callback[data_id]
+            data = info.data[data_id]
+        except KeyError:
+            pass
+        else:
+            await cb(data)
+    else:
+        async with trio.open_nursery() as nursery:
+            for dat_id, data in info.data.items():
+                try:
+                    cb = info.callback[dat_id]
+                except KeyError:
+                    pass
+                else:
+                    nursery.start_soon(cb, data)
 
 
-def store_conf(data: DataT) -> None:
-    """Update this configured data. """
-    _TYPE_TO_CONFIG[type(data)].data = data
+def store_conf(data: DataT, data_id: str='') -> None:
+    """Update the current data for this ID. """
+    info = _TYPE_TO_CONFIG[type(data)]
+    if data_id and not info.uses_id:
+        raise ValueError(f'Data type "{info.name}" does not support IDs!')
+    info.data[data_id] = data
 
 
-def parse_conf(props: Property) -> Dict[str, Data]:
-    """Parse a configuration file into individual data."""
+def parse_conf(props: Property) -> Dict[ConfType, Dict[str, Data]]:
+    """Parse a configuration file into individual data.
+
+    The data is in the form {conf_type: {id: data}}.
+    """
     conf = {}
     for child in props:
         try:
@@ -207,17 +247,38 @@ def parse_conf(props: Property) -> Dict[str, Data]:
             )
             # Don't try to parse, it'll be invalid.
             continue
-        conf[child.name] = info.cls.parse_kv1(child, version)
+        data_map: Dict[str, Data] = {}
+        conf[info] = data_map
+        if info.uses_id:
+            for data_prop in child:
+                data_map[data_prop.real_name] = info.cls.parse_kv1(data_prop, version)
+        else:
+            data_map[''] = info.cls.parse_kv1(child, version)
     return conf
 
 
-def build_conf(data: Iterable[Data]) -> Iterator[Property]:
-    """Build out a configuration file from some data."""
-    for obj in data:
-        info = _TYPE_TO_CONFIG[type(obj)]
-        prop = obj.export_kv1()
-        prop[0:0] = [Property('_version', str(info.version))]
-        prop.name = info.name
+def build_conf(data: Dict[ConfType, Dict[str, Data]]) -> Iterator[Property]:
+    """Build out a configuration file from some data.
+
+    The data is in the form {conf_type: {id: data}}.
+    """
+    for info, data_map in data.items():
+        prop = Property(info.name, [
+            Property('_version', str(info.version)),
+        ])
+        if info.uses_id:
+            for data_id, data in data_map.items():
+                sub_prop = data.export_kv1()
+                sub_prop.name = data_id
+                prop.append(sub_prop)
+        else:
+            # Must be a single '' key.
+            if list(data_map.keys()) != ['']:
+                raise ValueError(
+                    f'Must have a single \'\' key for non-id type "{info.name}", got:\n{data_map}'
+                )
+            [data] = data_map.values()
+            prop.extend(data.export_kv1())
         yield prop
 
 
