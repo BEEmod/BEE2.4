@@ -34,21 +34,6 @@ OPTION_LOAD: utils.FuncLookup[Callable[[Property], None]] = utils.FuncLookup('Lo
 OPTION_SAVE: utils.FuncLookup[Callable[[], Property]] = utils.FuncLookup('SaveHandler', attrs=['to_palette'])
 
 
-def get_curr_settings(*, is_palette: bool) -> Property:
-    """Return a property tree defining the current options."""
-    props = Property.root()
-
-    for opt_id, opt_func in OPTION_SAVE.items():
-        # Skip if it opts out of being on the palette.
-        if is_palette and not getattr(opt_func, 'to_palette', True):
-            continue
-        opt_prop = opt_func()
-        opt_prop.name = opt_id.title()
-        props.append(opt_prop)
-
-    return props
-
-
 def apply_settings(props: Property, *, is_palette: bool) -> None:
     """Given a property tree, apply it to the widgets."""
     for opt_prop in props:
@@ -193,12 +178,12 @@ async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awai
         await func(data_map[data_id])
 
 
-async def apply_conf(typ: Type[DataT], data_id: str='') -> None:
+async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
     """Apply the current settings for this config type and ID.
 
     If the data_id is not passed, all settings will be applied.
     """
-    info: ConfType[DataT] = _TYPE_TO_TYPE[typ]
+    data: DataT
     if data_id:
         if not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
@@ -313,6 +298,25 @@ def build_conf(data: Config) -> Iterator[Property]:
             [data] = data_map.values()
             prop.extend(data.export_kv1())
         yield prop
+
+
+def get_pal_conf() -> Config:
+    """Return a copy of the current settings for the palette."""
+    return Config({
+        info: opt_map.copy()
+        for info, opt_map in _CUR_CONFIG.items()
+        if not info.palette_stores
+    })
+
+
+async def apply_pal_conf(conf: Config) -> None:
+    """Apply a config provided from the palette."""
+    # First replace all the configs to be atomic, then apply.
+    for info, opt_map in conf.items():
+        _CUR_CONFIG[info] = opt_map.copy()
+    async with trio.open_nursery() as nursery:
+        for info in conf:
+            nursery.start_soon(apply_conf, info.cls)
 
 
 def get_package_locs() -> Iterator[Path]:
