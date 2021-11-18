@@ -38,12 +38,14 @@ def tk_error(
     if exc_tb.tb_next:
         exc_tb = exc_tb.tb_next
 
+    logger = logging.getLogger('BEE2')
+
     try:
         on_error(exc_type, exc_value, exc_tb)
     except Exception:
+        logger.exception('Failed to display messagebox:')
         pass
 
-    logger = logging.getLogger('BEE2')
     logger.error(
         msg='Uncaught Tk Exception:',
         exc_info=(exc_type, exc_value, exc_tb),

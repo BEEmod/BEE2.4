@@ -1,5 +1,6 @@
 """Run the BEE2."""
 import trio
+from outcome import Outcome, Error
 
 from BEE2_config import GEN_OPTS, get_package_locs
 from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error, sound
@@ -127,20 +128,22 @@ async def app_main() -> None:
     """The main loop for Trio."""
     global APP_NURSERY
     LOGGER.debug('Opening nursery...')
-    try:
-        async with trio.open_nursery() as nursery:
-            APP_NURSERY = nursery
-            await init_app()
-            await trio.sleep_forever()
-    except Exception as exc:
-        tk_error(type(exc), exc, exc.__traceback__)
-        raise
+    async with trio.open_nursery() as nursery:
+        APP_NURSERY = nursery
+        await init_app()
+        await trio.sleep_forever()
 
 
-def done_callback(trio_main_outcome):
+def done_callback(result: Outcome):
     """The app finished, quit."""
     from app import UI
+    if isinstance(result, Error):
+        LOGGER.error('Trio exited with exception', exc_info=result.error)
+        tk_error(type(result.error), result.error, result.error.__traceback__)
+    else:
+        LOGGER.debug('Trio exited normally.')
     UI.quit_application()
+    TK_ROOT.quit()
 
 
 def start_main() -> None:

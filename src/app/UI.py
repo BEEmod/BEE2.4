@@ -447,10 +447,7 @@ def quit_application() -> None:
     snd.clean_sample_folder()
 
     # Destroy the TK windows, finalise logging, then quit.
-    logging.shutdown()
-    TK_ROOT.quit()
     loadScreen.shutdown()
-    sys.exit(0)
 
 gameMan.quit_application = quit_application
 
