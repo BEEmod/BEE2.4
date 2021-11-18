@@ -90,6 +90,11 @@ def read_settings() -> None:
 
 def write_settings() -> None:
     """Write the settings to disk."""
+    if not any(_CUR_CONFIG.values()):
+        # We don't have any data saved, abort!
+        # This could happen while parsing, for example.
+        return
+
     props = Property.root()
     props.extend(build_conf(_CUR_CONFIG))
     with atomic_write(
