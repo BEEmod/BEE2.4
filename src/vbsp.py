@@ -797,7 +797,7 @@ def set_elev_videos(vmf: VMF) -> None:
         )
 
 
-def get_map_info(vmf: VMF) -> Set[str]:
+def get_map_info(vmf: VMF) -> None:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -807,8 +807,6 @@ def get_map_info(vmf: VMF) -> Set[str]:
     - if in preview mode
     """
     global GAME_MODE, IS_PREVIEW
-
-    inst_files = set()  # Get a set of every instance in the map.
 
     file_coop_entry = instanceLocs.get_special_inst('coopEntry')
     file_coop_exit = instanceLocs.get_special_inst('coopExit')
@@ -946,8 +944,6 @@ def get_map_info(vmf: VMF) -> Set[str]:
             # The coop frame must be the exit door...
             exit_door_frame = item
 
-        inst_files.add(item['file'])
-
     LOGGER.debug('Instances present:\n{}', '\n'.join([
         f'- "{file}": {count}'
         for file, count in filenames.most_common()
@@ -1005,9 +1001,6 @@ def get_map_info(vmf: VMF) -> Set[str]:
             exit_corr_type,
             exit_corr_name,
         )
-
-    # Return the set of all instances in the map.
-    return inst_files
 
 
 def mod_entryexit(
@@ -1400,6 +1393,7 @@ def position_exit_signs(vmf: VMF) -> None:
         file=inst_filename,
         fixup_style='0',  # Prefix
     )
+    conditions.ALL_INST.add(inst_filename.casefold())
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
     if options.get(bool, "remove_exit_signs_dual"):
@@ -1442,6 +1436,7 @@ def change_overlays(vmf: VMF) -> None:
                 angles=over['angles', '0 0 0'],
                 file=sign_inst,
             )
+            conditions.ALL_INST.add(sign_inst.casefold())
             if sign_inst_pack:
                 packing.pack_list(vmf, sign_inst_pack)
             new_inst.fixup['mat'] = sign_type.name.lower()
@@ -1528,6 +1523,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
             file=pti_file,
             fixup_style='0',
             )
+        conditions.ALL_INST.add(pti_file.casefold())
 
         has_cave = srctools.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
@@ -1873,14 +1869,15 @@ def main() -> None:
 
         rand.init_seed(vmf)
 
-        all_inst = get_map_info(vmf)
+        get_map_info(vmf)
+        change_ents(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
 
-        conditions.init(all_inst)
+        conditions.init(vmf)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
@@ -1892,7 +1889,6 @@ def main() -> None:
         conditions.check_all(vmf)
         add_extra_ents(vmf, GAME_MODE)
 
-        change_ents(vmf)
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)

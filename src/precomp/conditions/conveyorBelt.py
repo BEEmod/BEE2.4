@@ -110,12 +110,12 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         # Don't place at the last point - it doesn't teleport correctly,
         # and would be one too many.
         if segment_inst_file and pos != track_end:
-            seg_inst = vmf.create_ent(
-                classname='func_instance',
+            seg_inst = conditions.add_inst(
+                vmf,
                 targetname=track_name.format(index),
                 file=segment_inst_file,
                 origin=pos,
-                angles=orient.to_angle(),
+                angles=orient,
             )
             seg_inst.fixup.update(inst.fixup)
 

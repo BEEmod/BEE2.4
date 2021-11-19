@@ -1310,25 +1310,26 @@ def generate_fizzlers(vmf: VMF) -> None:
             length = (seg_max - seg_min).mag()
             rng = rand.seed(b'fizz_seg', seg_min, seg_max)
             if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]:
-                min_inst = vmf.create_ent(
+                # Assign to 'min' var so we can share some code.
+                min_inst = conditions.add_inst(
+                    vmf,
                     targetname=get_model_name(seg_ind),
-                    classname='func_instance',
                     file=rng.choice(fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]),
                     origin=(seg_min + seg_max)/2,
                     angles=min_orient,
                 )
             else:
                 # Both side models.
-                min_inst = vmf.create_ent(
+                min_inst = conditions.add_inst(
+                    vmf,
                     targetname=get_model_name(seg_ind),
-                    classname='func_instance',
                     file=rng.choice(model_min),
                     origin=seg_min,
                     angles=min_orient,
                 )
-                max_inst = vmf.create_ent(
+                max_inst = conditions.add_inst(
+                    vmf,
                     targetname=get_model_name(seg_ind),
-                    classname='func_instance',
                     file=rng.choice(model_max),
                     origin=seg_max,
                     angles=max_orient,
@@ -1354,8 +1355,8 @@ def generate_fizzlers(vmf: VMF) -> None:
                 rng = rand.seed(b'fizz_mid', seg_min, seg_max)
                 for dist in range(64, round(length) - 63, 128):
                     mid_pos = seg_min + forward * dist
-                    mid_inst = vmf.create_ent(
-                        classname='func_instance',
+                    mid_inst = conditions.add_inst(
+                        vmf,
                         targetname=fizz_name,
                         angles=min_orient.to_angle(),
                         file=rng.choice(fizz_type.inst[FizzInst.GRID, is_static]),

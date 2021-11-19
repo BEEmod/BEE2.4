@@ -145,11 +145,12 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         sec_visgroup = 'secondary'
 
     if sign_prim and sign_sec:
-        inst['file'] = res['large_clip', '']
+        inst['file'] = fname = res['large_clip', '']
         inst['origin'] = (prim_pos + sec_pos) / 2
     else:
-        inst['file'] = res['small_clip', '']
+        inst['file'] = fname = res['small_clip', '']
         inst['origin'] = prim_pos if sign_prim else sec_pos
+    conditions.ALL_INST.add(fname.casefold())
 
     brush_faces: List[Side] = []
     tiledef: Optional[tiling.TileDef] = None

@@ -17,8 +17,14 @@ COND_MOD_NAME = 'Instances'
 @make_flag('instance')
 def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
     """Evaluates True if the instance matches the given file."""
-    inst_list = instanceLocs.resolve(flag.value)
-    return lambda inst: inst['file'].casefold() in inst_list
+    inst_list = set(instanceLocs.resolve(flag.value))
+
+    def check_inst(inst: Entity) -> bool:
+        """Each time, check if no matching instances exist, so we can skip conditions."""
+        if conditions.ALL_INST.isdisjoint(inst_list):
+            raise conditions.Unsatisfiable
+        return inst['file'].casefold() in inst_list
+    return check_inst
 
 
 @make_flag('instFlag', 'InstPart')
@@ -28,14 +34,10 @@ def flag_file_cont(inst: Entity, flag: Property) -> bool:
 
 
 @make_flag('hasInst')
-def flag_has_inst(flag: Property) -> bool:
+def flag_has_inst(flag: Property) -> Callable[[Entity], bool]:
     """Checks if the given instance is present anywhere in the map."""
-    flags = instanceLocs.resolve(flag.value)
-    return any(
-        inst.casefold() in flags
-        for inst in
-        conditions.ALL_INST
-    )
+    flags = set(instanceLocs.resolve(flag.value))
+    return lambda inst: flags.isdisjoint(conditions.ALL_INST)
 
 
 @make_flag('hasTrait')
@@ -194,7 +196,8 @@ def flag_offset_distance(inst: Entity, flag: Property) -> bool:
 @make_result('rename', 'changeInstance')
 def res_change_instance(inst: Entity, res: Property):
     """Set the file to a value."""
-    inst['file'] = instanceLocs.resolve_one(res.value, error=True)
+    inst['file'] = filename = instanceLocs.resolve_one(res.value, error=True)
+    conditions.ALL_INST.add(filename.casefold())
 
 
 @make_result('suffix', 'instSuffix')
@@ -213,6 +216,9 @@ def res_set_key(inst: Entity, res: Property):
     """
     key, value = inst.fixup.substitute(res.value, allow_invert=True).split(' ', 1)
     inst[key] = value
+    if key.casefold() == 'file':
+        LOGGER.warning('Use changeInstance for setting instance filenames, not setKey.')
+        conditions.ALL_INST.add(value)
 
 
 @make_result('instVar', 'instVarSuffix')

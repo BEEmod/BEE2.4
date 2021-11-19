@@ -33,8 +33,9 @@ def res_add_global_inst(vmf: VMF, res: Property):
     """
     if not res.has_children():
         res = Property('AddGlobal', [Property('File', res.value)])
+    file = instanceLocs.resolve_one(res['file'], error=True)
 
-    if res.bool('allow_multiple') or res['file'] not in conditions.GLOBAL_INSTANCES:
+    if res.bool('allow_multiple') or file.casefold() not in conditions.GLOBAL_INSTANCES:
         # By default we will skip adding the instance
         # if was already added - this is helpful for
         # items that add to original items, or to avoid
@@ -42,7 +43,7 @@ def res_add_global_inst(vmf: VMF, res: Property):
         new_inst = vmf.create_ent(
             classname="func_instance",
             targetname=res['name', ''],
-            file=instanceLocs.resolve_one(res['file'], error=True),
+            file=file,
             angles=res['angles', '0 0 0'],
             fixup_style=res['fixup_style', '0'],
         )
@@ -50,7 +51,8 @@ def res_add_global_inst(vmf: VMF, res: Property):
             new_inst['origin'] = res['position']
         except IndexError:
             new_inst['origin'] = options.get(Vec, 'global_ents_loc')
-        conditions.GLOBAL_INSTANCES.add(res['file'])
+        conditions.GLOBAL_INSTANCES.add(file.casefold())
+        conditions.ALL_INST.add(file.casefold())
         if new_inst['targetname'] == '':
             new_inst['targetname'] = "inst_"
             new_inst.make_unique()
@@ -107,13 +109,13 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         # Don't bother making a overlay which will be deleted.
         return None
 
-    overlay_inst = vmf.create_ent(
-        classname='func_instance',
+    overlay_inst = conditions.add_inst(
+        vmf,
         targetname=inst['targetname', ''],
         file=filename,
         angles=angles,
         origin=inst['origin'],
-        fixup_style=res['fixup_style', '0'],
+        fixup_style=res.int('fixup_style'),
     )
     # Don't run if the fixup block exists..
     if srctools.conv_bool(res['copy_fixup', '1']):
@@ -187,7 +189,7 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
         pools = all_pools.copy()
         for (flags, value, potential_pools) in conf_selectors:
             for flag in flags:
-                if not conditions.check_flag(vmf, flag, inst):
+                if not conditions.check_flag(flag, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [
@@ -197,13 +199,12 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
                 ]
                 name, filename = rng.choice(allowed_inst)
                 pools.remove((name, filename))
-                vmf.create_ent(
-                    'func_instance',
+                conditions.add_inst(
+                    vmf,
                     targetname=inst['targetname'],
                     file=filename,
                     angles=inst['angles'],
                     origin=inst['origin'],
-                    fixup_style='0',
                 ).fixup[conf_variable] = value
     return add_group
 

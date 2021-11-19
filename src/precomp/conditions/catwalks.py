@@ -2,8 +2,7 @@
 from srctools import Vec, Property, VMF, Entity
 import srctools.logger
 
-from precomp import brushLoc, instanceLocs
-from precomp.conditions import make_result, RES_EXHAUSTED, INST_ANGLE
+from precomp import brushLoc, instanceLocs, conditions
 from precomp.connections import ITEMS
 import utils
 
@@ -55,7 +54,7 @@ def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
     direction = direction.norm()
 
     if diff.z > 0:
-        angle = INST_ANGLE[direction.as_tuple()]
+        angle = conditions.INST_ANGLE[direction.as_tuple()]
         # We need to add stairs
         for stair_pos in range(0, int(diff.z), 128):
             # Move twice the vertical horizontally
@@ -63,9 +62,9 @@ def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
             loc = point_a + (2 * stair_pos + 128) * direction
             # Do the vertical offset
             loc.z += stair_pos
-            vmf.create_ent(
-                classname='func_instance',
-                origin=loc.join(' '),
+            conditions.add_inst(
+                vmf,
+                origin=loc,
                 angles=angle,
                 file=instances['stair'],
             )
@@ -76,17 +75,17 @@ def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
         # We need to add downward stairs
         # They point opposite to normal ones
         LOGGER.debug('down from {}', point_a)
-        angle = INST_ANGLE[(-direction).as_tuple()]
+        angle = conditions.INST_ANGLE[(-direction).as_tuple()]
         for stair_pos in range(0, -int(diff.z), 128):
             LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
-            loc = point_a + (2 * stair_pos + 256) * direction  # type: Vec
+            loc = point_a + (2 * stair_pos + 256) * direction
             # Do the vertical offset plus additional 128 units
             # to account for the moved instance
             loc.z -= (stair_pos + 128)
-            vmf.create_ent(
-                classname='func_instance',
-                origin=loc.join(' '),
+            conditions.add_inst(
+                vmf,
+                origin=loc,
                 angles=angle,
                 file=instances['stair'],
             )
@@ -97,29 +96,26 @@ def place_catwalk_connections(vmf: VMF, instances, point_a: Vec, point_b: Vec):
 
     # Now do straight sections
     LOGGER.debug('Stretching {} {}', distance, direction)
-    angle = INST_ANGLE[direction.as_tuple()]
+    angle = conditions.INST_ANGLE[direction.as_tuple()]
     loc = point_a + (direction * 128)
 
-    # Figure out the most efficent number of sections
-    for segment_len in utils.fit(
-            distance,
-            [512, 256, 128]
-            ):
-        vmf.create_ent(
-            classname='func_instance',
-            origin=loc.join(' '),
+    # Figure out the most efficient number of sections
+    for segment_len in utils.fit(distance, [512, 256, 128]):
+        conditions.add_inst(
+            vmf,
+            origin=loc,
             angles=angle,
             file=instances['straight_' + str(segment_len)],
         )
         loc += (segment_len * direction)
 
 
-@make_result('makeCatwalk')
+@conditions.make_result('makeCatwalk')
 def res_make_catwalk(vmf: VMF, res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
-    
+
     * Instances:
         * `markerInst: The instance set in editoritems.
         * `straight_128`/`256`/`512`: Straight sections. Extends East.
@@ -179,7 +175,7 @@ def res_make_catwalk(vmf: VMF, res: Property):
         inst['origin'] = str(origin)
 
     if not markers:
-        return RES_EXHAUSTED
+        return conditions.RES_EXHAUSTED
 
     LOGGER.info('Connections: {}', links)
     LOGGER.info('Markers: {}', markers)
@@ -237,20 +233,23 @@ def res_make_catwalk(vmf: VMF, res: Property):
         normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
 
         new_type, inst['angles'] = utils.CONN_LOOKUP[dir_mask.as_tuple()]
-        inst['file'] = instances[CATWALK_TYPES[new_type]]
+        inst['file'] = filename = instances[CATWALK_TYPES[new_type]]
+        conditions.ALL_INST.add(filename.casefold())
 
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
             if normal.z == 0:
                 if normal == dir_mask.conn_dir():
                     inst['file'] = instances['end_wall']
+                    conditions.ALL_INST.add(instances['end_wall'].casefold())
             continue  # We never have normal supports on end pieces
         elif new_type is utils.CONN_TYPES.none:
             # Unconnected catwalks on the wall switch to a special instance.
             # This lets players stand next to a portal surface on the wall.
             if normal.z == 0:
                 inst['file'] = instances['single_wall']
-                inst['angles'] = INST_ANGLE[normal.as_tuple()]
+                conditions.ALL_INST.add(instances['single_wall'].casefold())
+                inst['angles'] = conditions.INST_ANGLE[normal.as_tuple()]
             else:
                 inst.remove()
             continue  # These don't get supports otherwise
@@ -271,12 +270,12 @@ def res_make_catwalk(vmf: VMF, res: Property):
             supp = instances['support_wall']
 
         if supp:
-            vmf.create_ent(
-                classname='func_instance',
+            conditions.add_inst(
+                vmf,
                 origin=inst['origin'],
-                angles=INST_ANGLE[normal.as_tuple()],
+                angles=conditions.INST_ANGLE[normal.as_tuple()],
                 file=supp,
             )
 
     LOGGER.info('Finished catwalk generation!')
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
