@@ -656,7 +656,11 @@ def check_all(vmf: VMF) -> None:
                     )
 
     LOGGER.info('---------------------')
-    LOGGER.info('Conditions executed, {}/{} skipped!', skipped_cond, len(conditions))
+    LOGGER.info(
+        'Conditions executed, {}/{} ({:.0%}) skipped!',
+        skipped_cond, len(conditions),
+        skipped_cond/len(conditions),
+    )
     import vbsp
     LOGGER.info('Map has attributes: {}', [
         key
