@@ -301,7 +301,7 @@ def resolve_one(path, default: Default_T='', error=False) -> Union[str, Default_
 
 
 # Cache the return values, since they're constant.
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=100)
 def _resolve(path: str) -> List[str]:
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
@@ -407,7 +407,7 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
     return inst_out
 
 
-# Copy over the lru_cache() functions to make them easily acessable.
+# Copy over the lru_cache() functions to make them easily accessible.
 resolve.cache_info = _resolve.cache_info
 resolve.cache_clear = _resolve.cache_clear
 
