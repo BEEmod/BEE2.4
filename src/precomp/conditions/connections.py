@@ -1,5 +1,8 @@
 """Results relating to item connections."""
+from typing import Callable
+
 import srctools.logger
+
 from precomp import connections, conditions
 from srctools import Property, Entity, Output
 
@@ -8,7 +11,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.connections')
 
 
 @conditions.make_result('AddOutput')
-def res_add_output(res: Property):
+def res_add_output(res: Property) -> Callable[[Entity], None]:
     """Add an output from an instance to a global or local name.
 
     Values:
@@ -72,3 +75,31 @@ def res_add_output(res: Property):
             inst_in=inst.fixup.substitute(inst_in) or None,
         ))
     return add_output
+
+
+@conditions.make_result('ChangeIOType')
+def res_change_io_type(props: Property) -> Callable[[Entity], None]:
+    """Switch an item to use different inputs or outputs.
+
+    Must be done before priority level -250.
+    The contents are the same as that allowed in the input BEE2 block in
+    editoritems.
+    """
+    conf = connections.Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
+
+    def change_item(inst: Entity) -> None:
+        try:
+            item = connections.ITEMS[inst['targetname']]
+        except KeyError:
+            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+
+        item.config = conf
+
+        # Overwrite these as well.
+        item.enable_cmd = conf.enable_cmd
+        item.disable_cmd = conf.disable_cmd
+
+        item.sec_enable_cmd = conf.sec_enable_cmd
+        item.sec_disable_cmd = conf.sec_disable_cmd
+
+    return change_item
