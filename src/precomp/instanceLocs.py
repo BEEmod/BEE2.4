@@ -12,7 +12,7 @@ import editoritems
 import srctools.logger
 
 from typing import (
-    Optional, Union,
+    Callable, Optional, Union,
     List, Dict, Tuple, TypeVar, Iterable,
 )
 
@@ -407,9 +407,8 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
     return inst_out
 
 
-# Copy over the lru_cache() functions to make them easily accessible.
-resolve.cache_info = _resolve.cache_info
-resolve.cache_clear = _resolve.cache_clear
+# Make this publicly accessible.
+resolve_cache_info: Callable[[], object] = _resolve.cache_info
 
 
 def get_cust_inst(item_id: str, inst: str) -> Optional[str]:

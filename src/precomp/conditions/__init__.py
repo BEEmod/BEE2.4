@@ -672,7 +672,7 @@ def check_all(vmf: VMF) -> None:
     LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
     # Dynamically added by lru_cache()
     # noinspection PyUnresolvedReferences
-    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve.cache_info())
+    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve_cache_info())
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
