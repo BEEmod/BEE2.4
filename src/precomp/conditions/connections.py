@@ -88,6 +88,7 @@ def res_change_io_type(props: Property) -> Callable[[Entity], None]:
     conf = connections.Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
 
     def change_item(inst: Entity) -> None:
+        """Alter the type of each item passed in."""
         try:
             item = connections.ITEMS[inst['targetname']]
         except KeyError:
@@ -103,3 +104,47 @@ def res_change_io_type(props: Property) -> Callable[[Entity], None]:
         item.sec_disable_cmd = conf.sec_disable_cmd
 
     return change_item
+
+
+@conditions.make_result('AppendConnInputs')
+def res_append_io_type(res: Property) -> Callable[[Entity], None]:
+    """Append additional outputs to an item's connections, which are fired when inputs change.
+
+    Must be done before priority level -250. This has the same format of the editoritems BEE2 block,
+    but only accepts any number of the following:
+    - `enable_cmd`
+    - `disable_cmd`
+    - `sec_enable_cmd`
+    - `sec_disable_cmd`
+    """
+    prop_lists: dict[str, list[Output]] = {
+        name: []
+        for name in ['enable_cmd', 'disable_cmd', 'sec_enable_cmd', 'sec_disable_cmd']
+    }
+
+    for prop in res:
+        try:
+            lst = prop_lists[prop.name]
+        except KeyError:
+            raise ValueError(f'Unknown input command type "{prop.real_name}"!') from None
+        prop.name = ''  # Discard this from the output.
+        lst.append(Output.parse(prop))
+    # Collect into tuples for appending later, discard any blanks.
+    prop_tups = [
+        (name, tuple(out_list))
+        for name, out_list in prop_lists.items()
+        if out_list
+    ]
+    LOGGER.info('Append inputs: {}', prop_tups)
+
+    def append_to(inst: Entity) -> None:
+        """Append inputs to the item."""
+        try:
+            item = connections.ITEMS[inst['targetname']]
+        except KeyError:
+            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+        # Assign item.enable_cmd += out_tup, for all of them.
+        for name, out_tup in prop_tups:
+            setattr(item, name, getattr(item, name) + out_tup)
+
+    return append_to
