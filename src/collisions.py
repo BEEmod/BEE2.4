@@ -105,3 +105,48 @@ class BBox:
         elif self.min_z == self.max_z:
             return Vec(0.0, 0.0, 1.0)
         return None
+
+    def intersect(self, other: BBox) -> BBox | None:
+        """Check if another bbox collides with this one.
+
+        If so, return the bbox representing the overlap.
+        """
+        comb = self.contents & other.contents
+        if comb is CollideType.NOTHING:
+            return None
+        # We do each axis one at a time. First do a separating-axis test
+        # on either side, if that passes we don't collide.
+        if self.max_x < other.min_x or self.min_x > other.max_x:
+            return None
+        # They overlap, so compare the min/max pairs to get the intersection interval.
+        # If that's negative, we fail also.
+        min_x = max(self.min_x, other.min_x)
+        max_x = min(self.max_x, other.max_x)
+        if min_x > max_x:
+            return None
+
+        # Then repeat for the other axes.
+        if self.max_y < other.min_y or self.min_y > other.max_y:
+            return None
+
+        min_y = max(self.min_y, other.min_y)
+        max_y = min(self.max_y, other.max_y)
+        if min_y > max_y:
+            return None
+
+        if self.max_z < other.min_z or self.min_z > other.max_z:
+            return None
+
+        min_z = max(self.min_z, other.min_z)
+        max_z = min(self.max_z, other.max_z)
+        if min_z > max_z:
+            return None
+
+        try:
+            return BBox(
+                (min_x, min_y, min_z),
+                (max_x, max_y, max_z),
+                comb,
+            )
+        except ValueError:  # Edge or corner, don't count those.
+            return None

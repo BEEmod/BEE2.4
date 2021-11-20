@@ -1,10 +1,12 @@
 """Test the collisions module."""
 from __future__ import annotations
 
+import math
 from typing import Tuple
+from pathlib import Path
 import pytest
 
-from srctools import Vec
+from srctools import VMF, Vec, Property, Solid
 from collisions import BBox, CollideType
 
 tuple3 = Tuple[int, int, int]
@@ -129,3 +131,68 @@ def test_bbox_hash() -> None:
     assert hash(bb) != hash(BBox((40, 60, 80), (120, 455, 730), CollideType.PHYSICS))
     assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS))
     assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES))
+
+
+def reorder(coord: tuple3, order: str) -> tuple3:
+    """Reorder the coords by these axes."""
+    assoc = dict(zip('xyz', coord))
+    return assoc[order[0]], assoc[order[1]], assoc[order[2]],
+
+
+def test_reorder_helper() -> None:
+    """Test the reorder helper."""
+    assert reorder((1, 2, 3), 'xyz') == (1, 2, 3)
+    assert reorder((1, 2, 3), 'yzx') == (2, 3, 1)
+    assert reorder((1, 2, 3), 'zyx') == (3, 2, 1)
+    assert reorder((1, 2, 3), 'xzy') == (1, 3, 2)
+
+
+def get_intersect_testcases() -> list:
+    """Use a VMF to make it easier to generate the bounding boxes."""
+    with Path(__file__, '../bbox_samples.vmf').open() as f:
+        vmf = VMF.parse(Property.parse(f))
+
+    def process(brush: Solid | None) -> tuple[tuple[int, ...], tuple[int, ...]] | None:
+        """Extract the bounding box from the brush."""
+        if brush is None:
+            return None
+        bb_min, bb_max = brush.get_bbox()
+        for vec in [bb_min, bb_max]:
+            for ax in 'xyz':
+                # If one thick, make zero thick so we can test planes.
+                if abs(vec[ax]) == 63:
+                    vec[ax] = math.copysign(64, vec[ax])
+        return (tuple(map(int, bb_min)), tuple(map(int, bb_max)))
+
+    for ent in vmf.entities:
+        test = expected = None
+        for solid in ent.solids:
+            if solid.sides[0].mat.casefold() == 'tools/toolsskip':
+                expected = solid
+            if solid.sides[0].mat.casefold() == 'tools/toolstrigger':
+                test = solid
+        if test is None:
+            raise ValueError(ent.id)
+        yield (*process(test), process(expected))
+
+
+@pytest.mark.parametrize('mins, maxs, success', list(get_intersect_testcases()))
+@pytest.mark.parametrize('axes', ['xyz', 'yxz', 'zxy'])
+def test_bbox_intersection(
+    mins: tuple3, maxs: tuple3,
+    success: tuple[tuple3, tuple3] | None, axes: str,
+) -> None:
+    """Test intersection founction for bounding boxes.
+
+    We parameterise by swapping all the axes, then feed in various test cases.
+    """
+    bbox1 = BBox((-64, -64, -64), (+64, +64, +64), CollideType.EVERYTHING)
+    bbox2 = BBox(reorder(mins, axes), reorder(maxs, axes), CollideType.EVERYTHING)
+    result = bbox1.intersect(bbox2)
+    # assert result == bbox2.intersect(bbox1)  # Check order is irrelevant.
+    if success is None:
+        assert result is None
+    else:
+        exp_a, exp_b = success
+        expected = BBox(reorder(exp_a, axes), reorder(exp_b, axes), CollideType.EVERYTHING)
+        assert result == expected
