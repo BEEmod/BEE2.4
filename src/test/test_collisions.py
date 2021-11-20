@@ -133,18 +133,19 @@ def test_bbox_hash() -> None:
     assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES))
 
 
-def reorder(coord: tuple3, order: str) -> tuple3:
+def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> tuple3:
     """Reorder the coords by these axes."""
     assoc = dict(zip('xyz', coord))
-    return assoc[order[0]], assoc[order[1]], assoc[order[2]],
+    return x + assoc[order[0]], y + assoc[order[1]], z + assoc[order[2]],
 
 
 def test_reorder_helper() -> None:
     """Test the reorder helper."""
-    assert reorder((1, 2, 3), 'xyz') == (1, 2, 3)
-    assert reorder((1, 2, 3), 'yzx') == (2, 3, 1)
-    assert reorder((1, 2, 3), 'zyx') == (3, 2, 1)
-    assert reorder((1, 2, 3), 'xzy') == (1, 3, 2)
+    assert reorder((1, 2, 3), 'xyz', 0, 0, 0) == (1, 2, 3)
+    assert reorder((1, 2, 3), 'yzx', 0, 0, 0) == (2, 3, 1)
+    assert reorder((1, 2, 3), 'zyx', 0, 0, 0) == (3, 2, 1)
+    assert reorder((1, 2, 3), 'xzy', 0, 0, 0) == (1, 3, 2)
+    assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == (-2, 36, 12)
 
 
 def get_intersect_testcases() -> list:
@@ -178,21 +179,25 @@ def get_intersect_testcases() -> list:
 
 @pytest.mark.parametrize('mins, maxs, success', list(get_intersect_testcases()))
 @pytest.mark.parametrize('axes', ['xyz', 'yxz', 'zxy'])
+@pytest.mark.parametrize('x', [-128, 0, 129])
+@pytest.mark.parametrize('y', [-128, 0, 129])
+@pytest.mark.parametrize('z', [-128, 0, 129])
 def test_bbox_intersection(
     mins: tuple3, maxs: tuple3,
+    x: int, y: int, z: int,
     success: tuple[tuple3, tuple3] | None, axes: str,
 ) -> None:
     """Test intersection founction for bounding boxes.
 
-    We parameterise by swapping all the axes, then feed in various test cases.
+    We parameterise by swapping all the axes, and offsetting so it's in all the quadrants.
     """
-    bbox1 = BBox((-64, -64, -64), (+64, +64, +64), CollideType.EVERYTHING)
-    bbox2 = BBox(reorder(mins, axes), reorder(maxs, axes), CollideType.EVERYTHING)
+    bbox1 = BBox((x-64, y-64, z-64), (x+64, y+64, z+64), CollideType.EVERYTHING)
+    bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), CollideType.EVERYTHING)
     result = bbox1.intersect(bbox2)
     # assert result == bbox2.intersect(bbox1)  # Check order is irrelevant.
     if success is None:
         assert result is None
     else:
         exp_a, exp_b = success
-        expected = BBox(reorder(exp_a, axes), reorder(exp_b, axes), CollideType.EVERYTHING)
+        expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), CollideType.EVERYTHING)
         assert result == expected
