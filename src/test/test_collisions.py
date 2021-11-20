@@ -1,16 +1,19 @@
 """Test the collisions module."""
 from __future__ import annotations
 
+from typing import Tuple
 import pytest
 
 from srctools import Vec
 from collisions import BBox, CollideType
 
+tuple3 = Tuple[int, int, int]
+
 
 def assert_bbox(
     bbox: BBox,
-    mins: tuple[int, int, int],
-    maxes: tuple[int, int, int],
+    mins: tuple3,
+    maxes: tuple3,
     contents: CollideType,
     msg='',
 ) -> None:
@@ -89,7 +92,9 @@ def test_bbox_vecs() -> None:
     assert bb.mins is not bb.mins
     assert bb.maxes is not bb.maxes
 
+
 def test_bbox_is_frozen() -> None:
+    """Test modification is not possible."""
     bb = BBox((40, 60, 80), (120, 450, 730), CollideType.PHYSICS)
     with pytest.raises(AttributeError):
         bb.min_x = 100
@@ -104,7 +109,23 @@ def test_bbox_is_frozen() -> None:
         bb.max_y = 100
     with pytest.raises(AttributeError):
         bb.max_z = 100
+
+    with pytest.raises(AttributeError):
+        bb.contents = CollideType.GRATE
+    # Check all these assignments didn't actually do anything.
     assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS)
 
+
+def test_bbox_hash() -> None:
+    """Test hashability of bboxes."""
+    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.PHYSICS)
     hash(bb)  # Check it can be hashed.
+
+    # Check each value changes the hash.
+    assert hash(bb) != hash(BBox((45, 40, 80), (120, 450, 730), CollideType.PHYSICS))
+    assert hash(bb) != hash(BBox((40, 59, 80), (120, 450, 730), CollideType.PHYSICS))
     assert hash(bb) != hash(BBox((40, 60, 81), (120, 450, 730), CollideType.PHYSICS))
+    assert hash(bb) != hash(BBox((40, 60, 80), (121, 450, 730), CollideType.PHYSICS))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 455, 730), CollideType.PHYSICS))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES))
