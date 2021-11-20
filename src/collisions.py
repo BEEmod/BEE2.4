@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
-from typing import Optional
 import attr
 import functools
 
@@ -97,12 +96,12 @@ class BBox:
         )
 
     @property
-    def plane_normal(self) -> Optional[Vec]:
+    def plane_normal(self) -> Vec | None:
         """If a plane, returns the normal axis."""
         if self.min_x == self.max_x:
-            return Vec(1, 0, 0)
+            return Vec(1.0, 0.0, 0.0)
         elif self.min_y == self.max_y:
-            return Vec(0, 1, 0)
+            return Vec(0.0, 1.0, 0.0)
         elif self.min_z == self.max_z:
-            return Vec(0, 0, 1)
+            return Vec(0.0, 0.0, 1.0)
         return None
