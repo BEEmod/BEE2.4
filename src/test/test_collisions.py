@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import math
-from typing import Tuple
+from typing import Iterable, Tuple
 from pathlib import Path
 import pytest
 
-from srctools import VMF, Vec, Property, Solid
+from srctools import Angle, Matrix, VMF, Vec, Property, Solid
 from collisions import BBox, CollideType
 
 tuple3 = Tuple[int, int, int]
@@ -14,8 +14,8 @@ tuple3 = Tuple[int, int, int]
 
 def assert_bbox(
     bbox: BBox,
-    mins: tuple3,
-    maxes: tuple3,
+    mins: Iterable[int],
+    maxes: Iterable[int],
     contents: CollideType,
     msg='',
 ) -> None:
@@ -201,3 +201,29 @@ def test_bbox_intersection(
         exp_a, exp_b = success
         expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), CollideType.EVERYTHING)
         assert result == expected
+
+
+@pytest.mark.parametrize('pitch', range(0, 360, 90))
+@pytest.mark.parametrize('yaw', range(0, 360, 90))
+@pytest.mark.parametrize('roll', range(0, 360, 90))
+def test_bbox_rotation(
+    pitch: float, yaw: float, roll: float,
+) -> None:
+    """Test the rotation logic against the slow direct approach."""
+    ang = Angle(pitch, yaw, roll)
+    bb_start = BBox(Vec(100, 200, 300), Vec(300, 450, 600), CollideType.ANTLINES)
+    # Directly compute, by rotating all the angles,
+    points = [
+        Vec(x, y, z)
+        for x in [100, 300]
+        for y in [200, 450]
+        for z in [300, 600]
+    ]
+    result_ang = bb_start @ ang
+    result_mat = bb_start @ Matrix.from_angle(ang)
+    assert result_ang == result_mat
+
+    bb_min, bb_max = Vec.bbox(
+        point @ ang for point in points
+    )
+    assert_bbox(result_mat, round(bb_min, 0), round(bb_max, 0), CollideType.ANTLINES)

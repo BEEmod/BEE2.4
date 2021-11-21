@@ -6,7 +6,7 @@ from enum import Flag, auto as enum_auto
 import attr
 import functools
 
-from srctools import Vec
+from srctools.math import Vec, Angle, Matrix, to_matrix
 
 
 class CollideType(Flag):
@@ -150,3 +150,76 @@ class BBox:
             )
         except ValueError:  # Edge or corner, don't count those.
             return None
+
+    def __matmul__(self, other: Angle | Matrix) -> BBox:
+        """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
+        # https://gamemath.com/book/geomprims.html#transforming_aabbs
+        m = to_matrix(other)
+
+        if m[0, 0] > 0.0:
+            min_x = m[0, 0] * self.min_x
+            max_x = m[0, 0] * self.max_x
+        else:
+            min_x = m[0, 0] * self.max_x
+            max_x = m[0, 0] * self.min_x
+
+        if m[0, 1] > 0.0:
+            min_y = m[0, 1] * self.min_x
+            max_y = m[0, 1] * self.max_x
+        else:
+            min_y = m[0, 1] * self.max_x
+            max_y = m[0, 1] * self.min_x
+
+        if m[0, 2] > 0.0:
+            min_z = m[0, 2] * self.min_x
+            max_z = m[0, 2] * self.max_x
+        else:
+            min_z = m[0, 2] * self.max_x
+            max_z = m[0, 2] * self.min_x
+
+        if m[1, 0] > 0.0:
+            min_x += m[1, 0] * self.min_y
+            max_x += m[1, 0] * self.max_y
+        else:
+            min_x += m[1, 0] * self.max_y
+            max_x += m[1, 0] * self.min_y
+
+        if m[1, 1] > 0.0:
+            min_y += m[1, 1] * self.min_y
+            max_y += m[1, 1] * self.max_y
+        else:
+            min_y += m[1, 1] * self.max_y
+            max_y += m[1, 1] * self.min_y
+
+        if m[1, 2] > 0.0:
+            min_z += m[1, 2] * self.min_y
+            max_z += m[1, 2] * self.max_y
+        else:
+            min_z += m[1, 2] * self.max_y
+            max_z += m[1, 2] * self.min_y
+
+        if m[2, 0] > 0.0:
+            min_x += m[2, 0] * self.min_z
+            max_x += m[2, 0] * self.max_z
+        else:
+            min_x += m[2, 0] * self.max_z
+            max_x += m[2, 0] * self.min_z
+
+        if m[2, 1] > 0.0:
+            min_y += m[2, 1] * self.min_z
+            max_y += m[2, 1] * self.max_z
+        else:
+            min_y += m[2, 1] * self.max_z
+            max_y += m[2, 1] * self.min_z
+
+        if m[2, 2] > 0.0:
+            min_z += m[2, 2] * self.min_z
+            max_z += m[2, 2] * self.max_z
+        else:
+            min_z += m[2, 2] * self.max_z
+            max_z += m[2, 2] * self.min_z
+        return BBox(
+            (min_x, min_y, min_z),
+            (max_x, max_y, max_z),
+            self.contents,
+        )
