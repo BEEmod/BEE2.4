@@ -45,13 +45,13 @@ class BBox:
 
     def __init__(
         self,
-        point1: Vec | tuple[int, int, int],
-        point2: Vec | tuple[int, int, int],
+        point1: Vec | tuple[int|float, int|float, int|float],
+        point2: Vec | tuple[int|float, int|float, int|float],
         contents: CollideType = CollideType.SOLID,
     ) -> None:
         """Allow constructing from Vec, and flip values to make them min/max."""
-        min_x, min_y, min_z = map(int, point1)
-        max_x, max_y, max_z = map(int, point2)
+        min_x, min_y, min_z = map(round, point1)
+        max_x, max_y, max_z = map(round, point2)
         if min_x > max_x:
             min_x, max_x = max_x, min_x
         if min_x > max_x:

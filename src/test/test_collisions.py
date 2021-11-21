@@ -48,7 +48,7 @@ def test_bbox_construction() -> None:
     assert_bbox(bb, (1, 2, 3), (4, 5, 6), CollideType.SOLID)
 
     assert_bbox(
-        BBox(Vec(4, 2, 6), Vec(1, 5, 3), CollideType.FIZZLER | CollideType.ANTLINES),
+        BBox(Vec(4.1, 1.9, 6), Vec(1, 5.1, 2.85), CollideType.FIZZLER | CollideType.ANTLINES),
         (1, 2, 3), (4, 5, 6),
         CollideType.FIZZLER | CollideType.ANTLINES,
     )
