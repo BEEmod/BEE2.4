@@ -241,3 +241,15 @@ class BBox:
             (max_x, max_y, max_z),
             self.contents,
         )
+
+    def __add__(self, other: Vec | tuple[float, float, float]) -> BBox:
+        """Add a vector to the mins and maxes."""
+        if isinstance(other, BBox):  # Special-case error.
+            raise TypeError('Two bounding boxes cannot be added!')
+        return BBox(self.mins + other, self.maxes + other, self.contents)
+
+    def __sub__(self, other: Vec | tuple[float, float, float]) -> BBox:
+        """Add a vector to the mins and maxes."""
+        return BBox(self.mins - other, self.maxes - other, self.contents)
+
+    # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.

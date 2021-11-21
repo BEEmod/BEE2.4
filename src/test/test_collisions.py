@@ -219,7 +219,7 @@ def test_bbox_rotation(
 ) -> None:
     """Test the rotation logic against the slow direct approach."""
     ang = Angle(pitch, yaw, roll)
-    bb_start = BBox(Vec(100, 200, 300), Vec(300, 450, 600), CollideType.ANTLINES)
+    bb_start = BBox((100, 200, 300), (300, 450, 600), CollideType.ANTLINES)
     # Directly compute, by rotating all the angles,
     points = [
         Vec(x, y, z)
@@ -235,3 +235,28 @@ def test_bbox_rotation(
         point @ ang for point in points
     )
     assert_bbox(result_mat, round(bb_min, 0), round(bb_max, 0), CollideType.ANTLINES)
+
+
+def test_bbox_addition() -> None:
+    """Test adding to bbox to shift them around."""
+    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES)
+    assert_bbox(
+        bb + Vec(10, -30, 45),
+        (50, 30, 125), (130, 420, 775),
+        CollideType.ANTLINES,
+    )
+    assert_bbox(
+        bb + (10, -30, 45),
+        (50, 30, 125), (130, 420, 775),
+        CollideType.ANTLINES,
+    )
+    assert_bbox(
+        bb - Vec(10, 20, -15),
+        (30, 40, 95), (110, 430, 745),
+        CollideType.ANTLINES,
+    )
+    assert_bbox(
+        bb - (10, 20, -15),
+        (30, 40, 95), (110, 430, 745),
+        CollideType.ANTLINES,
+    )
