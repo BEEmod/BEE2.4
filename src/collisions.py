@@ -87,6 +87,24 @@ class BBox:
         return Vec(self.max_x, self.max_y, self.max_z)
 
     @property
+    def center(self) -> Vec:
+        """Return the center of the bounding box, as a Vector."""
+        return Vec(
+            (self.min_x + self.max_x) / 2.0,
+            (self.min_y + self.max_y) / 2.0,
+            (self.min_z + self.max_z) / 2.0,
+        )
+
+    @property
+    def size(self) -> Vec:
+        """Return the size of the bounding box, as a Vector."""
+        return Vec(
+            self.max_x - self.min_x,
+            self.max_y - self.min_y,
+            self.max_z - self.min_z,
+        )
+
+    @property
     def is_plane(self) -> bool:
         """Check if this is a plane, not a bounding volume."""
         return (

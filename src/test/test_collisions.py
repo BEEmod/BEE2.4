@@ -88,11 +88,19 @@ def test_illegal_bbox() -> None:
 
 def test_bbox_vecs() -> None:
     """Test that the vector properties don't return the same object."""
-    bb = BBox((40, 60, 80), (120, 450, 730))
-    assert bb.mins == Vec(40.0, 60.0, 80.0)
-    assert bb.maxes == Vec(120.0, 450.0, 730.0)
+    bb = BBox((30, 60, 80), (120, 451, 730))
+
+    assert bb.mins == Vec(30.0, 60.0, 80.0)
     assert bb.mins is not bb.mins
+
+    assert bb.maxes == Vec(120.0, 451.0, 730.0)
     assert bb.maxes is not bb.maxes
+
+    assert bb.size == Vec(90.0, 391.0, 650.0)
+    assert bb.size is not bb.size
+
+    assert bb.center == Vec(75.0, 255.5, 405.0)
+    assert bb.center is not bb.center
 
 
 def test_bbox_is_frozen() -> None:
