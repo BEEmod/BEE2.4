@@ -54,10 +54,6 @@ class BBox:
         max_x, max_y, max_z = map(round, point2)
         if min_x > max_x:
             min_x, max_x = max_x, min_x
-        if min_x > max_x:
-            min_x, max_x = max_x, min_x
-        if min_x > max_x:
-            min_x, max_x = max_x, min_x
         if min_y > max_y:
             min_y, max_y = max_y, min_y
         if min_z > max_z:
