@@ -258,9 +258,7 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
 def res_make_funnel_light(inst: Entity) -> None:
     """Place a light for Funnel items."""
     oran_on = inst.fixup.bool('$start_reversed')
-    need_blue = need_oran = False
-    name = ''
-    if inst.fixup['$connectioncount_polarity'] != '0':
+    if inst.fixup['$conn_count_b'] != '0':
         import vbsp
         if not vbsp.settings['style_vars']['funnelallowswitchedlights']:
             # Allow disabling adding switchable lights.
@@ -268,13 +266,15 @@ def res_make_funnel_light(inst: Entity) -> None:
         name = conditions.local_name(inst, 'light')
         need_blue = need_oran = True
     else:
+        name = ''
         if oran_on:
             need_oran = True
+            need_blue = False
         else:
             need_blue = True
+            need_oran = False
 
-    loc = Vec(0, 0, -56)
-    loc.localise(Vec.from_str(inst['origin']), Angle.from_str(inst['angles']))
+    loc = Vec(0, 0, -56) @ Angle.from_str(inst['angles']) + Vec.from_str(inst['origin'])
 
     if need_blue:
         inst.map.create_ent(
