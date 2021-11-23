@@ -83,6 +83,13 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         if x > self._max_x:
             self._max_x = x
 
+        if not self._data:
+            # The entire table is empty, we should move offsets and put this at index 0, 0.
+            self._yoff = -y
+            self._xoffs.append(-x)
+            self._data.append([val])
+            return
+
         y_ind = y + self._yoff
         y_bound = len(self._xoffs)
 
@@ -102,8 +109,8 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         # Now x.
         data = self._data[y_ind]
         if data is None or not data:
-            # This row is empty, so we can just move its offset to wherever
-            # we are.
+            # This row is empty, so we can just move its offset to wherever we are and create
+            # the list.
             self._data[y_ind] = [val]
             self._xoffs[y_ind] = -x
             return
