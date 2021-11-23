@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 from typing import (
-    TypeVar, Generic, Union, Any, Optional, Tuple,
+    TypeVar, Generic, Optional, Tuple,
     Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView,
 )
 
@@ -20,10 +20,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     """
     def __init__(
         self,
-        contents: Union[
-            Mapping[tuple[int, int], ValT],
-            Iterable[tuple[tuple[int, int], ValT]],
-        ] = (),
+        contents: Mapping[tuple[int, int], ValT] | Iterable[tuple[tuple[int, int], ValT]] = (),
     ) -> None:
         """Initalises the plane with the provided values."""
         # Track the minimum/maximum position found
