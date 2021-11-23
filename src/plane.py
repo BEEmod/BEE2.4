@@ -88,6 +88,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             self._yoff = -y
             self._xoffs.append(-x)
             self._data.append([val])
+            self._used += 1
             return
 
         y_ind = y + self._yoff
@@ -113,6 +114,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             # the list.
             self._data[y_ind] = [val]
             self._xoffs[y_ind] = -x
+            self._used += 1
             return
 
         x_ind = x + self._xoffs[y_ind]

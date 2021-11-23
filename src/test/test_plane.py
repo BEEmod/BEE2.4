@@ -13,7 +13,9 @@ def test_insertion(dx, dy) -> None:
     """Simple tests to ensure resizing works in each direction."""
     plane = Plane()
     for i in range(10):
+        assert len(plane) == i, f'{dx*i}, {dy*i}'
         plane[dx*i, dy*i] = i
+        assert len(plane) == i + 1, f'{dx*i}, {dy*i}'
         try:
             assert plane[dx*i, dy*i] == i
         except KeyError:
