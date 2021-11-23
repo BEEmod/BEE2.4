@@ -5,7 +5,6 @@ from plane import Plane
 import pytest
 
 
-
 @pytest.mark.parametrize('dx, dy', [
     (-2, 0), (2, 0), (0, -2), (0, 2),
     (2, 2), (-2, 2), (2, -2), (-2, -2),
@@ -35,6 +34,7 @@ def _points(*pattern):
     ]
     points.sort(key=lambda pos: int(pattern[pos[1]][pos[0]]))
     return points
+
 
 @pytest.mark.parametrize('off_x, off_y', [
     (3, 3), (1, 0), (0, 1), (1, 2), (2, 2), (4, 4), (0, 0), (-2, 10), (10, -5), (50, 50),
@@ -75,3 +75,31 @@ def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: in
         assert dict(plane.items()) == backup
         for (chk_x, chk_y), check in backup.items():
             assert plane[chk_x, chk_y] == check, backup
+
+
+def test_views() -> None:
+    """Test the view objects."""
+    plane: Plane[int] = Plane()
+    plane[0, 4] = 1
+    plane[2, -5] = 2
+    plane[0, 5] = 3
+    plane[0, 7] = 2
+
+    assert (0, 4) in plane.keys()
+    assert (1, 4) not in plane.keys()
+    assert "ab" not in plane.items()  # Invalid tuple
+    assert set(plane.keys()) == {
+        (0, 4), (2, -5), (0, 5), (0, 7),
+    }
+
+    assert 1 in plane.values()
+    assert 45 not in plane.values()
+    assert sorted(plane.values()) == [1, 2, 2, 3]
+
+    assert ((0, 5), 3) in plane.items()
+    assert ((2, -5), 4) not in plane.items()
+    assert ((3, 4), 2) not in plane.items()
+    assert 45 not in plane.items()  # Invalid tuple
+
+    # Check keys, values, items is in the same order.
+    assert list(zip(plane.keys(), plane.values())) == list(plane.items())

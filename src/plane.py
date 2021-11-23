@@ -156,9 +156,12 @@ class PlaneValues(ValuesView[ValT]):
 
     def __contains__(self, item: Any) -> bool:
         """Check if the provided item is a value."""
+        # We use None as a sentinel, don't false-positive.
         if item is None:
             return False
         for row in self._mapping._data:
+            if row is None:
+                continue
             if item in row:
                 return True
         return False
@@ -166,6 +169,8 @@ class PlaneValues(ValuesView[ValT]):
     def __iter__(self) -> None:
         """Produce all values in the plane."""
         for row in self._mapping._data:
+            if row is None:
+                continue
             for value in row:
                 if value is not None:
                     yield value
