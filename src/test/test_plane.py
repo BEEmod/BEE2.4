@@ -98,6 +98,7 @@ def test_views() -> None:
 
     assert 1 in plane.values()
     assert 45 not in plane.values()
+    assert None not in plane.values()  # Special case
     assert sorted(plane.values()) == [1, 2, 2, 3]
 
     assert ((0, 5), 3) in plane.items()
@@ -110,3 +111,28 @@ def test_views() -> None:
 
     # Check keys, values, items is in the same order.
     assert list(zip(plane.keys(), plane.values())) == list(plane.items())
+
+
+# noinspection PyTypeChecker
+def test_illegal_positions() -> None:
+    """Test invalid positions produce a KeyError."""
+    plane = Plane()
+    plane[1, 2] = 5
+    assert plane[1.0, 2.0] == 5
+    with pytest.raises(KeyError):
+        _ = plane[45, 9, 2]
+    with pytest.raises(KeyError):
+        _ = plane[45]
+    with pytest.raises(KeyError):
+        _ = plane["blah", 9]
+    with pytest.raises(KeyError):
+        _ = plane[9, "blah"]
+
+    with pytest.raises(KeyError):
+        plane[45, 9, 2] = object
+    with pytest.raises(KeyError):
+        plane[45] = object
+    with pytest.raises(KeyError):
+        plane["blah", 9] = object
+    with pytest.raises(KeyError):
+        plane[9, "blah"] = object
