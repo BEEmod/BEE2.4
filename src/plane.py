@@ -53,7 +53,11 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __getitem__(self, pos: Tuple[int, int]) -> ValT:
         """Return the value at a given position."""
-        x, y = pos
+        try:
+            x, y = map(int, pos)
+        except (ValueError, TypeError):
+            raise KeyError(pos) from None
+
         y += self._yoff
         try:
             x += self._xoffs[y]
@@ -66,7 +70,11 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __setitem__(self, pos: Tuple[int, int], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
-        x, y = pos
+        try:
+            x, y = map(int, pos)
+        except (ValueError, TypeError):
+            raise KeyError(pos) from None
+
         y_ind = y + self._yoff
         y_bound = len(self._xoffs)
 

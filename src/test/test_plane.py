@@ -87,10 +87,14 @@ def test_views() -> None:
 
     assert (0, 4) in plane.keys()
     assert (1, 4) not in plane.keys()
-    assert "ab" not in plane.items()  # Invalid tuple
     assert set(plane.keys()) == {
         (0, 4), (2, -5), (0, 5), (0, 7),
     }
+
+    # Check illegal values don't error.
+    assert "ab" not in plane.keys()
+    assert (1, ) not in plane.keys()
+    assert (3, 4, 5) not in plane.keys()
 
     assert 1 in plane.values()
     assert 45 not in plane.values()
@@ -99,7 +103,10 @@ def test_views() -> None:
     assert ((0, 5), 3) in plane.items()
     assert ((2, -5), 4) not in plane.items()
     assert ((3, 4), 2) not in plane.items()
-    assert 45 not in plane.items()  # Invalid tuple
+    # Check illegal values don't error.
+    assert 45 not in plane.items()
+    assert (1, ) not in plane.items()
+    assert (1, 2, 3, 4) not in plane.items()
 
     # Check keys, values, items is in the same order.
     assert list(zip(plane.keys(), plane.values())) == list(plane.items())
