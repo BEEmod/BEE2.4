@@ -11,7 +11,7 @@ import consts
 import srctools.logger
 from precomp.conditions import make_result
 from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_one
+from precomp.instanceLocs import resolve_one, resolve
 from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 
 
@@ -43,14 +43,19 @@ HOLES: Dict[
 ] = {}
 
 
-def get_pos_norm(origin: Vec):
+def get_pos_norm(origin: Vec) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
 def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
-    """Remove instances from the map, and store off the positions."""
+    """Find all glass/grating in the map.
+
+    This removes the per-tile instances, and all original brushwork.
+    The frames are updated with a fixup var, as appropriate.
+    """
+    frame_inst = resolve('[glass_frames]', silent=True)
     glass_inst = resolve_one('[glass_128]')
 
     pos = None
@@ -82,6 +87,14 @@ def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
         filename = inst['file'].casefold()
         if filename == glass_inst:
             inst.remove()
+        elif filename in frame_inst:
+            # Add a fixup to allow distinguishing the type.
+            pos = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm = Vec(z=-1) @ Angle.from_str(inst['angles'])
+            try:
+                inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = BARRIERS[pos.as_tuple(), norm.as_tuple()].value
+            except KeyError:
+                LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
     if options.get(str, 'glass_pack') and has_attr['glass']:
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
@@ -392,6 +405,12 @@ def make_barriers(vmf: VMF):
                 front_temp,
                 solid_pane_func,
             )
+            # Generate hint brushes, to ensure sorting is done correctly.
+            [hint] = solid_pane_func(0, 4.0, consts.Tools.SKIP)
+            for side in hint:
+                if abs(Vec.dot(side.normal(), normal)) > 0.99:
+                    side.mat = consts.Tools.HINT
+            vmf.add_brush(hint)
 
     if floorbeam_temp:
         LOGGER.info('Adding Glass floor beams...')
@@ -431,10 +450,8 @@ def make_glass_grating(
     # The actual glass/grating brush - 0.5-1.5 units back from the surface.
     main_ent.solids = solid_func(0.5, 1.5, consts.Tools.NODRAW)
 
-    abs_norm = abs(normal)
     for face in main_ent.sides():
-        f_normal = face.normal()
-        if abs(f_normal) == abs_norm:
+        if abs(Vec.dot(normal, face.normal())) > 0.99:
             texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
             front_temp.apply(face, change_mat=False)
 
@@ -526,8 +543,8 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 if our_group is neigh_group:
                     continue
 
-                # Now merge the two lists. We then need to update all dict locs
-                # to point to the new list.
+                # Now merge the two lists. We then need to update all dict
+                # locations to point to the new list.
 
                 if len(neigh_group) > len(our_group):
                     small_group, large_group = our_group, neigh_group
@@ -547,10 +564,8 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     # Side -> u, v or None
 
     for group in groups:
-
         bbox_min, bbox_max = Vec.bbox(group)
         dimensions = bbox_max - bbox_min
-        LOGGER.info('Size = {}', dimensions)
 
         # Our beams align to the smallest axis.
         if dimensions.y > dimensions.x:
@@ -564,7 +579,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
 
         # Build min, max tuples for each axis in the other direction.
         # This tells us where the beams will be.
-        beams: Dict[int, Tuple[int, int]] = {}
+        beams: dict[float, tuple[float, float]] = {}
 
         # Add 128 so the first pos isn't a beam.
         offset = bbox_min[side_ax] + 128

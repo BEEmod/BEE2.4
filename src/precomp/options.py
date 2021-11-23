@@ -29,7 +29,7 @@ class TYPE(Enum):
     def convert(self, value: str) -> Any:
         """Convert a string to the desired argument type."""
         return self.value(value)
-    
+
 TYPE_NAMES = {
     TYPE.STR: 'Text',
     TYPE.INT: 'Whole Number',
@@ -150,7 +150,7 @@ def set_opt(opt_name: str, value: str) -> None:
 
 
 def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
-    """Get the given option. 
+    """Get the given option.
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
 
@@ -171,7 +171,7 @@ def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
         expected_type = str
     else:
         enum_type = None
-        
+
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
         raise ValueError('Option "{}" is {} (expected {})'.format(
@@ -267,7 +267,7 @@ This is a list of all current options for the config.
 def dump_info(file: TextIO) -> None:
     """Create the wiki page for item options, given a file to write to."""
     print(DOC_HEADER, file=file)
-    
+
     for opt in DEFAULTS:
         if opt.default is None:
             default = ''
@@ -276,7 +276,7 @@ def dump_info(file: TextIO) -> None:
         else:
             default = ' = `' + repr(opt.default) + '`'
         file.write(INFO_DUMP_FORMAT.format(
-            id=opt.name, 
+            id=opt.name,
             default=default,
             type=TYPE_NAMES[opt.type],
             desc='\n'.join(opt.doc),
@@ -292,9 +292,6 @@ DEFAULTS = [
     Opt('remove_info_lighting', False,
         """Remove the glass/grating info_lighting entities.
         This should be used when the border is made of brushes.
-        """),
-    Opt('remove_exit_signs', False,
-        """Remove the exit sign overlays for singleplayer.
         """),
 
     Opt('_tiling_template_', '__TILING_TEMPLATE__',
@@ -423,6 +420,26 @@ DEFAULTS = [
     Opt('signPack', TYPE.STR,
         """Packlist to use when `signInst` is added.
         """),
+    Opt('signExitInst', TYPE.STR,
+        """Use an instance for a double exit sign instead of overlays.
+        
+        The instance is placed at the midpoint of the two overlays, and two vars
+        are set:
+        - $orient is set to "horizontal" or "vertical" to indicate if the pair
+          is positioned horizontally or vertically.
+        - $arrow is set to "north", "south", "east" or "west" to indicate the 
+          direction the arrow should point relative to the sign.
+        """),
+    Opt('remove_exit_signs', False,
+        """Remove the exit sign overlays for singleplayer.
+        
+        This does not apply if signExitInst is set and the overlays are next to
+        each other.
+        """),
+    Opt('remove_exit_signs_dual', True,
+        """Remove the exit sign overlays if signExitInst is set and they're 
+        next to each other.
+        """),
 
     Opt('broken_antline_chance', 0.0,
         """The chance an antline will be 'broken'.
@@ -470,6 +487,11 @@ DEFAULTS = [
 
         It should be a single brush cube - the wall is set to the same
         rotation as the matching side. (The bottom is ignored).
+        """),
+    Opt('generate_tidelines', False,
+        """Generate tideline overlays around the outside of goo pits.
+        
+        The material used is configured by `overlays.tideline`.
         """),
 
     Opt('glass_floorbeam_temp', TYPE.STR,
@@ -526,7 +548,7 @@ DEFAULTS = [
 
         This shouldn't need to be changed.
         """),
-    
+
     Opt('global_pti_ents_loc', Vec(-2400, -2800, 0),
         """Location of global_pti_ents.
 

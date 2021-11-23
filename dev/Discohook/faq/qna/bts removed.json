@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - BTS Removed",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Why is BTS being removed?",
+                "description": "The BTS style was made back before BEE2.4, and our direction has long since changed. The style doesn't work in the Puzzlemaker and it has become increasingly difficult to maintain and develop. As such, we've decided that it's best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it, but it would likely take on a different form, and nothing regarding this is being worked on right now.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

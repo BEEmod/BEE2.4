@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Supported Games",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "What games does BEE2.4 support?",
+                "description": "BEE2.4 supports Portal 2 and Aperture Tag. Thinking With Time Machine support is planned, but not yet implemented. (BEE2.4 can be used with TWTM, but you will not have the time machine and several other things will be broken.) Destroyed Aperture support is also planned once that mod is released.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

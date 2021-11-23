@@ -1,37 +1,45 @@
-from typing import List
+"""Style specific features which can be enabled or disabled."""
+from __future__ import annotations
 
-import srctools
 from packages import PakObject, Style, ParseData, ExportData
-from srctools import Property
+from srctools import Property, bool_as_int
 
 
-class StyleVar(PakObject, allow_mult=True, has_img=False):
+class StyleVar(PakObject, allow_mult=True):
+    """Style specific features which can be enabled or disabled."""
     def __init__(
         self,
         var_id: str,
         name: str,
-        styles: List[str],
+        styles: list[str],
         unstyled: bool=False,
+        inherit: bool=True,
         default: bool=False,
         desc: str='',
-    ):
+    ) -> None:
         self.id = var_id
         self.name = name
         self.default = default
         self.enabled = default
         self.desc = desc
-        if unstyled:
-            self.styles = None
-        else:
-            self.styles = styles
+        self.inherit = inherit
+        self.styles = None if unstyled else styles
 
     @classmethod
-    def parse(cls, data: 'ParseData') -> 'StyleVar':
+    def unstyled(cls, id: str, name: str, default: bool, desc: str) -> StyleVar:
+        """For builtin variables, define it as fully unstyled."""
+        return cls(id, name, [], True, False, default, desc)
+
+    @property
+    def is_unstyled(self) -> bool:
+        """check if the variable is unstyled."""
+        return self.styles is None
+
+    @classmethod
+    async def parse(cls, data: ParseData) -> StyleVar:
         """Parse StyleVars from configs."""
         name = data.info['name', '']
 
-        unstyled = data.info.bool('unstyled')
-        default = data.info.bool('enabled')
         styles = [
             prop.value
             for prop in
@@ -46,12 +54,13 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             data.id,
             name,
             styles,
-            unstyled=unstyled,
-            default=default,
+            unstyled=data.info.bool('unstyled'),
+            inherit=data.info.bool('inherit', True),
+            default=data.info.bool('enabled'),
             desc=desc,
         )
 
-    def add_over(self, override: 'StyleVar') -> None:
+    def add_over(self, override: StyleVar) -> None:
         """Override a stylevar to add more compatible styles."""
         # Setting it to be unstyled overrides any other values!
         if self.styles is None:
@@ -75,25 +84,23 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
                 self.desc = override.desc
 
     def __repr__(self) -> str:
-        return '<Stylevar "{}", name="{}", default={}, styles={}>:\n{}'.format(
-            self.id,
-            self.name,
-            self.default,
-            self.styles,
-            self.desc,
+        return (
+            f'<Stylevar "{self.id}", name="{self.name}", '
+            f'default={self.default}, '
+            f'styles={self.styles}>:\n{self.desc}'
         )
 
     def applies_to_style(self, style: Style) -> bool:
         """Check to see if this will apply for the given style.
 
         """
-        if self.styles is None:
-            return True  # Unstyled stylevar
+        if self.is_unstyled:
+            return True
 
         if style.id in self.styles:
             return True
 
-        return any(
+        return self.inherit and any(
             base.id in self.styles
             for base in
             style.bases
@@ -101,7 +108,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
 
     def applies_to_all(self) -> bool:
         """Check if this applies to all styles."""
-        if self.styles is None:
+        if self.is_unstyled:
             return True
 
         for style in Style.all():
@@ -116,9 +123,8 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         The .selected attribute is a dict mapping ids to the boolean value.
         """
         # Add the StyleVars block, containing each style_var.
-
         exp_data.vbsp_conf.append(Property('StyleVars', [
-            Property(key, srctools.bool_as_int(val))
+            Property(key, bool_as_int(val))
             for key, val in
             exp_data.selected.items()
         ]))

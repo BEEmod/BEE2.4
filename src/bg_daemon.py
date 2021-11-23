@@ -66,7 +66,7 @@ class BaseLoadScreen:
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
         self.win.attributes('-topmost', int(force_ontop))
-        self.win['cursor'] = utils.CURSORS['wait']
+        self.win['cursor'] = tk_tools.Cursors.WAIT
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
 
@@ -98,11 +98,11 @@ class BaseLoadScreen:
         """Record offset of mouse on click."""
         self.drag_x = event.x
         self.drag_y = event.y
-        self.win['cursor'] = utils.CURSORS['move_item']
+        self.win['cursor'] = tk_tools.Cursors.MOVE_ITEM
 
     def move_stop(self, event: tk.Event):
         """Clear values when releasing."""
-        self.win['cursor'] = utils.CURSORS['wait']
+        self.win['cursor'] = tk_tools.Cursors.WAIT
         self.drag_x = self.drag_y = None
 
     def move_motion(self, event: tk.Event):
@@ -144,8 +144,11 @@ class BaseLoadScreen:
 
     def op_set_length(self, stage: str, num: int) -> None:
         """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.update_stage(stage)
+        if num == 0:
+            self.op_skip_stage(stage)
+        else:
+            self.maxes[stage] = num
+            self.update_stage(stage)
 
     def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
@@ -172,19 +175,19 @@ class LoadScreen(BaseLoadScreen):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.frame = ttk.Frame(self.win, cursor=utils.CURSORS['wait'])
+        self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
 
         ttk.Label(
             self.frame,
             text=self.title_text + '...',
             font=("Helvetica", 12, "bold"),
-            cursor=utils.CURSORS['wait'],
+            cursor=tk_tools.Cursors.WAIT,
         ).grid(row=0, column=0)
         ttk.Separator(
             self.frame,
             orient=tk.HORIZONTAL,
-            cursor=utils.CURSORS['wait'],
+            cursor=tk_tools.Cursors.WAIT,
         ).grid(row=1, sticky="EW", columnspan=2)
 
         ttk.Button(
@@ -203,7 +206,7 @@ class LoadScreen(BaseLoadScreen):
                 ttk.Label(
                     self.frame,
                     text=stage_name + ':',
-                    cursor=utils.CURSORS['wait'],
+                    cursor=tk_tools.Cursors.WAIT,
                 ).grid(
                     row=ind * 2 + 2,
                     columnspan=2,
@@ -216,12 +219,12 @@ class LoadScreen(BaseLoadScreen):
                 length=210,
                 maximum=1000,
                 variable=self.bar_var[st_id],
-                cursor=utils.CURSORS['wait'],
+                cursor=tk_tools.Cursors.WAIT,
             )
             self.labels[st_id] = ttk.Label(
                 self.frame,
                 text='0/??',
-                cursor=utils.CURSORS['wait'],
+                cursor=tk_tools.Cursors.WAIT,
             )
             self.bars[st_id].grid(row=ind * 2 + 3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind * 2 + 2, column=1, sticky="E")
@@ -287,8 +290,6 @@ class SplashScreen(BaseLoadScreen):
             size=-12,  # negative = in pixels
         )
 
-        logo_img = img.png('BEE2/splash_logo')
-
         self.lrg_canvas = tk.Canvas(self.win)
         self.sml_canvas = tk.Canvas(
             self.win,
@@ -297,12 +298,6 @@ class SplashScreen(BaseLoadScreen):
 
         sml_width = int(min(self.win.winfo_screenwidth() * 0.5, 400))
         sml_height = int(min(self.win.winfo_screenheight() * 0.5, 175))
-
-        self.lrg_canvas.create_image(
-            10, 10,
-            anchor='nw',
-            image=logo_img,
-        )
 
         self.sml_canvas.create_text(
             sml_width / 2, 30,
@@ -414,7 +409,7 @@ class SplashScreen(BaseLoadScreen):
         for canvas, width, height in self.canvas:
             canvas['width'] = width
             canvas['height'] = height
-            canvas.bind(utils.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
+            canvas.bind(tk_tools.EVENTS['LEFT_DOUBLE'], self.toggle_compact)
 
             canvas.create_rectangle(
                 width-20,
@@ -481,14 +476,18 @@ class SplashScreen(BaseLoadScreen):
                 )
 
     def update_stage(self, stage):
-        text = '{}: ({}/{})'.format(
-            self.names[stage],
-            self.values[stage],
-            self.maxes[stage],
-        )
+        if self.maxes[stage] == 0:
+            text = f'{self.names[stage]}: (0/0)'
+            self.set_bar(stage, 1)
+        else:
+            text = (
+                f'{self.names[stage]}: '
+                f'({self.values[stage]}/{self.maxes[stage]})'
+            )
+            self.set_bar(stage, self.values[stage] / self.maxes[stage])
+
         self.sml_canvas.itemconfig('text_' + stage, text=text)
         self.lrg_canvas.itemconfig('text_' + stage, text=text)
-        self.set_bar(stage, self.values[stage] / self.maxes[stage])
 
     def set_bar(self, stage, fraction):
         """Set a progress bar to this fractional length."""
@@ -512,7 +511,7 @@ class SplashScreen(BaseLoadScreen):
             canvas.delete('tick_' + stage)
 
             if num == 0:
-                return  # No ticks
+                continue  # No ticks
 
             # Draw the ticks in...
             _, y1, _, y2 = canvas.coords('bar_' + stage)
@@ -665,7 +664,7 @@ class LogWindow:
             sel_frame,
             name='level_selector',
             values=translations['level_text'],
-            exportselection=0,
+            exportselection=False,
             # On Mac this defaults to being way too wide!
             width=15 if utils.MAC else None,
         )
@@ -676,9 +675,9 @@ class LogWindow:
         self.level_selector.grid(row=0, column=1, sticky='E')
         sel_frame.columnconfigure(1, weight=1)
 
-        utils.add_mousewheel(self.text, window, sel_frame, button_frame)
+        tk_tools.add_mousewheel(self.text, window, sel_frame, button_frame)
 
-        if utils.USE_SIZEGRIP:
+        if tk_tools.USE_SIZEGRIP:
             ttk.Sizegrip(button_frame).grid(row=0, column=3)
 
     def log(self, level_name: str, text: str) -> None:
@@ -770,34 +769,44 @@ def run_background(
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
-        while PIPE_REC.poll():  # Pop off all the values.
-            had_values = True
-            operation, scr_id, args = PIPE_REC.recv()
-            if operation == 'init':
-                # Create a new loadscreen.
-                is_main, title, stages = args
-                screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
-                SCREENS[scr_id] = screen
-            elif operation == 'set_force_ontop':
-                [force_ontop] = args
-                for screen in SCREENS.values():
-                    screen.win.attributes('-topmost', force_ontop)
-            else:
-                try:
-                    func = getattr(SCREENS[scr_id], 'op_' + operation)
-                except AttributeError:
-                    raise ValueError(f'Bad command "{operation}"!')
-                try:
-                    func(*args)
-                except Exception:
-                    raise Exception(operation)
-        while log_pipe_rec.poll():
-            log_window.handle(log_pipe_rec.recv())
+        try:
+            while PIPE_REC.poll():  # Pop off all the values.
+                had_values = True
+                operation, scr_id, args = PIPE_REC.recv()
+                if operation == 'init':
+                    # Create a new loadscreen.
+                    is_main, title, stages = args
+                    screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
+                    SCREENS[scr_id] = screen
+                elif operation == 'quit_daemon':
+                    # Shutdown.
+                    TK_ROOT.quit()
+                    return
+                elif operation == 'set_force_ontop':
+                    [force_ontop] = args
+                    for screen in SCREENS.values():
+                        screen.win.attributes('-topmost', force_ontop)
+                else:
+                    try:
+                        func = getattr(SCREENS[scr_id], 'op_' + operation)
+                    except AttributeError:
+                        raise ValueError(f'Bad command "{operation}"!')
+                    try:
+                        func(*args)
+                    except Exception:
+                        raise Exception(operation)
+            while log_pipe_rec.poll():
+                log_window.handle(log_pipe_rec.recv())
+        except BrokenPipeError:
+            # A pipe failed, means the main app quit. Terminate ourselves.
+            print('BG: Lost pipe!')
+            TK_ROOT.quit()
+            return
 
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
         # Otherwise we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
-    
+
     TK_ROOT.after(10, check_queue)
     TK_ROOT.mainloop()  # Infinite loop, until the entire process tree quits.

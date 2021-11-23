@@ -21,32 +21,36 @@ value:
     * VMF to recieve the overall map.
     * Entity to recieve the current instance.
     * Property to recieve keyvalues configuration.
+
+If the entity is not provided, the first time the result/flag is called it
+can return a callable which will instead be called with each entity. This allows
+only parsing configuration options once, and is expected to be used with a
+closure.
 """
+from __future__ import annotations
 import inspect
 import io
-import itertools
+import importlib
 import math
-import random
+import pkgutil
+import sys
+import typing
+import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
+from typing import Generic, TypeVar, Any, Callable, TextIO
 
-from typing import (
-    Callable, Any, Iterable, Optional,
-    Dict, List, Tuple, TypeVar,
-    Union,
-    Set,
-    TextIO,
-)
+import attr
 
-from precomp import instanceLocs
+from precomp import instanceLocs, rand
 import consts
 import srctools.logger
 import utils
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Angle,
+    VMF, Entity, Output, Solid, Angle, Matrix,
 )
 
 
@@ -54,19 +58,23 @@ COND_MOD_NAME = 'Main Conditions'
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
-# Stuff we get from VBSP in init()
-GLOBAL_INSTANCES = set()  # type: Set[str]
-ALL_INST = set()  # type: Set[str]
+# The global instance filenames we add.
+GLOBAL_INSTANCES: set[str] = set()
+# All instances that have been placed in the map at any point.
+# Pretend empty-string is there, so we don't flag it.
+ALL_INST: set[str] = {''}
 
-conditions: List['Condition'] = []
-FLAG_LOOKUP = {}  # type: Dict[str, Callable[[srctools.VMF, Entity, Property], bool]]
-RESULT_LOOKUP = {}  # type: Dict[str, Callable[[srctools.VMF, Entity, Property], object]]
-RESULT_SETUP = {}  # type: Dict[str, Callable[[srctools.VMF, Property], object]]
+conditions: list[Condition] = []
+FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
+RESULT_LOOKUP: dict[str, CondCall[object]] = {}
+
+# For legacy setup functions.
+RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
 # Used to dump a list of the flags, results, meta-conditions
-ALL_FLAGS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
-ALL_RESULTS = []  # type: List[Tuple[str, Iterable[str], Callable[[srctools.VMF, Entity, Property], bool]]]
-ALL_META = []  # type: List[Tuple[str, Decimal, Callable[[srctools.VMF], None]]]
+ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
 
 
 class SWITCH_TYPE(Enum):
@@ -156,54 +164,40 @@ class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
+class Unsatisfiable(Exception):
+    """Raised by flags to indicate they currently will always be false with all instances.
+
+    For example, an instance result when that instance currently isn't present.
+    """
+    pass
+
 # Flag to indicate a result doesn't need to be executed anymore,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
 
 
+@attr.define
 class Condition:
     """A single condition which may be evaluated."""
-    __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
-
-    def __init__(
-        self,
-        flags: List[Property]=None,
-        results: List[Property]=None,
-        else_results: List[Property]=None,
-        priority: Decimal=Decimal(),
-        source: str=None,
-    ) -> None:
-        self.flags = flags or []
-        self.results = results or []
-        self.else_results = else_results or []
-        self.priority = priority
-        self.source = source
-
-    def __repr__(self) -> str:
-        return (
-            'Condition(flags={!r}, '
-            'results={!r}, else_results={!r}, '
-            'priority={!r}'
-        ).format(
-            self.flags,
-            self.results,
-            self.else_results,
-            self.priority,
-        )
+    flags: list[Property] = attr.Factory(list)
+    results: list[Property] = attr.Factory(list)
+    else_results: list[Property] = attr.Factory(list)
+    priority: Decimal = Decimal()
+    source: str = None
 
     @classmethod
-    def parse(cls, prop_block: Property) -> 'Condition':
+    def parse(cls, prop_block: Property) -> Condition:
         """Create a condition from a Property block."""
-        flags = []  # type: List[Property]
-        results = []  # type: List[Property]
-        else_results = []  # type: List[Property]
+        flags: list[Property] = []
+        results: list[Property] = []
+        else_results: list[Property] = []
         priority = Decimal()
         source = None
         for prop in prop_block:
             if prop.name == 'result':
-                results.extend(prop.value)  # join multiple ones together
+                results.extend(prop)  # join multiple ones together
             elif prop.name == 'else':
-                else_results.extend(prop.value)
+                else_results.extend(prop)
             elif prop.name == '__src__':
                 # Value injected by the BEE2 export, this specifies
                 # the original source of the config.
@@ -226,7 +220,7 @@ class Condition:
             else:
                 flags.append(prop)
 
-        return cls(
+        return Condition(
             flags,
             results,
             else_results,
@@ -234,46 +228,11 @@ class Condition:
             source,
         )
 
-    def setup(self, vmf: VMF) -> None:
-        """Some results need some pre-processing before they can be used.
-
-        """
-        for res in self.results[:]:
-            self.setup_result(vmf, self.results, res, self.source)
-
-        for res in self.else_results[:]:
-            self.setup_result(vmf, self.else_results, res, self.source)
-
     @staticmethod
-    def setup_result(vmf: VMF, res_list: List[Property], result: Property, source: Optional[str]='') -> None:
-        """Helper method to perform result setup."""
-        func = RESULT_SETUP.get(result.name)
-        if func:
-            # noinspection PyBroadException
-            try:
-                result.value = func(vmf, result)
-            except Exception:
-                # Print the source of the condition if if fails...
-                LOGGER.exception(
-                    'Error in {} setup:',
-                    source or 'condition',
-                )
-                if utils.DEV_MODE:
-                    # Crash so this is immediately noticeable..
-                    utils.quit_app(1)
-                else:
-                    # In release, just skip this one - that way it's
-                    # still hopefully possible to run the game.
-                    result.value = None
-            if result.value is None:
-                # This result is invalid, remove it.
-                res_list.remove(result)
-
-    @staticmethod
-    def test_result(inst: Entity, res: Property) -> Union[bool, object]:
+    def test_result(inst: Entity, res: Property) -> bool | object:
         """Execute the given result."""
         try:
-            func = RESULT_LOOKUP[res.name]
+            cond_call = RESULT_LOOKUP[res.name]
         except KeyError:
             err_msg = '"{name}" is not a valid condition result!'.format(
                 name=res.real_name,
@@ -286,13 +245,20 @@ class Condition:
                 # Delete this so it doesn't re-fire..
                 return RES_EXHAUSTED
         else:
-            return func(inst.map, inst, res)
+            return cond_call(inst, res)
 
     def test(self, inst: Entity) -> None:
-        """Try to satisfy this condition on the given instance."""
+        """Try to satisfy this condition on the given instance.
+
+        If we find that no instance will succeed, raise Unsatisfiable.
+        """
         success = True
-        for flag in self.flags:
-            if not check_flag(inst.map, flag, inst):
+        # Only the first one can cause this condition to be skipped.
+        # We could have a situation where the first flag modifies the map
+        # such that it becomes satisfiable later, so this would be premature.
+        # If we have else results, we also can't skip because those could modify state.
+        for i, flag in enumerate(self.flags):
+            if not check_flag(flag, inst, can_skip=i==0 and not self.else_results):
                 success = False
                 break
         results = self.results if success else self.else_results
@@ -308,35 +274,66 @@ AnnCallT = TypeVar('AnnCallT')
 def annotation_caller(
     func: Callable[..., AnnCallT],
     *parms: type,
-) -> Callable[..., AnnCallT]:
+) -> tuple[Callable[..., AnnCallT], list[type]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
-    called with. func's arguments should be positional, and be annotated
-    with the same types. A wrapper will be returned which can be called
-    with the parms arguments, but delegates to func. (This could be the
-    function itself).
+    called with.
+
+    func's arguments should be positional, and be annotated
+    with the same types.
+
+    A wrapper will be returned which can be called
+    with arguments in order of parms, but delegates to func.
+    The actual argument order is also returned.
     """
+    # We can't take keyword arguments, or the varargs.
     allowed_kinds = [
         inspect.Parameter.POSITIONAL_ONLY,
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
     ]
-    type_to_parm = dict.fromkeys(parms, None)  # type: Dict[object, Optional[str]]
+
+    # For forward references and 3.7+ stringified arguments.
+
+    # Remove 'return' temporarily so we don't parse that, since we don't care.
+    ann = getattr(func, '__annotations__', None)
+    if ann is not None:
+        return_val = ann.pop('return', allowed_kinds)  # Sentinel
+    else:
+        return_val = None
+    try:
+        hints = typing.get_type_hints(func)
+    except Exception:
+        LOGGER.exception(
+            'Could not compute type hints for function {}.{}!',
+            getattr(func, '__module__', '<no module>'),
+            func.__qualname__,
+        )
+        sys.exit(1)  # Suppress duplicate exception capture.
+    finally:
+        if ann is not None and return_val is not allowed_kinds:
+            ann['return'] = return_val
+
+    ann_order: list[type] = []
+
+    # type -> parameter name.
+    type_to_parm: dict[type, str | None] = dict.fromkeys(parms, None)
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
         ann = parm.annotation
         if isinstance(ann, str):
-            ann = eval(ann)
+            ann = hints[parm.name]
         if parm.kind not in allowed_kinds:
-            raise ValueError('Parameter kind "{}" is not allowed!'.format(parm.kind))
+            raise ValueError(f'Parameter kind "{parm.kind}" is not allowed!')
         if ann is inspect.Parameter.empty:
-            raise ValueError('Parameters must have value!')
+            raise ValueError('Parameters must have an annotation!')
         try:
             if type_to_parm[ann] is not None:
-                raise ValueError('Parameter {} used twice!'.format(ann))
+                raise ValueError(f'Parameter {ann} used twice!')
         except KeyError:
-            raise ValueError('Unknown potential type {!r}'.format(ann))
+            raise ValueError(f'Unknown potential type {ann!r}!')
         type_to_parm[ann] = parm.name
+        ann_order.append(ann)
     inputs = []
     outputs = ['_'] * len(sig.parameters)
     # Parameter -> letter in func signature
@@ -356,7 +353,7 @@ def annotation_caller(
 
     if inputs == outputs:
         # Matches already, don't need to do anything.
-        return func
+        return func, ann_order
 
     # Double function to make a closure, to allow reference to the function
     # more directly.
@@ -380,10 +377,110 @@ def annotation_caller(
         )
     except AttributeError:
         pass
-    return reorder_func
+    return reorder_func, ann_order
 
 
-def add_meta(func, priority: Union[Decimal, int], only_once=True):
+CallResultT = TypeVar('CallResultT')
+
+
+def conv_setup_pair(
+    setup: Callable[..., Any],
+    result: Callable[..., CallResultT],
+) -> Callable[
+    [srctools.VMF, Property],
+    Callable[[Entity], CallResultT]
+]:
+    """Convert the old explict setup function into a new closure."""
+    setup_wrap, ann_order = annotation_caller(
+        setup,
+        srctools.VMF, Property,
+    )
+    result_wrap, ann_order = annotation_caller(
+        result,
+        srctools.VMF, Entity, Property,
+    )
+
+    def func(vmf: srctools.VMF, prop: Property):
+        """Replacement function which performs the legacy behaviour."""
+        # The old system for setup functions - smuggle them in by
+        # setting Property.value to an arbitrary object.
+        smuggle = Property(prop.real_name, setup_wrap(vmf, prop))
+
+        def closure(ent: Entity) -> object:
+            """Use the closure to store the smuggled setup data."""
+            return result_wrap(vmf, ent, smuggle)
+
+        return closure
+
+    func.__doc__ = result.__doc__
+    return func
+
+
+class CondCall(Generic[CallResultT]):
+    """A result or flag callback.
+
+    This should be called to execute it.
+    """
+    __slots__ = ['func', 'group', '_cback', '_setup_data']
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
+
+    def __init__(
+        self,
+        func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
+        group: str,
+    ):
+        self.func = func
+        self.group = group
+        self._cback, arg_order = annotation_caller(
+            func,
+            srctools.VMF, Entity, Property,
+        )
+        if Entity not in arg_order:
+            # We have setup functions.
+            self._setup_data = {}
+        else:
+            self._setup_data = None
+
+    def __call__(self, ent: Entity, conf: Property) -> CallResultT:
+        """Execute the callback."""
+        if self._setup_data is None:
+            return self._cback(ent.map, ent, conf)
+        else:
+            # Execute setup functions if required.
+            try:
+                cback = self._setup_data[id(conf)]
+            except KeyError:
+                # The None here is the entity, which is always unused
+                # for setup functions!
+                cback = self._setup_data[id(conf)] = self._cback(ent.map, None, conf)
+
+            if not callable(cback):
+                # We don't actually have a setup func,
+                # this func just doesn't care about entities.
+                # Fix this incorrect assumption, then return
+                # the result.
+                self._setup_data = None
+                return cback
+
+            return cback(ent)
+
+    @property
+    def __doc__(self) -> str | None:
+        """Description of the callback's behaviour."""
+        return self.func.__doc__
+
+
+def _get_cond_group(func: Any) -> str:
+    """Get the condition group hint for a function."""
+    try:
+        return func.__globals__['COND_MOD_NAME']
+    except KeyError:
+        group = func.__globals__['__name__']
+        LOGGER.info('No name for module "{}"!', group)
+        return group
+
+
+def add_meta(func, priority: Decimal | int, only_once=True):
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -400,11 +497,12 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
         dec_priority,
     )
 
-    RESULT_LOOKUP[name] = annotation_caller(func, srctools.VMF, Entity, Property)
+    # We don't care about setup functions for this.
+    RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
 
     cond = Condition(
         results=[Property(name, '')],
-        priority=Decimal(dec_priority),
+        priority=dec_priority,
         source='MetaCondition {}'.format(name)
     )
 
@@ -413,10 +511,10 @@ def add_meta(func, priority: Union[Decimal, int], only_once=True):
             Property('endCondition', '')
         )
     conditions.append(cond)
-    ALL_META.append((name, dec_priority, func))
+    ALL_META.append((name, dec_priority, wrapper))
 
 
-def meta_cond(priority=0, only_once=True):
+def meta_cond(priority: int=0, only_once: bool=True):
     """Decorator version of add_meta."""
     def x(func):
         add_meta(func, priority, only_once)
@@ -427,16 +525,8 @@ def meta_cond(priority=0, only_once=True):
 def make_flag(orig_name: str, *aliases: str):
     """Decorator to add flags to the lookup."""
     def x(func):
-        try:
-            func.group = func.__globals__['COND_MOD_NAME']
-        except KeyError:
-            func.group = func.__globals__['__name__']
-            LOGGER.info('No name for module "{}"!', func.group)
-
-        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
-        ALL_FLAGS.append(
-            (orig_name, aliases, func)
-        )
+        wrapper = CondCall(func, _get_cond_group(func))
+        ALL_FLAGS.append((orig_name, aliases, wrapper))
         FLAG_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
             FLAG_LOOKUP[name.casefold()] = wrapper
@@ -453,30 +543,42 @@ def make_result(orig_name: str, *aliases: str):
         if name.casefold() != folded_name
     ])
 
-    def x(func):
+    def x(result_func):
+        """Create the result when the function is supplied."""
+        # Legacy setup func support.
         try:
-            func.group = func.__globals__['COND_MOD_NAME']
+            setup_func = RESULT_SETUP.pop(orig_name.casefold())
         except KeyError:
-            func.group = func.__globals__['__name__']
-            LOGGER.info('No name for module "{}"!', func.group)
+            func = result_func
+            setup_func = None
+        else:
+            # Combine the legacy functions into one using a closure.
+            func = conv_setup_pair(setup_func, result_func)
 
-        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
-        ALL_RESULTS.append(
-            (orig_name, aliases, func)
-        )
-        RESULT_LOOKUP[folded_name] = wrapper
+        wrapper = CondCall(func, _get_cond_group(result_func))
+        RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
             RESULT_LOOKUP[name.casefold()] = wrapper
+        if setup_func is not None:
+            for name in aliases:
+                alias_setup = RESULT_SETUP.pop(name.casefold())
+                assert alias_setup is setup_func, alias_setup
+        ALL_RESULTS.append((orig_name, aliases, wrapper))
         return func
     return x
 
 
 def make_result_setup(*names: str):
-    """Decorator to do setup for this result."""
+    """Legacy setup function for results. This is no longer used."""
+    # Users can't do anything about this, don't bother them.
+    if utils.DEV_MODE:
+        warnings.warn('Use closure system instead.', DeprecationWarning, stacklevel=2)
+
     def x(func: Callable[..., Any]):
-        wrapper = annotation_caller(func, srctools.VMF, Property)
         for name in names:
-            RESULT_SETUP[name.casefold()] = wrapper
+            if name.casefold() in RESULT_LOOKUP:
+                raise ValueError('Legacy setup called after making result!')
+            RESULT_SETUP[name.casefold()] = func
         return func
     return x
 
@@ -488,49 +590,77 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(seed: str, inst_list: Set[str], vmf_file: VMF) -> None:
+def init(vmf: VMF) -> None:
     """Initialise the Conditions system."""
-    # Get a bunch of values from VBSP
-    global MAP_RAND_SEED
-    MAP_RAND_SEED = seed
-    ALL_INST.update(inst_list)
+    for inst in vmf.by_class['func_instance']:
+        ALL_INST.add(inst['file'].casefold())
 
     # Sort by priority, where higher = done later
     zero = Decimal(0)
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
+    # Check if any make_result_setup calls were done with no matching result.
+    if utils.DEV_MODE and RESULT_SETUP:
+        raise ValueError('Extra result_setup calls:\n' + '\n'.join([
+            f' - "{name}": {getattr(func, "__module__", "?")}.{func.__qualname__}()'
+            for name, func in RESULT_SETUP.items()
+        ]))
 
 
 def check_all(vmf: VMF) -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     LOGGER.info('-----------------------')
+    skipped_cond = 0
     for condition in conditions:
-        condition.setup(vmf)
-        for inst in vmf.by_class['func_instance']:
-            try:
-                condition.test(inst)
-            except NextInstance:
-                # This is raised to immediately stop running
-                # this condition, and skip to the next instance.
-                pass
-            except EndCondition:
-                # This is raised to immediately stop running
-                # this condition, and skip to the next condtion.
-                break
-            except:
-                # Print the source of the condition if if fails...
-                LOGGER.exception(
-                    'Error in {}:',
-                    condition.source or 'condition',
-                )
-                # Exit directly, so we don't print it again in the exception
-                # handler
-                utils.quit_app(1)
-            if not condition.results and not condition.else_results:
-                break  # Condition has run out of results, quit early
+        with srctools.logger.context(condition.source or ''):
+            for inst in vmf.by_class['func_instance']:
+                try:
+                    condition.test(inst)
+                except NextInstance:
+                    # NextInstance is raised to immediately stop running
+                    # this condition, and skip to the next instance.
+                    continue
+                except Unsatisfiable:
+                    # Unsatisfiable indicates this condition's flags will
+                    # never succeed, so just skip.
+                    skipped_cond += 1
+                    break
+                except EndCondition:
+                    # EndCondition is raised to immediately stop running
+                    # this condition, and skip to the next condition.
+                    break
+                except Exception:
+                    # Print the source of the condition if if fails...
+                    LOGGER.exception(
+                        'Error in {}:',
+                        condition.source or 'condition',
+                    )
+                    # Exit directly, so we don't print it again in the exception
+                    # handler
+                    utils.quit_app(1)
+                if not condition.results and not condition.else_results:
+                    break  # Condition has run out of results, quit early
+
+        if utils.DEV_MODE:
+            # Check ALL_INST is correct.
+            extra = GLOBAL_INSTANCES - ALL_INST
+            if extra:
+                LOGGER.warning('Extra global inst not in all inst: {}', extra)
+            for inst in vmf.by_class['func_instance']:
+                if inst['file'].casefold() not in ALL_INST:
+                    LOGGER.warning(
+                        'Condition "{}" '
+                        "doesn't add to in all_inst: {}!",
+                        condition.source,
+                        inst['file'],
+                    )
 
     LOGGER.info('---------------------')
-    LOGGER.info('Conditions executed!')
+    LOGGER.info(
+        'Conditions executed, {}/{} ({:.0%}) skipped!',
+        skipped_cond, len(conditions),
+        skipped_cond/len(conditions),
+    )
     import vbsp
     LOGGER.info('Map has attributes: {}', [
         key
@@ -538,19 +668,25 @@ def check_all(vmf: VMF) -> None:
         vbsp.settings['has_attr'].items()
         if value
     ])
+    # '' is always present, which sorts first, conveniently adding a \n at the start.
+    LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
     # Dynamically added by lru_cache()
     # noinspection PyUnresolvedReferences
-    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve.cache_info())
+    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve_cache_info())
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
-    """Determine the result for a condition flag."""
+def check_flag(flag: Property, inst: Entity, can_skip: bool = False) -> bool:
+    """Determine the result for a condition flag.
+
+    If can_skip is true, flags raising Unsatifiable will pass the exception through.
+    """
     name = flag.name
     # If starting with '!', invert the result.
     if name[:1] == '!':
         desired_result = False
+        can_skip = False  # This doesn't work.
         name = name[1:]
     else:
         desired_result = True
@@ -566,8 +702,15 @@ def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
             # Skip these conditions..
             return False
 
-    res = func(vmf, inst, flag)
-    return res == desired_result
+    try:
+        res = func(inst, flag)
+    except Unsatisfiable:
+        if can_skip:
+            raise
+        else:
+            return False
+    else:
+        return res is desired_result
 
 
 def import_conditions() -> None:
@@ -575,38 +718,14 @@ def import_conditions() -> None:
 
     This ensures everything gets registered.
     """
-    import importlib
-    import pkgutil
     # Find the modules in the conditions package.
-    # PyInstaller messes this up a bit.
-
-    if utils.FROZEN:
-        # This is the PyInstaller loader injected during bootstrap.
-        # See PyInstaller/loader/pyimod03_importers.py
-        # toc is a PyInstaller-specific attribute containing a set of
-        # all frozen modules.
-        loader = pkgutil.get_loader('precomp.conditions')
-        modules = [
-            module
-            for module in loader.toc
-            if module.startswith('precomp.conditions.')
-        ]  # type: List[str]
-    else:
-        # We can grab them properly.
-        modules = [
-            'precomp.conditions.' + module
-            for loader, module, is_package in
-            pkgutil.iter_modules(__path__)
-        ]
-
-    for module in modules:
+    for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
         # Import the module, then discard it. The module will run add_flag
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing {} ...', module)
-        importlib.import_module(module)
+        LOGGER.debug('Importing {} ...', module.name)
+        importlib.import_module(module.name)
     LOGGER.info('Imported all conditions modules!')
-
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
@@ -660,19 +779,21 @@ def dump_conditions(file: TextIO) -> None:
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
-        file.write('#### `{}` ({}):\n\n'.format(flag_key, priority))
+        file.write(f'#### `{flag_key}` ({priority}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 
     for lookup, name in [
-            (ALL_FLAGS, 'Flags'),
-            (ALL_RESULTS, 'Results'),
-            ]:
+        (ALL_FLAGS, 'Flags'),
+        (ALL_RESULTS, 'Results'),
+    ]:
         print('<!------->', file=file)
-        print('# ' + name, file=file)
+        print(f'# {name}', file=file)
         print('<!------->', file=file)
 
-        lookup_grouped = defaultdict(list)  # type: Dict[str, List[Tuple[str, Tuple[str, ...], Callable]]]
+        lookup_grouped: dict[str, list[
+            tuple[str, tuple[str, ...], CondCall]
+        ]] = defaultdict(list)
 
         for flag_key, aliases, func in lookup:
             group = getattr(func, 'group', 'ERROR')
@@ -700,14 +821,14 @@ def dump_conditions(file: TextIO) -> None:
             if group == '00special':
                 print(DOC_SPECIAL_GROUP, file=file)
             else:
-                print('### ' + group + '\n', file=file)
+                print(f'### {group}\n', file=file)
 
             LOGGER.info('Doing {} group...', group)
 
             for flag_key, aliases, func in funcs:
-                print('#### `{}`:\n'.format(flag_key), file=file)
+                print(f'#### `{flag_key}`:\n', file=file)
                 if aliases:
-                    print('**Aliases:** `' + '`, `'.join(aliases) + '`' + '  \n', file=file)
+                    print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
                 dump_func_docs(file, func)
                 file.write('\n')
 
@@ -721,39 +842,34 @@ def dump_func_docs(file: TextIO, func: Callable):
         print('**No documentation!**', file=file)
 
 
-def weighted_random(count: int, weights: str) -> List[int]:
-    """Generate random indexes with weights.
+def add_inst(
+    vmf: VMF,
+    *,
+    file: str,
+    origin: Vec | str,
+    angles: Angle | Matrix | str = '0 0 0',
+    targetname: str='',
+    fixup_style: int | str = '0',  # Default to Prefix.
+    no_fixup: bool = False,
+) -> Entity:
+    """Create and add a new instance at the specified position.
 
-    This produces a list intended to be fed to random.choice(), with
-    repeated indexes corresponding to the comma-separated weight values.
+    This provides defaults for parameters, and adds the filename to ALL_INST.
+    Values accept str in addition so they can be copied from existing keyvalues.
+
+    If no_fixup is set, it overrides fixup_style to None - this way it's a more clear
+    parameter for code.
     """
-    if weights == '':
-        # Empty = equal weighting.
-        return list(range(count))
-    if ',' not in weights:
-        LOGGER.warning('Invalid weight! ({})', weights)
-        return list(range(count))
+    ALL_INST.add(file.casefold())
+    return vmf.create_ent(
+        'func_instance',
+        origin=origin,
+        angles=angles,
+        targetname=targetname,
+        file=file,
+        fixup_style=fixup_style,
+    )
 
-    # Parse the weight
-    vals = weights.split(',')
-    weight = []
-    if len(vals) == count:
-        for i, val in enumerate(vals):
-            val = val.strip()
-            if val.isdecimal():
-                # repeat the index the correct number of times
-                weight.extend(
-                    [i] * int(val)
-                )
-            else:
-                # Abandon parsing
-                break
-    if len(weight) == 0:
-        LOGGER.warning('Failed parsing weight! ({!s})',weight)
-        weight = list(range(count))
-    # random.choice(weight) will now give an index with the correct
-    # probabilities.
-    return weight
 
 
 def add_output(inst: Entity, prop: Property, target: str) -> None:
@@ -772,10 +888,11 @@ def add_suffix(inst: Entity, suff: str) -> None:
     """
     file = inst['file']
     old_name, dot, ext = file.partition('.')
-    inst['file'] = ''.join((old_name, suff, dot, ext))
+    inst['file'] = new_filename = ''.join((old_name, suff, dot, ext))
+    ALL_INST.add(new_filename.casefold())
 
 
-def local_name(inst: Entity, name: Union[str, Entity]) -> str:
+def local_name(inst: Entity, name: str | Entity) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
@@ -807,7 +924,7 @@ def local_name(inst: Entity, name: Union[str, Entity]) -> str:
         raise ValueError('Unknown fixup style {}!'.format(fixup))
 
 
-def widen_fizz_brush(brush: Solid, thickness: float, bounds: Tuple[Vec, Vec]=None):
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=None):
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.
@@ -857,9 +974,9 @@ def set_ent_keys(
     block_name lets you change the 'keys' suffix on the prop_block name.
     ent can be any mapping.
     """
-    for prop in prop_block.find_key(block_name, []):
+    for prop in prop_block.find_block(block_name, or_blank=True):
         ent[prop.real_name] = resolve_value(inst, prop.value)
-    for prop in prop_block.find_key('Local' + block_name, []):
+    for prop in prop_block.find_block('Local' + block_name, or_blank=True):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -872,43 +989,22 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_value(inst: Entity, value: Union[str, T]) -> Union[str, T]:
-    """If a value starts with '$', lookup the associated var.
+def resolve_value(inst: Entity, value: str | T) -> str | T:
+    """If a value contains '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
-    If it starts with '!' (before '$'), invert boolean values.
+    If it starts with '!$', invert boolean values.
     """
     if not isinstance(value, str):
         return value
 
-    if value.startswith('!$'):
-        inverted = True
-        value = value[1:]
-    else:
-        inverted = False
-
-    if value.startswith('$'):
-        if value in inst.fixup:
-            value = inst.fixup[value]
-        else:
-            LOGGER.warning(
-                'Invalid fixup ({}) in the "{}" instance:\n{}',
-                value,
-                inst['targetname'],
-                inst,
-            )
-            value = ''
-
-    if inverted:
-        return srctools.bool_as_int(not srctools.conv_bool(value))
-    else:
-        return value
+    return inst.fixup.substitute(value, allow_invert=True)
 
 
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     """Retrieve an offset from an instance var. This allows several special values:
 
-    * $var to read from a variable
+    * Any $replace variables
     * <piston_start> or <piston> to get the unpowered position of a piston plat
     * <piston_end> to get the powered position of a piston plat
     * <piston_top> to get the extended position of a piston plat
@@ -916,7 +1012,7 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
 
     If scale is set, read values are multiplied by this, and zoff is added to Z.
     """
-    value = value.casefold()
+    value = inst.fixup.substitute(value).casefold()
     # Offset the overlay by the given distance
     # Some special placeholder values:
     if value == '<piston_start>' or value == '<piston>':
@@ -940,7 +1036,7 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
         )
     else:
         # Regular vector
-        offset = Vec.from_str(resolve_value(inst, value)) * scale
+        offset = Vec.from_str(value) * scale
     offset.z += zoff
 
     offset.localise(
@@ -949,27 +1045,6 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     )
 
     return offset
-
-
-def set_random_seed(inst: Entity, seed: str) -> None:
-    """Compute and set a random seed for a specific entity."""
-    from precomp import instance_traits
-
-    name = inst['targetname']
-    # The global instances like elevators always get the same name, or
-    # none at all so we cannot use those for the seed. Instead use the global
-    # seed.
-    if name == '' or 'preplaced' in instance_traits.get(inst):
-        import vbsp
-        random.seed('{}{}{}{}'.format(
-            vbsp.MAP_RAND_SEED, seed, inst['origin'], inst['angles'],
-        ))
-    else:
-        # We still need to use angles and origin, since things like
-        # fizzlers might not get unique names.
-        random.seed('{}{}{}{}'.format(
-            inst['targetname'], seed, inst['origin'], inst['angles']
-        ))
 
 
 @make_flag('debug')
@@ -1009,87 +1084,70 @@ def remove_blank_inst(inst: Entity) -> None:
         inst.remove()
 
 
-@make_result_setup('timedRelay')
-def res_timed_relay_setup(res: Property):
-    var = res['variable', consts.FixupVars.TIM_DELAY]
-    name = res['targetname']
-    disabled = res['disabled', '0']
-    flags = res['spawnflags', '0']
-
-    final_outs = [
-        Output.parse(subprop)
-        for prop in res.find_all('FinalOutputs')
-        for subprop in prop
-    ]
-
-    rep_outs = [
-        Output.parse(subprop)
-        for prop in res.find_all('RepOutputs')
-        for subprop in prop
-    ]
-
-    # Never use the comma seperator in the final output for consistency.
-    for out in itertools.chain(rep_outs, final_outs):
-        out.comma_sep = False
-
-    return var, name, disabled, flags, final_outs, rep_outs
-
-
 @make_result('timedRelay')
-def res_timed_relay(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
     """
-    var, name, disabled, flags, final_outs, rep_outs = res.value
+    delay_var = res['variable', consts.FixupVars.TIM_DELAY]
+    name = res['targetname']
+    disabled_var = res['disabled', '0']
+    flags = res['spawnflags', '0']
 
-    relay = vmf.create_ent(
-        classname='logic_relay',
-        spawnflags=flags,
-        origin=inst['origin'],
-        targetname=local_name(inst, name),
-    )
+    final_outs = [
+        Output.parse(prop)
+        for prop in res.find_children('FinalOutputs')
+    ]
 
-    relay['StartDisabled'] = (
-        inst.fixup[disabled]
-        if disabled.startswith('$') else
-        disabled
-    )
+    rep_outs = [
+        Output.parse(prop)
+        for prop in res.find_children('RepOutputs')
+    ]
 
-    delay = srctools.conv_float(
-        inst.fixup[var, '0']
-        if var.startswith('$') else
-        var
-    )
+    def make_relay(inst: Entity) -> None:
+        """Places the relay."""
+        relay = vmf.create_ent(
+            classname='logic_relay',
+            spawnflags=flags,
+            origin=inst['origin'],
+            targetname=local_name(inst, name),
+        )
 
-    for off in range(int(math.ceil(delay))):
-        for out in rep_outs:
-            new_out = out.copy()  # type: Output
+        relay['StartDisabled'] = inst.fixup.substitute(disabled_var, allow_invert=True)
+
+        delay = srctools.conv_float(inst.fixup.substitute(delay_var))
+
+        for off in range(int(math.ceil(delay))):
+            for out in rep_outs:
+                new_out = out.copy()
+                new_out.target = local_name(inst, new_out.target)
+                new_out.delay += off
+                new_out.comma_sep = False
+                relay.add_out(new_out)
+
+        for out in final_outs:
+            new_out = out.copy()
             new_out.target = local_name(inst, new_out.target)
-            new_out.delay += off
+            new_out.delay += delay
             new_out.comma_sep = False
             relay.add_out(new_out)
 
-    for out in final_outs:
-        new_out = out.copy()
-        new_out.target = local_name(inst, new_out.target)
-        new_out.delay += delay
-        new_out.comma_sep = False
-        relay.add_out(new_out)
-
-
-@make_result_setup('condition')
-def res_sub_condition_setup(vmf: VMF, res: Property):
-    """Setup the sub-condition."""
-    cond = Condition.parse(res)
-    cond.setup(vmf)
-    return cond
+    return make_relay
 
 
 @make_result('condition')
-def res_sub_condition(base_inst: Entity, res: Property):
+def res_sub_condition(res: Property):
     """Check a different condition if the outer block is true."""
-    res.value.test(base_inst)
+    cond = Condition.parse(res)
+
+    def test_cond(inst: Entity) -> None:
+        """For child conditions, we need to check every time."""
+        try:
+            cond.test(inst)
+        except Unsatisfiable:
+            pass
+    return test_cond
 
 
 @make_result('nextInstance')
@@ -1110,22 +1168,33 @@ def res_end_condition() -> None:
     raise EndCondition
 
 
-@make_result_setup('switch')
-def res_switch_setup(vmf: VMF, res: Property):
-    flag = None
+@make_result('switch')
+def res_switch(res: Property):
+    """Run the same flag multiple times with different arguments.
+
+    `method` is the way the search is done - `first`, `last`, `random`, or `all`.
+    `flag` is the name of the flag.
+    `seed` sets the randomisation seed for this block, for the random mode.
+    Each property group is a case to check - the property name is the flag
+    argument, and the contents are the results to execute in that case.
+    The special group `"<default>"` is only run if no other flag is valid.
+    For `random` mode, you can omit the flag to choose from all objects. In
+    this case the flag arguments are ignored.
+    """
+    flag_name = ''
     method = SWITCH_TYPE.FIRST
-    cases = []
+    raw_cases = []
     default = []
     rand_seed = ''
     for prop in res:
         if prop.has_children():
             if prop.name == '<default>':
-                default.append(prop)
+                default.extend(prop)
             else:
-                cases.append(prop)
+                raw_cases.append(prop)
         else:
             if prop.name == 'flag':
-                flag = prop.value
+                flag_name = prop.value
                 continue
             if prop.name == 'method':
                 try:
@@ -1135,99 +1204,41 @@ def res_switch_setup(vmf: VMF, res: Property):
             elif prop.name == 'seed':
                 rand_seed = prop.value
 
-    for prop in itertools.chain(cases, default):
-        for result in prop.value:
-            Condition.setup_result(
-                vmf,
-                prop.value,
-                result,
-                'switch: {} -> {}'.format(flag, prop.real_name),
-            )
-
     if method is SWITCH_TYPE.LAST:
-        cases[:] = cases[::-1]
+        raw_cases.reverse()
 
-    return (
-        flag,
-        cases,
-        default,
-        method,
-        rand_seed,
-    )
+    conf_cases: list[tuple[Property, list[Property]]] = [
+        (Property(flag_name, case.real_name), list(case))
+        for case in raw_cases
+    ]
 
+    def apply_switch(inst: Entity) -> None:
+        """Execute a switch."""
+        if method is SWITCH_TYPE.RANDOM:
+            cases = conf_cases.copy()
+            rand.seed(b'switch', rand_seed, inst).shuffle(cases)
+        else:  # Won't change.
+            cases = conf_cases
 
-@make_result('switch')
-def res_switch(vmf: VMF, inst: Entity, res: Property):
-    """Run the same flag multiple times with different arguments.
-
-    'method' is the way the search is done - first, last, random, or all.
-    'flag' is the name of the flag.
-    'seed' sets the randomisation seed for this block, for the random mode.
-    Each property group is a case to check - the property name is the flag
-    argument, and the contents are the results to execute in that case.
-    The special group "<default>" is only run if no other flag is valid.
-    For 'random' mode, you can omit the flag to choose from all objects. In
-    this case the flag arguments are ignored.
-    """
-    flag_name, cases, default, method, rand_seed = res.value
-
-    if method is SWITCH_TYPE.RANDOM:
-        cases = cases[:]
-        set_random_seed(inst, rand_seed)
-        random.shuffle(cases)
-
-    run_case = False
-
-    for case in cases:
-        if flag_name is not None:
-            flag = Property(flag_name, case.real_name)
-            if not check_flag(vmf, flag, inst):
+        run_default = True
+        for flag, results in cases:
+            # If not set, always succeed for the random situation.
+            if flag.real_name and not check_flag(flag, inst):
                 continue
-        for res in case:
-            Condition.test_result(inst, res)
-        run_case = True
-        if method is not SWITCH_TYPE.ALL:
-            # All does them all, otherwise we quit now.
-            break
-    if not run_case:
-        for res in default:
-            Condition.test_result(inst, res)
-
-
-@make_result_setup('staticPiston')
-def make_static_pist_setup(res: Property):
-    instances = (
-        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
-        'logic_0', 'logic_1', 'logic_2', 'logic_3',
-        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
-        'grate_low', 'grate_high',
-    )
-
-    if res.has_children():
-        # Pull from config
-        return {
-            name: instanceLocs.resolve_one(
-                res[name, ''],
-                error=False,
-            ) for name in instances
-        }
-    else:
-        # Pull from editoritems
-        if ':' in res.value:
-            from_item, prefix = res.value.split(':', 1)
-        else:
-            from_item = res.value
-            prefix = ''
-        return {
-            name: instanceLocs.resolve_one(
-                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
-                error=False,
-            ) for name in instances
-        }
+            for sub_res in results:
+                Condition.test_result(inst, sub_res)
+            run_default = False
+            if method is not SWITCH_TYPE.ALL:
+                # All does them all, otherwise we quit now.
+                break
+        if run_default:
+            for sub_res in default:
+                Condition.test_result(inst, sub_res)
+    return apply_switch
 
 
 @make_result('staticPiston')
-def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
+def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], None]:
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1239,56 +1250,91 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     Alternatively, specify all instances via editoritems, by setting the value
     to the item ID optionally followed by a :prefix.
     """
+    inst_keys = (
+        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
+        'logic_0', 'logic_1', 'logic_2', 'logic_3',
+        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        'grate_low', 'grate_high',
+    )
 
-    bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
-
-    if (
-        ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
-        ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
-    ):  # can it move?
-        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
-
-        # Use instances based on the height of the bottom position.
-        val = res.value['bottom_' + str(bottom_pos)]
-        if val:  # Only if defined
-            ent['file'] = val
-
-        logic_file = res.value['logic_' + str(bottom_pos)]
-        if logic_file:
-            # Overlay an additional logic file on top of the original
-            # piston. This allows easily splitting the piston logic
-            # from the styled components
-            logic_ent = ent.copy()
-            logic_ent['file'] = logic_file
-            vmf.add_ent(logic_ent)
-            # If no connections are present, set the 'enable' value in
-            # the logic to True so the piston can function
-            logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
-                ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
-            )
-    else:  # we are static
-        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
-        if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
-            pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
+    if res.has_children():
+        # Pull from config
+        instances = {
+            name: instanceLocs.resolve_one(
+                res[name, ''],
+                error=False,
+            ) for name in inst_keys
+        }
+    else:
+        # Pull from editoritems
+        if ':' in res.value:
+            from_item, prefix = res.value.split(':', 1)
         else:
-            pos = bottom_pos
-        ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
+            from_item = res.value
+            prefix = ''
+        instances = {
+            name: instanceLocs.resolve_one(
+                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
+                error=False,
+            ) for name in inst_keys
+        }
 
-        val = res.value['static_' + str(pos)]
-        if val:
-            ent['file'] = val
+    def make_static(ent: Entity) -> None:
+        """Make a piston static."""
+        bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
 
-    # Add in the grating for the bottom as an overlay.
-    # It's low to fit the piston at minimum, or higher if needed.
-    grate = res.value[
-        'grate_high'
-        if bottom_pos > 0 else
-        'grate_low'
-    ]
-    if grate:
-        grate_ent = ent.copy()
-        grate_ent['file'] = grate
-        vmf.add_ent(grate_ent)
+        if (
+            ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
+            ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
+        ):  # can it move?
+            ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
+
+            # Use instances based on the height of the bottom position.
+            val = instances['bottom_' + str(bottom_pos)]
+            if val:  # Only if defined
+                ent['file'] = val
+                ALL_INST.add(val.casefold())
+
+            logic_file = instances['logic_' + str(bottom_pos)]
+            if logic_file:
+                # Overlay an additional logic file on top of the original
+                # piston. This allows easily splitting the piston logic
+                # from the styled components
+                logic_ent = ent.copy()
+                logic_ent['file'] = logic_file
+                vmf.add_ent(logic_ent)
+                ALL_INST.add(logic_file.casefold())
+                # If no connections are present, set the 'enable' value in
+                # the logic to True so the piston can function
+                logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
+                    ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
+                )
+        else:  # we are static
+            ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
+            if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
+                pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
+            else:
+                pos = bottom_pos
+            ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
+
+            val = instances['static_' + str(pos)]
+            if val:
+                ent['file'] = val
+                ALL_INST.add(val.casefold())
+
+        # Add in the grating for the bottom as an overlay.
+        # It's low to fit the piston at minimum, or higher if needed.
+        grate = instances[
+            'grate_high'
+            if bottom_pos > 0 else
+            'grate_low'
+        ]
+        if grate:
+            grate_ent = ent.copy()
+            grate_ent['file'] = grate
+            ALL_INST.add(grate.casefold())
+            vmf.add_ent(grate_ent)
+    return make_static
 
 
 @make_result('GooDebris')
@@ -1309,13 +1355,14 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
 
     space = res.int('spacing', 1)
     rand_count = res.int('number', None)
+    rand_list: list[int] | None
     if rand_count:
-        rand_list = weighted_random(
+        rand_list = rand.parse_weights(
             rand_count,
             res['weights', ''],
         )
     else:
-        rand_list = None  # type: Optional[List[int]]
+        rand_list = None
     chance = res.int('chance', 30) / 100
     file = res['file']
     offset = res.int('offset', 0)
@@ -1358,24 +1405,25 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
         len(goo_top_locs),
     )
 
-    suff = ''
     for loc in possible_locs:
-        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
-        if random.random() > chance:
+        rng = rand.seed(b'goo_debris', loc)
+        if rng.random() > chance:
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list) + 1)
+            rand_fname = f'{file}_{rng.choice(rand_list) + 1}.vmf'
+        else:
+            rand_fname = file + '.vmf'
 
         if offset > 0:
-            loc.x += random.randint(-offset, offset)
-            loc.y += random.randint(-offset, offset)
+            loc.x += rng.randint(-offset, offset)
+            loc.y += rng.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
-        vmf.create_ent(
-            classname='func_instance',
-            file=file + suff + '.vmf',
-            origin=loc.join(' '),
-            angles='0 {} 0'.format(random.randrange(0, 3600)/10)
+        add_inst(
+            vmf,
+            file=rand_fname,
+            origin=loc,
+            angles=Angle(yaw=rng.randrange(0, 3600) / 10),
         )
 
     return RES_EXHAUSTED

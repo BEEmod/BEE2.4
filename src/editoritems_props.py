@@ -1,8 +1,8 @@
 """The different properties defineable for items."""
-from typing import Type, TypeVar, Generic, ClassVar, Sequence, Dict, Tuple
+from __future__ import annotations
+from typing import Type, TypeVar, Generic, ClassVar, Sequence, cast
 from abc import abstractmethod
 from enum import Enum
-from srctools import Property as KeyValues  # Prevent confusion
 from srctools import conv_bool, conv_int, conv_float, bool_as_int, Angle
 
 
@@ -28,16 +28,16 @@ class ItemProp(Generic[ValueT]):
         """Generic repr() for properties."""
         return f'{type(self).__qualname__}({self.default!r})'
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """Subclasses do not compare equal."""
         if type(self) is type(other):
-            return self.default == other.default
+            return self.default == cast(ItemProp, other).default
         return NotImplemented
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         """Subclasses do not compare equal."""
         if type(self) is type(other):
-            return self.default != other.default
+            return self.default != cast(ItemProp, other).default
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -70,7 +70,56 @@ class ItemProp(Generic[ValueT]):
 
 
 # ID -> class
-PROP_TYPES: Dict[str, Type[ItemProp]] = {}
+PROP_TYPES: dict[str, Type[ItemProp]] = {}
+
+
+class UnknownProp(ItemProp[str]):
+    """Placeholder for unknown properties."""
+    def __init__(
+        self,
+        name: str,
+        default: str,
+        index: int,
+    ) -> None:
+        self.name = name
+        super().__init__(default, index, user_default=False)
+
+    @property
+    def id(self) -> str:
+        """Override to specify the custom name."""
+        return self.name
+
+    @property
+    def trans_name(self) -> str:
+        """Use the raw name as the display name."""
+        return self.name
+
+    def __repr__(self) -> str:
+        """Generic repr() for properties."""
+        return f'UnknownProp({self.name!r}, {self.default!r})'
+
+    def __eq__(self, other: object) -> bool:
+        """Compare the name also."""
+        if isinstance(other, UnknownProp):
+            return self.name == other.name and self.default == other.default
+        return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        """Compare the name also."""
+        if isinstance(other, UnknownProp):
+            return self.name != other.name or self.default != other.default
+        return NotImplemented
+
+    def __getstate__(self):
+        """All the properties have the same attributes."""
+        return (self.name, self.default, self.index, self.allow_user_default)
+
+    def __setstate__(self, state):
+        (self.name, self.default, self.index, self.allow_user_default) = state
+
+    @staticmethod
+    def _parse_value(value: str) -> str:
+        return value
 
 
 class _BoolProp(ItemProp[bool]):
@@ -109,7 +158,7 @@ class _EnumProp(ItemProp[ValueT], Generic[ValueT]):
 
     @staticmethod
     def _export_value(typ: ValueT) -> str:
-        return str(typ.value)
+        return str(typ.value)  # type: ignore
 
 
 class _InternalStrProp(ItemProp[str]):
@@ -646,8 +695,9 @@ class GlassTypeProp(_EnumProp[GlassTypes]):
 PROP_TYPES.update({
     # If no ID, it's an internal implementation
     # class.
-    prop_type.id.casefold(): prop_type
+    prop_type.id.casefold(): prop_type  # type: ignore
     for prop_type in globals().values()
     if isinstance(prop_type, type)
-       and hasattr(prop_type, 'id')
+    and hasattr(prop_type, 'id')
+    and prop_type is not UnknownProp
 })

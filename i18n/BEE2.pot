@@ -4,14 +4,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2021-02-22 14:22+1000\n"
+"POT-Creation-Date: 2021-11-14 15:29+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.9.1\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -25,16 +25,40 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+#: app/paletteUI.py loadScreen.py
+msgid "Clear"
+msgstr ""
+
+#: loadScreen.py
+msgid "Copy"
+msgstr ""
+
+#: loadScreen.py
+msgid "Show:"
+msgstr ""
+
+#: loadScreen.py
+msgid "Logs - {}"
+msgstr ""
+
+#: loadScreen.py
+msgid "Debug messages"
+msgstr ""
+
+#: loadScreen.py
+msgid "Default"
+msgstr ""
+
+#: loadScreen.py
+msgid "Warnings Only"
+msgstr ""
+
 #: loadScreen.py
 msgid "Packages"
 msgstr ""
 
 #: loadScreen.py
 msgid "Loading Objects"
-msgstr ""
-
-#: loadScreen.py
-msgid "Loading Images"
 msgstr ""
 
 #: loadScreen.py
@@ -45,7 +69,7 @@ msgstr ""
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
-#: utils.py
+#: localisation.py
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
@@ -69,6 +93,7 @@ msgstr ""
 msgid "Bendy"
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
@@ -76,6 +101,7 @@ msgid ""
 "shapes."
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
@@ -87,6 +113,7 @@ msgid ""
 "entities at runtime."
 msgstr ""
 
+#. i18n: Progress bar description
 #: app/CompilerPane.py
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
@@ -185,6 +212,12 @@ msgstr ""
 
 #: app/CompilerPane.py
 msgid ""
+"You can hold down Shift during the start of the Lighting stage to invert "
+"this configuration on the fly."
+msgstr ""
+
+#: app/CompilerPane.py
+msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
 "When publishing, this is ignored."
@@ -258,6 +291,12 @@ msgstr ""
 
 #: app/CompilerPane.py
 msgid ""
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap whichlocation you spawn at on the fly."
+msgstr ""
+
+#: app/CompilerPane.py
+msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
 "examine the entry and exit corridors."
 msgstr ""
@@ -268,6 +307,20 @@ msgstr ""
 
 #: app/CompilerPane.py
 msgid "Corridor:"
+msgstr ""
+
+#: app/CompilerPane.py
+msgid "Singleplayer Entry Corridor"
+msgstr ""
+
+#. i18n: corridor selector window title.
+#: app/CompilerPane.py
+msgid "Singleplayer Exit Corridor"
+msgstr ""
+
+#. i18n: corridor selector window title.
+#: app/CompilerPane.py
+msgid "Coop Exit Corridor"
 msgstr ""
 
 #: app/CompilerPane.py
@@ -364,6 +417,7 @@ msgid ""
 "enabled, colored frames will be added to distinguish them."
 msgstr ""
 
+#. i18n: StyleVar default value.
 #: app/StyleVarPane.py
 msgid "Default: On"
 msgstr ""
@@ -372,10 +426,12 @@ msgstr ""
 msgid "Default: Off"
 msgstr ""
 
+#. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
 msgid "Styles: Unstyled"
 msgstr ""
 
+#. i18n: StyleVar which matches all styles.
 #: app/StyleVarPane.py
 msgid "Styles: All"
 msgstr ""
@@ -530,42 +586,14 @@ msgid ""
 msgstr ""
 
 #: app/UI.py
-msgid "Delete Palette \"{}\""
-msgstr ""
-
-#: app/UI.py
-msgid "BEE2 - Save Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "Enter a name:"
-msgstr ""
-
-#: app/UI.py
-msgid "This palette already exists. Overwrite?"
-msgstr ""
-
-#: app/UI.py app/gameMan.py
-msgid "Are you sure you want to delete \"{}\"?"
-msgstr ""
-
-#: app/UI.py
-msgid "Clear Palette"
-msgstr ""
-
-#: app/UI.py app/UI.py
-msgid "Delete Palette"
-msgstr ""
-
-#: app/UI.py
 msgid "Save Palette..."
 msgstr ""
 
-#: app/UI.py app/UI.py
+#: app/UI.py app/paletteUI.py
 msgid "Save Palette As..."
 msgstr ""
 
-#: app/UI.py app/UI.py
+#: app/UI.py app/paletteUI.py
 msgid "Save Settings in Palettes"
 msgstr ""
 
@@ -644,18 +672,6 @@ msgid "Palette"
 msgstr ""
 
 #: app/UI.py
-msgid "Clear"
-msgstr ""
-
-#: app/UI.py
-msgid "Fill Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "Save Palette"
-msgstr ""
-
-#: app/UI.py
 msgid "View"
 msgstr ""
 
@@ -669,6 +685,18 @@ msgstr ""
 
 #: app/UI.py
 msgid "Fill empty spots in the palette with random items."
+msgstr ""
+
+#: app/__init__.py
+msgid "BEEMOD {} Error!"
+msgstr ""
+
+#: app/__init__.py
+msgid ""
+"An error occurred: \n"
+"{}\n"
+"\n"
+"This has been copied to the clipboard."
 msgstr ""
 
 #: app/backup.py
@@ -1005,6 +1033,10 @@ msgid ""
 " (BEE2 will quit, this is the last game set!)"
 msgstr ""
 
+#: app/gameMan.py app/paletteUI.py
+msgid "Are you sure you want to delete \"{}\"?"
+msgstr ""
+
 #: app/helpMenu.py
 msgid "Wiki..."
 msgstr ""
@@ -1013,6 +1045,7 @@ msgstr ""
 msgid "Original Items..."
 msgstr ""
 
+#. i18n: The chat program.
 #: app/helpMenu.py
 msgid "Discord Server..."
 msgstr ""
@@ -1037,10 +1070,12 @@ msgstr ""
 msgid "Submit Item Bugs..."
 msgstr ""
 
+#. i18n: Original Palette
 #: app/helpMenu.py app/paletteLoader.py
 msgid "Portal 2"
 msgstr ""
 
+#. i18n: Aperture Tag's palette
 #: app/helpMenu.py app/paletteLoader.py
 msgid "Aperture Tag"
 msgstr ""
@@ -1087,36 +1122,20 @@ msgstr ""
 msgid "No Properties available!"
 msgstr ""
 
+#: app/itemPropWin.py
+msgid "Settings for \"{}\""
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "BEE2 - {}"
+msgstr ""
+
 #: app/item_search.py
 msgid "Search:"
 msgstr ""
 
 #: app/itemconfig.py
 msgid "Choose a Color"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Debug messages"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Default"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Warnings Only"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Logs - {}"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Copy"
-msgstr ""
-
-#: app/logWindow.py
-msgid "Show:"
 msgstr ""
 
 #: app/music_conf.py
@@ -1394,7 +1413,9 @@ msgid "Development Mode"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Enables displaying additional UI specific for development purposes."
+msgid ""
+"Enables displaying additional UI specific for development purposes. "
+"Requires restart to have an effect."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1436,6 +1457,14 @@ msgstr ""
 msgid "Dump Items list"
 msgstr ""
 
+#: app/optionWindow.py
+msgid "Reload Images"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgstr ""
+
 #: app/packageMan.py
 msgid "BEE2 - Restart Required!"
 msgstr ""
@@ -1450,20 +1479,72 @@ msgstr ""
 msgid "BEE2 - Manage Packages"
 msgstr ""
 
+#. i18n: Last exported items
 #: app/paletteLoader.py
 msgid "<Last Export>"
 msgstr ""
 
+#. i18n: Empty palette name
 #: app/paletteLoader.py
 msgid "Blank"
 msgstr ""
 
+#. i18n: BEEmod 1 palette.
 #: app/paletteLoader.py
 msgid "BEEMod"
 msgstr ""
 
+#. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Clear Palette"
+msgstr ""
+
+#: app/paletteUI.py app/paletteUI.py
+msgid "Delete Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Change Palette Group..."
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Rename Palette..."
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Fill Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Save Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Builtin / Readonly"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Delete Palette \"{}\""
+msgstr ""
+
+#: app/paletteUI.py app/paletteUI.py
+msgid "BEE2 - Save Palette"
+msgstr ""
+
+#: app/paletteUI.py app/paletteUI.py
+msgid "Enter a name:"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "BEE2 - Change Palette Group"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
 #: app/richTextBox.py
@@ -1471,15 +1552,17 @@ msgid "Open \"{}\" in the default browser?"
 msgstr ""
 
 #: app/selector_win.py
+msgid "{} Preview"
+msgstr ""
+
+#. i18n: 'None' item description
+#: app/selector_win.py
 msgid "Do not add anything."
 msgstr ""
 
+#. i18n: 'None' item name.
 #: app/selector_win.py
 msgid "<None>"
-msgstr ""
-
-#: app/selector_win.py app/selector_win.py
-msgid "Suggested"
 msgstr ""
 
 #: app/selector_win.py
@@ -1487,7 +1570,7 @@ msgid "Play a sample of this item."
 msgstr ""
 
 #: app/selector_win.py
-msgid "Reset to Default"
+msgid "Select Suggested"
 msgstr ""
 
 #: app/selector_win.py
@@ -1500,8 +1583,13 @@ msgid_plural "Authors: {}"
 msgstr[0] ""
 msgstr[1] ""
 
+#. i18n: Tooltip for colour swatch.
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
+msgstr ""
+
+#: app/selector_win.py app/selector_win.py
+msgid "Suggested"
 msgstr ""
 
 #: app/signage_ui.py app/signage_ui.py

@@ -1,0 +1,23 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Header",
+      "messages": [
+        {
+          "data": {
+            "content": "This is a list of answers to questions that have been frequently asked by users. If you are having problems with BEE2.4 or want to ask about a feature, check here.",
+            "embeds": null,
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ from enum import Enum
 import srctools.logger
 from precomp import tiling, texturing, template_brush, conditions
 import consts
-from srctools import Property, Entity, VMF, Vec, NoKeyError
+from srctools import Property, Entity, VMF, Vec, NoKeyError, Matrix, Angle
 from srctools.vmf import make_overlay, Side
 import vbsp
 
@@ -107,6 +107,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         sign = None
 
     has_arrow = inst.fixup.bool(consts.FixupVars.ST_ENABLED)
+    make_4x4 = res.bool('set4x4tile')
 
     sign_prim: Optional[Sign]
     sign_sec: Optional[Sign]
@@ -123,16 +124,13 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         return
 
     origin = Vec.from_str(inst['origin'])
-    angles = Vec.from_str(inst['angles'])
+    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
-    normal = Vec(z=-1).rotate(*angles)
-    forward = Vec(x=-1).rotate(*angles)
+    normal = -orient.up()
+    forward = -orient.forward()
 
-    prim_pos = Vec(0, -16, -64)
-    sec_pos = Vec(0, 16, -64)
-
-    prim_pos.localise(origin, angles)
-    sec_pos.localise(origin, angles)
+    prim_pos = Vec(0, -16, -64) @ orient + origin
+    sec_pos = Vec(0, +16, -64) @ orient + origin
 
     template_id = res['template_id', '']
 
@@ -147,11 +145,12 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         sec_visgroup = 'secondary'
 
     if sign_prim and sign_sec:
-        inst['file'] = res['large_clip', '']
+        inst['file'] = fname = res['large_clip', '']
         inst['origin'] = (prim_pos + sec_pos) / 2
     else:
-        inst['file'] = res['small_clip', '']
+        inst['file'] = fname = res['small_clip', '']
         inst['origin'] = prim_pos if sign_prim else sec_pos
+    conditions.ALL_INST.add(fname.casefold())
 
     brush_faces: List[Side] = []
     tiledef: Optional[tiling.TileDef] = None
@@ -167,7 +166,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
             vmf,
             template_id,
             origin,
-            angles,
+            orient,
             force_type=template_brush.TEMP_TYPES.detail,
             additional_visgroups=visgroup,
         )
@@ -203,6 +202,13 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
         if tiledef is not None:
             tiledef.bind_overlay(over)
+        if make_4x4:
+            try:
+                tile, u, v = tiling.find_tile(prim_pos, -normal)
+            except KeyError:
+                pass
+            else:
+                tile[u, v] = tile[u, v].as_4x4
 
     if sign_sec is not None:
         if has_arrow and res.bool('arrowDown'):
@@ -221,6 +227,13 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
 
         if tiledef is not None:
             tiledef.bind_overlay(over)
+        if make_4x4:
+            try:
+                tile, u, v = tiling.find_tile(sec_pos, -normal)
+            except KeyError:
+                pass
+            else:
+                tile[u, v] = tile[u, v].as_4x4
 
 
 def place_sign(

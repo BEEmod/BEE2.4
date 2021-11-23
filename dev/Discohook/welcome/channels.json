@@ -1,0 +1,57 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Welcome - Channels",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "--------------- CHANNELS ---------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": ":mega: Announcements",
+                    "value": "> <#293451173413912588>: New BEE2 releases will be announced here.\n> <#782084434207440906>: BEE Discord server news will be announced here.\n> <#293447504018669568>: Feed of actions on the repos. You should probably mute this."
+                  },
+                  {
+                    "name": ":clipboard: Information",
+                    "value": "> <#293438670654930944>: You're here.\n> <#804814306897690715>: Frequently asked questions, check here before posting\n> <#882496272693624883>: Common issues that have been reported.\n> <#605131357533896864>: Use this channel to get the Test Subject role."
+                  },
+                  {
+                    "name": ":bee: BEEmod 2.4",
+                    "value": "> <#293435914598744064>: General BEEmod discussion.\n> <#293444021190131713>: Discussion about development of future releases.\n> <#882493616554123295>: General tech support section."
+                  },
+                  {
+                    "name": ":package: User Created Packages",
+                    "value": "> <#721409165976666153>: Disclaimer about this unofficial extra content\n> <#605129795033890816>: Posts containing released content by other users\n> <#695590412089425941>: Discussion about user packages\n> <#721407139616260216>: Discussion about development of your own items\n> <#721407166992351273>: Discussion for problems with downloaded user packages"
+                  },
+                  {
+                    "name": ":game_die: Other",
+                    "value": "> <#315249214680465409>: Discussion and troubleshooting about Hammer maps.\n> <#307998594777219073>: Discussion of general Portal related content.\n> <#834640780614303765>: Channel for general discussion.\n> <#834641124463214612>: Post images, videos, or links of your projects here."
+                  },
+                  {
+                    "name": ":speaking_head: Hangout",
+                    "value": "> <#687481192433319936>: Chat for users who don't have a mic\n> :loud_sound: voice-hangout: General voice chat."
+                  }
+                ],
+                "footer": {
+                  "text": "Happy map-making!"
+                }
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

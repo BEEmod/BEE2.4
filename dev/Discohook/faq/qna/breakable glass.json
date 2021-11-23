@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Breakable Glass",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "In the Bomb Cube's description it says it can destroy breakable glass, but the Breakable Glass item isn't in the BEE2.4. Where is it?",
+                "description": "Breakable Glass hasn't been reimplemented yet, but it is planned, which is why it's mentioned in the Bomb Cube description.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

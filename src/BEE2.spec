@@ -1,7 +1,6 @@
 import os
 import sys
 from pathlib import Path
-import srctools
 import contextlib
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -9,9 +8,14 @@ import babel.messages.extract
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 
-
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+# Injected by PyInstaller.
+workpath: str
+SPECPATH: str
 
+# Allow importing utils.
+sys.path.append(SPECPATH)
+import utils
 
 # src -> build subfolder.
 data_files = [
@@ -23,7 +27,7 @@ data_files = [
 ]
 
 
-def do_localisation():
+def do_localisation() -> None:
     """Build localisation."""
 
     # Make the directories.
@@ -37,7 +41,10 @@ def do_localisation():
         msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
 
-    extracted = babel.messages.extract.extract_from_dir('.')
+    extracted = babel.messages.extract.extract_from_dir(
+        '.',
+        comment_tags=['i18n:'],
+    )
     for filename, lineno, message, comments, context in extracted:
         catalog.add(
             message,
@@ -132,8 +139,7 @@ EXCLUDES = [
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
-
-    'sqlite3',  # Imported from aenum, but we don't use that enum subclass.
+    'importlib_resources',  # 3.6 backport.
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
@@ -146,16 +152,23 @@ EXCLUDES = [
     'argparse',
 ]
 
-if sys.version_info >= (3, 7):
-    # Only needed on 3.6, it's in the stdlib thereafter.
-    EXCLUDES += ['importlib_resources']
+binaries = []
+if utils.WIN:
+    lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
+    try:
+        for dll in lib_path.iterdir():
+            if dll.suffix == '.dll':
+                binaries.append((str(dll), '.'))
+    except FileNotFoundError:
+        lib_path.mkdir(exist_ok=True)
+        raise ValueError(f'FFmpeg dlls should be downloaded into "{lib_path}".')
 
-bee_version = input('BEE2 Version (x.y.z): ')
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-version_val = 'BEE_VERSION=' + repr(bee_version)
-version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
+version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
+print(version_val)
+version_filename = os.path.join(workpath, '_compiled_version.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
     if f.read().strip() == version_val:
@@ -178,11 +191,12 @@ data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
 
 bee2_a = Analysis(
     ['BEE2_launch.pyw'],
-    pathex=[workpath, os.path.dirname(srctools.__path__[0])],
+    pathex=[workpath],
     datas=data_files,
     hiddenimports=[
         'PIL._tkinter_finder',
     ],
+    binaries=binaries,
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,
@@ -212,7 +226,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     windowed=True,
     icon='../BEE2.ico'

@@ -1,3 +1,7 @@
+"""StyleVPK allows specifying a set of files that will be added to a DLC3 VPK.
+
+This allows altering the in-editor wall textures, as well as a few others.
+"""
 import os
 import shutil
 
@@ -9,7 +13,7 @@ from packages import (
 from srctools import FileSystem, VPK
 
 
-class StyleVPK(PakObject, has_img=False):
+class StyleVPK(PakObject):
     """A set of VPK files used for styles.
 
     These are copied into _dlc3, allowing changing the in-editor wall
@@ -22,7 +26,7 @@ class StyleVPK(PakObject, has_img=False):
         self.dir = directory
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Read the VPK file from the package."""
         vpk_name = data.info['filename']
 
@@ -103,17 +107,6 @@ class StyleVPK(PakObject, has_img=False):
             del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
-
-    @staticmethod
-    def iter_vpk_names():
-        """Iterate over VPK filename suffixes.
-
-        The first is '_dir.vpk', then '_000.vpk' with increasing
-        numbers.
-        """
-        yield '_dir.vpk'
-        for i in range(999):
-            yield '_{:03}.vpk'.format(i)
 
     @staticmethod
     def clear_vpk_files(game) -> str:

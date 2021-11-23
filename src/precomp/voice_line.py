@@ -1,12 +1,11 @@
 """Adds voicelines dynamically into the map."""
 import itertools
-import random
 from decimal import Decimal
 from typing import List, Set, NamedTuple, Iterator
 
 import srctools.logger
 import vbsp
-from precomp import options as vbsp_options, packing, conditions
+from precomp import options as vbsp_options, packing, conditions, rand
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output, Entity
 
@@ -48,7 +47,7 @@ fake_inst = VMF().create_ent(
 )
 
 
-def has_responses():
+def has_responses() -> bool:
     """Check if we have any valid 'response' data for Coop."""
     return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
 
@@ -56,7 +55,7 @@ def has_responses():
 def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, voice_attrs: dict) -> None:
     """Write the coop responses information into the map."""
     config = ConfigFile('bee2/resp_voice.cfg', in_conf_folder=False)
-    response_block = QUOTE_DATA.find_key('CoopResponses', [])
+    response_block = QUOTE_DATA.find_key('CoopResponses', or_blank=True)
 
     # Pass in whether to include dings or not.
     vmf.create_ent(
@@ -143,7 +142,7 @@ def find_group_quotes(
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_flag(vmf, flag, fake_inst):
+            if not conditions.check_flag(flag, fake_inst):
                 valid_quote = False
                 break
 
@@ -271,12 +270,11 @@ def add_quote(
         name = prop.name.casefold()
 
         if name == 'file':
-            vmf.create_ent(
-                classname='func_instance',
-                targetname='',
+            conditions.add_inst(
+                vmf,
                 file=INST_PREFIX + prop.value,
                 origin=quote_loc,
-                fixup_style='2',  # No fixup
+                no_fixup=True,
             )
         elif name == 'choreo':
             # If the property has children, the children are a set of sequential
@@ -429,7 +427,7 @@ def sort_func(quote: PossibleQuote):
     # Without floating-point error.
     try:
         return Decimal(quote.priority)
-    except ValueError:
+    except ArithmeticError:
         # Default to priority 0
         return Decimal(0)
 
@@ -443,7 +441,6 @@ def add_voice(
     voice_attrs: dict,
     style_vars: dict,
     vmf: VMF,
-    map_seed: str,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""
@@ -457,13 +454,11 @@ def add_voice(
     quote_loc = get_studio_loc()
     if quote_base:
         LOGGER.info('Adding Base instance!')
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             targetname='voice',
             file=INST_PREFIX + quote_base,
-            angles='0 0 0',
             origin=quote_loc,
-            fixup_style='0',
         )
 
     # Either box in with nodraw, or place the voiceline studio.
@@ -521,13 +516,11 @@ def add_voice(
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         if not file:
             continue
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             targetname='voice_event_' + str(ind),
             file=file,
-            angles='0 0 0',
             origin=quote_loc,
-            fixup_style='0',
         )
 
     # Determine the flags that enable/disable specific lines based on which
@@ -586,26 +579,23 @@ def add_voice(
             if use_priority:
                 chosen = possible_quotes[0].lines
             else:
-                # Chose one of the quote blocks..
-                random.seed('{}-VOICE_QUOTE_{}'.format(
-                    map_seed,
-                    len(possible_quotes),
-                ))
-                chosen = random.choice(possible_quotes).lines
+                # Chose one of the quote blocks.
+                chosen = rand.seed(b'VOICE_QUOTE_BLOCK', *[
+                    prop['id', 'ID'] for quoteblock in possible_quotes
+                    for prop in quoteblock.lines
+                ]).choice(possible_quotes).lines
 
-            # Join the IDs for
-            # the voice lines to the map seed,
-            # so each quote block will chose different lines.
-            random.seed(map_seed + '-VOICE_LINE_' + '|'.join(
+            # Use the IDs for the voice lines, so each quote block will chose different lines.
+            rng = rand.seed(b'VOICE_QUOTE', *[
                 prop['id', 'ID']
                 for prop in
                 chosen
-            ))
+            ])
 
             # Add one of the associated quotes
             add_quote(
                 vmf,
-                random.choice(chosen),
+                rng.choice(chosen),
                 quote_targetname,
                 choreo_loc,
                 style_vars,
@@ -643,7 +633,7 @@ def add_voice(
 
     LOGGER.info('{} Mid quotes', len(mid_quotes))
     for mid_lines in mid_quotes:
-        line = random.choice(mid_lines)
+        line = rand.seed(b'mid_quote', *[name for item, ding, name in mid_lines]).choice(mid_lines)
         mid_item, use_ding, mid_name = line
         add_quote(vmf, mid_item, mid_name, quote_loc, style_vars, use_ding)
 

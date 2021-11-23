@@ -1,13 +1,12 @@
 """Adds breakable glass."""
-from precomp.conditions import make_result_setup, make_result, RES_EXHAUSTED
-from precomp.instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, VMF, Side, Entity, Output
-
-import srctools.logger
-from precomp import template_brush
-import consts
-
 from typing import Iterator, Any, Tuple, Dict, List, Optional
+
+from srctools import Property, Vec, VMF, Side, Entity, Output, Angle
+import srctools.logger
+
+from precomp import template_brush, conditions
+from precomp.instanceLocs import resolve as resolve_inst
+import consts
 
 
 COND_MOD_NAME = 'Breakable Glass'
@@ -76,8 +75,8 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
     This yields (targetname, min, max, normal, config) tuples.
     """
     # targetname -> min, max, normal, config
-    glass_items = {}  # type: Dict[str, Tuple[Vec, Vec, Vec, dict]]
-    for inst in vmf.by_class['func_instance']:  # type: Entity
+    glass_items: dict[str, tuple[Vec, Vec, Vec, dict]] = {}
+    for inst in vmf.by_class['func_instance']:
         try:
             conf = config[inst['file'].casefold()]
         except KeyError:
@@ -112,10 +111,10 @@ def make_frames(
     norm: Vec,
 ) -> None:
     """Generate frames for a rectangular glass item."""
-    def make_frame(frame_type: str, loc: Vec, angles: Vec) -> None:
+    def make_frame(frame_type: str, loc: Vec, angles: Angle) -> None:
         """Make a frame instance."""
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             targetname=targ,
             file=conf['frame_' + frame_type],
             # Position at the center of the block, instead of at the glass.
@@ -213,7 +212,7 @@ def make_frames(
 
 
 
-@make_result_setup('BreakableGlass')
+@conditions.make_result_setup('BreakableGlass')
 def res_breakable_glass_setup(res: Property):
     item_id = res['item']
     conf = {
@@ -229,12 +228,12 @@ def res_breakable_glass_setup(res: Property):
     return res.value
 
 
-@make_result('BreakableGlass')
+@conditions.make_result('BreakableGlass')
 def res_breakable_glass(inst: Entity, res: Property):
     """Adds breakable glass to the map.
 
     Parameters:
-    
+
     * `thickness`: Thickness of the collision brushes.
     * `offset`: Distance into the block to place the surface.
     * `border_size`: Distance on borders to inset by (so the shatter effects
@@ -349,4 +348,4 @@ def res_breakable_glass(inst: Entity, res: Property):
 
         make_frames(vmf, targ, conf, bbox_min, bbox_max, -norm)
 
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED

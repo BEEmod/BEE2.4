@@ -6,6 +6,12 @@ import pkgutil
 import os
 import sys
 
+# Injected by PyInstaller.
+workpath: str
+SPECPATH: str
+
+# Allow importing utils.
+sys.path.append(SPECPATH)
 
 # THe BEE2 modules cannot be imported inside the spec files.
 WIN = sys.platform.startswith('win')
@@ -33,32 +39,28 @@ if not transform_loc.exists():
 
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
-    'argparse',  # Used in __main__ of some modules
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
-    'distutils',  # Found in shutil, used if zipfile is not availible
-    'doctest',  # Used in __main__ of decimal and heapq
-    'optparse',  # Used in calendar.__main__
-    'pprint',  # From pickle, not needed
-    'textwrap',  # Used in zipfile.__main__
-
-    # We don't localise the compiler, but utils imports the modules.
-    'locale', 'gettext',
 
     # This isn't ever used in the compiler.
     'tkinter',
 
-    # We aren't using the Python 2 code, for obvious reasons.
-    'importlib_resources._py2',
+    # 3.6 backport
+    'importlib_resources',
 
     'win32api',
     'win32com',
-    'win32wnet'
+    'win32wnet',
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',
     'http',
+
+    # Imported in utils, but not required in compiler.
+    'bg_daemon',
+    # We don't need to actually run versioning at runtime.
+    'versioningit',
 ]
 
 # The modules made available for plugins to use.
@@ -69,7 +71,7 @@ INCLUDES = [
     'io', 'itertools', 'json', 'math', 'random', 're',
     'statistics', 'string', 'struct',
 ]
-INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'test' not in name and 'script' not in name)
+INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
@@ -102,14 +104,12 @@ INCLUDES += [
 ]
 
 
-bee_version = input('BEE2 Version ("x.y.z" or blank for dev): ')
-if bee_version:
-    bee_version = '2 v' + bee_version
-
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-version_val = 'BEE_VERSION=' + repr(bee_version)
-version_filename = os.path.join(workpath, 'BUILD_CONSTANTS.py')
+import utils
+version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
+print(version_val)
+version_filename = os.path.join(workpath, '_compiled_version.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
     if f.read().strip() == version_val:
@@ -118,14 +118,6 @@ with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
 if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
-
-# Empty module to be the package __init__.
-transforms_stub = Path(workpath, 'transforms_stub.py')
-try:
-    with transforms_stub.open('x') as f:
-        f.write('__path__ = []\n')
-except FileExistsError:
-    pass
 
 # Finally, run the PyInstaller analysis process.
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
@@ -140,14 +132,33 @@ vbsp_vrad_an = Analysis(
 )
 
 # Force the BSP transforms to be included in their own location.
+# Map package -> module.
+names: 'dict[str, list[str]]' = {}
 for mod in transform_loc.rglob('*.py'):
     rel_path = mod.relative_to(transform_loc)
 
     if rel_path.name.casefold() == '__init__.py':
         rel_path = rel_path.parent
     mod_name = rel_path.with_suffix('')
-    dotted = str(mod_name).replace('\\', '.').replace('/', '.')
-    vbsp_vrad_an.pure.append(('postcomp.transforms.' + dotted, str(mod), 'PYMODULE'))
+    dotted = 'postcomp.transforms.' + str(mod_name).replace('\\', '.').replace('/', '.')
+    package, module = dotted.rsplit('.', 1)
+    names.setdefault(package, []).append(module)
+    vbsp_vrad_an.pure.append((dotted, str(mod), 'PYMODULE'))
+
+# The package's __init__, where we add the names of all the transforms.
+# Build up a bunch of import statements to import them all.
+transforms_stub = Path(workpath, 'transforms_stub.py')
+with transforms_stub.open('w') as f:
+    f.write(f'__path__ = []\n')  # Make it a package.
+    # Sort long first, then by name.
+    for pack, modnames in sorted(names.items(), key=lambda t: (-len(t[1]), t[0])):
+        if pack:
+            f.write(f'from {pack} import ')
+        else:
+            f.write('import ')
+        modnames.sort()
+        f.write(', '.join(modnames))
+        f.write('\n')
 
 vbsp_vrad_an.pure.append(('postcomp.transforms', str(transforms_stub), 'PYMODULE'))
 

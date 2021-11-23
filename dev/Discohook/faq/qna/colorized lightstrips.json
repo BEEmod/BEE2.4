@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Colorized Lightstrips",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you add the ability to colorize light strips?",
+                "description": "This is also possible; however, the refraction shader used by light strips isn't compatible with the property used to color other things (e.g. cubes). The app would need to generate individual textures for each selected color, then those would be applied in-game. For this reason, the feature isn't currently being worked on, but could possibly be added in the future.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

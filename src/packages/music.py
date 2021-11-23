@@ -1,12 +1,13 @@
-from typing import Dict, List, Optional, FrozenSet
+"""Definitions for background music used in the map."""
+from __future__ import annotations
+from collections.abc import Iterable
+
 from srctools import Property
 import srctools.logger
 
 from consts import MusicChannel
-from packages import (
-    PakObject, set_cond_source, ParseData, SelitemData,
-    get_config, ExportData,
-)
+from app import lazy_conf
+from packages import PakObject, ParseData, SelitemData, get_config, ExportData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -18,20 +19,19 @@ class Music(PakObject):
     def __init__(
         self,
         music_id,
-        selitem_data: 'SelitemData',
-        sound: Dict[MusicChannel, List[str]],
-        children: Dict[MusicChannel, str],
-        config: Property=None,
-        inst=None,
-        sample: Dict[MusicChannel, Optional[str]]=None,
-        pack=(),
-        loop_len=0,
-        synch_tbeam=False,
-    ):
+        selitem_data: SelitemData,
+        sound: dict[MusicChannel, list[str]],
+        children: dict[MusicChannel, str],
+        config: lazy_conf.LazyConf = lazy_conf.BLANK,
+        inst: str | None = None,
+        sample: dict[MusicChannel, str | None] = None,
+        pack: Iterable[str] = (),
+        loop_len: int = 0,
+        synch_tbeam: bool = False,
+    ) -> None:
         self.id = music_id
-        self.config = config or Property(None, [])
+        self.config = config
         self.children = children
-        set_cond_source(config, 'Music <{}>'.format(music_id))
         self.inst = inst
         self.sound = sound
         self.packfiles = list(pack)
@@ -43,25 +43,18 @@ class Music(PakObject):
         self.has_synced_tbeam = synch_tbeam
 
     @classmethod
-    def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData):
         """Parse a music definition."""
-        selitem_data = SelitemData.parse(data.info)
+        selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
-        sound = data.info.find_key('soundscript', [])  # type: Property
+        sound = data.info.find_key('soundscript', or_blank=True)
 
         if sound.has_children():
             sounds = {}
             for channel in MusicChannel:
                 sounds[channel] = channel_snd = []
                 for prop in sound.find_all(channel.value):
-                    if prop.has_children():
-                        channel_snd += [
-                            subprop.value
-                            for subprop in
-                            prop
-                        ]
-                    else:
-                        channel_snd.append(prop.value)
+                    channel_snd.extend(prop.as_array())
 
             synch_tbeam = sound.bool('sync_funnel')
         else:
@@ -75,9 +68,9 @@ class Music(PakObject):
             synch_tbeam = False
 
         # The sample music file to play, if found.
-        sample_block = data.info.find_key('sample', '')  # type: Property
+        sample_block = data.info.find_key('sample', '')
         if sample_block.has_children():
-            sample = {}  # type: Dict[MusicChannel, Optional[str]]
+            sample: dict[MusicChannel, str | None] = {}
             for channel in MusicChannel:
                 chan_sample = sample[channel] = sample_block[channel.value, '']
                 if chan_sample:
@@ -97,9 +90,9 @@ class Music(PakObject):
                 else:
                     sample[channel] = None
         else:
-            # Single value, fill it into all channels we define.
+            # Single value, fill it into all channels.
             sample = {
-                channel: sample_block.value if sounds[channel] else None
+                channel: sample_block.value
                 for channel in MusicChannel
             }
 
@@ -117,7 +110,7 @@ class Music(PakObject):
             data.info.find_all('pack')
         ]
 
-        children_prop = data.info.find_key('children', [])
+        children_prop = data.info.find_block('children', or_blank=True)
         children = {
             channel: children_prop[channel.value, '']
             for channel in MusicChannel
@@ -126,9 +119,9 @@ class Music(PakObject):
 
         config = get_config(
             data.info,
-            data.fsys,
             'music',
             pak_id=data.pak_id,
+            source=f'Music <{data.id}>',
         )
         return cls(
             data.id,
@@ -143,15 +136,15 @@ class Music(PakObject):
             synch_tbeam=synch_tbeam,
         )
 
-    def add_over(self, override: 'Music'):
+    def add_over(self, override: 'Music') -> None:
         """Add the additional vbsp_config commands to ourselves."""
-        self.config.append(override.config)
+        self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Music ' + self.id + '>'
 
-    def provides_channel(self, channel: MusicChannel):
+    def provides_channel(self, channel: MusicChannel) -> bool:
         """Check if this music has this channel."""
         if self.sound[channel]:
             return True
@@ -160,7 +153,7 @@ class Music(PakObject):
             return True
         return False
 
-    def has_channel(self, channel: MusicChannel):
+    def has_channel(self, channel: MusicChannel) -> bool:
         """Check if this track or its children has a channel."""
         if self.sound[channel]:
             return True
@@ -171,9 +164,9 @@ class Music(PakObject):
             children = Music.by_id(self.children[channel])
         except KeyError:
             return False
-        return children.sound[channel]
+        return bool(children.sound[channel])
 
-    def get_attrs(self) -> Dict[str, bool]:
+    def get_attrs(self) -> dict[str, bool]:
         """Generate attributes for SelectorWin."""
         attrs = {
             channel.name: self.has_channel(channel)
@@ -183,7 +176,7 @@ class Music(PakObject):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, channel: MusicChannel):
+    def get_suggestion(self, channel: MusicChannel) -> str | None:
         """Get the ID we want to suggest for a channel."""
         try:
             child = Music.by_id(self.children[channel])
@@ -193,7 +186,7 @@ class Music(PakObject):
             return child.id
         return None
 
-    def get_sample(self, channel: MusicChannel) -> Optional[str]:
+    def get_sample(self, channel: MusicChannel) -> str | None:
         """Get the path to the sample file, if present."""
         if self.sample[channel]:
             return self.sample[channel]
@@ -206,14 +199,14 @@ class Music(PakObject):
     @staticmethod
     def export(exp_data: ExportData):
         """Export the selected music."""
-        selected = exp_data.selected  # type: Dict[MusicChannel, Optional[Music]]
+        selected: dict[MusicChannel, Music | None] = exp_data.selected
 
         base_music = selected[MusicChannel.BASE]
 
         vbsp_config = exp_data.vbsp_conf
 
         if base_music is not None:
-            vbsp_config += base_music.config.copy()
+            vbsp_config += base_music.config()
 
         music_conf = Property('MusicScript', [])
         vbsp_config.append(music_conf)
@@ -234,6 +227,14 @@ class Music(PakObject):
 
             to_pack.update(music.packfiles)
 
+        # If we need to pack, add the files to be unconditionally
+        # packed.
+        if to_pack:
+            music_conf.append(Property('pack', [
+                Property('file', filename)
+                for filename in to_pack
+            ]))
+
         if base_music is not None:
             vbsp_config.set_key(
                 ('Options', 'music_looplen'),
@@ -249,24 +250,13 @@ class Music(PakObject):
                 base_music.inst or '',
             )
 
-        # If we need to pack, add the files to be unconditionally
-        # packed.
-        if to_pack:
-            vbsp_config.set_key(
-                ('PackTriggers', 'Forced'),
-                [
-                    Property('File', file)
-                    for file in to_pack
-                ],
-            )
-
     @classmethod
     def post_parse(cls) -> None:
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
         """
-        sounds: Dict[FrozenSet[str], str] = {}
+        sounds: dict[frozenset[str], str] = {}
 
         for music in cls.all():
             for channel in MusicChannel:
@@ -274,7 +264,7 @@ class Music(PakObject):
                 child_id = music.children.get(channel, '')
                 if child_id:
                     try:
-                        child = cls.by_id(child_id)
+                        cls.by_id(child_id)
                     except KeyError:
                         LOGGER.warning(
                             'Music "{}" refers to nonexistent'

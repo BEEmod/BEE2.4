@@ -2,7 +2,7 @@ from packages import PakObject, ParseData, ExportData
 from srctools import Property
 
 
-class EditorSound(PakObject, has_img=False):
+class EditorSound(PakObject):
     """Add sounds that are usable in the editor.
 
     The editor only reads in game_sounds_editor, so custom sounds must be
@@ -16,11 +16,11 @@ class EditorSound(PakObject, has_img=False):
         data.name = self.id
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'EditorSound':
+    async def parse(cls, data: ParseData) -> 'EditorSound':
         """Parse editor sounds from the package."""
         return cls(
             snd_name=data.id,
-            data=data.info.find_key('keys', [])
+            data=data.info.find_key('keys', or_blank=True)
         )
 
     @staticmethod

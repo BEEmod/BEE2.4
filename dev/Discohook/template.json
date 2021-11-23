@@ -1,0 +1,23 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Hook - Template",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "",
+                "description": "",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          }
+        }
+      ]
+    }
+  ]
+}

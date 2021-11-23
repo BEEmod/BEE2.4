@@ -2,9 +2,8 @@
 from srctools import Property, Entity, Vec, VMF, Matrix, Angle
 import srctools.logger
 
-from precomp.conditions import make_result, make_flag
 from precomp.instanceLocs import resolve_one
-from precomp import connections, fizzler
+from precomp import conditions, connections, fizzler
 
 
 COND_MOD_NAME = 'Fizzlers'
@@ -12,7 +11,7 @@ COND_MOD_NAME = 'Fizzlers'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
-@make_flag('FizzlerType')
+@conditions.make_flag('FizzlerType')
 def flag_fizz_type(inst: Entity, flag: Property):
     """Check if a fizzler is the specified type name."""
     try:
@@ -22,7 +21,7 @@ def flag_fizz_type(inst: Entity, flag: Property):
     return fizz.fizz_type.id.casefold() == flag.value.casefold()
 
 
-@make_result('ChangeFizzlerType')
+@conditions.make_result('ChangeFizzlerType')
 def res_change_fizzler_type(inst: Entity, res: Property):
     """Change the type of a fizzler. Only valid when run on the base instance."""
     fizz_name = inst['targetname']
@@ -38,7 +37,7 @@ def res_change_fizzler_type(inst: Entity, res: Property):
         raise ValueError('Invalid fizzler type "{}"!', res.value)
 
 
-@make_result('ReshapeFizzler')
+@conditions.make_result('ReshapeFizzler')
 def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     """Convert a fizzler connected via the output to a new shape.
 
@@ -65,8 +64,10 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         try:
             fizz = fizzler.FIZZLERS[fizz_item.name]
         except KeyError:
-            LOGGER.warning('Reshaping fizzler with non-fizzler output ({})! Ignoring!', fizz_item.name)
             continue
+        # Detach this connection and remove traces of it.
+        conn.remove()
+
         fizz.emitters.clear()  # Remove old positions.
         fizz.up_axis = up_axis
         fizz.base_inst['origin'] = shape_inst['origin']
@@ -77,9 +78,9 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         # We create the fizzler instance, Fizzler object, and Item object
         # matching it.
         # This is hardcoded to use regular Emancipation Fields.
-        base_inst = vmf.create_ent(
+        base_inst = conditions.add_inst(
+            vmf,
             targetname=shape_name,
-            classname='func_instance',
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
             file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>'),
@@ -94,20 +95,23 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         fizz_item = connections.Item(
             base_inst,
             connections.ITEM_TYPES['item_barrier_hazard'],
-            shape_item.ant_floor_style,
-            shape_item.ant_wall_style,
+            ant_floor_style=shape_item.ant_floor_style,
+            ant_wall_style=shape_item.ant_wall_style,
         )
         connections.ITEMS[shape_name] = fizz_item
 
-    # Detach this connection and remove traces of it.
-    for conn in list(shape_item.outputs):
-        conn.remove()
-
-    # Transfer the inputs from us to the fizzler.
+    # Transfer the input/outputs from us to the fizzler.
     for inp in list(shape_item.inputs):
         inp.to_item = fizz_item
+    for conn in list(shape_item.outputs):
+        conn.from_item = fizz_item
 
-    shape_item.delete_antlines()
+    # If the fizzler has no outputs, then strip out antlines. Otherwise,
+    # they need to be transferred across, so we can't tell safely.
+    if fizz_item.output_act() is None and fizz_item.output_deact() is None:
+        shape_item.delete_antlines()
+    else:
+        shape_item.transfer_antlines(fizz_item)
 
     fizz_base = fizz.base_inst
     fizz_base['origin'] = shape_inst['origin']

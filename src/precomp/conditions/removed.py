@@ -1,13 +1,14 @@
 """Conditions that were present in older versions only."""
+from typing import TypeVar, Callable
 from precomp.conditions import RES_EXHAUSTED, make_flag, make_result
 import srctools.logger
 
 COND_MOD_NAME = 'Removed'
-
+T = TypeVar('T')
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-def deprecator(func, ret_val):
+def deprecator(func: Callable[..., Callable[[Callable], object]], ret_val: T):
     """Deprecate a flag or result."""
     def do_dep(name: str, *aliases: str, msg: str = None):
         used = False
@@ -16,7 +17,7 @@ def deprecator(func, ret_val):
         else:
             msg = f'{name} is no longer used.'
 
-        def deprecated():
+        def deprecated() -> T:
             """This result is no longer used."""
             nonlocal used
             if not used:
@@ -33,7 +34,10 @@ deprecate_result = deprecator(make_result, RES_EXHAUSTED)
 deprecate_flag = deprecator(make_flag, False)
 
 
-deprecate_result('HollowBrush')
+deprecate_result(
+    'HollowBrush',
+    msg='The tiling system means this no longer must be done manually.',
+)
 deprecate_result(
     'MarkLocking',
     msg='Configure locking items in the enhanced editoritems configuration.',

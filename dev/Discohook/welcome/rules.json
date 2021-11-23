@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Welcome - Rules",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "--------------- RULES ----------------",
+                "description": ">>> :one: -  Listen to Staff.\n:two: - English discussion only.\n:three: - Do not post NSFW, hate speech, slurs, spam, or suspicious files/links.\n:four: - No low effort content, memes, or random/disruptive messages.\n:five: - Use your better judgement.",
+                "color": 16761704
+            }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

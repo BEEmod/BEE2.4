@@ -1,0 +1,50 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE Welcome - Info",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "--------------- INFO ----------------",
+                "color": 16761704,
+                "fields": [
+                  {
+                    "name": "> GitHub Repositories (repos)",
+                    "value": "> BEEmod is split into two repositories. One for the app itself, and the other is for items and  in-editor / in-game content. Issues and suggestions related to the BEE2 application (executable) should go on BEE2.4, anything else on BEE2-items. If you have a question regarding BEE2.4, first check the FAQ, and if you can't find your answer there you can ask in one of the other channels."
+                  },
+                  {
+                    "name": "> Contributors",
+                    "value": "> The Contributor role is given to anybody who has contributed some sort of content to the BEE2.4. Typically this role will not be given for creating a separate tool/pack or BEE2.2 content, although this is not always the case."
+                  },
+                  {
+                    "name": "> User Created Packages (UCPs)",
+                    "value": "> User Created Packages are community made addon packages for BEEmod. They are not directly supported by the team and may break. Use them at your own discretion. If you use UCPs make sure you test issues with UCPs disabled before reporting."
+                  },
+                  {
+                    "name": "> Beta Testers",
+                    "value": "> Beta Testers are people who receive beta builds of the app. Beta builds tend to be less stable so these testers catch any mistakes the development team might have made.  Beta Testers are hand picked by the development team, so don't ask to receive the role."
+                  },
+                  {
+                    "name": "> BEEmod Community",
+                    "value": "> The community section of the BEEmod discord is reserved for people who both want it and can follow the rules. Its a more relaxed section of the server where you can talk about more general stuff. In order to opt in, you must introduce yourself in <#901350687047315496>"
+                  }
+                ]
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

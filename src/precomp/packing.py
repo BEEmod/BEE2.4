@@ -18,10 +18,7 @@ PACKLISTS = {}  # type: Dict[str, Set[str]]
 def parse_packlists(props: Property) -> None:
     """Parse the packlists.cfg file, to load our packing lists."""
     for prop in props.find_children('Packlist'):
-        PACKLISTS[prop.name] = {
-            file.value
-            for file in prop
-        }
+        PACKLISTS[prop.name] = set(prop.as_array())
 
 
 def pack_list(

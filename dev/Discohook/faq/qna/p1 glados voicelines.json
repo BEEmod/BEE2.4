@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - P1 Glados Voicelines",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Why doesn't Portal 1 GLaDOS have any lines?",
+                "description": "The Portal 1 GLaDOS lines aren't in Portal 2 by default, and as stated above, it's not possible to pack voice lines into maps. In the next release, existing lines which are similar to the P1 dialogue will be used.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

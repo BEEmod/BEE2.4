@@ -1,9 +1,13 @@
 """Customizable configuration for specific items or groups of them."""
+from __future__ import annotations
+
 import tkinter as tk
+import trio
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 from functools import lru_cache
 import math
+import attr
 
 from srctools import Property, Vec, conv_int, conv_bool
 from packages import PakObject, ExportData, ParseData, desc_parse
@@ -11,7 +15,8 @@ import BEE2_config
 from app.tooltip import add_tooltip
 import utils
 import srctools.logger
-from app import signage_ui, UI, tkMarkdown, sound, img
+from app import signage_ui, UI, tkMarkdown, sound, img, tk_tools
+from localisation import gettext
 
 from typing import Union, Callable, List, Tuple, Optional
 
@@ -38,80 +43,91 @@ INF = '∞'
 ITEM_VARIANT_LOAD = []
 
 
-@BEE2_config.option_handler('ItemVar')
-def save_load_itemvar(prop: Property=None) -> Optional[Property]:
-    """Save or load item variables into the palette."""
-    if prop is None:
-        prop = Property('', [])
-        for group in CONFIG_ORDER:
-            conf = Property(group.id, [])
-            for widget in group.widgets:  # ItemVariant special case.
-                if widget.values is not None:
-                    conf.append(Property(widget.id, widget.values.get()))
-            for widget in group.multi_widgets:
-                conf.append(Property(widget.id, [
-                    Property(str(tim_val), var.get())
-                    for tim_val, var in
-                    widget.values
-                ]))
-            prop.append(conf)
-        return prop
+def parse_color(color: str) -> Tuple[int, int, int]:
+    """Parse a string into a color."""
+    if color.startswith('#'):
+        try:
+            r = int(color[1:3], base=16)
+            g = int(color[3:5], base=16)
+            b = int(color[5:], base=16)
+        except ValueError:
+            LOGGER.warning('Invalid RGB value: "{}"!', color)
+            r = g = b = 128
     else:
-        # Loading.
-        for group in CONFIG_ORDER:
-            conf = prop.find_key(group.id, [])
-            for widget in group.widgets:
-                if widget.values is not None:  # ItemVariants
-                    try:
-                        widget.values.set(conf[widget.id])
-                    except LookupError:
-                        pass
-
-            for widget in group.multi_widgets:
-                time_conf = conf.find_key(widget.id, [])
-                for tim_val, var in widget.values:
-                    try:
-                        var.set(time_conf[str(tim_val)])
-                    except LookupError:
-                        pass
-        return None
+        r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
+    return r, g, b
 
 
+@BEE2_config.OPTION_SAVE('ItemVar')
+def save_itemvar() -> Property:
+    """Save item variables into the palette."""
+    prop = Property('', [])
+    for group in CONFIG_ORDER:
+        conf = Property(group.id, [])
+        for widget in group.widgets:
+            if widget.has_values:
+                conf.append(Property(widget.id, widget.values.get()))
+        for widget in group.multi_widgets:
+            conf.append(Property(widget.id, [
+                Property(str(tim_val), var.get())
+                for tim_val, var in
+                widget.values
+            ]))
+        prop.append(conf)
+    return prop
+
+
+@BEE2_config.OPTION_LOAD('ItemVar')
+def load_itemvar(prop: Property) -> None:
+    """Load item variables into the palette."""
+    for group in CONFIG_ORDER:
+        conf = prop.find_block(group.id, or_blank=True)
+        for widget in group.widgets:
+            if widget.has_values:
+                try:
+                    widget.values.set(conf[widget.id])
+                except LookupError:
+                    pass
+
+        for widget in group.multi_widgets:
+            time_conf = conf.find_block(widget.id, or_blank=True)
+            for tim_val, var in widget.values:
+                try:
+                    var.set(time_conf[str(tim_val)])
+                except LookupError:
+                    pass
+    return None
+
+
+@attr.define
 class Widget:
     """Represents a widget that can appear on a ConfigGroup."""
-    def __init__(
-        self,
-        wid_id: str,
-        name: str,
-        tooltip: str,
-        create_func: Callable[[tk.Frame, tk.StringVar, Property], None],
-        multi_func: Callable[[tk.Frame, List[Tuple[str, tk.StringVar]], Property], None],
-        config: Property,
-        values: Union[tk.StringVar, List[Tuple[Union[int, str], tk.StringVar]]],
-        is_timer: bool,
-        use_inf: bool,
-    ):
-        self.id = wid_id
-        self.name = name
-        self.tooltip = tooltip
-        self.values = values
-        self.config = config
-        self.create_func = create_func
-        self.multi_func = multi_func
-        self.is_timer = is_timer
-        self.use_inf = use_inf  # For timer, is infinite valid?
+    id: str
+    name: str
+    tooltip: str
+    create_func: Callable[[tk.Frame, tk.StringVar, Property], tk.Widget]
+    multi_func: Callable[[tk.Frame, list[tuple[str, tk.StringVar]], Property], None]
+    config: Property
+    values: Union[tk.StringVar, list[tuple[Union[int, str], tk.StringVar]]]
+    is_timer: bool
+    use_inf: bool  # For timer, is infinite valid?
+
+    @property
+    def has_values(self) -> bool:
+        """Item variant widgets don't have configuration, all others do."""
+        return self.create_func is not widget_item_variant
 
 
-class ConfigGroup(PakObject, allow_mult=True, has_img=False):
+class ConfigGroup(PakObject, allow_mult=True):
     """A group of configs for an item."""
     def __init__(
         self,
         conf_id: str,
         group_name: str,
         desc,
-        widgets: List['Widget'],
-        multi_widgets: List['Widget'],
-    ):
+        widgets: list[Widget],
+        multi_widgets: list[Widget],
+    ) -> None:
         self.id = conf_id
         self.name = group_name
         self.desc = desc
@@ -119,8 +135,8 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    def parse(cls, data: ParseData) -> 'PakObject':
-        props = data.info  # type: Property
+    async def parse(cls, data: ParseData) -> 'PakObject':
+        props = data.info
 
         if data.is_override:
             # Override doesn't have a name
@@ -128,12 +144,13 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
         else:
             group_name = props['Name']
 
-        desc = desc_parse(props, data.id)
+        desc = desc_parse(props, data.id, data.pak_id)
 
         widgets = []  # type: List[Widget]
         multi_widgets = []  # type: List[Widget]
 
         for wid in props.find_all('Widget'):
+            await trio.sleep(0)
             try:
                 create_func = WidgetLookup[wid['type']]
             except KeyError:
@@ -155,14 +172,15 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
             name = wid['Label']
             tooltip = wid['Tooltip', '']
             default = wid.find_key('Default', '')
-            values = None  # type: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
+            values: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:
                 if is_timer:
                     LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
                     is_timer = use_inf = False
-                # Values remains a dummy None value, we don't use it.
+                # Values isn't used, set to a dummy value.
+                values = []
             elif is_timer:
                 if default.has_children():
                     defaults = {
@@ -255,9 +273,7 @@ class ConfigGroup(PakObject, allow_mult=True, has_img=False):
         for conf in CONFIG_ORDER:
             config_section = CONFIG[conf.id]
             for wid in conf.widgets:
-                # Item_variant doesn't have an output value.
-                # Skip it.
-                if wid.create_func is not widget_item_variant:
+                if wid.has_values:
                     config_section[wid.id] = wid.values.get()
             for wid in conf.multi_widgets:
                 for num, var in wid.values:
@@ -286,13 +302,14 @@ def make_pane(parent: ttk.Frame):
     scrollbar.grid(column=1, row=0, sticky="ns")
     canvas['yscrollcommand'] = scrollbar.set
 
-    utils.add_mousewheel(canvas, canvas, parent)
+    tk_tools.add_mousewheel(canvas, canvas, parent)
     canvas_frame = ttk.Frame(canvas)
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)
 
     sign_button = signage_ui.init_widgets(canvas_frame)
-    sign_button.grid(row=0, column=0, sticky='ew')
+    if sign_button is not None:
+        sign_button.grid(row=0, column=0, sticky='ew')
 
     for conf_row, config in enumerate(CONFIG_ORDER, start=1):
         frame = ttk.LabelFrame(canvas_frame, text=config.name)
@@ -310,9 +327,14 @@ def make_pane(parent: ttk.Frame):
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
 
+                try:
+                    widget = wid.create_func(wid_frame, wid.values, wid.config)
+                except Exception:
+                    LOGGER.exception('Could not construct widget {}.{}', config.id, wid.id)
+                    continue
+
                 label = ttk.Label(wid_frame, text=wid.name + ': ')
                 label.grid(row=0, column=0)
-                widget = wid.create_func(wid_frame, wid.values, wid.config)
                 widget.grid(row=0, column=1, sticky='e')
 
                 if wid.tooltip:
@@ -430,7 +452,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
     except KeyError:
         raise ValueError('Unknown item "{}"!'.format(conf['ItemID']))
 
-    version_lookup = None
+    version_lookup: Optional[List[str]] = None
 
     def update_data():
         """Refresh the data in the list."""
@@ -457,7 +479,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
 
 
 @WidgetLookup('string', 'str')
-def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
     """Simple textbox for entering text."""
     return ttk.Entry(
         parent,
@@ -466,7 +488,7 @@ def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Mis
 
 
 @WidgetLookup('boolean', 'bool', 'checkbox')
-def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property):
+def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
     """Allows ticking a box."""
     # Ensure it's a bool value.
     if conv_bool(var.get()):
@@ -590,30 +612,14 @@ def widget_color_multi(
 def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Label:
     """Make a single swatch."""
     # Note: tkinter requires RGB as ints, not float!
-
-    def get_color():
-        """Parse out the color."""
-        color = var.get()
-        if color.startswith('#'):
-            try:
-                r = int(color[1:3], base=16)
-                g = int(color[3:5], base=16)
-                b = int(color[5:], base=16)
-            except ValueError:
-                LOGGER.warning('Invalid RGB value: "{}"!', color)
-                r = g = b = 128
-        else:
-            r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
-        return r, g, b
-
-    def open_win(e):
+    def open_win(e) -> None:
         """Display the color selection window."""
         widget_sfx()
-        r, g, b = get_color()
+        r, g, b = parse_color(var.get())
         new_color, tk_color = askcolor(
             color=(r, g, b),
             parent=parent.winfo_toplevel(),
-            title=_('Choose a Color'),
+            title=gettext('Choose a Color'),
         )
         if new_color is not None:
             r, g, b = map(int, new_color)  # Returned as floats, which is wrong.
@@ -622,15 +628,14 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
     swatch = ttk.Label(parent)
 
     def update_image(var_name: str, var_index: str, operation: str):
-        r, g, b = get_color()
-        swatch['image'] = img.color_square(round(Vec(r, g, b)), size)
+        img.apply(swatch, img.Handle.color(parse_color(var.get()), size, size))
 
     update_image('', '', '')
 
     # Register a function to be called whenever this variable is changed.
     var.trace_add('write', update_image)
 
-    utils.bind_leftclick(swatch, open_win)
+    tk_tools.bind_leftclick(swatch, open_win)
 
     return swatch
 

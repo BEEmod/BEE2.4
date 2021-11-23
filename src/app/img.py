@@ -1,108 +1,800 @@
-""" Functions to produce tk-compatible images, using Pillow as a backend.
+"""The image system manages all the images packages request.
 
-The image is saved in the dictionary, so it stays in memory. Otherwise
-it could get deleted, which will make the rendered image vanish.
+It handles loading them from disk and converting them to TK versions, and
+caching images so repeated requests are cheap.
 """
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Generic, TypeVar, Union, Callable, Type, cast
+from collections.abc import Sequence, Mapping
+from weakref import ref as WeakRef
+from tkinter import ttk
+import tkinter as tk
+import itertools
+import logging
 
 from PIL import ImageTk, Image, ImageDraw
-import os
+import attr
+import trio
 
-from srctools import Vec
+from srctools import Vec, Property
+from srctools.vtf import VTFFlags, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
-import logging
+
+from app import TK_ROOT
 import utils
 
-from typing import Iterable, Union, Dict, Tuple
+# Widgets with an image attribute that can be set.
+tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
+tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.Button)
+# WeakRef is only generic in stubs!
+WidgetWeakRef = Union['WeakRef[tk.Label]', 'WeakRef[ttk.Label]', 'WeakRef[tk.Button]', 'WeakRef[ttk.Button]']
+
+ArgT = TypeVar('ArgT')
+
+# Used to keep track of the used handles, so we can deduplicate them.
+_handles: dict[tuple, Handle] = {}
+# Matches widgets to the handle they use.
+_wid_tk: dict[WidgetWeakRef, Handle] = {}
+
+# TK images have unique IDs, so preserve discarded image objects.
+_unused_tk_img: dict[tuple[int, int], list[tk.PhotoImage]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
-
-cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
-# r, g, b, size -> image
-cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
-
-filesystem = FileSystemChain(
-    # Highest priority is the in-built UI images.
-    RawFileSystem(str(utils.install_path('images'))),
-)
+FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
+PACK_SYSTEMS: dict[str, FileSystem] = {}
 
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
 
-
-def load_filesystems(systems: Iterable[FileSystem]):
-    """Load in the filesystems used in packages."""
-    for sys in systems:
-        filesystem.add_sys(sys, 'resources/BEE2/')
+# Colour of the palette item background
+PETI_ITEM_BG = (229, 232, 233)
+PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
 
-def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
+def _load_special(path: str) -> Image.Image:
+    """Various special images we have to load."""
+    img: Image.Image
+    try:
+        img = Image.open(utils.install_path(f'images/BEE2/{path}.png'))
+        img.load()
+        return img.convert('RGBA')
+    except Exception:
+        LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
+        return Image.new('RGBA', (64, 64), PETI_ITEM_BG)
+
+ICONS: dict[str, Image.Image] = {
+    name: _load_special(name)
+    for name in ['error', 'none', 'load']
+}
+# The icon has 8 parts, with the gap in the 1 pos. So mirror/rotate to
+# derive the others.
+
+ICONS['load_0'] = _load_icon = ICONS['load']
+ICONS['load_7'] = _load_icon_flip = _load_icon.transpose(Image.FLIP_LEFT_RIGHT)
+ICONS['load_1'] = _load_icon_flip.transpose(Image.ROTATE_270)
+ICONS['load_2'] = _load_icon.transpose(Image.ROTATE_270)
+ICONS['load_3'] = _load_icon.transpose(Image.FLIP_TOP_BOTTOM)
+ICONS['load_4'] = _load_icon.transpose(Image.ROTATE_180)
+ICONS['load_5'] = _load_icon_flip.transpose(Image.ROTATE_90)
+ICONS['load_6'] = _load_icon.transpose(Image.ROTATE_90)
+
+del _load_icon, _load_icon_flip
+# Loader handles, which we want to cycle animate.
+_load_handles: dict[tuple[int, int], Handle] = {}
+
+# Once initialised, schedule here.
+_load_nursery: trio.Nursery | None = None
+# Load calls occuring before init. This is done so apply() can be called during import etc,
+# and it'll be deferred till later.
+_early_loads: set[Handle] = set()
+
+
+def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
     """Return an xy tuple given a size or tuple."""
     if isinstance(size, tuple):
         return size
     return size, size
 
 
-def color_hex(color: Vec) -> str:
-    """Convert a RGB colour to #xxxxxx."""
-    r, g, b = color
-    return '#{:2X}{:2X}{:2X}'.format(int(r), int(g), int(b))
+def _get_tk_img(width: int, height: int) -> ImageTk.PhotoImage:
+    """Recycle an old image, or construct a new one."""
+    if not width:
+        width = 16
+    if not height:
+        height = 16
+
+    # Use setdefault and pop so each step is atomic.
+    img_list = _unused_tk_img.setdefault((width, height), [])
+    try:
+        img = img_list.pop()
+    except IndexError:
+        img = ImageTk.PhotoImage('RGBA', (width, height))
+    return img
 
 
-def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
-    """Loads in an image for use in TKinter.
+def _discard_tk_img(img: ImageTk.PhotoImage | None) -> None:
+    """Store an unused image so it can be reused."""
+    if img is not None:
+        # Use setdefault and append so each step is atomic.
+        img_list = _unused_tk_img.setdefault((img.width(), img.height()), [])
+        img_list.append(img)
 
-    - The .png suffix will automatically be added.
-    - Images will be loaded from both the inbuilt files and the extracted
-    zip cache.
-    - If resize_to is set, the image will be resized to that size using the algo
-    algorithm.
-    - This caches images, so it won't be deleted (Tk doesn't keep a reference
-      to the Python object), and subsequent calls don't touch the hard disk.
+
+# Special paths which map to various images.
+PATH_BLANK = utils.PackagePath('<special>', 'blank')
+PATH_ERROR = utils.PackagePath('<special>', 'error')
+PATH_LOAD = utils.PackagePath('<special>', 'load')
+PATH_NONE = utils.PackagePath('<special>', 'none')
+PATH_BG = utils.PackagePath('color', PETI_ITEM_BG_HEX[1:])
+PATH_BLACK = utils.PackagePath('<color>', '000')
+PATH_WHITE = utils.PackagePath('<color>', 'fff')
+
+
+class ImageType(Generic[ArgT]):
+    """Represents a kind of image that can be loaded or generated.
+
+    This contains callables for generating a PIL image from a specified
+    arg type, width and height.
     """
-    path = path.casefold().replace('\\', '/')
+    def __init__(
+        self,
+        name: str,
+        pil_func: Callable[[ArgT, int, int], Image.Image],
+        allow_raw: bool=False,
+        alpha_result: bool=False,
+    ) -> None:
+        self.name = name
+        self.pil_func = pil_func
+        self.allow_raw = allow_raw
+        self.alpha_result = alpha_result
+
+    def __repr__(self) -> str:
+        return f'<ImageType "{self.name}">'
+
+
+def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Image.Image:
+    """Directly produce an image of this size with the specified color."""
+    return Image.new('RGBA', (width or 16, height or 16), color + (255, ))
+
+
+def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
+    """Produce an image of this size with transparent pixels."""
+    return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
+
+
+def _load_file(
+    fsys: FileSystem,
+    uri: utils.PackagePath,
+    width: int, height: int,
+    resize_algo: int,
+    check_other_packages: bool=False,
+) -> Image.Image:
+    """Load an image from a filesystem."""
+    path = uri.path.casefold()
     if path[-4:-3] != '.':
         path += ".png"
 
-    orig_path = path
+    image: Image.Image
+    try:
+        img_file = fsys[path]
+    except (KeyError, FileNotFoundError):
+        img_file = None
 
-    resize_width, resize_height = resize_to = tuple_size(resize_to)
+    # Deprecated behaviour, check the other packages.
+    if img_file is None and check_other_packages:
+        for pak_id, other_fsys in PACK_SYSTEMS.items():
+            try:
+                img_file = other_fsys[path]
+                LOGGER.warning(
+                    'Image "{}" was found in package "{}", '
+                    'fix the reference.',
+                    uri, pak_id,
+                )
+                break
+            except (KeyError, FileNotFoundError):
+                pass
+
+    if img_file is None:
+        LOGGER.error('"{}" does not exist!', uri)
+        return Handle.error(width, height).get_pil()
 
     try:
-        return cached_img[path, resize_width, resize_height]
+        with img_file.open_bin() as file:
+            if path.casefold().endswith('.vtf'):
+                vtf = VTF.read(file)
+                mipmap = 0
+                # If resizing, pick the mipmap equal to or slightly larger than
+                # the desired size. With powers of two, most cases we don't
+                # need to resize at all.
+                if width > 0 and height > 0 and VTFFlags.NO_MIP not in vtf.flags:
+                    for mipmap in range(vtf.mipmap_count):
+                        mip_width = max(vtf.width >> mipmap, 1)
+                        mip_height = max(vtf.height >> mipmap, 1)
+                        if mip_width < width or mip_height < height:
+                            mipmap = max(0, mipmap - 1)
+                            break
+                image = vtf.get(mipmap=mipmap).to_PIL()
+            else:
+                image = Image.open(file)
+                image.load()
+                if image.mode != 'RGBA':
+                    image = image.convert('RGBA')
+    except Exception:
+        LOGGER.warning(
+            'Could not parse image file {}:',
+            uri,
+            exc_info=True,
+        )
+        return Handle.error(width, height).get_pil()
+
+    if width > 0 and height > 0 and (width, height) != image.size:
+        image = image.resize((width, height), resample=resize_algo)
+    return image
+
+
+def _pil_from_package(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
+    """Load from a app package."""
+    try:
+        fsys = PACK_SYSTEMS[uri.package]
+    except KeyError:
+        LOGGER.warning('Unknown package for loading images: "{}"!', uri)
+        return Handle.error(width, height).get_pil()
+
+    return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
+
+
+def _pil_load_builtin(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
+    """Load from the builtin UI resources."""
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.ANTIALIAS)
+
+
+def _pil_load_builtin_sprite(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
+    """Load from the builtin UI resources, but use nearest-neighbour resizing."""
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
+
+
+def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -> Image.Image:
+    """Combine several images into one."""
+    if not width:
+        width = components[0].width
+    if not height:
+        height = components[0].height
+    img = Image.new('RGBA', (width, height))
+    for part in components:
+        if part.width != img.width or part.height != img.height:
+            raise ValueError(f'Mismatch in image sizes: {width}x{height} != {components}')
+        # noinspection PyProtectedMember
+        child = part._load_pil()
+        if child.mode != 'RGBA':
+            LOGGER.warning('Image {} did not use RGBA mode!', child)
+            child = child.convert('RGBA')
+        img.alpha_composite(child)
+    return img
+
+
+@attr.define
+class CropInfo:
+    """Crop parameters."""
+    source: Handle
+    bounds: tuple[int, int, int, int]  # left, top, right, bottom coords.
+    transpose: Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
+
+
+def _pil_from_crop(info: CropInfo, width: int, height: int) -> Image.Image:
+    """Crop this image down to part of the source."""
+    src_w = info.source.width
+    src_h = info.source.height
+
+    # noinspection PyProtectedMember
+    image = info.source._load_pil()
+    # Shrink down the source to the final source so the bounds apply.
+    # TODO: Rescale bounds to actual source size to improve result?
+    if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
+        image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
+
+    image = image.crop(info.bounds)
+    if info.transpose is not None:
+        image = image.transpose(info.transpose)
+
+    if width > 0 and height > 0 and (width, height) != image.size:
+        image = image.resize((width, height), resample=Image.ANTIALIAS)
+    return image
+
+
+def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
+    """Construct an image with an overlaid icon."""
+    ico = ICONS[arg]
+    if width == 0:
+        width = ico.width
+    if height == 0:
+        height = ico.height
+
+    img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
+
+    if width < ico.width or height < ico.height:
+        # Crop to the middle part.
+        img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
+    else:
+        # Center the 64x64 icon.
+        img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
+
+    return img
+
+
+TYP_COLOR = ImageType('color', _pil_from_color)
+TYP_ALPHA = ImageType('alpha', _pil_empty, alpha_result=True)
+TYP_FILE = ImageType('file', _pil_from_package)
+TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
+TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
+TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
+TYP_COMP = ImageType('composite', _pil_from_composite)
+TYP_CROP = ImageType('crop', _pil_from_crop)
+
+
+class Handle(Generic[ArgT]):
+    """Represents an image that may be reloaded as required.
+
+    The args are dependent on the type, and are used to create the image
+    in a background thread.
+    """
+    _cached_pil: Image.Image | None
+    _cached_tk: ImageTk.PhotoImage | None
+    def __init__(
+        self,
+        typ: ImageType[ArgT],
+        args: ArgT,
+        width: int,
+        height: int,
+    ) -> None:
+        """Internal use only."""
+        self.type = typ
+        self.arg = args
+        self.width = width
+        self.height = height
+
+        self._cached_pil = None
+        self._cached_tk = None
+        self._force_loaded = False
+        self._users: set[WidgetWeakRef | Handle] = set()
+        # If None, get_tk()/get_pil() was used.
+        # If true, this is in the queue to load.
+        self._loading = False
+        # When no users are present, schedule cleaning up the handle's data to reuse.
+        self._cancel_cleanup: trio.CancelScope = trio.CancelScope()
+
+    @classmethod
+    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: int | tuple[int, int], height: int) -> Handle[ArgT]:
+        if isinstance(width, tuple):
+            width, height = width
+        try:
+            return _handles[typ, arg, width, height]
+        except KeyError:
+            handle = _handles[typ, arg, width, height] = Handle(typ, arg, width, height)
+            return handle
+
+    def __repr__(self) -> str:
+        return f'<{self.type.name.title()} image, {self.width}x{self.height}, {self.arg!r}>'
+
+    @classmethod
+    def parse(
+        cls: Type[Handle],
+        prop: Property,
+        pack: str,
+        width: int,
+        height: int,
+        *,
+        subkey: str='',
+        subfolder: str='',
+    ) -> Handle:
+        """Parse a property into an image handle.
+
+        If a package isn't specified, the given package will be used.
+        Optionally, 'subkey' can be used to specifiy that the property is a subkey.
+        An error icon will then be produced automatically.
+        If subfolder is specified, files will be relative to this folder.
+        The width/height may be zero to indicate it should not be resized.
+        """
+        if subkey:
+            try:
+                prop = prop.find_key(subkey)
+            except LookupError:
+                return cls.error(width, height)
+        if prop.has_children():
+            children = []
+            for child in prop:
+                if child.name not in ('image', 'img', 'layer'):
+                    raise ValueError(f'Unknown compound type "{child}"!')
+                children.append(cls.parse(
+                    child, pack,
+                    width, height,
+                    subfolder=subfolder
+                ))
+            return cls.composite(children, width, height)
+
+        return cls.parse_uri(utils.PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
+
+    @classmethod
+    def parse_uri(
+        cls,
+        uri: utils.PackagePath,
+        width: int = 0, height: int = 0,
+        *,
+        subfolder: str='',
+    ) -> Handle:
+        """Parse a URI into an image handle.
+
+        parse() should be used wherever possible, since that allows composite
+        images.
+        If subfolder is specified, files will be relative to this folder.
+        The width/height may be zero to indicate it should not be resized.
+        """
+        if subfolder:
+            uri = uri.in_folder(subfolder)
+
+        typ: ImageType
+        args: object
+        if uri.path.casefold() == '<black>':  # Old special case name.
+            LOGGER.warning('Using "{}" for a black icon is deprecated, use "<color>:000" or "<rgb>:000".', uri)
+            typ = TYP_COLOR
+            args = (0, 0, 0)
+        elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
+            special_name = uri.package[1:-1]
+            if special_name == 'special':
+                args = None
+                name = uri.path.casefold()
+                if name == 'blank':
+                    typ = TYP_ALPHA
+                elif name in ('error', 'none', 'load'):
+                    typ = TYP_ICON
+                    args = name
+                elif name == 'bg':
+                    typ = TYP_COLOR
+                    args = PETI_ITEM_BG
+                else:
+                    raise ValueError(f'Unknown special type "{uri.path}"!')
+            elif special_name in ('color', 'colour', 'rgb'):
+                # <color>:#RGB, <color>:#RRGGBB, <color>:R,G,B
+                color = uri.path
+                if color.startswith('#'):
+                    color = color[1:]
+                try:
+                    if ',' in color:
+                        r, g, b = map(int, color.split(','))
+                    elif len(color) == 3:
+                        r = int(color[0] * 2, 16)
+                        g = int(color[1] * 2, 16)
+                        b = int(color[2] * 2, 16)
+                    elif len(color) == 6:
+                        r = int(color[0:2], 16)
+                        g = int(color[2:4], 16)
+                        b = int(color[4:6], 16)
+                    else:
+                        raise ValueError
+                except (ValueError, TypeError, OverflowError):
+                    # Try to grab from TK's colour list.
+                    try:
+                        r, g, b = TK_ROOT.winfo_rgb(color)
+                        # They're full 16-bit colors, we don't want that.
+                        r >>= 8
+                        g >>= 8
+                        b >>= 8
+                    except tk.TclError:
+                        raise ValueError(f'Colors must be RGB, RRGGBB hex values, or R,G,B decimal!, not {uri}') from None
+                typ = TYP_COLOR
+                args = (r, g, b)
+            elif special_name in ('bee', 'bee2'):  # Builtin resources.
+                typ = TYP_BUILTIN
+                args = uri
+            else:
+                raise ValueError(f'Unknown special icon type "{uri}"!')
+        else:  # File item
+            typ = TYP_FILE
+            args = uri
+        return cls._get(typ, args, width, height)
+
+    @classmethod
+    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle[utils.PackagePath]:
+        """Shortcut for getting a handle to a builtin UI image."""
+        return cls._get(TYP_BUILTIN, utils.PackagePath('<bee2>', path + '.png'), width, height)
+
+    @classmethod
+    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle[utils.PackagePath]:
+        """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
+        return cls._get(TYP_BUILTIN_SPR, utils.PackagePath('<bee2>', path + '.png'), width, height)
+
+    @classmethod
+    def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle[Sequence[Handle]]:
+        """Return a handle composed of several images layered on top of each other."""
+        if not children:
+            return cls.error(width, height)
+        if not width:
+            width = children[0].width
+        if not height:
+            height = children[0].height
+
+        # Handles aren't hashable, so we need to manually look up.
+        key = tuple((child.type, child.arg) for child in children)
+        try:
+            return _handles[TYP_COMP, key, width, height]
+        except KeyError:
+            handle = _handles[TYP_COMP, key, width, height] = Handle(TYP_COMP, children, width, height)
+            return handle
+
+    def crop(
+        self,
+        bounds: tuple[int, int, int, int],
+        transpose: int | None = None,
+        width: int = 0, height: int = 0,
+    ) -> Handle[Sequence[Handle]]:
+        """Wrap a handle to crop it into a smaller size."""
+        return Handle(TYP_CROP, CropInfo(self, bounds, transpose), width, height)
+
+    @classmethod
+    def file(cls, path: utils.PackagePath, width: int, height: int) -> Handle[utils.PackagePath]:
+        """Shortcut for getting a handle to file path."""
+        return cls._get(TYP_FILE, path, width, height)
+
+    @classmethod
+    def error(cls, width: int, height: int) -> Handle[str]:
+        """Shortcut for getting a handle to an error icon."""
+        return cls._get(TYP_ICON, 'error', width, height)
+
+    @classmethod
+    def ico_none(cls, width: int, height: int) -> Handle[str]:
+        """Shortcut for getting a handle to a 'none' icon."""
+        return cls._get(TYP_ICON, 'none', width, height)
+
+    @classmethod
+    def ico_loading(cls, width: int, height: int) -> Handle[str]:
+        """Shortcut for getting a handle to a 'loading' icon."""
+        try:
+            return _load_handles[width, height]
+        except KeyError:
+            res = _load_handles[width, height] = cls._get(TYP_ICON, 'load', width, height)
+            return res
+
+    @classmethod
+    def blank(cls, width: int, height: int) -> Handle:
+        """Shortcut for getting a handle to an empty image."""
+        # The argument is irrelevant.
+        return cls._get(TYP_ALPHA, None, width, height)
+
+    @classmethod
+    def color(cls, color: tuple[int, int, int] | Vec, width: int, height: int) -> Handle[tuple[int, int, int]]:
+        """Shortcut for getting a handle to a solid color."""
+        if isinstance(color, Vec):
+            # Convert.
+            color = int(color.x), int(color.y), int(color.z)
+        return cls._get(TYP_COLOR, color, width, height)
+
+    def get_pil(self) -> Image.Image:
+        """Load the PIL image if required, then return it."""
+        if self.type.allow_raw:
+            # Force load, so it's always ready.
+            self._force_loaded = True
+        elif not self._users and _load_nursery is not None:
+            # Loading something unused, schedule it to be cleaned soon.
+            self._cancel_cleanup.cancel()
+            self._cancel_cleanup = trio.CancelScope()
+            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+        return self._load_pil()
+
+    def get_tk(self) -> ImageTk.PhotoImage:
+        """Load the TK image if required, then return it.
+
+        Only available on BUILTIN type images since they cannot then be
+        reloaded.
+        """
+        if not self.type.allow_raw:
+            raise ValueError('Cannot use get_tk() on non-builtin types!')
+        self._force_loaded = True
+        return self._load_tk()
+
+    def _load_pil(self) -> Image.Image:
+        """Load the PIL image if required, then return it."""
+        if self._cached_pil is None:
+            self._cached_pil = self.type.pil_func(self.arg, self.width, self.height)
+        return self._cached_pil
+
+    def _load_tk(self) -> ImageTk.PhotoImage:
+        """Load the TK image if required, then return it."""
+        if self._cached_tk is None:
+            # LOGGER.debug('Loading {}', self)
+            res = self._load_pil()
+            # Except for builtin types (icons), strip alpha.
+            if not self.type.alpha_result:
+                res = res.convert('RGB')
+            self._cached_tk = _get_tk_img(res.width, res.height)
+            self._cached_tk.paste(res)
+        return self._cached_tk
+
+    def _decref(self, ref: 'WidgetWeakRef | Handle') -> None:
+        """A label was no longer set to this handle."""
+        if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
+            return
+        self._users.discard(ref)
+        if self.type is TYP_COMP:
+            for child in cast('Sequence[Handle]', self.arg):
+                child._decref(self)
+        elif self.type is TYP_CROP:
+            cast(CropInfo, self.arg).source._decref(self)
+        if not self._users and _load_nursery is not None:
+            # Schedule this handle to be cleaned up, and store a cancel scope so that
+            # can be aborted.
+            self._cancel_cleanup = trio.CancelScope()
+            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+
+    def _incref(self, ref: 'WidgetWeakRef | Handle') -> None:
+        """Add a label to the list of those controlled by us."""
+        if self._force_loaded:
+            return
+        self._users.add(ref)
+        # Abort cleaning up if we were planning to.
+        self._cancel_cleanup.cancel()
+        if self.type is TYP_COMP:
+            for child in cast('Sequence[Handle]', self.arg):
+                child._incref(self)
+        elif self.type is TYP_CROP:
+            cast(CropInfo, self.arg).source._incref(self)
+
+    def _request_load(self) -> ImageTk.PhotoImage:
+        """Request a reload of this image.
+
+        If this can be done synchronously, the result is returned.
+        Otherwise, this returns the loading icon.
+        """
+        if self._loading is True:
+            return Handle.ico_loading(self.width, self.height).get_tk()
+        if self._cached_tk is not None:
+            return self._cached_tk
+        if self._loading is False:
+            self._loading = True
+            if _load_nursery is None:
+                _early_loads.add(self)
+            else:
+                _load_nursery.start_soon(self._load_task)
+        return Handle.ico_loading(self.width, self.height).get_tk()
+
+    async def _load_task(self) -> None:
+        """Scheduled to load images then apply to the labels."""
+        await trio.to_thread.run_sync(self._load_pil)
+        self._loading = False
+        tk_ico = self._load_tk()
+        for label_ref in self._users:
+            if isinstance(label_ref, WeakRef):
+                label: tkImgWidgets | None = label_ref()
+                if label is not None:
+                    try:
+                        label['image'] = tk_ico
+                    except tk.TclError:
+                        # Can occur if the image has been removed/destroyed, but
+                        # the Python object still exists. Ignore, should be
+                        # cleaned up shortly.
+                        pass
+
+    async def _cleanup_task(self, scope: trio.CancelScope) -> None:
+        """Wait for the time to elapse, then clear the contents."""
+        with scope:
+            await trio.sleep(5)
+        # We weren't cancelled and are empty, cleanup.
+        if not scope.cancel_called and self._loading is not None and not self._users:
+            _discard_tk_img(self._cached_tk)
+            self._cached_tk = self._cached_pil = None
+
+
+def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
+    """Finaliser for _wid_tk keys.
+
+    Removes them from the dict, and decreases the usage count on the handle.
+    """
+    try:
+        handle = _wid_tk.pop(ref)
+    except (KeyError, TypeError, NameError):
+        # Interpreter could be shutting down and deleted globals, or we were
+        # called twice, etc. Just ignore.
+        pass
+    else:
+        handle._decref(ref)
+
+
+# noinspection PyProtectedMember
+async def _spin_load_icons() -> None:
+    """Cycle loading icons."""
+    fnames = [
+        f'load_{i}'
+        for i in range(8)
+    ]
+    for load_name in itertools.cycle(fnames):
+        await trio.sleep(0.125)
+        for handle in _load_handles.values():
+            handle.arg = load_name
+            handle._cached_pil = None
+            if handle._cached_tk is not None:
+                # This updates the TK widget directly.
+                handle._cached_tk.paste(handle._load_pil())
+
+
+# noinspection PyProtectedMember
+async def init(filesystems: Mapping[str, FileSystem]) -> None:
+    """Load in the filesystems used in package and start the background loading."""
+    global _load_nursery
+
+    PACK_SYSTEMS.clear()
+    for pak_id, sys in filesystems.items():
+        PACK_SYSTEMS[pak_id] = FileSystemChain(
+            (sys, 'resources/BEE2/'),
+            (sys, 'resources/materials/'),
+            (sys, 'resources/materials/models/props_map_editor/'),
+        )
+
+    async with trio.open_nursery() as _load_nursery:
+        LOGGER.debug('Early loads: {}', _early_loads)
+        while _early_loads:
+            handle = _early_loads.pop()
+            if handle._users:
+                _load_nursery.start_soon(Handle._load_task, handle)
+        _load_nursery.start_soon(_spin_load_icons)
+        await trio.sleep_forever()
+
+
+# noinspection PyProtectedMember
+def refresh_all() -> None:
+    """Force all images to reload."""
+    LOGGER.info('Forcing all images to reload!')
+    done = 0
+    for handle in list(_handles.values()):
+        # If force-loaded it's builtin UI etc we shouldn't reload.
+        # If already loading, no point.
+        if not handle._force_loaded and not handle._loading:
+            _discard_tk_img(handle._cached_tk)
+            handle._cached_tk = handle._cached_pil = None
+            loading = handle._request_load()
+            done += 1
+            for label_ref in handle._users:
+                if isinstance(label_ref, WeakRef):
+                    label: tkImgWidgets | None = label_ref()
+                    if label is not None:
+                        label['image'] = loading
+    LOGGER.info('Queued {} images to reload.', done)
+
+
+# noinspection PyProtectedMember
+def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
+    """Set the image in a widget.
+
+    This tracks the widget, so later reloads will affect the widget.
+    If the image is None, it is instead unset.
+    """
+    ref = WeakRef(widget, _label_destroyed)
+    if img is None:
+        widget['image'] = None
+        try:
+            old = _wid_tk.pop(ref)
+        except KeyError:
+            pass
+        else:
+            old._decref(ref)
+        return widget
+    try:
+        old = _wid_tk[ref]
     except KeyError:
         pass
-
-    with filesystem:
-        try:
-            img_file = filesystem[path]
-        except (KeyError, FileNotFoundError):
-            LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
-            return error or img_error
-        with img_file.open_bin() as file:
-            image = Image.open(file)  # type: Image.Image
-            image.load()
-
-    if resize_to != (0, 0) and resize_to != image.size:
-        image = image.resize(resize_to, algo)
-        # image.save(img_file._data.sys._resolve_path(img_file._data.path))
-
-    tk_img = ImageTk.PhotoImage(image=image)
-
-    cached_img[orig_path, resize_width, resize_height] = tk_img
-    return tk_img
-
-
-def spr(name, error=None):
-    """Load in the property icons with the correct size."""
-    # We're doubling the icon size, so use nearest-neighbour to keep
-    # image sharpness
-    return png('icons/'+name, error=error, resize_to=32, algo=Image.NEAREST)
-
-
-def icon(name, error=None):
-    """Load in a palette icon, using the correct directory and size."""
-    return png('items/' + name, error=error, resize_to=64)
+    else:
+        if old is img:
+            # Unchanged.
+            return widget
+        old._decref(ref)
+    img._incref(ref)
+    _wid_tk[ref] = img
+    cached_img = img._cached_tk
+    if cached_img is not None:
+        widget['image'] = cached_img
+    else:  # Need to load.
+        widget['image'] = img._request_load()
+    return widget
 
 
 def get_app_icon(path: str):
@@ -115,20 +807,23 @@ def make_splash_screen(
     max_width: float,
     max_height: float,
     base_height: int,
-    text1_bbox: Tuple[int, int, int, int],
-    text2_bbox: Tuple[int, int, int, int],
-):
+    text1_bbox: tuple[int, int, int, int],
+    text2_bbox: tuple[int, int, int, int],
+) -> tuple[tk.PhotoImage, int, int]:
     """Create the splash screen image.
 
     This uses a random screenshot from the splash_screens directory.
     It then adds the gradients on top.
     """
     import random
-    folder = str(utils.install_path('images/splash_screen'))
-    path = '<nothing>'
+    folder = utils.install_path('images/splash_screen')
+    user_folder = folder / 'user'
+    path = Path('<nothing>')
+    if user_folder.exists():
+        folder = user_folder
     try:
-        path = random.choice(os.listdir(folder))
-        with open(os.path.join(folder, path), 'rb') as img_file:
+        path = random.choice(list(folder.iterdir()))
+        with path.open('rb') as img_file:
             image = Image.open(img_file)
             image.load()
     except (FileNotFoundError, IndexError, IOError):
@@ -190,53 +885,8 @@ def make_splash_screen(
                 fill=(0, 150, 120, 20),
             )
 
+    logo_img = Image.open(utils.install_path('images/BEE2/splash_logo.png'))
+    draw.bitmap((10, 10), logo_img)
+
     tk_img = ImageTk.PhotoImage(image=image)
     return tk_img, image.width, image.height
-
-
-def color_square(color: Vec, size=16):
-    """Create a square image of the given size, with the given color."""
-    key = color.x, color.y, color.z, size
-
-    try:
-        return cached_squares[key]
-    except KeyError:
-        img = Image.new(
-            mode='RGB',
-            size=tuple_size(size),
-            color=(int(color.x), int(color.y), int(color.z)),
-        )
-        tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares[key] = tk_img
-        return tk_img
-
-
-def invis_square(size):
-    """Create a square image of the given size, filled with 0-alpha pixels."""
-
-    try:
-        return cached_squares['alpha', size]
-    except KeyError:
-        img = Image.new(
-            mode='RGBA',
-            size=tuple_size(size),
-            color=(0, 0, 0, 0),
-        )
-        tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares['alpha', size] = tk_img
-
-        return tk_img
-
-# Colour of the palette item background
-PETI_ITEM_BG = Vec(229, 232, 233)
-PETI_ITEM_BG_HEX = color_hex(PETI_ITEM_BG)
-
-
-BLACK_64 = color_square(Vec(0, 0, 0), size=64)
-BLACK_96 = color_square(Vec(0, 0, 0), size=96)
-PAL_BG_64 = color_square(PETI_ITEM_BG, size=64)
-PAL_BG_96 = color_square(PETI_ITEM_BG, size=96)
-
-# If image is not readable, use this instead
-# If this actually fails, use the black image.
-img_error = png('BEE2/error', error=BLACK_64)

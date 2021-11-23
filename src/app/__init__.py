@@ -2,8 +2,8 @@
 import tkinter as tk
 from types import TracebackType
 from typing import Type
-from utils import BEE_VERSION
-
+import utils
+import trio  # Import first, so it monkeypatch traceback before us.
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
@@ -34,27 +34,28 @@ def tk_error(
     # The exception is caught inside the TK code.
     # We don't care about that, so try and move the traceback up
     # one level.
-    import sys
     import logging
     if exc_tb.tb_next:
         exc_tb = exc_tb.tb_next
 
+    logger = logging.getLogger('BEE2')
+
     try:
         on_error(exc_type, exc_value, exc_tb)
-    except:
+    except Exception:
+        logger.exception('Failed to display messagebox:')
         pass
 
-    logger = logging.getLogger('BEE2')
     logger.error(
-        msg='Uncaught Exception:',
+        msg='Uncaught Tk Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
-    logging.shutdown()
 
-    # Since this isn't caught normally, it won't quit the application.
-    # Quit ourselves manually. to prevent TK just freezing.
-    TK_ROOT.quit()
-    sys.exit()
+    try:
+        from app.BEE2 import APP_NURSERY
+        APP_NURSERY.cancel_scope.cancel()
+    except Exception:
+        logger.exception("Couldn't cancel:")
 
 TK_ROOT.report_callback_exception = tk_error
 
@@ -69,7 +70,6 @@ def on_error(
     # We don't want this to fail, so import everything here, and wrap in
     # except Exception.
     import traceback
-
     err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
     # Grab and release the grab so nothing else can block the error message.
@@ -90,10 +90,13 @@ def on_error(
     # Put it onscreen.
     try:
         from tkinter import messagebox
+        from localisation import gettext
         messagebox.showinfo(
-            title='BEEMOD {} Error!'.format(BEE_VERSION),
-            message='An error occurred: \n{}\n\nThis has '
-                    'been copied to the clipboard.'.format(err),
+            title=gettext('BEEMOD {} Error!').format(utils.BEE_VERSION),
+            message=gettext(
+                'An error occurred: \n{}\n\n'
+                'This has been copied to the clipboard.'
+            ).format(err),
             icon=messagebox.ERROR,
         )
     except Exception:
@@ -109,3 +112,12 @@ def on_error(
     except Exception:
         # Ignore failures...
         pass
+
+# Various configuration booleans.
+PLAY_SOUND = tk.BooleanVar(value=True, name='OPT_play_sounds')
+KEEP_WIN_INSIDE = tk.BooleanVar(value=True, name='OPT_keep_win_inside')
+FORCE_LOAD_ONTOP = tk.BooleanVar(value=True, name='OPT_force_load_ontop')
+SHOW_LOG_WIN = tk.BooleanVar(value=False, name='OPT_show_log_window')
+LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
+PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
+DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
