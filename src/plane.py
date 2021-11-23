@@ -74,6 +74,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             x, y = map(int, pos)
         except (ValueError, TypeError):
             raise KeyError(pos) from None
+        if y < self._min_y:
+            self._min_y = y
+        if y > self._max_y:
+            self._max_y = y
+        if x < self._min_x:
+            self._min_x = x
+        if x > self._max_x:
+            self._max_x = x
 
         y_ind = y + self._yoff
         y_bound = len(self._xoffs)
@@ -85,15 +93,11 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             self._xoffs[0:0] = [0] * change
             self._data[0:0] = [None] * change
             y_ind = 0
-            if y < self._min_y:
-                self._min_y = y
         elif y_ind >= y_bound:
             change = y_ind - y_bound + 1
             self._xoffs += [0] * change
             self._data += [None] * change
             y_ind = -1  # y_bound - 1, but list can compute that.
-            if y > self._max_y:
-                self._max_y = y
 
         # Now x.
         data = self._data[y_ind]
@@ -111,14 +115,10 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             self._xoffs[y_ind] += change
             data[0:0] = [None] * change
             x_ind = 0
-            if x < self._min_x:
-                self._min_x = x
         elif x_ind >= x_bound:
             change = x_ind - x_bound + 1
             data += [None] * change
             x_ind = -1
-            if x > self._max_x:
-                self._max_x = x
 
         if data[x_ind] is None:
             if val is not None:
