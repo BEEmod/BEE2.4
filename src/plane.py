@@ -70,6 +70,10 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __setitem__(self, pos: Tuple[int, int], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
+        if val is None:
+            # delitem is much more efficient.
+            del self[pos]
+            return
         try:
             x, y = map(int, pos)
         except (ValueError, TypeError):
@@ -130,10 +134,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             x_ind = -1
 
         if data[x_ind] is None:
-            if val is not None:
-                self._used += 1
-        elif val is None:
-            self._used -= 1
+            self._used += 1
 
         data[x_ind] = val
 
@@ -147,7 +148,20 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                     yield (x, y)
 
     def __delitem__(self, pos: Tuple[int, int]) -> None:
-        self[pos] = None
+        """Remove the value at a given position, doing nothing if not set."""
+        try:
+            x, y = map(int, pos)
+        except (ValueError, TypeError):
+            raise KeyError(pos) from None
+
+        y += self._yoff
+        try:
+            x += self._xoffs[y]
+            if self._data[y][x] is not None:
+                self._used -= 1
+            self._data[y][x] = None
+        except IndexError:  # Already deleted.
+            pass
 
     def clear(self) -> None:
         """Remove all data from the plane."""

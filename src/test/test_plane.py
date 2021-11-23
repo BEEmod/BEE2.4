@@ -150,3 +150,34 @@ def test_illegal_positions() -> None:
         plane["blah", 9] = object
     with pytest.raises(KeyError):
         plane[9, "blah"] = object
+
+    with pytest.raises(KeyError):
+        del plane[45, 9, 2]
+    with pytest.raises(KeyError):
+        del plane[45]
+    with pytest.raises(KeyError):
+        del plane["blah", 9]
+    with pytest.raises(KeyError):
+        del plane[9, "blah"]
+
+
+def test_deletion() -> None:
+    """Test deleting positions."""
+    plane = Plane()
+    plane[5, 5] = 4
+    plane[4, 5] = 3
+    plane[5, 4] = 3
+    plane[6, 5] = 3
+    plane[5, 6] = 3
+    assert len(plane) == 5
+    for _ in 1, 2:
+        # Test they can be re-deleted.
+        del plane[4, 5]
+        del plane[5, 4]
+        del plane[6, 5]
+        del plane[5, 6]
+    # Never-set is fine.
+    del plane[5, 23]
+    del plane[-10, 4]
+    # Check we didn't double-count.
+    assert len(plane) == 1
