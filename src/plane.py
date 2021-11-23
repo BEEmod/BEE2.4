@@ -148,13 +148,12 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         return PlaneItems(self)
 
 
+# noinspection PyProtectedMember
 class PlaneValues(ValuesView[ValT]):
     """Implementation of Plane.values()."""
-    __slots__ = ()  # _mapping is defined in superclass.
-    def __init__(self, plane: Plane[ValT]) -> None:
-        self._mapping = plane
-        super().__init__(plane)
-        
+    __slots__ = ()
+    _mapping: Plane[ValT]  # Defined in superclass.
+
     def __contains__(self, item: Any) -> bool:
         """Check if the provided item is a value."""
         if item is None:
@@ -172,9 +171,12 @@ class PlaneValues(ValuesView[ValT]):
                     yield value
 
 
+# noinspection PyProtectedMember
 class PlaneItems(ItemsView[Tuple[int, int], ValT]):
     """Implementation of Plane.items()."""
-    __slots__ = ()  # _mapping is defined in superclass.
+    __slots__ = ()
+    _mapping: Plane[ValT]  # Defined in superclass.
+
     def __init__(self, plane: Plane[ValT]) -> None:
         self._mapping = plane
         super().__init__(plane)
