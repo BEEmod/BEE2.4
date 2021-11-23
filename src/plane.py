@@ -1,6 +1,7 @@
 """Implements an adaptive 2D matrix for storing items at arbitary coordinates efficiently.
 
 """
+from __future__ import annotations
 from typing import (
     TypeVar, Generic, Union, Any, Optional, Tuple,
     Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView,
@@ -20,8 +21,8 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def __init__(
         self,
         contents: Union[
-            Mapping[Tuple[int, int], ValT],
-            Iterable[Tuple[Tuple[int, int], ValT]],
+            Mapping[tuple[int, int], ValT],
+            Iterable[tuple[tuple[int, int], ValT]],
         ] = (),
     ) -> None:
         """Initalises the plane with the provided values."""
@@ -40,7 +41,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         return self._min_x, self._min_y
 
     @property
-    def maxes(self) -> Tuple[int, int]:
+    def maxes(self) -> tuple[int, int]:
         """Return the maximum bounding point ever set."""
         return self._max_x, self._max_y
 
@@ -51,7 +52,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def __repr__(self) -> str:
         return f'Plane({dict(self.items())!r})'
 
-    def __getitem__(self, pos: Tuple[int, int]) -> ValT:
+    def __getitem__(self, pos: tuple[int, int]) -> ValT:
         """Return the value at a given position."""
         try:
             x, y = map(int, pos)
@@ -68,7 +69,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             raise KeyError(pos)
         return out
 
-    def __setitem__(self, pos: Tuple[int, int], val: ValT) -> None:
+    def __setitem__(self, pos: tuple[int, int], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
         if val is None:
             # delitem is much more efficient.
@@ -108,7 +109,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         elif y_ind >= y_bound:
             change = y_ind - y_bound + 1
             self._xoffs += [0] * change
-            self._data += [None] * change
+            self._data += [None] * change  # type: ignore # Mypy assumes list[None]
             y_ind = -1  # y_bound - 1, but list can compute that.
 
         # Now x.
@@ -138,7 +139,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
         data[x_ind] = val
 
-    def __iter__(self) -> Tuple[int, int]:
+    def __iter__(self) -> Iterator[tuple[int, int]]:
         """Return all used keys."""
         for y, (xoff, row) in enumerate(zip(self._xoffs, self._data), start=-self._yoff):
             if row is None:
@@ -185,7 +186,7 @@ class PlaneValues(ValuesView[ValT]):
     __slots__ = ()
     _mapping: Plane[ValT]  # Defined in superclass.
 
-    def __contains__(self, item: Any) -> bool:
+    def __contains__(self, item: object) -> bool:
         """Check if the provided item is a value."""
         # We use None as a sentinel, don't false-positive.
         if item is None:
@@ -197,7 +198,7 @@ class PlaneValues(ValuesView[ValT]):
                 return True
         return False
 
-    def __iter__(self) -> None:
+    def __iter__(self) -> Iterator[ValT]:
         """Produce all values in the plane."""
         for row in self._mapping._data:
             if row is None:
@@ -217,7 +218,7 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
         self._mapping = plane
         super().__init__(plane)
 
-    def __contains__(self, item: Any) -> bool:
+    def __contains__(self, item: object) -> bool:
         """Check if the provided pos/value pair is present."""
         if not isinstance(item, tuple):
             return False
