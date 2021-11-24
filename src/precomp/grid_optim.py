@@ -3,9 +3,10 @@
 Given a grid of on/off positions, produce a set of rectangular boxes that
 efficiently cover the True positions without the False ones.
 """
-from typing import Tuple, Dict
+from typing import Mapping, Tuple
 from enum import Enum
 
+from plane import Plane
 
 __all__ = ['optimise']
 
@@ -17,51 +18,40 @@ class Pos(Enum):
     SET = 2  # Should be filled, and is already
 
     @property
-    def no_fill(self):
+    def no_fill(self) -> bool:
         """Is filling disallowed here?"""
         return self.value is not True
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '-x#'[self.value]
 
 
-def optimise(grid: Dict[Tuple[int, int], bool]):
+def optimise(grid: Mapping[Tuple[int, int], bool]):
     """Given a grid, return min, max pairs which fill the space.
 
     The grid should be a (x, y): bool dict.
     This yields (min_x, min_y, max_x, max_y) tuples.
     """
-    x_len = y_len = 0
-    for x, y in grid:
-        x_len = max(x, x_len)
-        y_len = max(y, y_len)
-    # Force to int if they're floats.
-    x_len = int(x_len) + 1
-    y_len = int(y_len) + 1
+    full_grid = Plane(default=Pos.VOID)
+    for (x, y), value in grid.items():
+        full_grid[x, y] = Pos(bool(value))
 
-    full_grid = {
-        (x, y): Pos(bool(grid.get((x, y), False)))
-        for x in range(x_len)
-        for y in range(y_len)
-    }  # type: Dict[Tuple[int, int], Pos]
+    x_min, y_min = full_grid.mins
+    x_max, y_max = full_grid.maxes
+    x_max += 1
+    y_max += 1
 
-    # Add guard data at the edge of the grid.
-    for x in range(x_len):
-        full_grid[x, y_len] = Pos.VOID
-    for y in range(y_len):
-        full_grid[x_len, y] = Pos.VOID
-
-    for x in range(x_len):
-        for y in range(y_len):
+    for x in range(x_min, x_max):
+        for y in range(y_min, y_max):
             if full_grid[x, y] is not Pos.TO_SET:
                 continue
-            yield _do_cell(full_grid, x, y, x_len, y_len)
+            yield _do_cell(full_grid, x, y, x_max, y_max)
 
     assert all(v is not Pos.TO_SET for v in full_grid.values())
 
 
 def _do_cell(
-    grid: Dict[Tuple[int, int], Pos],
+    grid: Plane[Pos],
     min_x: int,
     min_y: int,
     max_x: int,
