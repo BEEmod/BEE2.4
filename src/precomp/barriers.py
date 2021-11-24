@@ -3,6 +3,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Dict, Tuple, List, Callable
 
+from plane import Plane
 from precomp import (
     texturing, options, packing,
     template_brush,
@@ -224,8 +225,8 @@ def make_barriers(vmf: VMF):
     # (normal_dist, positive_axis, type) -> [(x, y)]
     slices: Dict[
         Tuple[Tuple[float, float, float], bool, BarrierType],
-        Dict[Tuple[int, int], False]
-    ] = defaultdict(dict)
+        Plane[bool]
+    ] = defaultdict(Plane)
     # We have this on the 32-grid so we can cut squares for holes.
 
     for (origin_tup, normal_tup), barr_type in BARRIERS.items():
@@ -261,6 +262,7 @@ def make_barriers(vmf: VMF):
             normal[norm_axis] > 0,
             barr_type,
         ]
+        offsets: tuple[int, ...]
         if hole_type is HoleType.LARGE:
             offsets = (-80, -48, -16, 16, 48, 80)
         else:
@@ -362,8 +364,8 @@ def make_barriers(vmf: VMF):
             solid_pane_func,
         )
 
-    for (plane_pos, is_pos, barr_type), pos_slice in slices.items():
-        plane_pos = Vec(plane_pos)
+    for (plane_pos_tup, is_pos, barr_type), pos_slice in slices.items():
+        plane_pos = Vec(plane_pos_tup)
         norm_axis = plane_pos.axis()
         normal = Vec.with_axes(norm_axis, 1 if is_pos else -1)
 
@@ -389,11 +391,11 @@ def make_barriers(vmf: VMF):
                 v_axis, max_v * 32 + 32,
             )
 
-            def solid_pane_func(pos1: float, pos2: float, mat: str) -> List[Solid]:
+            def solid_pane_func(off1: float, off2: float, mat: str) -> List[Solid]:
                 """Make the solid brush."""
                 return [vmf.make_prism(
-                    pos_min + normal * (64.0 - pos1),
-                    pos_max + normal * (64.0 - pos2),
+                    pos_min + normal * (64.0 - off1),
+                    pos_max + normal * (64.0 - off2),
                     mat=mat,
                 ).solid]
 
@@ -493,8 +495,9 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     """
     template = template_brush.get_template(temp_name)
     temp_world, temp_detail, temp_over = template.visgrouped()
+    beam_template: Solid
     try:
-        [beam_template] = temp_world + temp_detail  # type: Solid
+        [beam_template] = temp_world + temp_detail
     except ValueError:
         raise ValueError('Bad Glass Floorbeam template!')
 
@@ -513,12 +516,12 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     # This is a mapping from some glass piece to its group list.
     groups = {}
 
-    for (origin, normal), barr_type in BARRIERS.items():
+    for (origin, normal_tup), barr_type in BARRIERS.items():
         # Grating doesn't use it.
         if barr_type is not BarrierType.GLASS:
             continue
 
-        normal = Vec(normal)
+        normal = Vec(normal_tup)
 
         if not normal.z:
             # Not walls.
@@ -592,11 +595,11 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 continue
 
             try:
-                min_pos, max_pos = beams[side_off]
+                min_off, max_off = beams[side_off]
             except KeyError:
                 beams[side_off] = beam_off, beam_off
             else:
-                beams[side_off] = min(min_pos, beam_off), max(max_pos, beam_off)
+                beams[side_off] = min(min_off, beam_off), max(max_off, beam_off)
 
         detail = vmf.create_ent('func_detail')
 
