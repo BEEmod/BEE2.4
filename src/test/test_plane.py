@@ -1,5 +1,6 @@
 """Test the Plane class."""
-from typing import List, Tuple
+from collections import Counter
+from typing import List, Tuple, Optional
 
 from plane import Plane
 import pytest
@@ -93,16 +94,18 @@ def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: in
 
 def test_views() -> None:
     """Test the view objects."""
-    plane: Plane[int] = Plane()
+    plane: Plane[Optional[int]] = Plane()
     plane[0, 4] = 1
-    plane[2, -5] = 2
+    plane[2, -5] = None
     plane[0, 5] = 3
     plane[0, 7] = 2
+    plane[5, 3] = 2
 
     assert (0, 4) in plane.keys()
     assert (1, 4) not in plane.keys()
+    assert (2, -5) in plane.keys()
     assert set(plane.keys()) == {
-        (0, 4), (2, -5), (0, 5), (0, 7),
+        (0, 4), (2, -5), (0, 5), (0, 7), (5, 3),
     }
 
     # Check illegal values don't error.
@@ -112,8 +115,8 @@ def test_views() -> None:
 
     assert 1 in plane.values()
     assert 45 not in plane.values()
-    assert None not in plane.values()  # Special case
-    assert sorted(plane.values()) == [1, 2, 2, 3]
+    assert None in plane.values()
+    assert Counter(plane.values()) == {1: 1, 2: 2, 3: 1, None: 1}
 
     assert ((0, 5), 3) in plane.items()
     assert ((2, -5), 4) not in plane.items()
@@ -122,6 +125,9 @@ def test_views() -> None:
     assert 45 not in plane.items()
     assert (1, ) not in plane.items()
     assert (1, 2, 3, 4) not in plane.items()
+    assert set(plane.items()) == {
+        ((0, 4), 1), ((2, -5), None), ((0, 5), 3), ((0, 7), 2), ((5, 3), 2),
+    }
 
     # Check keys, values, items is in the same order.
     assert list(zip(plane.keys(), plane.values())) == list(plane.items())

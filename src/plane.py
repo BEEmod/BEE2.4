@@ -1,13 +1,15 @@
-"""Implements an adaptive 2D matrix for storing items at arbitary coordinates efficiently.
+"""Implements an adaptive 2D matrix for storing items at arbitrary coordinates efficiently.
 
 """
 from __future__ import annotations
 from typing import (
-    TypeVar, Generic, Optional, Tuple,
+    TypeVar, Generic, Optional, Tuple, Any,
     Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView,
 )
 
 ValT = TypeVar('ValT')
+# Sentinel object for empty slots.
+UNSET: Any = type('UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 
 
 class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
@@ -27,7 +29,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         self._min_x = self._min_y = self._max_x = self._max_y = 0
         self._yoff = 0
         self._xoffs: list[int] = []
-        self._data: list[Optional[list[Optional[ValT]]]] = []
+        self._data: list[Optional[list[ValT]]] = []
         self._used = 0
         if contents:
             self.update(contents)
@@ -62,16 +64,12 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             out = self._data[y][x]
         except IndexError:
             raise KeyError(pos) from None
-        if out is None:  # Empty slot.
+        if out is UNSET:  # Empty slot.
             raise KeyError(pos)
         return out
 
     def __setitem__(self, pos: tuple[int, int], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
-        if val is None:
-            # delitem is much more efficient.
-            del self[pos]
-            return
         try:
             x, y = map(int, pos)
         except (ValueError, TypeError):
@@ -124,14 +122,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         if x_ind < 0:
             change = -x_ind
             self._xoffs[y_ind] += change
-            data[0:0] = [None] * change
+            data[0:0] = [UNSET] * change
             x_ind = 0
         elif x_ind >= x_bound:
             change = x_ind - x_bound + 1
-            data += [None] * change
+            data += [UNSET] * change
             x_ind = -1
 
-        if data[x_ind] is None:
+        if data[x_ind] is UNSET:
             self._used += 1
 
         data[x_ind] = val
@@ -142,7 +140,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             if row is None:
                 continue
             for x, data in enumerate(row, start=-xoff):
-                if data is not None:
+                if data is not UNSET:
                     yield (x, y)
 
     def __delitem__(self, pos: Tuple[int, int]) -> None:
@@ -155,9 +153,9 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         y += self._yoff
         try:
             x += self._xoffs[y]
-            if self._data[y][x] is not None:
+            if self._data[y][x] is not UNSET:
                 self._used -= 1
-            self._data[y][x] = None
+                self._data[y][x] = UNSET
         except IndexError:  # Already deleted.
             pass
 
@@ -185,9 +183,6 @@ class PlaneValues(ValuesView[ValT]):
 
     def __contains__(self, item: object) -> bool:
         """Check if the provided item is a value."""
-        # We use None as a sentinel, don't false-positive.
-        if item is None:
-            return False
         for row in self._mapping._data:
             if row is None:
                 continue
@@ -201,7 +196,7 @@ class PlaneValues(ValuesView[ValT]):
             if row is None:
                 continue
             for value in row:
-                if value is not None:
+                if value is not UNSET:
                     yield value
 
 
@@ -236,5 +231,5 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
             if row is None:
                 continue
             for x, data in enumerate(row, start=-xoff):
-                if data is not None:
+                if data is not UNSET:
                     yield (x, y), data
