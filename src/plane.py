@@ -9,7 +9,7 @@ from typing import (
 
 ValT = TypeVar('ValT')
 # Sentinel object for empty slots.
-UNSET: Any = type('UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
+_UNSET: Any = type('_UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 
 
 class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
@@ -64,7 +64,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             out = self._data[y][x]
         except IndexError:
             raise KeyError(pos) from None
-        if out is UNSET:  # Empty slot.
+        if out is _UNSET:  # Empty slot.
             raise KeyError(pos)
         return out
 
@@ -125,14 +125,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         if x_ind < 0:
             change = -x_ind
             self._xoffs[y_ind] += change
-            data[0:0] = [UNSET] * change
+            data[0:0] = [_UNSET] * change
             x_ind = 0
         elif x_ind >= x_bound:
             change = x_ind - x_bound + 1
-            data += [UNSET] * change
+            data += [_UNSET] * change
             x_ind = -1
 
-        if data[x_ind] is UNSET:
+        if data[x_ind] is _UNSET:
             self._used += 1
 
         data[x_ind] = val
@@ -143,7 +143,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             if row is None:
                 continue
             for x, data in enumerate(row, start=-xoff):
-                if data is not UNSET:
+                if data is not _UNSET:
                     yield (x, y)
 
     def __delitem__(self, pos: Tuple[int, int]) -> None:
@@ -156,9 +156,9 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         y += self._yoff
         try:
             x += self._xoffs[y]
-            if self._data[y][x] is not UNSET:
+            if self._data[y][x] is not _UNSET:
                 self._used -= 1
-                self._data[y][x] = UNSET
+                self._data[y][x] = _UNSET
         except IndexError:  # Already deleted.
             pass
 
@@ -199,7 +199,7 @@ class PlaneValues(ValuesView[ValT]):
             if row is None:
                 continue
             for value in row:
-                if value is not UNSET:
+                if value is not _UNSET:
                     yield value
 
 
@@ -234,5 +234,5 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
             if row is None:
                 continue
             for x, data in enumerate(row, start=-xoff):
-                if data is not UNSET:
+                if data is not _UNSET:
                     yield (x, y), data
