@@ -1,7 +1,12 @@
 """Implements Glass and Grating."""
+from __future__ import annotations
+
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, Tuple, List, Callable
+from typing import Callable
+
+from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
+import srctools.logger
 
 from plane import Plane
 from precomp import (
@@ -9,16 +14,12 @@ from precomp import (
     template_brush,
 )
 import consts
-import srctools.logger
 from precomp.conditions import make_result
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.instanceLocs import resolve_one, resolve
-from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-
 COND_MOD_NAME = None
 
 
@@ -34,23 +35,23 @@ class HoleType(Enum):
     LARGE = 'large'  # 3x3 hole (funnel)
 
 # (origin, normal) -> BarrierType
-BARRIERS: Dict[
-    Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+BARRIERS: dict[
+    tuple[tuple[float, float, float], tuple[float, float, float]],
     BarrierType,
 ] = {}
-HOLES: Dict[
-    Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+HOLES: dict[
+    tuple[tuple[float, float, float], tuple[float, float, float]],
     HoleType,
 ] = {}
 
 
-def get_pos_norm(origin: Vec) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+def get_pos_norm(origin: Vec) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
-def parse_map(vmf: VMF, has_attr: Dict[str, bool]) -> None:
+def parse_map(vmf: VMF, has_attr: dict[str, bool]) -> None:
     """Find all glass/grating in the map.
 
     This removes the per-tile instances, and all original brushwork.
@@ -175,10 +176,6 @@ def make_barriers(vmf: VMF):
     grate_temp = template_brush.get_scaling_template(
         options.get(str, "grating_template")
     )
-    hole_temp_small: List[Solid]
-    hole_temp_lrg_diag: List[Solid]
-    hole_temp_lrg_cutout: List[Solid]
-    hole_temp_lrg_square: List[Solid]
     barr_type: BarrierType | None
 
     # Avoid error without this package.
@@ -294,7 +291,7 @@ def make_barriers(vmf: VMF):
             raise NotImplementedError
 
         angles = normal.to_angle()
-        hole_temp: List[Tuple[List[Solid], Matrix]] = []
+        hole_temp: list[tuple[list[Solid], Matrix]] = []
 
         # This is a tricky bit. Two large templates would collide
         # diagonally, and we allow the corner glass to not be present since
@@ -332,7 +329,7 @@ def make_barriers(vmf: VMF):
         else:
             hole_temp.append((hole_temp_small, Matrix.from_angle(angles)))
 
-        def solid_pane_func(off1: float, off2: float, mat: str) -> List[Solid]:
+        def solid_pane_func(off1: float, off2: float, mat: str) -> list[Solid]:
             """Given the two thicknesses, produce the curved hole from the template."""
             off_min = 64 - max(off1, off2)
             off_max = 64 - min(off1, off2)
@@ -390,7 +387,7 @@ def make_barriers(vmf: VMF):
                 v_axis, max_v * 32 + 32,
             )
 
-            def solid_pane_func(off1: float, off2: float, mat: str) -> List[Solid]:
+            def solid_pane_func(off1: float, off2: float, mat: str) -> list[Solid]:
                 """Make the solid brush."""
                 return [vmf.make_prism(
                     pos_min + normal * (64.0 - off1),
@@ -425,7 +422,7 @@ def make_glass_grating(
     normal: Vec,
     barr_type: BarrierType,
     front_temp: template_brush.ScalingTemplate,
-    solid_func: Callable[[float, float, str], List[Solid]],
+    solid_func: Callable[[float, float, str], list[Solid]],
 ):
     """Make all the brushes needed for glass/grating.
 
@@ -493,7 +490,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     The texture is assumed to match plasticwall004a's shape.
     """
     template = template_brush.get_template(temp_name)
-    temp_world, temp_detail, temp_over = template.visgrouped()
+    temp_world, temp_detail, _ = template.visgrouped()
     beam_template: Solid
     try:
         [beam_template] = temp_world + temp_detail
