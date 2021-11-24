@@ -3,12 +3,13 @@
 """
 from __future__ import annotations
 from typing import (
-    TypeVar, Generic, Optional, Tuple, Any,
-    Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView,
+    TypeVar, Generic, Optional, Tuple, Any, overload,
+    Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView
 )
 
 ValT = TypeVar('ValT')
-# Sentinel object for empty slots.
+DefaultT = TypeVar('DefaultT')
+# Sentinel object for empty slots and parameter defaults.
 _UNSET: Any = type('_UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 
 
@@ -23,6 +24,8 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def __init__(
         self,
         contents: Mapping[tuple[int, int], ValT] | Iterable[tuple[tuple[int, int], ValT]] = (),
+        *,
+        default: ValT=_UNSET,
     ) -> None:
         """Initalises the plane with the provided values."""
         # Track the minimum/maximum position found
@@ -31,6 +34,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         self._xoffs: list[int] = []
         self._data: list[Optional[list[ValT]]] = []
         self._used = 0
+        self.default = default
         if contents:
             self.update(contents)
 
@@ -53,19 +57,38 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __getitem__(self, pos: tuple[int, int]) -> ValT:
         """Return the value at a given position."""
+        return self.get(pos, self.default)
+
+    @overload
+    def get(self, __key: tuple[int, int]) -> Optional[ValT]: ...
+    @overload
+    def get(self, __key: tuple[int, int], __default: ValT | DefaultT) -> ValT | DefaultT: ...
+
+    def get(self, pos: tuple[int, int], default: DefaultT = None) -> DefaultT | ValT | None:
+        """Return the value at a given position, or a default if not present."""
         try:
             x, y = map(int, pos)
         except (ValueError, TypeError):
-            raise KeyError(pos) from None
+            if default is _UNSET:  # For __getitem__ only.
+                raise KeyError(pos) from None
+            else:
+                return default
 
+        out = _UNSET
         y += self._yoff
-        try:
-            x += self._xoffs[y]
-            out = self._data[y][x]
-        except IndexError:
-            raise KeyError(pos) from None
-        if out is _UNSET:  # Empty slot.
-            raise KeyError(pos)
+        # Zero checks ensure we don't do negative indexing.
+        if y >= 0:
+            try:
+                x += self._xoffs[y]
+                if x >= 0 and self._data[y]:
+                    out = self._data[y][x]
+            except IndexError:
+                pass
+        if out is _UNSET:
+            if default is _UNSET:
+                raise KeyError(pos)
+            else:
+                return default
         return out
 
     def __setitem__(self, pos: tuple[int, int], val: ValT) -> None:

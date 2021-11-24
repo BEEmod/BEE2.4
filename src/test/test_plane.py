@@ -19,16 +19,27 @@ def test_insertion(dx, dy) -> None:
         assert len(plane) == i + 1, f'{dx*i}, {dy*i}'
         try:
             assert plane[dx*i, dy*i] == i
+            assert plane.get((dx*i, dy*i)) == i
         except KeyError:
             pytest.fail(f'{dx*i}, {dy*i}')
-
-    assert dict(plane.items()) == {
+    expected = {
         (dx*i, dy*i): i
         for i in range(10)
     }
+    assert dict(plane.items()) == expected
+    # Check other positions are ignored.
+    min_x, min_y = plane.mins
+    max_x, max_y = plane.maxes
+    for x in range(min_x-1, max_x+2):
+        for y in range(min_y-1, max_y+2):
+            if (x, y) not in expected:
+                with pytest.raises(KeyError):
+                    _ = plane[x, y]
+                assert plane.get((x, y), 'hi') == 'hi'
 
 
 def _points(*pattern):
+    """Return each coordinate in order in the string map."""
     points = [
         (x, y)
         for x in range(5)
@@ -68,7 +79,9 @@ def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: in
     """Insert in various patterns, to test the dynamic resizing."""
     plane = Plane()
     backup = {}
-    min_x = min_y = max_x = max_y = 0
+    # First iteration will update.
+    min_x = min_y = +99999
+    max_x = max_y = -99999
     for val, (x, y) in enumerate(pattern):
         x -= off_x
         y -= off_y
@@ -147,6 +160,12 @@ def test_illegal_positions() -> None:
         _ = plane["blah", 9]
     with pytest.raises(KeyError):
         _ = plane[9, "blah"]
+    with pytest.raises(KeyError):
+        _ = plane[2, 8]
+
+    with pytest.raises(KeyError):
+        _ = plane.get((2, 8))
+    assert plane.get((2, 8), 45) == 45
 
     with pytest.raises(KeyError):
         plane[45, 9, 2] = object
@@ -187,3 +206,21 @@ def test_deletion() -> None:
     del plane[-10, 4]
     # Check we didn't double-count.
     assert len(plane) == 1
+
+
+def test_defaults() -> None:
+    """Test the ability to set a default value for all keys."""
+    plane_req = Plane()
+    plane_opt = Plane(default=45)
+
+    plane_req[2, 5] = plane_opt[2, 5] = 3
+    assert plane_req[2, 5] == 3
+    assert plane_opt[2, 5] == 3
+
+    for x in range(-10, 10):
+        for y in range(-10, 10):
+            if x == 2 and y == 5:
+                continue
+            with pytest.raises(KeyError):
+                _ = plane_req[x, y]
+            assert plane_opt[x, y] == 45
