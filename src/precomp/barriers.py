@@ -378,7 +378,9 @@ def make_barriers(vmf: VMF):
 
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
 
-        for min_u, min_v, max_u, max_v in grid_optimise(pos_slice):
+        for min_u, min_v, max_u, max_v, is_barrier in grid_optimise(pos_slice):
+            if not is_barrier:  # Hole placed here and overwrote the glass/grating.
+                continue
             # These are two points in the origin plane, at the borders.
             pos_min = Vec.with_axes(
                 norm_axis, plane_pos,

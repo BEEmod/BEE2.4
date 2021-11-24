@@ -1998,7 +1998,7 @@ def bevel_split(
     tile_pos: Plane[TileDef],
 ) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
-    for min_u, min_v, max_u, max_v in grid_optim.optimise(rect_points):
+    for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
         u_range = range(min_u, max_u + 1)
         v_range = range(min_v, max_v + 1)
 
@@ -2319,7 +2319,7 @@ def generate_goo(vmf: VMF) -> None:
     [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])
 
     for ((min_z, max_z), grid) in goo_pos.items():
-        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+        for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):
             bbox_min = Vec(min_x, min_y, min_z) * 128
             bbox_max = Vec(max_x, max_y, max_z) * 128
             prism = vmf.make_prism(
@@ -2343,7 +2343,7 @@ def generate_goo(vmf: VMF) -> None:
     bbox_min = Vec()
 
     for (z, grid) in trig_pos.items():
-        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+        for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):
             bbox_min = Vec(min_x, min_y, z) * 128
             bbox_max = Vec(max_x, max_y, z) * 128
             trig_hurt.solids.append(vmf.make_prism(
