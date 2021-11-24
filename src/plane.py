@@ -74,6 +74,17 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             x, y = map(int, pos)
         except (ValueError, TypeError):
             raise KeyError(pos) from None
+
+        if not self._data:
+            # The entire table is empty, we should move offsets and put this at index 0, 0.
+            self._yoff = -y
+            self._xoffs.append(-x)
+            self._data.append([val])
+            self._used += 1
+            self._min_x = self._max_x = x
+            self._min_y = self._max_y = y
+            return
+
         if y < self._min_y:
             self._min_y = y
         if y > self._max_y:
@@ -82,14 +93,6 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             self._min_x = x
         if x > self._max_x:
             self._max_x = x
-
-        if not self._data:
-            # The entire table is empty, we should move offsets and put this at index 0, 0.
-            self._yoff = -y
-            self._xoffs.append(-x)
-            self._data.append([val])
-            self._used += 1
-            return
 
         y_ind = y + self._yoff
         y_bound = len(self._xoffs)
