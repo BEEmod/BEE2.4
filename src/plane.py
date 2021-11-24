@@ -6,6 +6,7 @@ from typing import (
     TypeVar, Generic, Optional, Tuple, Any, overload,
     Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView
 )
+import copy
 
 ValT = TypeVar('ValT')
 DefaultT = TypeVar('DefaultT')
@@ -54,6 +55,27 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __repr__(self) -> str:
         return f'Plane({dict(self.items())!r})'
+
+    def copy(self) -> 'Plane[ValT]':
+        """Shallow-copy the plane."""
+        cpy = Plane.__new__(Plane)
+        cpy.__dict__.update(self.__dict__)  # Immutables
+        cpy._xoffs = self._xoffs.copy()
+        cpy._data = [
+            None if row is None else row.copy()
+            for row in self._data
+        ]
+        return cpy
+
+    __copy__ = copy
+
+    def __deepcopy__(self, memodict: dict={}) -> 'Plane[ValT]':
+        """Deep-copy the plane."""
+        cpy = Plane.__new__(Plane)
+        cpy.__dict__.update(self.__dict__) # Immutables
+        cpy._xoffs = self._xoffs.copy()
+        cpy._data = copy.deepcopy(self._data, memodict)
+        return cpy
 
     def __getitem__(self, pos: tuple[int, int]) -> ValT:
         """Return the value at a given position."""
