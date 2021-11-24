@@ -184,14 +184,10 @@ def make_barriers(vmf: VMF):
         hole_combined_temp = template_brush.get_template(
             options.get(str, 'glass_hole_temp')
         )
-        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'small'})
-        hole_temp_small = hole_world + hole_detail
-        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'large_diagonal'})
-        hole_temp_lrg_diag = hole_world + hole_detail
-        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'large_cutout'})
-        hole_temp_lrg_cutout = hole_world + hole_detail
-        hole_world, hole_detail, _ = hole_combined_temp.visgrouped({'large_square'})
-        hole_temp_lrg_square = hole_world + hole_detail
+        hole_temp_small = hole_combined_temp.visgrouped_solids({'small'})
+        hole_temp_lrg_diag = hole_combined_temp.visgrouped_solids({'large_diagonal'})
+        hole_temp_lrg_cutout = hole_combined_temp.visgrouped_solids({'large_cutout'})
+        hole_temp_lrg_square = hole_combined_temp.visgrouped_solids({'large_square'})
     else:
         hole_temp_small = hole_temp_lrg_diag = hole_temp_lrg_cutout = hole_temp_lrg_square = []
 
@@ -490,12 +486,11 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     The texture is assumed to match plasticwall004a's shape.
     """
     template = template_brush.get_template(temp_name)
-    temp_world, temp_detail, _ = template.visgrouped()
     beam_template: Solid
     try:
-        [beam_template] = temp_world + temp_detail
+        [beam_template] = template.visgrouped()
     except ValueError:
-        raise ValueError('Bad Glass Floorbeam template!')
+        raise ValueError('Bad Glass Floorbeam template! Must have exactly one brush.')
 
     # Grab the 'end' side, which we move around.
     for side in beam_template.sides:

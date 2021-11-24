@@ -1627,8 +1627,7 @@ def gen_tile_temp() -> None:
             options.get(str, '_tiling_template_'))
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
-            world, detail, over = template.visgrouped(name)
-            [categories[key]] = world
+            [categories[key]] = template.visgrouped_solids(name)
     except (KeyError, ValueError):
         raise Exception('Bad Tiling Template!')
 
