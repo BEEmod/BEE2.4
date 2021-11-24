@@ -179,6 +179,7 @@ def make_barriers(vmf: VMF):
     hole_temp_lrg_diag: List[Solid]
     hole_temp_lrg_cutout: List[Solid]
     hole_temp_lrg_square: List[Solid]
+    barr_type: BarrierType | None
 
     # Avoid error without this package.
     if HOLES:
@@ -222,10 +223,10 @@ def make_barriers(vmf: VMF):
 
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
-    # (normal_dist, positive_axis, type) -> [(x, y)]
-    slices: Dict[
-        Tuple[Tuple[float, float, float], bool, BarrierType],
-        Plane[bool]
+    # (normal_dist, positive_axis, type) -> Plane(type)
+    slices: dict[
+        tuple[tuple[float, float, float], bool],
+        Plane[BarrierType | None]
     ] = defaultdict(Plane)
     # We have this on the 32-grid so we can cut squares for holes.
 
@@ -238,20 +239,18 @@ def make_barriers(vmf: VMF):
         slice_plane = slices[
             norm_pos.as_tuple(),  # distance from origin to this plane.
             normal[norm_axis] > 0,
-            barr_type,
         ]
         for u_off in [-48, -16, 16, 48]:
             for v_off in [-48, -16, 16, 48]:
                 slice_plane[
                     int((u + u_off) // 32),
                     int((v + v_off) // 32),
-                ] = True
+                ] = barr_type
 
     # Remove pane sections where the holes are. We then generate those with
     # templates for slanted parts.
     for (origin_tup, norm_tup), hole_type in HOLES.items():
         barr_type = BARRIERS[origin_tup, norm_tup]
-
         origin = Vec(origin_tup)
         normal = Vec(norm_tup)
         norm_axis = normal.axis()
@@ -260,7 +259,6 @@ def make_barriers(vmf: VMF):
         slice_plane = slices[
             norm_pos.as_tuple(),
             normal[norm_axis] > 0,
-            barr_type,
         ]
         offsets: tuple[int, ...]
         if hole_type is HoleType.LARGE:
@@ -269,14 +267,14 @@ def make_barriers(vmf: VMF):
             offsets = (-16, 16)
         for u_off in offsets:
             for v_off in offsets:
-                # Remove these squares, but keep them in the dict
+                # Remove these squares, but keep them in the Plane
                 # so we can check if there was glass there.
                 uv = (
                     int((u + u_off) // 32),
                     int((v + v_off) // 32),
                 )
                 if uv in slice_plane:
-                    slice_plane[uv] = False
+                    slice_plane[uv] = None
                 # These have to be present, except for the corners
                 # on the large hole.
                 elif abs(u_off) != 80 or abs(v_off) != 80:
@@ -364,23 +362,22 @@ def make_barriers(vmf: VMF):
             solid_pane_func,
         )
 
-    for (plane_pos_tup, is_pos, barr_type), pos_slice in slices.items():
+    for (plane_pos_tup, is_pos), pos_slice in slices.items():
         plane_pos = Vec(plane_pos_tup)
         norm_axis = plane_pos.axis()
         normal = Vec.with_axes(norm_axis, 1 if is_pos else -1)
 
-        if barr_type is BarrierType.GLASS:
-            front_temp = glass_temp
-        elif barr_type is BarrierType.GRATING:
-            front_temp = grate_temp
-        else:
-            raise NotImplementedError
-
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
 
-        for min_u, min_v, max_u, max_v, is_barrier in grid_optimise(pos_slice):
-            if not is_barrier:  # Hole placed here and overwrote the glass/grating.
+        for min_u, min_v, max_u, max_v, barr_type in grid_optimise(pos_slice):
+            if barr_type is None:  # Hole placed here and overwrote the glass/grating.
                 continue
+            elif barr_type is BarrierType.GLASS:
+                front_temp = glass_temp
+            elif barr_type is BarrierType.GRATING:
+                front_temp = grate_temp
+            else:
+                raise NotImplementedError(barr_type)
             # These are two points in the origin plane, at the borders.
             pos_min = Vec.with_axes(
                 norm_axis, plane_pos,
