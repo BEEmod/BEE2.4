@@ -22,7 +22,7 @@ from typing import (
     Union, Type, Any,
     Dict, List, Tuple,
     Optional, Iterable,
-    Set,
+    Set, Sequence,
 )
 
 import utils
@@ -193,6 +193,16 @@ class TileSize(str, Enum):
         elif self.value == 'double':
             return 8, 8
         raise AssertionError(self)
+
+    @property
+    def width(self) -> int:
+        """Return the number of 32-size tiles this takes up horizontally."""
+        return self.size[0]
+
+    @property
+    def height(self) -> int:
+        """Return the number of 32-size tiles this takes up horizontally."""
+        return self.size[1]
 
 GENERATORS: Dict[
     Union[GenCat, Tuple[GenCat, Orient, Portalable]],
@@ -590,14 +600,6 @@ def load_config(conf: Property):
             raise ValueError(
                 'No 4x4 tile set for "{}"!'.format(gen_key))
 
-        # Copy 4x4, 2x2, 2x1 textures to the 1x1 size if the option was set.
-        # Do it before inheriting tiles, so there won't be duplicates.
-        if options['mixtiles']:
-            block_tex = textures[TileSize.TILE_1x1]
-            block_tex += textures[TileSize.TILE_4x4]
-            block_tex += textures[TileSize.TILE_2x2]
-            block_tex += textures[TileSize.TILE_2x1]
-
         # We need to do more processing.
         for orig, targ in TILE_INHERIT:
             if not textures[targ]:
@@ -809,10 +811,10 @@ class Generator(abc.ABC):
         If KeyError is raised, an appropriate exception is raised from that.
         """
 
-    def get_all(self, tex_name: str) -> List[str]:
+    def get_all(self, tex_name: str) -> Sequence[str]:
         """Return all the textures possible for a given name."""
         try:
-            return list(self.textures[tex_name])
+            return self.textures[tex_name]
         except KeyError:
             raise self._missing_error(tex_name) from None
 
