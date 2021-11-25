@@ -75,9 +75,9 @@ def generate_brushes(vmf: VMF) -> None:
     # Each subtile is generated individually. If it's a full-block tile we
     # try to merge tiles together with the same texture.
 
-    # The key is (normal, plane distance, tile type)
+    # The key is (normal, plane distance)
     full_tiles: dict[
-        tuple[float, float, float, float, TileType],
+        tuple[float, float, float, float],
         list[TileDef]
     ] = defaultdict(list)
 
@@ -89,7 +89,6 @@ def generate_brushes(vmf: VMF) -> None:
             full_tiles[
                 tile.normal.x, tile.normal.y, tile.normal.z,
                 plane_dist,
-                tile.base_type,
             ].append(tile)
 
             if tile.has_portal_helper:
@@ -105,7 +104,7 @@ def generate_brushes(vmf: VMF) -> None:
         else:
             tile.export(vmf)
 
-    for (norm_x, norm_y, norm_z, plane_dist, tile_type), tiles in full_tiles.items():
+    for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
         # Construct each plane of tiles.
         normal = Vec(norm_x, norm_y, norm_z)
         norm_axis = normal.axis()
@@ -118,14 +117,14 @@ def generate_brushes(vmf: VMF) -> None:
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
 
-            if tile_type is TileType.GOO_SIDE:
+            if tile.base_type is TileType.GOO_SIDE:
                 # This forces a specific size.
                 tex = texturing.gen(
                     texturing.GenCat.NORMAL,
                     normal,
                     Portalable.BLACK
                 ).get(pos, TileSize.GOO_SIDE, antigel=False)
-            elif tile_type is TileType.NODRAW:
+            elif tile.base_type is TileType.NODRAW:
                 tex = consts.Tools.NODRAW
             else:
                 tex = texturing.gen(
