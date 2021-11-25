@@ -30,6 +30,7 @@ from precomp import (
     template_brush,
     texturing,
     tiling,
+    tiling_gen,
     barriers,
     connections,
     options,
@@ -1890,7 +1891,7 @@ def main() -> None:
         conditions.check_all(vmf, coll)
         add_extra_ents(vmf, GAME_MODE)
 
-        tiling.generate_brushes(vmf)
+        tiling_gen.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)
         fix_worldspawn(vmf)
