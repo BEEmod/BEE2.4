@@ -1,6 +1,6 @@
 """Logic for generating the overall map geometry."""
-from collections import Counter, defaultdict
-from typing import Iterator, Optional
+from __future__ import annotations
+from collections import Counter, defaultdict, abc
 
 import attrs
 from srctools import Angle, Entity, Output, VMF, Vec, logger
@@ -29,7 +29,7 @@ class Tideline:
 def bevel_split(
     rect_points: Plane[bool],
     tile_pos: Plane[TileDef],
-) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
+) -> abc.Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
         u_range = range(min_u, max_u + 1)
@@ -240,7 +240,7 @@ def generate_goo(vmf: VMF) -> None:
     # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
     tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
-    pos: Optional[Vec] = None
+    pos: Vec | None = None
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
             goo_pos[pos.z, pos.z][pos.x, pos.y] = True
