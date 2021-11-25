@@ -49,31 +49,26 @@ TILE_TEMP: dict[
     dict[Union[str, tuple[int, int, int, bool]], Side]
 ] = {}
 
-NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
-# Specific angles, these ensure the textures align to world once done.
+NORMALS = [Vec(x=+1), Vec(x=-1), Vec(y=+1), Vec(y=-1), Vec(z=+1), Vec(z=-1)]
+# Specific corresponding, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
-NORM_ANGLES = {
-    Vec(x=1).as_tuple(): Matrix.from_angle(Angle(0, 0, 0)),
-    Vec(x=-1).as_tuple(): Matrix.from_angle(Angle(0, 180, 0)),
-    Vec(y=1).as_tuple(): Matrix.from_angle(Angle(0, 90, 0)),
-    Vec(y=-1).as_tuple(): Matrix.from_angle(Angle(0, 270, 0)),
-    Vec(z=1).as_tuple(): Matrix.from_angle(Angle(270, 270,  0)),
-    Vec(z=-1).as_tuple(): Matrix.from_angle(Angle(90, 90, 0)),
-}
-
-NORM_NAMES = {
-    Vec(x=1).as_tuple(): 'east',
-    Vec(x=-1).as_tuple(): 'west',
-    Vec(y=1).as_tuple(): 'north',
-    Vec(y=-1).as_tuple(): 'South',
-    Vec(z=1).as_tuple(): 'up',
-    Vec(z=-1).as_tuple(): 'down',
-}
+NORMAL_ANGLES = [
+    Matrix.from_angle(0.0, 0.0, 0.0),
+    Matrix.from_angle(0.0, 180, 0.0),
+    Matrix.from_angle(0.0, 90., 0.0),
+    Matrix.from_angle(0.0, 270, 0.0),
+    Matrix.from_angle(270, 270, 0.0),
+    Matrix.from_angle(90., 90., 0.0),
+]
+NORMAL_NAMES = dict(zip(
+    map(Vec.as_tuple, NORMALS),
+    ['east', 'west', 'north', 'south', 'up', 'down'],
+))
 # All the tiledefs in the map.
 # Maps a block center, normal -> the tiledef on the side of that block.
 TILES: dict[tuple[tuple[float, float, float], tuple[float, float, float]], TileDef] = {}
 
-# Special key for Tile.SubTile - This is set to 'u' or 'v' to
+# Special key for TileDef.subtile - this is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
 # This isn't a U,V tuple, but pretend it is so we can use it as a key.
 SUBTILE_FIZZ_KEY: tuple[int, int] = cast(Tuple[int, int], object())
@@ -867,7 +862,7 @@ class TileDef:
     def __repr__(self) -> str:
         return '<{} TileDef @ {} of {}>'.format(
             self.base_type.name,
-            NORM_NAMES.get(self.normal.as_tuple(), self.normal),
+            NORMAL_NAMES.get(self.normal.as_tuple(), self.normal),
             self.pos,
         )
 
@@ -1631,16 +1626,15 @@ def gen_tile_temp() -> None:
     except (KeyError, ValueError):
         raise Exception('Bad Tiling Template!')
 
-    for norm_tup, angles in NORM_ANGLES.items():
-        norm = Vec(norm_tup)
+    for norm, orient in zip(NORMALS, NORMAL_ANGLES):
         axis_norm = norm.axis()
 
         temp_part: dict[Union[str, tuple[int, int, int, bool]], Side] = {}
-        TILE_TEMP[norm_tup] = temp_part
+        TILE_TEMP[norm.as_tuple()] = temp_part
 
         for (thickness, bevel), temp in categories.items():
             brush = temp.copy()
-            brush.localise(Vec(), angles)
+            brush.localise(Vec(), orient)
 
             for face in brush:
                 if face.mat == consts.Special.BACKPANELS:
