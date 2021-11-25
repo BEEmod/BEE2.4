@@ -133,8 +133,8 @@ def generate_brushes(vmf: VMF) -> None:
                     tile.base_type.color
                 ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
 
-            u_pos = int((pos[u_axis]) // 128)
-            v_pos = int((pos[v_axis]) // 128)
+            u_pos = int((pos[u_axis] - 64) // 128)
+            v_pos = int((pos[v_axis] - 64) // 128)
             grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
@@ -145,8 +145,8 @@ def generate_brushes(vmf: VMF) -> None:
                     # Compute avg(128*min, 128*max)
                     # = (128 * min + 128 * max) / 2
                     # = (min + max) * 64
-                    u_axis, (min_u + max_u) * 64,
-                    v_axis, (min_v + max_v) * 64,
+                    u_axis, (1 + min_u + max_u) * 64,
+                    v_axis, (1 + min_v + max_v) * 64,
                 )
                 gen = texturing.gen(
                     texturing.GenCat.NORMAL,
