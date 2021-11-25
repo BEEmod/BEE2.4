@@ -1,23 +1,50 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
-from collections import Counter, defaultdict, abc
+from collections import Counter, defaultdict
+from typing import Iterator, Literal
 
 import attrs
-from srctools import Angle, Entity, Output, VMF, Vec, logger
+from srctools import Angle, Matrix, Vec, logger
+from srctools.vmf import VMF, Entity, Output, VisGroup
 
 import consts
 import utils
 from plane import Plane
 from precomp import grid_optim, options, rand, texturing
 from precomp.brushLoc import Block, POS as BLOCK_POS
-from precomp.texturing import Portalable, TileSize
-from precomp.tiling import OVERLAY_BINDS, TILES, TileDef, TileType, make_tile
+from precomp.texturing import Orient, Portalable, TileSize
+from precomp.tiling import OVERLAY_BINDS, TILES, TILETYPE_TO_SKIN, TileDef, TileType, make_tile
 
 
 LOGGER = logger.get_logger(__name__)
 
 
-@attrs.define(frozen=False)
+@attrs.define
+class SubTile:
+    """The state of a single 32x32 tile in a plane."""
+    type: TileType
+    antigel: bool
+
+    @property
+    def color(self) -> Portalable:
+        """Return the colour of the tile."""
+        if self.type.is_tile:
+            return self.type.color
+        return Portalable.BLACK
+
+
+@attrs.define
+class TexDef:
+    """The information required to create the surface of a material."""
+    tex: str
+    u_off: float = 0.0
+    v_off: float = 0.0
+    scale: float = 0.25  # 0.25 or 0.5 for double.
+    # Four required bevels.
+    bevels: tuple[bool, bool, bool, bool] = (False, False, False, False)
+
+
+@attrs.define
 class Tideline:
     """Temporary data used to hold the in-progress tideline overlays."""
     over: Entity
@@ -29,7 +56,7 @@ class Tideline:
 def bevel_split(
     rect_points: Plane[bool],
     tile_pos: Plane[TileDef],
-) -> abc.Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
+) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
         u_range = range(min_u, max_u + 1)
@@ -77,6 +104,15 @@ def generate_brushes(vmf: VMF) -> None:
         list[TileDef]
     ] = defaultdict(list)
 
+    # First examine each portal/noportal + orient set, to see what the max clump distance can be.
+    search_dists: dict[tuple[Portalable, Orient], int] = {}
+    for port in Portalable:
+        for orient in Orient:
+            gen = texturing.GENERATORS[texturing.GenCat.NORMAL, orient, port]
+            search_dists[port, orient] = gen.options['clump_length'] * (
+                8 if TileSize.TILE_DOUBLE in gen else 4
+            )
+
     for tile in TILES.values():
         # First, if not a simple tile, we have to deal with it individually.
         if not tile.is_simple():
@@ -104,7 +140,7 @@ def generate_brushes(vmf: VMF) -> None:
             )
 
     for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
-        generate_plane(vmf, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
+        generate_plane(vmf, search_dists, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
 
     LOGGER.info('Generating goop...')
     generate_goo(vmf)
@@ -129,99 +165,57 @@ def generate_brushes(vmf: VMF) -> None:
             over.remove()
 
 
-def generate_plane(vmf: VMF, normal: Vec, plane_dist: float, tiles: list[TileDef]) -> None:
+def generate_plane(
+    vmf: VMF,
+    search_dists: dict[tuple[Portalable, Orient], int],
+    normal: Vec, plane_dist: float,
+    tiles: list[TileDef],
+) -> None:
     """Generate all the tiles in a single flat plane.
 
     These are all the ones which could be potentially merged together.
+    Order of operations:
+    - Order the tiles by their UV positions, in a grid.
+    - Decompose those into individual subtile definitions.
+    - Repeatedly take sections and compute the texture.
+    - A second pass is made to determine the required bevelling.
+    - Finally that raw form is converted to brushes.
     """
     norm_axis = normal.axis()
+    orient = Orient.from_normal(normal)
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
     # (type, is_antigel, texture) -> (u, v) -> present/absent
     grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
 
-    tile_pos: Plane[TileDef] = Plane()
+    subtile_pos = Plane(default=SubTile(TileType.VOID, False))
 
     for tile in tiles:
-        pos = tile.pos + 64 * tile.normal
-
-        if tile.base_type is TileType.GOO_SIDE:
-            # This forces a specific size.
-            tex = texturing.gen(
-                texturing.GenCat.NORMAL,
-                normal,
-                Portalable.BLACK
-            ).get(pos, TileSize.GOO_SIDE, antigel=False)
-        elif tile.base_type is TileType.NODRAW:
-            tex = consts.Tools.NODRAW
-        else:
-            tex = texturing.gen(
-                texturing.GenCat.NORMAL,
-                normal,
-                tile.base_type.color
-            ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
-
-        u_pos = int((pos[u_axis] - 64) // 128)
-        v_pos = int((pos[v_axis] - 64) // 128)
-        grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
-        tile_pos[u_pos, v_pos] = tile
-
-    for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
-        for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
-            center = normal * plane_dist + Vec.with_axes(
-                # Compute avg(128*min, 128*max)
-                # = (128 * min + 128 * max) / 2
-                # = (min + max) * 64
-                u_axis, (1 + min_u + max_u) * 64,
-                v_axis, (1 + min_v + max_v) * 64,
-            )
-            is_double = False
-            if tex is not consts.Tools.NODRAW:
-                gen = texturing.gen(
-                    texturing.GenCat.NORMAL,
-                    normal,
-                    subtile_type.color
-                )
-                if (TileSize.TILE_DOUBLE in gen and
-                    (1 + max_u - min_u) % 2 == 0 and
-                    (1 + max_v - min_v) % 2 == 0
-                ):
-                    is_double = True
-                    tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
-
-            brush, front = make_tile(
-                vmf,
-                center,
-                normal,
-                tex,
-                texturing.SPECIAL.get(center, 'behind', antigel=is_antigel),
-                bevels=bevels,
-                width=(1 + max_u - min_u) * 128,
-                height=(1 + max_v - min_v) * 128,
-                antigel=is_antigel,
-            )
-            vmf.add_brush(brush)
-            if is_double:
-                # Compute the offset so that a 0,0 aligned brush can be
-                # offset so that point is at the minimum point of the tile,
-                # then round to the nearest 256 tile.
-                # That will ensure it gets the correct texturing.
-                # We know the scale is 0.25, so don't bother looking that up.
-                tile_min = Vec.with_axes(
-                    norm_axis, plane_dist,
-                    u_axis, 128 * min_u - 64,
-                    v_axis, 128 * min_v - 64,
-                )
-                front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256 / 0.25)
-                front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256 / 0.25)
-                if gen.options['scaleup256']:
-                    # It's actually a 128x128 tile, that we want to double scale for.
-                    front.scale = 0.5
-                    front.uaxis.offset /= 2
-                    front.vaxis.offset /= 2
-
-            for u in range(min_u, max_u + 1):
-                for v in range(min_v, max_v + 1):
-                    tile_pos[u, v].brush_faces.append(front)
+        pos = tile.pos_front
+        u_full = int((pos[u_axis] - 64) // 32)
+        v_full = int((pos[v_axis] - 64) // 32)
+        for u, v, tile_type in tile:
+            subtile_pos[u_full + u, v_full + v] = SubTile(tile_type, tile.is_antigel)
+    # Now, reprocess subtiles into textures by repeatedly spreading.
+    texture_plane: Plane[TexDef] = Plane()
+    while subtile_pos:
+        max_u, max_v, subtile = subtile_pos.largest_index()
+        max_dist = search_dists[subtile.color, orient]
+        min_u = max_u
+        min_v = max_v
+        for u in range(max_u, max_u - max_dist, -1):
+            if subtile_pos[u, max_v] == subtile:
+                min_u = u
+            else:
+                break
+        # Then in v until we hit a boundary.
+        for v in range(max_v, max_v - max_dist, -1):
+            if all(subtile_pos[u, v] == subtile for u in range(min_u, max_u + 1)):
+                min_v = v
+            else:
+                break
+        for u in range(min_u, max_u+1):
+            for v in range(min_v, max_v+1):
+                del subtile_pos[u, v]
 
 
 def generate_goo(vmf: VMF) -> None:

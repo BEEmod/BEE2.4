@@ -83,6 +83,18 @@ class Orient(Enum):
     CEILING = -1
     CEIL = -1
 
+    @classmethod
+    def from_normal(cls, norm: Vec) -> 'Orient':
+        """Find the orient matching this normal."""
+        # Even if not axis-aligned, make mostly-flat surfaces floor/ceiling: (+-45 degrees)
+        # sin(45) = ~0.707
+        # So use 0.8.
+        if norm.z > 0.8:
+            return cls.FLOOR
+        elif norm.z < -0.8:
+            return cls.CEIL
+        return cls.WALL
+
     def __str__(self) -> str:
         v = self.value
         if v == +1:
@@ -345,6 +357,12 @@ def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> 
             options[opt] = srctools.conv_float(value, default)
         else:
             raise ValueError('Bad default {!r} for "{}"!'.format(default, opt))
+    # Make sure the length is always larger.
+    try:
+        if options['clump_width'] > options['clump_length']:
+            options['clump_length'], options['clump_width'] = options['clump_width'], options['clump_length']
+    except KeyError:
+        pass
     return options
 
 
@@ -360,19 +378,7 @@ def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generato
     if portalable is None:
         raise TypeError('Portalability not provided!')
 
-    # Even if not axis-aligned, make mostly-flat surfaces
-    # floor/ceiling (+-40 degrees)
-    # sin(40) = ~0.707
-    # floor_tolerance = 0.8
-
-    if normal.z > 0.8:
-        orient = Orient.FLOOR
-    elif normal.z < -0.8:
-        orient = Orient.CEIL
-    else:
-        orient = Orient.WALL
-
-    return GENERATORS[cat, orient, portalable]
+    return GENERATORS[cat, Orient.from_normal(normal), portalable]
 
 
 def parse_name(name: str) -> Tuple['Generator', str]:

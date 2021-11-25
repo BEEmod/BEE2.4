@@ -99,7 +99,12 @@ BEVEL_AROUND: frozenset[tuple[int, int]] = frozenset({
     item for u, v, st in BEVEL_SIDES
     for item in st
 })
-
+# all valid uvs for tiledefs.
+UVS = [
+    (u, v)
+    for u in range(4)
+    for v in range(4)
+]
 
 @utils.freeze_enum_props
 class TileType(Enum):
@@ -245,6 +250,20 @@ TILETYPE_FROM_CHAR: dict[str, TileType] = {
     for k, v in
     TILETYPE_TO_CHAR.items()
 }
+
+# We use the skins value on the tilesetter to specify type, allowing visualising it.
+# So this is the type for each index. It is here for debug generation.
+TILE_SETTER_SKINS = [
+    TileType.BLACK,
+    TileType.BLACK_4x4,
+    TileType.WHITE,
+    TileType.WHITE_4x4,
+    TileType.NODRAW,
+    TileType.VOID,
+    TileType.CUTOUT_TILE_BROKEN,
+    TileType.CUTOUT_TILE_PARTIAL,
+]
+TILETYPE_TO_SKIN = {typ: ind for ind, typ in enumerate(TILE_SETTER_SKINS)}
 
 
 @utils.freeze_enum_props
@@ -453,12 +472,7 @@ class Panel:
     pan_type: PanelType
     thickness: int
     bevels: set[tuple[int, int]] = attrs.field(converter=set)
-
-    points: set[tuple[int, int]] = attrs.Factory({
-        (x, y)
-        for x in range(4)
-        for y in range(4)
-    }.copy)
+    points: set[tuple[int, int]] = attrs.Factory(set(UVS).copy)
     template: str = ''
     nodraw: bool = False
     seal: bool  = False
@@ -860,6 +874,16 @@ class TileDef:
         else:
             # floor/ceiling, any direction. So just specify +X.
             return Vec(1, 0, 0)
+
+    @property
+    def pos_voxel(self) -> Vec:
+        """Return the position of the voxel."""
+        return self.pos
+
+    @property
+    def pos_front(self) -> Vec:
+        """Return the position of the front of the voxel."""
+        return self.pos + 64 * self.normal
 
     def __repr__(self) -> str:
         return '<{} TileDef @ {} of {}>'.format(
@@ -1354,14 +1378,15 @@ class TileDef:
     def is_simple(self) -> bool:
         """Check if this tile is a simple tile that can merge with neighbours."""
         if (
-            self._sub_tiles is not None or
             self.panels or
             self.bullseye_count > 0 or
             self.override is not None
         ):
             return False
 
-        return self.base_type.is_tile
+        if self._sub_tiles is not None:
+            return all(self[uv].is_simple for uv in UVS)
+        else:
             return self.base_type.is_simple
 
     def add_portal_helper(self, orient: Vec=None) -> None:

@@ -19,7 +19,7 @@ from srctools.dmx import Element as DMElement
 import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
-from .tiling import TileType
+from .tiling import TileType, TILE_SETTER_SKINS
 from . import tiling, texturing, options, rand, collisions
 import consts
 
@@ -120,20 +120,6 @@ class CollisionDef(TemplateEntity):
     """Adds a bounding box to the map."""
     bbox: collisions.BBox
     visgroups: set[str]  # Visgroups required to add this.
-
-
-# We use the skins value on the tilesetter to specify type, allowing visualising it.
-# So this is the type for each index.
-TILE_SETTER_SKINS = [
-    TileType.BLACK,
-    TileType.BLACK_4x4,
-    TileType.WHITE,
-    TileType.WHITE_4x4,
-    TileType.NODRAW,
-    TileType.VOID,
-    TileType.CUTOUT_TILE_BROKEN,
-    TileType.CUTOUT_TILE_PARTIAL,
-]
 
 
 B = Portalable.BLACK
