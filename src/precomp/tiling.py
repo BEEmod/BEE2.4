@@ -145,6 +145,11 @@ class TileType(Enum):
         return self.value < 10
 
     @property
+    def is_simple(self) -> bool:
+        """Is this a simple textured surface - tiles, nodraw?"""
+        return self.value <= 10
+
+    @property
     def is_white(self) -> bool:
         """Is this portalable?"""
         return self.name.startswith('WHITE')
@@ -1357,6 +1362,7 @@ class TileDef:
             return False
 
         return self.base_type.is_tile
+            return self.base_type.is_simple
 
     def add_portal_helper(self, orient: Vec=None) -> None:
         """Add a portal placement helper to the tile.

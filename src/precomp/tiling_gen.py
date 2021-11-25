@@ -93,7 +93,7 @@ def generate_brushes(vmf: VMF) -> None:
         ].append(tile)
 
         if tile.has_portal_helper:
-            # Add the portal helper in directly.
+            # Add the portal helper in now, so the code below can treat the face normally.
             vmf.create_ent(
                 'info_placement_helper',
                 angles=Angle.from_basis(x=tile.normal, z=tile.portal_helper_orient),
@@ -174,17 +174,19 @@ def generate_plane(vmf: VMF, normal: Vec, plane_dist: float, tiles: list[TileDef
                 u_axis, (1 + min_u + max_u) * 64,
                 v_axis, (1 + min_v + max_v) * 64,
             )
-            gen = texturing.gen(
-                texturing.GenCat.NORMAL,
-                normal,
-                subtile_type.color
-            )
-            if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (
-                1 + max_v - min_v) % 2 == 0:
-                is_double = True
-                tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
-            else:
-                is_double = False
+            is_double = False
+            if tex is not consts.Tools.NODRAW:
+                gen = texturing.gen(
+                    texturing.GenCat.NORMAL,
+                    normal,
+                    subtile_type.color
+                )
+                if (TileSize.TILE_DOUBLE in gen and
+                    (1 + max_u - min_u) % 2 == 0 and
+                    (1 + max_v - min_v) % 2 == 0
+                ):
+                    is_double = True
+                    tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
 
             brush, front = make_tile(
                 vmf,
