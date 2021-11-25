@@ -110,8 +110,6 @@ def generate_brushes(vmf: VMF) -> None:
         normal = Vec(norm_x, norm_y, norm_z)
         norm_axis = normal.axis()
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-        bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
-
         # (type, is_antigel, texture) -> (u, v) -> present/absent
         grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
 
@@ -136,8 +134,8 @@ def generate_brushes(vmf: VMF) -> None:
                     tile.base_type.color
                 ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
 
-            u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
-            v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
+            u_pos = int((pos[u_axis]) // 128)
+            v_pos = int((pos[v_axis]) // 128)
             grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
@@ -148,8 +146,8 @@ def generate_brushes(vmf: VMF) -> None:
                     # Compute avg(128*min, 128*max)
                     # = (128 * min + 128 * max) / 2
                     # = (min + max) * 64
-                    u_axis, bbox_min[u_axis] + (min_u + max_u) * 64,
-                    v_axis, bbox_min[v_axis] + (min_v + max_v) * 64,
+                    u_axis, (min_u + max_u) * 64,
+                    v_axis, (min_v + max_v) * 64,
                 )
                 gen = texturing.gen(
                     texturing.GenCat.NORMAL,
@@ -182,8 +180,8 @@ def generate_brushes(vmf: VMF) -> None:
                     # We know the scale is 0.25, so don't bother looking that up.
                     tile_min = Vec.with_axes(
                         norm_axis, plane_dist,
-                        u_axis, bbox_min[u_axis] + 128 * min_u - 64,
-                        v_axis, bbox_min[v_axis] + 128 * min_v - 64,
+                        u_axis, 128 * min_u - 64,
+                        v_axis, 128 * min_v - 64,
                     )
                     front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256/0.25)
                     front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256/0.25)
