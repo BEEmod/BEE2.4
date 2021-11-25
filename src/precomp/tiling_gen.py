@@ -71,10 +71,6 @@ def bevel_split(
 def generate_brushes(vmf: VMF) -> None:
     """Generate all the brushes in the map, then set overlay sides."""
     LOGGER.info('Generating tiles...')
-    # Each tile is either a full-block tile, or some kind of subtile/special surface.
-    # Each subtile is generated individually. If it's a full-block tile we
-    # try to merge tiles together with the same texture.
-
     # The key is (normal, plane distance)
     full_tiles: dict[
         tuple[float, float, float, float],
@@ -82,117 +78,33 @@ def generate_brushes(vmf: VMF) -> None:
     ] = defaultdict(list)
 
     for tile in TILES.values():
-        if tile.is_simple():
-            pos = tile.pos + 64 * tile.normal
-            plane_dist = abs(pos.dot(tile.normal))
-
-            full_tiles[
-                tile.normal.x, tile.normal.y, tile.normal.z,
-                plane_dist,
-            ].append(tile)
-
-            if tile.has_portal_helper:
-                # Add the portal helper in directly.
-                vmf.create_ent(
-                    'info_placement_helper',
-                    angles=Angle.from_basis(x=tile.normal, z=tile.portal_helper_orient),
-                    origin=pos,
-                    force_placement=int(tile.has_oriented_portal_helper),
-                    snap_to_helper_angles=int(tile.has_oriented_portal_helper),
-                    radius=64,
-                )
-        else:
+        # First, if not a simple tile, we have to deal with it individually.
+        if not tile.is_simple():
             tile.export(vmf)
+            continue
+        # Otherwise, decompose into a big plane dict, for dynamic merging.
+
+        pos = tile.pos + 64 * tile.normal
+        plane_dist = abs(pos.dot(tile.normal))
+
+        full_tiles[
+            tile.normal.x, tile.normal.y, tile.normal.z,
+            plane_dist,
+        ].append(tile)
+
+        if tile.has_portal_helper:
+            # Add the portal helper in directly.
+            vmf.create_ent(
+                'info_placement_helper',
+                angles=Angle.from_basis(x=tile.normal, z=tile.portal_helper_orient),
+                origin=pos,
+                force_placement=int(tile.has_oriented_portal_helper),
+                snap_to_helper_angles=int(tile.has_oriented_portal_helper),
+                radius=64,
+            )
 
     for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
-        # Construct each plane of tiles.
-        normal = Vec(norm_x, norm_y, norm_z)
-        norm_axis = normal.axis()
-        u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-        # (type, is_antigel, texture) -> (u, v) -> present/absent
-        grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
-
-        tile_pos: Plane[TileDef] = Plane()
-
-        for tile in tiles:
-            pos = tile.pos + 64 * tile.normal
-
-            if tile.base_type is TileType.GOO_SIDE:
-                # This forces a specific size.
-                tex = texturing.gen(
-                    texturing.GenCat.NORMAL,
-                    normal,
-                    Portalable.BLACK
-                ).get(pos, TileSize.GOO_SIDE, antigel=False)
-            elif tile.base_type is TileType.NODRAW:
-                tex = consts.Tools.NODRAW
-            else:
-                tex = texturing.gen(
-                    texturing.GenCat.NORMAL,
-                    normal,
-                    tile.base_type.color
-                ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
-
-            u_pos = int((pos[u_axis] - 64) // 128)
-            v_pos = int((pos[v_axis] - 64) // 128)
-            grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
-            tile_pos[u_pos, v_pos] = tile
-
-        for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
-            for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
-                center = Vec.with_axes(
-                    norm_axis, plane_dist,
-                    # Compute avg(128*min, 128*max)
-                    # = (128 * min + 128 * max) / 2
-                    # = (min + max) * 64
-                    u_axis, (1 + min_u + max_u) * 64,
-                    v_axis, (1 + min_v + max_v) * 64,
-                )
-                gen = texturing.gen(
-                    texturing.GenCat.NORMAL,
-                    normal,
-                    subtile_type.color
-                )
-                if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (1 + max_v - min_v) % 2 == 0:
-                    is_double = True
-                    tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
-                else:
-                    is_double = False
-
-                brush, front = make_tile(
-                    vmf,
-                    center,
-                    normal,
-                    tex,
-                    texturing.SPECIAL.get(center, 'behind', antigel=is_antigel),
-                    bevels=bevels,
-                    width=(1 + max_u - min_u) * 128,
-                    height=(1 + max_v - min_v) * 128,
-                    antigel=is_antigel,
-                )
-                vmf.add_brush(brush)
-                if is_double:
-                    # Compute the offset so that a 0,0 aligned brush can be
-                    # offset so that point is at the minimum point of the tile,
-                    # then round to the nearest 256 tile.
-                    # That will ensure it gets the correct texturing.
-                    # We know the scale is 0.25, so don't bother looking that up.
-                    tile_min = Vec.with_axes(
-                        norm_axis, plane_dist,
-                        u_axis, 128 * min_u - 64,
-                        v_axis, 128 * min_v - 64,
-                    )
-                    front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256/0.25)
-                    front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256/0.25)
-                    if gen.options['scaleup256']:
-                        # It's actually a 128x128 tile, that we want to double scale for.
-                        front.scale = 0.5
-                        front.uaxis.offset /= 2
-                        front.vaxis.offset /= 2
-
-                for u in range(min_u, max_u + 1):
-                    for v in range(min_v, max_v + 1):
-                        tile_pos[u, v].brush_faces.append(front)
+        generate_plane(vmf, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
 
     LOGGER.info('Generating goop...')
     generate_goo(vmf)
@@ -215,6 +127,100 @@ def generate_brushes(vmf: VMF) -> None:
             over['sides'] = ' '.join(sorted(faces))
         else:
             over.remove()
+
+
+def generate_plane(vmf: VMF, normal: Vec, plane_dist: float, tiles: list[TileDef]) -> None:
+    """Generate all the tiles in a single flat plane.
+
+    These are all the ones which could be potentially merged together.
+    """
+    norm_axis = normal.axis()
+    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+    # (type, is_antigel, texture) -> (u, v) -> present/absent
+    grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
+
+    tile_pos: Plane[TileDef] = Plane()
+
+    for tile in tiles:
+        pos = tile.pos + 64 * tile.normal
+
+        if tile.base_type is TileType.GOO_SIDE:
+            # This forces a specific size.
+            tex = texturing.gen(
+                texturing.GenCat.NORMAL,
+                normal,
+                Portalable.BLACK
+            ).get(pos, TileSize.GOO_SIDE, antigel=False)
+        elif tile.base_type is TileType.NODRAW:
+            tex = consts.Tools.NODRAW
+        else:
+            tex = texturing.gen(
+                texturing.GenCat.NORMAL,
+                normal,
+                tile.base_type.color
+            ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
+
+        u_pos = int((pos[u_axis] - 64) // 128)
+        v_pos = int((pos[v_axis] - 64) // 128)
+        grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
+        tile_pos[u_pos, v_pos] = tile
+
+    for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
+        for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
+            center = Vec.with_axes(
+                norm_axis, plane_dist,
+                # Compute avg(128*min, 128*max)
+                # = (128 * min + 128 * max) / 2
+                # = (min + max) * 64
+                u_axis, (1 + min_u + max_u) * 64,
+                v_axis, (1 + min_v + max_v) * 64,
+            )
+            gen = texturing.gen(
+                texturing.GenCat.NORMAL,
+                normal,
+                subtile_type.color
+            )
+            if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (
+                1 + max_v - min_v) % 2 == 0:
+                is_double = True
+                tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
+            else:
+                is_double = False
+
+            brush, front = make_tile(
+                vmf,
+                center,
+                normal,
+                tex,
+                texturing.SPECIAL.get(center, 'behind', antigel=is_antigel),
+                bevels=bevels,
+                width=(1 + max_u - min_u) * 128,
+                height=(1 + max_v - min_v) * 128,
+                antigel=is_antigel,
+            )
+            vmf.add_brush(brush)
+            if is_double:
+                # Compute the offset so that a 0,0 aligned brush can be
+                # offset so that point is at the minimum point of the tile,
+                # then round to the nearest 256 tile.
+                # That will ensure it gets the correct texturing.
+                # We know the scale is 0.25, so don't bother looking that up.
+                tile_min = Vec.with_axes(
+                    norm_axis, plane_dist,
+                    u_axis, 128 * min_u - 64,
+                    v_axis, 128 * min_v - 64,
+                )
+                front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256 / 0.25)
+                front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256 / 0.25)
+                if gen.options['scaleup256']:
+                    # It's actually a 128x128 tile, that we want to double scale for.
+                    front.scale = 0.5
+                    front.uaxis.offset /= 2
+                    front.vaxis.offset /= 2
+
+            for u in range(min_u, max_u + 1):
+                for v in range(min_v, max_v + 1):
+                    tile_pos[u, v].brush_faces.append(front)
 
 
 def generate_goo(vmf: VMF) -> None:
