@@ -1346,7 +1346,7 @@ class TileDef:
                             face_output[u, v] = face
         return faces, brushes
 
-    def can_merge(self) -> bool:
+    def is_simple(self) -> bool:
         """Check if this tile is a simple tile that can merge with neighbours."""
         if (
             self._sub_tiles is not None or

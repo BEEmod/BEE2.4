@@ -82,7 +82,7 @@ def generate_brushes(vmf: VMF) -> None:
     ] = defaultdict(list)
 
     for tile in TILES.values():
-        if tile.can_merge():
+        if tile.is_simple():
             pos = tile.pos + 64 * tile.normal
             plane_dist = abs(pos.dot(tile.normal))
 
