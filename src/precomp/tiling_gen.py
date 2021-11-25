@@ -85,7 +85,7 @@ def generate_brushes(vmf: VMF) -> None:
         # Otherwise, decompose into a big plane dict, for dynamic merging.
 
         pos = tile.pos + 64 * tile.normal
-        plane_dist = abs(pos.dot(tile.normal))
+        plane_dist = pos.dot(tile.normal)
 
         full_tiles[
             tile.normal.x, tile.normal.y, tile.normal.z,
@@ -167,8 +167,7 @@ def generate_plane(vmf: VMF, normal: Vec, plane_dist: float, tiles: list[TileDef
 
     for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
         for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
-            center = Vec.with_axes(
-                norm_axis, plane_dist,
+            center = normal * plane_dist + Vec.with_axes(
                 # Compute avg(128*min, 128*max)
                 # = (128 * min + 128 * max) / 2
                 # = (min + max) * 64
