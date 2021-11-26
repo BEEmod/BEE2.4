@@ -318,8 +318,8 @@ def generate_plane(
         vmf.add_brush(brush)
         tile_min = Vec.with_axes(
             norm_axis, plane_dist,
-            u_axis, 32 * (1 + min_u + tex_def.u_off),
-            v_axis, 32 * (1 + min_v + tex_def.v_off),
+            u_axis, -32 * tex_def.u_off,
+            v_axis, -32 * tex_def.v_off,
         )
         # We only care about texture offsets of at most 256 units, so modulo by that.
         front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256 / 0.25)
