@@ -73,17 +73,6 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
     TileType.GOO_SIDE: [TileSize.GOO_SIDE],
 }
 
-# Temp, make larger more likely.
-WEIGHT = {
-    TileSize.TILE_DOUBLE: 32,
-    TileSize.TILE_1x1: 10,
-    TileSize.TILE_2x1: 16,
-    TileSize.TILE_2x2: 6,
-    TileSize.TILE_4x4: 1,
-    TileSize.GOO_SIDE: 1,
-    TileSize.CLUMP_GAP: 1,
-}
-
 
 def bevel_split(
     rect_points: Plane[bool],
@@ -144,7 +133,12 @@ def generate_brushes(vmf: VMF) -> None:
             search_dists[port, orient] = gen.options['clump_length'] * (
                 8 if TileSize.TILE_DOUBLE in gen else 4
             )
-            LOGGER.debug('Search dist: {}.{} = {}', port.value, orient.name, search_dists[port, orient])
+            LOGGER.debug(
+                '{}.{}:\nSearch dist: {}\nWeights: {}',
+                port.value, orient.name,
+                search_dists[port, orient],
+                gen.weights,
+            )
     for tile in TILES.values():
         # First, if not a simple tile, we have to deal with it individually.
         if not tile.is_simple():
@@ -272,7 +266,7 @@ def generate_plane(
                     tex_list = gen.get_all(size)
                     if tex_list:
                         sizes.append(size)
-                        counts.append(len(tex_list) * WEIGHT[size])
+                        counts.append(len(tex_list) * gen.weights[size])
             if not sizes:
                 # Fallback, use 4x4.
                 sizes = [TileSize.TILE_4x4]

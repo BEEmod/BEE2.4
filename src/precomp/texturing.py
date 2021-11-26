@@ -320,6 +320,16 @@ OPTION_DEFAULTS = {
     'clump_debug': False,  # If true, dump them all as skip brushes.
 }
 
+DEFAULT_WEIGHTS = {
+    TileSize.TILE_DOUBLE: 32,
+    TileSize.TILE_1x1: 10,
+    TileSize.TILE_2x1: 16,
+    TileSize.TILE_2x2: 6,
+    TileSize.TILE_4x4: 1,
+    TileSize.GOO_SIDE: 1,
+    TileSize.CLUMP_GAP: 1,
+}
+
 # Copy left to right if right isn't set.
 # The order is important, this ensures all tiles will be set
 # if only 4x4 is.
@@ -465,7 +475,10 @@ def load_config(conf: Property):
         global_options, global_options,
     ))
 
-    data: Dict[Any, Tuple[Dict[str, Any], Dict[str, List[str]]]] = {}
+    # We put the configurations for each generator in here, before constructing them.
+    all_options: dict[Any, dict[str, Any]] = {}
+    all_weights: dict[Any, dict[TileSize, int]] = {}
+    all_textures: dict[Any, dict[str, list[str]]] = {}
 
     gen_cat: GenCat
     gen_orient: Optional[Orient]
@@ -524,14 +537,17 @@ def load_config(conf: Property):
                         Property('Algorithm', 'RAND'),
                     ])
                 ])
-        textures = {}
 
         # First parse the options.
-        options = parse_options({
+        all_options[gen_key] = parse_options({
             prop.name or '': prop.value
             for prop in
             gen_conf.find_children('Options')
         }, global_options)
+
+        all_weights[gen_key] = weights = DEFAULT_WEIGHTS.copy()
+        textures: dict[str, list[str]] = {}
+        all_textures[gen_key] = textures
 
         # Now do textures.
         if is_tile:
@@ -543,15 +559,26 @@ def load_config(conf: Property):
                     gen_conf.find_all(str(tex_name))
                 ]
 
-            # In case someone switches them around, add on 2x1 to 1x2 textures.
-            textures[TileSize.TILE_2x1] += [
-                prop.value for prop in
-                gen_conf.find_all('1x2')
-            ]
+            if '1x2' in gen_conf:
+                LOGGER.warning('1x2 textures will soon change to actually be two vertical tiles!')
+                textures[TileSize.TILE_2x1] += [
+                    prop.value for prop in
+                    gen_conf.find_all('1x2')
+                ]
 
             if not any(textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
                     textures[tex_name] = [tex_default]
+            for subprop in gen_conf.find_children('weights'):
+                try:
+                    size = TileSize(subprop.name)
+                except ValueError:
+                    LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
+                    continue
+                try:
+                    weights[size] = int(subprop.value)
+                except (TypeError, ValueError, OverflowError):
+                    LOGGER.warning('Invalid weight "{}" for size {}', subprop.value, subprop.real_name)
         else:
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
@@ -561,8 +588,6 @@ def load_config(conf: Property):
                 ]
                 if not tex and tex_default:
                     tex.append(tex_default)
-
-        data[gen_key] = options, textures
 
         # Next, do a check to see if any texture names were specified that
         # we don't recognise.
@@ -589,12 +614,12 @@ def load_config(conf: Property):
             continue
         gen_cat, gen_orient, gen_portal = gen_key
 
-        options, textures = data[gen_key]
+        textures = all_textures[gen_key]
 
         if not any(textures.values()) and gen_cat is not GenCat.NORMAL:
             # For the additional categories of tiles, we copy the entire
             # NORMAL one over if it's not set.
-            textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
+            textures.update(all_textures[GenCat.NORMAL, gen_orient, gen_portal])
 
         if not textures[TileSize.TILE_4x4]:
             raise ValueError(
@@ -607,7 +632,9 @@ def load_config(conf: Property):
 
     # Now finally create the generators.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
-        options, textures = data[gen_key]
+        options = all_options[gen_key]
+        weights = all_weights[gen_key]
+        textures = all_textures[gen_key]
 
         if isinstance(gen_key, tuple):
             # Check the algorithm to use.
@@ -625,7 +652,7 @@ def load_config(conf: Property):
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, options, textures)
+        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, options, weights, textures)
 
         # Allow it to use the default enums as direct lookups.
         if isinstance(gentor, GenRandom):
@@ -742,7 +769,7 @@ class Generator(abc.ABC):
 
     # The settings which apply to all generators.
     # Since they're here all subclasses and instances can access this.
-    global_settings = {}  # type: Dict[str, Any]
+    global_settings: Dict[str, Any] = {}
 
     def __init__(
         self,
@@ -750,9 +777,11 @@ class Generator(abc.ABC):
         orient: Optional[Orient],
         portal: Optional[Portalable],
         options: Dict[str, Any],
+        weights: Dict[TileSize, int],
         textures: Dict[str, List[str]],
     ):
         self.options = options
+        self.weights = weights
         self.textures = textures
 
         # Tells us the category each generator matches to.
