@@ -2,6 +2,7 @@
 from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Iterator
+import functools
 
 import attrs
 from srctools import Angle, Entity, Output, VMF, Vec, logger
@@ -18,7 +19,7 @@ from precomp.tiling import OVERLAY_BINDS, TILES, TileDef, TileType, make_tile
 LOGGER = logger.get_logger(__name__)
 
 
-@attrs.define
+@attrs.frozen
 class SubTile:
     """The state of a single 32x32 tile in a plane."""
     type: TileType
@@ -29,12 +30,27 @@ class SubTile:
 class TexDef:
     """The information required to create the surface of a material."""
     tex: str
-    antigel: bool
+    antigel: bool = False
     u_off: float = 0.0
     v_off: float = 0.0
     scale: float = 0.25  # 0.25 or 0.5 for double.
     # Four required bevels.
     bevels: tuple[bool, bool, bool, bool] = (True, True, True, True)
+
+    def with_bevels(self, umin: bool, umax: bool, vmin: bool, vmax: bool) -> 'TexDef':
+        """Reconfigure with bevels."""
+        return make_texdef(
+            self.tex,
+            self.antigel,
+            self.u_off,
+            self.v_off,
+            self.scale,
+            (umin, umax, vmin, vmax),
+        )
+
+make_subtile = functools.lru_cache(maxsize=None)(SubTile)
+make_texdef = functools.lru_cache(maxsize=64)(TexDef)
+TEXDEF_NODRAW = TexDef(consts.Tools.NODRAW)
 
 
 @attrs.define
@@ -155,6 +171,7 @@ def generate_brushes(vmf: VMF) -> None:
 
     for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
         generate_plane(vmf, search_dists, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
+    LOGGER.info('Caches: subtile={}, texdef={}', make_subtile.cache_info(), make_texdef.cache_info())
 
     LOGGER.info('Generating goop...')
     generate_goo(vmf)
@@ -207,7 +224,7 @@ def generate_plane(
         u_full = int((pos[u_axis] - 64) // 32)
         v_full = int((pos[v_axis] - 64) // 32)
         for u, v, tile_type in tile:
-            subtile_pos[u_full + u, v_full + v] = SubTile(tile_type, tile.is_antigel)
+            subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel)
             grid_pos[u_full + u, v_full + v] = tile
     # Now, reprocess subtiles into textures by repeatedly spreading.
     texture_plane: Plane[TexDef] = Plane()
@@ -256,14 +273,14 @@ def generate_plane(
                 # Fallback, use 4x4.
                 sizes = [TileSize.TILE_4x4]
                 counts = [len(gen.get_all(TileSize.TILE_4x4))]
-            if True or gen.options['mixtiles']:
+            if gen.options['mixtiles']:
                 [size] = rng.choices(sizes, counts)
             else:
                 # Only use the first.
                 size = sizes[0]
             width = rng.randint(1, width // size.width) * size.width
             height = rng.randint(1, height // size.height) * size.height
-            tex_def = TexDef(
+            tex_def = make_texdef(
                 rng.choice(gen.get_all(size)),
                 subtile.antigel,
                 max_u % size.width,
@@ -271,7 +288,7 @@ def generate_plane(
             )
         else:
             # Not a tile, must be nodraw.
-            tex_def = TexDef(consts.Tools.NODRAW, False)
+            tex_def = TEXDEF_NODRAW
         for u in range(max_u-width+1, max_u+1):
             for v in range(max_v-height+1, max_v+1):
                 del subtile_pos[u, v]
