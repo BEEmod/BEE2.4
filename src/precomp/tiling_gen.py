@@ -282,8 +282,10 @@ def generate_plane(
             else:
                 # Only use the first.
                 size = sizes[0]
-            width = rng.randint(1, width // size.width) * size.width
-            height = rng.randint(1, height // size.height) * size.height
+            max_width = width // size.width
+            max_height = height // size.height
+            width = round(rng.triangular(1, max_width, min(1.5, max_width))) * size.width
+            height = round(rng.triangular(1, max_height, min(1.5, max_height))) * size.height
             tex_def = make_texdef(
                 rng.choice(gen.get_all(size)),
                 subtile.antigel,
@@ -330,8 +332,8 @@ def generate_plane(
             v_axis, -32 * tex_def.v_off,
         )
         # We only care about texture offsets of at most 256 units, so modulo by that.
-        front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256 / 0.25)
-        front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256 / 0.25)
+        front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25)
+        front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25)
 
         for tiledef in {
             grid_pos[u, v]
