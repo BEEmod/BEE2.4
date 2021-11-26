@@ -283,8 +283,8 @@ def generate_plane(
             tex_def = make_texdef(
                 rng.choice(gen.get_all(size)),
                 subtile.antigel,
-                max_u % size.width,
-                max_v % size.height,
+                (1 + max_u - width) % size.width,
+                (1 + max_v - height) % size.height,
             )
         else:
             # Not a tile, must be nodraw.
@@ -296,7 +296,7 @@ def generate_plane(
 
     # TODO: Count bevels.
 
-    for min_u, min_v, max_u, max_v, subtile in grid_optim.optimise(texture_plane):
+    for min_u, min_v, max_u, max_v, tex_def in grid_optim.optimise(texture_plane):
         center = normal * plane_dist + Vec.with_axes(
             # Compute avg(32*min, 32*max)
             # = (32 * min + 32 * max) / 2
@@ -308,19 +308,20 @@ def generate_plane(
             vmf,
             center,
             normal,
-            subtile.tex,
-            texturing.SPECIAL.get(center, 'behind', antigel=subtile.antigel),
-            bevels=subtile.bevels,
+            tex_def.tex,
+            texturing.SPECIAL.get(center, 'behind', antigel=tex_def.antigel),
+            bevels=tex_def.bevels,
             width=(1 + max_u - min_u) * 32,
             height=(1 + max_v - min_v) * 32,
-            antigel=subtile.antigel,
+            antigel=tex_def.antigel,
         )
         vmf.add_brush(brush)
         tile_min = Vec.with_axes(
             norm_axis, plane_dist,
-            u_axis, 32 * (1 + min_u + subtile.u_off),
-            v_axis, 32 * (1 + min_v + subtile.v_off),
+            u_axis, 32 * (1 + min_u + tex_def.u_off),
+            v_axis, 32 * (1 + min_v + tex_def.v_off),
         )
+        # We only care about texture offsets of at most 256 units, so modulo by that.
         front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25) % (256 / 0.25)
         front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25) % (256 / 0.25)
 
