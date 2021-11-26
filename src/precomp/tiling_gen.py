@@ -49,8 +49,10 @@ class TexDef:
         )
 
 make_subtile = functools.lru_cache(maxsize=None)(SubTile)
-make_texdef = functools.lru_cache(maxsize=64)(TexDef)
+make_texdef = functools.lru_cache(maxsize=32)(TexDef)
 TEXDEF_NODRAW = TexDef(consts.Tools.NODRAW)
+# We know we don't modify the tiledefs while generating.
+_cached_bevel = functools.lru_cache(maxsize=32)(TileDef.should_bevel)
 
 
 @attrs.define
@@ -73,10 +75,10 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
 
 # Temp, make larger more likely.
 WEIGHT = {
-    TileSize.TILE_DOUBLE: 16,
-    TileSize.TILE_1x1: 8,
-    TileSize.TILE_2x1: 5,
-    TileSize.TILE_2x2: 3,
+    TileSize.TILE_DOUBLE: 32,
+    TileSize.TILE_1x1: 10,
+    TileSize.TILE_2x1: 16,
+    TileSize.TILE_2x2: 6,
     TileSize.TILE_4x4: 1,
     TileSize.GOO_SIDE: 1,
     TileSize.CLUMP_GAP: 1,
@@ -168,6 +170,8 @@ def generate_brushes(vmf: VMF) -> None:
                 snap_to_helper_angles=int(tile.has_oriented_portal_helper),
                 radius=64,
             )
+
+    LOGGER.info('Generating {} planes:', len(full_tiles))
 
     for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
         generate_plane(vmf, search_dists, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
@@ -292,9 +296,13 @@ def generate_plane(
         for u in range(max_u-width+1, max_u+1):
             for v in range(max_v-height+1, max_v+1):
                 del subtile_pos[u, v]
-                texture_plane[u, v] = tex_def
-
-    # TODO: Count bevels.
+                tile = grid_pos[u, v]
+                texture_plane[u, v] = tex_def.with_bevels(
+                    _cached_bevel(tile, -1, 0),
+                    _cached_bevel(tile, +1, 0),
+                    _cached_bevel(tile, 0, -1),
+                    _cached_bevel(tile, 0, +1),
+                )
 
     for min_u, min_v, max_u, max_v, tex_def in grid_optim.optimise(texture_plane):
         center = normal * plane_dist + Vec.with_axes(
