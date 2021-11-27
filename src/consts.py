@@ -1,6 +1,6 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
+from typing import Mapping, cast, Any, TypeVar, Type, MutableMapping, Iterator
 from enum import Enum, EnumMeta
 from srctools import Side
 
@@ -51,20 +51,21 @@ class MaterialGroupMeta(EnumMeta):
     _value2member_map_: dict[str, Any]  # Enum defines.
 
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> MutableMapping[str, Any]:
+    def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwargs: Any) -> Mapping[str, Any]:
         """Override Enum class-dict type.
 
         This makes string-values lowercase when set.
         """
-        namespace = super().__prepare__(name, bases, **kwargs)
+        namespace = super().__prepare__(cls, bases, **kwargs)
         return _MaterialGroupNS(cast(MutableMapping[str, Any], namespace))
 
-    def __new__(mcs, cls: type, bases: tuple[type, ...], classdict: _MaterialGroupNS, **kwds: Any) -> EnumMeta:
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwds: Any) -> MaterialGroupMeta:
         """Unpack the dict type back to the original for EnumMeta.
 
         It accesses attributes, so it can't have our wrapper.
         """
-        return super().__new__(mcs, cls, bases, classdict.mapping, **kwds)
+        assert isinstance(namespace, _MaterialGroupNS)
+        return super().__new__(mcs, name, bases, namespace.mapping, **kwds)
 
     def __contains__(cls, value) -> bool:
         """MaterialGroup can check if strings are equal to a member."""
