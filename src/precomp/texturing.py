@@ -120,6 +120,11 @@ class Rotation(Enum):
     HALF = 180
     CW = 270
 
+    ROT_0 = 0
+    ROT_90 = 90
+    ROT_180 = 180
+    ROT_270 = 270
+
     @classmethod
     def parse(cls, value: str) -> Rotation:
         """Parse a string into a rotation value."""
