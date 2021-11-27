@@ -503,7 +503,7 @@ class Game:
         fgd = srctools.FGD()
 
         for ent in engine_fgd:
-            if ent.classname.startswith('comp_'):
+            if ent.classname.startswith('comp_') or ent.classname == "hammer_notes":
                 fgd.entities[ent.classname] = ent
                 ent.strip_tags(FGD_TAGS)
 
