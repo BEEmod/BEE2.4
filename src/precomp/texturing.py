@@ -534,7 +534,7 @@ def load_config(conf: Property):
     # We put the configurations for each generator in here, before constructing them.
     all_options: dict[Any, dict[str, Any]] = {}
     all_weights: dict[Any, dict[TileSize, int]] = {}
-    all_textures: dict[Any, dict[str, list[str]]] = {}
+    all_textures: dict[Any, dict[str, list[MaterialConf]]] = {}
 
     gen_cat: GenCat
     gen_orient: Optional[Orient]
@@ -602,7 +602,7 @@ def load_config(conf: Property):
         }, global_options)
 
         all_weights[gen_key] = weights = DEFAULT_WEIGHTS.copy()
-        textures: dict[str, list[str]] = {}
+        textures: dict[str, list[MaterialConf]] = {}
         all_textures[gen_key] = textures
 
         # Now do textures.
@@ -611,7 +611,7 @@ def load_config(conf: Property):
             # only use the defaults if no textures were specified.
             for tex_name in TileSize:
                 textures[tex_name] = [
-                    prop.value for prop in
+                    MaterialConf.parse(prop) for prop in
                     gen_conf.find_all(str(tex_name))
                 ]
 
@@ -622,9 +622,11 @@ def load_config(conf: Property):
                     gen_conf.find_all('1x2')
                 ]
 
+            # If not provided, use defaults. Otherwise, ignore them entirely.
             if not any(textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
-                    textures[tex_name] = [tex_default]
+                    # Use default scale/rotation.
+                    textures[tex_name] = [MaterialConf(tex_default)]
             for subprop in gen_conf.find_children('weights'):
                 try:
                     size = TileSize(subprop.name)
@@ -639,11 +641,12 @@ def load_config(conf: Property):
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
                 textures[tex_name] = tex = [
-                    prop.value for prop in
+                    MaterialConf.parse(prop) for prop in
                     gen_conf.find_all(str(tex_name))
                 ]
                 if not tex and tex_default:
-                    tex.append(tex_default)
+                    # Use default scale/rotation.
+                    tex.append(MaterialConf(tex_default))
 
         # Next, do a check to see if any texture names were specified that
         # we don't recognise.
@@ -678,8 +681,7 @@ def load_config(conf: Property):
             textures.update(all_textures[GenCat.NORMAL, gen_orient, gen_portal])
 
         if not textures[TileSize.TILE_4x4]:
-            raise ValueError(
-                'No 4x4 tile set for "{}"!'.format(gen_key))
+            raise ValueError(f'No 4x4 tile set for "{gen_key}"!')
 
         # We need to do more processing.
         for orig, targ in TILE_INHERIT:
@@ -834,7 +836,7 @@ class Generator(abc.ABC):
         portal: Optional[Portalable],
         options: Dict[str, Any],
         weights: Dict[TileSize, int],
-        textures: Dict[str, List[str]],
+        textures: Dict[str, List[MaterialConf]],
     ):
         self.options = options
         self.weights = weights
@@ -845,7 +847,7 @@ class Generator(abc.ABC):
         self.orient = orient
         self.portal = portal
 
-    def get(self, loc: Vec, tex_name: str, *, antigel: Optional[bool] = None) -> str:
+    def get(self, loc: Vec, tex_name: str, *, antigel: Optional[bool] = None) -> MaterialConf:
         """Get one texture for a position.
 
         If antigel is set, this is directly on a tile and so whether it's antigel
@@ -867,20 +869,22 @@ class Generator(abc.ABC):
             tex_name = TileSize.GOO_SIDE
 
         try:
-            texture = self._get(loc, tex_name)
+            mat_conf = self._get(loc, tex_name)
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0]))
         if antigel:
             try:
-                return ANTIGEL_MATS[texture.casefold()]
+                antigel_tex = ANTIGEL_MATS[mat_conf.mat.casefold()]
             except KeyError:
-                LOGGER.warning('No antigel mat generated for "{}"!', texture)
+                LOGGER.warning('No antigel mat generated for "{}"!', mat_conf.mat)
                 # Set it to itself to silence the warning.
-                ANTIGEL_MATS[texture.casefold()] = texture
+                ANTIGEL_MATS[mat_conf.mat.casefold()] = mat_conf.mat
+            else:
+                return MaterialConf(antigel_tex, mat_conf.scale, mat_conf.rotation)
 
-        return texture
+        return mat_conf
 
-    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: list[TileDef]) -> None:
         """Scan tiles in the map and setup the generator."""
 
     def _missing_error(self, tex_name: str):
@@ -890,13 +894,13 @@ class Generator(abc.ABC):
         ))
 
     @abc.abstractmethod
-    def _get(self, loc: Vec, tex_name: str) -> str:
+    def _get(self, loc: Vec, tex_name: str) -> MaterialConf:
         """Actually get a texture.
 
         If KeyError is raised, an appropriate exception is raised from that.
         """
 
-    def get_all(self, tex_name: str) -> Sequence[str]:
+    def get_all(self, tex_name: str) -> Sequence[MaterialConf]:
         """Return all the textures possible for a given name."""
         try:
             return self.textures[tex_name]
@@ -930,7 +934,7 @@ class GenRandom(Generator):
             if type(default) != str:
                 self.enum_data[id(default)] = key
 
-    def _get(self, loc: Vec, tex_name: str):
+    def _get(self, loc: Vec, tex_name: str) -> MaterialConf:
         if type(tex_name) != str:
             try:
                 tex_name = self.enum_data[id(tex_name)]
@@ -1062,7 +1066,7 @@ class GenClump(Generator):
             len(tiles),
         )
 
-    def _get(self, loc: Vec, tex_name: str) -> str:
+    def _get(self, loc: Vec, tex_name: str) -> MaterialConf:
         clump_seed = self._find_clump(loc)
 
         if clump_seed is None:
