@@ -9,7 +9,7 @@ import attrs
 
 import srctools.logger
 from precomp import rand
-from srctools import Property, Vec, conv_bool
+from srctools import Matrix, Property, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
@@ -113,6 +113,7 @@ class Orient(Enum):
         return self.value
 
 
+@utils.freeze_enum_props
 class QuarterRot(Enum):
     """Valid 90-degree rotation values."""
     NONE = 0
@@ -139,6 +140,21 @@ class QuarterRot(Enum):
         except ValueError:
             LOGGER.warning('Rotation values must be multiples of 90 degrees, not {}!', angle)
             return QuarterRot.NONE
+
+    @property
+    def mat_x(self) -> Matrix:
+        """Return the matrix performing this rotation, around the X axis."""
+        return Matrix.from_roll(self.value)
+
+    @property
+    def mat_y(self) -> Matrix:
+        """Return the matrix performing this rotation, around the Y axis."""
+        return Matrix.from_yaw(self.value)
+
+    @property
+    def mat_z(self) -> Matrix:
+        """Return the matrix performing this rotation, around the X axis."""
+        return Matrix.from_yaw(self.value)
 
 
 @attrs.frozen
