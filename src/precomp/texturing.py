@@ -34,11 +34,11 @@ if TYPE_CHECKING:
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Algorithms to use.
-GEN_CLASSES: utils.FuncLookup['Generator'] = utils.FuncLookup('Generators')
+GEN_CLASSES: utils.FuncLookup[Generator] = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
-SPECIAL: 'Generator'
-OVERLAYS: 'Generator'
+SPECIAL: Generator
+OVERLAYS: Generator
 
 
 class GenCat(Enum):
@@ -70,7 +70,7 @@ class Portalable(Enum):
     def __str__(self) -> str:
         return self.value
 
-    def __invert__(self) -> 'Portalable':
+    def __invert__(self) -> Portalable:
         if self.value == 'white':
             return Portalable.BLACK
         else:
@@ -85,7 +85,7 @@ class Orient(Enum):
     CEIL = -1
 
     @classmethod
-    def from_normal(cls, norm: Vec) -> 'Orient':
+    def from_normal(cls, norm: Vec) -> Orient:
         """Find the orient matching this normal."""
         # Even if not axis-aligned, make mostly-flat surfaces floor/ceiling: (+-45 degrees)
         # sin(45) = ~0.707
@@ -166,6 +166,16 @@ class MaterialConf:
         except LookupError:
             rotation = QuarterRot.NONE
         return cls(material, scale, rotation)
+
+    def apply(self, face: Side) -> None:
+        """Apply the config to a brush face.
+
+        This will overwrite the material, scale, and potentially rotate the face.
+        For this reason the scale and offsets should be set first.
+        """
+        face.mat = self.mat
+        face.scale = self.scale
+        # TODO: Rotation
 
 
 GEN_CATS = {
@@ -442,7 +452,7 @@ def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> 
     return options
 
 
-def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generator':
+def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> Generator:
     """Given a category, normal, and white/black return the correct generator."""
 
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
@@ -514,7 +524,7 @@ def apply(
     if loc is None:
         loc = face.get_origin()
 
-    face.mat = generator.get(loc + face.normal(), tex_name)
+    generator.get(loc + face.normal(), tex_name).apply(face)
 
 
 def load_config(conf: Property):
