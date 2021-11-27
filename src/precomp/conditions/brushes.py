@@ -328,36 +328,36 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
 
     solids = vmf.make_prism(point1, point2)
 
-    solids.north.mat = texturing.gen(
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.N),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['y'])
-    solids.south.mat = texturing.gen(
+    ).get(solids.north.get_origin(), tile_grids['y']).apply(solids.north)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.S),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['y'])
-    solids.east.mat = texturing.gen(
+    ).get(solids.north.get_origin(), tile_grids['y']).apply(solids.south)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.E),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['x'])
-    solids.west.mat = texturing.gen(
+    ).get(solids.north.get_origin(), tile_grids['x']).apply(solids.east)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.W),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['x'])
-    solids.top.mat = texturing.gen(
+    ).get(solids.north.get_origin(), tile_grids['x']).apply(solids.west)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.T),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['z'])
-    solids.bottom.mat = texturing.gen(
+    ).get(solids.north.get_origin(), tile_grids['z']).apply(solids.top)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.B),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['z'])
+    ).get(solids.north.get_origin(), tile_grids['z']).apply(solids.bottom)
 
     if res.bool('detail'):
         # Add the brush to a func_detail entity
