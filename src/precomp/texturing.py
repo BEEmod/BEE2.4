@@ -113,7 +113,7 @@ class Orient(Enum):
         return self.value
 
 
-class Rotation(Enum):
+class QuarterRot(Enum):
     """Valid 90-degree rotation values."""
     NONE = 0
     CCW = 90
@@ -126,19 +126,19 @@ class Rotation(Enum):
     ROT_270 = 270
 
     @classmethod
-    def parse(cls, value: str) -> Rotation:
+    def parse(cls, value: str) -> QuarterRot:
         """Parse a string into a rotation value."""
         try:
             angle = round(int(value))
         except (TypeError, ValueError, OverflowError):
             LOGGER.warning('Non-numeric rotation value "{}"!', value)
-            return Rotation.NONE
+            return QuarterRot.NONE
         angle %= 360
         try:
             return cls(angle)
         except ValueError:
             LOGGER.warning('Rotation values must be multiples of 90 degrees, not {}!', angle)
-            return Rotation.NONE
+            return QuarterRot.NONE
 
 
 @attrs.frozen
@@ -146,7 +146,7 @@ class MaterialConf:
     """Texture, rotation, scale to apply."""
     mat: str
     scale: float = 0.25
-    rotation: Rotation = Rotation.NONE
+    rotation: QuarterRot = QuarterRot.NONE
 
     @classmethod
     def parse(cls, prop: Property) -> MaterialConf:
@@ -162,9 +162,9 @@ class MaterialConf:
             LOGGER.warning('Material scale should be positive, not {}!', scale)
             scale = 0.25
         try:
-            rotation = Rotation.parse(prop['rotation'])
+            rotation = QuarterRot.parse(prop['rotation'])
         except LookupError:
-            rotation = Rotation.NONE
+            rotation = QuarterRot.NONE
         return cls(material, scale, rotation)
 
 
