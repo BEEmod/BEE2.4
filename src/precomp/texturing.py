@@ -167,6 +167,14 @@ class MaterialConf:
             rotation = QuarterRot.NONE
         return cls(material, scale, rotation)
 
+    def __bool__(self) -> bool:
+        """Blank materials are falsey."""
+        return self.mat != ''
+
+    def __str__(self) -> str:
+        """Stringifying the MatConf produces the material."""
+        return self.mat
+
     def apply(self, face: Side) -> None:
         """Apply the config to a brush face.
 
@@ -278,9 +286,9 @@ GENERATORS: Dict[
 # The defaults for each generator.
 # This also defines the texture names allowed, as well
 # as the total number of generators.
-TEX_DEFAULTS: Dict[
-    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
-    Dict[str, str],
+TEX_DEFAULTS: dict[
+    GenCat | tuple[GenCat, Orient, Portalable],
+    dict[str, str | MaterialConf],
 ] = {
     # Signage overlays.
     GenCat.OVERLAYS: {
@@ -636,7 +644,7 @@ def load_config(conf: Property):
             if not any(textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
                     # Use default scale/rotation.
-                    textures[tex_name] = [MaterialConf(tex_default)]
+                    textures[tex_name] = [MaterialConf(tex_default) if isinstance(tex_default, str) else MaterialConf]
             for subprop in gen_conf.find_children('weights'):
                 try:
                     size = TileSize(subprop.name)
@@ -655,8 +663,11 @@ def load_config(conf: Property):
                     gen_conf.find_all(str(tex_name))
                 ]
                 if not tex and tex_default:
-                    # Use default scale/rotation.
-                    tex.append(MaterialConf(tex_default))
+                    if isinstance(tex_default, str):
+                        # Use default scale/rotation.
+                        tex.append(MaterialConf(tex_default))
+                    else:
+                        tex.append(tex_default)
 
         # Next, do a check to see if any texture names were specified that
         # we don't recognise.
@@ -678,7 +689,7 @@ def load_config(conf: Property):
 
     # Now complete textures for tile types,
     # copying over data from other generators.
-    for gen_key, tex_defaults in TEX_DEFAULTS.items():
+    for gen_key in TEX_DEFAULTS:
         if isinstance(gen_key, GenCat):
             continue
         gen_cat, gen_orient, gen_portal = gen_key
@@ -725,7 +736,10 @@ def load_config(conf: Property):
         # Allow it to use the default enums as direct lookups.
         if isinstance(gentor, GenRandom):
             if gen_portal is None:
-                gentor.set_enum(tex_defaults.items())
+                gentor.set_enum(
+                    (tex_key, str(mat))
+                    for tex_key, mat in tex_defaults.items()
+                )
             else:
                 # Tiles always use TileSize.
                 gentor.set_enum((size.value, size) for size in TileSize)
