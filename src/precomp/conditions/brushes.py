@@ -15,6 +15,7 @@ from precomp import (
 import vbsp
 import consts
 from precomp.collisions import Collisions
+from precomp.texturing import MaterialConf, QuarterRot
 
 
 COND_MOD_NAME = 'Brushes'
@@ -224,6 +225,15 @@ def res_set_texture(inst: Entity, res: Property):
 
     norm = round(Vec.from_str(res['dir', '0 0 1']) @ angles, 6)
 
+    scale = res.float('scale', 0.25)
+    if scale <= 0.0:
+        LOGGER.warning('Material scale should be positive, not {}!', scale)
+        scale = 0.25
+    try:
+        rotation = QuarterRot.parse(res['rotation'])
+    except NoKeyError:
+        rotation = QuarterRot.NONE
+
     if srctools.conv_bool(res['gridpos', '0']):
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
@@ -259,11 +269,14 @@ def res_set_texture(inst: Entity, res: Property):
             'no longer usable! ("{}")',
             tex
         )
-    elif tex.startswith('[') and tex.endswith(']'):
-        gen, name = texturing.parse_name(tex[1:-1])
-        tex = gen.get(pos - 64 * norm, name)
 
-    tile.override = (tex, temp)
+    if tex.startswith('[') and tex.endswith(']'):
+        gen, name = texturing.parse_name(tex[1:-1])
+        mat_conf = gen.get(pos - 64 * norm, name)
+    else:
+        mat_conf = MaterialConf(tex, scale, rotation)
+
+    tile.override = (mat_conf, temp)
 
 
 @conditions.make_result('AddBrush')
