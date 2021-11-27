@@ -1,4 +1,7 @@
 """Run the BEE2."""
+from typing import Callable, Any
+import collections
+
 import trio
 from outcome import Outcome, Error
 
@@ -147,10 +150,34 @@ def done_callback(result: Outcome):
 
 
 def start_main() -> None:
+    """Starts the TK and Trio loops.
+
+    See https://github.com/richardsheridan/trio-guest/.
+    """
+    def tk_func() -> None:
+        """Called to execute the callback."""
+        queue.popleft()()
+
+    def run_sync_soon_threadsafe(func: Callable[[], Any]) -> None:
+        """Run the specified func in the next loop, from other threads."""
+        queue.append(func)
+        TK_ROOT.call("after", "idle", tk_func_name)
+
+    def run_sync_soon_not_threadsafe(func: Callable[[], Any]) -> None:
+        """Run the specified func in the next loop."""
+        queue.append(func)
+        # The zero here apparently avoids blocking the event loop if an endless stream of
+        # callbacks is triggered.
+        TK_ROOT.call("after", "idle", "after", 0, tk_func_name)
+
+    queue: collections.deque[Callable[[], Any]] = collections.deque()
+    tk_func_name = TK_ROOT.register(tk_func)
+
     LOGGER.debug('Starting Trio loop.')
     trio.lowlevel.start_guest_run(
         app_main,
-        run_sync_soon_threadsafe=TK_ROOT.after_idle,
+        run_sync_soon_threadsafe=run_sync_soon_threadsafe,
+        run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
     )
     TK_ROOT.mainloop()
