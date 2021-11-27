@@ -52,9 +52,9 @@ Icon
 *.filelist.txt
 
 # Compiled application output
-build_BEE2/
-compiler/
-dist/
+/build_BEE2/
+/compiler/
+/dist/
 
 # Ignore palettes
 palettes/*.bee2_palette
