@@ -391,7 +391,7 @@ def generate_goo(vmf: VMF) -> None:
                     tideline = tideline_over[key] = Tideline(
                         vmf.create_ent(
                             'info_overlay',
-                            material=texturing.OVERLAYS.get(ent_pos, 'tideline'),
+                            material='material',
                             angles='0 0 0',
                             origin=ent_pos,
                             basisOrigin=ent_pos,
@@ -405,6 +405,7 @@ def generate_goo(vmf: VMF) -> None:
                         ),
                         off, off, off,
                     )
+                    texturing.OVERLAYS.get(ent_pos, 'tideline').apply_over(tideline)
                     OVERLAY_BINDS[tideline.over] = [tile]
                 else:
                     tideline.min = min(tideline.min, off)
@@ -472,13 +473,13 @@ def generate_goo(vmf: VMF) -> None:
             # Use fancy goo on the level with the
             # highest number of blocks.
             # All plane z are the same.
-            prism.top.mat = texturing.SPECIAL.get(
+            texturing.SPECIAL.get(
                 bbox_max + (0, 0, 96), (
                     'goo' if
                     max_z == best_goo
                     else 'goo_cheap'
                 ),
-            )
+            ).apply(prism.top)
             vmf.add_brush(prism.solid)
 
     bbox_min = Vec()

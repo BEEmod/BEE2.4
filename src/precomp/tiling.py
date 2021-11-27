@@ -711,28 +711,30 @@ class Panel:
 
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
-                srctools.vmf.make_overlay(
+                over = srctools.vmf.make_overlay(
                     vmf,
                     angled_normal,
                     top_center,
                     64 * front_normal @ rotation,
                     64 * orient.left(),
-                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                    'material',
                     faces,
                 )
+                texturing.OVERLAYS.get(front_pos, 'bullseye').apply_over(over)
         else:
             # Do non-angled helpers.
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
-                srctools.vmf.make_overlay(
+                over = srctools.vmf.make_overlay(
                     vmf,
                     tile.normal,
                     front_pos + offset,
                     64 * orient.left(),
                     64 * orient.forward(),
-                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                    'material',
                     faces,
                 )
+                texturing.OVERLAYS.get(front_pos, 'bullseye').apply_over(over)
 
             # If it's a flip panel, always create a helper.
             if has_helper or self.pan_type.is_flip:
@@ -1301,20 +1303,20 @@ class TileDef:
                 if tile_type is TileType.GOO_SIDE:
                     # This forces a specific size.
                     u_size = v_size = 4
-                    tex = texturing.gen(
+                    mat_conf = texturing.gen(
                         gen_cat, normal, Portalable.BLACK
                     ).get(tile_center, TileSize.GOO_SIDE, antigel=False)
                 else:
                     if tile_type.is_4x4:
                         grid_size = TileSize.TILE_4x4
                     u_size, v_size = grid_size.size
-                    tex = texturing.gen(
+                    mat_conf = texturing.gen(
                         gen_cat, normal, tile_type.color,
                     ).get(tile_center, grid_size, antigel=self.is_antigel)
 
                 template: Optional[template_brush.ScalingTemplate]
                 if self.override is not None:
-                    tex, template = self.override
+                    mat_conf, template = self.override
                 else:
                     template = None
 
@@ -1322,7 +1324,7 @@ class TileDef:
                     vmf,
                     tile_center,
                     normal,
-                    top_surf=tex,
+                    top_surf=mat_conf,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
@@ -1336,7 +1338,7 @@ class TileDef:
                 if template is not None:
                     # If the texture isn't supplied, use the one from the
                     # template.
-                    template.apply(face, change_mat=not tex)
+                    template.apply(face, change_mat=not mat_conf)
 
                 faces.append(face)
                 brushes.append(brush)
@@ -1618,10 +1620,10 @@ def make_tile(
 
     edge_name = 'panel_edge' if panel_edge else 'edge'
 
-    umin_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
-    umax_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
-    vmin_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
-    vmax_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
+    texturing.SPECIAL.get(origin, edge_name, antigel=antigel).apply(umin_side)
+    texturing.SPECIAL.get(origin, edge_name, antigel=antigel).apply(umax_side)
+    texturing.SPECIAL.get(origin, edge_name, antigel=antigel).apply(vmin_side)
+    texturing.SPECIAL.get(origin, edge_name, antigel=antigel).apply(vmax_side)
 
     return Solid(vmf, sides=[
         top_side, back_side,

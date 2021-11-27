@@ -12,7 +12,7 @@ from precomp import rand
 from srctools import Matrix, Property, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
-from srctools.vmf import VisGroup, VMF, Side, Solid
+from srctools.vmf import Entity, VisGroup, VMF, Side, Solid
 from srctools.vmt import Material
 from precomp.brushLoc import POS as BLOCK_TYPE
 
@@ -200,6 +200,11 @@ class MaterialConf:
         face.mat = self.mat
         face.scale = self.scale
         # TODO: Rotation
+
+    def apply_over(self, over: Entity) -> None:
+        """Apply the config to an overlay."""
+        over['material'] = self.mat
+        # TODO: Rotation, scale
 
 
 GEN_CATS = {

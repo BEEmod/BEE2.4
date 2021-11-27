@@ -18,7 +18,7 @@ from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
 from srctools.dmx import Element as DMElement
 import srctools.logger
 
-from .texturing import Portalable, GenCat, TileSize
+from .texturing import MaterialConf, Portalable, GenCat, TileSize
 from .tiling import TileType, TILE_SETTER_SKINS
 from . import tiling, texturing, options, rand, collisions
 import consts
@@ -1177,15 +1177,16 @@ def retexture_template(
                 except KeyError:
                     override_mat = None
 
+            # TODO: Implement material conf here
             if override_mat is not None:
                 # Replace_tex overrides everything.
-                mat =  rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
+                mat = rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
                 if mat.startswith('<') and mat.endswith('>'):
                     # Lookup in the style data.
                     gen, mat = texturing.parse_name(mat[1:-1])
-                    mat = gen.get(face.get_origin() + face.normal(), mat)
+                    mat = gen.get(face.get_origin() + face.normal(), mat).mat
                 # If blank, don't set.
                 if mat:
                     face.mat = mat
@@ -1252,7 +1253,7 @@ def retexture_template(
     for over in template_data.overlay[:]:
         over_pos = Vec.from_str(over['basisorigin'])
         mat = over['material'].casefold()
-
+        # TODO: Implement material conf here
         if mat in replace_tex:
             rng = rand.seed(b'temp', template_data.template.id, over_pos, mat)
             mat = rng.choice(replace_tex[mat])
@@ -1261,16 +1262,16 @@ def retexture_template(
             if mat.startswith('<') or mat.endswith('>'):
                 mat = mat[1:-1]
                 gen, tex_name = texturing.parse_name(mat[1:-1])
-                mat = gen.get(over_pos, tex_name)
+                mat = gen.get(over_pos, tex_name).mat
         else:
             try:
                 sign_type = consts.Signage(mat)
             except ValueError:
                 pass
             else:
-                mat = texturing.OVERLAYS.get(over_pos, sign_type)
+                mat = texturing.OVERLAYS.get(over_pos, sign_type).mat
 
-        if mat == '':
+        if not mat:
             # If blank, remove the overlay from the map and the list.
             # (Since it's inplace, this can affect the tuple.)
             template_data.overlay.remove(over)
