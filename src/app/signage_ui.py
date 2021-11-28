@@ -1,15 +1,17 @@
 """Configures which signs are defined for the Signage item."""
-from typing import Optional, Tuple, List, Dict, overload
+from tkinter import ttk
+import tkinter as tk
+from typing import Optional, Tuple, List, Dict
+
+from srctools import Property
+import srctools.logger
 
 from app import dragdrop, img, TK_ROOT
-import srctools.logger
+from packages import Signage, Style
+from app import tk_tools
+from localisation import gettext
 import utils
 import BEE2_config
-from packages import Signage, Style
-import tkinter as tk
-from srctools import Property
-from tkinter import ttk
-from app import tk_tools
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -131,11 +133,11 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         return ttk.Label(master)
 
     window.resizable(True, True)
-    window.title(_('Configure Signage'))
+    window.title(gettext('Configure Signage'))
 
     frame_selected = ttk.Labelframe(
         window,
-        text=_('Selected'),
+        text=gettext('Selected'),
         relief='raised',
         labelanchor='n',
     )
@@ -149,7 +151,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     frame_preview = ttk.Frame(window, relief='raised', borderwidth=4)
 
     frame_selected.grid(row=0, column=0, sticky='nsew')
-    ttk.Separator(orient='horiz').grid(row=1, column=0, sticky='ew')
+    ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
     name_label.grid(row=2, column=0)
     frame_preview.grid(row=3, column=0, pady=4)
     canv_all.grid(row=0, column=1, rowspan=4, sticky='nsew')
@@ -202,7 +204,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         """Show the signage when hovered."""
         nonlocal hover_arrow, hover_sign
         if slot.contents is not None:
-            name_label['text'] = _('Signage: {}').format(slot.contents.name)
+            name_label['text'] = gettext('Signage: {}').format(slot.contents.name)
             hover_sign = slot.contents
             hover_arrow = True
             hover_toggle()
@@ -267,6 +269,6 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     window.protocol("WM_DELETE_WINDOW", hide_window)
     return ttk.Button(
         master,
-        text=_('Configure Signage'),
+        text=gettext('Configure Signage'),
         command=show_window,
     )
