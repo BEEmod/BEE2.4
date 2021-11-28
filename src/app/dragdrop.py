@@ -1,37 +1,34 @@
 """Implements drag/drop logic."""
 from collections import defaultdict
-
+from tkinter import ttk, messagebox
 import tkinter
 import utils
 from app import sound, img, TK_ROOT, tk_tools
 from enum import Enum
-from tkinter import ttk, messagebox
 from srctools.logger import get_logger
 from typing import (
-    Union, Generic, Any, TypeVar,
+    Union, Generic, Any, TypeVar, Protocol,
     Optional, Callable,
-    List, Tuple, Dict,
-    Iterator, Iterable,
+    List, Tuple, Dict, Iterator, Iterable,
 )
 
 __all__ = ['Manager', 'Slot', 'ItemProto']
-
-try:
-    from typing import Protocol
-except ImportError:
-    from typing_extensions import Protocol
-
 LOGGER = get_logger(__name__)
 
 
 class ItemProto(Protocol):
     """Protocol draggable items satisfy."""
     dnd_icon: img.Handle  # Image for the item.
+
+
+class ItemGroupProto(ItemProto, Protocol):
+    """Additional values required when grouping."""
     dnd_group: Optional[str]  # If set, the group an item belongs to.
     # If only one item is present for a group, it uses this.
     dnd_group_icon: Optional[img.Handle]
 
-ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
+
+ItemT = TypeVar('ItemT', bound=Union[ItemProto, ItemGroupProto])  # The object the items move around.
 
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'
@@ -66,7 +63,7 @@ class Manager(Generic[ItemT]):
     """Manages a set of drag-drop points."""
     def __init__(
         self,
-        master: tkinter.Toplevel,
+        master: Union[tkinter.Tk, tkinter.Toplevel],
         *,
         size: Tuple[int, int]=(64, 64),
         config_icon: bool=False
@@ -80,22 +77,22 @@ class Manager(Generic[ItemT]):
         """
         self.width, self.height = size
 
-        self._targets = []  # type: List[Slot[ItemT]]
-        self._sources = []  # type: List[Slot[ItemT]]
+        self._targets: List[Slot[ItemT]] = []
+        self._sources: List[Slot[ItemT]] = []
 
         self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
 
         self.config_icon = config_icon
 
         # If dragging, the item we are dragging.
-        self._cur_drag = None  # type: Optional[ItemT]
+        self._cur_drag: Optional[ItemT] = None
         # While dragging, the place we started at.
-        self._cur_prev_slot = None  # type: Optional[Slot[ItemT]]
+        self._cur_prev_slot: Optional[Slot[ItemT]] = None
 
-        self._callbacks = {
+        self._callbacks: Dict[Event, List[Callable[[Slot], None]]] = {
             event: []
             for event in Event
-        }  # type: Dict[Event, List[Callable[[Slot], None]]]
+        }
 
         self._drag_win = drag_win = tkinter.Toplevel(master)
         drag_win.withdraw()
@@ -208,7 +205,7 @@ class Manager(Generic[ItemT]):
                 height=self.height,
                 anchor='nw',
                 window=slot._lbl,
-                tags=[_CANV_TAG],
+                tags=(_CANV_TAG, ),
             )
             slot._pos_type = f'_canvas_{obj_id}'
 
@@ -501,7 +498,8 @@ class Slot(Generic[ItemT]):
             raise ValueError('Not added to a geometry manager yet!')
         elif self._pos_type.startswith('_canvas_'):
             # Attached via canvas, with an ID as suffix.
-            canv: tkinter.Canvas = self._lbl.winfo_parent()
+            canv = self._lbl.winfo_parent()
+            assert isinstance(canv, tkinter.Canvas)
             canv.delete(self._pos_type[8:])
         else:
             getattr(self._lbl, self._pos_type + '_forget')()
