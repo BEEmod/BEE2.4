@@ -65,8 +65,8 @@ class Tideline:
 
 # The TileSize values each type can pick from - first is the match, plus alts.
 ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
-    TileType.WHITE: [TileSize.TILE_DOUBLE, TileSize.TILE_1x1, TileSize.TILE_2x1, TileSize.TILE_2x2],
-    TileType.BLACK: [TileSize.TILE_DOUBLE, TileSize.TILE_1x1, TileSize.TILE_2x1, TileSize.TILE_2x2],
+    TileType.WHITE: [TileSize.TILE_DOUBLE, TileSize.TILE_1x1, TileSize.TILE_1x2, TileSize.TILE_2x1, TileSize.TILE_2x2],
+    TileType.BLACK: [TileSize.TILE_DOUBLE, TileSize.TILE_1x1, TileSize.TILE_1x2, TileSize.TILE_2x1, TileSize.TILE_2x2],
 
     TileType.WHITE_4x4: [TileSize.TILE_4x4],
     TileType.BLACK_4x4: [TileSize.TILE_4x4],

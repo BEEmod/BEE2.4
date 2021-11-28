@@ -290,6 +290,7 @@ class TileSize(str, Enum):
     TILE_4x4 = '4x4'  # 1/4 of a block
     TILE_2x2 = '2x2'  # 1/2 of a block
     TILE_2x1 = '2x1'  # Two vertical
+    TILE_1x2 = '1x2'  # Two horizontal
 
     TILE_DOUBLE = 'double'  # 256x256 tile textures.
 
@@ -310,6 +311,8 @@ class TileSize(str, Enum):
             return 2, 2
         elif self.value == '2x1':
             return 2, 4
+        elif self.value == '1x2':
+            return 4, 2
         elif self.value == 'double':
             return 8, 8
         raise AssertionError(self)
@@ -329,6 +332,16 @@ class TileSize(str, Enum):
         """Return if this is a non-square shape."""
         width, height = self.size
         return width != height
+
+    @property
+    def rotated(self) -> TileSize:
+        """Return the size when this is rotated 90 degrees."""
+        if self is TileSize.TILE_1x2:
+            return TileSize.TILE_2x1
+        if self is TileSize.TILE_2x1:
+            return TileSize.TILE_1x2
+        return self
+
 
 GENERATORS: Dict[
     Union[GenCat, Tuple[GenCat, Orient, Portalable]],
@@ -451,6 +464,7 @@ DEFAULT_WEIGHTS = {
     TileSize.TILE_DOUBLE: 32,
     TileSize.TILE_1x1: 10,
     TileSize.TILE_2x1: 16,
+    TileSize.TILE_1x2: 16,
     TileSize.TILE_2x2: 6,
     TileSize.TILE_4x4: 1,
     TileSize.GOO_SIDE: 1,
@@ -463,7 +477,8 @@ DEFAULT_WEIGHTS = {
 TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.TILE_2x2),
     (TileSize.TILE_2x2, TileSize.TILE_2x1),
-    (TileSize.TILE_2x1, TileSize.TILE_1x1),
+    (TileSize.TILE_2x2, TileSize.TILE_1x2),
+    (TileSize.TILE_2x2, TileSize.TILE_1x1),
 
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
@@ -625,6 +640,11 @@ def load_config(conf: Property):
         Property,
     ] = {}
 
+    # In the version adding the configuration for texturing, we made 1x2 a tile type
+    # instead of an alias for 2x1. So check for the former, to see if we need to warn about
+    # the latter change.
+    has_block_mats = False
+
     for prop in conf:
         if prop.name in ('options', 'antlines'):
             continue
@@ -638,6 +658,11 @@ def load_config(conf: Property):
                 LOGGER.warning('Could not parse texture generator type "{}"!', prop.name)
                 continue
             conf_for_gen[gen_cat, gen_orient, gen_portal] = prop
+            if not has_block_mats and prop.has_children():
+                for child in prop:
+                    if child.name != 'options' and child.has_children():
+                        has_block_mats = True
+                        break
         else:
             try:
                 gen_cat = GEN_CATS[prop.name]
@@ -696,12 +721,8 @@ def load_config(conf: Property):
                     gen_conf.find_all(str(tex_name))
                 ]
 
-            if '1x2' in gen_conf:
-                LOGGER.warning('1x2 textures will soon change to actually be two vertical tiles!')
-                textures[TileSize.TILE_2x1] += [
-                    prop.value for prop in
-                    gen_conf.find_all('1x2')
-                ]
+            if '1x2' in gen_conf and not has_block_mats:
+                LOGGER.warning('1x2 textures have changed to actually be two vertical tiles!')
 
             if all_options[gen_key]['mixrotation']:
                 # Automatically rotate tiles.
