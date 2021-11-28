@@ -20,7 +20,6 @@ def optimise(
 
     The grid should be a (x, y): T dict.
     This yields (min_x, min_y, max_x, max_y, T) tuples, where this region has the same value.
-    The values are compared by identity.
     """
     full_grid: Plane[T] = Plane(grid, default=VOID)
     x_min, y_min = full_grid.mins
@@ -35,7 +34,7 @@ def optimise(
                 continue
             yield _do_cell(full_grid, value, x, y, x_max, y_max)
 
-    assert all(v is VOID for v in full_grid.values()), full_grid
+    assert len(full_grid) == 0, (grid, full_grid)
 
 
 def _do_cell(
@@ -53,19 +52,19 @@ def _do_cell(
 
     # Extend in the x direction until we hit a boundary.
     for x1 in range(min_x, max_x + 1):
-        if grid[x1, min_y] is not value:
+        if grid[x1, min_y] != value:
             break
     # Then in y until we hit a boundary.
     for y1 in range(min_y, max_y + 1):
-        if any(grid[x, y1] is not value for x in range(min_x, x1)):
+        if any(grid[x, y1] != value for x in range(min_x, x1)):
             break
 
     # Then do it again but the other order.
     for y2 in range(min_y, max_y + 1):
-        if grid[min_x, y2] is not value:
+        if grid[min_x, y2] != value:
             break
     for x2 in range(min_x, max_x + 1):
-        if any(grid[x2, y] is not value for y in range(min_y, y2)):
+        if any(grid[x2, y] != value for y in range(min_y, y2)):
             break
 
     # Check which has a larger area.
