@@ -1,22 +1,17 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-
 from io import BytesIO
-from pathlib import Path
-from typing import NamedTuple, Optional, TYPE_CHECKING
+from typing import NamedTuple, Optional
 
 from PIL import Image
-import attr
 
-import utils
-from packages import PakObject, ParseData, ExportData, Style
-from app.img import Handle as ImgHandle
-from srctools.vtf import ImageFormats, VTF
+from srctools.vtf import ImageFormats, VTF, VTFFlags
 from srctools import Property
 import srctools.logger
 
-if TYPE_CHECKING:
-    from app import gameMan  # Prevent circular import
+from packages import PakObject, ParseData, ExportData, Style
+from app.img import Handle as ImgHandle
+import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 LEGEND_SIZE = (512, 1024)
@@ -218,10 +213,7 @@ class Signage(PakObject, allow_mult=True):
                 sel_icons[int(tim_id)] = sty_sign.icon
 
         exp_data.vbsp_conf.append(conf)
-        exp_data.resources[SIGN_LOC] = build_texture(
-            exp_data.game, exp_data.selected_style,
-            sel_icons,
-        )
+        exp_data.resources[SIGN_LOC] = build_texture(exp_data.selected_style, sel_icons)
 
     def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
         """Write this sign's data for the style to the provided property."""
@@ -248,7 +240,6 @@ class Signage(PakObject, allow_mult=True):
 
 
 def build_texture(
-    game: gameMan.Game,
     sel_style: Style,
     icons: dict[int, ImgHandle],
 ) -> bytes:
@@ -290,7 +281,7 @@ def build_texture(
     vtf = VTF(*LEGEND_SIZE, fmt=ImageFormats.DXT5)
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
-    vtf.flags |= vtf.flags.ANISOTROPIC
+    vtf.flags |= VTFFlags.ANISOTROPIC
 
     buf = BytesIO()
     try:
