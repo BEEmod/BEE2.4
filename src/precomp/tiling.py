@@ -1084,7 +1084,7 @@ class TileDef:
 
         U and V should be 1 or -1.
         """
-        # If there's a fully solid block on this side, we don't need to.
+        # If there's air on the side, we must always bevel.
         if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)].inside_map:
             return True
 
@@ -1130,7 +1130,7 @@ class TileDef:
 
         # Finally, for floors/ceilings you can place it 'sideways'.
         return (
-            self.normal.z != 0 and
+            abs(self.normal.z) > 0.1 and
             self[0, 1].is_white and self[0, 2].is_white and
             self[3, 1].is_white and self[3, 2].is_white
         )
@@ -1881,7 +1881,7 @@ def tiledefs_from_large_tile(
 
     neighbour_block = BLOCK_POS['world': grid_pos + 128 * norm]
 
-    if neighbour_block is Block.VOID:
+    if not neighbour_block.inside_map:
         tex_kind = TileType.NODRAW
 
     tiledef = TileDef(
