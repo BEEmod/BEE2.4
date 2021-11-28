@@ -161,7 +161,7 @@ class QuarterRot(Enum):
 class MaterialConf:
     """Texture, rotation, scale to apply."""
     mat: str
-    scale: float = 0.25
+    scale: float = 1.0
     rotation: QuarterRot = QuarterRot.NONE
 
     @classmethod
@@ -173,10 +173,10 @@ class MaterialConf:
             material = prop['material']
         except LookupError:
             raise ValueError('Material definition must have "material" key!') from None
-        scale = prop.float('scale', 0.25)
+        scale = prop.float('scale', 1.0)
         if scale <= 0.0:
             LOGGER.warning('Material scale should be positive, not {}!', scale)
-            scale = 0.25
+            scale = 1.0
         try:
             rotation = QuarterRot.parse(prop['rotation'])
         except LookupError:
@@ -198,7 +198,8 @@ class MaterialConf:
         For this reason the scale and offsets should be set first.
         """
         face.mat = self.mat
-        face.scale = self.scale
+        face.uaxis.scale *= self.scale
+        face.vaxis.scale *= self.scale
         # TODO: Rotation
 
     def apply_over(self, over: Entity) -> None:

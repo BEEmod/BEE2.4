@@ -211,6 +211,7 @@ def res_set_texture(inst: Entity, res: Property):
      the 128 brushes (Useful with fizzler/light strip items).
 
     `tex` is the texture to use.
+    `scale` allows you to scale up/down the material - this is a multiplier, not the actual value.
 
     If `template` is set, the template should be an axis aligned cube. This
     will be rotated by the instance angles, and then the face with the same
@@ -225,10 +226,10 @@ def res_set_texture(inst: Entity, res: Property):
 
     norm = round(Vec.from_str(res['dir', '0 0 1']) @ angles, 6)
 
-    scale = res.float('scale', 0.25)
+    scale = res.float('scale', 1.0)
     if scale <= 0.0:
         LOGGER.warning('Material scale should be positive, not {}!', scale)
-        scale = 0.25
+        scale = 1.0
     try:
         rotation = QuarterRot.parse(res['rotation'])
     except NoKeyError:
