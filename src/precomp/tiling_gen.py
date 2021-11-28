@@ -234,21 +234,46 @@ def generate_plane(
             # Not a tile, must be nodraw - we don't care how big.
             assert subtile.type is TileType.NODRAW
             max_dist = 64
-        min_u = max_u
-        min_v = max_v
+
+        # Search to find the largest region of the same tile type.
+
+        min_u1 = min_u2 = max_u
+        min_v1 = min_v2 = max_v
+
+        # First do u, v:
         for u in range(max_u, max_u - max_dist, -1):
             if subtile_pos[u, max_v] == subtile:
-                min_u = u
+                min_u1 = u
             else:
                 break
         # Then in v until we hit a boundary.
         for v in range(max_v, max_v - max_dist, -1):
-            if all(subtile_pos[u, v] == subtile for u in range(min_u, max_u + 1)):
-                min_v = v
+            if all(subtile_pos[u, v] == subtile for u in range(min_u1, max_u + 1)):
+                min_v1 = v
             else:
                 break
-        width = max_u - min_u + 1
-        height = max_v - min_v + 1
+
+        # Now try v, u:
+        for v in range(max_v, max_v - max_dist, -1):
+            if subtile_pos[max_u, v] == subtile:
+                min_v2 = v
+            else:
+                break
+        # Then in v until we hit a boundary.
+        for u in range(max_u, max_u - max_dist, -1):
+            if all(subtile_pos[u, v] == subtile for v in range(min_v2, max_v + 1)):
+                min_u2 = u
+            else:
+                break
+
+        # Then pick the biggest axis.
+        if (1+max_u - min_u1) * (1+max_v-min_v1) > (1+max_u - min_u2) * (1+max_v - min_v2):
+            width = max_u - min_u1 + 1
+            height = max_v - min_v1 + 1
+        else:
+            width = max_u - min_u2 + 1
+            height = max_v - min_v2 + 1
+
         if subtile.type.is_tile:
             # Now, pick a tile size.
             rng = rand.seed(
