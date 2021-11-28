@@ -12,7 +12,7 @@ import utils
 from plane import Plane
 from precomp import grid_optim, options, rand, texturing
 from precomp.brushLoc import Block, POS as BLOCK_POS
-from precomp.texturing import Orient, Portalable, TileSize
+from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
 from precomp.tiling import OVERLAY_BINDS, TILES, TileDef, TileType, make_tile
 
 
@@ -29,7 +29,7 @@ class SubTile:
 @attrs.frozen
 class TexDef:
     """The information required to create the surface of a material."""
-    tex: str
+    tex: MaterialConf
     antigel: bool = False
     u_off: float = 0.0
     v_off: float = 0.0
@@ -37,7 +37,7 @@ class TexDef:
     # Four required bevels.
     bevels: tuple[bool, bool, bool, bool] = (True, True, True, True)
 
-    def with_bevels(self, umin: bool, umax: bool, vmin: bool, vmax: bool) -> 'TexDef':
+    def with_bevels(self, umin: bool, umax: bool, vmin: bool, vmax: bool) -> TexDef:
         """Reconfigure with bevels."""
         return make_texdef(
             self.tex,
@@ -50,7 +50,7 @@ class TexDef:
 
 make_subtile = functools.lru_cache(maxsize=None)(SubTile)
 make_texdef = functools.lru_cache(maxsize=32)(TexDef)
-TEXDEF_NODRAW = TexDef(consts.Tools.NODRAW)
+TEXDEF_NODRAW = TexDef(MaterialConf(consts.Tools.NODRAW))
 # We know we don't modify the tiledefs while generating.
 _cached_bevel = functools.lru_cache(maxsize=32)(TileDef.should_bevel)
 
@@ -405,7 +405,6 @@ def generate_goo(vmf: VMF) -> None:
                         ),
                         off, off, off,
                     )
-                    texturing.OVERLAYS.get(ent_pos, 'tideline').apply_over(tideline)
                     OVERLAY_BINDS[tideline.over] = [tile]
                 else:
                     tideline.min = min(tideline.min, off)
@@ -431,6 +430,7 @@ def generate_goo(vmf: VMF) -> None:
         tideline.over['uv1'] = f'{tide_min} {rng.randint(28, 32)} 0'
         tideline.over['uv2'] = f'{tide_max} {rng.randint(28, 32)} 0'
         tideline.over['uv3'] = f'{tide_max} {rng.randint(-36, -28)} 0'
+        texturing.OVERLAYS.get(Vec.from_str(tideline.over['origin']), 'tideline').apply_over(tideline.over)
 
     # No goo.
     if not goo_pos or pos is None:
