@@ -289,8 +289,12 @@ class TileSize(str, Enum):
     TILE_1x1 = '1x1'  # Full block
     TILE_4x4 = '4x4'  # 1/4 of a block
     TILE_2x2 = '2x2'  # 1/2 of a block
+
     TILE_2x1 = '2x1'  # Two vertical
     TILE_1x2 = '1x2'  # Two horizontal
+
+    TILE_1x4 = '1x4'  # Horizontal strip
+    TILE_4x1 = '4x1'  # Vertical strip
 
     TILE_DOUBLE = 'double'  # 256x256 tile textures.
 
@@ -313,6 +317,10 @@ class TileSize(str, Enum):
             return 2, 4
         elif self.value == '1x2':
             return 4, 2
+        elif self.value == '4x1':
+            return 1, 4
+        elif self.value == '1x4':
+            return 4, 1
         elif self.value == 'double':
             return 8, 8
         raise AssertionError(self)
@@ -340,6 +348,11 @@ class TileSize(str, Enum):
             return TileSize.TILE_2x1
         if self is TileSize.TILE_2x1:
             return TileSize.TILE_1x2
+
+        if self is TileSize.TILE_1x4:
+            return TileSize.TILE_4x1
+        if self is TileSize.TILE_2x1:
+            return TileSize.TILE_1x4
         return self
 
 
@@ -466,6 +479,8 @@ DEFAULT_WEIGHTS = {
     TileSize.TILE_2x1: 16,
     TileSize.TILE_1x2: 16,
     TileSize.TILE_2x2: 6,
+    TileSize.TILE_4x1: 3,
+    TileSize.TILE_1x4: 3,
     TileSize.TILE_4x4: 1,
     TileSize.GOO_SIDE: 1,
     TileSize.CLUMP_GAP: 1,
@@ -476,6 +491,8 @@ DEFAULT_WEIGHTS = {
 # if only 4x4 is.
 TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.TILE_2x2),
+    (TileSize.TILE_4x4, TileSize.TILE_4x1),
+    (TileSize.TILE_4x4, TileSize.TILE_1x4),
     (TileSize.TILE_2x2, TileSize.TILE_2x1),
     (TileSize.TILE_2x2, TileSize.TILE_1x2),
     (TileSize.TILE_2x2, TileSize.TILE_1x1),

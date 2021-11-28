@@ -64,9 +64,15 @@ class Tideline:
     max: float
 
 # The TileSize values each type can pick from - first is the match, plus alts.
+tile_chain = [
+    TileSize.TILE_DOUBLE, TileSize.TILE_1x1,
+    TileSize.TILE_1x2, TileSize.TILE_2x1,
+    TileSize.TILE_2x2,
+    TileSize.TILE_1x4, TileSize.TILE_4x1,
+]
 ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
-    TileType.WHITE: [TileSize.TILE_DOUBLE, TileSize.TILE_1x1, TileSize.TILE_1x2, TileSize.TILE_2x1, TileSize.TILE_2x2],
-    TileType.BLACK: [TileSize.TILE_DOUBLE, TileSize.TILE_1x1, TileSize.TILE_1x2, TileSize.TILE_2x1, TileSize.TILE_2x2],
+    TileType.WHITE: tile_chain,
+    TileType.BLACK: tile_chain,
 
     TileType.WHITE_4x4: [TileSize.TILE_4x4],
     TileType.BLACK_4x4: [TileSize.TILE_4x4],
