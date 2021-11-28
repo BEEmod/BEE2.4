@@ -12,7 +12,7 @@ from precomp import rand
 from srctools import Matrix, Property, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
-from srctools.vmf import Entity, VisGroup, VMF, Side, Solid
+from srctools.vmf import Entity, UVAxis, VisGroup, VMF, Side, Solid
 from srctools.vmt import Material
 from precomp.brushLoc import POS as BLOCK_TYPE
 
@@ -207,9 +207,24 @@ class MaterialConf:
         For this reason the scale and offsets should be set first.
         """
         face.mat = self.mat
-        face.uaxis.scale *= self.scale
-        face.vaxis.scale *= self.scale
-        # TODO: Rotation
+        uaxis, vaxis = face.uaxis, face.vaxis
+
+        uaxis.scale *= self.scale
+        vaxis.scale *= self.scale
+        if self.rotation is not QuarterRot.NONE:
+            u_axis, v_axis = uaxis.vec(), vaxis.vec()
+            # Convert the offset values into an offset from the origin, then rotate.
+            # We can then extract the new offset via u/v axis dotting.
+            offset = u_axis * uaxis.offset + v_axis * vaxis.offset
+            orient = Matrix.axis_angle(face.normal(), self.rotation.value)
+            offset @= orient
+            u_axis @= orient
+            v_axis @= orient
+
+            face.uaxis = UVAxis(u_axis.x, u_axis.y, u_axis.z, Vec.dot(offset, u_axis), uaxis.scale)
+            face.vaxis = UVAxis(v_axis.x, v_axis.y, v_axis.z, Vec.dot(offset, v_axis), vaxis.scale)
+            # Doesn't actually do anything, but makes Hammer look nicer.
+            face.ham_rot = (face.ham_rot + self.rotation.value) % 360
 
     def apply_over(self, over: Entity) -> None:
         """Apply the config to an overlay."""
