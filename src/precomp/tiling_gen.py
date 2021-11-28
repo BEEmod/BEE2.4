@@ -301,10 +301,14 @@ def generate_plane(
             else:
                 # Only use the first.
                 size = sizes[0]
-            max_width = width // size.width
-            max_height = height // size.height
-            width = round(rng.triangular(1, max_width, min(1.5, max_width))) * size.width
-            height = round(rng.triangular(1, max_height, min(1.5, max_height))) * size.height
+            if size is TileSize.TILE_4x4:
+                # Force this to only place 1x1, so that other sizes get a chance.
+                width = height = 1
+            else:
+                max_width = width // size.width
+                max_height = height // size.height
+                width = round(rng.triangular(1, max_width, min(1.5, max_width))) * size.width
+                height = round(rng.triangular(1, max_height, min(1.5, max_height))) * size.height
             tex_def = make_texdef(
                 rng.choice(gen.get_all(size)),
                 subtile.antigel,
