@@ -360,9 +360,8 @@ def generate_plane(
             u_axis, -32 * tex_def.u_off,
             v_axis, -32 * tex_def.v_off,
         )
-        # We only care about texture offsets of at most 256 units, so modulo by that.
-        front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / 0.25)
-        front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / 0.25)
+        front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / front.uaxis.scale)
+        front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / front.vaxis.scale)
 
         for tiledef in {
             grid_pos[u, v]
