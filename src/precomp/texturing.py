@@ -726,15 +726,17 @@ def load_config(conf: Property):
 
             if all_options[gen_key]['mixrotation']:
                 # Automatically rotate tiles.
-                for tex_name, old_tex in textures.items():
-                    assert isinstance(tex_name, TileSize)
-                    textures[tex_name] = [
-                        attrs.evolve(mat, rotation=mat.rotation + new_rot)
-                        for mat in old_tex
-                        for new_rot in QuarterRot
-                        # For rectangular sizes, only allow 0/180.
-                        if not tex_name.is_rect or not new_rot.flips_uv
-                    ]
+                orig_defs: dict[TileSize, list[MaterialConf]] = {
+                    tex_name: tex_list.copy()
+                    for tex_name, tex_list in textures.items()
+                    if isinstance(tex_name, TileSize)  # Always true.
+                }
+                for start_size, mat_list in orig_defs.items():
+                    assert isinstance(start_size, TileSize)
+                    for rot in QuarterRot:
+                        size = start_size.rotated if rot.flips_uv else start_size
+                        for mat in mat_list:
+                            textures[size].append(attrs.evolve(mat, rotation=mat.rotation + rot))
 
             # If not provided, use defaults. Otherwise, ignore them entirely.
             if not any(textures.values()):
