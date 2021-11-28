@@ -472,7 +472,7 @@ def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> 
         elif isinstance(default, float):
             options[opt] = srctools.conv_float(value, default)
         else:
-            raise ValueError('Bad default {!r} for "{}"!'.format(default, opt))
+            raise ValueError(f'Bad default {default!r} for "{opt}"!')
     # Make sure the length is always larger.
     try:
         if options['clump_width'] > options['clump_length']:
@@ -744,9 +744,7 @@ def load_config(conf: Property):
             try:
                 generator: Type[Generator] = GEN_CLASSES[algo]  # type: ignore
             except KeyError:
-                raise ValueError('Invalid algorithm "{}" for {}!'.format(
-                    algo, gen_key
-                ))
+                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!')
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom
@@ -935,10 +933,7 @@ class Generator(abc.ABC):
         """Scan tiles in the map and setup the generator."""
 
     def _missing_error(self, tex_name: str):
-        return ValueError('Bad texture name: {}\n Allowed: {!r}'.format(
-            tex_name,
-            list(self.textures.keys()),
-        ))
+        return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
     def _get(self, loc: Vec, tex_name: str) -> MaterialConf:
