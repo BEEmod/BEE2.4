@@ -497,7 +497,7 @@ DEFAULTS = [
     Opt('glass_floorbeam_temp', TYPE.STR,
         """Template for beams in the middle of large glass floors.
 
-        The template should be two brushes for the texture scaling.
+        The template must be a single brush, aligned on the X axis.
         """),
     Opt('glass_floorbeam_sep', 2,
         """Number of blocks between beams.
