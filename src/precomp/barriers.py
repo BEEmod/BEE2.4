@@ -488,7 +488,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     template = template_brush.get_template(temp_name)
     beam_template: Solid
     try:
-        [beam_template] = template.visgrouped()
+        [beam_template] = template.visgrouped_solids()
     except ValueError:
         raise ValueError('Bad Glass Floorbeam template! Must have exactly one brush.')
 
