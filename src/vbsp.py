@@ -1608,39 +1608,30 @@ def main() -> None:
         for ent in vmf.entities:
             for out in ent.outputs:
                 out.comma_sep = False
-
-        # Ensure VRAD knows that the map is PeTI, it can't figure that out
-        # from parameters.
-        vmf.spawn['BEE2_is_peti'] = True
         # Set this so VRAD can know.
         vmf.spawn['BEE2_is_preview'] = info.is_preview
-
-        save(vmf, new_path)
-        if not skip_vbsp:
-            run_vbsp(
-                vbsp_args=new_args,
-                path=path,
-                new_path=new_path,
-            )
     except UserError as error:
         # The user did something wrong, so the map is invalid.
         # Compile a special map which displays the message.
         LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
         vmf = error.make_map()
 
-        # Flag as PeTI, preview, errored
-        vmf.spawn['BEE2_is_peti'] = True
+        # Flag as preview and errored for VRAD.
         vmf.spawn['BEE2_is_preview'] = True
         vmf.spawn['BEE2_is_error'] = True
 
-        # Act like this was made normally, running VBSP.
+    # Ensure VRAD knows that the map is PeTI, it can't figure that out
+    # from parameters.
+    vmf.spawn['BEE2_is_peti'] = True
+
+    # In both user-error and normal cases, we just save and run VBSP.
+    if not skip_vbsp:
         save(vmf, new_path)
-        if not skip_vbsp:
-            run_vbsp(
-                vbsp_args=new_args,
-                path=path,
-                new_path=new_path,
-            )
+        run_vbsp(
+            vbsp_args=new_args,
+            path=path,
+            new_path=new_path,
+        )
 
     LOGGER.info("BEE2 VBSP hook finished!")
 
