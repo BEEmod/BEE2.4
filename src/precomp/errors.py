@@ -76,13 +76,11 @@ class UserError(BaseException):
         vmf.create_ent('func_detail').solids.append(roof_detail.solid)
 
         # VScript displays the webpage, then kicks you back to the editor
-        # if the map is swapped back to.
+        # if the map is swapped back to. VRAD detects the classname and adds the script.
         vmf.create_ent(
-            'info_player_start',
+            'bee2_user_error',
             origin="64 64 1",
             angles="0 0 0",
-            vscripts='BEE2/compile_error.nut',
-            thinkfunction='Think',
         )
         # We need a light, so the map compiles lights and doesn't turn on
         # mat_fullbright.
