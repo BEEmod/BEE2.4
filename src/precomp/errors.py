@@ -5,8 +5,6 @@ import consts
 from srctools import Vec, VMF
 import utils
 
-ERROR_PAGE = utils.conf_location('error.html')
-
 ERROR_TEMPLATE = '''\
 <!DOCTYPE html>
 <html>
@@ -50,7 +48,7 @@ class UserError(BaseException):
 
         This map is as simple as possible to make compile time quick.
         """
-        with ERROR_PAGE.open('w') as f:
+        with utils.COMPILE_USER_ERROR_PAGE.open('w') as f:
             f.write(ERROR_TEMPLATE.replace('%MSG%', self.message))
         vmf = VMF()
         vmf.map_ver = 1

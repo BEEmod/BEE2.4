@@ -148,6 +148,9 @@ def conf_location(path: str) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     return loc
 
+# Location of a message shown when user errors occur.
+COMPILE_USER_ERROR_PAGE = conf_location('error.html')
+
 
 def fix_cur_directory() -> None:
     """Change directory to the location of the executable.
