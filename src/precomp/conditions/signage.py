@@ -246,8 +246,7 @@ def place_sign(
     rotate: bool=True,
 ) -> Entity:
     """Place the sign into the map."""
-
-    if rotate and normal.z == 0:
+    if rotate and abs(normal.z) < 0.1:
         # On the wall, point upward.
         forward = Vec(0, 0, 1)
 
