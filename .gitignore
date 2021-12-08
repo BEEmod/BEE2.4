@@ -78,3 +78,11 @@ src/bee_version.txt
 # Folders for DLLs we need.
 lib-32/
 lib-64/
+
+# Executable debugging info
+*.pdb
+# Rustfmt backups
+**/*.rs.bk
+# Cargo compiled executables
+trampoline/debug/
+trampoline/target/
