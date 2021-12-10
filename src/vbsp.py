@@ -1,9 +1,4 @@
 """Implements the BEE2 VBSP compiler replacement."""
-# Do this very early, so we log the startup sequence.
-from srctools.logger import init_logging
-
-LOGGER = init_logging('bee2/vbsp.log')
-
 import os
 import sys
 import shutil
@@ -46,7 +41,7 @@ import editoritems
 
 from typing import Any, Dict, Tuple, Set, Iterable, Optional
 
-
+LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'VBSP'
 
 # Configuration data extracted from VBSP_config
@@ -1748,7 +1743,6 @@ def main() -> None:
     """Main program code.
 
     """
-    global MAP_RAND_SEED
     LOGGER.info("BEE{} VBSP hook initiallised, srctools v{}.", utils.BEE_VERSION, srctools.__version__)
 
     # Warn if srctools Cython code isn't installed.
@@ -1918,7 +1912,3 @@ def main() -> None:
             )
 
     LOGGER.info("BEE2 VBSP hook finished!")
-
-
-if __name__ == '__main__':
-    main()

@@ -3,9 +3,6 @@
 This allows us to change the arguments passed in,
 edit the BSP after instances are collapsed, and pack files.
 """
-# Run as early as possible to catch errors in imports.
-from srctools.logger import init_logging
-LOGGER = init_logging('bee2/vrad.log')
 
 import os
 import sys
@@ -15,7 +12,7 @@ from typing import List
 from pathlib import Path
 
 import srctools.run
-from srctools import FGD
+from srctools import FGD, logger
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
@@ -33,6 +30,9 @@ from postcomp import (
     filter,
 )
 import utils
+
+
+LOGGER = logger.get_logger(__name__)
 
 
 def load_transforms() -> None:
@@ -295,6 +295,3 @@ def main(argv: List[str]) -> None:
         run_vrad(full_args)
 
     LOGGER.info("BEE2 VRAD hook finished!")
-
-if __name__ == '__main__':
-    main(sys.argv)
