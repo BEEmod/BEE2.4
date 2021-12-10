@@ -25,7 +25,7 @@ pub fn run_compiler(comp_name: &str) {
     println!("BEE compiler hook for {} started.", comp_name);
 
     // Grab the config left by the app.
-    let conf = parse_config(fs::read_to_string("bee2/app_loc.cfg").expect("No BEE config file."));
+    let conf = parse_config(fs::read_to_string("bee2/app_loc.paths").expect("No BEE config file."));
     println!("Config: {:?}", conf);
     let mut cmd;
     match conf {

@@ -852,7 +852,7 @@ class Game:
             export_screen.step('EXP', 'vbsp_config')
 
             LOGGER.info('Writing app location file!')
-            with open(self.abs_path('bin/bee2/app_loc.cfg'), 'w', encoding='utf8', newline='\n') as app_loc_file:
+            with open(self.abs_path('bin/bee2/app_loc.paths'), 'w', encoding='utf8', newline='\n') as app_loc_file:
                 app_loc_file.write(sys.executable)
                 if not utils.FROZEN:
                     # Write the source code script.
