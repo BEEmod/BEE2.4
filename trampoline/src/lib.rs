@@ -13,8 +13,8 @@ fn parse_config(conf: String) -> Config {
     match conf.chars().position(|x| x == '\n') {
         Some(sep) => {
             Config::PySource {
-                exe: String::from(conf.get(..sep).unwrap()),
-                script: String::from(conf.get(sep + 1..).unwrap())
+                exe: String::from(conf.get(..sep).unwrap_or_else(|| panic!("Index OOB: {}>{}", sep, conf.len()))),
+                script: String::from(conf.get(sep + 1..).unwrap_or_else(|| panic!("Index OOB: {}>{}", sep, conf.len()))),
             }
         },
         None => Config::Frozen(conf),
