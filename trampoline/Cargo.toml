@@ -2,10 +2,19 @@
 name = "trampoline"
 version = "0.1.0"
 edition = "2021"
+build = "src/build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[build-dependencies]
+winres = "0.1"
+
+[package.metadata.winres]
+ProductName = "BEEmod Executable Trampoline"
+FileDescription = "Redirects to the BEE compilers in the app."
+URL = "https://www.github.com/BEEmod/BEE2.4/"
 
 [profile.release]
 lto = true
