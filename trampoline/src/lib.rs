@@ -14,7 +14,7 @@ fn parse_config(conf: String) -> Config {
         Some(sep) => {
             Config::PySource {
                 exe: String::from(conf.get(..sep).unwrap()),
-                script: String::from(conf.get(sep+1..).unwrap())
+                script: String::from(conf.get(sep + 1..).unwrap())
             }
         },
         None => Config::Frozen(conf),
@@ -32,7 +32,7 @@ pub fn run_compiler(comp_name: &str) {
         Config::Frozen(exe) => {
             cmd = process::Command::new(exe);
         }
-        Config::PySource {exe, script} => {
+        Config::PySource { exe, script } => {
             cmd = process::Command::new(exe);
             cmd.arg(script);
         }
@@ -47,6 +47,9 @@ pub fn run_compiler(comp_name: &str) {
         .wait().expect("Could not wait for compiler.");
     process::exit(match result.code() {
         Some(code) => code,
-        None => { eprintln!("Terminated by signal."); 1}
+        None => {
+            eprintln!("Terminated by signal.");
+            1
+        }
     });
 }

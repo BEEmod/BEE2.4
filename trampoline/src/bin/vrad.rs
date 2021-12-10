@@ -2,5 +2,5 @@
 use trampoline::run_compiler;
 
 fn main() {
-	run_compiler("vrad");
+    run_compiler("vrad");
 }

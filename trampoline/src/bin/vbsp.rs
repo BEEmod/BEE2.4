@@ -2,5 +2,5 @@
 use trampoline::run_compiler;
 
 fn main() {
-	run_compiler("vbsp");
+    run_compiler("vbsp");
 }
