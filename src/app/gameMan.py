@@ -8,13 +8,13 @@ Does stuff related to the actual games.
 from __future__ import annotations
 from pathlib import Path
 from collections.abc import Iterable, Iterator
-
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
 
 import os
 import shutil
+import sys
 import math
 import re
 import io
@@ -22,6 +22,7 @@ import pickle
 import pickletools
 import copy
 import webbrowser
+
 from atomicwrites import atomic_write
 
 from BEE2_config import ConfigFile, GEN_OPTS
@@ -849,6 +850,14 @@ class Game:
                 for line in vbsp_config.export():
                     vbsp_file.write(line)
             export_screen.step('EXP', 'vbsp_config')
+
+            LOGGER.info('Writing app location file!')
+            with open(self.abs_path('bin/bee2/app_loc.cfg'), 'w', encoding='utf8', newline='\n') as app_loc_file:
+                app_loc_file.write(sys.executable)
+                if not utils.FROZEN:
+                    # Write the source code script.
+                    app_loc_file.write('\n')
+                    app_loc_file.write(sys.argv[0])
 
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
