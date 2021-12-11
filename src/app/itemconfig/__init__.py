@@ -139,30 +139,57 @@ class Widget:
     values: Union[tk.StringVar, list[tuple[Union[int, str], tk.StringVar]]]
     is_timer: bool
     use_inf: bool  # For timer, is infinite valid?
+    # When apply_conf() is executing, don't waste time re-storing.
+    _applying: bool = attr.ib(init=False, default=False)
 
     @property
     def has_values(self) -> bool:
         """Item variant widgets don't have configuration, all others do."""
         return self.create_func is not widget_item_variant
 
+    def __post_init__(self) -> None:
+        """Register a callback to store state when our widgets change."""
+        var: tk.StringVar
+        save_id = f'{self.group_id}:{self.id}'
+        if isinstance(self.values, list):
+            def on_changed(var_name: str, var_index: str, operation: str) -> None:
+                """Recompute state when changed."""
+                if not self._applying:
+                    BEE2_config.store_conf(WidgetConfig({
+                        str(tim_val): sub_var.get()
+                        for tim_val, sub_var in self.values
+                    }), save_id)
+            for _, var in self.values:
+                var.trace_add('write', on_changed)
+        else:
+            def on_changed(var_name: str, var_index: str, operation: str) -> None:
+                """Recompute state when changed."""
+                if not self._applying:
+                    BEE2_config.store_conf(WidgetConfig(self.values.get()), save_id)
+            self.values.trace_add('write', on_changed)
+
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
-        if isinstance(self.values, list):
-            if isinstance(data.values, str):
-                # Single in conf, apply to all.
-                for tim_val, var in self.values:
-                    var.set(data.values)
+        try:
+            self._applying = True
+            if isinstance(self.values, list):
+                if isinstance(data.values, str):
+                    # Single in conf, apply to all.
+                    for tim_val, var in self.values:
+                        var.set(data.values)
+                else:
+                    for tim_val, var in self.values:
+                        try:
+                            val = data.values[tim_val]
+                        except KeyError:
+                            continue
+                        var.set(val)
+            elif isinstance(data.values, str):
+                self.values.set(data.values)
             else:
-                for tim_val, var in self.values:
-                    try:
-                        val = data.values[tim_val]
-                    except KeyError:
-                        continue
-                    var.set(val)
-        elif isinstance(data.values, str):
-            self.values.set(data.values)
-        else:
-            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
+                LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
+        finally:
+            self._applying = False
 
 
 class ConfigGroup(PakObject, allow_mult=True):
@@ -391,6 +418,7 @@ async def make_pane(parent: ttk.Frame):
                 label = ttk.Label(wid_frame, text=wid.name + ': ')
                 label.grid(row=0, column=0)
                 widget.grid(row=0, column=1, sticky='e')
+                await BEE2_config.set_and_run_ui_callback(WidgetConfig, wid.apply_conf, f'{wid.group_id}:{wid.id}')
 
                 if wid.tooltip:
                     add_tooltip(widget, wid.tooltip)
@@ -421,6 +449,7 @@ async def make_pane(parent: ttk.Frame):
                 wid.values,
                 wid.config,
             )
+            await BEE2_config.set_and_run_ui_callback(WidgetConfig, wid.apply_conf, f'{wid.group_id}:{wid.id}')
 
             if wid.tooltip:
                 add_tooltip(wid_frame, wid.tooltip)
@@ -490,7 +519,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
     # We don't use the variable passed to us.
 
     try:
-        item = UI.item_list[conf['ItemID']]  # type: UI.Item
+        item = UI.item_list[conf['ItemID']]
     except KeyError:
         raise ValueError('Unknown item "{}"!'.format(conf['ItemID']))
 
