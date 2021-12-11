@@ -1,10 +1,10 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
-from typing import Optional, Union, Callable, List, Tuple
+from typing import Mapping, Optional, Union, Callable, List, Tuple
 from tkinter import ttk
 import tkinter as tk
 
-from srctools import Property, Vec, logger
+from srctools import EmptyMapping, Property, Vec, logger
 import trio
 import attr
 
@@ -52,6 +52,36 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     else:
         r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
     return r, g, b
+
+
+@BEE2_config.register('ItemVar', uses_id=True)
+@attr.frozen
+class WidgetConfig:
+    """The configuation persisted to disk and stored in palettes."""
+    # A single non-timer value, or timer name -> value.
+    values: str | Mapping[str, str] = EmptyMapping
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> WidgetConfig:
+        """Parse DMX config values."""
+        assert version == 1
+        if data.has_children():
+            return WidgetConfig({
+                prop.name: prop.value
+                for prop in data
+            })
+        else:
+            return WidgetConfig(data.value)
+
+    def export_kv1(self) -> Property:
+        """Generate keyvalues for saving configuration."""
+        if isinstance(self.values, str):
+            return Property('', self.values)
+        else:
+            return Property('', [
+                Property(tim, value)
+                for tim, value in self.values.items()
+            ])
 
 
 @BEE2_config.OPTION_SAVE('ItemVar')
