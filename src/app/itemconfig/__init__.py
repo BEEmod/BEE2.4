@@ -31,7 +31,8 @@ WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-W
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 CONFIG_ORDER: List[ConfigGroup] = []
 
-TIMER_NUM = ['inf'] + list(map(str, range(3, 31)))
+TIMER_NUM = list(map(str, range(3, 31)))
+TIMER_NUM_INF = ['inf', *TIMER_NUM]
 
 INF = '∞'
 
@@ -128,6 +129,7 @@ def load_itemvar(prop: Property) -> None:
 @attr.define
 class Widget:
     """Represents a widget that can appear on a ConfigGroup."""
+    group_id: str
     id: str
     name: str
     tooltip: str
@@ -142,6 +144,25 @@ class Widget:
     def has_values(self) -> bool:
         """Item variant widgets don't have configuration, all others do."""
         return self.create_func is not widget_item_variant
+
+    async def apply_conf(self, data: WidgetConfig) -> None:
+        """Apply the configuration to the UI."""
+        if isinstance(self.values, list):
+            if isinstance(data.values, str):
+                # Single in conf, apply to all.
+                for tim_val, var in self.values:
+                    var.set(data.values)
+            else:
+                for tim_val, var in self.values:
+                    try:
+                        val = data.values[tim_val]
+                    except KeyError:
+                        continue
+                    var.set(val)
+        elif isinstance(data.values, str):
+            self.values.set(data.values)
+        else:
+            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
 
 
 class ConfigGroup(PakObject, allow_mult=True):
@@ -197,8 +218,10 @@ class ConfigGroup(PakObject, allow_mult=True):
             wid_id = wid['id'].casefold()
             name = wid['Label']
             tooltip = wid['Tooltip', '']
-            default = wid.find_key('Default', '')
+            default_prop = wid.find_key('Default', '')
             values: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
+
+            conf = BEE2_config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}')
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:
@@ -208,44 +231,49 @@ class ConfigGroup(PakObject, allow_mult=True):
                 # Values isn't used, set to a dummy value.
                 values = []
             elif is_timer:
-                if default.has_children():
+                if default_prop.has_children():
                     defaults = {
-                        num: default[num]
-                        for num in TIMER_NUM
-                        # Exclude infinite if use_inf is False.
-                        if use_inf or num != 'inf'
+                        num: default_prop[num]
+                        for num in (TIMER_NUM_INF if use_inf else TIMER_NUM)
                     }
                 else:
                     # All the same.
-                    defaults = dict.fromkeys(TIMER_NUM, default.value)
-                values = [
-                    (num, tk.StringVar(
-                        value=CONFIG.get_val(
-                            data.id,
-                            '{}_{}'.format(wid_id, num),
-                            defaults[num],
-                        ),
-                        name='itemconf_{}_{}_{}'.format(data.id, wid_id, num)
-                    ))
-                    for num in TIMER_NUM
-                    # Exclude infinite if use_inf is False.
-                    if use_inf or num != 'inf'
-                ]
+                    defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
+
+                values = []
+                for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
+                    if conf.values is EmptyMapping:
+                        # No new conf, check the old conf.
+                        cur_value = CONFIG.get_val(data.id, '{}_{}'.format(wid_id, num), defaults[num])
+                    elif isinstance(conf.values, str):
+                        cur_value = conf.values
+                    else:
+                        cur_value = conf.values[num]
+                    values.append((num, tk.StringVar(
+                        value=cur_value,
+                        name=f'itemconf_{data.id}_{wid_id}_{num}'
+                    )))
             else:
-                if default.has_children():
+                if default_prop.has_children():
                     raise ValueError(
-                        'Can only have multiple defaults for timered widgets!'
+                        f'{data.id}:{wid_id}: Can only have multiple defaults for timer-ed widgets!'
                     )
+                if conf.values is EmptyMapping:
+                    # No new conf, check the old conf.
+                    cur_value = CONFIG.get_val(data.id, wid_id, default_prop.value)
+                elif isinstance(conf.values, str):
+                    cur_value = conf.values
+                else:
+                    LOGGER.warning('Widget {}:{} had timer defaults, but widget is singular!', data.id, wid_id)
+                    cur_value = default_prop.value
+
                 values = tk.StringVar(
-                    value=CONFIG.get_val(
-                        data.id,
-                        wid_id,
-                        default.value,
-                    ),
-                    name='itemconf_{}_{}'.format(data.id, wid_id),
+                    value=cur_value,
+                    name=f'itemconf_{data.id}_{wid_id}',
                 )
 
             (multi_widgets if is_timer else widgets).append(Widget(
+                data.id,
                 wid_id,
                 name,
                 tooltip,
