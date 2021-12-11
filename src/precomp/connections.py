@@ -650,34 +650,6 @@ def calc_connections(
                     frame['renderorder'] = 1  # On top
 
 
-@conditions.make_result('ChangeIOType')
-def res_change_io_type_parse(props: Property):
-    """Switch an item to use different inputs or outputs.
-
-    Must be done before priority level -250.
-    The contents are the same as that allowed in the input BEE2 block in
-    editoritems.
-    """
-    conf = Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
-
-    def change_item(inst: Entity) -> None:
-        try:
-            item = ITEMS[inst['targetname']]
-        except KeyError:
-            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
-
-        item.config = conf
-
-        # Overwrite these as well.
-        item.enable_cmd = conf.enable_cmd
-        item.disable_cmd = conf.disable_cmd
-
-        item.sec_enable_cmd = conf.sec_enable_cmd
-        item.sec_disable_cmd = conf.sec_disable_cmd
-
-    return change_item
-
-
 def do_item_optimisation(vmf: VMF) -> None:
     """Optimise redundant logic items."""
     needs_global_toggle = False
@@ -845,6 +817,8 @@ def gen_item_outputs(vmf: VMF) -> None:
         for pan in item.ind_panels:
             pan['file'] = desired_panel_inst
             pan.fixup[consts.FixupVars.TIM_ENABLED] = item.timer is not None
+        if item.ind_panels:
+            conditions.ALL_INST.add(desired_panel_inst.casefold())
 
     logic_auto = vmf.create_ent(
         'logic_auto',

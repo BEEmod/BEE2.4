@@ -91,6 +91,10 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
+# Piles of global widgets, should be made local...
+frmScroll: ttk.Frame  # Frame holding the item list.
+pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
+
 
 class Item:
     """Represents an item that can appear on the list."""
@@ -447,10 +451,7 @@ def quit_application() -> None:
     snd.clean_sample_folder()
 
     # Destroy the TK windows, finalise logging, then quit.
-    logging.shutdown()
-    TK_ROOT.quit()
     loadScreen.shutdown()
-    sys.exit(0)
 
 gameMan.quit_application = quit_application
 

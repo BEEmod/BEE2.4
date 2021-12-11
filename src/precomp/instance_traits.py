@@ -1,17 +1,21 @@
 """Adds various traits to instances, based on item classes."""
+from typing import List, MutableMapping, Optional, Callable, Dict, Set
+from weakref import WeakKeyDictionary
+
+import attr
+
 from srctools import Entity
 from srctools import VMF
 import srctools.logger
+
 from precomp.instanceLocs import ITEM_FOR_FILE
 from editoritems import Item, ItemClass
-
-from typing import Optional, Callable, Dict, Set, List
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Special case - specific attributes..
-ID_ATTRS = {
+ID_ATTRS: Dict[str, List[Set[str]]] = {
     'ITEM_PLACEMENT_HELPER': [
         {'placement_helper'},
     ],
@@ -38,7 +42,7 @@ ID_ATTRS = {
     ]
 }
 
-CLASS_ATTRS = {
+CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
     ItemClass.FLOOR_BUTTON: [
         {'white', 'weighted', 'floor_button'},
         {'black', 'weighted', 'floor_button'},
@@ -132,11 +136,21 @@ CLASS_ATTRS = {
     # Other classes have no traits - single or no instances.
 }
 
+
+@attr.define
+class TraitInfo:
+    """The info associated for each instance."""
+    item_class: ItemClass = ItemClass.UNCLASSED
+    item_id: Optional[str] = None
+    traits: Set[str] = attr.ib(factory=set)
+
 # Special functions to call on an instance for their item ID (str)
 # or class (enum).
 # Arguments are the instance, trait set, item ID and subtype index.
-TRAIT_ID_FUNC = {}  # type: Dict[str, Callable[[Entity, Set[str], str, int], None]]
-TRAIT_CLS_FUNC = {}  # type: Dict[ItemClass, Callable[[Entity, Set[str], str, int], None]]
+TRAIT_ID_FUNC: Dict[str, Callable[[Entity, Set[str], str, int], None]] = {}
+TRAIT_CLS_FUNC: Dict[ItemClass, Callable[[Entity, Set[str], str, int], None]] = {}
+# Maps entities to their traits.
+ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
 
 
 def trait_id_func(target: str):
@@ -148,7 +162,7 @@ def trait_id_func(target: str):
 
 def trait_cls_func(target: ItemClass):
     def deco(func):
-        TRAIT_ID_FUNC[target] = func
+        TRAIT_CLS_FUNC[target] = func
         return func
     return deco
 
@@ -159,10 +173,10 @@ def get(inst: Entity) -> Set[str]:
     Modify to set values.
     """
     try:
-        return inst.traits
-    except AttributeError:
-        inst.traits = set()
-        return inst.traits
+        return ENT_TO_TRAITS[inst].traits
+    except KeyError:
+        info = ENT_TO_TRAITS[inst] = TraitInfo()
+        return info.traits
 
 
 def get_class(inst: Entity) -> Optional[ItemClass]:
@@ -170,7 +184,10 @@ def get_class(inst: Entity) -> Optional[ItemClass]:
 
     It must be the original entity placed by the PeTI.
     """
-    return getattr(inst, 'peti_class', None)
+    try:
+        return ENT_TO_TRAITS[inst].item_class
+    except KeyError:
+        return None
 
 
 def get_item_id(inst: Entity) -> Optional[str]:
@@ -178,7 +195,10 @@ def get_item_id(inst: Entity) -> Optional[str]:
 
     It must be the original entity placed by the PeTI.
     """
-    return getattr(inst, 'peti_item_id', None)
+    try:
+        return ENT_TO_TRAITS[inst].item_id
+    except KeyError:
+        return None
 
 
 def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
@@ -204,15 +224,14 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
             LOGGER.warning('Unknown item ID <{}>', item_id)
             item_class = ItemClass.UNCLASSED
 
-        inst.peti_class = item_class
-        inst.peti_item_id = item_id
-        traits = get(inst)
+        info = ENT_TO_TRAITS[inst] = TraitInfo(item_class, item_id)
+
         try:
-            traits |= ID_ATTRS[item_id.upper()][item_ind]
+            info.traits |= ID_ATTRS[item_id.upper()][item_ind]
         except (IndexError, KeyError):
             pass
         try:
-            traits |= CLASS_ATTRS[item_class][item_ind]
+            info.traits |= CLASS_ATTRS[item_class][item_ind]
         except (IndexError, KeyError):
             pass
 
@@ -221,10 +240,12 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
         except KeyError:
             pass
         else:
-            func(inst, traits, item_id, item_ind)
+            func(inst, info.traits, item_id, item_ind)
         try:
             func = TRAIT_CLS_FUNC[item_class]
         except KeyError:
             pass
         else:
-            func(inst, traits, item_id, item_ind)
+            func(inst, info.traits, item_id, item_ind)
+
+    LOGGER.info('Traits: {}', dict(ENT_TO_TRAITS.items()))

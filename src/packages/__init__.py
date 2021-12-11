@@ -491,7 +491,7 @@ async def load_packages(
             'essential resources and objects.'
         )
 
-    data: dict[Type[PakT], list[PakT]] = {}
+    data: dict[Type[PakObject], list[PakObject]] = {}
     obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
 
     for obj_type in OBJ_TYPES.values():

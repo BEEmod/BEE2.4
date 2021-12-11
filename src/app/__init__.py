@@ -38,22 +38,24 @@ def tk_error(
     if exc_tb.tb_next:
         exc_tb = exc_tb.tb_next
 
+    logger = logging.getLogger('BEE2')
+
     try:
         on_error(exc_type, exc_value, exc_tb)
     except Exception:
+        logger.exception('Failed to display messagebox:')
         pass
 
-    logger = logging.getLogger('BEE2')
     logger.error(
         msg='Uncaught Tk Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
 
     try:
-        import BEE2
-        BEE2.APP_NURSERY.cancel_scope.cancel()
+        from app.BEE2 import APP_NURSERY
+        APP_NURSERY.cancel_scope.cancel()
     except Exception:
-        pass
+        logger.exception("Couldn't cancel:")
 
 TK_ROOT.report_callback_exception = tk_error
 

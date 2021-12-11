@@ -1,5 +1,9 @@
 """Run the BEE2."""
+from typing import Callable, Any
+import collections
+
 import trio
+from outcome import Outcome, Error
 
 from BEE2_config import GEN_OPTS
 from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error, sound
@@ -129,27 +133,53 @@ async def app_main() -> None:
     """The main loop for Trio."""
     global APP_NURSERY
     LOGGER.debug('Opening nursery...')
-    try:
-        async with trio.open_nursery() as nursery:
-            APP_NURSERY = nursery
-            await init_app()
-            await trio.sleep_forever()
-    except Exception as exc:
-        tk_error(type(exc), exc, exc.__traceback__)
-        raise
+    async with trio.open_nursery() as nursery:
+        APP_NURSERY = nursery
+        await init_app()
+        await trio.sleep_forever()
 
 
-def done_callback(trio_main_outcome):
+def done_callback(result: Outcome):
     """The app finished, quit."""
     from app import UI
+    if isinstance(result, Error):
+        LOGGER.error('Trio exited with exception', exc_info=result.error)
+        tk_error(type(result.error), result.error, result.error.__traceback__)
+    else:
+        LOGGER.debug('Trio exited normally.')
     UI.quit_application()
+    TK_ROOT.quit()
 
 
 def start_main() -> None:
+    """Starts the TK and Trio loops.
+
+    See https://github.com/richardsheridan/trio-guest/.
+    """
+    def tk_func() -> None:
+        """Called to execute the callback."""
+        queue.popleft()()
+
+    def run_sync_soon_threadsafe(func: Callable[[], Any]) -> None:
+        """Run the specified func in the next loop, from other threads."""
+        queue.append(func)
+        TK_ROOT.call("after", "idle", tk_func_name)
+
+    def run_sync_soon_not_threadsafe(func: Callable[[], Any]) -> None:
+        """Run the specified func in the next loop."""
+        queue.append(func)
+        # The zero here apparently avoids blocking the event loop if an endless stream of
+        # callbacks is triggered.
+        TK_ROOT.call("after", "idle", "after", 0, tk_func_name)
+
+    queue: collections.deque[Callable[[], Any]] = collections.deque()
+    tk_func_name = TK_ROOT.register(tk_func)
+
     LOGGER.debug('Starting Trio loop.')
     trio.lowlevel.start_guest_run(
         app_main,
-        run_sync_soon_threadsafe=TK_ROOT.after_idle,
+        run_sync_soon_threadsafe=run_sync_soon_threadsafe,
+        run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
     )
     TK_ROOT.mainloop()

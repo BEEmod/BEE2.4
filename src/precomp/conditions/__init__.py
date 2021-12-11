@@ -50,7 +50,7 @@ import utils
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Angle,
+    VMF, Entity, Output, Solid, Angle, Matrix,
 )
 
 
@@ -58,9 +58,11 @@ COND_MOD_NAME = 'Main Conditions'
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
 
-# Stuff we get from VBSP in init()
+# The global instance filenames we add.
 GLOBAL_INSTANCES: set[str] = set()
-ALL_INST: set[str] = set()
+# All instances that have been placed in the map at any point.
+# Pretend empty-string is there, so we don't flag it.
+ALL_INST: set[str] = {''}
 
 conditions: list[Condition] = []
 FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
@@ -162,6 +164,13 @@ class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
+class Unsatisfiable(Exception):
+    """Raised by flags to indicate they currently will always be false with all instances.
+
+    For example, an instance result when that instance currently isn't present.
+    """
+    pass
+
 # Flag to indicate a result doesn't need to be executed anymore,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
@@ -239,10 +248,17 @@ class Condition:
             return cond_call(inst, res)
 
     def test(self, inst: Entity) -> None:
-        """Try to satisfy this condition on the given instance."""
+        """Try to satisfy this condition on the given instance.
+
+        If we find that no instance will succeed, raise Unsatisfiable.
+        """
         success = True
-        for flag in self.flags:
-            if not check_flag(inst.map, flag, inst):
+        # Only the first one can cause this condition to be skipped.
+        # We could have a situation where the first flag modifies the map
+        # such that it becomes satisfiable later, so this would be premature.
+        # If we have else results, we also can't skip because those could modify state.
+        for i, flag in enumerate(self.flags):
+            if not check_flag(flag, inst, can_skip=i==0 and not self.else_results):
                 success = False
                 break
         results = self.results if success else self.else_results
@@ -574,9 +590,10 @@ def add(prop_block):
         conditions.append(con)
 
 
-def init(inst_list: set[str]) -> None:
+def init(vmf: VMF) -> None:
     """Initialise the Conditions system."""
-    ALL_INST.update(inst_list)
+    for inst in vmf.by_class['func_instance']:
+        ALL_INST.add(inst['file'].casefold())
 
     # Sort by priority, where higher = done later
     zero = Decimal(0)
@@ -593,20 +610,26 @@ def check_all(vmf: VMF) -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     LOGGER.info('-----------------------')
+    skipped_cond = 0
     for condition in conditions:
         with srctools.logger.context(condition.source or ''):
             for inst in vmf.by_class['func_instance']:
                 try:
                     condition.test(inst)
                 except NextInstance:
-                    # This is raised to immediately stop running
+                    # NextInstance is raised to immediately stop running
                     # this condition, and skip to the next instance.
-                    pass
-                except EndCondition:
-                    # This is raised to immediately stop running
-                    # this condition, and skip to the next condtion.
+                    continue
+                except Unsatisfiable:
+                    # Unsatisfiable indicates this condition's flags will
+                    # never succeed, so just skip.
+                    skipped_cond += 1
                     break
-                except:
+                except EndCondition:
+                    # EndCondition is raised to immediately stop running
+                    # this condition, and skip to the next condition.
+                    break
+                except Exception:
                     # Print the source of the condition if if fails...
                     LOGGER.exception(
                         'Error in {}:',
@@ -618,8 +641,26 @@ def check_all(vmf: VMF) -> None:
                 if not condition.results and not condition.else_results:
                     break  # Condition has run out of results, quit early
 
+        if utils.DEV_MODE:
+            # Check ALL_INST is correct.
+            extra = GLOBAL_INSTANCES - ALL_INST
+            if extra:
+                LOGGER.warning('Extra global inst not in all inst: {}', extra)
+            for inst in vmf.by_class['func_instance']:
+                if inst['file'].casefold() not in ALL_INST:
+                    LOGGER.warning(
+                        'Condition "{}" '
+                        "doesn't add to in all_inst: {}!",
+                        condition.source,
+                        inst['file'],
+                    )
+
     LOGGER.info('---------------------')
-    LOGGER.info('Conditions executed!')
+    LOGGER.info(
+        'Conditions executed, {}/{} ({:.0%}) skipped!',
+        skipped_cond, len(conditions),
+        skipped_cond/len(conditions),
+    )
     import vbsp
     LOGGER.info('Map has attributes: {}', [
         key
@@ -627,19 +668,25 @@ def check_all(vmf: VMF) -> None:
         vbsp.settings['has_attr'].items()
         if value
     ])
+    # '' is always present, which sorts first, conveniently adding a \n at the start.
+    LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
     # Dynamically added by lru_cache()
     # noinspection PyUnresolvedReferences
-    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve.cache_info())
+    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve_cache_info())
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
-    """Determine the result for a condition flag."""
+def check_flag(flag: Property, inst: Entity, can_skip: bool = False) -> bool:
+    """Determine the result for a condition flag.
+
+    If can_skip is true, flags raising Unsatifiable will pass the exception through.
+    """
     name = flag.name
     # If starting with '!', invert the result.
     if name[:1] == '!':
         desired_result = False
+        can_skip = False  # This doesn't work.
         name = name[1:]
     else:
         desired_result = True
@@ -655,8 +702,15 @@ def check_flag(vmf: VMF, flag: Property, inst: Entity) -> bool:
             # Skip these conditions..
             return False
 
-    res = func(inst, flag)
-    return res == desired_result
+    try:
+        res = func(inst, flag)
+    except Unsatisfiable:
+        if can_skip:
+            raise
+        else:
+            return False
+    else:
+        return res is desired_result
 
 
 def import_conditions() -> None:
@@ -788,6 +842,36 @@ def dump_func_docs(file: TextIO, func: Callable):
         print('**No documentation!**', file=file)
 
 
+def add_inst(
+    vmf: VMF,
+    *,
+    file: str,
+    origin: Vec | str,
+    angles: Angle | Matrix | str = '0 0 0',
+    targetname: str='',
+    fixup_style: int | str = '0',  # Default to Prefix.
+    no_fixup: bool = False,
+) -> Entity:
+    """Create and add a new instance at the specified position.
+
+    This provides defaults for parameters, and adds the filename to ALL_INST.
+    Values accept str in addition so they can be copied from existing keyvalues.
+
+    If no_fixup is set, it overrides fixup_style to None - this way it's a more clear
+    parameter for code.
+    """
+    ALL_INST.add(file.casefold())
+    return vmf.create_ent(
+        'func_instance',
+        origin=origin,
+        angles=angles,
+        targetname=targetname,
+        file=file,
+        fixup_style=fixup_style,
+    )
+
+
+
 def add_output(inst: Entity, prop: Property, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(
@@ -804,7 +888,8 @@ def add_suffix(inst: Entity, suff: str) -> None:
     """
     file = inst['file']
     old_name, dot, ext = file.partition('.')
-    inst['file'] = ''.join((old_name, suff, dot, ext))
+    inst['file'] = new_filename = ''.join((old_name, suff, dot, ext))
+    ALL_INST.add(new_filename.casefold())
 
 
 def local_name(inst: Entity, name: str | Entity) -> str:
@@ -1054,7 +1139,15 @@ def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 @make_result('condition')
 def res_sub_condition(res: Property):
     """Check a different condition if the outer block is true."""
-    return Condition.parse(res).test
+    cond = Condition.parse(res)
+
+    def test_cond(inst: Entity) -> None:
+        """For child conditions, we need to check every time."""
+        try:
+            cond.test(inst)
+        except Unsatisfiable:
+            pass
+    return test_cond
 
 
 @make_result('nextInstance')
@@ -1130,7 +1223,7 @@ def res_switch(res: Property):
         run_default = True
         for flag, results in cases:
             # If not set, always succeed for the random situation.
-            if flag.real_name and not check_flag(inst.map, flag, inst):
+            if flag.real_name and not check_flag(flag, inst):
                 continue
             for sub_res in results:
                 Condition.test_result(inst, sub_res)
@@ -1200,6 +1293,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             val = instances['bottom_' + str(bottom_pos)]
             if val:  # Only if defined
                 ent['file'] = val
+                ALL_INST.add(val.casefold())
 
             logic_file = instances['logic_' + str(bottom_pos)]
             if logic_file:
@@ -1209,6 +1303,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
                 logic_ent = ent.copy()
                 logic_ent['file'] = logic_file
                 vmf.add_ent(logic_ent)
+                ALL_INST.add(logic_file.casefold())
                 # If no connections are present, set the 'enable' value in
                 # the logic to True so the piston can function
                 logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
@@ -1225,6 +1320,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             val = instances['static_' + str(pos)]
             if val:
                 ent['file'] = val
+                ALL_INST.add(val.casefold())
 
         # Add in the grating for the bottom as an overlay.
         # It's low to fit the piston at minimum, or higher if needed.
@@ -1236,6 +1332,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
         if grate:
             grate_ent = ent.copy()
             grate_ent['file'] = grate
+            ALL_INST.add(grate.casefold())
             vmf.add_ent(grate_ent)
     return make_static
 
@@ -1322,11 +1419,11 @@ def res_goo_debris(vmf: VMF, res: Property) -> object:
             loc.x += rng.randint(-offset, offset)
             loc.y += rng.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
-        vmf.create_ent(
-            classname='func_instance',
+        add_inst(
+            vmf,
             file=rand_fname,
-            origin=loc.join(' '),
-            angles=f'0 {rng.randrange(0, 3600) / 10} 0'
+            origin=loc,
+            angles=Angle(yaw=rng.randrange(0, 3600) / 10),
         )
 
     return RES_EXHAUSTED
