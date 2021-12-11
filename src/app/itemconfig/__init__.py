@@ -17,16 +17,18 @@ import utils
 
 LOGGER = logger.get_logger(__name__)
 
+SingleCreateFunc = Callable[[tk.Frame, tk.StringVar, Property], tk.Widget]
+MultiCreateFunc = Callable[[tk.Frame, List[Tuple[str, tk.StringVar]], Property], None]
+
 # Functions for each widget.
 # The function is passed a parent frame, StringVar, and Property block.
-WidgetLookup = utils.FuncLookup('Widgets')
+WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets')
 # Override for timer-type widgets to be more compact - passed a num:var dict
 # of StringVars instead. The widgets should insert themselves into the parent
 # frame.
-WidgetLookupMulti = utils.FuncLookup('Multi-Widgets')
+WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-Widgets')
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
-
 CONFIG_ORDER: List[ConfigGroup] = []
 
 TIMER_NUM = ['inf'] + list(map(str, range(3, 31)))
@@ -99,8 +101,8 @@ class Widget:
     id: str
     name: str
     tooltip: str
-    create_func: Callable[[tk.Frame, tk.StringVar, Property], tk.Widget]
-    multi_func: Callable[[tk.Frame, list[tuple[str, tk.StringVar]], Property], None]
+    create_func: SingleCreateFunc
+    multi_func: MultiCreateFunc
     config: Property
     values: Union[tk.StringVar, list[tuple[Union[int, str], tk.StringVar]]]
     is_timer: bool
@@ -140,8 +142,8 @@ class ConfigGroup(PakObject, allow_mult=True):
 
         desc = desc_parse(props, data.id, data.pak_id)
 
-        widgets = []  # type: List[Widget]
-        multi_widgets = []  # type: List[Widget]
+        widgets: list[Widget] = []
+        multi_widgets: list[Widget] = []
 
         for wid in props.find_all('Widget'):
             await trio.sleep(0)
@@ -253,7 +255,7 @@ class ConfigGroup(PakObject, allow_mult=True):
         # Don't display that as well.
         CONFIG_ORDER.remove(override)
 
-    def widget_ids(self):
+    def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""
         return {
             wid.id
@@ -321,6 +323,7 @@ async def make_pane(parent: ttk.Frame):
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
 
+                assert isinstance(wid.values, tk.StringVar)
                 try:
                     widget = wid.create_func(wid_frame, wid.values, wid.config)
                 except Exception:
@@ -354,6 +357,7 @@ async def make_pane(parent: ttk.Frame):
                 wid_frame = ttk.LabelFrame(frame, text=wid.name)
 
             wid_frame.grid(row=row, column=0, sticky='ew')
+            assert isinstance(wid.values, list)
             wid.multi_func(
                 wid_frame,
                 wid.values,
