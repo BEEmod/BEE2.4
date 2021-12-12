@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List, Tuple
+from typing import AsyncIterator, List, Tuple
 
 import tkinter as tk
-from srctools import Property, conv_int
+from srctools import Property, conv_int, logger
 
-from app.itemconfig import LOGGER, WidgetLookup, WidgetLookupMulti, multi_grid
+from app.itemconfig import UpdateFunc, WidgetLookup, WidgetLookupMulti, multi_grid
 from app.tooltip import add_tooltip
+
+
+LOGGER = logger.get_logger('itemconfig.timer')
 
 
 @lru_cache(maxsize=20)
@@ -20,17 +23,20 @@ def timer_values(min_value: int, max_value: int) -> List[str]:
 
 
 @WidgetLookupMulti('Timer', 'MinuteSeconds')
-def widget_minute_seconds_multi(
-        parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+async def widget_minute_seconds_multi(
+        parent: tk.Frame,
+        values: List[Tuple[str, tk.StringVar]], conf: Property
+) -> AsyncIterator[Tuple[str, UpdateFunc]]:
     """For timers, display in a more compact form."""
-    for row, column, tim_text, var in multi_grid(values, columns=5):
-        timer = widget_minute_seconds(parent, var, conf)
+    for row, column, tim_val, tim_text, var in multi_grid(values, columns=5):
+        timer, update = await widget_minute_seconds(parent, var, conf)
         timer.grid(row=row, column=column)
         add_tooltip(timer, tim_text, delay=0)
+        yield tim_val, update
 
 
 @WidgetLookup('Timer', 'MinuteSeconds')
-def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
+async def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
@@ -48,20 +54,17 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
 
     existing_value = var.get()
 
-    def update_disp(var_name: str, var_index: str, operation: str) -> None:
+    async def update_disp(new_val: str) -> None:
         """Whenever the string changes, update the displayed text."""
-        seconds = conv_int(var.get(), -1)
+        seconds = conv_int(new_val, -1)
         if min_value <= seconds <= max_value:
             disp_var.set('{}:{:02}'.format(seconds // 60, seconds % 60))
         else:
-            LOGGER.warning('Bad timer value "{}" for "{}"!', var.get(), conf['id'])
+            LOGGER.warning('Bad timer value "{}" for "{}"!', new_val, conf['id'])
             # Recurse, with a known safe value.
             var.set(values[0])
 
-    # Whenever written to, call this.
-    var.trace_add('write', update_disp)
-
-    def set_var():
+    def set_var() -> None:
         """Set the variable to the current value."""
         try:
             minutes, seconds = disp_var.get().split(':')
@@ -134,4 +137,5 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
     )
     # We need to set this after, it gets reset to the first one.
     var.set(existing_value)
-    return spinbox
+    await update_disp(existing_value)
+    return spinbox, update_disp

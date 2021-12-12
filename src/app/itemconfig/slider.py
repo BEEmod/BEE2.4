@@ -6,7 +6,7 @@ import tkinter as tk
 from srctools import Property
 from tkinter import ttk
 
-from app.itemconfig import WidgetLookup, widget_sfx
+from app.itemconfig import UpdateFunc, WidgetLookup, widget_sfx
 
 
 def decimal_points(num: float) -> int:
@@ -20,7 +20,7 @@ def decimal_points(num: float) -> int:
 
 
 @WidgetLookup('range', 'slider')
-def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
+async def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a slider for setting a number in a range."""
     limit_min = conf.float('min', 0)
     limit_max = conf.float('max', 100)
@@ -50,12 +50,11 @@ def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Wid
             widget_sfx()
             var.set(new_pos)
 
-    def trace_func(*args) -> None:
-        off = (float(var.get()) - limit_min) / step
+    async def update_ui(new_value: str) -> None:
+        off = (float(new_value) - limit_min) / step
         ui_var.set(str(round(off)))
 
-    trace_func()
-    ui_var.trace_add('write', trace_func)
+    await update_ui(var.get())
 
     frame = ttk.Frame(parent)
     frame.columnconfigure(1, weight=1)
@@ -78,4 +77,4 @@ def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Wid
     disp.grid(row=0, column=0)
     scale.grid(row=0, column=1, sticky='ew')
 
-    return frame
+    return frame, update_ui

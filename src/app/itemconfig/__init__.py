@@ -1,6 +1,8 @@
 """Customizable configuration for specific items or groups of them."""
-from __future__ import annotations
-from typing import Mapping, Optional, Union, Callable, List, Tuple
+from typing import (
+    Optional, Union, Callable,
+    AsyncIterator, Awaitable, Mapping, List, Tuple,
+)
 from tkinter import ttk
 import tkinter as tk
 
@@ -9,7 +11,7 @@ import trio
 import attr
 
 from packages import PakObject, ExportData, ParseData, desc_parse
-from app import UI, signage_ui, tkMarkdown, sound, tk_tools
+from app import UI, signage_ui, tkMarkdown, sound, tk_tools, BEE2
 from app.tooltip import add_tooltip
 import BEE2_config
 import utils
@@ -17,19 +19,29 @@ import utils
 
 LOGGER = logger.get_logger(__name__)
 
-SingleCreateFunc = Callable[[tk.Frame, tk.StringVar, Property], tk.Widget]
-MultiCreateFunc = Callable[[tk.Frame, List[Tuple[str, tk.StringVar]], Property], None]
+# Called when the var is changed, to update UI if required.
+UpdateFunc = Callable[[str], Awaitable[None]]
 
 # Functions for each widget.
 # The function is passed a parent frame, StringVar, and Property block.
+# The widget to be installed should be returned, and a callback to refresh the UI.
+SingleCreateFunc = Callable[
+    [tk.Frame, tk.StringVar, Property],
+    Awaitable[Tuple[tk.Widget, UpdateFunc]]
+]
 WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets')
-# Override for timer-type widgets to be more compact - passed a num:var dict
-# of StringVars instead. The widgets should insert themselves into the parent
-# frame.
+
+# Override for timer-type widgets to be more compact - passed a num:var dict of StringVars
+# instead. The widgets should insert themselves into the parent frame.
+# It then yields timer_val, update-func pairs.
+MultiCreateFunc = Callable[
+    [tk.Frame, List[Tuple[str, tk.StringVar]], Property],
+    AsyncIterator[Tuple[str, UpdateFunc]]
+]
 WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-Widgets')
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
-CONFIG_ORDER: List[ConfigGroup] = []
+CONFIG_ORDER: List['ConfigGroup'] = []
 
 TIMER_NUM = list(map(str, range(3, 31)))
 TIMER_NUM_INF = ['inf', *TIMER_NUM]
@@ -38,6 +50,10 @@ INF = '∞'
 
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD = []
+
+
+async def nop_update(__value: str) -> None:
+    """Placeholder callback which does nothing."""
 
 
 def parse_color(color: str) -> Tuple[int, int, int]:
@@ -60,10 +76,10 @@ def parse_color(color: str) -> Tuple[int, int, int]:
 class WidgetConfig:
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
-    values: str | Mapping[str, str] = EmptyMapping
+    values: Union[str, Mapping[str, str]] = EmptyMapping
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> WidgetConfig:
+    def parse_kv1(cls, data: Property, version: int) -> 'WidgetConfig':
         """Parse DMX config values."""
         assert version == 1
         if data.has_children():
@@ -85,47 +101,6 @@ class WidgetConfig:
             ])
 
 
-@BEE2_config.OPTION_SAVE('ItemVar')
-def save_itemvar() -> Property:
-    """Save item variables into the palette."""
-    prop = Property('', [])
-    for group in CONFIG_ORDER:
-        conf = Property(group.id, [])
-        for widget in group.widgets:
-            if widget.has_values:
-                conf.append(Property(widget.id, widget.values.get()))
-        for widget in group.multi_widgets:
-            conf.append(Property(widget.id, [
-                Property(str(tim_val), var.get())
-                for tim_val, var in
-                widget.values
-            ]))
-        prop.append(conf)
-    return prop
-
-
-@BEE2_config.OPTION_LOAD('ItemVar')
-def load_itemvar(prop: Property) -> None:
-    """Load item variables into the palette."""
-    for group in CONFIG_ORDER:
-        conf = prop.find_block(group.id, or_blank=True)
-        for widget in group.widgets:
-            if widget.has_values:
-                try:
-                    widget.values.set(conf[widget.id])
-                except LookupError:
-                    pass
-
-        for widget in group.multi_widgets:
-            time_conf = conf.find_block(widget.id, or_blank=True)
-            for tim_val, var in widget.values:
-                try:
-                    var.set(time_conf[str(tim_val)])
-                except LookupError:
-                    pass
-    return None
-
-
 @attr.define
 class Widget:
     """Common logic for both kinds of widget that can appear on a ConfigGroup."""
@@ -141,15 +116,12 @@ class Widget:
         """Item variant widgets don't have configuration, all others do."""
         return self.create_func is not widget_item_variant
 
-    async def apply_conf(self, data: WidgetConfig) -> None:
-        """Apply the configuration to the UI."""
-        raise NotImplementedError
-
 
 @attr.define
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
     value: tk.StringVar
+    ui_cback: Optional[UpdateFunc] = None
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
@@ -158,19 +130,33 @@ class SingleWidget(Widget):
         else:
             self.value.set(data.values)
 
+    def __attrs_post_init__(self) -> None:
+        """Add functions to recompute state/UI when changed."""
+        save_id = f'{self.group_id}:{self.id}'
+
+        def on_changed(*_) -> None:
+            """Recompute state and UI when changed."""
+            val = self.value.get()
+            BEE2_config.store_conf(WidgetConfig(val), save_id)
+            if self.ui_cback is not None:
+                BEE2.APP_NURSERY.start_soon(self.ui_cback, val)
+
+        self.value.trace_add('write', on_changed)
+
 
 @attr.define
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
-    multi_func: MultiCreateFunc
-    values: list[tuple[Union[int, str], tk.StringVar]]
+    multi_func: MultiCreateFunc  # Function to create and arrange the block of widgets.
     use_inf: bool  # For timer, is infinite valid?
+    values: list[tuple[str, tk.StringVar]]
+    ui_cbacks: dict[str, UpdateFunc] = attr.Factory(dict)
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
         if isinstance(data.values, str):
             # Single in conf, apply to all.
-            for tim_val, var in self.values:
+            for _, var in self.values:
                 var.set(data.values)
         else:
             for tim_val, var in self.values:
@@ -180,30 +166,28 @@ class MultiWidget(Widget):
                     continue
                 var.set(val)
 
-    # def __attrs_post_init__(self) -> None:
-    #     """Register a callback to store state when our widgets change."""
-    #     var: tk.StringVar
-    #     save_id = f'{self.group_id}:{self.id}'
-    #     try:
-    #         self._no_store = True
-    #         if isinstance(self.values, list):
-    #             def on_changed(var_name: str, var_index: str, operation: str) -> None:
-    #                 """Recompute state when changed."""
-    #                 if not self._no_store:
-    #                     BEE2_config.store_conf(WidgetConfig({
-    #                         str(tim_val): sub_var.get()
-    #                         for tim_val, sub_var in self.values
-    #                     }), save_id)
-    #                 for _, var in self.values:
-    #                     var.trace_add('write', on_changed)
-    #         else:
-    #             def on_changed(var_name: str, var_index: str, operation: str) -> None:
-    #                 """Recompute state when changed."""
-    #                 if not self._no_store:
-    #                     BEE2_config.store_conf(WidgetConfig(self.values.get()), save_id)
-    #             self.values.trace_add('write', on_changed)
-    #     finally:
-    #         self._no_store = False
+    def __attrs_post_init__(self) -> None:
+        """Add functions to recompute state/UI when changed."""
+        for tim_val, var in self.values:
+            var.trace_add('write', self._get_on_changed(tim_val, var))
+
+    def _get_on_changed(self, tim_val: str, var: tk.StringVar) -> Callable[[str, str, str], None]:
+        """Get a function to recompute state and UI when changed."""
+        save_id = f'{self.group_id}:{self.id}'
+
+        def on_changed(*_) -> None:
+            """Recompute state and UI when changed."""
+            try:
+                cback = self.ui_cbacks[tim_val]
+            except KeyError:
+                pass
+            else:
+                BEE2.APP_NURSERY.start_soon(cback, var.get())
+            BEE2_config.store_conf(WidgetConfig({
+                num: sub_var.get()
+                for num, sub_var in self.values
+            }), save_id)
+        return on_changed
 
 
 class ConfigGroup(PakObject, allow_mult=True):
@@ -223,7 +207,8 @@ class ConfigGroup(PakObject, allow_mult=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    async def parse(cls, data: ParseData) -> 'PakObject':
+    async def parse(cls, data: ParseData) -> PakObject:
+        """Parse the config group from info.txt."""
         props = data.info
 
         if data.is_override:
@@ -280,11 +265,11 @@ class ConfigGroup(PakObject, allow_mult=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                values = []
+                values: list[tuple[str, tk.StringVar]] = []
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if conf.values is EmptyMapping:
                         # No new conf, check the old conf.
-                        cur_value = CONFIG.get_val(data.id, '{}_{}'.format(wid_id, num), defaults[num])
+                        cur_value = CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
                     elif isinstance(conf.values, str):
                         cur_value = conf.values
                     else:
@@ -350,7 +335,7 @@ class ConfigGroup(PakObject, allow_mult=True):
 
         return group
 
-    def add_over(self, override: ConfigGroup) -> None:
+    def add_over(self, override: 'ConfigGroup') -> None:
         """Override a ConfigGroup to add additional widgets."""
         # Make sure they don't double-up.
         conficts = self.widget_ids() & override.widget_ids()
@@ -377,9 +362,9 @@ class ConfigGroup(PakObject, allow_mult=True):
         """Write all our values to the config."""
         for conf in CONFIG_ORDER:
             config_section = CONFIG[conf.id]
-            for wid in conf.widgets:
-                if wid.has_values:
-                    config_section[wid.id] = wid.value.get()
+            for s_wid in conf.widgets:
+                if s_wid.has_values:
+                    config_section[s_wid.id] = s_wid.value.get()
             for m_wid in conf.multi_widgets:
                 for num, var in m_wid.values:
                     config_section[f'{m_wid.id}_{num}'] = var.get()
@@ -433,7 +418,7 @@ async def make_pane(parent: ttk.Frame) -> None:
                 wid_frame.columnconfigure(1, weight=1)
 
                 try:
-                    widget = s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
+                    widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
                 except Exception:
                     LOGGER.exception('Could not construct widget {}.{}', config.id, s_wid.id)
                     continue
@@ -468,11 +453,16 @@ async def make_pane(parent: ttk.Frame) -> None:
 
             wid_frame.grid(row=row, column=0, sticky='ew')
             assert isinstance(m_wid.values, list)
-            m_wid.multi_func(
-                wid_frame,
-                m_wid.values,
-                m_wid.config,
-            )
+            try:
+                async for tim_val, value in m_wid.multi_func(
+                    wid_frame,
+                    m_wid.values,
+                    m_wid.config,
+                ):
+                    m_wid.ui_cbacks[tim_val] = value
+            except Exception:
+                LOGGER.exception('Could not construct widget {}.{}', config.id, m_wid.id)
+                continue
             await BEE2_config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
 
             if m_wid.tooltip:
@@ -484,7 +474,8 @@ async def make_pane(parent: ttk.Frame) -> None:
         width=canvas_frame.winfo_reqwidth(),
     )
 
-    def canvas_reflow(e):
+    def canvas_reflow(_) -> None:
+        """Update canvas when the window resizes."""
         canvas['scrollregion'] = canvas.bbox('all')
 
     canvas.bind('<Configure>', canvas_reflow)
@@ -492,23 +483,24 @@ async def make_pane(parent: ttk.Frame) -> None:
 
 def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     """For widgets without a multi version, do it generically."""
-    def generic_func(parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+    async def generic_func(parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
         """Generically make a set of labels."""
-        for row, (timer, var) in enumerate(values):
-            if timer == 'inf':
+        for row, (tim_val, var) in enumerate(values):
+            if tim_val == 'inf':
                 timer_disp = INF
             else:
-                timer_disp = timer
+                timer_disp = tim_val
 
             parent.columnconfigure(1, weight=1)
 
             label = ttk.Label(parent, text=timer_disp + ':')
             label.grid(row=row, column=0)
-            widget = widget_func(
+            widget, update = await widget_func(
                 parent,
                 var,
                 conf,
             )
+            yield tim_val, update
             widget.grid(row=row, column=1, sticky='ew')
 
     return generic_func
@@ -524,16 +516,16 @@ def multi_grid(values: List[Tuple[str, tk.StringVar]], columns=10):
             tim_disp = str(tim)
             index = int(tim)
         row, column = divmod(index - 1, columns)
-        yield row, column, tim_disp, var
+        yield row, column, tim, tim_disp, var
 
 
-def widget_sfx(*args):
+def widget_sfx(*args) -> None:
     """Play sounds when interacting."""
     sound.fx_blockable('config')
 
 
 @WidgetLookup('itemvariant', 'variant')
-def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+async def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.
@@ -549,7 +541,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
 
     version_lookup: Optional[List[str]] = None
 
-    def update_data():
+    def update_data() -> None:
         """Refresh the data in the list."""
         nonlocal version_lookup
         version_lookup = contextWin.set_version_combobox(combobox, item)
@@ -570,7 +562,7 @@ def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
 
     ITEM_VARIANT_LOAD.append(update_data)
     update_data()
-    return combobox
+    return combobox, nop_update
 
 
 # Load all the widgets.

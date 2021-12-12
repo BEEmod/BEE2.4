@@ -4,13 +4,13 @@ import tkinter as tk
 from srctools import Property
 from tkinter import ttk
 
-from app.itemconfig import WidgetLookup
+from app.itemconfig import UpdateFunc, WidgetLookup, nop_update
 
 
 @WidgetLookup('string', 'str')
-def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
+async def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
     """Simple textbox for entering text."""
     return ttk.Entry(
         parent,
         textvariable=var,
-    )
+    ), nop_update

@@ -1,6 +1,5 @@
 """A Widget for allowing selecting a colour."""
 from __future__ import annotations
-from typing import List, Tuple
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 import tkinter as tk
@@ -8,38 +7,42 @@ import tkinter as tk
 from srctools import Property
 
 from app import img, tk_tools
-from app.itemconfig import WidgetLookup, WidgetLookupMulti, multi_grid, parse_color, widget_sfx
+from app.itemconfig import (
+    UpdateFunc, WidgetLookup, WidgetLookupMulti,
+    multi_grid, parse_color, widget_sfx,
+)
 from app.tooltip import add_tooltip
 from localisation import gettext
 
 
 @WidgetLookup('color', 'colour', 'rgb')
-def widget_color_single(
+async def widget_color_single(
     parent: tk.Frame,
     var: tk.StringVar,
     conf: Property,
-) -> tk.Widget:
+) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a colour swatch for specifying colours.
 
     Values can be provided as #RRGGBB, but will be written as 3 0-255 values.
     """
     # Isolates the swatch so it doesn't resize.
     frame = ttk.Frame(parent)
-    swatch = make_color_swatch(frame, var, 24)
+    swatch, update = make_color_swatch(frame, var, 24)
     swatch.grid(row=0, column=0, sticky='w')
-    return frame
+    return frame, update
 
 
 @WidgetLookupMulti('color', 'colour', 'rgb')
-def widget_color_multi(parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+async def widget_color_multi(parent: tk.Frame, values: list[tuple[str, tk.StringVar]], conf: Property):
     """For color swatches, display in a more compact form."""
-    for row, column, tim_text, var in multi_grid(values):
-        swatch = make_color_swatch(parent, var, 16)
+    for row, column, tim_val, tim_text, var in multi_grid(values):
+        swatch, update = make_color_swatch(parent, var, 16)
         swatch.grid(row=row, column=column)
         add_tooltip(swatch, tim_text, delay=0)
+        yield tim_val, update
 
 
-def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Label:
+def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> tuple[tk.Widget, UpdateFunc]:
     """Make a single swatch."""
     # Note: tkinter requires RGB as ints, not float!
     def open_win(e) -> None:
@@ -56,15 +59,11 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size: int) -> ttk.Lab
             var.set('{} {} {}'.format(int(r), int(g), int(b)))
 
     swatch = ttk.Label(parent)
-
-    def update_image(var_name: str, var_index: str, operation: str):
-        img.apply(swatch, img.Handle.color(parse_color(var.get()), size, size))
-
-    update_image('', '', '')
-
-    # Register a function to be called whenever this variable is changed.
-    var.trace_add('write', update_image)
-
+    img.apply(swatch, img.Handle.color(parse_color(var.get()), size, size))
     tk_tools.bind_leftclick(swatch, open_win)
 
-    return swatch
+    async def update_image(new_value: str) -> None:
+        """Update the image when changed."""
+        img.apply(swatch, img.Handle.color(parse_color(new_value), size, size))
+
+    return swatch, update_image
