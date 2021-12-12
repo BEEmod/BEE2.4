@@ -128,68 +128,82 @@ def load_itemvar(prop: Property) -> None:
 
 @attr.define
 class Widget:
-    """Represents a widget that can appear on a ConfigGroup."""
+    """Common logic for both kinds of widget that can appear on a ConfigGroup."""
     group_id: str
     id: str
     name: str
     tooltip: str
-    create_func: SingleCreateFunc
-    multi_func: MultiCreateFunc
     config: Property
-    values: Union[tk.StringVar, list[tuple[Union[int, str], tk.StringVar]]]
-    is_timer: bool
-    use_inf: bool  # For timer, is infinite valid?
-    # When apply_conf() is executing, don't waste time re-storing.
-    _applying: bool = attr.ib(init=False, default=False)
+    create_func: SingleCreateFunc
 
     @property
     def has_values(self) -> bool:
         """Item variant widgets don't have configuration, all others do."""
         return self.create_func is not widget_item_variant
 
-    def __post_init__(self) -> None:
-        """Register a callback to store state when our widgets change."""
-        var: tk.StringVar
-        save_id = f'{self.group_id}:{self.id}'
-        if isinstance(self.values, list):
-            def on_changed(var_name: str, var_index: str, operation: str) -> None:
-                """Recompute state when changed."""
-                if not self._applying:
-                    BEE2_config.store_conf(WidgetConfig({
-                        str(tim_val): sub_var.get()
-                        for tim_val, sub_var in self.values
-                    }), save_id)
-            for _, var in self.values:
-                var.trace_add('write', on_changed)
-        else:
-            def on_changed(var_name: str, var_index: str, operation: str) -> None:
-                """Recompute state when changed."""
-                if not self._applying:
-                    BEE2_config.store_conf(WidgetConfig(self.values.get()), save_id)
-            self.values.trace_add('write', on_changed)
+    async def apply_conf(self, data: WidgetConfig) -> None:
+        """Apply the configuration to the UI."""
+        raise NotImplementedError
+
+
+@attr.define
+class SingleWidget(Widget):
+    """Represents a single widget with no timer value."""
+    value: tk.StringVar
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
-        try:
-            self._applying = True
-            if isinstance(self.values, list):
-                if isinstance(data.values, str):
-                    # Single in conf, apply to all.
-                    for tim_val, var in self.values:
-                        var.set(data.values)
-                else:
-                    for tim_val, var in self.values:
-                        try:
-                            val = data.values[tim_val]
-                        except KeyError:
-                            continue
-                        var.set(val)
-            elif isinstance(data.values, str):
-                self.values.set(data.values)
-            else:
-                LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
-        finally:
-            self._applying = False
+        if isinstance(data.values, list):
+            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
+        else:
+            self.value.set(data.values)
+
+
+@attr.define
+class MultiWidget(Widget):
+    """Represents a group of multiple widgets for all the timer values."""
+    multi_func: MultiCreateFunc
+    values: list[tuple[Union[int, str], tk.StringVar]]
+    use_inf: bool  # For timer, is infinite valid?
+
+    async def apply_conf(self, data: WidgetConfig) -> None:
+        """Apply the configuration to the UI."""
+        if isinstance(data.values, str):
+            # Single in conf, apply to all.
+            for tim_val, var in self.values:
+                var.set(data.values)
+        else:
+            for tim_val, var in self.values:
+                try:
+                    val = data.values[tim_val]
+                except KeyError:
+                    continue
+                var.set(val)
+
+    # def __attrs_post_init__(self) -> None:
+    #     """Register a callback to store state when our widgets change."""
+    #     var: tk.StringVar
+    #     save_id = f'{self.group_id}:{self.id}'
+    #     try:
+    #         self._no_store = True
+    #         if isinstance(self.values, list):
+    #             def on_changed(var_name: str, var_index: str, operation: str) -> None:
+    #                 """Recompute state when changed."""
+    #                 if not self._no_store:
+    #                     BEE2_config.store_conf(WidgetConfig({
+    #                         str(tim_val): sub_var.get()
+    #                         for tim_val, sub_var in self.values
+    #                     }), save_id)
+    #                 for _, var in self.values:
+    #                     var.trace_add('write', on_changed)
+    #         else:
+    #             def on_changed(var_name: str, var_index: str, operation: str) -> None:
+    #                 """Recompute state when changed."""
+    #                 if not self._no_store:
+    #                     BEE2_config.store_conf(WidgetConfig(self.values.get()), save_id)
+    #             self.values.trace_add('write', on_changed)
+    #     finally:
+    #         self._no_store = False
 
 
 class ConfigGroup(PakObject, allow_mult=True):
@@ -199,8 +213,8 @@ class ConfigGroup(PakObject, allow_mult=True):
         conf_id: str,
         group_name: str,
         desc,
-        widgets: list[Widget],
-        multi_widgets: list[Widget],
+        widgets: list[SingleWidget],
+        multi_widgets: list[MultiWidget],
     ) -> None:
         self.id = conf_id
         self.name = group_name
@@ -220,8 +234,8 @@ class ConfigGroup(PakObject, allow_mult=True):
 
         desc = desc_parse(props, data.id, data.pak_id)
 
-        widgets: list[Widget] = []
-        multi_widgets: list[Widget] = []
+        widgets: list[SingleWidget] = []
+        multi_widgets: list[MultiWidget] = []
 
         for wid in props.find_all('Widget'):
             await trio.sleep(0)
@@ -255,9 +269,8 @@ class ConfigGroup(PakObject, allow_mult=True):
                 if is_timer:
                     LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
                     is_timer = use_inf = False
-                # Values isn't used, set to a dummy value.
-                values = []
-            elif is_timer:
+
+            if is_timer:
                 if default_prop.has_children():
                     defaults = {
                         num: default_prop[num]
@@ -280,12 +293,28 @@ class ConfigGroup(PakObject, allow_mult=True):
                         value=cur_value,
                         name=f'itemconf_{data.id}_{wid_id}_{num}'
                     )))
+
+                multi_widgets.append(MultiWidget(
+                    group_id=data.id,
+                    id=wid_id,
+                    name=name,
+                    tooltip=tooltip,
+                    config=wid,
+                    create_func=create_func,
+                    multi_func=timer_func,
+                    values=values,
+                    use_inf=use_inf,
+                ))
             else:
+                # Singular Widget.
                 if default_prop.has_children():
                     raise ValueError(
                         f'{data.id}:{wid_id}: Can only have multiple defaults for timer-ed widgets!'
                     )
-                if conf.values is EmptyMapping:
+
+                if create_func is widget_item_variant:
+                    cur_value = ''  # Not used.
+                elif conf.values is EmptyMapping:
                     # No new conf, check the old conf.
                     cur_value = CONFIG.get_val(data.id, wid_id, default_prop.value)
                 elif isinstance(conf.values, str):
@@ -294,23 +323,18 @@ class ConfigGroup(PakObject, allow_mult=True):
                     LOGGER.warning('Widget {}:{} had timer defaults, but widget is singular!', data.id, wid_id)
                     cur_value = default_prop.value
 
-                values = tk.StringVar(
-                    value=cur_value,
-                    name=f'itemconf_{data.id}_{wid_id}',
-                )
-
-            (multi_widgets if is_timer else widgets).append(Widget(
-                data.id,
-                wid_id,
-                name,
-                tooltip,
-                create_func,
-                timer_func,
-                wid,
-                values,
-                is_timer,
-                use_inf,
-            ))
+                widgets.append(SingleWidget(
+                    group_id=data.id,
+                    id=wid_id,
+                    name=name,
+                    tooltip=tooltip,
+                    config=wid,
+                    create_func=create_func,
+                    value=tk.StringVar(
+                        value=cur_value,
+                        name=f'itemconf_{data.id}_{wid_id}',
+                    ),
+                ))
 
         group = cls(
             data.id,
@@ -326,7 +350,7 @@ class ConfigGroup(PakObject, allow_mult=True):
 
         return group
 
-    def add_over(self, override: 'ConfigGroup'):
+    def add_over(self, override: ConfigGroup) -> None:
         """Override a ConfigGroup to add additional widgets."""
         # Make sure they don't double-up.
         conficts = self.widget_ids() & override.widget_ids()
@@ -349,22 +373,22 @@ class ConfigGroup(PakObject, allow_mult=True):
         }
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Write all our values to the config."""
         for conf in CONFIG_ORDER:
             config_section = CONFIG[conf.id]
             for wid in conf.widgets:
                 if wid.has_values:
-                    config_section[wid.id] = wid.values.get()
-            for wid in conf.multi_widgets:
-                for num, var in wid.values:
-                    config_section['{}_{}'.format(wid.id, num)] = var.get()
+                    config_section[wid.id] = wid.value.get()
+            for m_wid in conf.multi_widgets:
+                for num, var in m_wid.values:
+                    config_section[f'{m_wid.id}_{num}'] = var.get()
             if not config_section:
                 del CONFIG[conf.id]
         CONFIG.save_check()
 
 
-async def make_pane(parent: ttk.Frame):
+async def make_pane(parent: ttk.Frame) -> None:
     """Create all the widgets we use."""
     CONFIG_ORDER.sort(key=lambda grp: grp.name)
 
@@ -403,27 +427,27 @@ async def make_pane(parent: ttk.Frame):
 
         # Now make the widgets.
         if config.widgets:
-            for row, wid in enumerate(config.widgets):
+            for row, s_wid in enumerate(config.widgets):
                 wid_frame = ttk.Frame(frame)
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
 
-                assert isinstance(wid.values, tk.StringVar)
                 try:
-                    widget = wid.create_func(wid_frame, wid.values, wid.config)
+                    widget = s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
                 except Exception:
-                    LOGGER.exception('Could not construct widget {}.{}', config.id, wid.id)
+                    LOGGER.exception('Could not construct widget {}.{}', config.id, s_wid.id)
                     continue
 
-                label = ttk.Label(wid_frame, text=wid.name + ': ')
+                label = ttk.Label(wid_frame, text=s_wid.name + ': ')
                 label.grid(row=0, column=0)
                 widget.grid(row=0, column=1, sticky='e')
-                await BEE2_config.set_and_run_ui_callback(WidgetConfig, wid.apply_conf, f'{wid.group_id}:{wid.id}')
+                if s_wid.has_values:
+                    await BEE2_config.set_and_run_ui_callback(WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}')
 
-                if wid.tooltip:
-                    add_tooltip(widget, wid.tooltip)
-                    add_tooltip(label, wid.tooltip)
-                    add_tooltip(wid_frame, wid.tooltip)
+                if s_wid.tooltip:
+                    add_tooltip(widget, s_wid.tooltip)
+                    add_tooltip(label, s_wid.tooltip)
+                    add_tooltip(wid_frame, s_wid.tooltip)
 
         if config.widgets and config.multi_widgets:
             ttk.Separator(orient='horizontal').grid(
@@ -435,24 +459,24 @@ async def make_pane(parent: ttk.Frame):
             continue
 
         # Continue from wherever we were.
-        for row, wid in enumerate(config.multi_widgets, start=row+1):
+        for row, m_wid in enumerate(config.multi_widgets, start=row+1):
             # If we only have 1 widget, don't add a redundant title.
             if widget_count == 1:
                 wid_frame = ttk.Frame(frame)
             else:
-                wid_frame = ttk.LabelFrame(frame, text=wid.name)
+                wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
 
             wid_frame.grid(row=row, column=0, sticky='ew')
-            assert isinstance(wid.values, list)
-            wid.multi_func(
+            assert isinstance(m_wid.values, list)
+            m_wid.multi_func(
                 wid_frame,
-                wid.values,
-                wid.config,
+                m_wid.values,
+                m_wid.config,
             )
-            await BEE2_config.set_and_run_ui_callback(WidgetConfig, wid.apply_conf, f'{wid.group_id}:{wid.id}')
+            await BEE2_config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
 
-            if wid.tooltip:
-                add_tooltip(wid_frame, wid.tooltip)
+            if m_wid.tooltip:
+                add_tooltip(wid_frame, m_wid.tooltip)
 
     canvas.update_idletasks()
     canvas.config(
@@ -466,7 +490,7 @@ async def make_pane(parent: ttk.Frame):
     canvas.bind('<Configure>', canvas_reflow)
 
 
-def widget_timer_generic(widget_func):
+def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     """For widgets without a multi version, do it generically."""
     def generic_func(parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
         """Generically make a set of labels."""
