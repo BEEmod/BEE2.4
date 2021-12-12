@@ -219,14 +219,14 @@ class CompilePaneState:
         """Generate keyvalues1 format data."""
         props = Property('', [
             Property('sshot_type', self.sshot_type),
-            Property('sshot_cleanup', self.sshot_cleanup),
-            Property('spawn_elev', self.spawn_elev),
+            Property('sshot_cleanup', bool_as_int(self.sshot_cleanup)),
+            Property('spawn_elev', bool_as_int(self.spawn_elev)),
             Property('player_model', self.player_mdl),
-            Property('voiceline_priority', self.use_voice_priority),
+            Property('voiceline_priority', bool_as_int(self.use_voice_priority)),
             Property('corridor', [
-                Property('sp_entry', self.corr_sp_entry),
-                Property('sp_exit', self.corr_sp_exit),
-                Property('coop', self.corr_coop),
+                Property('sp_entry', str(self.corr_sp_entry)),
+                Property('sp_exit', str(self.corr_sp_exit)),
+                Property('coop', str(self.corr_coop)),
             ]),
         ])
 
