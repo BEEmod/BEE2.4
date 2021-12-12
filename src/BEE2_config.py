@@ -305,7 +305,7 @@ def get_pal_conf() -> Config:
     return Config({
         info: opt_map.copy()
         for info, opt_map in _CUR_CONFIG.items()
-        if not info.palette_stores
+        if info.palette_stores
     })
 
 
