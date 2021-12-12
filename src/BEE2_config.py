@@ -173,7 +173,7 @@ async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awai
     if data_id in info.callback:
         raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
     info.callback[data_id] = func
-    data_map = _CUR_CONFIG[info]
+    data_map = _CUR_CONFIG.setdefault(info, {})
     if data_id in data_map:
         await func(data_map[data_id])
 
@@ -223,7 +223,7 @@ def store_conf(data: DataT, data_id: str='') -> None:
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
     LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-    _CUR_CONFIG[info][data_id] = data
+    _CUR_CONFIG.setdefault(info, {})[data_id] = data
 
 
 def parse_conf(props: Property) -> Config:
