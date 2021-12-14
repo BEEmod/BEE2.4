@@ -80,7 +80,7 @@ class WidgetConfig:
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'WidgetConfig':
-        """Parse DMX config values."""
+        """Parse Keyvalues config values."""
         assert version == 1
         if data.has_children():
             return WidgetConfig({
@@ -247,7 +247,7 @@ class ConfigGroup(PakObject, allow_mult=True):
             default_prop = wid.find_key('Default', '')
             values: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
 
-            conf = BEE2_config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}')
+            conf = BEE2_config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:

@@ -205,7 +205,7 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
                     nursery.start_soon(cb, data)
 
 
-def get_cur_conf(cls: Type[DataT], data_id: str='') -> DataT:
+def get_cur_conf(cls: Type[DataT], data_id: str='', default: Optional[DataT] = None) -> DataT:
     """Fetch the currently active config for this ID."""
     info: ConfType[DataT] = _TYPE_TO_TYPE[cls]
     if data_id and not info.uses_id:
@@ -214,7 +214,10 @@ def get_cur_conf(cls: Type[DataT], data_id: str='') -> DataT:
         data = _CUR_CONFIG[info][data_id]
     except KeyError:
         # Return a default value.
-        return info.cls()
+        if default is not None:
+            return default
+        else:
+            raise
     assert isinstance(data, info.cls), info
     return data
 

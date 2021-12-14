@@ -245,6 +245,9 @@ class CompilePaneState:
         return props
 
 
+DEFAULT_STATE = CompilePaneState()
+
+
 async def apply_state(state: CompilePaneState) -> None:
     """Apply saved state to the UI and compile config."""
     chosen_thumb.set(state.sshot_type)
@@ -368,7 +371,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
 def sel_corr_callback(sel_item: str, corr_name: str) -> None:
     """Callback for saving the result of selecting a corridor."""
     BEE2_config.store_conf(attr.evolve(
-        BEE2_config.get_cur_conf(CompilePaneState),
+        BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         **{'corr_' + corr_name: 0 if sel_item is None else int(sel_item)},
     ))
     COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
@@ -474,7 +477,7 @@ def find_screenshot(e=None) -> None:
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
         BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState),
+            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             sshot_cust=buf.getvalue(),
         ))
         set_screenshot(image)
@@ -496,7 +499,7 @@ def set_screen_type() -> None:
         window.winfo_reqheight(),
     ))
     BEE2_config.store_conf(attr.evolve(
-        BEE2_config.get_cur_conf(CompilePaneState),
+        BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         sshot_type=chosen,
     ))
     COMPILE_CFG.save_check()
@@ -816,7 +819,7 @@ async def make_map_widgets(frame: ttk.Frame):
     def set_voice_priority() -> None:
         """Called when the voiceline priority is changed."""
         BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState),
+            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
         ))
         COMPILE_CFG['General']['voiceline_priority'] = str(VOICE_PRIORITY_VAR.get())
@@ -848,7 +851,7 @@ async def make_map_widgets(frame: ttk.Frame):
     def elev_changed(state: bool) -> None:
         """Called when an elevator is selected."""
         BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState),
+            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             spawn_elev=state,
         ))
         COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state)
@@ -940,7 +943,7 @@ async def make_map_widgets(frame: ttk.Frame):
         """Save the selected player model."""
         model = PLAYER_MODELS_REV[player_model_var.get()]
         BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState),
+            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             player_mdl=model,
         ))
         COMPILE_CFG['General']['player_model'] = model
