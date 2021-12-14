@@ -961,7 +961,7 @@ class SelectorWin:
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-    def widget(self, frame: Misc) -> ttk.Entry:
+    async def widget(self, frame: Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
 
         Use like 'selWin.widget(parent).grid(row=0, column=1)' to create
@@ -1707,89 +1707,3 @@ class SelectorWin:
         # Reposition all our items, but only if we're visible.
         if self.win.winfo_ismapped():
             self.flow_items()
-
-
-def test() -> None:
-    """Setup a window with dummy data."""
-    from BEE2_config import GEN_OPTS
-    from packages import find_packages, PACKAGE_SYS
-    from utils import PackagePath
-    # Setup images to read from packages.
-    print('Loading packages for images.')
-    GEN_OPTS.load()
-    find_packages(GEN_OPTS['Directories']['package'])
-    img.load_filesystems(PACKAGE_SYS)
-    print('Done.')
-
-    lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
-    lbl.grid()
-    TK_ROOT.geometry("+500+500")
-
-    test_list = [
-        Item(
-            "SKY_BLACK",
-            "Black",
-            long_name="Darkness",
-            icon=img.Handle.color((125, 0, 92), ICON_SIZE, ICON_SIZE),
-            authors=["Valve"],
-            desc='Pure black darkness. Nothing to see here.',
-            attributes={
-                'test_color': Vec(255, 32, 32),
-                'astr': 'Dark',
-                'test_bool_1': False,
-                'test_bool_2': True,
-            },
-        ),
-        Item(
-            "SKY_BTS",
-            "BTS",
-            long_name="Behind The Scenes - Factory",
-            icon=img.Handle.parse_uri(PackagePath("valve_clean_style", "voices/glados"), ICON_SIZE, ICON_SIZE),
-            authors=["TeamSpen210"],
-
-            desc='The dark constuction and office areas of Aperture.  '
-                 'Catwalks extend between different buildings, with '
-                 'vactubes and cranes carrying objects throughout '
-                 'the facility.  \n'
-                 'Abandoned offices can often be found here.\n\n'
-                 '* This is a bullet point, with a\n second line'
-                 '> white-on-black text',
-            attributes={
-                'test_color': Vec(40, 53, 64),
-                'astr': 'Machinery',
-                'test_bool_1': True,
-                'test_bool_2': False,
-                'listy': ['Chair', 'Panel', 'Turret']
-            },
-        ),
-    ]
-
-    window = SelectorWin(
-        TK_ROOT,
-        test_list,
-        save_id='_test_window',
-        has_none=True,
-        has_def=True,
-        callback=functools.partial(
-            LOGGER.info,
-            'Selected:',
-        ),
-        attributes=[
-            AttrDef.color('test_color', "I'm a color.", Vec(128, 128, 128)),
-            AttrDef.bool('test_bool_1', "'I'm a bool", False),
-            AttrDef.bool('test_bool_2', "'I'm a bool", True),
-            AttrDef.string('astr', 'Hi'),
-            AttrDef.list('listy', 'Desc', ['a', 'b', 'c']),
-        ],
-    )
-    window.widget(TK_ROOT).grid(row=1, column=0, sticky='EW')
-    window.set_suggested({"SKY_BLACK"})
-
-    def swap_read() -> None:
-        """Toggle readonly."""
-        window.readonly = not window.readonly
-
-    ttk.Button(TK_ROOT, text='Readonly', command=swap_read).grid()
-
-    TK_ROOT.deiconify()
-    TK_ROOT.mainloop()

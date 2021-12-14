@@ -1112,7 +1112,7 @@ def pal_shuffle() -> None:
 # initMainWind generates the main frames that hold all the panes to
 # make it easy to move them around if needed
 
-def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
+async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1155,7 +1155,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=gettext('Music: '))
-    music_win = music_conf.make_widgets(music_frame, pane)
+    music_win = await music_conf.make_widgets(music_frame, pane)
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
@@ -1229,14 +1229,14 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         left_pad = 0
 
     # Make all the selector window textboxes
-    style_win.widget(props).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    (await style_win.widget(props)).grid(row=0, column=1, sticky='EW', padx=left_pad)
     # row=1: Suggested.
     voice_frame.grid(row=2, column=1, sticky='EW')
-    skybox_win.widget(props).grid(row=3, column=1, sticky='EW', padx=left_pad)
-    elev_win.widget(props).grid(row=4, column=1, sticky='EW', padx=left_pad)
+    (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
+    (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
     music_frame.grid(row=5, column=0, sticky='EW', columnspan=2)
 
-    voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    (await voice_win.widget(voice_frame)).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if tk_tools.USE_SIZEGRIP:
         sizegrip = ttk.Sizegrip(props, cursor=tk_tools.Cursors.STRETCH_HORIZ)
@@ -1672,7 +1672,7 @@ async def init_windows() -> None:
         tool_img='icons/win_options',
         tool_col=2,
     )
-    init_option(windows['opt'], pal_ui)
+    await init_option(windows['opt'], pal_ui)
     loader.step('UI', 'options')
 
     await StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)

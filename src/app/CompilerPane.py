@@ -4,7 +4,7 @@ These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
 
-from typing import Mapping, Union
+from typing import Union
 from tkinter import filedialog
 from tkinter import ttk
 import tkinter as tk
@@ -534,7 +534,7 @@ def make_setter(section: str, config: str, variable: tk.Variable, state_var: str
     variable.trace_add('write', callback)
 
 
-def make_widgets() -> None:
+async def make_widgets() -> None:
     """Create the compiler options pane.
 
     """
@@ -557,7 +557,7 @@ def make_widgets() -> None:
     map_frame = ttk.Frame(nbook)
     # note: Tab name
     nbook.add(map_frame, text=gettext('Map Settings'))
-    make_map_widgets(map_frame)
+    await make_map_widgets(map_frame)
 
     comp_frame = ttk.Frame(nbook)
     # note: Tab name
@@ -798,7 +798,7 @@ def make_comp_widgets(frame: ttk.Frame):
     refresh_counts(reload=False)
 
 
-def make_map_widgets(frame: ttk.Frame):
+async def make_map_widgets(frame: ttk.Frame):
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.
@@ -899,9 +899,9 @@ def make_map_widgets(frame: ttk.Frame):
 
     load_corridors()
 
-    CORRIDOR['sp_entry'].widget(corr_frame).grid(row=0, column=1, sticky='ew')
-    CORRIDOR['sp_exit'].widget(corr_frame).grid(row=1, column=1, sticky='ew')
-    CORRIDOR['coop'].widget(corr_frame).grid(row=2, column=1, sticky='ew')
+    (await CORRIDOR['sp_entry'].widget(corr_frame)).grid(row=0, column=1, sticky='ew')
+    (await CORRIDOR['sp_exit'].widget(corr_frame)).grid(row=1, column=1, sticky='ew')
+    (await CORRIDOR['coop'].widget(corr_frame)).grid(row=2, column=1, sticky='ew')
 
     ttk.Label(
         corr_frame,
@@ -967,7 +967,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    make_widgets()
+    await make_widgets()
     await BEE2_config.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
@@ -978,6 +978,8 @@ def init_application() -> None:
     window.title(gettext('Compiler Options - {}').format(utils.BEE_VERSION))
     window.resizable(True, False)
 
-    make_widgets()
+    # TODO load async properly.
+    import trio
+    trio.run(make_widgets)
 
     TK_ROOT.deiconify()

@@ -118,7 +118,7 @@ def load_selitems() -> None:
         )
 
 
-def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
+async def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     """Generate the UI components, and return the base window."""
 
     def for_channel(channel: MusicChannel) -> List[SelItem]:
@@ -260,7 +260,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     toggle_btn.grid(row=0, column=0)
 
     for row, channel in enumerate(MusicChannel):
-        btn = WINDOWS[channel].widget(frame)
+        btn = await WINDOWS[channel].widget(frame)
         if row:
             exp_widgets.append(btn)
         btn.grid(row=row, column=2, sticky='EW')
