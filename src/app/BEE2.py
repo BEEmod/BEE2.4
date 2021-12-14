@@ -6,7 +6,11 @@ import trio
 from outcome import Outcome, Error
 
 from BEE2_config import GEN_OPTS
-from app import gameMan, UI, music_conf, logWindow, img, TK_ROOT, DEV_MODE, tk_error, sound
+from app import (
+    TK_ROOT, DEV_MODE, tk_error,
+    sound, img, gameMan, music_conf,
+    UI, logWindow,
+)
 import loadScreen
 import packages
 import utils
@@ -78,8 +82,6 @@ async def init_app():
     logWindow.HANDLER.setLevel(GEN_OPTS['Debug']['window_log_level'])
 
     LOGGER.debug('Loading settings...')
-
-    UI.load_settings()
 
     gameMan.load()
     gameMan.set_game_by_name(

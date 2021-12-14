@@ -28,26 +28,6 @@ import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# Functions for saving or loading application settings.
-# The palette attribute indicates if this will be persisted in palettes.
-OPTION_LOAD: utils.FuncLookup[Callable[[Property], None]] = utils.FuncLookup('LoadHandler', attrs=['from_palette'])
-OPTION_SAVE: utils.FuncLookup[Callable[[], Property]] = utils.FuncLookup('SaveHandler', attrs=['to_palette'])
-
-
-def apply_settings(props: Property, *, is_palette: bool) -> None:
-    """Given a property tree, apply it to the widgets."""
-    for opt_prop in props:
-        assert opt_prop.name is not None
-        try:
-            func = OPTION_LOAD[opt_prop.name]
-        except KeyError:
-            LOGGER.warning('No handler for option type "{}"!', opt_prop.real_name)
-            continue
-        # Skip if it opts out of being on the palette.
-        if is_palette and not getattr(func, 'from_palette', True):
-            continue
-        func(opt_prop)
-
 
 def read_settings() -> None:
     """Read and apply the settings from disk."""

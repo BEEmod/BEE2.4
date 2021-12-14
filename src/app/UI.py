@@ -456,48 +456,6 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-def load_settings():
-    """Load options from the general config file."""
-    optionWindow.load()
-
-
-@BEE2_config.OPTION_SAVE('LastSelected')
-def save_last_selected() -> Property:
-    """Save the last selected objects."""
-    sel_win = [
-        ('Style', style_win),
-        ('Skybox', skybox_win),
-        ('Voice', voice_win),
-        ('Elevator', elev_win),
-    ]
-    for channel, win in music_conf.WINDOWS.items():
-        sel_win.append(('Music_' + channel.name.title(), win))
-
-    props = Property('', [])
-    for win_name, win in sel_win:
-        props.append(Property(win_name, win.chosen_id or '<NONE>'))
-    return props
-
-
-@BEE2_config.OPTION_LOAD('LastSelected')
-def load_last_selected(props: Property) -> None:
-    """Load the last selected objects."""
-    sel_win = [
-        ('Style', style_win),
-        ('Skybox', skybox_win),
-        ('Voice', voice_win),
-        ('Elevator', elev_win),
-    ]
-    for channel, win in music_conf.WINDOWS.items():
-        sel_win.append(('Music_' + channel.name.title(), win))
-
-    for win_name, win in sel_win:
-        try:
-            win.sel_item_id(props[win_name])
-        except IndexError:
-            pass
-
-
 def load_packages() -> None:
     """Import in the list of items and styles from the packages.
 
