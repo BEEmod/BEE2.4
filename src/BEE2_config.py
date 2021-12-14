@@ -190,7 +190,7 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
             data = _CUR_CONFIG[info][data_id]
             cb = info.callback[data_id]
         except KeyError:
-            pass
+            LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
         else:
             assert isinstance(data, info.cls), info
             await cb(data)
@@ -200,7 +200,7 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
                 try:
                     cb = info.callback[dat_id]
                 except KeyError:
-                    pass
+                    LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
                 else:
                     nursery.start_soon(cb, data)
 
@@ -328,7 +328,7 @@ async def apply_pal_conf(conf: Config) -> None:
 
 @register('LastSelected', uses_id=True)
 @attr.frozen
-class LastSelected(Data):
+class LastSelected:
     """Used for several general items, specifies the last selected one for restoration."""
     id: Optional[str] = None
 
