@@ -349,6 +349,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
             for i in range(1, length + 1)
         ],
         save_id='corr_' + corr_name,
+        store_last_selected=False,
         title=title,
         none_desc=gettext(
             'Randomly choose a corridor. '

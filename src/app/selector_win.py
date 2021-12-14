@@ -526,10 +526,12 @@ class SelectorWin:
         lst: list[Item],
         *,  # Make all keyword-only for readability
         save_id: str,  # Required!
+        store_last_selected: bool=True,
         has_none=True,
         has_def=True,
         sound_sys: FileSystemChain=None,
         modal=False,
+        default_id: str='<NONE>',
         # i18n: 'None' item description
         none_desc=gettext('Do not add anything.'),
         none_attrs=EmptyMapping,
@@ -551,11 +553,13 @@ class SelectorWin:
         - tk: Must be a Toplevel window, either the tk() root or another
         window if needed.
         - save_id: The ID used to save/load the window state.
+        - store_last_selected: If set, save/load the selected ID.
         - lst: A list of Item objects, defining the visible items.
         - If has_none is True, a <none> item will be added to the beginning
           of the list.
         - If has_def is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
+        - default_id is the item to initially select, if no previous one is set.
         - If snd_sample_sys is set, a '>' button will appear next to names
           to play the associated audio sample for the item.
           The value should be a FileSystem to look for samples in.
@@ -599,7 +603,7 @@ class SelectorWin:
         self.disp_btn: Optional[ttk.Button] = None
 
         # ID of the currently chosen item
-        self.chosen_id = None
+        self.chosen_id: Optional[str] = None
 
         # Callback function, and positional arguments to pass
         if callback is not None:
@@ -625,14 +629,27 @@ class SelectorWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        try:
-            self.selected = self.item_list[0]
-        except IndexError:
+
+        prev_state = BEE2_config.get_cur_conf(
+            BEE2_config.LastSelected,
+            save_id,
+            BEE2_config.LastSelected(default_id),
+        )
+        if not self.item_list:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
             # least this works.
             self.item_list = [self.noneItem]
             self.selected = self.noneItem
+        elif prev_state.id is None and has_none:
+            self.selected = self.noneItem
+        else:
+            for item in self.item_list:
+                if item.name == prev_state.id:
+                    self.selected = item
+                    break
+            else:  # Arbitrarily pick first.
+                self.selected = self.item_list[0]
 
         self.orig_selected = self.selected
         self.parent = tk
@@ -670,6 +687,7 @@ class SelectorWin:
 
         # The ID used to persist our window state across sessions.
         self.save_id = save_id.casefold()
+        self.store_last_selected = store_last_selected
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
@@ -961,6 +979,11 @@ class SelectorWin:
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
+    async def _load_selected(self, selected: BEE2_config.LastSelected) -> None:
+        """Load a new selected item."""
+        self.sel_item_id('<NONE>' if selected.id is None else selected.id)
+        self.save()
+
     async def widget(self, frame: Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
 
@@ -997,7 +1020,13 @@ class SelectorWin:
         # are readonly.
         self.readonly = self._readonly
 
-        self.save()
+        if self.store_last_selected:
+            await BEE2_config.set_and_run_ui_callback(
+                BEE2_config.LastSelected, self._load_selected,
+                self.save_id,
+            )
+        else:
+            self.save()
 
         return self.display
 
@@ -1132,7 +1161,6 @@ class SelectorWin:
                 height=self.win.winfo_height(),
             )
             BEE2_config.store_conf(state, self.save_id)
-            LOGGER.debug('Storing window state "{}" = {}', self.save_id, state)
 
         if self.modal:
             self.win.grab_release()
@@ -1255,6 +1283,8 @@ class SelectorWin:
 
     def do_callback(self) -> None:
         """Call the callback function."""
+        if self.store_last_selected:
+            BEE2_config.store_conf(BEE2_config.LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
             self.callback(self.chosen_id, *self.callback_params)
 

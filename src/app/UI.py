@@ -629,6 +629,7 @@ def load_packages() -> None:
         TK_ROOT,
         style_list,
         save_id='styles',
+        default_id='BEE2_CLEAN',
         title=gettext('Select Style'),
         desc=gettext(
             'The Style controls many aspects of the map. It decides the materials used for walls, '
@@ -638,7 +639,7 @@ def load_packages() -> None:
         has_none=False,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
-        # things are open..
+        # things are open...
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
@@ -668,16 +669,6 @@ def load_packages() -> None:
             SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
         ]
     )
-
-    # Defaults, which will be reset at the end.
-    selected_style = 'BEE2_CLEAN'
-    style_win.sel_item_id('BEE2_CLEAN')
-
-    voice_win.sel_suggested()
-    skybox_win.sel_suggested()
-    elev_win.sel_suggested()
-    for win in music_conf.WINDOWS.values():
-        win.sel_suggested()
 
 
 def current_style() -> packages.Style:
