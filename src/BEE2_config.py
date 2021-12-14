@@ -12,7 +12,7 @@ from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import (
     NewType, TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
-    Awaitable, Iterator, Dict, Mapping,
+    Awaitable, Iterator, Dict, Mapping, cast,
 )
 from threading import Lock, Event
 
@@ -99,7 +99,7 @@ class Data(Protocol):
     """Data which can be saved to the config. These should be immutable."""
     @classmethod
     def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
-        """Parse DMX config values."""
+        """Parse keyvalues config values."""
         raise NotImplementedError
 
     def export_kv1(self) -> Property:
@@ -175,7 +175,7 @@ async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awai
     info.callback[data_id] = func
     data_map = _CUR_CONFIG.setdefault(info, {})
     if data_id in data_map:
-        await func(data_map[data_id])
+        await func(cast(DataT, data_map[data_id]))
 
 
 async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
@@ -183,7 +183,6 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
 
     If the data_id is not passed, all settings will be applied.
     """
-    data: DataT
     if data_id:
         if not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
@@ -193,6 +192,7 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
         except KeyError:
             pass
         else:
+            assert isinstance(data, info.cls), info
             await cb(data)
     else:
         async with trio.open_nursery() as nursery:
@@ -205,16 +205,18 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
                     nursery.start_soon(cb, data)
 
 
-def get_cur_conf(data: Type[DataT], data_id: str='') -> DataT:
+def get_cur_conf(cls: Type[DataT], data_id: str='') -> DataT:
     """Fetch the currently active config for this ID."""
-    info: ConfType[DataT] = _TYPE_TO_TYPE[data]
+    info: ConfType[DataT] = _TYPE_TO_TYPE[cls]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
     try:
-        return _CUR_CONFIG[info][data_id]
+        data = _CUR_CONFIG[info][data_id]
     except KeyError:
         # Return a default value.
         return info.cls()
+    assert isinstance(data, info.cls), info
+    return data
 
 
 def store_conf(data: DataT, data_id: str='') -> None:
@@ -275,12 +277,12 @@ def parse_conf(props: Property) -> Config:
     return conf
 
 
-def build_conf(data: Config) -> Iterator[Property]:
+def build_conf(conf: Config) -> Iterator[Property]:
     """Build out a configuration file from some data.
 
     The data is in the form {conf_type: {id: data}}.
     """
-    for info, data_map in data.items():
+    for info, data_map in conf.items():
         prop = Property(info.name, [
             Property('_version', str(info.version)),
         ])
