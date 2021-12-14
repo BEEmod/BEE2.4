@@ -1129,7 +1129,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         frame,
         text=gettext('Save Settings in Palettes'),
         variable=pal_ui.var_save_settings,
-        command=pal_ui.event_save_settings_changed,
+        command=pal_ui.store_configuration,
     ).grid(row=2, sticky="EW", padx=5)
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")

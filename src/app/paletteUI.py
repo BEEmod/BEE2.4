@@ -2,16 +2,18 @@
 from __future__ import annotations
 from typing import Awaitable, Callable
 from uuid import UUID
-
-import tkinter as tk
 from tkinter import ttk, messagebox
+import tkinter as tk
+
+from srctools import Property
+import srctools.logger
+import attr
 
 import BEE2_config
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
 from app import tk_tools, paletteLoader, TK_ROOT, img, BEE2
 from localisation import gettext
 
-import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
 TREE_TAG_GROUPS = 'pal_group'
@@ -22,6 +24,34 @@ ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 __all__ = [
     'PaletteUI', 'Palette', 'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
 ]
+
+
+@BEE2_config.register('Palette', palette_stores=False)
+@attr.frozen
+class PaletteState:
+    """Data related to palettes which is restored next run.
+
+    Since we don't store in the palette, we don't need to register the UI callback.
+    """
+    selected: UUID = UUID_PORTAL2
+    save_settings: bool = False
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'PaletteState':
+        """Parse Keyvalues data."""
+        assert version == 1
+        try:
+            uuid = UUID(hex=data['selected'])
+        except (LookupError, ValueError):
+            uuid = UUID_PORTAL2
+        return PaletteState(uuid, data.bool('save_settings', False))
+
+    def export_kv1(self) -> Property:
+        """Export to a property block."""
+        return Property('', [
+            Property('selected', self.selected.hex),
+            Property('save_settings', srctools.bool_as_int(self.save_settings)),
+        ])
 
 
 class PaletteUI:
@@ -46,21 +76,17 @@ class PaletteUI:
             pal.uuid: pal
             for pal in paletteLoader.load_palettes()
         }
-
-        try:
-            self.selected_uuid = UUID(hex=BEE2_config.GEN_OPTS.get_val('Last_Selected', 'palette_uuid', ''))
-        except ValueError:
-            self.selected_uuid = UUID_PORTAL2
-
-        f.rowconfigure(1, weight=1)
-        f.columnconfigure(0, weight=1)
-        self.var_save_settings = tk.BooleanVar(value=BEE2_config.GEN_OPTS.get_bool('General', 'palette_save_settings'))
+        prev_state = BEE2_config.get_cur_conf(PaletteState, default=PaletteState())
+        self.selected_uuid = prev_state.selected
+        self.var_save_settings = tk.BooleanVar(value=prev_state.save_settings)
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
         self.get_items = get_items
         self.set_items = set_items
         # Overwritten to configure the save state button.
         self.save_btn_state = lambda s: None
 
+        f.rowconfigure(1, weight=1)
+        f.columnconfigure(0, weight=1)
         ttk.Button(
             f,
             text=gettext('Clear Palette'),
@@ -267,9 +293,9 @@ class PaletteUI:
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='normal')
             self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='normal')
 
-    def event_save_settings_changed(self) -> None:
-        """Save the state of this button."""
-        BEE2_config.GEN_OPTS['General']['palette_save_settings'] = srctools.bool_as_int(self.var_save_settings.get())
+    def store_configuration(self) -> None:
+        """Save the state of the palette to the config."""
+        BEE2_config.store_conf(PaletteState(self.selected_uuid, self.var_save_settings.get()))
 
     def event_remove(self) -> None:
         """Remove the currently selected palette."""
@@ -329,9 +355,11 @@ class PaletteUI:
 
     def select_palette(self, uuid: UUID) -> None:
         """Select a new palette. This does not update items/settings!"""
-        pal = self.palettes[uuid]
-        self.selected_uuid = uuid
-        BEE2_config.GEN_OPTS['Last_Selected']['palette_uuid'] = uuid.hex
+        if uuid in self.palettes:
+            self.selected_uuid = uuid
+            self.store_configuration()
+        else:
+            LOGGER.warning('Unknown UUID {}!', uuid.hex)
 
     def event_change_group(self) -> None:
         """Change the group of a palette."""
