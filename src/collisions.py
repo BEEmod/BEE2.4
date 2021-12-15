@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
+from typing import Iterable
+
 import attr
 import functools
 
@@ -42,12 +44,14 @@ class BBox:
     max_y: int
     max_z: int
     contents: CollideType
+    tags: frozenset[str]
 
     def __init__(
         self,
         point1: Vec | tuple[int|float, int|float, int|float],
         point2: Vec | tuple[int|float, int|float, int|float],
         contents: CollideType = CollideType.SOLID,
+        tags: Iterable[str] | str = frozenset(),
     ) -> None:
         """Allow constructing from Vec, and flip values to make them min/max."""
         min_x, min_y, min_z = map(round, point1)
@@ -70,6 +74,7 @@ class BBox:
             min_x, min_y, min_z,
             max_x, max_y, max_z,
             contents,
+            frozenset([tags] if isinstance(tags, str) else tags),
         )
 
     @property

@@ -74,6 +74,19 @@ def test_bbox_construction() -> None:
     assert_bbox(plane_z, (80, 90, 40), (110, 250, 40), CollideType.GRATE)
 
 
+def test_bbox_tags() -> None:
+    """Test construction of the tag values."""
+    assert BBox((-10, -10, -10), (+10, +10, +10)).tags == frozenset({})
+    assert BBox(
+        (-10, -10, -10), (+10, +10, +10), CollideType.BRIDGE,
+        'tags',  # Special case, not iterated.
+    ).tags == frozenset({'tags'})
+    assert BBox(
+        (-10, -10, -10), (+10, +10, +10),
+        tags=['a', 'b', 'embed'],
+    ).tags == frozenset({'a', 'b', 'embed'})
+
+
 def test_illegal_bbox() -> None:
     """A line or point segement is not allowed."""
     with pytest.raises(ValueError):
