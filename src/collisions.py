@@ -125,6 +125,14 @@ class BBox:
             return Vec(0.0, 0.0, 1.0)
         return None
 
+    def with_points(
+        self,
+        point1: Vec | tuple[int|float, int|float, int|float],
+        point2: Vec | tuple[int|float, int|float, int|float],
+    ) -> BBox:
+        """Return a new bounding box with the specified points, but this collision and tags."""
+        return BBox(point1, point2, self.contents, self.tags)
+
     def intersect(self, other: BBox) -> BBox | None:
         """Check if another bbox collides with this one.
 
@@ -162,11 +170,7 @@ class BBox:
             return None
 
         try:
-            return BBox(
-                (min_x, min_y, min_z),
-                (max_x, max_y, max_z),
-                comb,
-            )
+            return self.with_points((min_x, min_y, min_z), (max_x, max_y, max_z))
         except ValueError:  # Edge or corner, don't count those.
             return None
 
@@ -237,20 +241,16 @@ class BBox:
         else:
             min_z += m[2, 2] * self.max_z
             max_z += m[2, 2] * self.min_z
-        return BBox(
-            (min_x, min_y, min_z),
-            (max_x, max_y, max_z),
-            self.contents,
-        )
+        return self.with_points((min_x, min_y, min_z), (max_x, max_y, max_z))
 
     def __add__(self, other: Vec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
-        return BBox(self.mins + other, self.maxes + other, self.contents)
+        return self.with_points(self.mins + other, self.maxes + other)
 
     def __sub__(self, other: Vec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""
-        return BBox(self.mins - other, self.maxes - other, self.contents)
+        return self.with_points(self.mins - other, self.maxes - other)
 
     # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.

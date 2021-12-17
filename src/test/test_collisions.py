@@ -17,6 +17,7 @@ def assert_bbox(
     mins: Iterable[int],
     maxes: Iterable[int],
     contents: CollideType,
+    tags: set[str],
     msg='',
 ) -> None:
     """Test the bbox matches the given values."""
@@ -28,6 +29,8 @@ def assert_bbox(
     x2, y2, z2 = maxes
     if bbox.contents is not contents:
         pytest.fail(f'{bbox}.contents != {contents}{msg}')
+    if bbox.tags != tags:
+        pytest.fail(f'{bbox}.tags != {tags!r}{msg}')
     if (
         bbox.min_x != x1 or bbox.min_y != y1 or bbox.min_z != z1 or
         bbox.max_x != x2 or bbox.max_y != y2 or bbox.max_z != z2
@@ -45,37 +48,36 @@ def test_bbox_construction() -> None:
     assert bb.max_y == 5
     assert bb.max_z == 6
     assert bb.contents is CollideType.SOLID
-    assert_bbox(bb, (1, 2, 3), (4, 5, 6), CollideType.SOLID)
+    assert_bbox(bb, (1, 2, 3), (4, 5, 6), CollideType.SOLID, set())
 
     assert_bbox(
         BBox(Vec(4.1, 1.9, 6), Vec(1, 5.1, 2.85), CollideType.FIZZLER | CollideType.ANTLINES),
         (1, 2, 3), (4, 5, 6),
         CollideType.FIZZLER | CollideType.ANTLINES,
+        set(),
     )
     assert_bbox(
-        BBox((-50, 80, -60), (30, -40, 95), CollideType.GLASS),
+        BBox((-50, 80, -60), (30, -40, 95), CollideType.GLASS, 'tag1'),
         (-50, -40, -60), (30, 80, 95),
         CollideType.GLASS,
+        {'tag1', },
     )
 
-    plane_x = BBox([80, 90, 10], [80, 250, 40], CollideType.GRATE)
+    plane_x = BBox((80, 90, 10), (80, 250, 40), CollideType.GRATE)
     assert plane_x.is_plane
     assert plane_x.plane_normal == Vec(1, 0, 0)
-    assert_bbox(plane_x, (80, 90, 10), (80, 250, 40), CollideType.GRATE)
+    assert_bbox(plane_x, (80, 90, 10), (80, 250, 40), CollideType.GRATE, set())
 
-    plane_y = BBox([80, 250, 10], [110, 250, 40], CollideType.GRATE)
+    plane_y = BBox((80, 250, 10), (110, 250, 40), CollideType.GRATE)
     assert plane_y.is_plane
     assert plane_y.plane_normal == Vec(0, 1, 0)
-    assert_bbox(plane_y, (80, 250, 10), (110, 250, 40), CollideType.GRATE)
+    assert_bbox(plane_y, (80, 250, 10), (110, 250, 40), CollideType.GRATE, set())
 
-    plane_z = BBox([80, 250, 40], [110, 90, 40], CollideType.GRATE)
+    plane_z = BBox((80, 250, 40), (110, 90, 40), CollideType.GRATE)
     assert plane_z.is_plane
     assert plane_z.plane_normal == Vec(0, 0, 1)
-    assert_bbox(plane_z, (80, 90, 40), (110, 250, 40), CollideType.GRATE)
+    assert_bbox(plane_z, (80, 90, 40), (110, 250, 40), CollideType.GRATE, set())
 
-
-def test_bbox_tags() -> None:
-    """Test construction of the tag values."""
     assert BBox((-10, -10, -10), (+10, +10, +10)).tags == frozenset({})
     assert BBox(
         (-10, -10, -10), (+10, +10, +10), CollideType.BRIDGE,
@@ -135,8 +137,12 @@ def test_bbox_is_frozen() -> None:
 
     with pytest.raises(AttributeError):
         bb.contents = CollideType.GRATE
+    with pytest.raises(AttributeError):
+        bb.tags = frozenset({'tag1', 'tag2', 'tag3'})
+    with pytest.raises(AttributeError):
+        bb.tags.add('extra')
     # Check all these assignments didn't actually do anything.
-    assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS)
+    assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS, set())
 
 
 def test_bbox_hash() -> None:
@@ -232,7 +238,7 @@ def test_bbox_rotation(
 ) -> None:
     """Test the rotation logic against the slow direct approach."""
     ang = Angle(pitch, yaw, roll)
-    bb_start = BBox((100, 200, 300), (300, 450, 600), CollideType.ANTLINES)
+    bb_start = BBox((100, 200, 300), (300, 450, 600), CollideType.ANTLINES, 'blah')
     # Directly compute, by rotating all the angles,
     points = [
         Vec(x, y, z)
@@ -247,29 +253,29 @@ def test_bbox_rotation(
     bb_min, bb_max = Vec.bbox(
         point @ ang for point in points
     )
-    assert_bbox(result_mat, round(bb_min, 0), round(bb_max, 0), CollideType.ANTLINES)
+    assert_bbox(result_mat, round(bb_min, 0), round(bb_max, 0), CollideType.ANTLINES, {'blah'})
 
 
 def test_bbox_addition() -> None:
     """Test adding to bbox to shift them around."""
-    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES)
+    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES, {'a', 'b'})
     assert_bbox(
         bb + Vec(10, -30, 45),
         (50, 30, 125), (130, 420, 775),
-        CollideType.ANTLINES,
+        CollideType.ANTLINES, {'a', 'b'}
     )
     assert_bbox(
         bb + (10, -30, 45),
         (50, 30, 125), (130, 420, 775),
-        CollideType.ANTLINES,
+        CollideType.ANTLINES, {'a', 'b'}
     )
     assert_bbox(
         bb - Vec(10, 20, -15),
         (30, 40, 95), (110, 430, 745),
-        CollideType.ANTLINES,
+        CollideType.ANTLINES, {'a', 'b'}
     )
     assert_bbox(
         bb - (10, 20, -15),
         (30, 40, 95), (110, 430, 745),
-        CollideType.ANTLINES,
+        CollideType.ANTLINES, {'a', 'b'}
     )
