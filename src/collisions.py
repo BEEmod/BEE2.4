@@ -14,15 +14,18 @@ from srctools.math import Vec, Angle, Matrix, to_matrix
 class CollideType(Flag):
     """Type of collision."""
     NOTHING = 0
-    SOLID = enum_auto()
-    GRATING = enum_auto()
-    GLASS = enum_auto()
+    SOLID = enum_auto()  # Regular solid walls, props etc.
+    DECORATION = enum_auto()  # A location where decoration may not be placed.
+    GRATING = enum_auto()  # Grating, blocks movement, but does not block energy beams.
+    GLASS = enum_auto()   # Only permits lasers through.
     BRIDGE = enum_auto()
     FIZZLER = enum_auto()
     PHYSICS = enum_auto()
-    ANTLINES = enum_auto()
+    ANTLINES = enum_auto()  # Antlines should not pass here.
 
     GRATE = GRATING
+    DECO = DECORATION
+    ANTLINE = ANTLINES
 
     # OR all defined members from above.
     EVERYTHING = functools.reduce(
