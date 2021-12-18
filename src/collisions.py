@@ -8,7 +8,13 @@ from typing import Iterable
 import attr
 import functools
 
+from srctools import Entity, Side, conv_bool, logger
 from srctools.math import Vec, Angle, Matrix, to_matrix
+
+import consts
+
+
+LOGGER = logger.get_logger(__name__)
 
 
 class CollideType(Flag):
@@ -135,6 +141,39 @@ class BBox:
     ) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
         return BBox(point1, point2, self.contents, self.tags)
+
+    @classmethod
+    def from_ent(cls, ent: Entity) -> BBox:
+        """Parse keyvalues on a VMF entity."""
+        mins, maxes = ent.get_bbox()
+        non_skip_faces = [
+            face for solid in ent.solids
+            for face in solid
+            if face.mat != consts.Tools.SKIP
+        ]
+        try:
+            # Only one non-skip face, "flatten" along its plane.
+            face: Side
+            [face] = non_skip_faces
+        except ValueError:
+            pass  # Regular bbox.
+        else:
+            plane_norm = face.normal()
+            plane_point = face.planes[0]
+            for point in [mins, maxes]:
+                # Get the offset from the plane, then subtract to force it onto the plane.
+                point -= plane_norm * Vec.dot(point - plane_point, plane_norm)
+
+        coll = CollideType.NOTHING
+        for key, value in ent.keys.items():
+            if key.casefold().startswith('coll_') and conv_bool(value):
+                coll_name = key[5:].upper()
+                try:
+                    coll |= CollideType[coll_name]
+                except KeyError:
+                    LOGGER.warning('Invalid collide type: "{}"!', key)
+
+        return cls(mins, maxes, coll, ent['tags'].split())
 
     def intersect(self, other: BBox) -> BBox | None:
         """Check if another bbox collides with this one.
