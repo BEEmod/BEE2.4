@@ -147,17 +147,18 @@ def test_bbox_is_frozen() -> None:
 
 def test_bbox_hash() -> None:
     """Test hashability of bboxes."""
-    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.PHYSICS)
+    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'})
     hash(bb)  # Check it can be hashed.
 
     # Check each value changes the hash.
-    assert hash(bb) != hash(BBox((45, 40, 80), (120, 450, 730), CollideType.PHYSICS))
-    assert hash(bb) != hash(BBox((40, 59, 80), (120, 450, 730), CollideType.PHYSICS))
-    assert hash(bb) != hash(BBox((40, 60, 81), (120, 450, 730), CollideType.PHYSICS))
-    assert hash(bb) != hash(BBox((40, 60, 80), (121, 450, 730), CollideType.PHYSICS))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 455, 730), CollideType.PHYSICS))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES))
+    assert hash(bb) != hash(BBox((45, 40, 80), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 59, 80), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 60, 81), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 60, 80), (121, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 455, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES, {'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS, {'tag1', 'tag3'}))
 
 
 def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> tuple3:
