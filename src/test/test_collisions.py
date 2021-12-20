@@ -280,3 +280,44 @@ def test_bbox_addition() -> None:
         (30, 40, 95), (110, 430, 745),
         CollideType.ANTLINES, {'a', 'b'}
     )
+
+
+def test_bbox_parse_block() -> None:
+    """Test parsing of a block-shaped bbox from a VMF."""
+    vmf = VMF()
+    ent = vmf.create_ent(
+        'bee2_collision',
+        coll_deco=1,
+        coll_physics=1,
+        coll_grating=0,
+        tags='standard excellent',
+    )
+    ent.solids.append(vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70)).solid)
+    assert_bbox(
+        BBox.from_ent(ent),
+        (80, 10, 40), (150, 220, 70),
+        CollideType.DECORATION | CollideType.PHYSICS,
+        {'standard', 'excellent'},
+    )
+
+
+@pytest.mark.parametrize('axis, mins, maxes', [
+    ('west',   (80, 10, 40),  (80, 220, 70)),   # -X
+    ('east',   (150, 10, 40), (150, 220, 70)),  # +X
+    ('south',  (80, 10, 40),  (150, 10, 70)),   # -Y
+    ('north',  (80, 220, 40), (150, 220, 70)),  # +Y
+    ('bottom', (80, 10, 40),  (150, 220, 40)),  # -Z
+    ('top',    (80, 10, 70),  (150, 220, 70)),  # +Z
+], ids=['-x', '+x', '-y', '+y', '-z', '+z'])
+def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
+    """Test parsing planar bboxes from a VMF.
+
+    With 5 skip sides, the brush is flattened into the remaining plane.
+    """
+    vmf = VMF()
+    ent = vmf.create_ent('bee2_collision', coll_solid=1)
+    prism = vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70), mat='tools/toolsskip')
+    getattr(prism, axis).mat = 'tools/toolsclip'
+    ent.solids.append(prism.solid)
+
+    assert_bbox(BBox.from_ent(ent), mins, maxes, CollideType.SOLID, set())
