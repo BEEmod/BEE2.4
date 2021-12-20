@@ -127,9 +127,11 @@ class FaceType(Enum):
     CHECK = CHECKERED = '4x4_checkered'
 
 
-class CollType(Flag):
-    """Types of collisions between items.
+class OccuType(Flag):
+    """Types of occupation between items.
 
+    This is named OccuType to distinguish it from the expanded collision types
+    used in the compiler.
     Physics is excluded from the generated piston collisions, if it
     can move out of those locations.
     """
@@ -149,12 +151,12 @@ class CollType(Flag):
     DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> 'CollType':
+    def parse(cls, tok: Tokenizer) -> 'OccuType':
         """Parse the collision type value."""
         coll = cls.NOTHING
         for part in tok.expect(Token.STRING).split():
             try:
-                coll |= COLL_TYPES[part.upper()]
+                coll |= OCCU_TYPES[part.upper()]
             except KeyError:
                 raise tok.error('Unknown collision type "{}"!', part)
         return coll
@@ -167,7 +169,7 @@ class CollType(Flag):
         except KeyError:
             pass
         names = []
-        for name, coll_type in COLL_TYPES.items():
+        for name, coll_type in OCCU_TYPES.items():
             if name != 'COLLIDE_EVERYTHING' and coll_type.value & value:
                 names.append(name)
         names.sort()
@@ -395,8 +397,8 @@ _coord_cache.update({
 })
 # Cache the computed value shapes.
 _coll_type_str: dict[int, str] = {
-    CollType.NOTHING.value: 'COLLIDE_NOTHING',
-    CollType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
+    OccuType.NOTHING.value: 'COLLIDE_NOTHING',
+    OccuType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
 }
 
 ITEM_CLASSES: dict[str, ItemClass] = {
@@ -407,9 +409,9 @@ FACE_TYPES: dict[str, FaceType] = {
     face.value.casefold(): face
     for face in FaceType
 }
-COLL_TYPES: dict[str, CollType] = {
+OCCU_TYPES: dict[str, OccuType] = {
     'COLLIDE_' + coll.name: coll
-    for coll in CollType
+    for coll in OccuType
 }
 
 # The defaults, if this is unset.
@@ -524,8 +526,8 @@ class OccupiedVoxel:
     If normal is not None, this is a side and not a cube.
     If subpos is not None, this is a 32x32 cube and not a full voxel.
     """
-    type: CollType
-    against: CollType | None  # TODO: Don't know what the default is.
+    type: OccuType
+    against: OccuType | None  # TODO: Don't know what the default is.
     pos: Coord
     subpos: Coord | None = None
     normal: Coord | None = None
@@ -1391,8 +1393,8 @@ class Item:
     def _parse_occupied_voxels(self, tok: Tokenizer) -> None:
         """Parse occupied voxel definitions. We add on the volume variant for convienience."""
         for occu_key in tok.block('OccupiedVoxels'):
-            collide_type = CollType.DEFAULT
-            collide_against: CollType | None = None
+            collide_type = OccuType.DEFAULT
+            collide_against: OccuType | None = None
             pos1 = Coord(0, 0, 0)
             pos2: Coord | None = None
             normal: Coord | None = None
@@ -1414,9 +1416,9 @@ class Item:
                 elif folded_key == 'pos2':
                     pos2 = Coord.parse(tok.expect(Token.STRING), tok.error)
                 elif folded_key == 'collidetype':
-                    collide_type = CollType.parse(tok)
+                    collide_type = OccuType.parse(tok)
                 elif folded_key == 'collideagainst':
-                    collide_against = CollType.parse(tok)
+                    collide_against = OccuType.parse(tok)
                 elif folded_key == 'normal':
                     normal = Coord.parse(tok.expect(Token.STRING), tok.error)
                     if normal not in NORMALS:
@@ -1727,7 +1729,7 @@ class Item:
 
     def _export_occupied_voxels(self, f: _TextFile) -> None:
         """Write occupied voxels to a file."""
-        voxel_groups: dict[tuple[Coord, CollType, CollType | None], list[OccupiedVoxel]] = defaultdict(list)
+        voxel_groups: dict[tuple[Coord, OccuType, OccuType | None], list[OccupiedVoxel]] = defaultdict(list)
         voxel: OccupiedVoxel
         voxels: list[OccupiedVoxel]
         for voxel in self.occupy_voxels:
@@ -1737,10 +1739,10 @@ class Item:
         for (pos, typ, against), voxels in voxel_groups.items():
             f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
             f.write(f'\t\t\t\t"Pos" "{pos}"\n')
-            if typ is not CollType.DEFAULT and against is not None:
+            if typ is not OccuType.DEFAULT and against is not None:
                 f.write(f'\t\t\t\t"CollideType"    "{typ}"\n')
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
-            elif typ is not CollType.DEFAULT:
+            elif typ is not OccuType.DEFAULT:
                 f.write(f'\t\t\t\t"CollideType" "{typ}"\n')
             elif against is not None:
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')

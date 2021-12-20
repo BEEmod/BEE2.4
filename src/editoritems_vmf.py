@@ -5,7 +5,7 @@ from typing import Callable, Iterator, Dict
 from srctools import Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity, ValidKVs
 
-from editoritems import Item, ConnSide, CollType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
+from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
 
 
 LOGGER = logger.get_logger(__name__)
@@ -51,15 +51,15 @@ CONN_OFFSET_TO_SKIN = {
 }
 
 
-def parse_colltype(value: str) -> CollType:
-    """Parse a collide type specification from the VMF."""
-    val = CollType.NOTHING
+def parse_occutype(value: str) -> OccuType:
+    """Parse an occupation type specification from the VMF."""
+    val = OccuType.NOTHING
     for word in value.split():
         word = word.upper()
         if word.startswith('COLLIDE_'):
             word = word[8:]
         try:
-            val |= CollType[word]
+            val |= OccuType[word]
         except KeyError:
             LOGGER.warning('Unknown collide type "{}"', word)
     return val
@@ -170,9 +170,9 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
     bbox_min = round(bbox_min, 0)
     bbox_max = round(bbox_max, 0)
 
-    coll_type = parse_colltype(ent['coll_type'])
+    coll_type = parse_occutype(ent['coll_type'])
     if ent['coll_against']:
-        coll_against = parse_colltype(ent['coll_against'])
+        coll_against = parse_occutype(ent['coll_against'])
     else:
         coll_against = None
 
