@@ -14,6 +14,7 @@ from srctools.tokenizer import Tokenizer, Token
 
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, UnknownProp, PROP_TYPES
+from collisions import CollideType, BBox, NonBBoxError
 
 
 LOGGER = logger.get_logger(__name__)
@@ -158,23 +159,40 @@ class OccuType(Flag):
             try:
                 coll |= OCCU_TYPES[part.upper()]
             except KeyError:
-                raise tok.error('Unknown collision type "{}"!', part)
+                raise tok.error('Unknown Occupied Voxels collision type "{}"!', part)
         return coll
 
     def __str__(self) -> str:
         """The string form is each of the names seperated by spaces."""
         value = self.value
         try:
-            return _coll_type_str[value]
+            return _occu_type_str[value]
         except KeyError:
             pass
         names = []
-        for name, coll_type in OCCU_TYPES.items():
-            if name != 'COLLIDE_EVERYTHING' and coll_type.value & value:
+        for name, occu_type in OCCU_TYPES.items():
+            if name != 'COLLIDE_EVERYTHING' and occu_type.value & value:
                 names.append(name)
         names.sort()
-        res = _coll_type_str[value] = ' '.join(names)
+        res = _occu_type_str[value] = ' '.join(names)
         return res
+
+    @property
+    def collision(self) -> CollideType:
+        """Convert to the equivalent collision type."""
+        try:
+            return _occu_to_collide[self]
+        except KeyError:
+            pass
+        result = CollideType.NOTHING
+        occu_type: OccuType
+        for occu_type in OccuType:
+            if occu_type is OccuType.EVERYTHING:
+                continue
+            if occu_type.value & self.value:
+                result |= CollideType[occu_type.name]
+        _occu_to_collide[self] = result
+        return result
 
 
 class Sound(Enum):
@@ -396,10 +414,12 @@ _coord_cache.update({
     for c in NORMALS
 })
 # Cache the computed value shapes.
-_coll_type_str: dict[int, str] = {
+_occu_type_str: dict[int, str] = {
     OccuType.NOTHING.value: 'COLLIDE_NOTHING',
     OccuType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
 }
+# Cached OccuType -> CollideType conversions.
+_occu_to_collide: dict[OccuType, CollideType] = {}
 
 ITEM_CLASSES: dict[str, ItemClass] = {
     cls.id.casefold(): cls
