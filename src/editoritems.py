@@ -888,6 +888,8 @@ class Item:
     embed_faces: list[EmbedFace] = attr.Factory(list)
     # Overlays automatically placed
     overlays: list[Overlay] = attr.Factory(list)
+    # More precise BEE collisions.
+    collisions: list[BBox] = attr.Factory(list)
 
     # Connection types that don't represent item I/O, like for droppers
     # or fizzlers.
@@ -1173,10 +1175,10 @@ class Item:
                     )
 
     def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
-        """Parse the export block of the item definitions. This returns the parsed connections info.
+        """Parse the export block of the item definitions. This returns the parsed connection's info.
 
         Since the standard input/output blocks must be parsed in one group, we collect those in the
-        passed property.
+        passed-in property block for later parsing.
         """
 
         for key in tok.block('Exporting'):
@@ -1197,6 +1199,8 @@ class Item:
                 self._parse_occupied_voxels(tok)
             elif folded_key == 'embeddedvoxels':
                 self._parse_embedded_voxels(tok)
+            elif folded_key == 'collisions':
+                self._parse_collisions(tok)
             elif folded_key == 'embedface':
                 self._parse_embed_faces(tok)
             elif folded_key == 'overlay':
@@ -1539,6 +1543,32 @@ class Item:
                 raise tok.error('No size specified for embedded face!')
             self.embed_faces.append(EmbedFace(center, size, grid))
 
+    def _parse_collisions(self, tok: Tokenizer) -> None:
+        """Parse the enhanced blocks BEE uses for collision."""
+        for group_name in tok.block('Collisions'):
+            tags = frozenset(group_name.casefold().split())
+            for box_name in tok.block(group_name):
+                if box_name.casefold() != 'bbox':
+                    raise tok.error('Unknown collision type "{}"!', box_name)
+                points: list[Vec] = []
+                coll_type = CollideType.NOTHING
+                for bbox_key in tok.block(box_name):
+                    folded_key = bbox_key.casefold()
+                    if folded_key.rstrip('0123456789') == 'pos':
+                        points.append(Vec.from_str(tok.expect(Token.STRING)))
+                    elif folded_key == 'type':
+                        for name in tok.expect(Token.STRING).split():
+                            try:
+                                coll_type |= CollideType[name.upper()]
+                            except KeyError:
+                                raise tok.error('Unknown collision type "{}"', name)
+                if len(points) < 2:
+                    raise tok.error('Two points must be provided for a bounding box!')
+                bb_min, bb_max = Vec.bbox(points)
+                try:
+                    self.collisions.append(BBox(bb_min, bb_max, coll_type, tags))
+                except NonBBoxError as exc:
+                    raise tok.error(str(exc)) from None
     def _parse_overlay(self, tok: Tokenizer) -> None:
         """Parse overlay definitions, which place overlays."""
         center: Vec | None = None
@@ -1812,6 +1842,7 @@ class Item:
             self.occupy_voxels,
             self.embed_voxels,
             self.embed_faces,
+            self.collisions,
             self.overlays,
             self.conn_inputs,
             self.conn_outputs,
@@ -1847,6 +1878,7 @@ class Item:
             self.occupy_voxels,
             self.embed_voxels,
             self.embed_faces,
+            self.collisions,
             self.overlays,
             self.conn_inputs,
             self.conn_outputs,
