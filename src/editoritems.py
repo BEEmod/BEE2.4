@@ -1569,6 +1569,41 @@ class Item:
                     self.collisions.append(BBox(bb_min, bb_max, coll_type, tags))
                 except NonBBoxError as exc:
                     raise tok.error(str(exc)) from None
+
+    def generate_collisions(self) -> None:
+        """If no specific collisions were defined, generate them by looking at OccupiedVoxels."""
+        if self.collisions:
+            return
+        for occu in self.occupy_voxels:
+            pos = Vec(occu.pos) * 128
+            if occu.subpos is None:
+                half_dist = 64.0
+            else:
+                pos += Vec(occu.subpos) * 32 - (48, 48, 48)
+                half_dist = 16.0
+            if occu.normal is None:
+                # Full cube.
+                try:
+                    self.collisions.append(BBox(
+                        pos - half_dist, pos + half_dist,
+                        occu.type.collision, {'generated'},
+                    ))
+                except NonBBoxError as exc:
+                    LOGGER.warning('"{}": Invalid occupied voxel: {}', self.id, exc)
+            else:
+                # Plane.
+                pos -= half_dist * Vec(occu.normal)
+                pos1, pos2 = pos, pos.copy()
+                # Expand in all but the normal axis.
+                for axis, val in enumerate(occu.normal):
+                    if val == 0.0:
+                        pos1[axis] -= half_dist
+                        pos2[axis] += half_dist
+                try:
+                    self.collisions.append(BBox(pos1, pos2, occu.type.collision, {'generated'}))
+                except NonBBoxError as exc:
+                    LOGGER.warning('"{}": Invalid occupied voxel: {}', self.id, exc)
+
     def _parse_overlay(self, tok: Tokenizer) -> None:
         """Parse overlay definitions, which place overlays."""
         center: Vec | None = None
