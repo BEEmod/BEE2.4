@@ -17,6 +17,23 @@ import consts
 LOGGER = logger.get_logger(__name__)
 
 
+@attr.define
+class NonBBoxError(ValueError):
+    """Raised to indicate a bbox is a line or point, not a plane or bounding box."""
+    min_x: int
+    min_y: int
+    min_z: int
+    max_x: int
+    max_y: int
+    max_z: int
+
+    def __str__(self) -> str:
+        return (
+                f'({self.min_x} {self.min_y} {self.min_z}) - '
+                f'({self.max_x} {self.max_y} {self.max_z}) '
+                'is not a full volume or plane!'
+            )
+
 class CollideType(Flag):
     """Type of collision."""
     NOTHING = 0
@@ -73,11 +90,7 @@ class BBox:
             min_z, max_z = max_z, min_z
 
         if (min_x != max_x) + (min_y != max_y) + (min_z != max_z) < 2:
-            raise ValueError(
-                f'({min_x} {min_y} {min_z}) - '
-                f'({max_x} {max_y} {max_z}) '
-                f'is not a full volume or plane!'
-            )
+            raise NonBBoxError(min_x, min_y, min_z, max_x, max_y, max_z)
 
         self.__attrs_init__(
             min_x, min_y, min_z,
