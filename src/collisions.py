@@ -57,7 +57,7 @@ class CollideType(Flag):
     )
 
 
-@attr.frozen
+@attr.frozen(eq=False)
 class BBox:
     """An axis aligned volume for collision.
 
@@ -70,6 +70,7 @@ class BBox:
     max_y: int
     max_z: int
     contents: CollideType
+    name: str  # Item name, or empty for definitions.
     tags: frozenset[str]
 
     def __init__(
@@ -78,6 +79,7 @@ class BBox:
         point2: Vec | tuple[int|float, int|float, int|float],
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
+        name: str = '',
     ) -> None:
         """Allow constructing from Vec, and flip values to make them min/max."""
         min_x, min_y, min_z = map(round, point1)
@@ -96,6 +98,7 @@ class BBox:
             min_x, min_y, min_z,
             max_x, max_y, max_z,
             contents,
+            name,
             frozenset([tags] if isinstance(tags, str) else tags),
         )
 
@@ -153,7 +156,19 @@ class BBox:
         point2: Vec | tuple[int|float, int|float, int|float],
     ) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
-        return BBox(point1, point2, self.contents, self.tags)
+        return BBox(point1, point2, self.contents, self.tags, self.name)
+
+    def with_name(self, name: str) -> BBox:
+        """Return a new bounding box with a different item name."""
+        bbox = BBox.__new__(BBox)
+        bbox.__attrs_init__(
+            self.min_x, self.min_y, self.min_z,
+            self.max_x, self.max_y, self.max_z,
+            self.contents,
+            name,
+            self.tags,
+        )
+        return bbox
 
     @classmethod
     def from_ent(cls, ent: Entity) -> BBox:
