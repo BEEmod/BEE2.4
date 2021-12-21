@@ -283,7 +283,7 @@ class Template:
 
     def visgrouped(
         self,
-        visgroups: Union[str, Iterable[str]]=(),
+        visgroups: str | Iterable[str]=(),
     ) -> tuple[list[Solid], list[Solid], list[Entity]]:
         """Given some visgroups, return the matching data.
 
@@ -313,6 +313,14 @@ class Template:
             overlays.extend(over)
 
         return world_brushes, detail_brushes, overlays
+
+    def visgrouped_solids(self, visgroups: str | Iterable[str]=()) -> list[Solid]:
+        """Given some visgroups, return the matching brushes.
+
+        This ignores the world/detail brush distinction.
+        """
+        world, detail, _ = self.visgrouped(visgroups)
+        return world + detail
 
 
 class ScalingTemplate(Mapping[
@@ -806,15 +814,9 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
     except KeyError:
         pass
     temp = get_template(temp_name)
-
-    world, detail, over = temp.visgrouped(over_names)
-
-    if detail:
-        world += detail
-
     uvs = {}
 
-    for brush in world:
+    for brush in temp.visgrouped_solids(over_names):
         for side in brush.sides:
             uvs[side.normal().as_tuple()] = (
                 side.mat,

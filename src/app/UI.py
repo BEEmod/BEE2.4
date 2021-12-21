@@ -91,6 +91,10 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
+# Piles of global widgets, should be made local...
+frmScroll: ttk.Frame  # Frame holding the item list.
+pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
+
 
 class Item:
     """Represents an item that can appear on the list."""

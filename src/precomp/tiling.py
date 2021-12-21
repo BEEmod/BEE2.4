@@ -20,6 +20,8 @@ from srctools import Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
+
+from plane import Plane
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from precomp.texturing import TileSize, Portalable
 from . import (
@@ -47,31 +49,26 @@ TILE_TEMP: dict[
     dict[Union[str, tuple[int, int, int, bool]], Side]
 ] = {}
 
-NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
-# Specific angles, these ensure the textures align to world once done.
+NORMALS = [Vec(x=+1), Vec(x=-1), Vec(y=+1), Vec(y=-1), Vec(z=+1), Vec(z=-1)]
+# Specific corresponding, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
-NORM_ANGLES = {
-    Vec(x=1).as_tuple(): Matrix.from_angle(Angle(0, 0, 0)),
-    Vec(x=-1).as_tuple(): Matrix.from_angle(Angle(0, 180, 0)),
-    Vec(y=1).as_tuple(): Matrix.from_angle(Angle(0, 90, 0)),
-    Vec(y=-1).as_tuple(): Matrix.from_angle(Angle(0, 270, 0)),
-    Vec(z=1).as_tuple(): Matrix.from_angle(Angle(270, 270,  0)),
-    Vec(z=-1).as_tuple(): Matrix.from_angle(Angle(90, 90, 0)),
-}
-
-NORM_NAMES = {
-    Vec(x=1).as_tuple(): 'east',
-    Vec(x=-1).as_tuple(): 'west',
-    Vec(y=1).as_tuple(): 'north',
-    Vec(y=-1).as_tuple(): 'South',
-    Vec(z=1).as_tuple(): 'up',
-    Vec(z=-1).as_tuple(): 'down',
-}
+NORMAL_ANGLES = [
+    Matrix.from_angle(0.0, 0.0, 0.0),
+    Matrix.from_angle(0.0, 180, 0.0),
+    Matrix.from_angle(0.0, 90., 0.0),
+    Matrix.from_angle(0.0, 270, 0.0),
+    Matrix.from_angle(270, 270, 0.0),
+    Matrix.from_angle(90., 90., 0.0),
+]
+NORMAL_NAMES = dict(zip(
+    map(Vec.as_tuple, NORMALS),
+    ['east', 'west', 'north', 'south', 'up', 'down'],
+))
 # All the tiledefs in the map.
 # Maps a block center, normal -> the tiledef on the side of that block.
 TILES: dict[tuple[tuple[float, float, float], tuple[float, float, float]], TileDef] = {}
 
-# Special key for Tile.SubTile - This is set to 'u' or 'v' to
+# Special key for TileDef.subtile - this is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
 # This isn't a U,V tuple, but pretend it is so we can use it as a key.
 SUBTILE_FIZZ_KEY: tuple[int, int] = cast(Tuple[int, int], object())
@@ -865,7 +862,7 @@ class TileDef:
     def __repr__(self) -> str:
         return '<{} TileDef @ {} of {}>'.format(
             self.base_type.name,
-            NORM_NAMES.get(self.normal.as_tuple(), self.normal),
+            NORMAL_NAMES.get(self.normal.as_tuple(), self.normal),
             self.pos,
         )
 
@@ -1625,21 +1622,19 @@ def gen_tile_temp() -> None:
             options.get(str, '_tiling_template_'))
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
-            world, detail, over = template.visgrouped(name)
-            [categories[key]] = world
+            [categories[key]] = template.visgrouped_solids(name)
     except (KeyError, ValueError):
         raise Exception('Bad Tiling Template!')
 
-    for norm_tup, angles in NORM_ANGLES.items():
-        norm = Vec(norm_tup)
+    for norm, orient in zip(NORMALS, NORMAL_ANGLES):
         axis_norm = norm.axis()
 
         temp_part: dict[Union[str, tuple[int, int, int, bool]], Side] = {}
-        TILE_TEMP[norm_tup] = temp_part
+        TILE_TEMP[norm.as_tuple()] = temp_part
 
         for (thickness, bevel), temp in categories.items():
             brush = temp.copy()
-            brush.localise(Vec(), angles)
+            brush.localise(Vec(), orient)
 
             for face in brush:
                 if face.mat == consts.Special.BACKPANELS:
@@ -1992,11 +1987,11 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
 
 
 def bevel_split(
-    rect_points: dict[tuple[int, int], bool],
-    tile_pos: dict[tuple[int, int], TileDef],
+    rect_points: Plane[bool],
+    tile_pos: Plane[TileDef],
 ) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
-    for min_u, min_v, max_u, max_v in grid_optim.optimise(rect_points):
+    for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
         u_range = range(min_u, max_u + 1)
         v_range = range(min_v, max_v + 1)
 
@@ -2078,9 +2073,9 @@ def generate_brushes(vmf: VMF) -> None:
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
         # (type, is_antigel, texture) -> (u, v) -> present/absent
-        grid_pos: dict[tuple[TileType, bool, str], dict[tuple[int, int], bool]] = defaultdict(dict)
+        grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
 
-        tile_pos: dict[tuple[int, int], TileDef] = {}
+        tile_pos: Plane[TileDef] = Plane()
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
@@ -2317,7 +2312,7 @@ def generate_goo(vmf: VMF) -> None:
     [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])
 
     for ((min_z, max_z), grid) in goo_pos.items():
-        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+        for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):
             bbox_min = Vec(min_x, min_y, min_z) * 128
             bbox_max = Vec(max_x, max_y, max_z) * 128
             prism = vmf.make_prism(
@@ -2341,7 +2336,7 @@ def generate_goo(vmf: VMF) -> None:
     bbox_min = Vec()
 
     for (z, grid) in trig_pos.items():
-        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+        for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):
             bbox_min = Vec(min_x, min_y, z) * 128
             bbox_max = Vec(max_x, max_y, z) * 128
             trig_hurt.solids.append(vmf.make_prism(

@@ -1805,11 +1805,14 @@ def main() -> None:
     )
     game_dir = ''
 
+    skip_vbsp = False
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
         if a == '-force_peti' or a == '-force_hammer':
             new_args[i] = ''
             old_args[i] = ''
+        elif a == '-skip_vbsp':  # Debug command, for skipping.
+            skip_vbsp = True
         # Strip the entity limit, and the following number
         elif a == '-entity_limit':
             new_args[i] = ''
@@ -1907,11 +1910,12 @@ def main() -> None:
         vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
 
         save(vmf, new_path)
-        run_vbsp(
-            vbsp_args=new_args,
-            path=path,
-            new_path=new_path,
-        )
+        if not skip_vbsp:
+            run_vbsp(
+                vbsp_args=new_args,
+                path=path,
+                new_path=new_path,
+            )
 
     LOGGER.info("BEE2 VBSP hook finished!")
 
