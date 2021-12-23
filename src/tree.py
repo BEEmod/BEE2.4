@@ -34,7 +34,10 @@ class RTree(Generic[ValueT]):
             ValueHolder[ValueT]
         ] = {}
 
-    def __iter__(self) -> Tuple[Vec, Vec, ValueT]:
+    def __len__(self) -> int:
+        return sum(len(holder.values) for holder in self._by_id.values())
+
+    def __iter__(self) -> Iterator[Tuple[Vec, Vec, ValueT]]:
         """Iterating over the tree returns each bbox and value associated with it."""
         for holder in self._by_id.values():
             mins = Vec(holder.min_x, holder.min_y, holder.min_z)
