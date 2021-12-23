@@ -20,6 +20,7 @@ from BEE2_config import ConfigFile
 import utils
 import srctools.run
 import srctools.logger
+from precomp.collisions import Collisions
 from precomp import (
     instance_traits,
     brushLoc,
@@ -1856,7 +1857,11 @@ def main() -> None:
         ant_floor, ant_wall, id_to_item = load_settings()
 
         vmf = load_map(path)
-        instance_traits.set_traits(vmf, id_to_item)
+        coll = Collisions()
+        instance_traits.set_traits(vmf, id_to_item, coll)
+
+        if utils.DEV_MODE:
+            coll.dump(vmf)
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
