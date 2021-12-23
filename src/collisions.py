@@ -57,7 +57,7 @@ class CollideType(Flag):
     )
 
 
-@attr.frozen(eq=False)
+@attr.frozen
 class BBox:
     """An axis aligned volume for collision.
 
