@@ -1,11 +1,10 @@
 """Adds various traits to instances, based on item classes."""
-from typing import List, MutableMapping, Optional, Callable, Dict, Set
+from typing import List, MutableMapping, Optional, Dict, Set
 from weakref import WeakKeyDictionary
 
 import attr
 
-from srctools import Entity
-from srctools import VMF
+from srctools import Entity, VMF
 import srctools.logger
 
 from precomp.instanceLocs import ITEM_FOR_FILE
@@ -144,27 +143,8 @@ class TraitInfo:
     item_id: Optional[str] = None
     traits: Set[str] = attr.ib(factory=set)
 
-# Special functions to call on an instance for their item ID (str)
-# or class (enum).
-# Arguments are the instance, trait set, item ID and subtype index.
-TRAIT_ID_FUNC: Dict[str, Callable[[Entity, Set[str], str, int], None]] = {}
-TRAIT_CLS_FUNC: Dict[ItemClass, Callable[[Entity, Set[str], str, int], None]] = {}
 # Maps entities to their traits.
 ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
-
-
-def trait_id_func(target: str):
-    def deco(func):
-        TRAIT_ID_FUNC[target.casefold()] = func
-        return func
-    return deco
-
-
-def trait_cls_func(target: ItemClass):
-    def deco(func):
-        TRAIT_CLS_FUNC[target] = func
-        return func
-    return deco
 
 
 def get(inst: Entity) -> Set[str]:
@@ -234,18 +214,3 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
             info.traits |= CLASS_ATTRS[item_class][item_ind]
         except (IndexError, KeyError):
             pass
-
-        try:
-            func = TRAIT_ID_FUNC[item_id.casefold()]
-        except KeyError:
-            pass
-        else:
-            func(inst, info.traits, item_id, item_ind)
-        try:
-            func = TRAIT_CLS_FUNC[item_class]
-        except KeyError:
-            pass
-        else:
-            func(inst, info.traits, item_id, item_ind)
-
-    LOGGER.info('Traits: {}', dict(ENT_TO_TRAITS.items()))
