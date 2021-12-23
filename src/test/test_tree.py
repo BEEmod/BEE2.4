@@ -4,6 +4,39 @@ from tree import RTree
 from random import Random
 
 
+def test_duplicate_insertion() -> None:
+    """Test inserting values with the same bbox."""
+    tree = RTree()
+    tree.insert(Vec(10, 20, 30), Vec(40, 50, 60), 'value1')
+    tree.insert(Vec(50, 20, 30), Vec(80, 65, 60), 'another')
+    tree.insert(Vec(10, 20, 30), Vec(40, 50, 60), 'value2')
+    assert len(tree) == 3
+    # Iterating produces both values.
+    assert {
+        (*mins, *maxes, val)
+        for mins, maxes, val in tree
+    } == {
+        (10, 20, 30, 40, 50, 60, 'value1'),
+        (50, 20, 30, 80, 65, 60, 'another'),
+        (10, 20, 30, 40, 50, 60, 'value2'),
+    }
+    # Check all vecs are unique.
+    vecs = [
+        vec for mins, maxes, _ in tree
+        for vec in [mins, maxes]
+    ]
+    assert len(set(map(id, vecs))) == 6, list(tree)
+    # Check we can delete one.
+    tree.remove(Vec(10, 20, 30), Vec(40, 50, 60), 'value1')
+    assert {
+        (*mins, *maxes, val)
+        for mins, maxes, val in tree
+    } == {
+        (50, 20, 30, 80, 65, 60, 'another'),
+        (10, 20, 30, 40, 50, 60, 'value2'),
+    }
+
+
 def test_bbox() -> None:
     """Test the bounding box behaviour against a brute-force loop."""
     rand = Random(1234)  # Ensure reproducibility.
