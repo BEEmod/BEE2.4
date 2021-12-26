@@ -34,6 +34,7 @@ class NonBBoxError(ValueError):
                 'is not a full volume or plane!'
             )
 
+
 class CollideType(Flag):
     """Type of collision."""
     NOTHING = 0
@@ -55,6 +56,17 @@ class CollideType(Flag):
         operator.or_,
         filter(lambda x: isinstance(x, int), vars().values()),
     )
+
+    @classmethod
+    def parse(cls, text: str) -> CollideType:
+        """Parse from a space-separated string."""
+        coll = cls.NOTHING
+        for word in text.split():
+            try:
+                coll |= cls[word.upper()]
+            except KeyError:
+                raise ValueError(f'Unknown collide type "{word}"!')
+        return coll
 
 
 @attr.frozen
