@@ -44,12 +44,14 @@ class CollideType(Flag):
     GLASS = enum_auto()   # Only permits lasers through.
     BRIDGE = enum_auto()
     FIZZLER = enum_auto()
-    PHYSICS = enum_auto()
+    TEMPORARY = enum_auto()  # Collision is only sometimes present here.
     ANTLINES = enum_auto()  # Antlines should not pass here.
 
     GRATE = GRATING
     DECO = DECORATION
     ANTLINE = ANTLINES
+    # Aliases matching editoritems COLLIDE_ definitions.
+    PHYSICS = SOLID | TEMPORARY
 
     # OR all defined members from above.
     EVERYTHING = functools.reduce(
