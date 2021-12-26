@@ -1862,7 +1862,7 @@ def main() -> None:
         instance_traits.set_traits(vmf, id_to_item, coll)
 
         if utils.DEV_MODE:
-            coll.dump(vmf)
+            coll.dump(vmf, 'coll_pre')
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1903,6 +1903,9 @@ def main() -> None:
         change_overlays(vmf)
         barriers.make_barriers(vmf)
         fix_worldspawn(vmf)
+
+        if utils.DEV_MODE:
+            coll.dump(vmf, 'coll_post')
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:
