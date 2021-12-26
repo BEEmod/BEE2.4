@@ -25,8 +25,9 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
           then added to the position.
     - Remove: Remove bounding boxes from this item with the tags specified in the value.
     - TrackPlat: Add a bounding box across the whole of a track platform's movement volume. This
-        takes the same parameters as BBox, except that the left and right sides (X) are positioned
-        relative to those ends of the track.
+        takes the same parameters as BBox, but the orientation is relative to the tracks not the
+        platform. The volume is placed relative to each track end instance, then those are combined
+        so it "sweeps" from the first to the last.
     """
     name = inst['targetname']
     LOGGER.info('"{}":{} -> coll {}', name, inst['file'], coll.collisions_for_item(inst['targetname']))
@@ -34,7 +35,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
     orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
     # Offset from platform of the track start and end.
-    track_center = origin.copy()
+    track_start = origin.copy()
     track_dir = Vec(1, 0, 0)
     track_dist = 0.0
     track_orient = orient.copy()
@@ -62,9 +63,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
         track_dist = conv_float(inst.fixup.float('travel_distance'))
         # Oscillating might move the midpoint of the track.
         track_pos = inst.fixup.float('starting_position', 0.0)
-        track_center += (0.5 - track_pos) * track_dist * world_track_dir
-        inst.map.create_ent('info_target', origin=track_center)
-
+        track_start -= track_pos * track_dist * world_track_dir
     for prop in res:
         if prop.name == 'remove':
             tags = frozenset(map(str.casefold, inst.fixup.substitute(prop.value).split()))
@@ -78,14 +77,14 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
             content = CollideType.parse(inst.fixup.substitute(prop['type']))
 
             if prop.name == 'trackplat':
-                for pos in [pos1, pos2]:
-                    dot = Vec.dot(pos, track_dir)
-                    if dot > 0.01:
-                        pos += (track_dist / 2) * track_dir
-                    elif dot < -0.01:
-                        pos -= (track_dist / 2) * track_dir
+                # Sweep the bounding box through the movement, to compute the full size.
+                sweep = track_dir * track_dist
+                pos1, pos2 = Vec.bbox(
+                    pos1, pos2,
+                    pos1 + sweep, pos2 + sweep,
+                )
                 rotation = track_orient
-                box_pos = track_center
+                box_pos = track_start
             else:
                 rotation = orient
                 box_pos = origin
