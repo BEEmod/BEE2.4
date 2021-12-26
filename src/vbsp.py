@@ -221,11 +221,12 @@ def load_map(map_path: str) -> VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF):
+def add_voice(vmf: VMF, coll: Collisions):
     """Add voice lines to the map."""
     voice_line.add_voice(
         voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
+        coll=coll,
         vmf=vmf,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
@@ -1894,7 +1895,7 @@ def main() -> None:
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf)
+        conditions.check_all(vmf, coll)
         add_extra_ents(vmf, GAME_MODE)
 
         tiling.generate_brushes(vmf)
