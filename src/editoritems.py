@@ -890,6 +890,9 @@ class Item:
     overlays: list[Overlay] = attr.Factory(list)
     # More precise BEE collisions.
     collisions: list[BBox] = attr.Factory(list)
+    # Record if collisions were set in editoritems, so an empty block can be used
+    # to opt out of inheriting from occupied voxels.
+    _has_collisions_block: bool = attr.ib(init=False, default=False, repr=False)
 
     # Connection types that don't represent item I/O, like for droppers
     # or fizzlers.
@@ -1545,6 +1548,7 @@ class Item:
 
     def _parse_collisions(self, tok: Tokenizer) -> None:
         """Parse the enhanced blocks BEE uses for collision."""
+        self._has_collisions_block = True
         for group_name in tok.block('Collisions'):
             tags = frozenset(group_name.casefold().split())
             for box_name in tok.block(group_name):
@@ -1572,7 +1576,8 @@ class Item:
 
     def generate_collisions(self) -> None:
         """If no specific collisions were defined, generate them by looking at OccupiedVoxels."""
-        if self.collisions:
+        # Explicitly specified, don't generate.
+        if self.collisions or self._has_collisions_block:
             return
         for occu in self.occupy_voxels:
             pos = Vec(occu.pos) * 128
