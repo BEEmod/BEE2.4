@@ -619,12 +619,14 @@ def add_screenshot_logic(vmf: VMF) -> None:
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
     ).upper() == 'AUTO' and IS_PREVIEW:
+        SSHOT_FNAME = 'instances/bee2/logic/screenshot_logic.vmf'
         vmf.create_ent(
             classname='func_instance',
-            file='instances/bee2/logic/screenshot_logic.vmf',
+            file=SSHOT_FNAME,
             origin=options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
+        conditions.ALL_INST.add(SSHOT_FNAME)
         LOGGER.info('Added Screenshot Logic')
 
 
