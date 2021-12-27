@@ -94,7 +94,6 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
             else:
                 rotation = orient
                 box_pos = origin
-            vmf.create_ent('info_target', origin=box_pos, angles=rotation.to_angle()).comments = f'{track_dist} @ {track_dir}'
             for subprop in prop:
                 if subprop.name not in ('off1', 'off2'):
                     continue
