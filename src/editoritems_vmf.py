@@ -1,10 +1,11 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
 
-from typing import Callable, Iterator, Dict
+from typing import Callable
 from srctools import Matrix, Angle, Vec, logger, conv_int
-from srctools.vmf import VMF, Entity, ValidKVs
+from srctools.vmf import VMF, Entity
 
+from collisions import BBox
 from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
 
 
@@ -18,12 +19,13 @@ def load(item: Item, vmf: VMF) -> None:
     with logger.context(item.id):
         for ent in vmf.entities:
             classname = ent['classname'].casefold()
-            if not classname.startswith('bee2_editor_') or ent.hidden:
+            if ent.hidden:
                 continue
             try:
                 func = LOAD_FUNCS[classname]
             except KeyError:
-                LOGGER.warning('Unknown item configuration entity "{}"!', classname)
+                if classname.startswith('bee2_editor_'):
+                    LOGGER.warning('Unknown item configuration entity "{}"!', classname)
             else:
                 func(item, ent)
 
@@ -65,7 +67,7 @@ def parse_occutype(value: str) -> OccuType:
     return val
 
 
-def load_connectionpoint(item: Item, ent: Entity) -> None:
+def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
     """Allow more conveniently defining connectionpoints."""
     origin = Vec.from_str(ent['origin'])
     angles = Angle.from_str(ent['angles'])
@@ -107,7 +109,7 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
     ))
 
 
-def save_connectionpoint(item: Item, vmf: VMF) -> None:
+def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
     """Write connectionpoints to a VMF."""
     for side, points in item.antline_points.items():
         yaw = side.yaw
@@ -134,7 +136,7 @@ def save_connectionpoint(item: Item, vmf: VMF) -> None:
             )
 
 
-def load_embeddedvoxel(item: Item, ent: Entity) -> None:
+def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
     """Parse embed definitions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
@@ -153,7 +155,7 @@ def load_embeddedvoxel(item: Item, ent: Entity) -> None:
     )))
 
 
-def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
+def save_editor_embeddedvoxel(item: Item, vmf: VMF) -> None:
     """Save embedded voxel volumes."""
     for bbox_min, bbox_max in bounding_boxes(item.embed_voxels):
         vmf.create_ent('bee2_editor_embeddedvoxel').solids.append(vmf.make_prism(
@@ -164,7 +166,7 @@ def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
-def load_occupiedvoxel(item: Item, ent: Entity) -> None:
+def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
     """Parse voxel collisions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
@@ -241,7 +243,7 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
     )
 
 
-def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
+def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
     """Save occupied voxel volumes."""
     for voxel in item.occupy_voxels:
         pos = Vec(voxel.pos) * 128
@@ -281,8 +283,19 @@ def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
+def load_collision_bbox(item: Item, ent: Entity) -> None:
+    """Load precise BEE collisions."""
+    item.collisions.append(BBox.from_ent(ent))
+
+
+def save_collision_bbox(item: Item, vmf: VMF) -> None:
+    """Export precise BEE collisions."""
+    for coll in item.collisions:
+        coll.as_ent(vmf)
+
+
 LOAD_FUNCS.update({
-    'bee2_editor' + name[4:]: func
+    'bee2_' + name[4:]: func
     for name, func in globals().items()
     if name.startswith('load_')
 })
