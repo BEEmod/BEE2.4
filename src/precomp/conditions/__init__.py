@@ -422,6 +422,10 @@ class CondCall(Generic[CallResultT]):
     This should be called to execute it.
     """
     __slots__ = ['func', 'group', '_cback', '_setup_data']
+    _cback: Callable[
+        [srctools.VMF, collisions.Collisions, Entity | None, Property],
+        CallResultT | Callable[[Entity], CallResultT],
+    ]
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
 
     def __init__(
@@ -631,10 +635,7 @@ def check_all(vmf: VMF) -> None:
                     break
                 except Exception:
                     # Print the source of the condition if if fails...
-                    LOGGER.exception(
-                        'Error in {}:',
-                        condition.source or 'condition',
-                    )
+                    LOGGER.exception('Error in {}:', condition.source or 'condition')
                     # Exit directly, so we don't print it again in the exception
                     # handler
                     utils.quit_app(1)
@@ -649,11 +650,13 @@ def check_all(vmf: VMF) -> None:
             for inst in vmf.by_class['func_instance']:
                 if inst['file'].casefold() not in ALL_INST:
                     LOGGER.warning(
-                        'Condition "{}" '
-                        "doesn't add to in all_inst: {}!",
+                        'Condition "{}" doesn\'t add "{}" to all_inst!',
                         condition.source,
                         inst['file'],
                     )
+                    extra.add(inst['file'].casefold())
+            # Suppress errors for future conditions.
+            ALL_INST.update(extra)
 
     LOGGER.info('---------------------')
     LOGGER.info(
