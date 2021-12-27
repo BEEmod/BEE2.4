@@ -8,7 +8,7 @@ from typing import Iterable
 import attr
 import functools
 
-from srctools import Entity, Side, conv_bool, logger
+from srctools import Entity, Side, VMF, conv_bool, logger
 from srctools.math import Vec, Angle, Matrix, to_matrix
 
 import consts
@@ -216,6 +216,35 @@ class BBox:
                     LOGGER.warning('Invalid collide type: "{}"!', key)
 
         return cls(mins, maxes, coll, ent['tags'].split())
+
+    def as_ent(self, vmf: VMF) -> Entity:
+        """Convert back into an entity."""
+        # If a plane, then we have to produce a valid brush - subtract in the negative dir, put skip
+        # on all other sides.
+        norm = self.plane_normal
+        if norm is not None:
+            prism = vmf.make_prism(self.mins - norm, self.maxes, consts.Tools.SKIP)
+            if norm == (1, 0, 0):
+                prism.east.mat = consts.Tools.CLIP
+            elif norm == (0, 1, 0):
+                prism.north.mat = consts.Tools.CLIP
+            elif norm == (0, 0, 1):
+                prism.top.mat = consts.Tools.CLIP
+            else:
+                raise AssertionError(norm)
+        else:
+            prism = vmf.make_prism(self.mins, self.maxes, consts.Tools.CLIP)
+
+        ent = vmf.create_ent(
+            'bee2_collision_bbox',
+            tags=' '.join(sorted(self.tags)),
+            item_name=self.name,
+        )
+        for coll in CollideType:
+            if coll is not CollideType.EVERYTHING:
+                ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
+        ent.solids.append(prism.solid)
+        return ent
 
     def intersect(self, other: BBox) -> BBox | None:
         """Check if another bbox collides with this one.

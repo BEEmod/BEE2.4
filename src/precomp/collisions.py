@@ -59,25 +59,8 @@ class Collisions:
         for name, bb_list in self._by_name.items():
             group = EntityGroup(vmf, shown=False)
             for bbox in bb_list:
-                # If a plane, then we have to thicken in that direction to make it a valid brush.
-                mins = bbox.mins
-                maxes = bbox.maxes
-                if bbox.is_plane:
-                    for axis, norm in enumerate(bbox.plane_normal):
-                        if norm != 0.0:
-                            mins[axis] -= 0.5
-                            maxes[axis] += 0.5
-
-                brush = vmf.make_prism(mins, maxes, 'tools/toolsclip').solid
-                ent = vmf.create_ent(
-                    'bee2_collisions',
-                    item_id=name,
-                    tags=' '.join(sorted(bbox.tags)),
-                )
-                for coll in CollideType:
-                    if coll is not CollideType.EVERYTHING:
-                        ent[f'coll_{coll.name.lower()}'] = (coll & bbox.contents) is not CollideType.NOTHING
-                ent.solids.append(brush)
+                ent = bbox.as_ent(vmf)
+                ent['item_id'] = name
                 ent.visgroup_ids.add(visgroup.id)
                 ent.groups.add(group.id)
                 ent.vis_shown = False
