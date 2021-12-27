@@ -163,8 +163,7 @@ def test_illegal_positions() -> None:
     with pytest.raises(KeyError):
         _ = plane[2, 8]
 
-    with pytest.raises(KeyError):
-        _ = plane.get((2, 8))
+    assert plane.get((2, 8)) is None
     assert plane.get((2, 8), 45) == 45
 
     with pytest.raises(KeyError):
