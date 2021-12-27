@@ -170,10 +170,10 @@
 	[
 	channel(choices) : "Channel" : "BASE" : "The type of music this contains." = 
 		[	
-    	"base"      : "Main track"
+		"base"      : "Main track"
 		"tbeam"     : "Excursion Funnel"
-    	"BounceGel" : "Repulsion Gel"
-    	"SpeedGel"  : "Propulsion Gel"
+		"BounceGel" : "Repulsion Gel"
+		"SpeedGel"  : "Propulsion Gel"
 		]
 	sync(boolean) : "Sync" : 0 : "For funnels only, synchronise to the base track."
 
