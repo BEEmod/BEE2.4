@@ -286,7 +286,7 @@ def test_bbox_parse_block() -> None:
     """Test parsing of a block-shaped bbox from a VMF."""
     vmf = VMF()
     ent = vmf.create_ent(
-        'bee2_collision',
+        'bee2_collision_bbox',
         coll_deco=1,
         coll_physics=1,
         coll_grating=0,
@@ -315,7 +315,7 @@ def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     With 5 skip sides, the brush is flattened into the remaining plane.
     """
     vmf = VMF()
-    ent = vmf.create_ent('bee2_collision', coll_solid=1)
+    ent = vmf.create_ent('bee2_collision_bbox', coll_solid=1)
     prism = vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70), mat='tools/toolsskip')
     getattr(prism, axis).mat = 'tools/toolsclip'
     ent.solids.append(prism.solid)
