@@ -1,12 +1,12 @@
 """Handles generating Piston Platforms with specific logic."""
-from typing import Dict, List, Optional
+from typing import Optional
 
 from precomp import packing, template_brush, conditions
 import srctools.logger
 from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
-from srctools import Entity, VMF, Property, Output, Vec, Angle
+from srctools import Entity, Matrix, VMF, Property, Output, Vec, Angle
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -53,9 +53,9 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
                 inst_filenames[name] = ''
                 continue
         elif item_id is not None:
-            lookup = '<{}:bee2_pist_{}>'.format(item_id, name)
+            lookup = f'<{item_id}:bee2_pist_{name}>'
         else:
-            raise ValueError('No "{}" specified!'.format(name))
+            raise ValueError(f'No "{name}" specified!')
         inst_filenames[name] = resolve_single(lookup, error=True)
 
     template = template_brush.get_template(res['template'])
@@ -69,7 +69,6 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
 
     has_dn_fizz = res.bool('has_dn_fizz')
     automatic_var = res['auto_var', '']
-    color_var = res['color_var', '']
     source_ent = res['source_ent', '']
     snd_start = res['snd_start', '']
     snd_loop = res['snd_loop', '']
@@ -132,17 +131,17 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
             st_pos, end_pos = min_pos, max_pos
 
         script_ent.add_out(
-            Output('OnUser1', '!self', 'RunScriptCode', 'moveto({})'.format(st_pos)),
-            Output('OnUser2', '!self', 'RunScriptCode', 'moveto({})'.format(end_pos)),
+            Output('OnUser1', '!self', 'RunScriptCode', f'moveto({st_pos})'),
+            Output('OnUser2', '!self', 'RunScriptCode', f'moveto({end_pos})'),
         )
 
         origin = Vec.from_str(inst['origin'])
-        angles = Angle.from_str(inst['angles'])
-        off = Vec(z=128) @ angles
+        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        off = orient.up(128)
         move_ang = off.to_angle()
 
         # Index -> func_movelinear.
-        pistons: Dict[int, Entity] = {}
+        pistons: dict[int, Entity] = {}
 
         static_ent = vmf.create_ent('func_brush', origin=origin)
 
@@ -161,7 +160,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
                 if pist_ind > max_pos:
                     # It's 'after' the highest position, so it never extends.
                     # So simplify by merging those all.
-                    # That's before this so it'll have to exist.
+                    # The max pos was evaluated earlier, so this must be set.
                     temp_targ = pistons[max_pos]
                     if start_up:
                         pist_ent['origin'] = brush_pos = origin + max_pos * off
@@ -180,7 +179,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
 
                     pistons[pist_ind] = temp_targ = vmf.create_ent(
                         'func_movelinear',
-                        targetname=conditions.local_name(pist_ent, 'pist' + str(pist_ind)),
+                        targetname=conditions.local_name(pist_ent, f'pist{pist_ind}'),
                         origin=brush_pos - off,
                         movedir=move_ang,
                         startposition=start_up,
@@ -189,7 +188,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
                     )
                     if pist_ind - 1 in pistons:
                         pistons[pist_ind]['parentname'] = conditions.local_name(
-                            pist_ent, 'pist' + str(pist_ind - 1),
+                            pist_ent, f'pist{pist_ind - 1}',
                         )
 
             if fname:
@@ -202,7 +201,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
                 vmf,
                 template,
                 brush_pos,
-                angles,
+                orient,
                 force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
                 additional_visgroups={visgroup_names[pist_ind - 1]},
@@ -217,8 +216,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
             )
 
         # Associate any set panel with the same entity, if it's present.
-        tile_pos = Vec(z=-128)
-        tile_pos.localise(origin, angles)
+        tile_pos = origin - orient.up(128)
         panel: Optional[Panel] = None
         try:
             tiledef = TILES[tile_pos.as_tuple(), off.norm().as_tuple()]
@@ -244,7 +242,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
             script_ent['classname'] = 'ambient_generic'
             script_ent['message'] = snd_loop
             script_ent['health'] = 10  # Volume
-            script_ent['pitch'] = '100'
+            script_ent['pitch'] = 100
             script_ent['spawnflags'] = 16  # Start silent, looped.
             script_ent['radius'] = 1024
 
