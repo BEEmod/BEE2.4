@@ -171,7 +171,7 @@
 	coll_fizzler(boolean):    "Collide: Fizzler"    : 0 : "The region occupied by an object destroying fizzler (meaning objects could be destroyed here)."
 	coll_temporary(boolean):  "Collide: Temporary"  : 0 : "Indicates a region which will only sometimes be solid. This should be used for the movement region of things like platforms and panels."
 	coll_decoration(boolean): "Collide: Decoration" : 0 : "Prohibits additional decoration from being placed in this area."
-	coll_antline(boolean):    "Collide: Antline"    : 0 : "Prohibits antlines from being placed in this area."
+	coll_antlines(boolean):   "Collide: Antlines"   : 0 : "Prohibits antlines from being placed in this area."
 	]
 
 // Entities added to the finished map to pass information to VRAD.
