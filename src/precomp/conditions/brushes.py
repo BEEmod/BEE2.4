@@ -590,7 +590,7 @@ def res_import_template(vmf: VMF, coll: Collisions, res: Property):
             return
 
         for vis_flag_block in visgroup_instvars:
-            if all(conditions.check_flag(flag, colls, inst) for flag in vis_flag_block):
+            if all(conditions.check_flag(flag, coll, inst) for flag in vis_flag_block):
                 visgroups.add(vis_flag_block.real_name)
 
         force_colour = conf_force_colour
