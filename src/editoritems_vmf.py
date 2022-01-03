@@ -285,7 +285,7 @@ def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
 
 def load_collision_bbox(item: Item, ent: Entity) -> None:
     """Load precise BEE collisions."""
-    item.collisions.append(BBox.from_ent(ent))
+    item.collisions.extend(BBox.from_ent(ent))
 
 
 def save_collision_bbox(item: Item, vmf: VMF) -> None:

@@ -625,13 +625,11 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             force=srctools.conv_bool(ent['force']),
         ))
 
-    coll: list[CollisionDef] = [
-        CollisionDef(
-            collisions.BBox.from_ent(ent),
-            set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
-        )
-        for ent in vmf.by_class['bee2_collision_bbox']
-    ]
+    coll: list[CollisionDef] = []
+    for ent in vmf.by_class['bee2_collision_bbox']:
+        visgroups = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
+        for bbox in collisions.BBox.from_ent(ent):
+            coll.append(CollisionDef(bbox, visgroups))
 
     return Template(
         loc.id,

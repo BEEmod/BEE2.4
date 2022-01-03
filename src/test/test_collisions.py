@@ -293,9 +293,20 @@ def test_bbox_parse_block() -> None:
         tags='standard excellent',
     )
     ent.solids.append(vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70)).solid)
+    ent.solids.append(vmf.make_prism(Vec(-30, 45, 80), Vec(-20, 60, 120)).solid)
+    bb2, bb1 =  BBox.from_ent(ent)
+    # Allow it to produce in either order.
+    if bb1.min_x == -30:
+        bb1, bb2 = bb2, bb1
     assert_bbox(
-        BBox.from_ent(ent),
+        bb1,
         (80, 10, 40), (150, 220, 70),
+        CollideType.DECORATION | CollideType.PHYSICS,
+        {'standard', 'excellent'},
+    )
+    assert_bbox(
+        bb2,
+        (-30, 45, 80), (-20, 60, 120),
         CollideType.DECORATION | CollideType.PHYSICS,
         {'standard', 'excellent'},
     )
@@ -319,5 +330,5 @@ def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     prism = vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70), mat='tools/toolsskip')
     getattr(prism, axis).mat = 'tools/toolsclip'
     ent.solids.append(prism.solid)
-
-    assert_bbox(BBox.from_ent(ent), mins, maxes, CollideType.SOLID, set())
+    [bbox] = BBox.from_ent(ent)
+    assert_bbox(bbox, mins, maxes, CollideType.SOLID, set())

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
-from typing import Iterable
+from typing import Iterable, Iterator
 
 import attr
 import functools
@@ -185,27 +185,8 @@ class BBox:
         return bbox
 
     @classmethod
-    def from_ent(cls, ent: Entity) -> BBox:
-        """Parse keyvalues on a VMF entity."""
-        mins, maxes = ent.get_bbox()
-        non_skip_faces = [
-            face for solid in ent.solids
-            for face in solid
-            if face.mat != consts.Tools.SKIP
-        ]
-        try:
-            # Only one non-skip face, "flatten" along its plane.
-            face: Side
-            [face] = non_skip_faces
-        except ValueError:
-            pass  # Regular bbox.
-        else:
-            plane_norm = face.normal()
-            plane_point = face.planes[0]
-            for point in [mins, maxes]:
-                # Get the offset from the plane, then subtract to force it onto the plane.
-                point -= plane_norm * Vec.dot(point - plane_point, plane_norm)
-
+    def from_ent(cls, ent: Entity) -> Iterator[BBox]:
+        """Parse keyvalues on a VMF entity. One bounding box is produced for each brush."""
         coll = CollideType.NOTHING
         for key, value in ent.keys.items():
             if key.casefold().startswith('coll_') and conv_bool(value):
@@ -214,8 +195,29 @@ class BBox:
                     coll |= CollideType[coll_name]
                 except KeyError:
                     LOGGER.warning('Invalid collide type: "{}"!', key)
+        tags = frozenset(ent['tags'].split())
 
-        return cls(mins, maxes, coll, ent['tags'].split())
+        for solid in ent.solids:
+            mins, maxes = solid.get_bbox()
+            non_skip_faces = [
+                face
+                for face in solid
+                if face.mat != consts.Tools.SKIP
+            ]
+            try:
+                # Only one non-skip face, "flatten" along its plane.
+                face: Side
+                [face] = non_skip_faces
+            except ValueError:
+                pass  # Regular bbox.
+            else:
+                plane_norm = face.normal()
+                plane_point = face.planes[0]
+                for point in [mins, maxes]:
+                    # Get the offset from the plane, then subtract to force it onto the plane.
+                    point -= plane_norm * Vec.dot(point - plane_point, plane_norm)
+
+            yield cls(mins, maxes, coll, tags)
 
     def as_ent(self, vmf: VMF) -> Entity:
         """Convert back into an entity."""
