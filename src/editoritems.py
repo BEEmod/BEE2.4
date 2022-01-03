@@ -1570,7 +1570,7 @@ class Item:
                     raise tok.error('Two points must be provided for a bounding box!')
                 bb_min, bb_max = Vec.bbox(points)
                 try:
-                    self.collisions.append(BBox(bb_min, bb_max, coll_type, tags))
+                    self.collisions.append(BBox(bb_min, bb_max, contents=coll_type, tags=tags))
                 except NonBBoxError as exc:
                     raise tok.error(str(exc)) from None
 
@@ -1591,7 +1591,7 @@ class Item:
                 try:
                     self.collisions.append(BBox(
                         pos - half_dist, pos + half_dist,
-                        occu.type.collision, {'generated'},
+                        contents=occu.type.collision, tags='generated',
                     ))
                 except NonBBoxError as exc:
                     LOGGER.warning('"{}": Invalid occupied voxel: {}', self.id, exc)
@@ -1605,7 +1605,7 @@ class Item:
                         pos1[axis] -= half_dist
                         pos2[axis] += half_dist
                 try:
-                    self.collisions.append(BBox(pos1, pos2, occu.type.collision, {'generated'}))
+                    self.collisions.append(BBox(pos1, pos2, contents=occu.type.collision, tags='generated'))
                 except NonBBoxError as exc:
                     LOGGER.warning('"{}": Invalid occupied voxel: {}', self.id, exc)
 

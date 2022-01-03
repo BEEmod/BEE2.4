@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, overload
 
 import attr
 import functools
@@ -71,7 +71,7 @@ class CollideType(Flag):
         return coll
 
 
-@attr.frozen
+@attr.frozen(init=False)
 class BBox:
     """An axis aligned volume for collision.
 
@@ -87,17 +87,50 @@ class BBox:
     name: str  # Item name, or empty for definitions.
     tags: frozenset[str]
 
+    @overload
     def __init__(
         self,
-        point1: Vec | tuple[int|float, int|float, int|float],
-        point2: Vec | tuple[int|float, int|float, int|float],
+        min_x: int | float, min_y: int | float, min_z: int | float,
+        max_x: int | float, max_y: int | float, max_z: int | float,
+        /, *,
+        contents: CollideType = CollideType.SOLID,
+        tags: Iterable[str] | str = frozenset(),
+        name: str = '',
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        point1: Vec, point2: Vec,
+        /, *,
+        contents: CollideType = CollideType.SOLID,
+        tags: Iterable[str] | str = frozenset(),
+        name: str = '',
+    ) -> None: ...
+
+    def __init__(
+        self,
+        /,
+        *args: Vec | int | float,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
         name: str = '',
     ) -> None:
         """Allow constructing from Vec, and flip values to make them min/max."""
-        min_x, min_y, min_z = map(round, point1)
-        max_x, max_y, max_z = map(round, point2)
+        if len(args) == 6:
+            try:
+                min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)  # type: ignore
+            except (TypeError, ValueError):
+                raise TypeError('6 numbers must be supplied!')
+        elif len(args) == 2:
+            point1, point2 = args
+            if isinstance(point1, Vec) and isinstance(point2, Vec):
+                min_x, min_y, min_z = map(round, point1)
+                max_x, max_y, max_z = map(round, point2)
+            else:
+                raise TypeError(f'Expected 2 vectors, got {type(point1).__name__} and {type(point2).__name__}')
+        else:
+            raise TypeError(f'Expected 2 or 6 positional args, got {len(args)}!')
         if min_x > max_x:
             min_x, max_x = max_x, min_x
         if min_y > max_y:
@@ -164,25 +197,19 @@ class BBox:
             return Vec(0.0, 0.0, 1.0)
         return None
 
-    def with_points(
-        self,
-        point1: Vec | tuple[int|float, int|float, int|float],
-        point2: Vec | tuple[int|float, int|float, int|float],
-    ) -> BBox:
+    def with_points(self, point1: Vec, point2: Vec) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
-        return BBox(point1, point2, self.contents, self.tags, self.name)
+        return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
     def with_name(self, name: str) -> BBox:
         """Return a new bounding box with a different item name."""
-        bbox = BBox.__new__(BBox)
-        bbox.__attrs_init__(
+        return BBox(
             self.min_x, self.min_y, self.min_z,
             self.max_x, self.max_y, self.max_z,
-            self.contents,
-            name,
-            self.tags,
+            contents=self.contents,
+            name=name,
+            tags=self.tags,
         )
-        return bbox
 
     @classmethod
     def from_ent(cls, ent: Entity) -> Iterator[BBox]:
@@ -217,7 +244,7 @@ class BBox:
                     # Get the offset from the plane, then subtract to force it onto the plane.
                     point -= plane_norm * Vec.dot(point - plane_point, plane_norm)
 
-            yield cls(mins, maxes, coll, tags)
+            yield cls(mins, maxes, contents=coll, tags=tags)
 
     def as_ent(self, vmf: VMF) -> Entity:
         """Convert back into an entity."""
@@ -285,8 +312,13 @@ class BBox:
             return None
 
         try:
-            return self.with_points((min_x, min_y, min_z), (max_x, max_y, max_z))
-        except ValueError:  # Edge or corner, don't count those.
+            return BBox(
+                min_x, min_y, min_z, max_x, max_y, max_z,
+                contents=self.contents,
+                tags=self.tags,
+                name=self.name,
+            )
+        except NonBBoxError:  # Edge or corner, don't count those.
             return None
 
     def __matmul__(self, other: Angle | Matrix) -> BBox:
@@ -356,7 +388,12 @@ class BBox:
         else:
             min_z += m[2, 2] * self.max_z
             max_z += m[2, 2] * self.min_z
-        return self.with_points((min_x, min_y, min_z), (max_x, max_y, max_z))
+        return BBox(
+            min_x, min_y, min_z, max_x, max_y, max_z,
+            contents=self.contents,
+            tags=self.tags,
+            name=self.name,
+        )
 
     def __add__(self, other: Vec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""

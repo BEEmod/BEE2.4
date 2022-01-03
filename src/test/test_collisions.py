@@ -51,40 +51,45 @@ def test_bbox_construction() -> None:
     assert_bbox(bb, (1, 2, 3), (4, 5, 6), CollideType.SOLID, set())
 
     assert_bbox(
-        BBox(Vec(4.1, 1.9, 6), Vec(1, 5.1, 2.85), CollideType.FIZZLER | CollideType.ANTLINES),
+        BBox(Vec(4.1, 1.9, 6), Vec(1, 5.1, 2.85), contents=CollideType.FIZZLER | CollideType.ANTLINES),
         (1, 2, 3), (4, 5, 6),
         CollideType.FIZZLER | CollideType.ANTLINES,
         set(),
     )
     assert_bbox(
-        BBox((-50, 80, -60), (30, -40, 95), CollideType.GLASS, 'tag1'),
+        BBox(-50, 80, -60, 30, -40, 95, contents=CollideType.GLASS, tags='tag1'),
         (-50, -40, -60), (30, 80, 95),
         CollideType.GLASS,
         {'tag1', },
     )
 
-    plane_x = BBox((80, 90, 10), (80, 250, 40), CollideType.GRATE)
+    plane_x = BBox(80, 90.0, 10, 80.0, 250, 40.0, contents=CollideType.GRATE)
     assert plane_x.is_plane
     assert plane_x.plane_normal == Vec(1, 0, 0)
     assert_bbox(plane_x, (80, 90, 10), (80, 250, 40), CollideType.GRATE, set())
 
-    plane_y = BBox((80, 250, 10), (110, 250, 40), CollideType.GRATE)
+    plane_x = BBox(80.0, 90.0, 10, 80, 250, 40.0, contents=CollideType.GRATE)
+    assert plane_x.is_plane
+    assert plane_x.plane_normal == Vec(1, 0, 0)
+    assert_bbox(plane_x, (80, 90, 10), (80, 250, 40), CollideType.GRATE, set())
+
+    plane_y = BBox(80, 250, 10.0, 110.0, 250, 40, contents=CollideType.GRATE)
     assert plane_y.is_plane
     assert plane_y.plane_normal == Vec(0, 1, 0)
     assert_bbox(plane_y, (80, 250, 10), (110, 250, 40), CollideType.GRATE, set())
 
-    plane_z = BBox((80, 250, 40), (110, 90, 40), CollideType.GRATE)
+    plane_z = BBox(80, 250, 40, 110, 90, 40, contents=CollideType.GRATE)
     assert plane_z.is_plane
     assert plane_z.plane_normal == Vec(0, 0, 1)
     assert_bbox(plane_z, (80, 90, 40), (110, 250, 40), CollideType.GRATE, set())
 
-    assert BBox((-10, -10, -10), (+10, +10, +10)).tags == frozenset({})
+    assert BBox(-10, -10, -10, +10, +10, +10).tags == frozenset({})
     assert BBox(
-        (-10, -10, -10), (+10, +10, +10), CollideType.BRIDGE,
-        'tags',  # Special case, not iterated.
+        -10, -10, -10, +10, +10, +10, contents=CollideType.BRIDGE,
+        tags='tags',  # Special case, not iterated.
     ).tags == frozenset({'tags'})
     assert BBox(
-        (-10, -10, -10), (+10, +10, +10),
+        -10, -10, -10, +10, +10, +10,
         tags=['a', 'b', 'embed'],
     ).tags == frozenset({'a', 'b', 'embed'})
 
@@ -103,7 +108,7 @@ def test_illegal_bbox() -> None:
 
 def test_bbox_vecs() -> None:
     """Test that the vector properties don't return the same object."""
-    bb = BBox((30, 60, 80), (120, 451, 730))
+    bb = BBox(30, 60, 80, 120, 451, 730)
 
     assert bb.mins == Vec(30.0, 60.0, 80.0)
     assert bb.mins is not bb.mins
@@ -120,7 +125,7 @@ def test_bbox_vecs() -> None:
 
 def test_bbox_is_frozen() -> None:
     """Test modification is not possible."""
-    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.PHYSICS)
+    bb = BBox(40, 60, 80, 120, 450, 730, contents=CollideType.PHYSICS)
     with pytest.raises(AttributeError):
         bb.min_x = 100
     with pytest.raises(AttributeError):
@@ -147,33 +152,33 @@ def test_bbox_is_frozen() -> None:
 
 def test_bbox_hash() -> None:
     """Test hashability of bboxes."""
-    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'})
+    bb = BBox(40, 60, 80, 120, 450, 730, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'})
     hash(bb)  # Check it can be hashed.
 
     # Check each value changes the hash.
-    assert hash(bb) != hash(BBox((45, 40, 80), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 59, 80), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 60, 81), (120, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 60, 80), (121, 450, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 455, 730), CollideType.PHYSICS, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES, {'tag1', 'tag2'}))
-    assert hash(bb) != hash(BBox((40, 60, 80), (120, 450, 732), CollideType.PHYSICS, {'tag1', 'tag3'}))
+    assert hash(bb) != hash(BBox(45, 40, 80, 120, 450, 730, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 59, 80, 120, 450, 730, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 60, 81, 120, 450, 730, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 60, 80, 121, 450, 730, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 60, 80, 120, 455, 730, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 60, 80, 120, 450, 732, contents=CollideType.PHYSICS, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 60, 80, 120, 450, 730, contents=CollideType.ANTLINES, tags={'tag1', 'tag2'}))
+    assert hash(bb) != hash(BBox(40, 60, 80, 120, 450, 732, contents=CollideType.PHYSICS, tags={'tag1', 'tag3'}))
 
 
-def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> tuple3:
+def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> Vec:
     """Reorder the coords by these axes."""
     assoc = dict(zip('xyz', coord))
-    return x + assoc[order[0]], y + assoc[order[1]], z + assoc[order[2]],
+    return Vec(x + assoc[order[0]], y + assoc[order[1]], z + assoc[order[2]])
 
 
 def test_reorder_helper() -> None:
     """Test the reorder helper."""
-    assert reorder((1, 2, 3), 'xyz', 0, 0, 0) == (1, 2, 3)
-    assert reorder((1, 2, 3), 'yzx', 0, 0, 0) == (2, 3, 1)
-    assert reorder((1, 2, 3), 'zyx', 0, 0, 0) == (3, 2, 1)
-    assert reorder((1, 2, 3), 'xzy', 0, 0, 0) == (1, 3, 2)
-    assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == (-2, 36, 12)
+    assert reorder((1, 2, 3), 'xyz', 0, 0, 0) == Vec(1, 2, 3)
+    assert reorder((1, 2, 3), 'yzx', 0, 0, 0) == Vec(2, 3, 1)
+    assert reorder((1, 2, 3), 'zyx', 0, 0, 0) == Vec(3, 2, 1)
+    assert reorder((1, 2, 3), 'xzy', 0, 0, 0) == Vec(1, 3, 2)
+    assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
 def get_intersect_testcases() -> list:
@@ -219,15 +224,15 @@ def test_bbox_intersection(
 
     We parameterise by swapping all the axes, and offsetting so it's in all the quadrants.
     """
-    bbox1 = BBox((x-64, y-64, z-64), (x+64, y+64, z+64), CollideType.EVERYTHING)
-    bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), CollideType.EVERYTHING)
+    bbox1 = BBox(x-64, y-64, z-64, x+64, y+64, z+64, contents=CollideType.EVERYTHING)
+    bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), contents=CollideType.EVERYTHING)
     result = bbox1.intersect(bbox2)
     # assert result == bbox2.intersect(bbox1)  # Check order is irrelevant.
     if success is None:
         assert result is None
     else:
         exp_a, exp_b = success
-        expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), CollideType.EVERYTHING)
+        expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), contents=CollideType.EVERYTHING)
         assert result == expected
 
 
@@ -239,7 +244,7 @@ def test_bbox_rotation(
 ) -> None:
     """Test the rotation logic against the slow direct approach."""
     ang = Angle(pitch, yaw, roll)
-    bb_start = BBox((100, 200, 300), (300, 450, 600), CollideType.ANTLINES, 'blah')
+    bb_start = BBox(100, 200, 300, 300, 450, 600, contents=CollideType.ANTLINES, tags='blah')
     # Directly compute, by rotating all the angles,
     points = [
         Vec(x, y, z)
@@ -259,7 +264,7 @@ def test_bbox_rotation(
 
 def test_bbox_addition() -> None:
     """Test adding to bbox to shift them around."""
-    bb = BBox((40, 60, 80), (120, 450, 730), CollideType.ANTLINES, {'a', 'b'})
+    bb = BBox(40, 60, 80, 120, 450, 730, contents=CollideType.ANTLINES, tags={'a', 'b'})
     assert_bbox(
         bb + Vec(10, -30, 45),
         (50, 30, 125), (130, 420, 775),
