@@ -254,6 +254,39 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     int((v + v_off) // 32),
                 ] = barr_type
 
+    # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
+    # is done correctly.
+    for (plane_pos_tup, is_pos), pos_slice in slices.items():
+        plane_pos = Vec(plane_pos_tup)
+        norm_axis = plane_pos.axis()
+        normal = Vec.with_axes(norm_axis, 1 if is_pos else -1)
+
+        u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+        is_present: Plane[object] = pos_slice.copy()
+        for pos in is_present:
+            is_present[pos] = True
+        for min_u, min_v, max_u, max_v, _ in grid_optimise(is_present):
+            # These are two points in the origin plane, at the borders.
+            pos_min = Vec.with_axes(
+                norm_axis, plane_pos,
+                u_axis, min_u * 32,
+                v_axis, min_v * 32,
+            )
+            pos_max = Vec.with_axes(
+                norm_axis, plane_pos,
+                u_axis, max_u * 32 + 32,
+                v_axis, max_v * 32 + 32,
+            )
+            hint = vmf.make_prism(
+                pos_min + normal * 64,
+                pos_max + normal * 60,
+                mat=consts.Tools.SKIP,
+            ).solid
+            for side in hint:
+                if abs(Vec.dot(side.normal(), normal)) > 0.99:
+                    side.mat = consts.Tools.HINT
+            vmf.add_brush(hint)
+
     # Remove pane sections where the holes are. We then generate those with
     # templates for slanted parts.
     for (origin_tup, norm_tup), hole_type in HOLES.items():
@@ -292,7 +325,6 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     )
 
         # Now generate the curved brushwork.
-
         if barr_type is BarrierType.GLASS:
             contents = collisions.CollideType.GLASS
             front_temp = glass_temp
@@ -333,6 +365,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     if corn_v > v // 32:
                         hole_temp.append(hole_temp_lrg_diag + (corn_mat, ))
                     continue
+                # This bit of the glass is present, so include it in our brush, then clear.
                 if (corn_u, corn_v) in slice_plane:
                     hole_temp.append(hole_temp_lrg_square + (corn_mat, ))
                 else:
@@ -429,12 +462,6 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 front_temp,
                 solid_pane_func,
             )
-            # Generate hint brushes, to ensure sorting is done correctly.
-            [hint] = solid_pane_func(0, 4.0, consts.Tools.SKIP)
-            for side in hint:
-                if abs(Vec.dot(side.normal(), normal)) > 0.99:
-                    side.mat = consts.Tools.HINT
-            vmf.add_brush(hint)
 
     if floorbeam_temp:
         LOGGER.info('Adding Glass floor beams...')
