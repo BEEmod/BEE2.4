@@ -82,7 +82,7 @@ class RTree(Generic[ValueT]):
         for holder_id in self.tree.intersection((*mins, *maxs)):
             yield from self._by_id[holder_id].values
 
-    def find_nearest(self, point: Vec, min_count: int = 1) -> ValueT:
+    def find_nearest(self, point: Vec, min_count: int = 1) -> Iterator[ValueT]:
         """Find the values nearest to a point.
 
         Return at least the specified number of points - if equidistant more
