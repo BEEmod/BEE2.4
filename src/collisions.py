@@ -201,14 +201,19 @@ class BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
         return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
-    def with_name(self, name: str) -> BBox:
-        """Return a new bounding box with a different item name."""
+    def with_attrs(
+        self, *,
+        name: str | None = None,
+        contents: CollideType | None = None,
+        tags: Iterable[str] | str | None = None,
+    ) -> BBox:
+        """Return a new bounding box with the name, contents or tags changed."""
         return BBox(
             self.min_x, self.min_y, self.min_z,
             self.max_x, self.max_y, self.max_z,
-            contents=self.contents,
-            name=name,
-            tags=self.tags,
+            contents=contents if contents is not None else self.contents,
+            name=name if name is not None else self.name,
+            tags=tags if tags is not None else self.tags,
         )
 
     @classmethod

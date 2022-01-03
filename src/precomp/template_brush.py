@@ -814,7 +814,7 @@ def import_template(
                 if not coll_def.visgroups.issubset(chosen_groups):
                     continue
                 bbox = coll_def.bbox @ orient + origin
-                coll.add(bbox.with_name(targetname))
+                coll.add(bbox.with_attrs(name=targetname))
         else:
             LOGGER.warning('With collisions provided, the instance name must not be blank!')
 

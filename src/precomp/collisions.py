@@ -47,11 +47,10 @@ class Collisions:
 
     def add_item_coll(self, item: Item, inst: Entity) -> None:
         """Add the default collisions from an item definition for this instance."""
-        name = inst['targetname']
         origin = Vec.from_str(inst['origin'])
         orient = Matrix.from_angle(Angle.from_str(inst['angles']))
         for coll in item.collisions:
-            self.add((coll @ orient + origin).with_name(name))
+            self.add((coll @ orient + origin).with_attrs(name=inst['targetname']))
 
     def dump(self, vmf: VMF, vis_name: str = 'Collisions') -> None:
         """Dump all the bounding boxes as a set of brushes."""
