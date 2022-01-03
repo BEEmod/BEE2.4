@@ -11,10 +11,9 @@ import srctools.logger
 from plane import Plane
 from precomp import (
     texturing, options, packing,
-    template_brush,
+    template_brush, conditions, collisions,
 )
 import consts
-from precomp.conditions import make_result
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.instanceLocs import resolve_one, resolve
 
@@ -112,7 +111,6 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
     try:
         center_type = BARRIERS[origin.as_tuple(), normal.as_tuple()]
     except KeyError:
-        LOGGER.warning('No center barrier at {}, {}', origin, normal)
         return False
 
     if hole_type is HoleType.SMALL:
@@ -140,7 +138,7 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
     return True
 
 
-@make_result('GlassHole')
+@conditions.make_result('GlassHole')
 def res_glass_hole(inst: Entity, res: Property):
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
     hole_type = HoleType(res.value)
@@ -164,11 +162,27 @@ def res_glass_hole(inst: Entity, res: Property):
         inst['origin'] = inv_origin
         inst['angles'] = inv_normal.to_angle()
     else:
+        LOGGER.warning('No center barrier at {} with axis  {}', origin, normal)
         # Remove the instance, so this does nothing.
         inst.remove()
 
 
-def make_barriers(vmf: VMF):
+def template_solids_and_coll(
+    template: template_brush.Template | None, visgroup: str,
+) -> tuple[list[Solid], list[collisions.BBox]]:
+    """Retrieve the brushes and collision boxes for the specified visgroup."""
+    if template is None:
+        return [], []
+    else:
+        groups = {visgroup, ''}
+        return template.visgrouped_solids(visgroup), [
+            coll.bbox for coll in template.collisions
+            if coll.visgroups.issubset(groups)
+        ]
+
+
+@conditions.meta_cond(150)
+def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities. get_tex is vbsp.get_tex."""
     glass_temp = template_brush.get_scaling_template(
         options.get(str, "glass_template")
@@ -184,12 +198,13 @@ def make_barriers(vmf: VMF):
         hole_combined_temp = template_brush.get_template(
             options.get(str, 'glass_hole_temp')
         )
-        hole_temp_small = hole_combined_temp.visgrouped_solids({'small'})
-        hole_temp_lrg_diag = hole_combined_temp.visgrouped_solids({'large_diagonal'})
-        hole_temp_lrg_cutout = hole_combined_temp.visgrouped_solids({'large_cutout'})
-        hole_temp_lrg_square = hole_combined_temp.visgrouped_solids({'large_square'})
     else:
-        hole_temp_small = hole_temp_lrg_diag = hole_temp_lrg_cutout = hole_temp_lrg_square = []
+        hole_combined_temp = None
+
+    hole_temp_small = template_solids_and_coll(hole_combined_temp, 'small')
+    hole_temp_lrg_diag = template_solids_and_coll(hole_combined_temp, 'large_diagonal')
+    hole_temp_lrg_cutout = template_solids_and_coll(hole_combined_temp, 'large_cutout')
+    hole_temp_lrg_square = template_solids_and_coll(hole_combined_temp, 'large_square')
 
     floorbeam_temp = options.get(str, 'glass_floorbeam_temp')
 
@@ -221,8 +236,7 @@ def make_barriers(vmf: VMF):
         tuple[tuple[float, float, float], bool],
         Plane[BarrierType | None]
     ] = defaultdict(Plane)
-    # We have this on the 32-grid so we can cut squares for holes.
-
+    # We have this on the 32-grid to allow us to cut squares for holes.
     for (origin_tup, normal_tup), barr_type in BARRIERS.items():
         origin = Vec(origin_tup)
         normal = Vec(normal_tup)
@@ -260,7 +274,7 @@ def make_barriers(vmf: VMF):
             offsets = (-16, 16)
         for u_off in offsets:
             for v_off in offsets:
-                # Remove these squares, but keep them in the Plane
+                # Remove these squares, but keep them in the Plane,
                 # so we can check if there was glass there.
                 uv = (
                     int((u + u_off) // 32),
@@ -280,14 +294,16 @@ def make_barriers(vmf: VMF):
         # Now generate the curved brushwork.
 
         if barr_type is BarrierType.GLASS:
+            contents = collisions.CollideType.GLASS
             front_temp = glass_temp
         elif barr_type is BarrierType.GRATING:
+            contents = collisions.CollideType.GRATING
             front_temp = grate_temp
         else:
             raise NotImplementedError
 
         angles = normal.to_angle()
-        hole_temp: list[tuple[list[Solid], Matrix]] = []
+        hole_temp: list[tuple[list[Solid], list[collisions.BBox], Matrix]] = []
 
         # This is a tricky bit. Two large templates would collide
         # diagonally, and we allow the corner glass to not be present since
@@ -315,22 +331,28 @@ def make_barriers(vmf: VMF):
                     # be more optimal. To pick, arbitrarily make the upper one
                     # be in charge.
                     if corn_v > v // 32:
-                        hole_temp.append((hole_temp_lrg_diag, corn_mat))
+                        hole_temp.append(hole_temp_lrg_diag + (corn_mat, ))
                     continue
                 if (corn_u, corn_v) in slice_plane:
-                    hole_temp.append((hole_temp_lrg_square, corn_mat))
+                    hole_temp.append(hole_temp_lrg_square + (corn_mat, ))
                 else:
-                    hole_temp.append((hole_temp_lrg_cutout, corn_mat))
+                    hole_temp.append(hole_temp_lrg_cutout + (corn_mat, ))
 
         else:
-            hole_temp.append((hole_temp_small, Matrix.from_angle(angles)))
+            hole_temp.append(hole_temp_small + (Matrix.from_angle(angles), ))
+
+        for _, bbox_list, matrix in hole_temp:
+            # Place the collisions.
+            for bbox in bbox_list:
+                bbox = bbox @ matrix + origin
+                coll.add(bbox.with_attrs(name=barr_type.name, contents=contents))
 
         def solid_pane_func(off1: float, off2: float, mat: str) -> list[Solid]:
             """Given the two thicknesses, produce the curved hole from the template."""
             off_min = 64 - max(off1, off2)
             off_max = 64 - min(off1, off2)
             new_brushes = []
-            for brushes, matrix in hole_temp:
+            for brushes, _, matrix in hole_temp:
                 for orig_brush in brushes:
                     brush = orig_brush.copy(vmf_file=vmf)
                     new_brushes.append(brush)
@@ -366,8 +388,10 @@ def make_barriers(vmf: VMF):
             if barr_type is None:  # Hole placed here and overwrote the glass/grating.
                 continue
             elif barr_type is BarrierType.GLASS:
+                contents = collisions.CollideType.GLASS
                 front_temp = glass_temp
             elif barr_type is BarrierType.GRATING:
+                contents = collisions.CollideType.GRATING
                 front_temp = grate_temp
             else:
                 raise NotImplementedError(barr_type)
@@ -382,6 +406,12 @@ def make_barriers(vmf: VMF):
                 u_axis, max_u * 32 + 32,
                 v_axis, max_v * 32 + 32,
             )
+            coll.add(collisions.BBox(
+                pos_min + normal * 64.0,
+                pos_max + normal * 60.0,
+                name=barr_type.name,
+                contents=contents,
+            ))
 
             def solid_pane_func(off1: float, off2: float, mat: str) -> list[Solid]:
                 """Make the solid brush."""

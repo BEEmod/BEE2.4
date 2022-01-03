@@ -1901,7 +1901,6 @@ def main() -> None:
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)
-        barriers.make_barriers(vmf)
         fix_worldspawn(vmf)
 
         if utils.DEV_MODE:
