@@ -150,8 +150,8 @@ def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
         return
 
     item.embed_voxels.update(map(Coord.from_vec, Vec.iter_grid(
-        (bbox_min + (64, 64, 64)) / 128,
-        (bbox_max - (64, 64, 64)) / 128,
+        (bbox_min + (64, 64, 64 + 128)) / 128,
+        (bbox_max + (-64, -64, -64 + 128)) / 128,
     )))
 
 
@@ -232,6 +232,7 @@ def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
                 return
             elif bbox_min[u] % 32 == bbox_min[v] % 32 == bbox_max[v] % 32 == bbox_max[v] % 32 == 0.0:
                 # Subvoxel surface definitions.
+                # TODO
                 return
             else:
                 # Not aligned to grid, skip to error.
@@ -295,7 +296,7 @@ def save_collision_bbox(item: Item, vmf: VMF) -> None:
 
 
 LOAD_FUNCS.update({
-    'bee2_' + name[4:]: func
+    'bee2' + name[4:]: func
     for name, func in globals().items()
     if name.startswith('load_')
 })
