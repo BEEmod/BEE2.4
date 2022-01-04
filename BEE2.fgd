@@ -130,12 +130,6 @@
 	group_id(string) : "Group ID" : "" : "?"
 	]
 
-@PointClass wirebox(min, max) = bee2_editor_embeddedvoxel: "Defines an EmbeddedVoxel section of an item. The shape is aligned to the 128-grid."
-	[
-	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the hollowed area."
-	min(vecline) : "Maximum Position" : "64 64 0" : "The maximum position of the hollowed area."
-	]
-
 @PointClass wirebox(min, max) = bee2_editor_embedface: "Defines a EmbedFace section for an item."
 	[
 	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the brush section. Vertical position is ignored."
@@ -149,6 +143,10 @@
 		"1x1"           : "1x1 Tiles"
 		"Grid_Default"  : "Normal Wall"
 		]
+	]
+
+@SolidClass = bee2_editor_embeddedvoxel: "Defines an EmbeddedVoxel section of an item. The bounding box must be aligned to the voxel grid."
+	[
 	]
 
 @SolidClass = bee2_editor_occupiedvoxel: "Defines a region the item takes up. Depending on the resultant option, this can be positioned in a variety of ways: \n" +
