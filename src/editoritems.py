@@ -1549,30 +1549,31 @@ class Item:
     def _parse_collisions(self, tok: Tokenizer) -> None:
         """Parse the enhanced blocks BEE uses for collision."""
         self._has_collisions_block = True
-        for group_name in tok.block('Collisions'):
-            tags = frozenset(group_name.casefold().split())
-            for box_name in tok.block(group_name):
-                if box_name.casefold() != 'bbox':
-                    raise tok.error('Unknown collision type "{}"!', box_name)
-                points: list[Vec] = []
-                coll_type = CollideType.NOTHING
-                for bbox_key in tok.block(box_name):
-                    folded_key = bbox_key.casefold()
-                    if folded_key.rstrip('0123456789') == 'pos':
-                        points.append(Vec.from_str(tok.expect(Token.STRING)))
-                    elif folded_key == 'type':
-                        for name in tok.expect(Token.STRING).split():
-                            try:
-                                coll_type |= CollideType[name.upper()]
-                            except KeyError:
-                                raise tok.error('Unknown collision type "{}"', name)
-                if len(points) < 2:
-                    raise tok.error('Two points must be provided for a bounding box!')
-                bb_min, bb_max = Vec.bbox(points)
-                try:
-                    self.collisions.append(BBox(bb_min, bb_max, contents=coll_type, tags=tags))
-                except NonBBoxError as exc:
-                    raise tok.error(str(exc)) from None
+        for box_name in tok.block('Collisions'):
+            if box_name.casefold() != 'bbox':
+                raise tok.error('Unknown collision type "{}"!', box_name)
+            points: list[Vec] = []
+            coll_type = CollideType.NOTHING
+            tags = set()
+            for bbox_key in tok.block(box_name):
+                folded_key = bbox_key.casefold()
+                if folded_key.rstrip('0123456789') == 'pos':
+                    points.append(Vec.from_str(tok.expect(Token.STRING)))
+                elif folded_key in ('tag', 'tags'):
+                    tags.update(tok.expect(Token.STRING).casefold().split())
+                elif folded_key == 'type':
+                    for name in tok.expect(Token.STRING).split():
+                        try:
+                            coll_type |= CollideType[name.upper()]
+                        except KeyError:
+                            raise tok.error('Unknown collision type "{}"', name)
+            if len(points) < 2:
+                raise tok.error('Two points must be provided for a bounding box!')
+            bb_min, bb_max = Vec.bbox(points)
+            try:
+                self.collisions.append(BBox(bb_min, bb_max, contents=coll_type, tags=tags))
+            except NonBBoxError as exc:
+                raise tok.error(str(exc)) from None
 
     def generate_collisions(self) -> None:
         """If no specific collisions were defined, generate them by looking at OccupiedVoxels."""
