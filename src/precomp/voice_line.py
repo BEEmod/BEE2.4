@@ -9,6 +9,8 @@ from precomp import options as vbsp_options, packing, conditions, rand
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output, Entity
 
+from precomp.collisions import Collisions
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
@@ -116,6 +118,7 @@ def res_quote_event(res: Property):
 
 def find_group_quotes(
     vmf: VMF,
+    coll: Collisions,
     group: Property,
     mid_quotes,
     allow_mid_voices,
@@ -142,7 +145,7 @@ def find_group_quotes(
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_flag(flag, fake_inst):
+            if not conditions.check_flag(flag, coll, fake_inst):
                 valid_quote = False
                 break
 
@@ -441,6 +444,7 @@ def add_voice(
     voice_attrs: dict,
     style_vars: dict,
     vmf: VMF,
+    coll: Collisions,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""
@@ -557,6 +561,7 @@ def add_voice(
         possible_quotes = sorted(
             find_group_quotes(
                 vmf,
+                coll,
                 group,
                 mid_quotes,
                 use_dings=use_dings,

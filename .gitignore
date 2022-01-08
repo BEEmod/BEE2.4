@@ -75,6 +75,9 @@ src/bee_version.txt
 # PyInstaller temporary file directory
 /build_tmp/
 
-# Folders for DLLs we need.
-lib-32/
+# Ignore copies of FFMPEG, but include libspatialindex.
+# rtree doesn't have 32-bit windows wheels, so incldue the files ourselves.
 lib-64/
+lib-32/swresample-*
+lib-32/swscale-*
+lib-32/av*

@@ -536,9 +536,9 @@ def report_items() -> None:
         for item in sorted(Item.all(), key=lambda it: it.id):
             for vers_name, version in item.versions.items():
                 if len(item.versions) == 1:
-                    f.write(f'- <{item.id}>\n')
+                    f.write(f'- `<{item.id}>`\n')
                 else:
-                    f.write(f'- <{item.id}:{vers_name}>\n')
+                    f.write(f'- `<{item.id}:{vers_name}>`\n')
 
                 variant_to_id = defaultdict(list)
                 for sty_id, variant in version.styles.items():
@@ -547,5 +547,5 @@ def report_items() -> None:
                 for variant, style_ids in variant_to_id.items():
                     f.write(
                         f'\t- [ ] {", ".join(sorted(style_ids))}:\n'
-                        f'\t  {variant.source}\n'
+                        f'\t  `{variant.source}`\n'
                     )

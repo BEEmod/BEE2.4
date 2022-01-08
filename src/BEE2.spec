@@ -157,10 +157,12 @@ if utils.WIN:
     lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
     try:
         for dll in lib_path.iterdir():
-            if dll.suffix == '.dll':
+            if dll.suffix == '.dll' and dll.stem.startswith(('av', 'swscale', 'swresample')):
                 binaries.append((str(dll), '.'))
     except FileNotFoundError:
         lib_path.mkdir(exist_ok=True)
+        pass
+    if not binaries:  # Not found.
         raise ValueError(f'FFmpeg dlls should be downloaded into "{lib_path}".')
 
 

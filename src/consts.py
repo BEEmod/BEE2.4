@@ -93,9 +93,16 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
     * str(member) == member.value
     """
     def __eq__(self, other) -> bool:
+        """Compare case-insensitively."""
         if isinstance(other, Side):
             other = other.mat
         return self.value == other.casefold()
+
+    def __ne__(self, other) -> bool:
+        """Compare case-insensitively."""
+        if isinstance(other, Side):
+            other = other.mat
+        return self.value != other.casefold()
 
     def __str__(self) -> str:
         return self.value

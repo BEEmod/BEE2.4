@@ -20,6 +20,7 @@ from BEE2_config import ConfigFile
 import utils
 import srctools.run
 import srctools.logger
+from precomp.collisions import Collisions
 from precomp import (
     instance_traits,
     brushLoc,
@@ -220,11 +221,12 @@ def load_map(map_path: str) -> VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF):
+def add_voice(vmf: VMF, coll: Collisions):
     """Add voice lines to the map."""
     voice_line.add_voice(
         voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
+        coll=coll,
         vmf=vmf,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
@@ -1858,7 +1860,11 @@ def main() -> None:
         ant_floor, ant_wall, id_to_item = load_settings()
 
         vmf = load_map(path)
-        instance_traits.set_traits(vmf, id_to_item)
+        coll = Collisions()
+        instance_traits.set_traits(vmf, id_to_item, coll)
+
+        if utils.DEV_MODE:
+            coll.dump(vmf, 'coll_pre')
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1891,14 +1897,16 @@ def main() -> None:
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf)
+        conditions.check_all(vmf, coll)
         add_extra_ents(vmf, GAME_MODE)
 
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)
-        barriers.make_barriers(vmf)
         fix_worldspawn(vmf)
+
+        if utils.DEV_MODE:
+            coll.dump(vmf, 'coll_post')
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:

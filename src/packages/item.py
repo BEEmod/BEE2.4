@@ -759,7 +759,7 @@ def parse_item_folder(
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
 
-        first_item: Item | None = None
+        first_item: EditorItem | None = None
         extra_items: list[EditorItem] = []
         try:
             props = filesystem.read_prop(prop_path).find_key('Properties')
@@ -794,11 +794,13 @@ def parse_item_folder(
             pass
         else:
             editoritems_vmf.load(first_item, editor_vmf)
+        first_item.generate_collisions()
 
         # extra_items is any extra blocks (offset catchers, extent items).
         # These must not have a palette section - it'll override any the user
         # chooses.
         for extra_item in extra_items:
+            extra_item.generate_collisions()
             for subtype in extra_item.subtypes:
                 if subtype.pal_pos is not None:
                     LOGGER.warning(
