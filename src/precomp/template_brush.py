@@ -303,16 +303,15 @@ class Template:
         visgroups can also be a single string, to select that.
         """
         if isinstance(visgroups, str):
-            visgroups = {'', visgroups}
+            chosen = {visgroups, ''}
         else:
-            visgroups = set(visgroups)
-            visgroups.add('')
+            chosen = {*visgroups, ''}
 
         world_brushes: list[Solid] = []
         detail_brushes: list[Solid] = []
         overlays: list[Entity] = []
 
-        for group in visgroups:
+        for group in chosen:
             try:
                 world, detail, over = self._data[group.casefold()]
             except KeyError:
@@ -674,6 +673,8 @@ def import_template(
     bind_tile_pos: Iterable[Vec]=(),
     align_bind: bool=False,
     coll: collisions.Collisions=None,
+    coll_add: Optional[collisions.CollideType] = collisions.CollideType.NOTHING,
+    coll_mask: collisions.CollideType = collisions.CollideType.EVERYTHING,
 ) -> ExportedTemplate:
     """Import the given template at a location.
 
@@ -690,6 +691,9 @@ def import_template(
     * If any `bound_tile_pos` are provided, these are offsets to tiledefs which
       should have all the overlays in this template bound to them, and vice versa.
     * If `align_bind` is set, these will be first aligned to grid.
+    * `coll_mask` and `coll_force` allow modifying the collision types added. `coll_mask` is AND-ed
+      with the bbox type, then `coll_add` is OR-ed in. If the collide type ends up being NOTHING, it
+      is skipped.
     """
     import vbsp
     if isinstance(temp_name, Template):
@@ -813,8 +817,10 @@ def import_template(
             for coll_def in template.collisions:
                 if not coll_def.visgroups.issubset(chosen_groups):
                     continue
-                bbox = coll_def.bbox @ orient + origin
-                coll.add(bbox.with_attrs(name=targetname))
+                contents = (coll_def.bbox.contents & coll_mask) | coll_add
+                if contents is not contents.NOTHING:
+                    bbox = coll_def.bbox @ orient + origin
+                    coll.add(bbox.with_attrs(name=targetname, contents=contents))
         else:
             LOGGER.warning('With collisions provided, the instance name must not be blank!')
 
