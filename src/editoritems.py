@@ -854,7 +854,7 @@ class Item:
     # Movement handle
     handle: Handle = Handle.NONE
     facing: DesiredFacing = DesiredFacing.NONE
-    invalid_surf: set[Surface] = attr.ib(factory=set, converter=set)
+    invalid_surf: set[Surface] = attr.ib(factory=set)
     # Anim name to sequence index.
     animations: dict[Anim, int] = attr.ib(factory=dict)
 
@@ -1331,9 +1331,9 @@ class Item:
                 )
             conn = self.conn_inputs.pop(ConnTypes.POLARITY)
             if conn.activate is not None:
-                conf.sec_enable_cmd += ((conn.act_name, conn.activate),)
+                conf.sec_enable_cmd += (Output('', conn.act_name, conn.activate), )
             if conn.deactivate is not None:
-                conf.sec_disable_cmd += ((conn.deact_name, conn.deactivate),)
+                conf.sec_disable_cmd += (Output('', conn.deact_name, conn.deactivate), )
 
         if ConnTypes.NORMAL in self.conn_outputs:
             conn = self.conn_outputs.pop(ConnTypes.NORMAL)
