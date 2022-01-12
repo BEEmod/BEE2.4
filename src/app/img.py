@@ -748,7 +748,10 @@ def refresh_all() -> None:
     for handle in list(_handles.values()):
         # If force-loaded it's builtin UI etc we shouldn't reload.
         # If already loading, no point.
-        if not handle._force_loaded and not handle._loading:
+        if handle._force_loaded:
+            LOGGER.warning('Could not reload force-loaded {!r}', handle)
+            continue
+        if not handle._loading:
             _discard_tk_img(handle._cached_tk)
             handle._cached_tk = handle._cached_pil = None
             loading = handle._request_load()
