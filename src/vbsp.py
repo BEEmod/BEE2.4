@@ -1863,9 +1863,6 @@ def main() -> None:
         coll = Collisions()
         instance_traits.set_traits(vmf, id_to_item, coll)
 
-        if utils.DEV_MODE:
-            coll.dump(vmf, 'coll_pre')
-
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
         # Requires instance traits!
@@ -1906,7 +1903,7 @@ def main() -> None:
         fix_worldspawn(vmf)
 
         if utils.DEV_MODE:
-            coll.dump(vmf, 'coll_post')
+            coll.dump(vmf, vis_name='collisions')
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:
