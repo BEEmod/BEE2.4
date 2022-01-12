@@ -112,7 +112,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
             coll.add(BBox(
                 pos1 @ rotation + box_pos,
                 pos2 @ rotation + box_pos,
-                content, tags, name,
+                contents=content, tags=tags, name=name,
             ))
         else:
             LOGGER.warning('Unknown collision option "{}"!', prop.name)
