@@ -421,12 +421,11 @@ def parse_temp_name(name) -> tuple[str, set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
         temp_name, visgroups = name.rsplit(':', 1)
-        return temp_name.casefold(), {
-            vis.strip().casefold()
-            for vis in
-            visgroups.split(',')
-            if not vis.isspace()
-        }
+        return temp_name.casefold(), set(
+            # Parse comma-seperated visgroups, remove empty, and casefold.
+            map(str.casefold, map(str.strip,
+                itertools.filterfalse(str.isspace, visgroups.split(','))
+        )))
     else:
         return name.casefold(), set()
 
