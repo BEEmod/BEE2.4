@@ -1270,13 +1270,16 @@ Clump = namedtuple('Clump', [
 ])
 
 
-@conditions.make_result_setup('SetAreaTex')
-def cond_force_clump_setup(res: Property):
+@conditions.make_result('SetAreaTex')
+def cond_force_clump(res: Property) -> conditions.ResultCallable:
+    """Force an area to use certain textures.
+
+    This only works in styles using the clumping texture algorithm.
+    """
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
     # Except for white/black walls, all the textures fallback to each other.
-
     white_tex = res['white']
     white_floor = res['whiteFloor', white_tex]
     white_4x4 = res['white4x4', white_tex]
@@ -1299,29 +1302,19 @@ def cond_force_clump_setup(res: Property):
         'black.2x2': res['black2x2', black_floor],
     }
 
-    return point1, point2, tex_data
+    def set_tex(inst: Entity) -> None:
+        """Store off the new textures."""
+        origin = Vec.from_str(inst['origin'])
+        angles = Angle.from_str(inst['angles'])
 
+        min_pos, max_pos = Vec.bbox(point1 @ angles + origin, point2 @ angles + origin)
 
-@conditions.make_result('SetAreaTex')
-def cond_force_clump(inst: Entity, res: Property):
-    """Force an area to use certain textures.
-
-    This only works in styles using the clumping texture algorithm.
-    """
-    point1, point2, tex_data = res.value
-    origin = Vec.from_str(inst['origin'])
-    angles = Angle.from_str(inst['angles'])
-
-    point1 = point1 @ angles + origin
-    point2 = point2 @ angles + origin
-
-    min_pos, max_pos = Vec.bbox(point1, point2)
-
-    PRESET_CLUMPS.append(Clump(
-        min_pos,
-        max_pos,
-        tex_data
-    ))
+        PRESET_CLUMPS.append(Clump(
+            min_pos,
+            max_pos,
+            tex_data
+        ))
+    return set_tex
 
 
 @conditions.meta_cond(priority=-10)
