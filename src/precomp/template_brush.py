@@ -15,7 +15,7 @@ from srctools import Property
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
-from srctools.dmx import Element as DMElement, ValueType as DMType
+from srctools.dmx import Element as DMElement
 import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
@@ -437,11 +437,9 @@ def load_templates(path: str) -> None:
         dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
     if fmt_name != 'bee_templates' or fmt_ver not in [1]:
         raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
-    temp_list = dmx['temp']
-    if temp_list.type is not DMType.ELEMENT:
-        raise ValueError('Badd template array type ' + temp_list.type.name)
-    for template in dmx['temp']:
-        assert isinstance(template, DMElement), template
+    for template in dmx['temp'].iter_elem():
+        if template is None:
+            raise ValueError('Null template!')
         _TEMPLATES[template.name.casefold()] = UnparsedTemplate(
             template.name.upper(),
             template['package'].val_str,
