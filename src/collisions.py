@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
-from typing import Iterable, Iterator, overload
+from typing import Iterable, Iterator, Sequence, overload
 
 import attr
 import functools
@@ -69,6 +69,18 @@ class CollideType(Flag):
             except KeyError:
                 raise ValueError(f'Unknown collide type "{word}"!')
         return coll
+
+# The types we want to write into vmfs.
+EXPORT_KVALUES: Sequence[CollideType] = [
+    CollideType.SOLID,
+    CollideType.DECORATION,
+    CollideType.GRATING,
+    CollideType.GLASS,
+    CollideType.BRIDGE,
+    CollideType.FIZZLER,
+    CollideType.TEMPORARY,
+    CollideType.ANTLINES,
+]
 
 
 @attr.frozen(init=False)
@@ -272,11 +284,11 @@ class BBox:
         ent = vmf.create_ent(
             'bee2_collision_bbox',
             tags=' '.join(sorted(self.tags)),
-            item_name=self.name,
+            item_id=self.name,
         )
-        for coll in CollideType:
-            if coll is not CollideType.EVERYTHING:
-                ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
+        # Exclude the aliases.
+        for coll in EXPORT_KVALUES:
+            ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
         ent.solids.append(prism.solid)
         return ent
 

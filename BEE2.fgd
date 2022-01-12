@@ -163,7 +163,7 @@
 	tags(string): "Tags" : : "Space-seperated list of tags to associate with the collision volume."
 	item_name(string) readonly: "Item Name" : : "In exports of the full map collisions, this is the item name this collision is for."
 	coll_solid(boolean):      "Collide: Solid"      : 0 : "General collisions, should be used for solid walls, props and the like that do not pass anything through."
-	coll_grate(boolean):      "Collide: Grating"    : 0 : "Grating blocks movement, but does not block 'energy' effects."
+	coll_grating(boolean):    "Collide: Grating"    : 0 : "Grating blocks movement, but does not block 'energy' effects."
 	coll_glass(boolean):      "Collide: Glass"      : 0 : "Glass blocks everything, except for line of sight and Discouragement Beams."
 	coll_bridge(boolean):     "Collide: Bridge"     : 0 : "The area of effect of a Light Bridge. "
 	coll_fizzler(boolean):    "Collide: Fizzler"    : 0 : "The region occupied by an object destroying fizzler (meaning objects could be destroyed here)."
