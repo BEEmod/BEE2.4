@@ -45,12 +45,13 @@ def load_transforms() -> None:
         # We embedded a copy of all the transforms in this package, which auto-imports the others.
         # noinspection PyUnresolvedReferences
         from postcomp import transforms
+        LOGGER.debug('Loading transforms from frozen package: {}', transforms)
     else:
         # We can just delegate to the regular postcompiler finder.
         try:
             transform_loc = Path(os.environ['BSP_TRANSFORMS'])
         except KeyError:
-            transform_loc = utils.install_path('../HammerAddons/transforms/')
+            transform_loc = utils.install_path('../HammerAddons/transforms/').resolve()
         if not transform_loc.exists():
             raise ValueError(
                 f'Invalid BSP transforms location "{transform_loc.resolve()}"!\n'
@@ -61,6 +62,7 @@ def load_transforms() -> None:
             PluginSource(transform_loc, recurse=True),
         ])
         sys.meta_path.append(finder)
+        LOGGER.debug('Loading transforms from source: {}', transform_loc)
         finder.load_all()
 
 
