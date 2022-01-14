@@ -845,9 +845,9 @@ def parse_item_folder(
 
         if Item.log_ent_count and not folders[fold].ent_count:
             LOGGER.warning(
-                '"{id}:{path}" has missing entity count!',
-                id=pak_id,
-                path=prop_path,
+                '"{}:{}" has missing entity count!',
+                pak_id,
+                prop_path,
             )
 
         # If we have one of the grouping icon definitions but not both required
@@ -856,10 +856,10 @@ def parse_item_folder(
         has_icon = folders[fold].all_icon is not None
         if (has_name or has_icon or 'all' in folders[fold].icons) and (not has_name or not has_icon):
             LOGGER.warning(
-                'Warning: "{id}:{path}" has incomplete grouping icon '
+                'Warning: "{}:{}" has incomplete grouping icon '
                 'definition!',
-                id=pak_id,
-                path=prop_path,
+                pak_id,
+                prop_path,
             )
         folders[fold].vbsp_config = lazy_conf.from_file(
             utils.PackagePath(pak_id, config_path),
@@ -934,7 +934,9 @@ async def assign_styled_items(
         # We need to repeatedly loop to handle the chains of
         # dependencies. This is a list of (style_id, UnParsed).
         to_change: list[tuple[str, UnParsedItemVariant]] = []
-        styles: dict[str, UnParsedItemVariant | ItemVariant | None] = vers.styles
+        # We temporarily set values like this during parsing, by the end of this loop
+        # it'll all be ItemVariant.
+        styles: dict[str, UnParsedItemVariant | ItemVariant | None] = vers.styles  # type: ignore
         for sty_id, conf in styles.items():
             to_change.append((sty_id, conf))
             # Not done yet
@@ -1012,8 +1014,11 @@ async def assign_styled_items(
                 )
             to_change = deferred
 
+        # Ensure we've converted all these over.
+        assert all(isinstance(variant, ItemVariant) for variant in styles.values()), styles
+
         # Fix this reference to point to the actual value.
-        vers.def_style = styles[vers.def_style]
+        vers.def_style = vers.styles[vers.def_style]
 
         if DEV_MODE.get():
             # Check each editoritem definition for some known issues.
@@ -1034,22 +1039,16 @@ async def assign_styled_items(
                     styles[style.id] = styles[base_style.id]
                     if log_fallbacks and not item.unstyled:
                         LOGGER.warning(
-                            'Item "{item}" using parent '
-                            '"{rep}" for "{style}"!',
-                            item=item.id,
-                            rep=base_style.id,
-                            style=style.id,
+                            'Item "{}" using parent "{}" for "{}"!',
+                            item.id, base_style.id, style.id,
                         )
                     break
             else:
                 # No parent matches!
                 if log_missing_styles and not item.unstyled:
                     LOGGER.warning(
-                        'Item "{0.id}"{2} using '
-                        'inappropriate style for "{1.id}"!',
-                        item,
-                        style,
-                        vers_desc,
+                        'Item "{}"{} using inappropriate style for "{}"!',
+                        item.id, vers_desc, style.id,
                     )
 
                 # If 'isolate versions' is set on the item,

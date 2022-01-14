@@ -131,7 +131,7 @@ class BBox:
         """Allow constructing from Vec, and flip values to make them min/max."""
         if len(args) == 6:
             try:
-                min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)  # type: ignore
+                min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)
             except (TypeError, ValueError):
                 raise TypeError('6 numbers must be supplied!')
         elif len(args) == 2:
