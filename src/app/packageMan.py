@@ -1,6 +1,7 @@
 """Allows enabling and disabling individual packages.
 """
-from typing import Iterable, List, Tuple
+from __future__ import annotations
+from typing import Iterable
 from tkinter import ttk, messagebox
 import tkinter as tk
 from app import TK_ROOT
@@ -16,7 +17,7 @@ window.withdraw()
 
 PACK_CONFIG = ConfigFile('packages.cfg')
 list_widget: CheckDetails
-pack_items: List[Tuple[packages.Package, CheckItem]] = []
+pack_items: list[tuple[packages.Package, CheckItem]] = []
 
 
 def show() -> None:
