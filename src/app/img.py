@@ -155,16 +155,6 @@ class ImageType(Generic[ArgT]):
         return f'<ImageType "{self.name}">'
 
 
-def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Image.Image:
-    """Directly produce an image of this size with the specified color."""
-    return Image.new('RGBA', (width or 16, height or 16), color + (255, ))
-
-
-def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
-    """Produce an image of this size with transparent pixels."""
-    return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
-
-
 def _load_file(
     fsys: FileSystem,
     uri: utils.PackagePath,
@@ -234,104 +224,6 @@ def _load_file(
         image = image.resize((width, height), resample=resize_algo)
     return image
 
-
-def _pil_from_package(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
-    """Load from a app package."""
-    try:
-        fsys = PACK_SYSTEMS[uri.package]
-    except KeyError:
-        LOGGER.warning('Unknown package for loading images: "{}"!', uri)
-        return Handle.error(width, height).get_pil()
-
-    return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
-
-
-def _pil_load_builtin(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
-    """Load from the builtin UI resources."""
-    return _load_file(FSYS_BUILTIN, uri, width, height, Image.ANTIALIAS)
-
-
-def _pil_load_builtin_sprite(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
-    """Load from the builtin UI resources, but use nearest-neighbour resizing."""
-    return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
-
-
-def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -> Image.Image:
-    """Combine several images into one."""
-    if not width:
-        width = components[0].width
-    if not height:
-        height = components[0].height
-    img = Image.new('RGBA', (width, height))
-    for part in components:
-        if part.width != img.width or part.height != img.height:
-            raise ValueError(f'Mismatch in image sizes: {width}x{height} != {components}')
-        # noinspection PyProtectedMember
-        child = part._load_pil()
-        if child.mode != 'RGBA':
-            LOGGER.warning('Image {} did not use RGBA mode!', child)
-            child = child.convert('RGBA')
-        img.alpha_composite(child)
-    return img
-
-
-@attr.define
-class CropInfo:
-    """Crop parameters."""
-    source: Handle
-    bounds: tuple[int, int, int, int]  # left, top, right, bottom coords.
-    transpose: Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
-
-
-def _pil_from_crop(info: CropInfo, width: int, height: int) -> Image.Image:
-    """Crop this image down to part of the source."""
-    src_w = info.source.width
-    src_h = info.source.height
-
-    # noinspection PyProtectedMember
-    image = info.source._load_pil()
-    # Shrink down the source to the final source so the bounds apply.
-    # TODO: Rescale bounds to actual source size to improve result?
-    if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
-        image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
-
-    image = image.crop(info.bounds)
-    if info.transpose is not None:
-        image = image.transpose(info.transpose)
-
-    if width > 0 and height > 0 and (width, height) != image.size:
-        image = image.resize((width, height), resample=Image.ANTIALIAS)
-    return image
-
-
-def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
-    """Construct an image with an overlaid icon."""
-    ico = ICONS[arg]
-    if width == 0:
-        width = ico.width
-    if height == 0:
-        height = ico.height
-
-    img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
-
-    if width < ico.width or height < ico.height:
-        # Crop to the middle part.
-        img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
-    else:
-        # Center the 64x64 icon.
-        img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
-
-    return img
-
-
-TYP_COLOR = ImageType('color', _pil_from_color)
-TYP_ALPHA = ImageType('alpha', _pil_empty, alpha_result=True)
-TYP_FILE = ImageType('file', _pil_from_package)
-TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
-TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
-TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
-TYP_COMP = ImageType('composite', _pil_from_composite)
-TYP_CROP = ImageType('crop', _pil_from_crop)
 
 
 class Handle(Generic[ArgT]):
@@ -684,6 +576,114 @@ class Handle(Generic[ArgT]):
             _discard_tk_img(self._cached_tk)
             self._cached_tk = self._cached_pil = None
 
+
+def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Image.Image:
+    """Directly produce an image of this size with the specified color."""
+    return Image.new('RGBA', (width or 16, height or 16), color + (255, ))
+
+
+def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
+    """Produce an image of this size with transparent pixels."""
+    return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
+
+
+def _pil_from_package(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
+    """Load from a app package."""
+    try:
+        fsys = PACK_SYSTEMS[uri.package]
+    except KeyError:
+        LOGGER.warning('Unknown package for loading images: "{}"!', uri)
+        return Handle.error(width, height).get_pil()
+
+    return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
+
+
+def _pil_load_builtin(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
+    """Load from the builtin UI resources."""
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.ANTIALIAS)
+
+
+def _pil_load_builtin_sprite(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
+    """Load from the builtin UI resources, but use nearest-neighbour resizing."""
+    return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
+
+
+def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -> Image.Image:
+    """Combine several images into one."""
+    if not width:
+        width = components[0].width
+    if not height:
+        height = components[0].height
+    img = Image.new('RGBA', (width, height))
+    for part in components:
+        if part.width != img.width or part.height != img.height:
+            raise ValueError(f'Mismatch in image sizes: {width}x{height} != {components}')
+        # noinspection PyProtectedMember
+        child = part._load_pil()
+        if child.mode != 'RGBA':
+            LOGGER.warning('Image {} did not use RGBA mode!', child)
+            child = child.convert('RGBA')
+        img.alpha_composite(child)
+    return img
+
+
+@attr.define
+class CropInfo:
+    """Crop parameters."""
+    source: Handle
+    bounds: tuple[int, int, int, int]  # left, top, right, bottom coords.
+    transpose: Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
+
+
+def _pil_from_crop(info: CropInfo, width: int, height: int) -> Image.Image:
+    """Crop this image down to part of the source."""
+    src_w = info.source.width
+    src_h = info.source.height
+
+    # noinspection PyProtectedMember
+    image = info.source._load_pil()
+    # Shrink down the source to the final source so the bounds apply.
+    # TODO: Rescale bounds to actual source size to improve result?
+    if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
+        image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
+
+    image = image.crop(info.bounds)
+    if info.transpose is not None:
+        image = image.transpose(info.transpose)
+
+    if width > 0 and height > 0 and (width, height) != image.size:
+        image = image.resize((width, height), resample=Image.ANTIALIAS)
+    return image
+
+
+def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
+    """Construct an image with an overlaid icon."""
+    ico = ICONS[arg]
+    if width == 0:
+        width = ico.width
+    if height == 0:
+        height = ico.height
+
+    img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
+
+    if width < ico.width or height < ico.height:
+        # Crop to the middle part.
+        img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
+    else:
+        # Center the 64x64 icon.
+        img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
+
+    return img
+
+
+TYP_COLOR = ImageType('color', _pil_from_color)
+TYP_ALPHA = ImageType('alpha', _pil_empty, alpha_result=True)
+TYP_FILE = ImageType('file', _pil_from_package)
+TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
+TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
+TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
+TYP_COMP = ImageType('composite', _pil_from_composite)
+TYP_CROP = ImageType('crop', _pil_from_crop)
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
     """Finaliser for _wid_tk keys.
