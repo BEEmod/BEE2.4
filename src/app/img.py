@@ -6,7 +6,7 @@ caching images so repeated requests are cheap.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Generic, TypeVar, Union, Callable, Type, cast
+from typing import Any, ClassVar, Iterator, Literal, TypeVar, Union, Type, cast
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
 from tkinter import ttk
@@ -32,10 +32,10 @@ tkImgWidgetsT = TypeVar('tkImgWidgetsT', tk.Label, ttk.Label, tk.Button, ttk.But
 # WeakRef is only generic in stubs!
 WidgetWeakRef = Union['WeakRef[tk.Label]', 'WeakRef[ttk.Label]', 'WeakRef[tk.Button]', 'WeakRef[ttk.Button]']
 
-ArgT = TypeVar('ArgT')
+HandleT = TypeVar('HandleT', bound='Handle')
 
 # Used to keep track of the used handles, so we can deduplicate them.
-_handles: dict[tuple, Handle] = {}
+_handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
 # Matches widgets to the handle they use.
 _wid_tk: dict[WidgetWeakRef, Handle] = {}
 
@@ -83,17 +83,17 @@ ICONS['load_6'] = _load_icon.transpose(Image.ROTATE_90)
 
 del _load_icon, _load_icon_flip
 # Loader handles, which we want to cycle animate.
-_load_handles: dict[tuple[int, int], Handle] = {}
+_load_handles: dict[tuple[int, int], ImgIcon] = {}
 
 # Once initialised, schedule here.
 _load_nursery: trio.Nursery | None = None
-# Load calls occuring before init. This is done so apply() can be called during import etc,
+# Load calls occurring before init. This is done so apply() can be called during import etc,
 # and it'll be deferred till later.
 _early_loads: set[Handle] = set()
 
 
 def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
-    """Return an xy tuple given a size or tuple."""
+    """Return a xy tuple given a size or tuple."""
     if isinstance(size, tuple):
         return size
     return size, size
@@ -131,28 +131,6 @@ PATH_NONE = utils.PackagePath('<special>', 'none')
 PATH_BG = utils.PackagePath('color', PETI_ITEM_BG_HEX[1:])
 PATH_BLACK = utils.PackagePath('<color>', '000')
 PATH_WHITE = utils.PackagePath('<color>', 'fff')
-
-
-class ImageType(Generic[ArgT]):
-    """Represents a kind of image that can be loaded or generated.
-
-    This contains callables for generating a PIL image from a specified
-    arg type, width and height.
-    """
-    def __init__(
-        self,
-        name: str,
-        pil_func: Callable[[ArgT, int, int], Image.Image],
-        allow_raw: bool=False,
-        alpha_result: bool=False,
-    ) -> None:
-        self.name = name
-        self.pil_func = pil_func
-        self.allow_raw = allow_raw
-        self.alpha_result = alpha_result
-
-    def __repr__(self) -> str:
-        return f'<ImageType "{self.name}">'
 
 
 def _load_file(
@@ -225,46 +203,56 @@ def _load_file(
     return image
 
 
-class Handle(Generic[ArgT]):
+@attr.define(eq=False)
+class Handle:
     """Represents an image that may be reloaded as required.
 
     The args are dependent on the type, and are used to create the image
     in a background thread.
     """
-    _cached_pil: Image.Image | None
-    _cached_tk: ImageTk.PhotoImage | None
-    def __init__(
-        self,
-        width: int,
-        height: int,
-    ) -> None:
-        """Internal use only."""
-        self.type = ImageType()
-        self.width = width
-        self.height = height
+    width: int
+    height: int
 
-        self._cached_pil = None
-        self._cached_tk = None
-        self._force_loaded = False
-        self._users: set[WidgetWeakRef | Handle] = set()
-        # If None, get_tk()/get_pil() was used.
-        # If true, this is in the queue to load.
-        self._loading = False
-        # When no users are present, schedule cleaning up the handle's data to reuse.
-        self._cancel_cleanup: trio.CancelScope = trio.CancelScope()
+    _cached_pil: Image.Image | None = attr.ib(init=False, default=None, repr=False)
+    _cached_tk: ImageTk.PhotoImage | None = attr.ib(init=False, default=None, repr=False)
+
+    _users: set[WidgetWeakRef | Handle] = attr.ib(init=False, factory=set, repr=False)
+    # If set, get_tk()/get_pil() was used.
+    _force_loaded: bool = attr.ib(init=False, default=False)
+    # If true, this is in the queue to load.
+    _loading: bool = attr.ib(init=False, default=False)
+    # When no users are present, schedule cleaning up the handle's data to reuse.
+    _cancel_cleanup: trio.CancelScope = attr.ib(init=False, factory=trio.CancelScope, repr=False)
+
+    # Determines whether get_pil() and get_tk() can be called directly.
+    allow_raw: ClassVar[bool] = False
+    # Whether the result can be transparent.
+    alpha_result: ClassVar[bool] = False
+
+    # Subclass methods
+    def _children(self) -> Iterator[Handle]:
+        """Yield all the handles this depends on."""
+        return iter(())
+
+    def _make_image(self) -> Image.Image:
+        """Construct the image data, must be implemented by subclass."""
+        raise NotImplementedError
 
     @classmethod
-    def _get(cls, typ: ImageType[ArgT], arg: ArgT, width: int | tuple[int, int], height: int) -> Handle[ArgT]:
+    def _to_key(cls, args: tuple) -> tuple:
+        """Override in subclasses to convert mutable attributes to deduplicate."""
+        return args
+
+    @classmethod
+    def _deduplicate(cls: Type[HandleT], width: int | tuple[int, int], height: int, *args: Any) -> HandleT:
         if isinstance(width, tuple):
             width, height = width
+        key = cls._to_key(args)
         try:
-            return _handles[typ, arg, width, height]
+            return cast(HandleT, _handles[cls, key, width, height])
         except KeyError:
-            handle = _handles[typ, arg, width, height] = Handle(typ, arg, width, height)
+            handle = _handles[cls, key, width, height] = cls(width, height, *args)
             return handle
-
-    def __repr__(self) -> str:
-        return f'<{self.type.name.title()} image, {self.width}x{self.height}, {self.arg!r}>'
 
     @classmethod
     def parse(
@@ -322,25 +310,25 @@ class Handle(Generic[ArgT]):
         if subfolder:
             uri = uri.in_folder(subfolder)
 
-        typ: ImageType
-        args: object
+        typ: Type[Handle]
+        args: list
         if uri.path.casefold() == '<black>':  # Old special case name.
             LOGGER.warning('Using "{}" for a black icon is deprecated, use "<color>:000" or "<rgb>:000".', uri)
-            typ = TYP_COLOR
-            args = (0, 0, 0)
+            typ = ImgColor
+            args = [0, 0, 0]
         elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
             special_name = uri.package[1:-1]
             if special_name == 'special':
-                args = None
+                args = []
                 name = uri.path.casefold()
                 if name == 'blank':
-                    typ = TYP_ALPHA
+                    typ = ImgAlpha
                 elif name in ('error', 'none', 'load'):
-                    typ = TYP_ICON
-                    args = name
+                    typ = ImgIcon
+                    args = [name]
                 elif name == 'bg':
-                    typ = TYP_COLOR
-                    args = PETI_ITEM_BG
+                    typ = ImgColor
+                    args = [PETI_ITEM_BG]
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
             elif special_name in ('color', 'colour', 'rgb'):
@@ -371,30 +359,30 @@ class Handle(Generic[ArgT]):
                         b >>= 8
                     except tk.TclError:
                         raise ValueError(f'Colors must be RGB, RRGGBB hex values, or R,G,B decimal!, not {uri}') from None
-                typ = TYP_COLOR
-                args = (r, g, b)
+                typ = ImgColor
+                args = [r, g, b]
             elif special_name in ('bee', 'bee2'):  # Builtin resources.
-                typ = TYP_BUILTIN
-                args = uri
+                typ = ImgBuiltin
+                args = [uri]
             else:
                 raise ValueError(f'Unknown special icon type "{uri}"!')
         else:  # File item
-            typ = TYP_FILE
-            args = uri
-        return cls._get(typ, args, width, height)
+            typ = ImgFile
+            args = [uri]
+        return typ._deduplicate(width, height, *args)
 
     @classmethod
-    def builtin(cls, path: str, width: int = 0, height: int = 0) -> Handle[utils.PackagePath]:
+    def builtin(cls, path: str, width: int = 0, height: int = 0) -> ImgBuiltin:
         """Shortcut for getting a handle to a builtin UI image."""
-        return cls._get(TYP_BUILTIN, utils.PackagePath('<bee2>', path + '.png'), width, height)
+        return ImgBuiltin._deduplicate(width, height, utils.PackagePath('<bee2>', path + '.png'))
 
     @classmethod
-    def sprite(cls, path: str, width: int = 0, height: int = 0) -> Handle[utils.PackagePath]:
+    def sprite(cls, path: str, width: int = 0, height: int = 0) -> ImgSprite:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
-        return cls._get(TYP_BUILTIN_SPR, utils.PackagePath('<bee2>', path + '.png'), width, height)
+        return ImgSprite._deduplicate(width, height, utils.PackagePath('<bee2>', path + '.png'))
 
     @classmethod
-    def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle[Sequence[Handle]]:
+    def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle:
         """Return a handle composed of several images layered on top of each other."""
         if not children:
             return cls.error(width, height)
@@ -403,64 +391,58 @@ class Handle(Generic[ArgT]):
         if not height:
             height = children[0].height
 
-        # Handles aren't hashable, so we need to manually look up.
-        key = tuple((child.type, child.arg) for child in children)
-        try:
-            return _handles[TYP_COMP, key, width, height]
-        except KeyError:
-            handle = _handles[TYP_COMP, key, width, height] = Handle(TYP_COMP, children, width, height)
-            return handle
+        return ImgComposite._deduplicate(width, height, children)
 
     def crop(
         self,
         bounds: tuple[int, int, int, int],
         transpose: int | None = None,
         width: int = 0, height: int = 0,
-    ) -> Handle[Sequence[Handle]]:
+    ) -> ImgCrop:
         """Wrap a handle to crop it into a smaller size."""
-        return Handle(TYP_CROP, CropInfo(self, bounds, transpose), width, height)
+        return ImgCrop._deduplicate(width, height, self, bounds, transpose)
 
     @classmethod
-    def file(cls, path: utils.PackagePath, width: int, height: int) -> Handle[utils.PackagePath]:
+    def file(cls, path: utils.PackagePath, width: int, height: int) -> ImgFile:
         """Shortcut for getting a handle to file path."""
-        return cls._get(TYP_FILE, path, width, height)
+        return ImgFile._deduplicate(width, height, path)
 
     @classmethod
-    def error(cls, width: int, height: int) -> Handle[str]:
+    def error(cls, width: int, height: int) -> ImgIcon:
         """Shortcut for getting a handle to an error icon."""
-        return cls._get(TYP_ICON, 'error', width, height)
+        return ImgIcon._deduplicate(width, height,  'error')
 
     @classmethod
-    def ico_none(cls, width: int, height: int) -> Handle[str]:
+    def ico_none(cls, width: int, height: int) -> ImgIcon:
         """Shortcut for getting a handle to a 'none' icon."""
-        return cls._get(TYP_ICON, 'none', width, height)
+        return ImgIcon._deduplicate(width, height, 'none')
 
     @classmethod
-    def ico_loading(cls, width: int, height: int) -> Handle[str]:
+    def ico_loading(cls, width: int, height: int) -> ImgIcon:
         """Shortcut for getting a handle to a 'loading' icon."""
         try:
             return _load_handles[width, height]
         except KeyError:
-            res = _load_handles[width, height] = cls._get(TYP_ICON, 'load', width, height)
+            res = _load_handles[width, height] = ImgIcon._deduplicate(width, height, 'load')
             return res
 
     @classmethod
-    def blank(cls, width: int, height: int) -> Handle:
+    def blank(cls, width: int, height: int) -> ImgAlpha:
         """Shortcut for getting a handle to an empty image."""
-        # The argument is irrelevant.
-        return cls._get(TYP_ALPHA, None, width, height)
+        return ImgAlpha._deduplicate(width, height)
 
     @classmethod
-    def color(cls, color: tuple[int, int, int] | Vec, width: int, height: int) -> Handle[tuple[int, int, int]]:
+    def color(cls, color: tuple[int, int, int] | Vec, width: int, height: int) -> ImgColor:
         """Shortcut for getting a handle to a solid color."""
         if isinstance(color, Vec):
             # Convert.
-            color = int(color.x), int(color.y), int(color.z)
-        return cls._get(TYP_COLOR, color, width, height)
+            return ImgColor._deduplicate(width, height, int(color.x), int(color.y), int(color.z))
+        else:
+            return ImgColor._deduplicate(width, height, *color)
 
     def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
-        if self.type.allow_raw:
+        if self.allow_raw:
             # Force load, so it's always ready.
             self._force_loaded = True
         elif not self._users and _load_nursery is not None:
@@ -476,15 +458,15 @@ class Handle(Generic[ArgT]):
         Only available on BUILTIN type images since they cannot then be
         reloaded.
         """
-        if not self.type.allow_raw:
-            raise ValueError('Cannot use get_tk() on non-builtin types!')
+        if not self.allow_raw:
+            raise ValueError(f'Cannot use get_tk() on non-builtin type {self!r}!')
         self._force_loaded = True
         return self._load_tk()
 
     def _load_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
         if self._cached_pil is None:
-            self._cached_pil = self.type.pil_func(self.arg, self.width, self.height)
+            self._cached_pil = self._make_image()
         return self._cached_pil
 
     def _load_tk(self) -> ImageTk.PhotoImage:
@@ -493,7 +475,7 @@ class Handle(Generic[ArgT]):
             # LOGGER.debug('Loading {}', self)
             res = self._load_pil()
             # Except for builtin types (icons), strip alpha.
-            if not self.type.alpha_result:
+            if not self.alpha_result:
                 res = res.convert('RGB')
             self._cached_tk = _get_tk_img(res.width, res.height)
             self._cached_tk.paste(res)
@@ -504,11 +486,8 @@ class Handle(Generic[ArgT]):
         if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
             return
         self._users.discard(ref)
-        if self.type is TYP_COMP:
-            for child in cast('Sequence[Handle]', self.arg):
-                child._decref(self)
-        elif self.type is TYP_CROP:
-            cast(CropInfo, self.arg).source._decref(self)
+        for child in self._children():
+            child._decref(self)
         if not self._users and _load_nursery is not None:
             # Schedule this handle to be cleaned up, and store a cancel scope so that
             # can be aborted.
@@ -522,11 +501,8 @@ class Handle(Generic[ArgT]):
         self._users.add(ref)
         # Abort cleaning up if we were planning to.
         self._cancel_cleanup.cancel()
-        if self.type is TYP_COMP:
-            for child in cast('Sequence[Handle]', self.arg):
-                child._incref(self)
-        elif self.type is TYP_CROP:
-            cast(CropInfo, self.arg).source._incref(self)
+        for child in self._children():
+            child._incref(self)
 
     def _request_load(self) -> ImageTk.PhotoImage:
         """Request a reload of this image.
@@ -572,34 +548,36 @@ class Handle(Generic[ArgT]):
             _discard_tk_img(self._cached_tk)
             self._cached_tk = self._cached_pil = None
 
-    def _make_image(self) -> Image.Image:
-        """Construct the image data, must be implemented by subclass."""
-        raise NotImplementedError
 
-
+@attr.define(eq=False)
 class ImgColor(Handle):
     """An image containing a solid color."""
-    def __init__(self, width: int, height: int, color: tuple[int, int, int]) -> None:
-        super().__init__(width, height)
-        self.fill = color
+    red: int
+    green: int
+    blue: int
 
     def _make_image(self) -> Image.Image:
         """Directly produce an image of this size with the specified color."""
-        return Image.new('RGBA', (self.width or 16, self.height or 16), self.fill + (255, ))
+        return Image.new(
+            'RGBA',
+            (self.width or 16, self.height or 16),
+            (self.red, self.green, self.blue, 255),
+        )
 
 
-class ImgEmpty(Handle):
+class ImgAlpha(Handle):
     """An image which is entirely transparent."""
+    alpha_result: ClassVar[bool] = True
+
     def _make_image(self) -> Image.Image:
         """Produce an image of this size with transparent pixels."""
         return Image.new('RGBA', (self.width or 16, self.height or 16), (0, 0, 0, 0))
 
 
+@attr.define(eq=False)
 class ImgFile(Handle):
     """An image loaded from a package."""
-    def __init__(self, width: int, height: int, uri: utils.PackagePath) -> None:
-        super().__init__(width, height)
-        self.uri = uri
+    uri: utils.PackagePath
 
     def _make_image(self) -> Image.Image:
         """Load from a app package."""
@@ -612,33 +590,39 @@ class ImgFile(Handle):
         return _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
 
 
+@attr.define(eq=False)
 class ImgBuiltin(Handle):
     """An image loaded from builtin UI resources."""
-    def __init__(self, width: int, height: int, uri: utils.PackagePath) -> None:
-        super().__init__(width, height)
-        self.uri = uri
+    uri: utils.PackagePath
+    allow_raw: ClassVar[bool] = True
+    alpha_result: ClassVar[bool] = True
 
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources."""
         return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.ANTIALIAS)
 
 
+@attr.define(eq=False)
 class ImgSprite(Handle):
     """An image loaded from builtin UI resources, with nearest-neighbour resizing."""
-    def __init__(self, width: int, height: int, uri: utils.PackagePath) -> None:
-        super().__init__(width, height)
-        self.uri = uri
+    uri: utils.PackagePath
+    allow_raw: ClassVar[bool] = True
+    alpha_result: ClassVar[bool] = True
 
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources, but use nearest-neighbour resizing."""
         return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.NEAREST)
 
 
+@attr.define(eq=False)
 class ImgComposite(Handle):
     """An image composed of multiple layers composited together."""
-    def __init__(self, width: int, height: int, layers: Sequence[Handle]) -> None:
-        super().__init__(width, height)
-        self.layers = layers
+    layers: Sequence[Handle]
+
+    @classmethod
+    def _to_key(cls, children: tuple[Handle, ...]) -> tuple:
+        """Handles aren't hashable, so we need to use identity."""
+        return tuple(map(id, children))
 
     def _make_image(self) -> Image.Image:
         """Combine several images into one."""
@@ -657,63 +641,66 @@ class ImgComposite(Handle):
         return img
 
 
-@attr.define
-class CropInfo:
-    """Crop parameters."""
+@attr.define(eq=False)
+class ImgCrop(Handle):
+    """An image that crops another down to only show part."""
     source: Handle
     bounds: tuple[int, int, int, int]  # left, top, right, bottom coords.
-    transpose: Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
+    # Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
+    transpose: Literal[0, 1, 3] | None
+
+    def _children(self) -> Iterator[Handle]:
+        yield self.source
+
+    @classmethod
+    def _to_key(cls, args: tuple) -> tuple:
+        """Handles aren't hashable, so we need to use identity."""
+        [child, bounds, transpose] = args
+        return (id(child), bounds, transpose)
+
+    def _make_image(self) -> Image.Image:
+        """Crop this image down to part of the source."""
+        src_w = self.source.width
+        src_h = self.source.height
+
+        image = self.source._load_pil()
+        # Shrink down the source to the final source so the bounds apply.
+        # TODO: Rescale bounds to actual source size to improve result?
+        if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
+            image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
+
+        image = image.crop(self.bounds)
+        if self.transpose is not None:
+            image = image.transpose(self.transpose)
+
+        if self.width > 0 and self.height > 0 and (self.width, self.height) != image.size:
+            image = image.resize((self.width, self.height), resample=Image.ANTIALIAS)
+        return image
 
 
-def _pil_from_crop(info: CropInfo, width: int, height: int) -> Image.Image:
-    """Crop this image down to part of the source."""
-    src_w = info.source.width
-    src_h = info.source.height
+@attr.define(eq=False)
+class ImgIcon(Handle):
+    """An image containing the PeTI background with a centered icon."""
+    icon_name: str
+    allow_raw: ClassVar[bool] = True
 
-    # noinspection PyProtectedMember
-    image = info.source._load_pil()
-    # Shrink down the source to the final source so the bounds apply.
-    # TODO: Rescale bounds to actual source size to improve result?
-    if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
-        image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
+    def _make_image(self) -> Image.Image:
+        """Construct an image with an overlaid icon."""
+        ico = ICONS[self.icon_name]
+        width = self.width or ico.width
+        height = self.height or ico.height
 
-    image = image.crop(info.bounds)
-    if info.transpose is not None:
-        image = image.transpose(info.transpose)
+        img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
 
-    if width > 0 and height > 0 and (width, height) != image.size:
-        image = image.resize((width, height), resample=Image.ANTIALIAS)
-    return image
+        if width < ico.width or height < ico.height:
+            # Crop to the middle part.
+            img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
+        else:
+            # Center the 64x64 icon.
+            img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
 
+        return img
 
-def _pil_icon(arg: str, width: int, height: int) -> Image.Image:
-    """Construct an image with an overlaid icon."""
-    ico = ICONS[arg]
-    if width == 0:
-        width = ico.width
-    if height == 0:
-        height = ico.height
-
-    img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
-
-    if width < ico.width or height < ico.height:
-        # Crop to the middle part.
-        img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
-    else:
-        # Center the 64x64 icon.
-        img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
-
-    return img
-
-
-TYP_COLOR = ImageType('color', _pil_from_color)
-TYP_ALPHA = ImageType('alpha', _pil_empty, alpha_result=True)
-TYP_FILE = ImageType('file', _pil_from_package)
-TYP_BUILTIN_SPR = ImageType('sprite', _pil_load_builtin_sprite, allow_raw=True, alpha_result=True)
-TYP_BUILTIN = ImageType('builtin', _pil_load_builtin, allow_raw=True, alpha_result=True)
-TYP_ICON = ImageType('icon', _pil_icon, allow_raw=True)
-TYP_COMP = ImageType('composite', _pil_from_composite)
-TYP_CROP = ImageType('crop', _pil_from_crop)
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
     """Finaliser for _wid_tk keys.
@@ -727,6 +714,7 @@ def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
         # called twice, etc. Just ignore.
         pass
     else:
+        # noinspection PyProtectedMember
         handle._decref(ref)
 
 
@@ -740,7 +728,7 @@ async def _spin_load_icons() -> None:
     for load_name in itertools.cycle(fnames):
         await trio.sleep(0.125)
         for handle in _load_handles.values():
-            handle.arg = load_name
+            handle.icon_name = load_name
             handle._cached_pil = None
             if handle._cached_tk is not None:
                 # This updates the TK widget directly.
