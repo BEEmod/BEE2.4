@@ -225,7 +225,6 @@ def _load_file(
     return image
 
 
-
 class Handle(Generic[ArgT]):
     """Represents an image that may be reloaded as required.
 
@@ -236,14 +235,11 @@ class Handle(Generic[ArgT]):
     _cached_tk: ImageTk.PhotoImage | None
     def __init__(
         self,
-        typ: ImageType[ArgT],
-        args: ArgT,
         width: int,
         height: int,
     ) -> None:
         """Internal use only."""
-        self.type = typ
-        self.arg = args
+        self.type = ImageType()
         self.width = width
         self.height = height
 
@@ -576,55 +572,89 @@ class Handle(Generic[ArgT]):
             _discard_tk_img(self._cached_tk)
             self._cached_tk = self._cached_pil = None
 
-
-def _pil_from_color(color: tuple[int, int, int], width: int, height: int) -> Image.Image:
-    """Directly produce an image of this size with the specified color."""
-    return Image.new('RGBA', (width or 16, height or 16), color + (255, ))
-
-
-def _pil_empty(arg: object, width: int, height: int) -> Image.Image:
-    """Produce an image of this size with transparent pixels."""
-    return Image.new('RGBA', (width or 16, height or 16), (0, 0, 0, 0))
+    def _make_image(self) -> Image.Image:
+        """Construct the image data, must be implemented by subclass."""
+        raise NotImplementedError
 
 
-def _pil_from_package(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
-    """Load from a app package."""
-    try:
-        fsys = PACK_SYSTEMS[uri.package]
-    except KeyError:
-        LOGGER.warning('Unknown package for loading images: "{}"!', uri)
-        return Handle.error(width, height).get_pil()
+class ImgColor(Handle):
+    """An image containing a solid color."""
+    def __init__(self, width: int, height: int, color: tuple[int, int, int]) -> None:
+        super().__init__(width, height)
+        self.fill = color
 
-    return _load_file(fsys, uri, width, height, Image.ANTIALIAS, True)
-
-
-def _pil_load_builtin(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
-    """Load from the builtin UI resources."""
-    return _load_file(FSYS_BUILTIN, uri, width, height, Image.ANTIALIAS)
+    def _make_image(self) -> Image.Image:
+        """Directly produce an image of this size with the specified color."""
+        return Image.new('RGBA', (self.width or 16, self.height or 16), self.fill + (255, ))
 
 
-def _pil_load_builtin_sprite(uri: utils.PackagePath, width: int, height: int) -> Image.Image:
-    """Load from the builtin UI resources, but use nearest-neighbour resizing."""
-    return _load_file(FSYS_BUILTIN, uri, width, height, Image.NEAREST)
+class ImgEmpty(Handle):
+    """An image which is entirely transparent."""
+    def _make_image(self) -> Image.Image:
+        """Produce an image of this size with transparent pixels."""
+        return Image.new('RGBA', (self.width or 16, self.height or 16), (0, 0, 0, 0))
 
 
-def _pil_from_composite(components: Sequence[Handle], width: int, height: int) -> Image.Image:
-    """Combine several images into one."""
-    if not width:
-        width = components[0].width
-    if not height:
-        height = components[0].height
-    img = Image.new('RGBA', (width, height))
-    for part in components:
-        if part.width != img.width or part.height != img.height:
-            raise ValueError(f'Mismatch in image sizes: {width}x{height} != {components}')
-        # noinspection PyProtectedMember
-        child = part._load_pil()
-        if child.mode != 'RGBA':
-            LOGGER.warning('Image {} did not use RGBA mode!', child)
-            child = child.convert('RGBA')
-        img.alpha_composite(child)
-    return img
+class ImgFile(Handle):
+    """An image loaded from a package."""
+    def __init__(self, width: int, height: int, uri: utils.PackagePath) -> None:
+        super().__init__(width, height)
+        self.uri = uri
+
+    def _make_image(self) -> Image.Image:
+        """Load from a app package."""
+        try:
+            fsys = PACK_SYSTEMS[self.uri.package]
+        except KeyError:
+            LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
+            return Handle.error(self.width, self.height).get_pil()
+
+        return _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
+
+
+class ImgBuiltin(Handle):
+    """An image loaded from builtin UI resources."""
+    def __init__(self, width: int, height: int, uri: utils.PackagePath) -> None:
+        super().__init__(width, height)
+        self.uri = uri
+
+    def _make_image(self) -> Image.Image:
+        """Load from the builtin UI resources."""
+        return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.ANTIALIAS)
+
+
+class ImgSprite(Handle):
+    """An image loaded from builtin UI resources, with nearest-neighbour resizing."""
+    def __init__(self, width: int, height: int, uri: utils.PackagePath) -> None:
+        super().__init__(width, height)
+        self.uri = uri
+
+    def _make_image(self) -> Image.Image:
+        """Load from the builtin UI resources, but use nearest-neighbour resizing."""
+        return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.NEAREST)
+
+
+class ImgComposite(Handle):
+    """An image composed of multiple layers composited together."""
+    def __init__(self, width: int, height: int, layers: Sequence[Handle]) -> None:
+        super().__init__(width, height)
+        self.layers = layers
+
+    def _make_image(self) -> Image.Image:
+        """Combine several images into one."""
+        width = self.width or self.layers[0].width
+        height = self.height or self.layers[0].height
+        img = Image.new('RGBA', (width, height))
+        for part in self.layers:
+            if part.width != img.width or part.height != img.height:
+                raise ValueError(f'Mismatch in image sizes: {width}x{height} != {self.layers}')
+            # noinspection PyProtectedMember
+            child = part._load_pil()
+            if child.mode != 'RGBA':
+                LOGGER.warning('Image {} did not use RGBA mode!', child)
+                child = child.convert('RGBA')
+            img.alpha_composite(child)
+        return img
 
 
 @attr.define
