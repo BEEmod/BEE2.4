@@ -1133,12 +1133,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         command=pal_ui.event_save_as,
     ).grid(row=1, sticky="EW", padx=5)
 
-    ttk.Checkbutton(
-        frame,
-        text=gettext('Save Settings in Palettes'),
-        variable=pal_ui.var_save_settings,
-        command=pal_ui.event_save_settings_changed,
-    ).grid(row=2, sticky="EW", padx=5)
+    pal_ui.make_option_checkbox(frame).grid(row=2, sticky="EW", padx=5)
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 

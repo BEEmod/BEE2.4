@@ -260,7 +260,16 @@ class PaletteUI:
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='normal')
             self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='normal')
 
-    def event_save_settings_changed(self) -> None:
+    def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
+        """Create a checkbutton configured to control the save palette in settings option."""
+        return ttk.Checkbutton(
+            frame,
+            text=gettext('Save Settings in Palettes'),
+            variable=self.var_save_settings,
+            command=self._event_save_settings_changed,
+        )
+
+    def _event_save_settings_changed(self) -> None:
         """Save the state of this button."""
         BEE2_config.GEN_OPTS['General']['palette_save_settings'] = srctools.bool_as_int(self.var_save_settings.get())
 
