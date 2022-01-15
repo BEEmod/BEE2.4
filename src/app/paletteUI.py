@@ -110,18 +110,19 @@ class PaletteUI:
             command=self.event_remove,
         )
         self.ui_menu_delete_index = menu.index('end')
+        self.ui_menu_indexes = [self.ui_menu_delete_index]
 
         menu.add_command(
             label=gettext('Change Palette Group...'),
             command=self.event_change_group,
         )
-        self.ui_menu_regroup_index = menu.index('end')
+        self.ui_menu_indexes.append(menu.index('end'))
 
         menu.add_command(
             label=gettext('Rename Palette...'),
             command=self.event_rename,
         )
-        self.ui_menu_rename_index = menu.index('end')
+        self.ui_menu_indexes.append(menu.index('end'))
 
         menu.add_command(
             label=gettext('Fill Palette'),
@@ -142,7 +143,7 @@ class PaletteUI:
             command=self.event_save,
             accelerator=tk_tools.ACCEL_SAVE,
         )
-        self.ui_menu_save_ind = menu.index('end')
+        self.ui_menu_indexes.append(menu.index('end'))
         menu.add_command(
             label=gettext('Save Palette As...'),
             command=self.event_save_as,
@@ -233,7 +234,7 @@ class PaletteUI:
                         image=gear_img,
                         tags=TREE_TAG_PALETTES,
                     )
-        # Finally strip any ones which were removed.
+        # Finally, strip any ones which were removed.
         if existing:
             self.ui_treeview.delete(*existing)
 
@@ -248,17 +249,13 @@ class PaletteUI:
         if self.selected.readonly:
             self.ui_remove.state(('disabled',))
             self.save_btn_state(('disabled',))
-            self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='disabled')
-            self.ui_menu.entryconfigure(self.ui_menu_regroup_index, state='disabled')
-            self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='disabled')
-            self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='disabled')
+            for ind in self.ui_menu_indexes:
+                self.ui_menu.entryconfigure(ind, state='disabled')
         else:
             self.ui_remove.state(('!disabled',))
             self.save_btn_state(('!disabled',))
-            self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='normal')
-            self.ui_menu.entryconfigure(self.ui_menu_regroup_index, state='normal')
-            self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='normal')
-            self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='normal')
+            for ind in self.ui_menu_indexes:
+                self.ui_menu.entryconfigure(ind, state='normal')
 
     def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
         """Create a checkbutton configured to control the save palette in settings option."""
