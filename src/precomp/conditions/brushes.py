@@ -14,6 +14,7 @@ from precomp import (
 )
 import vbsp
 import consts
+from precomp.collisions import Collisions
 
 
 COND_MOD_NAME = 'Brushes'
@@ -369,7 +370,7 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('TemplateBrush')
-def res_import_template(vmf: VMF, res: Property):
+def res_import_template(vmf: VMF, coll: Collisions, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only
@@ -589,7 +590,7 @@ def res_import_template(vmf: VMF, res: Property):
             return
 
         for vis_flag_block in visgroup_instvars:
-            if all(conditions.check_flag(flag, inst) for flag in vis_flag_block):
+            if all(conditions.check_flag(flag, coll, inst) for flag in vis_flag_block):
                 visgroups.add(vis_flag_block.real_name)
 
         force_colour = conf_force_colour
@@ -642,9 +643,10 @@ def res_import_template(vmf: VMF, res: Property):
             template,
             origin,
             orient,
-            targetname=inst['targetname', ''],
+            targetname=inst['targetname'],
             force_type=force_type,
             add_to_map=True,
+            coll=coll,
             additional_visgroups=visgroups,
             bind_tile_pos=bind_tile_pos,
             align_bind=align_bind_overlay,

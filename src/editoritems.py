@@ -14,6 +14,7 @@ from srctools.tokenizer import Tokenizer, Token
 
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, UnknownProp, PROP_TYPES
+from collisions import CollideType, BBox, NonBBoxError
 
 
 LOGGER = logger.get_logger(__name__)
@@ -127,9 +128,11 @@ class FaceType(Enum):
     CHECK = CHECKERED = '4x4_checkered'
 
 
-class CollType(Flag):
-    """Types of collisions between items.
+class OccuType(Flag):
+    """Types of occupation between items.
 
+    This is named OccuType to distinguish it from the expanded collision types
+    used in the compiler.
     Physics is excluded from the generated piston collisions, if it
     can move out of those locations.
     """
@@ -149,30 +152,47 @@ class CollType(Flag):
     DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> 'CollType':
+    def parse(cls, tok: Tokenizer) -> 'OccuType':
         """Parse the collision type value."""
         coll = cls.NOTHING
         for part in tok.expect(Token.STRING).split():
             try:
-                coll |= COLL_TYPES[part.upper()]
+                coll |= OCCU_TYPES[part.upper()]
             except KeyError:
-                raise tok.error('Unknown collision type "{}"!', part)
+                raise tok.error('Unknown Occupied Voxels collision type "{}"!', part)
         return coll
 
     def __str__(self) -> str:
         """The string form is each of the names seperated by spaces."""
         value = self.value
         try:
-            return _coll_type_str[value]
+            return _occu_type_str[value]
         except KeyError:
             pass
         names = []
-        for name, coll_type in COLL_TYPES.items():
-            if name != 'COLLIDE_EVERYTHING' and coll_type.value & value:
+        for name, occu_type in OCCU_TYPES.items():
+            if name != 'COLLIDE_EVERYTHING' and occu_type.value & value:
                 names.append(name)
         names.sort()
-        res = _coll_type_str[value] = ' '.join(names)
+        res = _occu_type_str[value] = ' '.join(names)
         return res
+
+    @property
+    def collision(self) -> CollideType:
+        """Convert to the equivalent collision type."""
+        try:
+            return _occu_to_collide[self]
+        except KeyError:
+            pass
+        result = CollideType.NOTHING
+        occu_type: OccuType
+        for occu_type in OccuType:
+            if occu_type is OccuType.EVERYTHING:
+                continue
+            if occu_type.value & self.value:
+                result |= CollideType[occu_type.name]
+        _occu_to_collide[self] = result
+        return result
 
 
 class Sound(Enum):
@@ -394,10 +414,12 @@ _coord_cache.update({
     for c in NORMALS
 })
 # Cache the computed value shapes.
-_coll_type_str: dict[int, str] = {
-    CollType.NOTHING.value: 'COLLIDE_NOTHING',
-    CollType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
+_occu_type_str: dict[int, str] = {
+    OccuType.NOTHING.value: 'COLLIDE_NOTHING',
+    OccuType.EVERYTHING.value: 'COLLIDE_EVERYTHING',
 }
+# Cached OccuType -> CollideType conversions.
+_occu_to_collide: dict[OccuType, CollideType] = {}
 
 ITEM_CLASSES: dict[str, ItemClass] = {
     cls.id.casefold(): cls
@@ -407,9 +429,9 @@ FACE_TYPES: dict[str, FaceType] = {
     face.value.casefold(): face
     for face in FaceType
 }
-COLL_TYPES: dict[str, CollType] = {
+OCCU_TYPES: dict[str, OccuType] = {
     'COLLIDE_' + coll.name: coll
-    for coll in CollType
+    for coll in OccuType
 }
 
 # The defaults, if this is unset.
@@ -524,8 +546,8 @@ class OccupiedVoxel:
     If normal is not None, this is a side and not a cube.
     If subpos is not None, this is a 32x32 cube and not a full voxel.
     """
-    type: CollType
-    against: CollType | None  # TODO: Don't know what the default is.
+    type: OccuType
+    against: OccuType | None  # TODO: Don't know what the default is.
     pos: Coord
     subpos: Coord | None = None
     normal: Coord | None = None
@@ -832,7 +854,7 @@ class Item:
     # Movement handle
     handle: Handle = Handle.NONE
     facing: DesiredFacing = DesiredFacing.NONE
-    invalid_surf: set[Surface] = attr.ib(factory=set, converter=set)
+    invalid_surf: set[Surface] = attr.ib(factory=set)
     # Anim name to sequence index.
     animations: dict[Anim, int] = attr.ib(factory=dict)
 
@@ -866,6 +888,11 @@ class Item:
     embed_faces: list[EmbedFace] = attr.Factory(list)
     # Overlays automatically placed
     overlays: list[Overlay] = attr.Factory(list)
+    # More precise BEE collisions.
+    collisions: list[BBox] = attr.Factory(list)
+    # Record if collisions were set in editoritems, so an empty block can be used
+    # to opt out of inheriting from occupied voxels.
+    _has_collisions_block: bool = attr.ib(init=False, default=False, repr=False)
 
     # Connection types that don't represent item I/O, like for droppers
     # or fizzlers.
@@ -1151,10 +1178,10 @@ class Item:
                     )
 
     def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
-        """Parse the export block of the item definitions. This returns the parsed connections info.
+        """Parse the export block of the item definitions. This returns the parsed connection's info.
 
         Since the standard input/output blocks must be parsed in one group, we collect those in the
-        passed property.
+        passed-in property block for later parsing.
         """
 
         for key in tok.block('Exporting'):
@@ -1175,6 +1202,8 @@ class Item:
                 self._parse_occupied_voxels(tok)
             elif folded_key == 'embeddedvoxels':
                 self._parse_embedded_voxels(tok)
+            elif folded_key == 'collisions':
+                self._parse_collisions(tok)
             elif folded_key == 'embedface':
                 self._parse_embed_faces(tok)
             elif folded_key == 'overlay':
@@ -1302,9 +1331,9 @@ class Item:
                 )
             conn = self.conn_inputs.pop(ConnTypes.POLARITY)
             if conn.activate is not None:
-                conf.sec_enable_cmd += ((conn.act_name, conn.activate),)
+                conf.sec_enable_cmd += (Output('', conn.act_name, conn.activate), )
             if conn.deactivate is not None:
-                conf.sec_disable_cmd += ((conn.deact_name, conn.deactivate),)
+                conf.sec_disable_cmd += (Output('', conn.deact_name, conn.deactivate), )
 
         if ConnTypes.NORMAL in self.conn_outputs:
             conn = self.conn_outputs.pop(ConnTypes.NORMAL)
@@ -1391,8 +1420,8 @@ class Item:
     def _parse_occupied_voxels(self, tok: Tokenizer) -> None:
         """Parse occupied voxel definitions. We add on the volume variant for convienience."""
         for occu_key in tok.block('OccupiedVoxels'):
-            collide_type = CollType.DEFAULT
-            collide_against: CollType | None = None
+            collide_type = OccuType.DEFAULT
+            collide_against: OccuType | None = None
             pos1 = Coord(0, 0, 0)
             pos2: Coord | None = None
             normal: Coord | None = None
@@ -1414,9 +1443,9 @@ class Item:
                 elif folded_key == 'pos2':
                     pos2 = Coord.parse(tok.expect(Token.STRING), tok.error)
                 elif folded_key == 'collidetype':
-                    collide_type = CollType.parse(tok)
+                    collide_type = OccuType.parse(tok)
                 elif folded_key == 'collideagainst':
-                    collide_against = CollType.parse(tok)
+                    collide_against = OccuType.parse(tok)
                 elif folded_key == 'normal':
                     normal = Coord.parse(tok.expect(Token.STRING), tok.error)
                     if normal not in NORMALS:
@@ -1516,6 +1545,70 @@ class Item:
             if size is None:
                 raise tok.error('No size specified for embedded face!')
             self.embed_faces.append(EmbedFace(center, size, grid))
+
+    def _parse_collisions(self, tok: Tokenizer) -> None:
+        """Parse the enhanced blocks BEE uses for collision."""
+        self._has_collisions_block = True
+        for box_name in tok.block('Collisions'):
+            if box_name.casefold() != 'bbox':
+                raise tok.error('Unknown collision type "{}"!', box_name)
+            points: list[Vec] = []
+            coll_type = CollideType.NOTHING
+            tags = set()
+            for bbox_key in tok.block(box_name):
+                folded_key = bbox_key.casefold()
+                if folded_key.rstrip('0123456789') == 'pos':
+                    points.append(Vec.from_str(tok.expect(Token.STRING)))
+                elif folded_key in ('tag', 'tags'):
+                    tags.update(tok.expect(Token.STRING).casefold().split())
+                elif folded_key == 'type':
+                    for name in tok.expect(Token.STRING).split():
+                        try:
+                            coll_type |= CollideType[name.upper()]
+                        except KeyError:
+                            raise tok.error('Unknown collision type "{}"', name)
+            if len(points) < 2:
+                raise tok.error('Two points must be provided for a bounding box!')
+            bb_min, bb_max = Vec.bbox(points)
+            try:
+                self.collisions.append(BBox(bb_min, bb_max, contents=coll_type, tags=tags))
+            except NonBBoxError as exc:
+                raise tok.error(str(exc)) from None
+
+    def generate_collisions(self) -> None:
+        """If no specific collisions were defined, generate them by looking at OccupiedVoxels."""
+        # Explicitly specified, don't generate.
+        if self.collisions or self._has_collisions_block:
+            return
+        for occu in self.occupy_voxels:
+            pos = Vec(occu.pos) * 128
+            if occu.subpos is None:
+                half_dist = 64.0
+            else:
+                pos += Vec(occu.subpos) * 32 - (48, 48, 48)
+                half_dist = 16.0
+            if occu.normal is None:
+                # Full cube.
+                try:
+                    self.collisions.append(BBox(
+                        pos - half_dist, pos + half_dist,
+                        contents=occu.type.collision, tags='generated',
+                    ))
+                except NonBBoxError as exc:
+                    LOGGER.warning('"{}": Invalid occupied voxel: {}', self.id, exc)
+            else:
+                # Plane.
+                pos -= half_dist * Vec(occu.normal)
+                pos1, pos2 = pos, pos.copy()
+                # Expand in all but the normal axis.
+                for axis, val in enumerate(occu.normal):
+                    if val == 0.0:
+                        pos1[axis] -= half_dist
+                        pos2[axis] += half_dist
+                try:
+                    self.collisions.append(BBox(pos1, pos2, contents=occu.type.collision, tags='generated'))
+                except NonBBoxError as exc:
+                    LOGGER.warning('"{}": Invalid occupied voxel: {}', self.id, exc)
 
     def _parse_overlay(self, tok: Tokenizer) -> None:
         """Parse overlay definitions, which place overlays."""
@@ -1727,7 +1820,7 @@ class Item:
 
     def _export_occupied_voxels(self, f: _TextFile) -> None:
         """Write occupied voxels to a file."""
-        voxel_groups: dict[tuple[Coord, CollType, CollType | None], list[OccupiedVoxel]] = defaultdict(list)
+        voxel_groups: dict[tuple[Coord, OccuType, OccuType | None], list[OccupiedVoxel]] = defaultdict(list)
         voxel: OccupiedVoxel
         voxels: list[OccupiedVoxel]
         for voxel in self.occupy_voxels:
@@ -1737,10 +1830,10 @@ class Item:
         for (pos, typ, against), voxels in voxel_groups.items():
             f.write('\t\t\t"Voxel"\n\t\t\t\t{\n')
             f.write(f'\t\t\t\t"Pos" "{pos}"\n')
-            if typ is not CollType.DEFAULT and against is not None:
+            if typ is not OccuType.DEFAULT and against is not None:
                 f.write(f'\t\t\t\t"CollideType"    "{typ}"\n')
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
-            elif typ is not CollType.DEFAULT:
+            elif typ is not OccuType.DEFAULT:
                 f.write(f'\t\t\t\t"CollideType" "{typ}"\n')
             elif against is not None:
                 f.write(f'\t\t\t\t"CollideAgainst" "{against}"\n')
@@ -1790,6 +1883,7 @@ class Item:
             self.occupy_voxels,
             self.embed_voxels,
             self.embed_faces,
+            self.collisions,
             self.overlays,
             self.conn_inputs,
             self.conn_outputs,
@@ -1825,6 +1919,7 @@ class Item:
             self.occupy_voxels,
             self.embed_voxels,
             self.embed_faces,
+            self.collisions,
             self.overlays,
             self.conn_inputs,
             self.conn_outputs,

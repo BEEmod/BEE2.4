@@ -5,7 +5,7 @@ from typing import Optional, Callable
 from srctools import Vec, Entity, Property, VMF, Angle
 import srctools.logger
 
-from precomp import instanceLocs, options, conditions, rand
+from precomp import instanceLocs, options, collisions, conditions, rand
 
 
 COND_MOD_NAME = 'Instance Generation'
@@ -137,7 +137,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
 
 
 @conditions.make_result('addShuffleGroup')
-def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
+def res_add_shuffle_group(vmf: VMF, coll: collisions.Collisions, res: Property) -> Callable[[Entity], None]:
     """Pick from a pool of instances to randomise decoration.
 
     For each sub-condition that succeeds, a random instance is placed, with
@@ -189,7 +189,7 @@ def res_add_shuffle_group(vmf: VMF, res: Property) -> Callable[[Entity], None]:
         pools = all_pools.copy()
         for (flags, value, potential_pools) in conf_selectors:
             for flag in flags:
-                if not conditions.check_flag(flag, inst):
+                if not conditions.check_flag(flag, coll, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [

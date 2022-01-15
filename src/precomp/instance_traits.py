@@ -1,18 +1,20 @@
 """Adds various traits to instances, based on item classes."""
-from typing import List, MutableMapping, Optional, Callable, Dict, Set
+from typing import List, MutableMapping, Optional, Dict, Set
 from weakref import WeakKeyDictionary
 
 import attr
 
-from srctools import Entity
-from srctools import VMF
+from srctools import Entity, VMF
 import srctools.logger
 
 from precomp.instanceLocs import ITEM_FOR_FILE
+from precomp.collisions import Collisions
 from editoritems import Item, ItemClass
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+# Indicates the collision should only go on the main instance.
+SKIP_COLL = '_skip_coll'
 
 # Special case - specific attributes..
 ID_ATTRS: Dict[str, List[Set[str]]] = {
@@ -53,8 +55,8 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
     ],
     ItemClass.FUNNEL: [
         {'tbeam_emitter'},
-        {'white', 'tbeam_frame'},
-        {'black', 'tbeam_frame'},
+        {'white', 'tbeam_frame', SKIP_COLL},
+        {'black', 'tbeam_frame', SKIP_COLL},
     ],
     ItemClass.CUBE: [
         {'dropperless', 'cube_standard'},
@@ -64,28 +66,28 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
         {'dropperless', 'cube_franken'},
     ],
     ItemClass.FIZZLER: [
-        {'fizzler', 'fizzler_base'},
+        {'fizzler', 'fizzler_base', SKIP_COLL},
         {'fizzler', 'fizzler_model'},
     ],
     ItemClass.TRACK_PLATFORM: [
-        {'track_platform', 'plat_bottom_grate'},
-        {'track_platform', 'plat_bottom'},
-        {'track_platform', 'plat_middle'},
-        {'track_platform', 'plat_top'},
-        {'track_platform', 'plat_non_osc'},
-        {'track_platform', 'plat_osc'},
-        {'track_platform', 'plat_single'},
+        {'track_platform', 'track', 'plat_bottom_grate', SKIP_COLL},
+        {'track_platform', 'track', 'plat_bottom', SKIP_COLL},
+        {'track_platform', 'track', 'plat_middle', SKIP_COLL},
+        {'track_platform', 'track', 'plat_top', SKIP_COLL},
+        {'track_platform', 'platform', 'plat_non_osc'},
+        {'track_platform', 'platform', 'plat_osc'},
+        {'track_platform', 'track', 'plat_single', SKIP_COLL},
     ],
     ItemClass.GLASS: [
         {'barrier', 'barrier_128'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_corner'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_straight'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_short'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_convex_corner'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_corner'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_straight'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_short'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner'},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_corner', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_straight', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_short', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_convex_corner', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_corner', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_straight', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_short', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner', SKIP_COLL},
     ],
     ItemClass.DOOR_ENTRY_SP: [
         {'corridor_1', 'entry_corridor', 'sp_corridor', 'preplaced'},
@@ -95,34 +97,34 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
         {'corridor_5', 'entry_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_6', 'entry_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_7', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white', 'preplaced'},
-        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black', 'preplaced'},
-        {'entry_elevator', 'elevator', 'sp_corridor', 'preplaced'},
-        {'exit_elevator', 'elevator', 'sp_corridor', 'preplaced'},
-        {'arrival_departure_transition', 'preplaced'},
+        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white', 'preplaced', SKIP_COLL},
+        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black', 'preplaced', SKIP_COLL},
+        {'entry_elevator', 'elevator', 'sp_corridor', 'preplaced', SKIP_COLL},
+        {'exit_elevator', 'elevator', 'sp_corridor', 'preplaced', SKIP_COLL},
+        {'arrival_departure_transition', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_EXIT_SP: [
         {'corridor_1', 'exit_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_2', 'exit_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_3', 'exit_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_4', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white', 'preplaced', SKIP_COLL},
+        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_ENTRY_COOP: [
         {'entry_corridor', 'coop_corridor', 'preplaced'},
         set(),  # White/black 'door frames', not used on the entry.
         set(),
-        {'exit_elevator', 'elevator', 'coop_corridor', 'preplaced'},
-        {'arrival_departure_transition', 'preplaced'},
+        {'exit_elevator', 'elevator', 'coop_corridor', 'preplaced', SKIP_COLL},
+        {'arrival_departure_transition', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_EXIT_COOP: [
         {'corridor_1', 'exit_corridor', 'coop_corridor', 'preplaced'},
         {'corridor_2', 'exit_corridor', 'coop_corridor', 'preplaced'},
         {'corridor_3', 'exit_corridor', 'coop_corridor', 'preplaced'},
         {'corridor_4', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white', 'preplaced', SKIP_COLL},
+        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black', 'preplaced', SKIP_COLL},
     ],
 
     ItemClass.PAINT_DROPPER: [
@@ -144,27 +146,8 @@ class TraitInfo:
     item_id: Optional[str] = None
     traits: Set[str] = attr.ib(factory=set)
 
-# Special functions to call on an instance for their item ID (str)
-# or class (enum).
-# Arguments are the instance, trait set, item ID and subtype index.
-TRAIT_ID_FUNC: Dict[str, Callable[[Entity, Set[str], str, int], None]] = {}
-TRAIT_CLS_FUNC: Dict[ItemClass, Callable[[Entity, Set[str], str, int], None]] = {}
 # Maps entities to their traits.
 ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
-
-
-def trait_id_func(target: str):
-    def deco(func):
-        TRAIT_ID_FUNC[target.casefold()] = func
-        return func
-    return deco
-
-
-def trait_cls_func(target: ItemClass):
-    def deco(func):
-        TRAIT_CLS_FUNC[target] = func
-        return func
-    return deco
 
 
 def get(inst: Entity) -> Set[str]:
@@ -201,8 +184,8 @@ def get_item_id(inst: Entity) -> Optional[str]:
         return None
 
 
-def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
-    """Scan through the map, and apply traits to instances."""
+def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
+    """Scan through the map, apply traits to instances, and set initial collisions."""
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()
         if not inst_file:
@@ -219,10 +202,13 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
             continue
 
         try:
-            item_class = id_to_item[item_id.casefold()].cls
+            item = id_to_item[item_id.casefold()]
         except KeyError:  # dict fail
             LOGGER.warning('Unknown item ID <{}>', item_id)
             item_class = ItemClass.UNCLASSED
+            item = None
+        else:
+            item_class = item.cls
 
         info = ENT_TO_TRAITS[inst] = TraitInfo(item_class, item_id)
 
@@ -235,17 +221,11 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
         except (IndexError, KeyError):
             pass
 
-        try:
-            func = TRAIT_ID_FUNC[item_id.casefold()]
-        except KeyError:
-            pass
-        else:
-            func(inst, info.traits, item_id, item_ind)
-        try:
-            func = TRAIT_CLS_FUNC[item_class]
-        except KeyError:
-            pass
-        else:
-            func(inst, info.traits, item_id, item_ind)
 
-    LOGGER.info('Traits: {}', dict(ENT_TO_TRAITS.items()))
+        if SKIP_COLL in info.traits:
+            # Don't add collision, even if it's defined. This is say the tbeam frame instance, or
+            # an elevator - we want the collisions on a different instance.
+            info.traits.remove(SKIP_COLL)
+            # Also skip if no name is set.
+        elif item is not None and inst['targetname'] != '':
+            coll.add_item_coll(item, inst)

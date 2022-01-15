@@ -15,12 +15,12 @@ from srctools import Property
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, Solid, Side, VMF, UVAxis
-from srctools.dmx import Element as DMElement, ValueType as DMType
+from srctools.dmx import Element as DMElement
 import srctools.logger
 
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
-from . import tiling, texturing, options, rand
+from . import tiling, texturing, options, rand, collisions
 import consts
 
 
@@ -77,14 +77,14 @@ class UnparsedTemplate:
 @attr.define
 class TemplateEntity:
     """One of the several entities defined in templates."""
-    offset: Vec
-    normal: Vec  # Normal of the surface.
     visgroups: set[str]  # Visgroups applied to this entity.
 
 
 @attr.define
 class ColorPicker(TemplateEntity):
     """Color pickers allow applying the existing colors onto faces."""
+    offset: Vec
+    normal: Vec  # Normal of the surface.
     priority: Decimal  # Decimal order to do them in.
     name: str  # Name to reference from other ents.
     sides: list[str]
@@ -102,6 +102,8 @@ class ColorPicker(TemplateEntity):
 @attr.define
 class VoxelSetter(TemplateEntity):
     """Set all tiles in a tiledef."""
+    offset: Vec
+    normal: Vec  # Normal of the surface.
     tile_type: TileType  # Type to produce.
     force: bool  # Force overwrite existing values.
 
@@ -111,6 +113,14 @@ class TileSetter(VoxelSetter):
     """Set tiles in a particular position."""
     color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
     picker_name: str  # Name of colorpicker to use for the color.
+
+
+@attr.define
+class CollisionDef(TemplateEntity):
+    """Adds a bounding box to the map."""
+    bbox: collisions.BBox
+    visgroups: set[str]  # Visgroups required to add this.
+
 
 # We use the skins value on the tilesetter to specify type, allowing visualising it.
 # So this is the type for each index.
@@ -238,6 +248,7 @@ class Template:
         color_pickers: Iterable[ColorPicker]=(),
         tile_setters: Iterable[TileSetter]=(),
         voxel_setters: Iterable[VoxelSetter]=(),
+        coll: Iterable[CollisionDef]=(),
     ) -> None:
         self.id = temp_id
         self._data = {}
@@ -247,7 +258,7 @@ class Template:
         visgroup_names.update(world)
         visgroup_names.update(detail)
         visgroup_names.update(overlays)
-        for ent in itertools.chain(color_pickers, tile_setters, voxel_setters):
+        for ent in itertools.chain(color_pickers, tile_setters, voxel_setters, coll):
             visgroup_names.update(ent.visgroups)
 
         for group in visgroup_names:
@@ -269,6 +280,7 @@ class Template:
         )
         self.tile_setters = list(tile_setters)
         self.voxel_setters = list(voxel_setters)
+        self.collisions = list(coll)
 
     def __repr__(self) -> str:
         return (
@@ -291,16 +303,15 @@ class Template:
         visgroups can also be a single string, to select that.
         """
         if isinstance(visgroups, str):
-            visgroups = {'', visgroups}
+            chosen = {visgroups, ''}
         else:
-            visgroups = set(visgroups)
-            visgroups.add('')
+            chosen = {*visgroups, ''}
 
         world_brushes: list[Solid] = []
         detail_brushes: list[Solid] = []
         overlays: list[Entity] = []
 
-        for group in visgroups:
+        for group in chosen:
             try:
                 world, detail, over = self._data[group.casefold()]
             except KeyError:
@@ -410,12 +421,11 @@ def parse_temp_name(name) -> tuple[str, set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
         temp_name, visgroups = name.rsplit(':', 1)
-        return temp_name.casefold(), {
-            vis.strip().casefold()
-            for vis in
-            visgroups.split(',')
-            if not vis.isspace()
-        }
+        return temp_name.casefold(), set(
+            # Parse comma-seperated visgroups, remove empty, and casefold.
+            map(str.casefold, map(str.strip,
+                itertools.filterfalse(str.isspace, visgroups.split(','))
+        )))
     else:
         return name.casefold(), set()
 
@@ -426,11 +436,9 @@ def load_templates(path: str) -> None:
         dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
     if fmt_name != 'bee_templates' or fmt_ver not in [1]:
         raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
-    temp_list = dmx['temp']
-    if temp_list.type is not DMType.ELEMENT:
-        raise ValueError('Badd template array type ' + temp_list.type.name)
-    for template in dmx['temp']:
-        assert isinstance(template, DMElement), template
+    for template in dmx['temp'].iter_elem():
+        if template is None:
+            raise ValueError('Null template!')
         _TEMPLATES[template.name.casefold()] = UnparsedTemplate(
             template.name.upper(),
             template['package'].val_str,
@@ -613,6 +621,12 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             force=srctools.conv_bool(ent['force']),
         ))
 
+    coll: list[CollisionDef] = []
+    for ent in vmf.by_class['bee2_collision_bbox']:
+        visgroups = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
+        for bbox in collisions.BBox.from_ent(ent):
+            coll.append(CollisionDef(bbox, visgroups))
+
     return Template(
         loc.id,
         set(visgroup_names.values()),
@@ -626,6 +640,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         color_pickers,
         tile_setters,
         voxel_setters,
+        coll,
     )
 
 
@@ -654,23 +669,28 @@ def import_template(
     additional_visgroups: Iterable[str]=(),
     bind_tile_pos: Iterable[Vec]=(),
     align_bind: bool=False,
+    coll: collisions.Collisions=None,
+    coll_add: Optional[collisions.CollideType] = collisions.CollideType.NOTHING,
+    coll_mask: collisions.CollideType = collisions.CollideType.EVERYTHING,
 ) -> ExportedTemplate:
     """Import the given template at a location.
 
-    temp_name can be a string, or a template instance. visgroups is a list
-    of additional visgroups to use after the ones in the name string (if given).
-
-    If force_type is set to 'detail' or 'world', all brushes will be converted
-    to the specified type instead. A list of world brushes and the func_detail
-    entity will be returned. If there are no detail brushes, None will be
-    returned instead of an invalid entity.
-
-    If targetname is set, it will be used to localise overlay names.
-    add_to_map sets whether to add the brushes and func_detail to the map.
-
-    If any bound_tile_pos are provided, these are offsets to tiledefs which
-    should have all the overlays in this template bound to them, and vice versa.
-    If align_bind is set, these will be first aligned to grid.
+    * `temp_name` can be a string, or a template instance.
+    * `visgroups` is a list of additional visgroups to use after the ones in the name string (if given).
+    * If `force_type` is set to 'detail' or 'world', all brushes will be converted
+      to the specified type instead. A list of world brushes and the func_detail
+      entity will be returned. If there are no detail brushes, None will be
+      returned instead of an invalid entity.
+    * If `targetname` is set, it will be used to localise overlay names.
+      add_to_map sets whether to add the brushes and func_detail to the map.
+    * IF `coll` is provided, the template may have bee2_collision volumes. The targetname must be
+      provided in this case.
+    * If any `bound_tile_pos` are provided, these are offsets to tiledefs which
+      should have all the overlays in this template bound to them, and vice versa.
+    * If `align_bind` is set, these will be first aligned to grid.
+    * `coll_mask` and `coll_force` allow modifying the collision types added. `coll_mask` is AND-ed
+      with the bbox type, then `coll_add` is OR-ed in. If the collide type ends up being NOTHING, it
+      is skipped.
     """
     import vbsp
     if isinstance(temp_name, Template):
@@ -786,6 +806,20 @@ def import_template(
                 if over['sides'] == '':
                     tile.bind_overlay(over)
             tile.brush_faces.extend(bound_overlay_faces)
+
+    if template.collisions:
+        if coll is None:
+            LOGGER.warning('Template "{}" has collisions, but unable to apply these!', template.id)
+        elif targetname:
+            for coll_def in template.collisions:
+                if not coll_def.visgroups.issubset(chosen_groups):
+                    continue
+                contents = (coll_def.bbox.contents & coll_mask) | coll_add
+                if contents is not contents.NOTHING:
+                    bbox = coll_def.bbox @ orient + origin
+                    coll.add(bbox.with_attrs(name=targetname, contents=contents))
+        else:
+            LOGGER.warning('With collisions provided, the instance name must not be blank!')
 
     return ExportedTemplate(
         world=new_world,

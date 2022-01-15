@@ -118,6 +118,9 @@ class Group:
             'comp_relay',
             origin=logic_pos,
             targetname=start.item.name,
+            # Must be != to be enabled.
+            ctrl_type='1',
+            ctrl_value='0',
         )
 
         # Create the item for the entire group of markers.

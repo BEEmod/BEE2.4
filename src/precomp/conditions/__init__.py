@@ -43,7 +43,7 @@ from typing import Generic, TypeVar, Any, Callable, TextIO
 
 import attr
 
-from precomp import instanceLocs, rand
+from precomp import instanceLocs, rand, collisions
 import consts
 import srctools.logger
 import utils
@@ -75,6 +75,11 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
+
+
+# The return values for 2-stage results and flags.
+FlagCallable = Callable[[Entity], bool]
+ResultCallable = Callable[[Entity], object]
 
 
 class SWITCH_TYPE(Enum):
@@ -229,7 +234,7 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(inst: Entity, res: Property) -> bool | object:
+    def test_result(coll: collisions.Collisions, inst: Entity, res: Property) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -245,9 +250,9 @@ class Condition:
                 # Delete this so it doesn't re-fire..
                 return RES_EXHAUSTED
         else:
-            return cond_call(inst, res)
+            return cond_call(coll, inst, res)
 
-    def test(self, inst: Entity) -> None:
+    def test(self, coll: collisions.Collisions, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance.
 
         If we find that no instance will succeed, raise Unsatisfiable.
@@ -258,12 +263,12 @@ class Condition:
         # such that it becomes satisfiable later, so this would be premature.
         # If we have else results, we also can't skip because those could modify state.
         for i, flag in enumerate(self.flags):
-            if not check_flag(flag, inst, can_skip=i==0 and not self.else_results):
+            if not check_flag(flag, coll, inst, can_skip=i==0 and not self.else_results):
                 success = False
                 break
         results = self.results if success else self.else_results
         for res in results[:]:
-            should_del = self.test_result(inst, res)
+            should_del = self.test_result(coll, inst, res)
             if should_del is RES_EXHAUSTED:
                 results.remove(res)
 
@@ -422,6 +427,10 @@ class CondCall(Generic[CallResultT]):
     This should be called to execute it.
     """
     __slots__ = ['func', 'group', '_cback', '_setup_data']
+    _cback: Callable[
+        [srctools.VMF, collisions.Collisions, Entity | None, Property],
+        CallResultT | Callable[[Entity], CallResultT],
+    ]
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
 
     def __init__(
@@ -433,7 +442,7 @@ class CondCall(Generic[CallResultT]):
         self.group = group
         self._cback, arg_order = annotation_caller(
             func,
-            srctools.VMF, Entity, Property,
+            srctools.VMF, collisions.Collisions, Entity, Property,
         )
         if Entity not in arg_order:
             # We have setup functions.
@@ -441,10 +450,10 @@ class CondCall(Generic[CallResultT]):
         else:
             self._setup_data = None
 
-    def __call__(self, ent: Entity, conf: Property) -> CallResultT:
+    def __call__(self, coll: collisions.Collisions, ent: Entity, conf: Property) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
-            return self._cback(ent.map, ent, conf)
+            return self._cback(ent.map, coll, ent, conf)
         else:
             # Execute setup functions if required.
             try:
@@ -452,7 +461,7 @@ class CondCall(Generic[CallResultT]):
             except KeyError:
                 # The None here is the entity, which is always unused
                 # for setup functions!
-                cback = self._setup_data[id(conf)] = self._cback(ent.map, None, conf)
+                cback = self._setup_data[id(conf)] = self._cback(ent.map, coll, None, conf)
 
             if not callable(cback):
                 # We don't actually have a setup func,
@@ -606,7 +615,7 @@ def init(vmf: VMF) -> None:
         ]))
 
 
-def check_all(vmf: VMF) -> None:
+def check_all(vmf: VMF, coll: collisions.Collisions) -> None:
     """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     LOGGER.info('-----------------------')
@@ -615,7 +624,7 @@ def check_all(vmf: VMF) -> None:
         with srctools.logger.context(condition.source or ''):
             for inst in vmf.by_class['func_instance']:
                 try:
-                    condition.test(inst)
+                    condition.test(coll, inst)
                 except NextInstance:
                     # NextInstance is raised to immediately stop running
                     # this condition, and skip to the next instance.
@@ -631,10 +640,7 @@ def check_all(vmf: VMF) -> None:
                     break
                 except Exception:
                     # Print the source of the condition if if fails...
-                    LOGGER.exception(
-                        'Error in {}:',
-                        condition.source or 'condition',
-                    )
+                    LOGGER.exception('Error in {}:', condition.source or 'condition')
                     # Exit directly, so we don't print it again in the exception
                     # handler
                     utils.quit_app(1)
@@ -649,11 +655,13 @@ def check_all(vmf: VMF) -> None:
             for inst in vmf.by_class['func_instance']:
                 if inst['file'].casefold() not in ALL_INST:
                     LOGGER.warning(
-                        'Condition "{}" '
-                        "doesn't add to in all_inst: {}!",
+                        'Condition "{}" doesn\'t add "{}" to all_inst!',
                         condition.source,
                         inst['file'],
                     )
+                    extra.add(inst['file'].casefold())
+            # Suppress errors for future conditions.
+            ALL_INST.update(extra)
 
     LOGGER.info('---------------------')
     LOGGER.info(
@@ -677,7 +685,7 @@ def check_all(vmf: VMF) -> None:
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(flag: Property, inst: Entity, can_skip: bool = False) -> bool:
+def check_flag(flag: Property, coll: collisions.Collisions, inst: Entity, can_skip: bool = False) -> bool:
     """Determine the result for a condition flag.
 
     If can_skip is true, flags raising Unsatifiable will pass the exception through.
@@ -703,7 +711,7 @@ def check_flag(flag: Property, inst: Entity, can_skip: bool = False) -> bool:
             return False
 
     try:
-        res = func(inst, flag)
+        res = func(coll, inst, flag)
     except Unsatisfiable:
         if can_skip:
             raise
@@ -1137,14 +1145,14 @@ def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 
 
 @make_result('condition')
-def res_sub_condition(res: Property):
+def res_sub_condition(coll: collisions.Collisions, res: Property):
     """Check a different condition if the outer block is true."""
     cond = Condition.parse(res)
 
     def test_cond(inst: Entity) -> None:
         """For child conditions, we need to check every time."""
         try:
-            cond.test(inst)
+            cond.test(coll, inst)
         except Unsatisfiable:
             pass
     return test_cond
@@ -1169,7 +1177,7 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(res: Property):
+def res_switch(coll: collisions.Collisions, res: Property):
     """Run the same flag multiple times with different arguments.
 
     `method` is the way the search is done - `first`, `last`, `random`, or `all`.
@@ -1223,17 +1231,17 @@ def res_switch(res: Property):
         run_default = True
         for flag, results in cases:
             # If not set, always succeed for the random situation.
-            if flag.real_name and not check_flag(flag, inst):
+            if flag.real_name and not check_flag(flag, coll, inst):
                 continue
             for sub_res in results:
-                Condition.test_result(inst, sub_res)
+                Condition.test_result(coll, inst, sub_res)
             run_default = False
             if method is not SWITCH_TYPE.ALL:
                 # All does them all, otherwise we quit now.
                 break
         if run_default:
             for sub_res in default:
-                Condition.test_result(inst, sub_res)
+                Condition.test_result(coll, inst, sub_res)
     return apply_switch
 
 

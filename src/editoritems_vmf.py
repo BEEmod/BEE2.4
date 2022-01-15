@@ -1,11 +1,12 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
 
-from typing import Callable, Iterator, Dict
+from typing import Callable
 from srctools import Matrix, Angle, Vec, logger, conv_int
-from srctools.vmf import VMF, Entity, ValidKVs
+from srctools.vmf import VMF, Entity
 
-from editoritems import Item, ConnSide, CollType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
+from collisions import BBox
+from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
 
 
 LOGGER = logger.get_logger(__name__)
@@ -18,12 +19,13 @@ def load(item: Item, vmf: VMF) -> None:
     with logger.context(item.id):
         for ent in vmf.entities:
             classname = ent['classname'].casefold()
-            if not classname.startswith('bee2_editor_') or ent.hidden:
+            if ent.hidden:
                 continue
             try:
                 func = LOAD_FUNCS[classname]
             except KeyError:
-                LOGGER.warning('Unknown item configuration entity "{}"!', classname)
+                if classname.startswith('bee2_editor_'):
+                    LOGGER.warning('Unknown item configuration entity "{}"!', classname)
             else:
                 func(item, ent)
 
@@ -51,21 +53,21 @@ CONN_OFFSET_TO_SKIN = {
 }
 
 
-def parse_colltype(value: str) -> CollType:
-    """Parse a collide type specification from the VMF."""
-    val = CollType.NOTHING
+def parse_occutype(value: str) -> OccuType:
+    """Parse an occupation type specification from the VMF."""
+    val = OccuType.NOTHING
     for word in value.split():
         word = word.upper()
         if word.startswith('COLLIDE_'):
             word = word[8:]
         try:
-            val |= CollType[word]
+            val |= OccuType[word]
         except KeyError:
             LOGGER.warning('Unknown collide type "{}"', word)
     return val
 
 
-def load_connectionpoint(item: Item, ent: Entity) -> None:
+def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
     """Allow more conveniently defining connectionpoints."""
     origin = Vec.from_str(ent['origin'])
     angles = Angle.from_str(ent['angles'])
@@ -107,7 +109,7 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
     ))
 
 
-def save_connectionpoint(item: Item, vmf: VMF) -> None:
+def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
     """Write connectionpoints to a VMF."""
     for side, points in item.antline_points.items():
         yaw = side.yaw
@@ -134,7 +136,7 @@ def save_connectionpoint(item: Item, vmf: VMF) -> None:
             )
 
 
-def load_embeddedvoxel(item: Item, ent: Entity) -> None:
+def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
     """Parse embed definitions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
@@ -148,12 +150,12 @@ def load_embeddedvoxel(item: Item, ent: Entity) -> None:
         return
 
     item.embed_voxels.update(map(Coord.from_vec, Vec.iter_grid(
-        (bbox_min + (64, 64, 64)) / 128,
-        (bbox_max - (64, 64, 64)) / 128,
+        (bbox_min + (64, 64, 64 + 128)) / 128,
+        (bbox_max + (-64, -64, -64 + 128)) / 128,
     )))
 
 
-def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
+def save_editor_embeddedvoxel(item: Item, vmf: VMF) -> None:
     """Save embedded voxel volumes."""
     for bbox_min, bbox_max in bounding_boxes(item.embed_voxels):
         vmf.create_ent('bee2_editor_embeddedvoxel').solids.append(vmf.make_prism(
@@ -164,15 +166,15 @@ def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
-def load_occupiedvoxel(item: Item, ent: Entity) -> None:
+def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
     """Parse voxel collisions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
     bbox_max = round(bbox_max, 0)
 
-    coll_type = parse_colltype(ent['coll_type'])
+    coll_type = parse_occutype(ent['coll_type'])
     if ent['coll_against']:
-        coll_against = parse_colltype(ent['coll_against'])
+        coll_against = parse_occutype(ent['coll_against'])
     else:
         coll_against = None
 
@@ -230,6 +232,7 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
                 return
             elif bbox_min[u] % 32 == bbox_min[v] % 32 == bbox_max[v] % 32 == bbox_max[v] % 32 == 0.0:
                 # Subvoxel surface definitions.
+                # TODO
                 return
             else:
                 # Not aligned to grid, skip to error.
@@ -241,7 +244,7 @@ def load_occupiedvoxel(item: Item, ent: Entity) -> None:
     )
 
 
-def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
+def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
     """Save occupied voxel volumes."""
     for voxel in item.occupy_voxels:
         pos = Vec(voxel.pos) * 128
@@ -281,8 +284,19 @@ def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
+def load_collision_bbox(item: Item, ent: Entity) -> None:
+    """Load precise BEE collisions."""
+    item.collisions.extend(BBox.from_ent(ent))
+
+
+def save_collision_bbox(item: Item, vmf: VMF) -> None:
+    """Export precise BEE collisions."""
+    for coll in item.collisions:
+        coll.as_ent(vmf)
+
+
 LOAD_FUNCS.update({
-    'bee2_editor' + name[4:]: func
+    'bee2' + name[4:]: func
     for name, func in globals().items()
     if name.startswith('load_')
 })

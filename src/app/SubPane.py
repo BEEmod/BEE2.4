@@ -1,4 +1,4 @@
-from typing import Callable, Any
+from typing import Callable, Any, Union
 
 import tkinter as tk
 from tkinter import ttk
@@ -47,7 +47,7 @@ class SubPane(tk.Toplevel):
     """
     def __init__(
         self,
-        parent: tk.Misc,
+        parent: Union[tk.Toplevel, tk.Tk],
         *,
         tool_frame: tk.Frame,
         tool_img: str,

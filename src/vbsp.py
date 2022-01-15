@@ -20,6 +20,7 @@ from BEE2_config import ConfigFile
 import utils
 import srctools.run
 import srctools.logger
+from precomp.collisions import Collisions
 from precomp import (
     instance_traits,
     brushLoc,
@@ -220,11 +221,12 @@ def load_map(map_path: str) -> VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF):
+def add_voice(vmf: VMF, coll: Collisions):
     """Add voice lines to the map."""
     voice_line.add_voice(
         voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
+        coll=coll,
         vmf=vmf,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
@@ -619,12 +621,14 @@ def add_screenshot_logic(vmf: VMF) -> None:
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
     ).upper() == 'AUTO' and IS_PREVIEW:
+        SSHOT_FNAME = 'instances/bee2/logic/screenshot_logic.vmf'
         vmf.create_ent(
             classname='func_instance',
-            file='instances/bee2/logic/screenshot_logic.vmf',
+            file=SSHOT_FNAME,
             origin=options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
+        conditions.ALL_INST.add(SSHOT_FNAME)
         LOGGER.info('Added Screenshot Logic')
 
 
@@ -1266,13 +1270,16 @@ Clump = namedtuple('Clump', [
 ])
 
 
-@conditions.make_result_setup('SetAreaTex')
-def cond_force_clump_setup(res: Property):
+@conditions.make_result('SetAreaTex')
+def cond_force_clump(res: Property) -> conditions.ResultCallable:
+    """Force an area to use certain textures.
+
+    This only works in styles using the clumping texture algorithm.
+    """
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
     # Except for white/black walls, all the textures fallback to each other.
-
     white_tex = res['white']
     white_floor = res['whiteFloor', white_tex]
     white_4x4 = res['white4x4', white_tex]
@@ -1295,29 +1302,19 @@ def cond_force_clump_setup(res: Property):
         'black.2x2': res['black2x2', black_floor],
     }
 
-    return point1, point2, tex_data
+    def set_tex(inst: Entity) -> None:
+        """Store off the new textures."""
+        origin = Vec.from_str(inst['origin'])
+        angles = Angle.from_str(inst['angles'])
 
+        min_pos, max_pos = Vec.bbox(point1 @ angles + origin, point2 @ angles + origin)
 
-@conditions.make_result('SetAreaTex')
-def cond_force_clump(inst: Entity, res: Property):
-    """Force an area to use certain textures.
-
-    This only works in styles using the clumping texture algorithm.
-    """
-    point1, point2, tex_data = res.value
-    origin = Vec.from_str(inst['origin'])
-    angles = Angle.from_str(inst['angles'])
-
-    point1 = point1 @ angles + origin
-    point2 = point2 @ angles + origin
-
-    min_pos, max_pos = Vec.bbox(point1, point2)
-
-    PRESET_CLUMPS.append(Clump(
-        min_pos,
-        max_pos,
-        tex_data
-    ))
+        PRESET_CLUMPS.append(Clump(
+            min_pos,
+            max_pos,
+            tex_data
+        ))
+    return set_tex
 
 
 @conditions.meta_cond(priority=-10)
@@ -1856,7 +1853,8 @@ def main() -> None:
         ant_floor, ant_wall, id_to_item = load_settings()
 
         vmf = load_map(path)
-        instance_traits.set_traits(vmf, id_to_item)
+        coll = Collisions()
+        instance_traits.set_traits(vmf, id_to_item, coll)
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1889,14 +1887,16 @@ def main() -> None:
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf)
+        conditions.check_all(vmf, coll)
         add_extra_ents(vmf, GAME_MODE)
 
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)
-        barriers.make_barriers(vmf)
         fix_worldspawn(vmf)
+
+        if utils.DEV_MODE:
+            coll.dump(vmf, vis_name='collisions')
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:

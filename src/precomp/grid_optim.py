@@ -3,15 +3,14 @@
 Given a grid of positions, produce a set of rectangular boxes that efficiently cover all
 set positions.
 """
-from typing import Mapping, Tuple, Iterator, TypeVar, Union
-from enum import Enum
+from typing import Mapping, Tuple, Iterator, TypeVar, Union, Any
 
 from plane import Plane
 
 
 __all__ = ['optimise']
 T = TypeVar('T')
-VOID = object()  # Sentinel
+VOID: Any = object()  # Sentinel
 
 
 def optimise(
@@ -23,7 +22,7 @@ def optimise(
     This yields (min_x, min_y, max_x, max_y, T) tuples, where this region has the same value.
     The values are compared by identity.
     """
-    full_grid = Plane(grid, default=VOID)
+    full_grid: Plane[T] = Plane(grid, default=VOID)
     x_min, y_min = full_grid.mins
     x_max, y_max = full_grid.maxes
     x_max += 1

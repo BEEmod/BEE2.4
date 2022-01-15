@@ -293,7 +293,16 @@ class PaletteUI:
             self.ui_menu.entryconfigure(self.ui_menu_save_ind, state='normal')
             self.ui_menu.entryconfigure(self.ui_menu_rename_index, state='normal')
 
-    def store_configuration(self) -> None:
+    def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
+        """Create a checkbutton configured to control the save palette in settings option."""
+        return ttk.Checkbutton(
+            frame,
+            text=gettext('Save Settings in Palettes'),
+            variable=self.var_save_settings,
+            command=self._store_configuration,
+        )
+
+    def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""
         BEE2_config.store_conf(PaletteState(self.selected_uuid, self.var_save_settings.get()))
 
@@ -357,7 +366,7 @@ class PaletteUI:
         """Select a new palette. This does not update items/settings!"""
         if uuid in self.palettes:
             self.selected_uuid = uuid
-            self.store_configuration()
+            self._store_configuration()
         else:
             LOGGER.warning('Unknown UUID {}!', uuid.hex)
 

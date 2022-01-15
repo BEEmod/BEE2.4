@@ -2,33 +2,30 @@
 
 This also handles Bomb-type Paint Droppers.
 """
+from typing import ClassVar, Dict, Optional, Union
 import collections
 
+import attr
+from srctools import Entity, Vec, VMF, Angle, logger
+
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
-from srctools import Entity, Vec, VMF, Angle
-from srctools.logger import get_logger
-
-from typing import Dict, Optional, List, Tuple, Union
 
 
-LOGGER = get_logger(__name__)
+LOGGER = logger.get_logger(__name__)
 
 # Targetname -> plate.
+# Spell out the union to allow type narrowing.
 PLATES: Dict[str, Union['AngledPlate', 'StraightPlate', 'PaintDropper']] = {}
 
 
+@attr.define
 class FaithPlate:
     """A Faith Plate."""
-    VISGROUP: str = ''  # Visgroup name for the generated trigger.
-    def __init__(
-        self,
-        inst: Entity,
-        trig: Entity,
-    ) -> None:
-        self.inst = inst
-        self.trig = trig
-        self.trig_offset = Vec()
-        self.template: Optional[template_brush.Template] = None
+    VISGROUP: ClassVar[str] = ''  # Visgroup name for the generated trigger.
+    inst: Entity
+    trig: Entity
+    trig_offset: Vec = attr.ib(init=False, factory=Vec().copy)
+    template: Optional[template_brush.Template] = attr.ib(init=False, default=None)
 
     @property
     def name(self) -> str:
@@ -41,49 +38,27 @@ class FaithPlate:
         self.inst['targetname'] = value
 
     def __repr__(self) -> str:
-        return f'<{type(self).__name__} "{self.name}">'
+        return f'<{type(self).__name__} "{vars(self)}">'
 
 
+@attr.define
 class AngledPlate(FaithPlate):
     """A faith plate with an angled trajectory."""
-    VISGROUP = 'angled'
-
-    def __init__(
-        self,
-        inst: Entity,
-        trig: Entity,
-        target: Union[Vec, tiling.TileDef],
-    ) -> None:
-        super().__init__(inst, trig)
-        self.target = target
+    VISGROUP: ClassVar[str] = 'angled'
+    target: Union[Vec, tiling.TileDef]
 
 
+@attr.define
 class StraightPlate(FaithPlate):
     """A faith plate with a straight trajectory."""
-    VISGROUP = 'straight'
-
-    def __init__(
-        self,
-        inst: Entity,
-        trig: Entity,
-        helper_trig: Entity,
-    ) -> None:
-        super().__init__(inst, trig)
-        self.helper_trig = helper_trig
+    VISGROUP: ClassVar[str] = 'straight'
+    helper_trig: Entity
 
 
 class PaintDropper(FaithPlate):
     """A special case - bomb-type Paint Droppers use this to aim the bomb."""
-    VISGROUP = 'paintdrop'
-
-    def __init__(
-        self,
-        inst: Entity,
-        trig: Entity,
-        target: Union[Vec, tiling.TileDef],
-    ) -> None:
-        super().__init__(inst, trig)
-        self.target = target
+    VISGROUP: ClassVar[str] = 'paintdrop'
+    target: Union[Vec, tiling.TileDef]
 
 
 @conditions.meta_cond(-900)
@@ -97,9 +72,9 @@ def associate_faith_plates(vmf: VMF) -> None:
     """
 
     # Find all the triggers and targets first.
-    triggers: Dict[str, Entity] = {}
-    helper_trigs: Dict[str, Entity] = {}
-    paint_trigs: Dict[str, Entity] = {}
+    triggers: dict[str, Optional[Entity]] = {}
+    helper_trigs: dict[str, Entity] = {}
+    paint_trigs: dict[str, Entity] = {}
 
     for trig in vmf.by_class['trigger_catapult']:
         name = trig['targetname']
@@ -175,7 +150,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         if inst['file'].casefold() in faith_targ_file:
             inst.remove()  # Don't keep the targets.
             origin = Vec.from_str(inst['origin'])
-            norm = Vec(z=1).rotate_by_str(inst['angles'])
+            norm = Vec(z=1) @ Angle.from_str(inst['angles'])
             try:
                 tdef = tiling.TILES[(origin - 128 * norm).as_tuple(), norm.as_tuple()]
             except KeyError:
@@ -216,14 +191,14 @@ def associate_faith_plates(vmf: VMF) -> None:
 def gen_faithplates(vmf: VMF) -> None:
     """Place the targets and catapults into the map."""
     # Target positions -> list of triggers wanting to aim there.
-    pos_to_trigs: Dict[
-        Union[Tuple[float, float, float], tiling.TileDef],
-        List[Entity]
+    pos_to_trigs: dict[
+        Union[tuple[float, float, float], tiling.TileDef],
+        list[Entity]
     ] = collections.defaultdict(list)
 
     for plate in PLATES.values():
         if isinstance(plate, (AngledPlate, PaintDropper)):
-            targ_pos: Union[Tuple[float, float, float], tiling.TileDef]
+            targ_pos: Union[tuple[float, float, float], tiling.TileDef]
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:
