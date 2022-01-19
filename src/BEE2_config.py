@@ -78,6 +78,11 @@ DataT = TypeVar('DataT', bound='Data')
 class Data(Protocol):
     """Data which can be saved to the config. These should be immutable."""
     @classmethod
+    def parse_legacy(cls: Type[DataT], conf: Property) -> Dict[str, DataT]:
+        """Parse from the old legacy config. The user has to handle the uses_id style."""
+        raise NotImplementedError
+
+    @classmethod
     def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
         """Parse keyvalues config values."""
         raise NotImplementedError
@@ -216,6 +221,13 @@ def parse_conf(props: Property) -> Config:
 
     The data is in the form {conf_type: {id: data}}.
     """
+    if 'version' not in props:  # New conf format
+        return parse_conf_legacy(props)
+
+    version = props.int('version')
+    if version != 1:
+        raise ValueError(f'Unknown config version {version}!')
+
     conf = Config({})
     for child in props:
         try:
@@ -260,11 +272,27 @@ def parse_conf(props: Property) -> Config:
     return conf
 
 
+def parse_conf_legacy(props: Property) -> Config:
+    """Parse the old config format."""
+    conf = Config({})
+    # Convert legacy configs.
+    _CUR_CONFIG.clear()
+    for info in _NAME_TO_TYPE.values():
+        if hasattr(info.cls, 'parse_legacy'):
+            conf[info] = new = info.cls.parse_legacy(props)
+            LOGGER.info('Converted legacy {} to {}', info.name, new)
+        else:
+            LOGGER.warning('No legacy conf for "{}"!', info.name)
+            conf[info] = {}
+    return conf
+
+
 def build_conf(conf: Config) -> Iterator[Property]:
     """Build out a configuration file from some data.
 
     The data is in the form {conf_type: {id: data}}.
     """
+    yield Property('version', '1')
     for info, data_map in conf.items():
         prop = Property(info.name, [
             Property('_version', str(info.version)),
