@@ -28,13 +28,27 @@ __all__ = [
 
 @BEE2_config.register('Palette', palette_stores=False)
 @attr.frozen
-class PaletteState:
+class PaletteState(BEE2_config.Data):
     """Data related to palettes which is restored next run.
 
     Since we don't store in the palette, we don't need to register the UI callback.
     """
     selected: UUID = UUID_PORTAL2
     save_settings: bool = False
+
+    @classmethod
+    def parse_legacy(cls, conf: Property) -> dict[str, PaletteState]:
+        """Convert the legacy config options to the new format."""
+        # These are all in the GEN_OPTS config.
+        try:
+            selected_uuid = UUID(hex=BEE2_config.GEN_OPTS.get_val('Last_Selected', 'palette_uuid', ''))
+        except ValueError:
+            selected_uuid = UUID_PORTAL2
+
+        return {'': cls(
+            selected_uuid,
+            BEE2_config.GEN_OPTS.get_bool('General', 'palette_save_settings'),
+        )}
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'PaletteState':
