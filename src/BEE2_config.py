@@ -104,7 +104,7 @@ class ConfType(Generic[DataT]):
     # applies the data to the UI. This way we know it can be done safely now.
     # If data was loaded from the config, the callback is immediately awaited.
     # One is provided independently for each ID, so it can be sent to the right object.
-    callback: Dict[str, Callable[[DataT], Awaitable]] = attr.Factory(dict)
+    callback: Dict[str, Callable[[DataT], Awaitable]] = attr.ib(factory=dict, repr=False)
 
 
 _NAME_TO_TYPE: Dict[str, ConfType] = {}
@@ -276,7 +276,6 @@ def parse_conf_legacy(props: Property) -> Config:
     """Parse the old config format."""
     conf = Config({})
     # Convert legacy configs.
-    _CUR_CONFIG.clear()
     for info in _NAME_TO_TYPE.values():
         if hasattr(info.cls, 'parse_legacy'):
             conf[info] = new = info.cls.parse_legacy(props)
@@ -294,6 +293,9 @@ def build_conf(conf: Config) -> Iterator[Property]:
     """
     yield Property('version', '1')
     for info, data_map in conf.items():
+        if not data_map:
+            # Blank, don't save.
+            continue
         prop = Property(info.name, [
             Property('_version', str(info.version)),
         ])
