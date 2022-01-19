@@ -1,6 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Optional, Union, Callable,
+    Dict, Optional, Union, Callable,
     AsyncIterator, Awaitable, Mapping, List, Tuple,
 )
 from tkinter import ttk
@@ -77,6 +77,17 @@ class WidgetConfig:
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
     values: Union[str, Mapping[str, str]] = EmptyMapping
+
+    @classmethod
+    def parse_legacy(cls, props: Property) -> Dict[str, 'WidgetConfig']:
+        """Parse from the old legacy config."""
+        data = {}
+        for group in props.find_children('ItemVar'):
+            if not group.has_children():
+                LOGGER.warning('Illegal leaf property "{}" in ItemVar conf', group.name)
+            for widget in group:
+                data[f'{group.real_name}:{widget.real_name}'] = WidgetConfig.parse_kv1(widget, 1)
+        return data
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'WidgetConfig':
