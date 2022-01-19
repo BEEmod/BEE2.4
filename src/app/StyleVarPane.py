@@ -1,6 +1,6 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 from tkinter import *
 from tkinter import ttk
 
@@ -117,12 +117,20 @@ def mandatory_unlocked() -> bool:
 
 @BEE2_config.register('StyleVar', uses_id=True)
 @attr.frozen
-class StyleVarState:
+class StyleVarState(BEE2_config.Data):
     """Holds style var state stored in configs."""
     value: bool = False
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'StyleVarState':
+    def parse_legacy(cls, conf: Property) -> Dict[str, StyleVarState]:
+        """Parse the old StyleVar config."""
+        return {
+            prop.real_name: cls(conv_bool(prop.value))
+            for prop in conf.find_children('StyleVar')
+        }
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> StyleVarState:
         """Parse KV1-formatted stylevar states."""
         assert version == 1, version
         return cls(conv_bool(data.value))
