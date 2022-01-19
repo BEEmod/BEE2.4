@@ -159,7 +159,7 @@ cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old
 
 @BEE2_config.register('CompilerPane')
 @attr.frozen
-class CompilePaneState:
+class CompilePaneState(BEE2_config.Data):
     """State saved in palettes.
 
     Note: We specifically do not save/load the following:
@@ -178,7 +178,16 @@ class CompilePaneState:
     corr_coop: int = 0
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'CompilePaneState':
+    def parse_legacy(cls, conf: Property) -> dict[str, CompilePaneState]:
+        """Parse legacy config data."""
+        # No change from new KV1 format.
+        return {'': cls.parse_kv1(
+            conf.find_key('CompilerPane', or_blank=True),
+            1,
+        )}
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> CompilePaneState:
         """Parse Keyvalues1 format data."""
         if 'sshot_data' in data:
             screenshot_parts = b'\n'.join([
