@@ -511,7 +511,7 @@ class SelectorWin:
     The string "<NONE>" is used for the none item's ID.
 
     Attributes:
-    - selected_id: The currently-selected item ID. If set to None, the
+    - chosen_id: The currently-selected item ID. If set to None, the
       None Item is chosen.
     - callback: A function called whenever an item is chosen. The first
       argument is the selected ID.
@@ -976,6 +976,7 @@ class SelectorWin:
         else:
             self.attr = None
 
+        self.set_disp()
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
