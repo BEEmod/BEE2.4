@@ -1,5 +1,5 @@
 """Configures which signs are defined for the Signage item."""
-from typing import Mapping, Optional, Sequence, Tuple, List, Dict
+from typing import Iterable, Mapping, Optional, Sequence, Tuple, List, Dict, Union
 import tkinter as tk
 from tkinter import ttk
 
@@ -46,6 +46,8 @@ DEFAULT_IDS = {
     16: 'SIGN_LIGHT_BRIDGE',
     17: 'SIGN_PAINT_BOUNCE',
     18: 'SIGN_PAINT_SPEED',
+    # Remaining are blank.
+    **dict.fromkeys(range(19, 31), ''),
 }
 
 
@@ -62,15 +64,19 @@ def export_data() -> List[Tuple[str, str]]:
 @attr.frozen
 class Layout:
     """A layout of selected signs."""
-    signs: Mapping[int, str] = attr.Factory({
-        tim: DEFAULT_IDS.get(tim, '')
-        for tim in SIGN_IND
-    }.copy)
+    signs: Mapping[int, str] = attr.Factory(DEFAULT_IDS.copy)
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'Layout':
+    def parse_legacy(cls, props: Property) -> Dict[str, 'Layout']:
+        """Parse the old config format."""
+        # Simply call the new parse, it's unchanged.
+        sign = Layout.parse_kv1(props.find_children('Signage'), 1)
+        return {'': sign}
+
+    @classmethod
+    def parse_kv1(cls, data: Union[Property, Iterable[Property]], version: int) -> 'Layout':
         """Parse DMX config values."""
-        sign = dict.fromkeys(SIGN_IND, '')
+        sign = DEFAULT_IDS.copy()
         for child in data:
             try:
                 timer = int(child.name)
