@@ -635,6 +635,8 @@ class SelectorWin:
             save_id,
             BEE2_config.LastSelected(default_id),
         )
+        if store_last_selected:
+            BEE2_config.store_conf(prev_state, save_id)
         if not self.item_list:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
