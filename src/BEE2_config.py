@@ -11,7 +11,7 @@ Most functions are also altered to allow defaults instead of erroring.
 from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
 from pathlib import Path
 from typing import (
-    NewType, TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
+    ClassVar, List, NewType, Tuple, TypeVar, Generic, Protocol, Any, Optional, Callable, Type,
     Awaitable, Iterator, Dict, Mapping, cast,
 )
 from threading import Lock, Event
@@ -341,6 +341,29 @@ async def apply_pal_conf(conf: Config) -> None:
 class LastSelected:
     """Used for several general items, specifies the last selected one for restoration."""
     id: Optional[str] = None
+    # For legacy parsing, old to new save IDs.
+    legacy: ClassVar[List[Tuple[str, str]]] = {
+        ('Style', 'styles'),
+        ('Skybox', 'skyboxes'),
+        ('Voice', 'voicelines'),
+        ('Elevator', 'elevators'),
+        ('Music_Base', 'music_base'),
+        ('Music_Tbeam', 'music_tbeam'),
+        ('Music_Bounce', 'music_bounce'),
+        ('Music_Speed', 'music_speed'),
+    }
+
+    @classmethod
+    def parse_legacy(cls, conf: Property) -> Dict[str, 'LastSelected']:
+        """Parse legacy config data."""
+        result = {}
+        last_sel = conf.find_key('LastSelected', or_blank=True)
+        for old, new in cls.legacy:
+            try:
+                result[new] = cls(last_sel[old])
+            except LookupError:
+                pass
+        return result
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'LastSelected':
