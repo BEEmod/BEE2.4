@@ -91,7 +91,6 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
     """
     if music_id is None:
         music_id = '<NONE>'
-    GEN_OPTS['Last_Selected']['music_' + channel.name.casefold()] = music_id
     # If collapsed, the hidden ones follow the base always.
     if channel is channel.BASE:
         set_suggested(music_id, sel_item=is_collapsed)
@@ -130,15 +129,6 @@ async def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
                 selitem.snd_sample = music.get_sample(channel)
                 music_list.append(selitem)
         return music_list
-
-    # This gets overwritten when making windows.
-    last_selected = {
-        channel: GEN_OPTS.get_val(
-            'Last_Selected',
-            'music_' + channel.name.casefold(),
-            '<NONE>',
-        ) for channel in MusicChannel
-    }
 
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
@@ -278,8 +268,5 @@ async def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         set_collapsed()
     else:
         set_expanded()
-
-    for channel, win in WINDOWS.items():
-        win.sel_item_id(last_selected[channel])
 
     return base_win
