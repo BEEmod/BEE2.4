@@ -21,6 +21,7 @@ import trio
 from atomicwrites import atomic_write
 
 from srctools import Property, KeyValError
+from srctools.dmx import Element
 
 import utils
 import srctools.logger
@@ -89,6 +90,10 @@ class Data(Protocol):
 
     def export_kv1(self) -> Property:
         """Generate keyvalues for saving configuration."""
+        raise NotImplementedError
+
+    def export_dmx(self) -> Element:
+        """Generate DMX for saving the configuration."""
         raise NotImplementedError
 
 
@@ -313,6 +318,38 @@ def build_conf(conf: Config) -> Iterator[Property]:
             [data] = data_map.values()
             prop.extend(data.export_kv1())
         yield prop
+
+
+def build_conf_dmx(conf: Config) -> Element:
+    """Build out a configuration file from some data.
+
+    The data is in the form {conf_type: {id: data}}.
+    """
+    info: ConfType
+    root = Element('BEE2Config', 'DMElement')
+    for info, data_map in conf.items():
+        if not hasattr(info.cls, 'export_dmx'):
+            LOGGER.warning('No DMX export for {}!', info.name)
+            continue
+        if info.uses_id:
+            elem = Element(info.name, f'Conf_v{info.version}')
+            for data_id, data in data_map.items():
+                sub_elem = data.export_dmx()
+                sub_elem.name = data_id
+                sub_elem.type = 'SubConf'
+                elem[data_id] = sub_elem
+        else:
+            # Must be a single '' key.
+            if list(data_map.keys()) != ['']:
+                raise ValueError(
+                    f'Must have a single \'\' key for non-id type "{info.name}", got:\n{data_map}'
+                )
+            [data] = data_map.values()
+            elem = data.export_dmx()
+            elem.name = info.name
+            elem.type = f'Conf_v{info.version}'
+        root[info.name] = elem
+    return root
 
 
 def get_pal_conf() -> Config:
