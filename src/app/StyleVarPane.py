@@ -1,6 +1,8 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
 from typing import Callable, Dict, Optional
+
+from srctools.dmx import Element
 from tkinter import *
 from tkinter import ttk
 
@@ -138,6 +140,12 @@ class StyleVarState(BEE2_config.Data):
     def export_kv1(self) -> Property:
         """Export the stylevars in KV1 format."""
         return Property('', bool_as_int(self.value))
+
+    def export_dmx(self) -> Element:
+        """Export stylevars in DMX format."""
+        elem = Element('StyleVar', 'DMElement')
+        elem['value'] = self.value
+        return elem
 
 
 def export_data(chosen_style: Style) -> dict[str, bool]:

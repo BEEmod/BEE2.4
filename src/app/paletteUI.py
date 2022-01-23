@@ -2,6 +2,8 @@
 from __future__ import annotations
 from typing import Awaitable, Callable
 from uuid import UUID
+
+from srctools.dmx import Element, Attribute
 from tkinter import ttk, messagebox
 import tkinter as tk
 
@@ -66,6 +68,13 @@ class PaletteState(BEE2_config.Data):
             Property('selected', self.selected.hex),
             Property('save_settings', srctools.bool_as_int(self.save_settings)),
         ])
+
+    def export_dmx(self) -> Element:
+        """Export to a DMX."""
+        elem = Element('Palette', 'DMElement')
+        elem['selected'] = self.selected.bytes
+        elem['save_settings'] = self.save_settings
+        return elem
 
 
 class PaletteUI:

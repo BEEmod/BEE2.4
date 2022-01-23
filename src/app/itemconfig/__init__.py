@@ -7,6 +7,7 @@ from tkinter import ttk
 import tkinter as tk
 
 from srctools import EmptyMapping, Property, Vec, logger
+from srctools.dmx import Element
 import trio
 import attr
 
@@ -73,7 +74,7 @@ def parse_color(color: str) -> Tuple[int, int, int]:
 
 @BEE2_config.register('ItemVar', uses_id=True)
 @attr.frozen
-class WidgetConfig:
+class WidgetConfig(BEE2_config.Data):
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
     values: Union[str, Mapping[str, str]] = EmptyMapping
@@ -110,6 +111,15 @@ class WidgetConfig:
                 Property(tim, value)
                 for tim, value in self.values.items()
             ])
+
+    def export_dmx(self) -> Element:
+        elem = Element('ItemVar', 'DMElement')
+        if isinstance(self.values, str):
+            elem['value'] = self.values
+        else:
+            for tim, value in self.values.items():
+                elem[f'tim_{tim}'] = value
+        return elem
 
 
 @attr.define

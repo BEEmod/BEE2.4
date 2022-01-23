@@ -5,6 +5,8 @@ These can be set and take effect immediately, without needing to export.
 from __future__ import annotations
 
 from typing import Union
+
+from srctools.dmx import Element
 from tkinter import filedialog
 from tkinter import ttk
 import tkinter as tk
@@ -252,6 +254,21 @@ class CompilePaneState(BEE2_config.Data):
                 ]
             ))
         return props
+
+    def export_dmx(self) -> Element:
+        """Generate DMX format data."""
+        elem = Element('CompilerPaneState', 'DMElement')
+        elem['sshot_type'] = self.sshot_type
+        elem['sshot_cleanup'] = self.sshot_cleanup
+        elem['spawn_elev'] = self.spawn_elev
+        elem['player_model'] = self.player_mdl
+        elem['voiceline_priority'] = self.use_voice_priority
+        elem['corr_sp_entry'] = self.corr_sp_entry
+        elem['corr_sp_exit'] = self.corr_sp_exit
+        elem['corr_coop'] = self.corr_coop
+        if self.sshot_type == 'CUST':
+            elem['sshot_data'] = self.sshot_cust
+        return elem
 
 
 DEFAULT_STATE = CompilePaneState()
