@@ -436,11 +436,12 @@ def quit_application() -> None:
     try:
         BEE2_config.write_settings()
     except Exception:
-        pass
+        LOGGER.exception('Saving main conf:')
     try:
         GEN_OPTS.save_check()
     except Exception:
-        pass
+        LOGGER.exception('Saving GEN_OPTS:')
+
     item_opts.save_check()
     CompilerPane.COMPILE_CFG.save_check()
     try:
