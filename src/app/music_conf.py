@@ -138,6 +138,7 @@ async def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         desc=gettext('This controls the background music used for a map. Expand the dropdown to set '
                      'tracks for specific test elements.'),
         has_none=True,
+        default_id='VALVE_PETI',
         sound_sys=filesystem,
         none_desc=gettext('Add no music to the map at all. Testing Element-specific music may still '
                           'be added.'),
