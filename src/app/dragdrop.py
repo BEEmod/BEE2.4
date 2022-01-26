@@ -258,7 +258,7 @@ class Manager(Generic[ItemT]):
             image = self._img_blank
         elif group:
             try:
-                image = item.dnd_group_icon
+                image = item.dnd_group_icon  # type: ignore
             except AttributeError:
                 image = item.dnd_icon
         else:
@@ -294,7 +294,7 @@ class Manager(Generic[ItemT]):
             # If none of this group are present in the targets and we're
             # pulling from the items, we hold a group icon.
             try:
-                group = self._cur_drag.dnd_group
+                group = self._cur_drag.dnd_group  # type: ignore
             except AttributeError:
                 pass
             else:
