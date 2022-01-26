@@ -502,8 +502,8 @@ def find_screenshot(e=None) -> None:
             f.write(buf.getvalue())
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-        app.config.store_conf(attr.evolve(
-            app.config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.store_conf(attr.evolve(
+            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             sshot_cust=buf.getvalue(),
         ))
         set_screenshot(image)
