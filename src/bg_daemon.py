@@ -241,9 +241,9 @@ class LoadScreen(BaseLoadScreen):
         if max_val == 0:  # 0/0 sections are skipped automatically.
             self.bar_var[stage].set(1000)
         else:
-            self.bar_var[stage].set(
+            self.bar_var[stage].set(round(
                 1000 * self.values[stage] / max_val
-            )
+            ))
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.values[stage],
             max_val,
