@@ -103,21 +103,29 @@ AttrValues = Union[str, list, bool, Vec]
 
 @BEE2_config.register('SelectorWindow', palette_stores=False, uses_id=True)
 @attr.frozen
-class WindowState:
+class WindowState(BEE2_config.Data):
     """The immutable window state stored in config files for restoration next launch."""
     open_groups: Mapping[str, bool] = attr.Factory({}.copy)
     width: int = 0
     height: int = 0
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'WindowState':
+    def parse_legacy(cls, conf: Property) -> dict[str, WindowState]:
+        """Convert the old legacy configuration."""
+        result: dict[str, WindowState] = {}
+        for prop in conf.find_children('Selectorwindow'):
+            result[prop.name] = cls.parse_kv1(prop, 1)
+        return result
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> WindowState:
         """Parse from keyvalues."""
         assert version == 1
         open_groups = {
             prop.name: srctools.conv_bool(prop.value)
             for prop in data.find_children('Groups')
         }
-        return WindowState(
+        return cls(
             open_groups,
             data.int('width', -1), data.int('height', -1),
         )
