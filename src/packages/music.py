@@ -49,6 +49,7 @@ class Music(PakObject):
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', or_blank=True)
 
+        sounds: dict[MusicChannel, list[str]]
         if sound.has_children():
             sounds = {}
             for channel in MusicChannel:
@@ -96,13 +97,13 @@ class Music(PakObject):
                 for channel in MusicChannel
             }
 
-        snd_length = data.info['loop_len', '0']
-        if ':' in snd_length:
+        snd_length_str = data.info['loop_len', '0']
+        if ':' in snd_length_str:
             # Allow specifying lengths as min:sec.
-            minute, second = snd_length.split(':')
+            minute, second = snd_length_str.split(':')
             snd_length = 60 * srctools.conv_int(minute) + srctools.conv_int(second)
         else:
-            snd_length = srctools.conv_int(snd_length)
+            snd_length = srctools.conv_int(snd_length_str)
 
         packfiles = [
             prop.value
@@ -111,7 +112,7 @@ class Music(PakObject):
         ]
 
         children_prop = data.info.find_block('children', or_blank=True)
-        children = {
+        children: dict[MusicChannel, str] = {
             channel: children_prop[channel.value, '']
             for channel in MusicChannel
             if channel is not MusicChannel.BASE

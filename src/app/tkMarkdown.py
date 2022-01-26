@@ -49,8 +49,8 @@ class MarkdownData:
     Blocks are a list of data.
     """
     # External users shouldn't modify directly, so make it readonly.
-    blocks: Sequence[Block] = attr.ib(converter=list, factory=[].copy)
-    # richtextbox strips the newlines later on, so we can join with these preserved.
+    blocks: Sequence[Block] = attr.ib(factory=[].copy)
+    # RichTextBox strips the newlines later on, so we can join with these preserved.
     _unstripped: bool = True
 
     def __bool__(self) -> bool:
@@ -59,7 +59,7 @@ class MarkdownData:
 
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
-        return MarkdownData(self.blocks)
+        return MarkdownData(list(self.blocks))
 
     @classmethod
     def text(cls, text: str, *tags: str, url: str | None = None) -> MarkdownData:

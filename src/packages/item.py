@@ -206,7 +206,7 @@ class ItemVariant:
         """Modify either the base or extra editoritems block."""
         # We can share a lot of the data, if it isn't changed and we take
         # care to copy modified parts.
-        editor = list(map(copy.copy, editor))
+        editor = [copy.copy(item) for item in editor]
 
         # Create a list of subtypes in the file, in order to edit.
         subtype_lookup = [
@@ -379,14 +379,15 @@ class Item(PakObject):
         self,
         item_id: str,
         versions: dict[str, Version],
+        *,
         def_version: Version,
-        needs_unlock: bool=False,
-        all_conf: lazy_conf.LazyConf=lazy_conf.BLANK,
-        unstyled: bool=False,
-        isolate_versions: bool=False,
-        glob_desc: tkMarkdown.MarkdownData=(),
-        desc_last: bool=False,
-        folders: dict[tuple[FileSystem, str], ItemVariant]=EmptyMapping,
+        needs_unlock: bool,
+        all_conf: lazy_conf.LazyConf,
+        unstyled: bool,
+        isolate_versions: bool,
+        glob_desc: tkMarkdown.MarkdownData,
+        desc_last: bool,
+        folders: dict[tuple[FileSystem, str], ItemVariant],
     ) -> None:
         self.id = item_id
         self.versions = versions

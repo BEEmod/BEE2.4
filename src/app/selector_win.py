@@ -1290,6 +1290,7 @@ class SelectorWin:
 
         self.sel_item(self.selected)
         self.win.after(2, self.flow_items)
+        return None
 
     def open_context(self, _: Event = None) -> None:
         """Dislay the context window at the text widget."""
@@ -1416,6 +1417,7 @@ class SelectorWin:
                     else:
                         img.apply(label, ICON_CROSS)
                 elif label.type is AttrTypes.COLOR:
+                    assert isinstance(val, Vec)
                     img.apply(label, img.Handle.color(val, 16, 16))
                     # Display the full color when hovering..
                     # i18n: Tooltip for colour swatch.
@@ -1424,6 +1426,7 @@ class SelectorWin:
                     ))
                 elif label.type is AttrTypes.LIST:
                     # Join the values (in alphabetical order)
+                    assert isinstance(val, list)
                     label['text'] = ', '.join(sorted(val))
                 elif label.type is AttrTypes.STRING:
                     # Just a string.

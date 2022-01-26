@@ -2,6 +2,7 @@
 from enum import Enum
 from typing import NamedTuple, Dict
 
+import attr
 from tkinter import ttk
 import tkinter as tk
 import webbrowser
@@ -36,7 +37,6 @@ class ResIcon(Enum):
     TWTM = 'menu_twtm'
     MEL = 'menu_mel'
 
-SEPERATOR = object()
 
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
@@ -49,13 +49,17 @@ def steam_url(name):
     return 'steam://store/' + utils.STEAM_IDS[name]
 
 
-WebResource = NamedTuple('WebResource', [
-    ('name', str),
-    ('url', str),
-    ('icon', ResIcon),
-])
-Res = WebResource
+@attr.s(auto_attribs=True)
+class WebResource:
+    name: str
+    url: str
+    icon: ResIcon
 
+
+# This produces a '-------' instead.
+SEPERATOR = WebResource('', '', ResIcon.NONE)
+
+Res = WebResource
 WEB_RESOURCES = [
     Res(gettext('Wiki...'), BEE2_ITEMS_REPO + 'wiki/', ResIcon.BEE2),
     Res(
@@ -448,7 +452,7 @@ class Dialog(tk.Toplevel):
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
-        self.bind("<Escape>", self.withdraw)
+        self.bind("<Escape>", lambda e: self.withdraw())
 
         frame = tk.Frame(self, background='white')
         frame.grid(row=0, column=0, sticky='nsew')

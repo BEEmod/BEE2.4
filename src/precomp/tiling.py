@@ -1045,7 +1045,7 @@ class TileDef:
                     yield umin, umax, vmin, vmax, pattern.tex, tile_type
 
         # All unfilled spots are single 4x4 tiles, or other objects.
-        for (u, v), tile_type in tiles.items():  # type: ignore  # SUBTILE_FIZZ_KEY
+        for (u, v), tile_type in tiles.items():
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
 

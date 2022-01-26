@@ -25,7 +25,7 @@ INSTANCE_FILES: Dict[str, List[str]] = {}
 # Note this is imperfect - two items could reuse the same instance.
 ITEM_FOR_FILE: Dict[str, Tuple[str, Union[int, str]]] = {}
 
-_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
+_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+]) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
     \s*<
     \s*([^:]+)
@@ -38,7 +38,7 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES: Dict[str, Dict[str, editoritems.FSPath]] = defaultdict(dict)
+CUST_INST_FILES: Dict[str, Dict[str, str]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
@@ -218,6 +218,7 @@ SPECIAL_INST_FOLDED = {
 
 def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
+    cust_instances: dict[str, str]
     for item in items:
         # Extra definitions: key -> filename.
         # Make sure to do this first, so numbered instances are set in
@@ -281,7 +282,7 @@ def resolve(path: str, silent: bool=False) -> List[str]:
 Default_T = TypeVar('Default_T')
 
 
-def resolve_one(path, default: Default_T='', error=False) -> Union[str, Default_T]:
+def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -347,7 +348,7 @@ def _resolve(path: str) -> List[str]:
         return [path.casefold()]
 
 
-def get_subitems(comma_list, item_inst, item_id) -> List[str]:
+def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[str]:
     """Pick out the subitems from a list."""
     output = []
     for val in comma_list.split(','):
@@ -393,17 +394,17 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
 
     # Convert to instance lists
     inst_out = []
-    for ind in output:
+    for inst in output:
         # bee_ instance, already evaluated
-        if isinstance(ind, str):
-            inst_out.append(ind)
+        if isinstance(inst, str):
+            inst_out.append(inst)
             continue
 
         # Only use if it's actually in range
-        if 0 <= ind < len(item_inst):
+        if 0 <= inst < len(item_inst):
             # Skip "" instance blocks
-            if item_inst[ind] != '':
-                inst_out.append(item_inst[ind])
+            if item_inst[inst] != '':
+                inst_out.append(item_inst[inst])
     return inst_out
 
 

@@ -304,8 +304,9 @@ class PakObject:
         return cast(PakT, cls._id_to_obj[object_id.casefold()])
 
 
-def reraise_keyerror(err: BaseException, obj_id: str) -> NoReturn:
+def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
+    key_error: NoKeyError
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
             # Property.__getitem__ raises IndexError from
@@ -652,7 +653,7 @@ async def parse_package(
 
 
 async def parse_object(
-    obj_class: Type[PakObject], obj_id: str, obj_data: ParseData, obj_override: list[ParseData],
+    obj_class: Type[PakObject], obj_id: str, obj_data: ObjData, obj_override: list[ParseData],
     data: dict[Type[PakObject], list[PakObject]],
     loader: LoadScreen,
 ) -> None:
@@ -730,7 +731,7 @@ class Package:
     ) -> None:
         disp_name = info['Name', None]
         if disp_name is None:
-            LOGGER.warning('Warning: {id} has no display name!', id=pak_id)
+            LOGGER.warning('Warning: {} has no display name!', pak_id)
             disp_name = pak_id.lower()
 
         self.id = pak_id
@@ -783,8 +784,6 @@ class Package:
             return int(self.path.stat().st_mtime)
 
 
-
-
 class Style(PakObject):
     """Represents a style, specifying the era a test was built in."""
     def __init__(
@@ -833,6 +832,8 @@ class Style(PakObject):
             not data.is_override,  # Assume no video for override
         )
         vpk_name = info['vpk_name', ''].casefold()
+        items: list[EditorItem]
+        renderables: dict[RenderableType, Renderable]
 
         sugg: dict[str, set[str]] = {
             'quote': set(),
@@ -871,7 +872,7 @@ class Style(PakObject):
                 if prop.has_children():
                     corridors[group, i] = CorrDesc(
                         name=prop['name', ''],
-                        icon=prop['icon', icon],
+                        icon=utils.PackagePath.parse(prop['icon', icon], data.pak_id),
                         desc=prop['Desc', ''],
                     )
                 else:

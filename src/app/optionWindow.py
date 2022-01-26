@@ -5,7 +5,7 @@ from pathlib import Path
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
-from typing import Callable, List, Tuple, Dict
+from typing import Callable, List, Tuple, Dict, Any
 
 from enum import Enum
 
@@ -32,7 +32,7 @@ class AfterExport(Enum):
     MINIMISE = 1  # Minimise to tray
     QUIT = 2  # Quit the app.
 
-UI = {}
+UI: Dict[str, Any] = {}
 AFTER_EXPORT_ACTION = IntVar(
     value=AfterExport.MINIMISE.value,
     name='OPT_after_export_action',
@@ -197,10 +197,7 @@ def make_checkbox(
 
 def init_widgets() -> None:
     """Create all the widgets."""
-    UI['nbook'] = nbook = ttk.Notebook(
-        win,
-
-    )
+    UI['nbook'] = nbook = ttk.Notebook(win)
     UI['nbook'].grid(
         row=0,
         column=0,

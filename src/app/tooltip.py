@@ -14,7 +14,7 @@ CENT_DIST = 50  # Distance around center where we align centered.
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 window.transient(master=TK_ROOT)
-window.overrideredirect(1)
+window.overrideredirect(True)
 window.resizable(False, False)
 
 context_label = tk.Label(

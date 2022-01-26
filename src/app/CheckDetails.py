@@ -5,17 +5,15 @@ Headings can
 be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
+from typing import Iterator, Optional
 from tkinter import ttk
 from tkinter import font
 import tkinter as tk
-
 import functools
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
 from localisation import gettext
-
-from typing import List, Iterator, Optional
 
 
 UP_ARROW = '\u25B3'
@@ -72,7 +70,7 @@ class Item:
         - state is the initial state of the checkbox.
         """
         self.values = values
-        self.state_var = tk.IntVar(value=bool(state))
+        self.state_var = tk.BooleanVar(value=bool(state))
         self.master = None  # type: Optional[CheckDetails]
         self.check = None  # type: Optional[ttk.Checkbutton]
         self.locked = lock_check
@@ -169,6 +167,7 @@ class Item:
 
     @property
     def state(self) -> bool:
+        """Return whether the checkbox is checked."""
         return self.state_var.get()
 
     @state.setter
@@ -203,11 +202,11 @@ class CheckDetails(ttk.Frame):
 
         self.parent = parent
         self.headers = list(headers)
-        self.items = []  # type: List[Item]
+        self.items: list[Item] = []
         self.sort_ind = None
         self.rev_sort = False  # Should we sort in reverse?
 
-        self.head_check_var = tk.IntVar(value=False)
+        self.head_check_var = tk.BooleanVar(value=False)
         self.wid_head_check = ttk.Checkbutton(
             self,
             variable=self.head_check_var,
@@ -238,9 +237,9 @@ class CheckDetails(ttk.Frame):
             showhandle=False,
         )
         self.wid_header.grid(row=0, column=1, sticky='EW')
-        self.wid_head_frames = [0] * len(self.headers)  # type: List[ttk.Frame]
-        self.wid_head_label = [0] * len(self.headers)  # type: List[ttk.Label]
-        self.wid_head_sort = [0] * len(self.headers)  # type: List[ttk.Label]
+        self.wid_head_frames: list[ttk.Frame] = [0] * len(self.headers)
+        self.wid_head_label: list[ttk.Label] = [0] * len(self.headers)
+        self.wid_head_sort: list[ttk.Label] = [0] * len(self.headers)
         self.make_headers()
 
         self.wid_canvas = tk.Canvas(

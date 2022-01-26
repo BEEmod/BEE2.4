@@ -254,6 +254,7 @@ class Manager(Generic[ItemT]):
         group: bool=False,
     ) -> None:
         """Display the specified item on the given label."""
+        image: img.Handle
         if item is None:
             image = self._img_blank
         elif group:

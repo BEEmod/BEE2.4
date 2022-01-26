@@ -136,11 +136,11 @@ class P2C:
             LOGGER.warning('Failed parsing puzzle file!', path, exc_info=True)
             props = Property('portal2_puzzle', [])
             title = None
-            desc = _('Failed to parse this puzzle file. It can still be backed up.')
+            desc = gettext('Failed to parse this puzzle file. It can still be backed up.')
         else:
-            props = props.find_key('portal2_puzzle', [])
+            props = props.find_key('portal2_puzzle', or_blank=True)
             title = props['title', None]
-            desc = props['description', _('No description found.')]
+            desc = props['description', gettext('No description found.')]
 
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
@@ -167,11 +167,11 @@ class P2C:
             title=self.title,
         )
 
-    def make_item(self):
+    def make_item(self) -> CheckItem:
         """Make a corresponding CheckItem object."""
         chk = CheckItem(
             self.title,
-            (_('Coop') if self.is_coop else _('SP')),
+            (gettext('Coop') if self.is_coop else gettext('SP')),
             self.mod_time,
             hover_text=self.desc
         )
@@ -202,7 +202,7 @@ class Date:
             )
 
     # No date = always earlier
-    def __lt__(self, other):
+    def __lt__(self, other: 'Date') -> bool:
         if self.date is None:
             return True
         elif other.date is None:
@@ -210,7 +210,7 @@ class Date:
         else:
             return self.date < other.date
 
-    def __gt__(self, other):
+    def __gt__(self, other: 'Date') -> bool:
         if self.date is None:
             return False
         elif other.date is None:
@@ -218,23 +218,27 @@ class Date:
         else:
             return self.date > other.date
 
-    def __le__(self, other):
+    def __le__(self, other: 'Date') -> bool:
         if self.date is None:
             return other.date is None
         else:
             return self.date <= other.date
 
-    def __ge__(self, other):
+    def __ge__(self, other: 'Date') -> bool:
         if self.date is None:
             return other.date is None
         else:
             return self.date >= other.date
 
-    def __eq__(self, other):
-        return self.date == other.date
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Date):
+            return self.date == other.date
+        return NotImplemented
 
-    def __ne__(self, other):
-        return self.date != other.date
+    def __ne__(self, other) -> bool:
+        if isinstance(other, Date):
+            return self.date != other.date
+        return NotImplemented
 
 
 # Note: All the backup functions use zip files, but also work on FakeZip
@@ -392,11 +396,7 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
         for old_name, new_name in reversed(
                 list(zip(back_files, back_files[1:]))
                 ):
-            LOGGER.info(
-                'Moving: {old} -> {new}',
-                old=old_name,
-                new=new_name,
-            )
+            LOGGER.info('Moving: {} -> {}', old_name, new_name)
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)
             try:

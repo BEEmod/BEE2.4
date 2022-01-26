@@ -131,7 +131,6 @@ _grid_keys = Union[Vec, Tuple[float, float, float], slice]
 def _conv_key(pos: _grid_keys) -> tuple[float, float, float]:
     """Convert the key given in [] to a grid-position, as a x,y,z tuple."""
     # TODO: Slices are assumed to be int by typeshed.
-    # type: ignore
     if isinstance(pos, slice):
         system, slice_pos = pos.start, pos.stop
         if system == 'world':
