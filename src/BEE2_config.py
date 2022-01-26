@@ -380,7 +380,7 @@ async def apply_pal_conf(conf: Config) -> None:
 
 @register('LastSelected', uses_id=True)
 @attr.frozen
-class LastSelected:
+class LastSelected(Data):
     """Used for several general items, specifies the last selected one for restoration."""
     id: Optional[str] = None
     # For legacy parsing, old to new save IDs.
@@ -414,12 +414,30 @@ class LastSelected:
         if data.has_children():
             raise ValueError(f'LastSelected cannot be a block: {data!r}')
         if data.value.casefold() == '<none>':
-            return LastSelected(None)
-        return LastSelected(data.value)
+            return cls(None)
+        return cls(data.value)
 
     def export_kv1(self) -> Property:
         """Export to a property block."""
         return Property('', '<NONE>' if self.id is None else self.id)
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'LastSelected':
+        """Parse DMX elements."""
+        assert version == 1
+        if 'selected_none' in data and data['selected_none'].val_bool:
+            return cls(None)
+        else:
+            return cls(data['selected'].val_str)
+
+    def export_dmx(self) -> Element:
+        """Export to a DMX element."""
+        elem = Element('LastSelected', 'DMElement')
+        if self.id is None:
+            elem['selected_none'] = True
+        else:
+            elem['selected'] = self.id
+        return elem
 
 
 def get_package_locs() -> Iterator[Path]:
