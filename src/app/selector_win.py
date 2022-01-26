@@ -19,14 +19,15 @@ import random
 from typing import Optional, Union, Iterable, Mapping, Callable, Any, AbstractSet
 
 import attr
+from srctools.dmx import Attribute, Element, ValueType
+from srctools.filesys import FileSystemChain
+import srctools.logger
 
 from app.richTextBox import tkRichText
 from app.tkMarkdown import MarkdownData
 from app.tooltip import add_tooltip, set_tooltip
 from packages import SelitemData
 from srctools import Vec, Property, EmptyMapping
-import srctools.logger
-from srctools.filesys import FileSystemChain
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
@@ -98,62 +99,70 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list')
 
 
-AttrValues =  Union[str, list, bool, Vec]
+AttrValues = Union[str, list, bool, Vec]
 
 
-@attr.define
-class WindowState:
-    """The window state stored in config files for restoration next launch."""
-    open_groups: dict[str, bool]
-    width: int
-    height: int
+@BEE2_config.register('SelectorWindow', palette_stores=False, uses_id=True)
+@attr.frozen
+class WindowState(BEE2_config.Data):
+    """The immutable window state stored in config files for restoration next launch."""
+    open_groups: Mapping[str, bool] = attr.Factory({}.copy)
+    width: int = 0
+    height: int = 0
 
     @classmethod
-    def parse(cls, props: Property) -> WindowState:
+    def parse_legacy(cls, conf: Property) -> dict[str, WindowState]:
+        """Convert the old legacy configuration."""
+        result: dict[str, WindowState] = {}
+        for prop in conf.find_children('Selectorwindow'):
+            result[prop.name] = cls.parse_kv1(prop, 1)
+        return result
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> WindowState:
         """Parse from keyvalues."""
+        assert version == 1
         open_groups = {
             prop.name: srctools.conv_bool(prop.value)
-            for prop in props.find_children('Groups')
+            for prop in data.find_children('Groups')
         }
-        return WindowState(
+        return cls(
             open_groups,
-            props.int('width', -1), props.int('height', -1),
+            data.int('width', -1), data.int('height', -1),
         )
 
-    def export(self) -> Property:
+    def export_kv1(self) -> Property:
         """Generate keyvalues."""
-        props = Property('', [
-            Property('width', str(self.width)),
-            Property('height', str(self.height)),
-        ])
+        props = Property('', [])
         with props.build() as builder:
+            builder.width(str(self.width))
+            builder.height(str(self.height))
             with builder.Groups:
                 for name, is_open in self.open_groups.items():
                     builder[name](srctools.bool_as_int(is_open))
         return props
 
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> WindowState:
+        """Parse DMX elements."""
+        assert version == 1
+        closed = dict.fromkeys(data['closed'].iter_str(), False)
+        opened = dict.fromkeys(data['opened'].iter_str(), True)
+        if closed.keys() & opened.keys():
+            LOGGER.warning('Overlap between:\nopened={}\nclosed={}', opened, closed)
+        closed.update(opened)
+        return cls(closed, data['width'].val_int, data['height'].val_int)
 
-# The saved window states. When windows open they read from here, then write
-# when closing.
-SAVED_STATE: dict[str, WindowState] = {}
-
-
-@BEE2_config.OPTION_SAVE('SelectorWindow', to_palette=False)
-def save_handler() -> Property:
-    """Save properties to the config for next launch."""
-    props = Property('', [])
-    for save_id, state in SAVED_STATE.items():
-        prop = state.export()
-        prop.name = save_id
-        props.append(prop)
-    return props
-
-
-@BEE2_config.OPTION_LOAD('SelectorWindow', from_palette=False)
-def load_handler(props: Property) -> None:
-    """Load properties to the config from last launch."""
-    for prop in props:
-        SAVED_STATE[prop.name] = WindowState.parse(prop)
+    def export_dmx(self) -> Element:
+        """Serialise the state as a DMX element."""
+        elem = Element('WindowState', 'DMElement')
+        elem['width'] = self.width
+        elem['height'] = self.height
+        elem['opened'] = opened = Attribute.array('opened', ValueType.STRING)
+        elem['closed'] = closed = Attribute.array('closed', ValueType.STRING)
+        for name, val in self.open_groups.items():
+            (opened if val else closed).append(name)
+        return elem
 
 
 @attr.define
@@ -533,7 +542,7 @@ class SelectorWin:
     The string "<NONE>" is used for the none item's ID.
 
     Attributes:
-    - selected_id: The currently-selected item ID. If set to None, the
+    - chosen_id: The currently-selected item ID. If set to None, the
       None Item is chosen.
     - callback: A function called whenever an item is chosen. The first
       argument is the selected ID.
@@ -548,10 +557,12 @@ class SelectorWin:
         lst: list[Item],
         *,  # Make all keyword-only for readability
         save_id: str,  # Required!
+        store_last_selected: bool=True,
         has_none=True,
         has_def=True,
         sound_sys: FileSystemChain=None,
         modal=False,
+        default_id: str='<NONE>',
         # i18n: 'None' item description
         none_desc=gettext('Do not add anything.'),
         none_attrs=EmptyMapping,
@@ -573,11 +584,13 @@ class SelectorWin:
         - tk: Must be a Toplevel window, either the tk() root or another
         window if needed.
         - save_id: The ID used to save/load the window state.
+        - store_last_selected: If set, save/load the selected ID.
         - lst: A list of Item objects, defining the visible items.
         - If has_none is True, a <none> item will be added to the beginning
           of the list.
         - If has_def is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
+        - default_id is the item to initially select, if no previous one is set.
         - If snd_sample_sys is set, a '>' button will appear next to names
           to play the associated audio sample for the item.
           The value should be a FileSystem to look for samples in.
@@ -621,7 +634,7 @@ class SelectorWin:
         self.disp_btn: Optional[ttk.Button] = None
 
         # ID of the currently chosen item
-        self.chosen_id = None
+        self.chosen_id: Optional[str] = None
 
         # Callback function, and positional arguments to pass
         if callback is not None:
@@ -647,14 +660,29 @@ class SelectorWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        try:
-            self.selected = self.item_list[0]
-        except IndexError:
+
+        prev_state = BEE2_config.get_cur_conf(
+            BEE2_config.LastSelected,
+            save_id,
+            BEE2_config.LastSelected(default_id),
+        )
+        if store_last_selected:
+            BEE2_config.store_conf(prev_state, save_id)
+        if not self.item_list:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
             # least this works.
             self.item_list = [self.noneItem]
             self.selected = self.noneItem
+        elif prev_state.id is None and has_none:
+            self.selected = self.noneItem
+        else:
+            for item in self.item_list:
+                if item.name == prev_state.id:
+                    self.selected = item
+                    break
+            else:  # Arbitrarily pick first.
+                self.selected = self.item_list[0]
 
         self.orig_selected = self.selected
         self.parent = tk
@@ -692,6 +720,7 @@ class SelectorWin:
 
         # The ID used to persist our window state across sessions.
         self.save_id = save_id.casefold()
+        self.store_last_selected = store_last_selected
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
@@ -980,10 +1009,16 @@ class SelectorWin:
         else:
             self.attr = None
 
+        self.set_disp()
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-    def widget(self, frame: Misc) -> ttk.Entry:
+    async def _load_selected(self, selected: BEE2_config.LastSelected) -> None:
+        """Load a new selected item."""
+        self.sel_item_id('<NONE>' if selected.id is None else selected.id)
+        self.save()
+
+    async def widget(self, frame: Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
 
         Use like 'selWin.widget(parent).grid(row=0, column=1)' to create
@@ -1019,7 +1054,13 @@ class SelectorWin:
         # are readonly.
         self.readonly = self._readonly
 
-        self.save()
+        if self.store_last_selected:
+            await BEE2_config.set_and_run_ui_callback(
+                BEE2_config.LastSelected, self._load_selected,
+                self.save_id,
+            )
+        else:
+            self.save()
 
         return self.display
 
@@ -1145,7 +1186,7 @@ class SelectorWin:
                 img.apply(item.button, None)
 
         if not self.first_open:  # We've got state to store.
-            SAVED_STATE[self.save_id] = state = WindowState(
+            state = WindowState(
                 open_groups={
                     grp_id: grp.visible
                     for grp_id, grp in self.group_widgets.items()
@@ -1153,7 +1194,7 @@ class SelectorWin:
                 width=self.win.winfo_width(),
                 height=self.win.winfo_height(),
             )
-            LOGGER.debug('Storing window state "{}" = {}', self.save_id, state)
+            BEE2_config.store_conf(state, self.save_id)
 
         if self.modal:
             self.win.grab_release()
@@ -1217,7 +1258,7 @@ class SelectorWin:
         if self.first_open:
             self.first_open = False
             try:
-                state = SAVED_STATE[self.save_id]
+                state = BEE2_config.get_cur_conf(WindowState, self.save_id)
             except KeyError:
                 pass
             else:
@@ -1276,6 +1317,8 @@ class SelectorWin:
 
     def do_callback(self) -> None:
         """Call the callback function."""
+        if self.store_last_selected:
+            BEE2_config.store_conf(BEE2_config.LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
             self.callback(self.chosen_id, *self.callback_params)
 
@@ -1728,89 +1771,3 @@ class SelectorWin:
         # Reposition all our items, but only if we're visible.
         if self.win.winfo_ismapped():
             self.flow_items()
-
-
-def test() -> None:
-    """Setup a window with dummy data."""
-    from BEE2_config import GEN_OPTS
-    from packages import find_packages, PACKAGE_SYS
-    from utils import PackagePath
-    # Setup images to read from packages.
-    print('Loading packages for images.')
-    GEN_OPTS.load()
-    find_packages(GEN_OPTS['Directories']['package'])
-    img.load_filesystems(PACKAGE_SYS)
-    print('Done.')
-
-    lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
-    lbl.grid()
-    TK_ROOT.geometry("+500+500")
-
-    test_list = [
-        Item(
-            "SKY_BLACK",
-            "Black",
-            long_name="Darkness",
-            icon=img.Handle.color((125, 0, 92), ICON_SIZE, ICON_SIZE),
-            authors=["Valve"],
-            desc='Pure black darkness. Nothing to see here.',
-            attributes={
-                'test_color': Vec(255, 32, 32),
-                'astr': 'Dark',
-                'test_bool_1': False,
-                'test_bool_2': True,
-            },
-        ),
-        Item(
-            "SKY_BTS",
-            "BTS",
-            long_name="Behind The Scenes - Factory",
-            icon=img.Handle.parse_uri(PackagePath("valve_clean_style", "voices/glados"), ICON_SIZE, ICON_SIZE),
-            authors=["TeamSpen210"],
-
-            desc='The dark constuction and office areas of Aperture.  '
-                 'Catwalks extend between different buildings, with '
-                 'vactubes and cranes carrying objects throughout '
-                 'the facility.  \n'
-                 'Abandoned offices can often be found here.\n\n'
-                 '* This is a bullet point, with a\n second line'
-                 '> white-on-black text',
-            attributes={
-                'test_color': Vec(40, 53, 64),
-                'astr': 'Machinery',
-                'test_bool_1': True,
-                'test_bool_2': False,
-                'listy': ['Chair', 'Panel', 'Turret']
-            },
-        ),
-    ]
-
-    window = SelectorWin(
-        TK_ROOT,
-        test_list,
-        save_id='_test_window',
-        has_none=True,
-        has_def=True,
-        callback=functools.partial(
-            LOGGER.info,
-            'Selected:',
-        ),
-        attributes=[
-            AttrDef.color('test_color', "I'm a color.", Vec(128, 128, 128)),
-            AttrDef.bool('test_bool_1', "'I'm a bool", False),
-            AttrDef.bool('test_bool_2', "'I'm a bool", True),
-            AttrDef.string('astr', 'Hi'),
-            AttrDef.list('listy', 'Desc', ['a', 'b', 'c']),
-        ],
-    )
-    window.widget(TK_ROOT).grid(row=1, column=0, sticky='EW')
-    window.set_suggested({"SKY_BLACK"})
-
-    def swap_read() -> None:
-        """Toggle readonly."""
-        window.readonly = not window.readonly
-
-    ttk.Button(TK_ROOT, text='Readonly', command=swap_read).grid()
-
-    TK_ROOT.deiconify()
-    TK_ROOT.mainloop()

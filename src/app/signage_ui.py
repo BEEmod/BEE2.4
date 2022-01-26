@@ -1,17 +1,18 @@
 """Configures which signs are defined for the Signage item."""
-from tkinter import ttk
+from typing import Iterable, Mapping, Optional, Sequence, Tuple, List, Dict, Union
 import tkinter as tk
-from typing import Optional, Tuple, List, Dict
+from tkinter import ttk
 
 from srctools import Property
 import srctools.logger
+import attr
 
 from app import dragdrop, img, TK_ROOT
-from packages import Signage, Style
 from app import tk_tools
+from packages import Signage, Style
 from localisation import gettext
-import utils
 import BEE2_config
+import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -20,6 +21,8 @@ window.withdraw()
 
 drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
+# The valid timer indexes for signs.
+SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
@@ -43,6 +46,8 @@ DEFAULT_IDS = {
     16: 'SIGN_LIGHT_BRIDGE',
     17: 'SIGN_PAINT_BOUNCE',
     18: 'SIGN_PAINT_SPEED',
+    # Remaining are blank.
+    **dict.fromkeys(range(19, 31), ''),
 }
 
 
@@ -55,43 +60,66 @@ def export_data() -> List[Tuple[str, str]]:
     ]
 
 
-@BEE2_config.OPTION_SAVE('Signage')
-def save_signage() -> Property:
-    """Save the signage info to settings or a palette."""
-    props = Property('Signage', [])
-    for timer, slot in SLOTS_SELECTED.items():
-        props.append(Property(
-            str(timer),
-            '' if slot.contents is None
-            else slot.contents.id,
-        ))
-    return props
+@BEE2_config.register('Signage')
+@attr.frozen
+class Layout:
+    """A layout of selected signs."""
+    signs: Mapping[int, str] = attr.Factory(DEFAULT_IDS.copy)
 
+    @classmethod
+    def parse_legacy(cls, props: Property) -> Dict[str, 'Layout']:
+        """Parse the old config format."""
+        # Simply call the new parse, it's unchanged.
+        sign = Layout.parse_kv1(props.find_children('Signage'), 1)
+        return {'': sign}
 
-@BEE2_config.OPTION_LOAD('Signage')
-def load_signage(props: Property) -> None:
-    """Load the signage info from settings or a palette."""
-    for child in props:
-        try:
-            slot = SLOTS_SELECTED[int(child.name)]
-        except (ValueError, TypeError):
-            LOGGER.warning('Non-numeric timer value "{}"!', child.name)
-            continue
-        except KeyError:
-            LOGGER.warning('Invalid timer value {}!', child.name)
-            continue
-
-        if child.value:
+    @classmethod
+    def parse_kv1(cls, data: Union[Property, Iterable[Property]], version: int) -> 'Layout':
+        """Parse DMX config values."""
+        sign = DEFAULT_IDS.copy()
+        for child in data:
             try:
-                slot.contents = Signage.by_id(child.value)
+                timer = int(child.name)
+            except (ValueError, TypeError):
+                LOGGER.warning('Non-numeric timer value "{}"!', child.name)
+                continue
+
+            if timer not in sign:
+                LOGGER.warning('Invalid timer value {}!', child.name)
+                continue
+            sign[timer] = child.value
+        return cls(sign)
+
+    def export_kv1(self) -> Property:
+        """Generate keyvalues for saving signages."""
+        props = Property('Signage', [])
+        for timer, sign in self.signs.items():
+            props.append(Property(str(timer), sign))
+        return props
+
+
+async def apply_config(data: Layout) -> None:
+    """Apply saved signage info to the UI."""
+    for timer in SIGN_IND:
+        try:
+            slot = SLOTS_SELECTED[timer]
+        except KeyError:
+            LOGGER.warning('Invalid timer value {}!', timer)
+            continue
+
+        value = data.signs.get(timer, '')
+        if value:
+            try:
+                slot.contents = Signage.by_id(value)
             except KeyError:
-                LOGGER.warning('No signage with id "{}"!', child.value)
+                LOGGER.warning('No signage with id "{}"!', value)
         else:
             slot.contents = None
 
 
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
+    icon: Optional[img.Handle]
     for sign in Signage.all():
         for potential_style in new_style.bases:
             try:
@@ -123,14 +151,13 @@ def style_changed(new_style: Style) -> None:
         drag_man.load_icons()
 
 
-def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
+async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
-
-    If no signages are defined, this returns None.
     """
 
     if not any(Signage.all()):
-        return ttk.Label(master)
+        # There's no signage, disable the configurator. This will be invisible basically.
+        return ttk.Frame(master)
 
     window.resizable(True, True)
     window.title(gettext('Configure Signage'))
@@ -225,7 +252,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
     drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
 
-    for i in range(3, 31):
+    for i in SIGN_IND:
         SLOTS_SELECTED[i] = slot = drag_man.slot(
             frame_selected,
             source=False,
@@ -255,6 +282,11 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
 
     def hide_window() -> None:
         """Hide the window."""
+        # Store off the configured signage.
+        BEE2_config.store_conf(Layout({
+            timer: slt.contents.id if slt.contents is not None else ''
+            for timer, slt in SLOTS_SELECTED.items()
+        }))
         window.withdraw()
         drag_man.unload_icons()
         img.apply(preview_left, IMG_BLANK)
@@ -267,6 +299,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         utils.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
+    await BEE2_config.set_and_run_ui_callback(Layout, apply_config)
     return ttk.Button(
         master,
         text=gettext('Configure Signage'),

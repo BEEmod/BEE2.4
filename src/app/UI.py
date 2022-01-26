@@ -457,48 +457,6 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-def load_settings():
-    """Load options from the general config file."""
-    optionWindow.load()
-
-
-@BEE2_config.OPTION_SAVE('LastSelected')
-def save_last_selected() -> Property:
-    """Save the last selected objects."""
-    sel_win = [
-        ('Style', style_win),
-        ('Skybox', skybox_win),
-        ('Voice', voice_win),
-        ('Elevator', elev_win),
-    ]
-    for channel, win in music_conf.WINDOWS.items():
-        sel_win.append(('Music_' + channel.name.title(), win))
-
-    props = Property('', [])
-    for win_name, win in sel_win:
-        props.append(Property(win_name, win.chosen_id or '<NONE>'))
-    return props
-
-
-@BEE2_config.OPTION_LOAD('LastSelected')
-def load_last_selected(props: Property) -> None:
-    """Load the last selected objects."""
-    sel_win = [
-        ('Style', style_win),
-        ('Skybox', skybox_win),
-        ('Voice', voice_win),
-        ('Elevator', elev_win),
-    ]
-    for channel, win in music_conf.WINDOWS.items():
-        sel_win.append(('Music_' + channel.name.title(), win))
-
-    for win_name, win in sel_win:
-        try:
-            win.sel_item_id(props[win_name])
-        except IndexError:
-            pass
-
-
 def load_packages() -> None:
     """Import in the list of items and styles from the packages.
 
@@ -630,6 +588,7 @@ def load_packages() -> None:
         TK_ROOT,
         style_list,
         save_id='styles',
+        default_id='BEE2_CLEAN',
         title=gettext('Select Style'),
         desc=gettext(
             'The Style controls many aspects of the map. It decides the materials used for walls, '
@@ -639,7 +598,7 @@ def load_packages() -> None:
         has_none=False,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
-        # things are open..
+        # things are open...
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
@@ -669,16 +628,6 @@ def load_packages() -> None:
             SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
         ]
     )
-
-    # Defaults, which will be reset at the end.
-    selected_style = 'BEE2_CLEAN'
-    style_win.sel_item_id('BEE2_CLEAN')
-
-    voice_win.sel_suggested()
-    skybox_win.sel_suggested()
-    elev_win.sel_suggested()
-    for win in music_conf.WINDOWS.values():
-        win.sel_suggested()
 
 
 def current_style() -> packages.Style:
@@ -1034,7 +983,7 @@ def drag_fast(drag_item: PalItem, e: tk.Event) -> None:
     flow_preview()
 
 
-def set_palette(chosen_pal: paletteUI.Palette) -> None:
+async def set_palette(chosen_pal: paletteUI.Palette) -> None:
     """Select a palette."""
     pal_clear()
     for item, sub in chosen_pal.pos:
@@ -1059,7 +1008,8 @@ def set_palette(chosen_pal: paletteUI.Palette) -> None:
         ))
 
     if chosen_pal.settings is not None:
-        BEE2_config.apply_settings(chosen_pal.settings, is_palette=True)
+        LOGGER.info('Settings: {}', chosen_pal.settings)
+        await BEE2_config.apply_pal_conf(chosen_pal.settings)
 
     flow_preview()
 
@@ -1112,7 +1062,7 @@ def pal_shuffle() -> None:
 # initMainWind generates the main frames that hold all the panes to
 # make it easy to move them around if needed
 
-def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
+async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1150,7 +1100,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=gettext('Music: '))
-    music_win = music_conf.make_widgets(music_frame, pane)
+    music_win = await music_conf.make_widgets(music_frame, pane)
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
@@ -1224,14 +1174,14 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         left_pad = 0
 
     # Make all the selector window textboxes
-    style_win.widget(props).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    (await style_win.widget(props)).grid(row=0, column=1, sticky='EW', padx=left_pad)
     # row=1: Suggested.
     voice_frame.grid(row=2, column=1, sticky='EW')
-    skybox_win.widget(props).grid(row=3, column=1, sticky='EW', padx=left_pad)
-    elev_win.widget(props).grid(row=4, column=1, sticky='EW', padx=left_pad)
+    (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
+    (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
     music_frame.grid(row=5, column=0, sticky='EW', columnspan=2)
 
-    voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    (await voice_win.widget(voice_frame)).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if tk_tools.USE_SIZEGRIP:
         sizegrip = ttk.Sizegrip(props, cursor=tk_tools.Cursors.STRETCH_HORIZ)
@@ -1667,16 +1617,13 @@ async def init_windows() -> None:
         tool_img='icons/win_options',
         tool_col=2,
     )
-    init_option(windows['opt'], pal_ui)
-
+    await init_option(windows['opt'], pal_ui)
     loader.step('UI', 'options')
 
-    StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
-
+    await StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
     loader.step('UI', 'stylevar')
 
-    CompilerPane.make_pane(frames['toolMenu'], view_menu)
-
+    await CompilerPane.make_pane(frames['toolMenu'], view_menu)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
@@ -1804,7 +1751,5 @@ async def init_windows() -> None:
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
-    set_palette(pal_ui.selected)
-    # Set_palette needs to run first, so it can fix invalid palette indexes.
-    BEE2_config.read_settings()
+    await set_palette(pal_ui.selected)
     pal_ui.update_state()

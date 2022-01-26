@@ -91,7 +91,6 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
     """
     if music_id is None:
         music_id = '<NONE>'
-    GEN_OPTS['Last_Selected']['music_' + channel.name.casefold()] = music_id
     # If collapsed, the hidden ones follow the base always.
     if channel is channel.BASE:
         set_suggested(music_id, sel_item=is_collapsed)
@@ -118,7 +117,7 @@ def load_selitems() -> None:
         )
 
 
-def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
+async def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     """Generate the UI components, and return the base window."""
 
     def for_channel(channel: MusicChannel) -> List[SelItem]:
@@ -131,15 +130,6 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
                 music_list.append(selitem)
         return music_list
 
-    # This gets overwritten when making windows.
-    last_selected = {
-        channel: GEN_OPTS.get_val(
-            'Last_Selected',
-            'music_' + channel.name.casefold(),
-            '<NONE>',
-        ) for channel in MusicChannel
-    }
-
     base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
@@ -148,6 +138,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         desc=gettext('This controls the background music used for a map. Expand the dropdown to set '
                      'tracks for specific test elements.'),
         has_none=True,
+        default_id='VALVE_PETI',
         sound_sys=filesystem,
         none_desc=gettext('Add no music to the map at all. Testing Element-specific music may still '
                           'be added.'),
@@ -260,7 +251,7 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     toggle_btn.grid(row=0, column=0)
 
     for row, channel in enumerate(MusicChannel):
-        btn = WINDOWS[channel].widget(frame)
+        btn = await WINDOWS[channel].widget(frame)
         if row:
             exp_widgets.append(btn)
         btn.grid(row=row, column=2, sticky='EW')
@@ -278,8 +269,5 @@ def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
         set_collapsed()
     else:
         set_expanded()
-
-    for channel, win in WINDOWS.items():
-        win.sel_item_id(last_selected[channel])
 
     return base_win
