@@ -19,14 +19,15 @@ import random
 from typing import Optional, Union, Iterable, Mapping, Callable, Any, AbstractSet
 
 import attr
+from srctools.dmx import Attribute, Element, ValueType
+from srctools.filesys import FileSystemChain
+import srctools.logger
 
 from app.richTextBox import tkRichText
 from app.tkMarkdown import MarkdownData
 from app.tooltip import add_tooltip, set_tooltip
 from packages import SelitemData
 from srctools import Vec, Property, EmptyMapping
-import srctools.logger
-from srctools.filesys import FileSystemChain
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
@@ -140,6 +141,28 @@ class WindowState(BEE2_config.Data):
                 for name, is_open in self.open_groups.items():
                     builder[name](srctools.bool_as_int(is_open))
         return props
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> WindowState:
+        """Parse DMX elements."""
+        assert version == 1
+        closed = dict.fromkeys(data['closed'].iter_str(), False)
+        opened = dict.fromkeys(data['opened'].iter_str(), True)
+        if closed.keys() & opened.keys():
+            LOGGER.warning('Overlap between:\nopened={}\nclosed={}', opened, closed)
+        closed.update(opened)
+        return cls(closed, data['width'].val_int, data['height'].val_int)
+
+    def export_dmx(self) -> Element:
+        """Serialise the state as a DMX element."""
+        elem = Element('WindowState', 'DMElement')
+        elem['width'] = self.width
+        elem['height'] = self.height
+        elem['opened'] = opened = Attribute.array('opened', ValueType.STRING)
+        elem['closed'] = closed = Attribute.array('closed', ValueType.STRING)
+        for name, val in self.open_groups.items():
+            (opened if val else closed).append(name)
+        return elem
 
 
 @attr.define
