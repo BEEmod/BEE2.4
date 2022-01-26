@@ -149,6 +149,7 @@ def register(
     def deco(cls: Type[DataT]) -> Type[DataT]:
         """Register the class."""
         info = ConfType(cls, name, version, palette_stores, uses_id)
+        assert name.casefold() not in {'version', 'name'}, info  # Reserved names
         assert name.casefold() not in _NAME_TO_TYPE, info
         assert cls not in _TYPE_TO_TYPE, info
         _NAME_TO_TYPE[name.casefold()] = _TYPE_TO_TYPE[cls] = info
@@ -240,6 +241,8 @@ def parse_conf(props: Property) -> Config:
 
     conf = Config({})
     for child in props:
+        if child.name == 'version':
+            continue
         try:
             info = _NAME_TO_TYPE[child.name]
         except KeyError:
