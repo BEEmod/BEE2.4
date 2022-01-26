@@ -3,7 +3,7 @@ import functools
 import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, Dict, Optional
+from typing import Iterator, List, Tuple, Dict, Optional, Any
 
 from tkinter import *
 from tkinter import font
@@ -23,9 +23,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 voice_item = None
 
-UI = {}
-
-TABS = {}
+UI: Dict[str, Any] = {}
+TABS: Dict[str, ttk.Frame] = {}
 
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'

@@ -21,7 +21,7 @@ import srctools.logger
 
 from typing import (
     NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
-    Collection, Iterable, Mapping,
+    Collection, Iterable, Mapping, cast,
 )
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
@@ -51,7 +51,7 @@ class SelitemData:
     group: Optional[str]
     sort_key: str
     # The packages used to define this, used for debugging.
-    packages: set[str] = attr.Factory(frozenset)
+    packages: frozenset[str] = attr.Factory(frozenset)
 
     @classmethod
     def parse(cls, info: Property, pack_id: str) -> SelitemData:
@@ -296,12 +296,12 @@ class PakObject:
     @classmethod
     def all(cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
-        return cls._id_to_obj.values()
+        return cast('Collection[PakT]', cls._id_to_obj.values())
 
     @classmethod
     def by_id(cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
-        return cls._id_to_obj[object_id.casefold()]
+        return cast(PakT, cls._id_to_obj[object_id.casefold()])
 
 
 def reraise_keyerror(err: BaseException, obj_id: str) -> NoReturn:
@@ -384,6 +384,7 @@ async def find_packages(nursery: trio.Nursery, pak_dir: Path) -> None:
             # _000.vpk files, useless without the directory
             continue
 
+        filesys: FileSystem
         if name.is_dir():
             filesys = RawFileSystem(name)
         else:
@@ -960,15 +961,10 @@ class Style(PakObject):
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'
 
-    def export(self) -> tuple[list[EditorItem], dict[RenderableType, Renderable], Property]:
-        """Export this style, returning the vbsp_config and editoritems.
-
-        This is a special case, since styles should go first in the lists.
-        """
-        vbsp_config = Property(None, [])
-        vbsp_config += self.config()
-
-        return self.items, self.renderables, vbsp_config
+    @staticmethod
+    def export(exp_data: ExportData) -> None:
+        """This isn't used for Styles, we do them specially."""
+        pass
 
 
 def desc_parse(
