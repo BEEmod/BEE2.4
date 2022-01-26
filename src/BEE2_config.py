@@ -92,6 +92,11 @@ class Data(Protocol):
         """Generate keyvalues for saving configuration."""
         raise NotImplementedError
 
+    @classmethod
+    def parse_dmx(cls: Type[DataT], data: Element, version: int) -> DataT:
+        """Parse DMX config values."""
+        raise NotImplementedError
+
     def export_dmx(self) -> Element:
         """Generate DMX for saving the configuration."""
         raise NotImplementedError
