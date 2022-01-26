@@ -21,8 +21,7 @@ import attr
 from srctools import Property, bool_as_int
 from srctools.logger import get_logger
 
-from app import SubPane, img, tkMarkdown, tk_tools
-from app import TK_ROOT, selector_win
+from app import SubPane, img, tkMarkdown, tk_tools, config, TK_ROOT, selector_win
 from app.tooltip import add_tooltip, set_tooltip
 from localisation import gettext
 from packages import CORRIDOR_COUNTS, CorrDesc
@@ -159,9 +158,9 @@ vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_fu
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
-@BEE2_config.register('CompilerPane')
+@config.register('CompilerPane')
 @attr.frozen
-class CompilePaneState(BEE2_config.Data):
+class CompilePaneState(config.Data):
     """State saved in palettes.
 
     Note: We specifically do not save/load the following:
@@ -397,8 +396,8 @@ def make_corr_wid(corr_name: str, title: str) -> None:
 
 def sel_corr_callback(sel_item: str, corr_name: str) -> None:
     """Callback for saving the result of selecting a corridor."""
-    BEE2_config.store_conf(attr.evolve(
-        BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+    config.store_conf(attr.evolve(
+        config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         **{'corr_' + corr_name: 0 if sel_item is None else int(sel_item)},
     ))
     COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
@@ -503,8 +502,8 @@ def find_screenshot(e=None) -> None:
             f.write(buf.getvalue())
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-        BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        app.config.store_conf(attr.evolve(
+            app.config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             sshot_cust=buf.getvalue(),
         ))
         set_screenshot(image)
@@ -525,8 +524,8 @@ def set_screen_type() -> None:
         window.winfo_width(),
         window.winfo_reqheight(),
     ))
-    BEE2_config.store_conf(attr.evolve(
-        BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+    config.store_conf(attr.evolve(
+        config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         sshot_type=chosen,
     ))
     COMPILE_CFG.save_check()
@@ -845,8 +844,8 @@ async def make_map_widgets(frame: ttk.Frame):
 
     def set_voice_priority() -> None:
         """Called when the voiceline priority is changed."""
-        BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.store_conf(attr.evolve(
+            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
         ))
         COMPILE_CFG['General']['voiceline_priority'] = str(VOICE_PRIORITY_VAR.get())
@@ -877,8 +876,8 @@ async def make_map_widgets(frame: ttk.Frame):
 
     def elev_changed(state: bool) -> None:
         """Called when an elevator is selected."""
-        BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.store_conf(attr.evolve(
+            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             spawn_elev=state,
         ))
         COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state)
@@ -969,8 +968,8 @@ async def make_map_widgets(frame: ttk.Frame):
     def set_model(e: tk.Event) -> None:
         """Save the selected player model."""
         model = PLAYER_MODELS_REV[player_model_var.get()]
-        BEE2_config.store_conf(attr.evolve(
-            BEE2_config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.store_conf(attr.evolve(
+            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             player_mdl=model,
         ))
         COMPILE_CFG['General']['player_model'] = model
@@ -998,7 +997,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     await make_widgets()
-    await BEE2_config.set_and_run_ui_callback(CompilePaneState, apply_state)
+    await config.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
 def init_application() -> None:

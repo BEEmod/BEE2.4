@@ -9,7 +9,7 @@ from BEE2_config import GEN_OPTS
 from app import (
     TK_ROOT, DEV_MODE, tk_error,
     sound, img, gameMan, music_conf,
-    UI, logWindow,
+    UI, logWindow, config,
 )
 import loadScreen
 import packages
@@ -63,7 +63,7 @@ async def init_app():
     """Initialise the application."""
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
-    BEE2_config.read_settings()
+    config.read_settings()
 
     # Special case, load in this early so it applies.
     utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')

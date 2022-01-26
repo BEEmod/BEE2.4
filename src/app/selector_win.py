@@ -28,7 +28,7 @@ from app.tkMarkdown import MarkdownData
 from app.tooltip import add_tooltip, set_tooltip
 from packages import SelitemData
 from srctools import Vec, Property, EmptyMapping
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
+from app import tkMarkdown, tk_tools, sound, config, img, TK_ROOT, DEV_MODE
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
@@ -102,9 +102,9 @@ class AttrTypes(Enum):
 AttrValues = Union[str, list, bool, Vec]
 
 
-@BEE2_config.register('SelectorWindow', palette_stores=False, uses_id=True)
+@config.register('SelectorWindow', palette_stores=False, uses_id=True)
 @attr.frozen
-class WindowState(BEE2_config.Data):
+class WindowState(config.Data):
     """The immutable window state stored in config files for restoration next launch."""
     open_groups: Mapping[str, bool] = attr.Factory({}.copy)
     width: int = 0
@@ -661,13 +661,13 @@ class SelectorWin:
         else:
             self.item_list = lst
 
-        prev_state = BEE2_config.get_cur_conf(
-            BEE2_config.LastSelected,
+        prev_state = config.get_cur_conf(
+            config.LastSelected,
             save_id,
-            BEE2_config.LastSelected(default_id),
+            config.LastSelected(default_id),
         )
         if store_last_selected:
-            BEE2_config.store_conf(prev_state, save_id)
+            config.store_conf(prev_state, save_id)
         if not self.item_list:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
@@ -1013,7 +1013,7 @@ class SelectorWin:
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-    async def _load_selected(self, selected: BEE2_config.LastSelected) -> None:
+    async def _load_selected(self, selected: config.LastSelected) -> None:
         """Load a new selected item."""
         self.sel_item_id('<NONE>' if selected.id is None else selected.id)
         self.save()
@@ -1055,8 +1055,8 @@ class SelectorWin:
         self.readonly = self._readonly
 
         if self.store_last_selected:
-            await BEE2_config.set_and_run_ui_callback(
-                BEE2_config.LastSelected, self._load_selected,
+            await config.set_and_run_ui_callback(
+                config.LastSelected, self._load_selected,
                 self.save_id,
             )
         else:
@@ -1194,7 +1194,7 @@ class SelectorWin:
                 width=self.win.winfo_width(),
                 height=self.win.winfo_height(),
             )
-            BEE2_config.store_conf(state, self.save_id)
+            config.store_conf(state, self.save_id)
 
         if self.modal:
             self.win.grab_release()
@@ -1258,7 +1258,7 @@ class SelectorWin:
         if self.first_open:
             self.first_open = False
             try:
-                state = BEE2_config.get_cur_conf(WindowState, self.save_id)
+                state = config.get_cur_conf(WindowState, self.save_id)
             except KeyError:
                 pass
             else:
@@ -1318,7 +1318,7 @@ class SelectorWin:
     def do_callback(self) -> None:
         """Call the callback function."""
         if self.store_last_selected:
-            BEE2_config.store_conf(BEE2_config.LastSelected(self.chosen_id), self.save_id)
+            config.store_conf(config.LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
             self.callback(self.chosen_id, *self.callback_params)
 

@@ -13,7 +13,7 @@ import attr
 
 import BEE2_config
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
-from app import tk_tools, paletteLoader, TK_ROOT, img, BEE2
+from app import tk_tools, paletteLoader, config, TK_ROOT, img, BEE2
 from localisation import gettext
 
 
@@ -28,9 +28,9 @@ __all__ = [
 ]
 
 
-@BEE2_config.register('Palette', palette_stores=False)
+@config.register('Palette', palette_stores=False)
 @attr.frozen
-class PaletteState(BEE2_config.Data):
+class PaletteState(config.Data):
     """Data related to palettes which is restored next run.
 
     Since we don't store in the palette, we don't need to register the UI callback.
@@ -99,7 +99,7 @@ class PaletteUI:
             pal.uuid: pal
             for pal in paletteLoader.load_palettes()
         }
-        prev_state = BEE2_config.get_cur_conf(PaletteState, default=PaletteState())
+        prev_state = config.get_cur_conf(PaletteState, default=PaletteState())
         self.selected_uuid = prev_state.selected
         self.var_save_settings = tk.BooleanVar(value=prev_state.save_settings)
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
@@ -324,7 +324,7 @@ class PaletteUI:
 
     def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""
-        BEE2_config.store_conf(PaletteState(self.selected_uuid, self.var_save_settings.get()))
+        config.store_conf(PaletteState(self.selected_uuid, self.var_save_settings.get()))
 
     def event_remove(self) -> None:
         """Remove the currently selected palette."""
@@ -347,7 +347,7 @@ class PaletteUI:
         else:
             self.selected.pos = self.get_items()
             if self.var_save_settings.get():
-                self.selected.settings = BEE2_config.get_pal_conf()
+                self.selected.settings = config.get_pal_conf()
             else:
                 self.selected.settings = None
             self.selected.save(ignore_readonly=True)
@@ -364,7 +364,7 @@ class PaletteUI:
             pal.uuid = paletteLoader.uuid4()
 
         if self.var_save_settings.get():
-            pal.settings = BEE2_config.get_pal_conf()
+            pal.settings = config.get_pal_conf()
 
         pal.save()
         self.palettes[pal.uuid] = pal

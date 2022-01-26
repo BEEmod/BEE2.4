@@ -9,7 +9,6 @@ import random
 import functools
 import math
 
-from srctools import Property
 import srctools.logger
 import trio
 
@@ -44,6 +43,7 @@ from app import (
     signage_ui,
     paletteUI,
     music_conf,
+    config,
 )
 
 
@@ -434,7 +434,7 @@ def quit_application() -> None:
         GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
     try:
-        BEE2_config.write_settings()
+        config.write_settings()
     except Exception:
         LOGGER.exception('Saving main conf:')
     try:
@@ -773,7 +773,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         # Save the configs since we're writing to disk lots anyway.
         GEN_OPTS.save_check()
         item_opts.save_check()
-        BEE2_config.write_settings()
+        config.write_settings()
 
         message = gettext('Selected Items and Style successfully exported!')
         if not vpk_success:
@@ -1009,7 +1009,7 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
 
     if chosen_pal.settings is not None:
         LOGGER.info('Settings: {}', chosen_pal.settings)
-        await BEE2_config.apply_pal_conf(chosen_pal.settings)
+        await config.apply_pal_conf(chosen_pal.settings)
 
     flow_preview()
 

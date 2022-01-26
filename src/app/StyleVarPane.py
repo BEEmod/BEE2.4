@@ -15,9 +15,8 @@ import attr
 
 from packages import Style, StyleVar
 from app.SubPane import SubPane
-from app import tooltip, TK_ROOT, itemconfig, tk_tools
+from app import tooltip, TK_ROOT, itemconfig, tk_tools, config
 from localisation import ngettext, gettext
-import BEE2_config
 
 
 LOGGER = get_logger(__name__)
@@ -117,9 +116,9 @@ def mandatory_unlocked() -> bool:
         return False
 
 
-@BEE2_config.register('StyleVar', uses_id=True)
+@config.register('StyleVar', uses_id=True)
 @attr.frozen
-class StyleVarState(BEE2_config.Data):
+class StyleVarState(config.Data):
     """Holds style var state stored in configs."""
     value: bool = False
 
@@ -316,8 +315,8 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
         async def apply_state(state: StyleVarState) -> None:
             """Applies the given state."""
             tk_var.set(state.value)
-        await BEE2_config.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
-        check['command'] = lambda: BEE2_config.store_conf(StyleVarState(tk_var.get() != 0), var_id)
+        await config.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
+        check['command'] = lambda: config.store_conf(StyleVarState(tk_var.get() != 0), var_id)
 
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
@@ -336,7 +335,7 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
         if var.id == 'UnlockDefault':
             def on_unlock_default_set() -> None:
                 """Update item filters when this is changed by the user."""
-                BEE2_config.store_conf(StyleVarState(unlock_def_var.get() != 0), 'UnlockDefault')
+                config.store_conf(StyleVarState(unlock_def_var.get() != 0), 'UnlockDefault')
                 update_item_vis()
 
             async def apply_unlock_default(state: StyleVarState) -> None:
@@ -346,7 +345,7 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
 
             unlock_def_var = int_var
             chk['command'] = on_unlock_default_set
-            await BEE2_config.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
+            await config.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
         else:
             await add_state_syncers(var.id, chk, int_var)
 

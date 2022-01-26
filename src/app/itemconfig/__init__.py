@@ -11,6 +11,7 @@ from srctools.dmx import Element
 import trio
 import attr
 
+import app.config
 from packages import PakObject, ExportData, ParseData, desc_parse
 from app import UI, signage_ui, tkMarkdown, sound, tk_tools, BEE2
 from app.tooltip import add_tooltip
@@ -72,9 +73,9 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     return r, g, b
 
 
-@BEE2_config.register('ItemVar', uses_id=True)
+@app.config.register('ItemVar', uses_id=True)
 @attr.frozen
-class WidgetConfig(BEE2_config.Data):
+class WidgetConfig(app.config.Data):
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
     values: Union[str, Mapping[str, str]] = EmptyMapping
@@ -158,7 +159,7 @@ class SingleWidget(Widget):
         def on_changed(*_) -> None:
             """Recompute state and UI when changed."""
             val = self.value.get()
-            BEE2_config.store_conf(WidgetConfig(val), save_id)
+            app.config.store_conf(WidgetConfig(val), save_id)
             if self.ui_cback is not None:
                 BEE2.APP_NURSERY.start_soon(self.ui_cback, val)
 
@@ -204,7 +205,7 @@ class MultiWidget(Widget):
                 pass
             else:
                 BEE2.APP_NURSERY.start_soon(cback, var.get())
-            BEE2_config.store_conf(WidgetConfig({
+            app.config.store_conf(WidgetConfig({
                 num: sub_var.get()
                 for num, sub_var in self.values
             }), save_id)
@@ -268,7 +269,7 @@ class ConfigGroup(PakObject, allow_mult=True):
             default_prop = wid.find_key('Default', '')
             values: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
 
-            conf = BEE2_config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
+            conf = app.config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:
@@ -448,7 +449,7 @@ async def make_pane(parent: ttk.Frame) -> None:
                 label.grid(row=0, column=0)
                 widget.grid(row=0, column=1, sticky='e')
                 if s_wid.has_values:
-                    await BEE2_config.set_and_run_ui_callback(WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}')
+                    await app.config.set_and_run_ui_callback(WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}')
 
                 if s_wid.tooltip:
                     add_tooltip(widget, s_wid.tooltip)
@@ -484,7 +485,7 @@ async def make_pane(parent: ttk.Frame) -> None:
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', config.id, m_wid.id)
                 continue
-            await BEE2_config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
+            await app.config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
 
             if m_wid.tooltip:
                 add_tooltip(wid_frame, m_wid.tooltip)

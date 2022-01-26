@@ -7,8 +7,7 @@ from srctools import Property
 import srctools.logger
 import attr
 
-from app import dragdrop, img, TK_ROOT
-from app import tk_tools
+from app import dragdrop, img, tk_tools, config, TK_ROOT
 from packages import Signage, Style
 from localisation import gettext
 import BEE2_config
@@ -60,9 +59,9 @@ def export_data() -> List[Tuple[str, str]]:
     ]
 
 
-@BEE2_config.register('Signage')
+@config.register('Signage')
 @attr.frozen
-class Layout:
+class Layout(config.Data):
     """A layout of selected signs."""
     signs: Mapping[int, str] = attr.Factory(DEFAULT_IDS.copy)
 
@@ -283,7 +282,7 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     def hide_window() -> None:
         """Hide the window."""
         # Store off the configured signage.
-        BEE2_config.store_conf(Layout({
+        config.store_conf(Layout({
             timer: slt.contents.id if slt.contents is not None else ''
             for timer, slt in SLOTS_SELECTED.items()
         }))
@@ -299,7 +298,7 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         utils.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
-    await BEE2_config.set_and_run_ui_callback(Layout, apply_config)
+    await config.set_and_run_ui_callback(Layout, apply_config)
     return ttk.Button(
         master,
         text=gettext('Configure Signage'),
