@@ -35,7 +35,6 @@ OBJ_TYPES: dict[str, Type[PakObject]] = {}
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS: dict[str, FileSystem] = {}
 
-
 def __getattr__(name):
     """Redirect to LOADED object."""
     if name == 'all_obj':
@@ -299,7 +298,7 @@ class PakObject:
         raise NotImplementedError
 
     @classmethod
-    def post_parse(cls) -> None:
+    def post_parse(cls, packset: PackagesSet) -> None:
         """Do processing after all objects of this type have been fully parsed."""
         pass
 
@@ -718,6 +717,7 @@ async def parse_object(
         raise ValueError(
             '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
         )
+    assert object_.id == obj_id, f'{object_!r} -> {object_.id} != "{obj_id}"!'
 
     object_.pak_id = obj_data.pak_id
     object_.pak_name = obj_data.disp_name

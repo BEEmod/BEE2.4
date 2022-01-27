@@ -11,9 +11,9 @@ class EditorSound(PakObject):
     The values in 'keys' will form the soundscript body.
     """
     def __init__(self, snd_name: str, data: Property) -> None:
-        self.id = 'BEE2_Editor.' + snd_name
+        self.id = snd_name
         self.data = data
-        data.name = self.id
+        data.name = 'BEE2_Editor.' + self.id
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'EditorSound':
