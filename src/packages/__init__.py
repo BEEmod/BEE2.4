@@ -2,6 +2,8 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
+
+import warnings
 from collections import defaultdict
 from pathlib import Path
 
@@ -29,13 +31,21 @@ if TYPE_CHECKING:  # Prevent circular import
 
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages')
-
-all_obj: dict[Type[PakObject], dict[str, ObjData]] = {}
-packages: dict[str, Package] = {}
 OBJ_TYPES: dict[str, Type[PakObject]] = {}
-
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS: dict[str, FileSystem] = {}
+
+
+def __getattr__(name):
+    """Redirect to LOADED object."""
+    if name == 'all_obj':
+        warnings.warn('Use packages.LOADED or local PackagesSet', DeprecationWarning, stacklevel=1)
+        return LOADED.unparsed
+    elif name == 'packages':
+        warnings.warn('Use packages.LOADED or local PackagesSet', DeprecationWarning, stacklevel=1)
+        return LOADED.packages
+    else:
+        raise AttributeError(name)
 
 
 @attr.define
@@ -296,12 +306,14 @@ class PakObject:
     @classmethod
     def all(cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
-        return cast('Collection[PakT]', cls._id_to_obj.values())
+        warnings.warn('Make this local!', DeprecationWarning, stacklevel=1)
+        return LOADED.all_obj(cls)
 
     @classmethod
     def by_id(cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
-        return cast(PakT, cls._id_to_obj[object_id.casefold()])
+        warnings.warn('Make this local!', DeprecationWarning, stacklevel=1)
+        return LOADED.obj_by_id(cls, object_id)
 
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
@@ -370,7 +382,34 @@ def set_cond_source(props: Property, source: str) -> None:
         cond['__src__'] = source
 
 
-async def find_packages(nursery: trio.Nursery, pak_dir: Path) -> None:
+@attr.define
+class PackagesSet:
+    """Holds all the data pared from packages.
+
+    This is swapped out to reload packages.
+    """
+    packages: dict[str, Package] = attr.Factory(dict)
+    # type -> id -> object
+    # The object data before being parsed, and the final result.
+    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attr.Factory(lambda: defaultdict(dict))
+    objects: dict[Type[PakObject], dict[str, PakObject]] = attr.Factory(lambda: defaultdict(dict))
+    # For overrides, a type/ID pair to the list of overrides.
+    overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attr.Factory(lambda: defaultdict(list))
+
+    def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
+        """Get the list of objects parsed."""
+        return cast('Collection[PakT]', self.objects[cls].values())
+
+    def obj_by_id(self, cls: Type[PakT], object_id: str) -> PakT:
+        """Return the object with a given ID."""
+        return cast(PakT, self.objects[cls][object_id.casefold()])
+
+
+# Global loaded packages. TODO: This should become local.
+LOADED = PackagesSet()
+
+
+async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Path) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     try:
@@ -414,7 +453,7 @@ async def find_packages(nursery: trio.Nursery, pak_dir: Path) -> None:
             continue
         pak_id = info['ID']
 
-        if pak_id.casefold() in packages:
+        if pak_id.casefold() in packset.packages:
             raise ValueError(
                 f'Duplicate package with id "{pak_id}"!\n'
                 'If you just updated the mod, delete any old files in packages/.'
@@ -422,7 +461,7 @@ async def find_packages(nursery: trio.Nursery, pak_dir: Path) -> None:
 
         PACKAGE_SYS[pak_id.casefold()] = filesys
 
-        packages[pak_id.casefold()] = Package(
+        packset.packages[pak_id.casefold()] = Package(
             pak_id,
             filesys,
             info,
@@ -475,41 +514,35 @@ async def load_packages(
     Item.log_ent_count = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
 
+    packset = LOADED  # TODO remove.
+
     async with trio.open_nursery() as find_nurs:
         for pak_dir in pak_dirs:
-            find_nurs.start_soon(find_packages, find_nurs, pak_dir)
+            find_nurs.start_soon(find_packages, find_nurs, packset, pak_dir)
 
-    pack_count = len(packages)
+    pack_count = len(packset.packages)
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
         no_packages_err(pak_dirs, 'No packages found!')
 
     # We must have the clean style package.
-    if CLEAN_PACKAGE not in packages:
+    if CLEAN_PACKAGE not in packset.packages:
         no_packages_err(
             pak_dirs,
             'No Clean Style package! This is required for some '
             'essential resources and objects.'
         )
 
-    data: dict[Type[PakObject], list[PakObject]] = {}
-    obj_override: dict[Type[PakObject], dict[str, list[ParseData]]] = {}
-
-    for obj_type in OBJ_TYPES.values():
-        all_obj[obj_type] = {}
-        obj_override[obj_type] = defaultdict(list)
-        data[obj_type] = []
-
     async with trio.open_nursery() as nursery:
-        for pack in packages.values():
+        for pack in packset.packages.values():
             if not pack.enabled:
-                LOGGER.info('Package {id} disabled!', id=pack.id)
+                LOGGER.info('Package {} disabled!', pack.id)
                 pack_count -= 1
                 loader.set_length("PAK", pack_count)
                 continue
 
-            nursery.start_soon(parse_package, nursery, pack, obj_override, loader, has_tag_music, has_mel_music)
+            nursery.start_soon(parse_package, nursery, packset, pack, loader, has_tag_music, has_mel_music)
         LOGGER.debug('Submitted packages.')
 
     LOGGER.debug('Parsed packages, now parsing objects.')
@@ -517,22 +550,22 @@ async def load_packages(
     loader.set_length("OBJ", sum(
         len(obj_type)
         for obj_type in
-        all_obj.values()
+        packset.unparsed.values()
     ))
 
     async with trio.open_nursery() as nursery:
-        for obj_class, objs in all_obj.items():
+        for obj_class, objs in packset.unparsed.items():
             for obj_id, obj_data in objs.items():
-                overrides = obj_override[obj_class].get(obj_id, [])
+                overrides = packset.overrides[obj_class, obj_id]
                 nursery.start_soon(
                     parse_object,
-                    obj_class, obj_id, obj_data, overrides, data, loader,
+                    obj_class, obj_id, obj_data, overrides, packset.objects, loader,
                 )
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
         '{:<15}: {}'.format(obj_type.__name__, len(objs))
         for obj_type, objs in
-        data.items()
+        packset.objects.items()
     ))
 
     for obj_type in OBJ_TYPES.values():
@@ -542,15 +575,15 @@ async def load_packages(
     # This has to be done after styles.
     LOGGER.info('Allocating styled items...')
     async with trio.open_nursery() as nursery:
-        for it in Item.all():
+        for it in packset.all_obj(Item):
             nursery.start_soon(assign_styled_items, log_item_fallbacks, log_missing_styles, it)
     return PACKAGE_SYS
 
 
 async def parse_package(
     nursery: trio.Nursery,
+    packset: PackagesSet,
     pack: Package,
-    obj_override: dict[Type[PakObject], dict[str, list[ParseData]]],
     loader: LoadScreen,
     has_tag: bool=False,
     has_mel: bool=False,
@@ -565,12 +598,10 @@ async def parse_package(
         elif pre.value == '<MEL_MUSIC>':
             if not has_mel:
                 return
-        elif pre.value.casefold() not in packages:
+        elif pre.value.casefold() not in packset.packages:
             LOGGER.warning(
-                'Package "{pre}" required for "{id}" - '
-                'ignoring package!',
-                pre=pre.value,
-                id=pack.id,
+                'Package "{}" required for "{}" - ignoring package!',
+                pre.value,  pack.id,
             )
             return
 
@@ -613,7 +644,7 @@ async def parse_package(
                     obj_id = over_prop['id']
                 except LookupError:
                     raise ValueError('No ID for "{}" object type!'.format(obj_type)) from None
-                obj_override[obj_type][obj_id].append(
+                packset.overrides[obj_type, obj_id].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
         else:
@@ -626,17 +657,17 @@ async def parse_package(
                 obj_id = obj['id']
             except LookupError:
                 raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
-            if obj_id in all_obj[obj_type]:
+            if obj_id in packset.unparsed_objects[obj_type]:
                 if obj_type.allow_mult:
                     # Pretend this is an override
-                    obj_override[obj_type][obj_id].append(
+                    packset.overrides[obj_type, obj_id].append(
                         ParseData(pack.fsys, obj_id, obj, pack.id, True)
                     )
                     # Don't continue to parse and overwrite
                     continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
-            all_obj[obj_type][obj_id] = ObjData(
+            packset.unparsed[obj_type][obj_id] = ObjData(
                 pack.fsys,
                 obj,
                 pack.id,
