@@ -306,13 +306,13 @@ class PakObject:
     @classmethod
     def all(cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=1)
+        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
         return LOADED.all_obj(cls)
 
     @classmethod
     def by_id(cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=1)
+        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
         return LOADED.obj_by_id(cls, object_id)
 
 
@@ -446,7 +446,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                nursery.start_soon(find_packages, nursery, name)
+                nursery.start_soon(find_packages, nursery, packset, name)
             else:
                 LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
@@ -555,11 +555,10 @@ async def load_packages(
 
     async with trio.open_nursery() as nursery:
         for obj_class, objs in packset.unparsed.items():
-            for obj_id, obj_data in objs.items():
-                overrides = packset.overrides[obj_class, obj_id]
+            for obj_id in objs:
                 nursery.start_soon(
                     parse_object,
-                    obj_class, obj_id, obj_data, overrides, packset.objects, loader,
+                    packset, obj_class, obj_id, loader,
                 )
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
@@ -657,7 +656,7 @@ async def parse_package(
                 obj_id = obj['id']
             except LookupError:
                 raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
-            if obj_id in packset.unparsed_objects[obj_type]:
+            if obj_id in packset.unparsed[obj_type]:
                 if obj_type.allow_mult:
                     # Pretend this is an override
                     packset.overrides[obj_type, obj_id].append(
@@ -684,11 +683,12 @@ async def parse_package(
 
 
 async def parse_object(
-    obj_class: Type[PakObject], obj_id: str, obj_data: ObjData, obj_override: list[ParseData],
-    data: dict[Type[PakObject], list[PakObject]],
+    packset: PackagesSet,
+    obj_class: Type[PakObject], obj_id: str,
     loader: LoadScreen,
 ) -> None:
     """Parse through the object and store the resultant class."""
+    obj_data = packset.unparsed[obj_class][obj_id]
     try:
         with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
             object_ = await obj_class.parse(
@@ -720,13 +720,9 @@ async def parse_object(
             '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
         )
 
-    # Store in this database so we can find all objects for each type.
-    # noinspection PyProtectedMember
-    obj_class._id_to_obj[object_.id.casefold()] = object_
-
     object_.pak_id = obj_data.pak_id
     object_.pak_name = obj_data.disp_name
-    for override_data in obj_override:
+    for override_data in packset.overrides[obj_class, obj_id.casefold()]:
         await trio.sleep(0)
         try:
             with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
@@ -747,7 +743,8 @@ async def parse_object(
 
         await trio.sleep(0)
         object_.add_over(override)
-    data[obj_class].append(object_)
+    assert obj_id.casefold() not in packset.objects[obj_class], f'{obj_class}("{obj_id}") = {object_}'
+    packset.objects[obj_class][obj_id.casefold()] = object_
     loader.step("OBJ")
 
 
