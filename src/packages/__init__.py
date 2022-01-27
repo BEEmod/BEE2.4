@@ -643,7 +643,7 @@ async def parse_package(
                     obj_id = over_prop['id']
                 except LookupError:
                     raise ValueError('No ID for "{}" object type!'.format(obj_type)) from None
-                packset.overrides[obj_type, obj_id].append(
+                packset.overrides[obj_type, obj_id.casefold()].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
         else:
@@ -659,7 +659,7 @@ async def parse_package(
             if obj_id in packset.unparsed[obj_type]:
                 if obj_type.allow_mult:
                     # Pretend this is an override
-                    packset.overrides[obj_type, obj_id].append(
+                    packset.overrides[obj_type, obj_id.casefold()].append(
                         ParseData(pack.fsys, obj_id, obj, pack.id, True)
                     )
                     # Don't continue to parse and overwrite
