@@ -33,7 +33,7 @@ def show() -> None:
 def make_packitems() -> Iterable[CheckItem]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
-    for pack in packages.packages.values():
+    for pack in packages.LOADED.packages.values():
         item = CheckItem(
             pack.disp_name,
             hover_text=pack.desc or 'No description!',

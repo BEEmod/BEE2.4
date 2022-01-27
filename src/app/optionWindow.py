@@ -114,7 +114,7 @@ def clear_caches() -> None:
         game.save()
     GEN_OPTS['General']['cache_time'] = '0'
 
-    for pack_id in packages.packages:
+    for pack_id in packages.LOADED.packages:
         packages.PACK_CONFIG[pack_id]['ModTime'] = '0'
 
     # This needs to be disabled, since otherwise we won't actually export
