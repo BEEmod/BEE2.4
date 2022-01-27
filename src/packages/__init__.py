@@ -499,6 +499,7 @@ def no_packages_err(pak_dirs: list[Path], msg: str) -> NoReturn:
 
 
 async def load_packages(
+    packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
     log_item_fallbacks=False,
@@ -513,8 +514,6 @@ async def load_packages(
 
     Item.log_ent_count = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
-
-    packset = LOADED  # TODO remove.
 
     async with trio.open_nursery() as find_nurs:
         for pak_dir in pak_dirs:
@@ -569,7 +568,7 @@ async def load_packages(
 
     for obj_type in OBJ_TYPES.values():
         LOGGER.info('Post-process {} objects...', obj_type.__name__)
-        obj_type.post_parse()
+        obj_type.post_parse(packset)
 
     # This has to be done after styles.
     LOGGER.info('Allocating styled items...')
@@ -961,31 +960,36 @@ class Style(PakObject):
         )
 
     @classmethod
-    def post_parse(cls) -> None:
+    def post_parse(cls, packset: PackagesSet) -> None:
         """Assign the bases lists for all styles, and set default suggested items."""
-        all_styles: dict[str, Style] = {}
-
         defaults = ['<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>']
 
-        for style in cls.all():
-            all_styles[style.id] = style
+        for style in packset.all_obj(Style):
             for default, sugg_set in zip(defaults, style.suggested):
                 if not sugg_set:
                     sugg_set.add(default)
 
-        for style in all_styles.values():
             base = []
             b_style = style
             while b_style is not None:
-                # Recursively find all the base styles for this one
+                # Recursively find all the base styles for this one.
                 if b_style in base:
                     # Already hit this!
                     raise Exception('Loop in bases for "{}"!'.format(b_style.id))
-                base.append(b_style)
-                b_style = all_styles.get(b_style.base_style, None)
                 # Just append the style.base_style to the list,
-                # until the style with that ID isn't found anymore.
+                # until the style with that ID isn't found any more.
+                base.append(b_style)
+                if b_style.base_style is not None:
+                    try:
+                        b_style = packset.obj_by_id(cls, b_style.base_style)
+                    except KeyError:
+                        LOGGER.warning('Unknown style "{}"!', b_style.base_style)
+                        break
+                else:
+                    # No more.
+                    break
             style.bases = base
+            LOGGER.debug('Inheritance path for {} = {}', style, style.bases)
 
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'

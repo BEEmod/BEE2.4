@@ -91,6 +91,7 @@ async def init_app():
 
     LOGGER.info('Loading Packages...')
     package_sys = await packages.load_packages(
+        packages.LOADED,
         list(BEE2_config.get_package_locs()),
         loader=loadScreen.main_loader,
         log_item_fallbacks=GEN_OPTS.get_bool(

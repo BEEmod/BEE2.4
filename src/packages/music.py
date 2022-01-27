@@ -7,7 +7,7 @@ import srctools.logger
 
 from consts import MusicChannel
 from app import lazy_conf
-from packages import PakObject, ParseData, SelitemData, get_config, ExportData
+from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config, ExportData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -238,14 +238,14 @@ class Music(PakObject):
             )
 
     @classmethod
-    def post_parse(cls) -> None:
+    def post_parse(cls, packset: PackagesSet) -> None:
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
         """
         sounds: dict[frozenset[str], str] = {}
 
-        for music in cls.all():
+        for music in packset.all_obj(cls):
             for channel in MusicChannel:
                 # Base isn't present in this.
                 child_id = music.children.get(channel, '')

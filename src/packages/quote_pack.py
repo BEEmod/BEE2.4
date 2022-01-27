@@ -4,7 +4,7 @@ from typing import Optional, Set, Iterator
 import srctools
 import utils
 from packages import (
-    PakObject, set_cond_source, ParseData,
+    PackagesSet, PakObject, set_cond_source, ParseData,
     get_config, ExportData, LOGGER, SelitemData,
 )
 from srctools import Property, Vec, NoKeyError
@@ -203,7 +203,7 @@ class QuotePack(PakObject):
         return Property(prop.real_name, children)
 
     @classmethod
-    def post_parse(cls) -> None:
+    def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
 
         def iter_lines(conf: Property) -> Iterator[Property]:
@@ -216,7 +216,7 @@ class QuotePack(PakObject):
                 if group.has_children():
                     yield from group
 
-        for voice in cls.all():
+        for voice in packset.all_obj(cls):
             used: Set[str] = set()
             for quote in iter_lines(voice.config):
                 try:
