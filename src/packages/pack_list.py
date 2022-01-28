@@ -9,7 +9,7 @@ from packages import (
 from srctools import Property
 
 
-class PackList(PakObject, allow_mult=True, needs_foreground=True):
+class PackList(PakObject, allow_mult=True):
     """Specifies a group of resources which can be packed together."""
     def __init__(self, pak_id: str, files: List[str]) -> None:
         self.id = pak_id
@@ -94,7 +94,7 @@ class PackList(PakObject, allow_mult=True, needs_foreground=True):
 
         pack_block = Property('PackList', [])
 
-        for pack in PackList.all():  # type: PackList
+        for pack in exp_data.packset.all_obj(PackList):
             # Build a
             # "Pack_id"
             # {
