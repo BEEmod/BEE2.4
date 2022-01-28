@@ -212,7 +212,7 @@ class MultiWidget(Widget):
         return on_changed
 
 
-class ConfigGroup(PakObject, allow_mult=True):
+class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
     """A group of configs for an item."""
     def __init__(
         self,

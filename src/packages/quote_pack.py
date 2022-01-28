@@ -10,7 +10,7 @@ from packages import (
 from srctools import Property, Vec, NoKeyError
 
 
-class QuotePack(PakObject):
+class QuotePack(PakObject, needs_foreground=True):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
         self,

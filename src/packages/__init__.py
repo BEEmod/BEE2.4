@@ -243,6 +243,7 @@ class PakObject:
     If duplicates occur, they will be treated as overrides.
     Set 'has_img' to control whether the object will count towards the images
     loading bar - this should be stepped in the UI.load_packages() method.
+    Setting `needs_foreground` indicates that it is unable to load after the main UI.
     """
     # ID of the object
     id: str
@@ -253,10 +254,12 @@ class PakObject:
 
     _id_to_obj: ClassVar[dict[str, PakObject]]
     allow_mult: ClassVar[bool]
+    needs_foreground: ClassVar[bool]
 
     def __init_subclass__(
         cls,
         allow_mult: bool = False,
+        needs_foreground: bool = False,
         **kwargs,
     ) -> None:
         super().__init_subclass__(**kwargs)
@@ -265,6 +268,8 @@ class PakObject:
         # Maps object IDs to the object.
         cls._id_to_obj = {}
         cls.allow_mult = allow_mult
+        cls.needs_foreground = needs_foreground
+        LOGGER.debug('Needs foreground: {}={}', cls, needs_foreground)
 
     @classmethod
     async def parse(cls: Type[PakT], data: ParseData) -> PakT:
@@ -812,7 +817,7 @@ class Package:
             return int(self.path.stat().st_mtime)
 
 
-class Style(PakObject):
+class Style(PakObject, needs_foreground=True):
     """Represents a style, specifying the era a test was built in."""
     def __init__(
         self,

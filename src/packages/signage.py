@@ -27,7 +27,7 @@ class SignStyle(NamedTuple):
     type: str
 
 
-class SignageLegend(PakObject):
+class SignageLegend(PakObject, needs_foreground=True):
     """Allows specifying image resources used to construct the legend texture.
 
     The background texture if specified is added to the upper-left of the image.
@@ -51,6 +51,7 @@ class SignageLegend(PakObject):
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'SignageLegend':
+        """Parse a signage legend."""
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
         else:
@@ -65,12 +66,13 @@ class SignageLegend(PakObject):
             ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
             bg, blank,
         )
+
     @staticmethod
     def export(exp_data: ExportData) -> None:
         """This is all performed in Signage."""
 
 
-class Signage(PakObject, allow_mult=True):
+class Signage(PakObject, allow_mult=True, needs_foreground=True):
     """Defines different square signage overlays."""
     def __init__(
         self,

@@ -9,7 +9,7 @@ from packages import (
 from srctools import Property
 
 
-class PackList(PakObject, allow_mult=True):
+class PackList(PakObject, allow_mult=True, needs_foreground=True):
     """Specifies a group of resources which can be packed together."""
     def __init__(self, pak_id: str, files: List[str]) -> None:
         self.id = pak_id

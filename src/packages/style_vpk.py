@@ -13,7 +13,7 @@ from packages import (
 from srctools import FileSystem, VPK
 
 
-class StyleVPK(PakObject):
+class StyleVPK(PakObject, needs_foreground=True):
     """A set of VPK files used for styles.
 
     These are copied into _dlc3, allowing changing the in-editor wall

@@ -371,7 +371,7 @@ class Version:
         return f'<Version "{self.id}">'
 
 
-class Item(PakObject):
+class Item(PakObject, needs_foreground=True):
     """An item in the editor..."""
     log_ent_count = False
 
