@@ -404,6 +404,7 @@ class PackagesSet:
     _type_ready: dict[Type[PakObject], trio.Event] = attr.ib(init=False, factory=dict)
 
     def ready(self, cls: Type[PakObject]) -> trio.Event:
+        """Return a Trio Event which is set when a specific object type is fully parsed."""
         try:
             return self._type_ready[cls]
         except KeyError:
@@ -412,10 +413,12 @@ class PackagesSet:
 
     def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
+        assert self.ready(cls).is_set(), cls
         return cast('Collection[PakT]', self.objects[cls].values())
 
     def obj_by_id(self, cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
+        assert self.ready(cls).is_set(), cls
         return cast(PakT, self.objects[cls][object_id.casefold()])
 
 
