@@ -13,7 +13,7 @@ import srctools.logger
 import trio
 
 import loadScreen
-from app import TK_ROOT
+from app import TK_ROOT, BEE2
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
@@ -819,7 +819,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         set_game(gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
-    menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+        menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
 
 
 def set_disp_name(item, e=None) -> None:
@@ -1093,6 +1093,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         textvariable=EXPORT_CMD_VAR,
         command=functools.partial(export_editoritems, pal_ui),
     )
+    UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
     props = ttk.Frame(frame, width="50")
@@ -1422,6 +1423,7 @@ def init_menu_bar(win: tk.Toplevel, export: Callable[[], None]) -> Tuple[tk.Menu
         accelerator=tk_tools.ACCEL_EXPORT,
     )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
+    file_menu.entryconfigure(file_menu.export_btn_index, state='disabled')
 
     file_menu.add_command(
         label=gettext("Add Game"),
@@ -1715,6 +1717,15 @@ async def init_windows() -> None:
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()
     windows['pal'].load_conf()
+
+    async def enable_export() -> None:
+        """Enable exporting only after all packages are loaded."""
+        for cls in packages.OBJ_TYPES.values():
+            await packages.LOADED.ready(cls).wait()
+        UI['pal_export'].state(('!disabled',))
+        menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+
+    BEE2.APP_NURSERY.start_soon(enable_export)
 
     def style_select_callback(style_id: str) -> None:
         """Callback whenever a new style is chosen."""

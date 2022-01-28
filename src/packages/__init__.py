@@ -411,6 +411,10 @@ class PackagesSet:
             self._type_ready[cls] = evt = trio.Event()
             return evt
 
+    def can_export(self) -> bool:
+        """Check if we're currently able to export."""
+        return all(self._type_ready[cls].is_set() for cls in OBJ_TYPES.values())
+
     def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
         assert self.ready(cls).is_set(), cls
