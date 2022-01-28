@@ -419,7 +419,6 @@ class PalItem:
 
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
-    import sys, logging
     from app import BEE2
     LOGGER.info('Shutting down application.')
     try:
@@ -457,16 +456,15 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-def load_packages() -> None:
+def load_packages(packset: packages.PackagesSet) -> None:
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     """
     global skybox_win, voice_win, style_win, elev_win
-    global selected_style
 
-    for item in packages.Item.all():
+    for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
     sky_list: list[selWinItem] = []
@@ -478,24 +476,24 @@ def load_packages() -> None:
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, packages.Skybox.all(), {
+        (sky_list, packages.Skybox, {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, packages.QuotePack.all(), {
+        (voice_list, packages.QuotePack, {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, packages.Style.all(), {
+        (style_list, packages.Style, {
             'VID': 'has_video',
         }),
-        (elev_list, packages.Elevator.all(), {
+        (elev_list, packages.Elevator, {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, obj_list, attrs in obj_types:
+    for sel_list, obj_type, attrs in obj_types:
         attr_commands = [
             # cache the operator.attrgetter funcs
             (key, operator.attrgetter(value))
@@ -503,7 +501,7 @@ def load_packages() -> None:
         ]
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(obj_list, key=operator.attrgetter('selitem_data.name')):
+        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,

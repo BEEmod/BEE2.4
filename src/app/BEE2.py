@@ -112,7 +112,7 @@ async def init_app():
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
     gameMan.load_filesystems(package_sys.values())
-    UI.load_packages()
+    UI.load_packages(packages.LOADED)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 
