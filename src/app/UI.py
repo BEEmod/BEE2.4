@@ -494,11 +494,6 @@ def load_packages(packset: packages.PackagesSet) -> None:
     ]
 
     for sel_list, obj_type, attrs in obj_types:
-        attr_commands = [
-            # cache the operator.attrgetter funcs
-            (key, operator.attrgetter(value))
-            for key, value in attrs.items()
-        ]
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
         for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
@@ -506,9 +501,9 @@ def load_packages(packset: packages.PackagesSet) -> None:
                 obj.id,
                 obj.selitem_data,
                 attrs={
-                    key: func(obj)
-                    for key, func in
-                    attr_commands
+                    key: getattr(obj, attr_name)
+                    for key, attr_name in
+                    attrs.items()
                 }
             ))
 
