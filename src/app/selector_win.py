@@ -99,7 +99,7 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list')
 
 
-AttrValues = Union[str, list, bool, Vec]
+AttrValues = Union[str, Iterable[str], bool, Vec]
 
 
 @config.register('SelectorWindow', palette_stores=False, uses_id=True)
@@ -1426,7 +1426,7 @@ class SelectorWin:
                     ))
                 elif label.type is AttrTypes.LIST:
                     # Join the values (in alphabetical order)
-                    assert isinstance(val, list)
+                    assert isinstance(val, Iterable), repr(val)
                     label['text'] = ', '.join(sorted(val))
                 elif label.type is AttrTypes.STRING:
                     # Just a string.
