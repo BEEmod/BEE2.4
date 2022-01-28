@@ -11,7 +11,7 @@ import attr
 import trio
 
 import srctools
-from app import tkMarkdown, img, lazy_conf
+from app import tkMarkdown, img, lazy_conf, BEE2
 import utils
 import consts
 from app.packageMan import PACK_CONFIG
@@ -269,7 +269,6 @@ class PakObject:
         cls._id_to_obj = {}
         cls.allow_mult = allow_mult
         cls.needs_foreground = needs_foreground
-        LOGGER.debug('Needs foreground: {}={}', cls, needs_foreground)
 
     @classmethod
     async def parse(cls: Type[PakT], data: ParseData) -> PakT:
@@ -304,8 +303,8 @@ class PakObject:
         raise NotImplementedError
 
     @classmethod
-    def post_parse(cls, packset: PackagesSet) -> None:
-        """Do processing after all objects of this type have been fully parsed."""
+    async def post_parse(cls, packset: PackagesSet) -> None:
+        """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
 
     @classmethod
@@ -400,6 +399,16 @@ class PackagesSet:
     objects: dict[Type[PakObject], dict[str, PakObject]] = attr.Factory(lambda: defaultdict(dict))
     # For overrides, a type/ID pair to the list of overrides.
     overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attr.Factory(lambda: defaultdict(list))
+
+    # Indicates if an object type has been fully parsed.
+    _type_ready: dict[Type[PakObject], trio.Event] = attr.ib(init=False, factory=dict)
+
+    def ready(self, cls: Type[PakObject]) -> trio.Event:
+        try:
+            return self._type_ready[cls]
+        except KeyError:
+            self._type_ready[cls] = evt = trio.Event()
+            return evt
 
     def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
@@ -552,42 +561,62 @@ async def load_packages(
     LOGGER.debug('Parsed packages, now parsing objects.')
 
     loader.set_length("OBJ", sum(
-        len(obj_type)
-        for obj_type in
-        packset.unparsed.values()
+        len(obj_map)
+        for obj_type, obj_map in
+        packset.unparsed.items()
+        if obj_type.needs_foreground
     ))
-
-    async with trio.open_nursery() as nursery:
-        for obj_class, objs in packset.unparsed.items():
-            for obj_id in objs:
-                nursery.start_soon(
-                    parse_object,
-                    packset, obj_class, obj_id, loader,
-                )
 
     LOGGER.info('Object counts:\n{}\n', '\n'.join(
         '{:<15}: {}'.format(obj_type.__name__, len(objs))
         for obj_type, objs in
-        packset.objects.items()
+        packset.unparsed.items()
     ))
 
-    for obj_type in OBJ_TYPES.values():
-        LOGGER.info('Post-process {} objects...', obj_type.__name__)
-        obj_type.post_parse(packset)
+    # Load either now, or in background.
+    async with trio.open_nursery() as nursery:
+        for obj_class, objs in packset.unparsed.items():
+            if obj_class.needs_foreground:
+                nursery.start_soon(
+                    parse_type,
+                    packset, obj_class, objs, loader,
+                )
+            else:
+                BEE2.APP_NURSERY.start_soon(
+                    parse_type,
+                    packset, obj_class, objs, None,
+                )
 
     # This has to be done after styles.
+    await packset.ready(Style).wait()
+    await packset.ready(Item).wait()
     LOGGER.info('Allocating styled items...')
     async with trio.open_nursery() as nursery:
         for it in packset.all_obj(Item):
             nursery.start_soon(assign_styled_items, log_item_fallbacks, log_missing_styles, it)
+
     return PACKAGE_SYS
+
+
+async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[PakT], loader: Optional[LoadScreen]) -> None:
+    """Parse all of a specific object type."""
+    async with trio.open_nursery() as nursery:
+        for obj_id in objs:
+            nursery.start_soon(
+                parse_object,
+                packset, obj_class, obj_id, loader,
+            )
+    LOGGER.info('Post-process {} objects...', obj_class.__name__)
+    # Set first, allowing post parse to wait until later.
+    packset.ready(obj_class).set()
+    await obj_class.post_parse(packset)
 
 
 async def parse_package(
     nursery: trio.Nursery,
     packset: PackagesSet,
     pack: Package,
-    loader: LoadScreen,
+    loader: Optional[LoadScreen],
     has_tag: bool=False,
     has_mel: bool=False,
 ) -> None:
@@ -750,7 +779,8 @@ async def parse_object(
         object_.add_over(override)
     assert obj_id.casefold() not in packset.objects[obj_class], f'{obj_class}("{obj_id}") = {object_}'
     packset.objects[obj_class][obj_id.casefold()] = object_
-    loader.step("OBJ")
+    if loader is not None:
+        loader.step("OBJ")
 
 
 class Package:
@@ -966,7 +996,7 @@ class Style(PakObject, needs_foreground=True):
         )
 
     @classmethod
-    def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, packset: PackagesSet) -> None:
         """Assign the bases lists for all styles, and set default suggested items."""
         defaults = ['<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>']
 

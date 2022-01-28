@@ -1,8 +1,9 @@
+"""Adds sounds useable in the editor."""
 from packages import PakObject, ParseData, ExportData
 from srctools import Property
 
 
-class EditorSound(PakObject, needs_foreground=True):
+class EditorSound(PakObject):
     """Add sounds that are usable in the editor.
 
     The editor only reads in game_sounds_editor, so custom sounds must be
@@ -27,6 +28,4 @@ class EditorSound(PakObject, needs_foreground=True):
     def export(exp_data: ExportData):
         """Export EditorSound objects."""
         # Just command the game to do the writing.
-        exp_data.game.add_editor_sounds(
-            EditorSound.all()
-        )
+        exp_data.game.add_editor_sounds(exp_data.packset.all_obj(EditorSound))

@@ -9,7 +9,7 @@ from srctools.vtf import ImageFormats, VTF, VTFFlags
 from srctools import Property
 import srctools.logger
 
-from packages import PakObject, ParseData, ExportData, Style
+from packages import PackagesSet, PakObject, ParseData, ExportData, Style
 from app.img import Handle as ImgHandle
 import utils
 
@@ -27,7 +27,7 @@ class SignStyle(NamedTuple):
     type: str
 
 
-class SignageLegend(PakObject, needs_foreground=True):
+class SignageLegend(PakObject):
     """Allows specifying image resources used to construct the legend texture.
 
     The background texture if specified is added to the upper-left of the image.
@@ -182,7 +182,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
         for tim_id, sign_id in sel_ids:
             try:
-                sign = Signage.by_id(sign_id)
+                sign = exp_data.packset.obj_by_id(Signage, sign_id)
             except KeyError:
                 LOGGER.warning('Signage "{}" does not exist!', sign_id)
                 continue
@@ -196,7 +196,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             ]:
                 if sub_id:
                     try:
-                        sub_sign = Signage.by_id(sub_id)
+                        sub_sign = exp_data.packset.obj_by_id(Signage, sub_id)
                     except KeyError:
                         LOGGER.warning(
                             'Signage "{}"\'s {} "{}" '
@@ -215,7 +215,9 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 sel_icons[int(tim_id)] = sty_sign.icon
 
         exp_data.vbsp_conf.append(conf)
-        exp_data.resources[SIGN_LOC] = build_texture(exp_data.selected_style, sel_icons)
+        exp_data.resources[SIGN_LOC] = build_texture(
+            exp_data.packset, exp_data.selected_style, sel_icons,
+        )
 
     def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
         """Write this sign's data for the style to the provided property."""
@@ -242,22 +244,23 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
 
 def build_texture(
+    packset: PackagesSet,
     sel_style: Style,
     icons: dict[int, ImgHandle],
 ) -> bytes:
     """Construct the legend texture for the signage."""
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
-    blank: Optional[Image.Image] = None
+    blank_img: Optional[Image.Image] = None
     for style in sel_style.bases:
         try:
-            legend_info = SignageLegend.by_id(style.id)
+            legend_info = packset.obj_by_id(SignageLegend, style.id)
         except KeyError:
             pass
         else:
             overlay = legend_info.overlay.get_pil()
             if legend_info.blank is not None:
-                blank = legend_info.blank.get_pil().convert('RGB')
+                blank_img = legend_info.blank.get_pil().convert('RGB')
             if legend_info.background is not None:
                 legend.paste(legend_info.background.get_pil(), (0, 0))
             break
@@ -272,9 +275,9 @@ def build_texture(
         try:
             ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.ANTIALIAS).convert('RGB')
         except KeyError:
-            if blank is None:
+            if blank_img is None:
                 continue
-            ico = blank
+            ico = blank_img
         legend.paste(ico, (x * CELL_SIZE, y * CELL_SIZE))
 
     if overlay is not None:

@@ -203,7 +203,7 @@ class QuotePack(PakObject, needs_foreground=True):
         return Property(prop.real_name, children)
 
     @classmethod
-    def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
 
         def iter_lines(conf: Property) -> Iterator[Property]:

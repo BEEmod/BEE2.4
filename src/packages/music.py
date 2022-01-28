@@ -238,7 +238,7 @@ class Music(PakObject, needs_foreground=True):
             )
 
     @classmethod
-    def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, packset: PackagesSet) -> None:
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
