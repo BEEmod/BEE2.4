@@ -721,6 +721,7 @@ class Game:
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
+                        packset=packages.LOADED,  # TODO
                         selected_style=style,
                         resources=resources,
                     ))

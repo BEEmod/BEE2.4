@@ -180,8 +180,9 @@ class ExportData:
     selected_style: Style
     all_items: list[EditorItem]  # All the items in the map
     renderables: dict[RenderableType, Renderable]  # The error/connection icons
-    vbsp_conf: Property
-    game: Game
+    vbsp_conf: Property  # vbsp_config.cfg file.
+    packset: PackagesSet  # The entire loaded packages set.
+    game: Game  # The current game.
     # As objects export, they may fill this to include additional resources
     # to be written to the game folder. This way it can be deferred until
     # after regular resources are copied.
