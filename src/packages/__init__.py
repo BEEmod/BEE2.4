@@ -598,9 +598,14 @@ async def load_packages(
     await packset.ready(Style).wait()
     await packset.ready(Item).wait()
     LOGGER.info('Allocating styled items...')
+    styles = packset.all_obj(Style)
     async with trio.open_nursery() as nursery:
-        for it in packset.all_obj(Item):
-            nursery.start_soon(assign_styled_items, log_item_fallbacks, log_missing_styles, it)
+        for item_to_style in packset.all_obj(Item):
+            nursery.start_soon(
+                assign_styled_items,
+                log_item_fallbacks, log_missing_styles,
+                styles, item_to_style,
+            )
 
     return PACKAGE_SYS
 

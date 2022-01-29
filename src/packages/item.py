@@ -7,10 +7,11 @@ from __future__ import annotations
 import operator
 import re
 import copy
-from typing import NamedTuple, Match, cast
+from typing import NamedTuple, Iterable, Match, cast
 from pathlib import PurePosixPath as FSPath
 
-from srctools import FileSystem, Property, EmptyMapping, VMF
+import attr
+from srctools import FileSystem, Property, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
 import srctools.logger
 
@@ -580,19 +581,11 @@ class Item(PakObject, needs_foreground=True):
         pal_list, versions, prop_conf = exp_data.selected
 
         style_id = exp_data.selected_style.id
-
-        aux_item_configs: dict[str, ItemConfig] = {
-            conf.id: conf
-            for conf in ItemConfig.all()
-        }
-
-        for item in sorted(Item.all(), key=operator.attrgetter('id')):
+        item: Item
+        for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):
             ver_id = versions.get(item.id, 'VER_DEFAULT')
 
-            (
-                items,
-                config_part
-            ) = item._get_export_data(
+            (items, config_part) = item._get_export_data(
                 pal_list, ver_id, style_id, prop_conf,
             )
 
@@ -601,7 +594,7 @@ class Item(PakObject, needs_foreground=True):
 
             # Add auxiliary configs as well.
             try:
-                aux_conf = aux_item_configs[item.id]
+                aux_conf = exp_data.packset.obj_by_id(ItemConfig, item.id)
             except KeyError:
                 pass
             else:
@@ -909,6 +902,7 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
 async def assign_styled_items(
     log_fallbacks: bool,
     log_missing_styles: bool,
+    all_styles: Iterable[Style],
     item: Item,
 ) -> None:
     """Handle inheritance across item folders.
@@ -1031,7 +1025,7 @@ async def assign_styled_items(
                     with srctools.logger.context(f'{item.id}:{sty_id} -> {extra.id}'):
                         extra.validate()
 
-        for style in Style.all():
+        for style in all_styles:
             if style.id in styles:
                 continue  # We already have a definition
             for base_style in style.bases:
