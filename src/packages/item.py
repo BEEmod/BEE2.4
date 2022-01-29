@@ -13,7 +13,6 @@ from pathlib import PurePosixPath as FSPath
 import attr
 from srctools import FileSystem, Property, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
-import srctools.logger
 
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 from packages import (
@@ -26,13 +25,14 @@ import editoritems_vmf
 import utils
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = logger.get_logger(__name__)
 
 # Finds names surrounded by %s
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 
 
-class UnParsedItemVariant(NamedTuple):
+@attr.frozen
+class UnParsedItemVariant:
     """The desired variant for an item, before we've figured out the dependencies."""
     pak_id: str  # The package that defined this variant.
     filesys: FileSystem  # The original filesystem.
@@ -344,6 +344,7 @@ class ItemVariant:
         return editor
 
 
+@attr.define
 class Version:
     """Versions are a set of styles defined for an item.
 
@@ -353,20 +354,11 @@ class Version:
     During parsing, the styles are UnParsedItemVariant and def_style is the ID.
     We convert that in setup_style_tree.
     """
-    __slots__ = ['name', 'id', 'isolate', 'styles', 'def_style']
-    def __init__(
-        self,
-        vers_id: str,
-        name: str,
-        isolate: bool,
-        styles: dict[str, ItemVariant],
-        def_style: ItemVariant | str,
-    ) -> None:
-        self.name = name
-        self.id = vers_id
-        self.isolate = isolate
-        self.styles = styles
-        self.def_style = def_style
+    name: str
+    id: str
+    isolate: bool
+    styles: dict[str, ItemVariant]
+    def_style: ItemVariant | str
 
     def __repr__(self) -> str:
         return f'<Version "{self.id}">'
@@ -749,9 +741,9 @@ def parse_item_folder(
     """
     folders: dict[str, ItemVariant] = {}
     for fold in folders_to_parse:
-        prop_path = 'items/' + fold + '/properties.txt'
-        editor_path = 'items/' + fold + '/editoritems.txt'
-        config_path = 'items/' + fold + '/vbsp_config.cfg'
+        prop_path = f'items/{fold}/properties.txt'
+        editor_path = f'items/{fold}/editoritems.txt'
+        config_path = f'items/{fold}/vbsp_config.cfg'
 
         first_item: EditorItem | None = None
         extra_items: list[EditorItem] = []
@@ -759,10 +751,7 @@ def parse_item_folder(
             props = filesystem.read_prop(prop_path).find_key('Properties')
             f = filesystem[editor_path].open_str()
         except FileNotFoundError as err:
-            raise IOError(
-                '"' + pak_id + ':items/' + fold + '" not valid! '
-                'Folder likely missing! '
-            ) from err
+            raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
         with f:
             tok = Tokenizer(f, editor_path)
             for tok_type, tok_value in tok:
@@ -783,7 +772,7 @@ def parse_item_folder(
             )
 
         try:
-            editor_vmf = VMF.parse(filesystem.read_prop(editor_path[:-3] + 'vmf'))
+            editor_vmf = VMF.parse(filesystem.read_prop(f'{editor_path[:-3]}vmf'))
         except FileNotFoundError:
             pass
         else:
@@ -1019,10 +1008,10 @@ async def assign_styled_items(
             # Check each editoritem definition for some known issues.
             for sty_id, variant in styles.items():
                 assert isinstance(variant, ItemVariant), f'{item.id}:{sty_id} = {variant!r}!!'
-                with srctools.logger.context(f'{item.id}:{sty_id}'):
+                with logger.context(f'{item.id}:{sty_id}'):
                     variant.editor.validate()
                 for extra in variant.editor_extra:
-                    with srctools.logger.context(f'{item.id}:{sty_id} -> {extra.id}'):
+                    with logger.context(f'{item.id}:{sty_id} -> {extra.id}'):
                         extra.validate()
 
         for style in all_styles:
