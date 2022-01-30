@@ -1,6 +1,6 @@
 """Run the BEE2."""
 import functools
-from typing import Callable, Any, Optional, List
+from typing import Callable, Any, Optional, List, Tuple
 import time
 import collections
 
@@ -130,7 +130,10 @@ async def init_app() -> None:
     LOGGER.info('UI initialised!')
 
     if Tracer.slow:
-        LOGGER.info('Slow tasks\n{}', '\n'.join(Tracer.slow))
+        LOGGER.info('Slow tasks\n{}', '\n'.join([
+            msg for _, msg in
+            sorted(Tracer.slow, key=lambda t: t[1])
+        ]))
 
     loadScreen.main_loader.destroy()
     # Delay this until the loop has actually run.
@@ -141,7 +144,7 @@ async def init_app() -> None:
 
 class Tracer(trio.abc.Instrument):
     """Track tasks to detect slow ones."""
-    slow: List[str] = []
+    slow: List[Tuple[float, str]] = []
 
     def __init__(self) -> None:
         self.elapsed: dict[trio.lowlevel.Task, float] = {}
@@ -185,7 +188,7 @@ class Tracer(trio.abc.Instrument):
                     type(val).__str__ is not object.__str__
                 ) and 'KI_PROTECTION' not in name   # Trio flag.
             }
-            self.slow.append(f'Task time={elapsed:.06}: {task!r}, args={args}')
+            self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={args}'))
 
 
 async def app_main() -> None:
