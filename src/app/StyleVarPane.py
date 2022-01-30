@@ -281,13 +281,13 @@ async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callabl
     canvas.grid(sticky='NSEW')
     window.rowconfigure(0, weight=1)
 
-    UI['style_scroll'] = ttk.Scrollbar(
+    style_scroll = ttk.Scrollbar(
         stylevar_frame,
         orient=VERTICAL,
         command=canvas.yview,
         )
-    UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
-    canvas['yscrollcommand'] = UI['style_scroll'].set
+    style_scroll.grid(column=1, row=0, rowspan=2, sticky="NS")
+    canvas['yscrollcommand'] = style_scroll.set
 
     tk_tools.add_mousewheel(canvas, stylevar_frame)
 
@@ -302,7 +302,7 @@ async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callabl
     ttk.Separator(
         canvas_frame,
         orient=HORIZONTAL,
-        ).grid(row=2, sticky='EW', pady=(10, 5))
+    ).grid(row=2, sticky='EW', pady=(10, 5))
 
     frm_other = ttk.Labelframe(canvas_frame, text=gettext("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
@@ -312,13 +312,13 @@ async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callabl
         text=gettext('No Options!'),
         font='TkMenuFont',
         justify='center',
-        )
+    )
     UI['stylevar_other_none'] = ttk.Label(
         frm_other,
         text=gettext('None!'),
         font='TkMenuFont',
         justify='center',
-        )
+    )
     VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
 
     async def add_state_syncers(var_id: str, check: ttk.Checkbutton, tk_var: IntVar) -> None:
