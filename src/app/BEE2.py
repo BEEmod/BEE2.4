@@ -91,6 +91,7 @@ async def init_app():
 
     LOGGER.info('Loading Packages...')
     package_sys = await packages.load_packages(
+        packages.LOADED,
         list(BEE2_config.get_package_locs()),
         loader=loadScreen.main_loader,
         log_item_fallbacks=GEN_OPTS.get_bool(
@@ -111,7 +112,7 @@ async def init_app():
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
     gameMan.load_filesystems(package_sys.values())
-    UI.load_packages()
+    UI.load_packages(packages.LOADED)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 

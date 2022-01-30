@@ -530,14 +530,14 @@ class Game:
             return False
 
         # Check lengths, to ensure we re-extract if packages were removed.
-        if len(packages.packages) != len(self.mod_times):
+        if len(packages.LOADED.packages) != len(self.mod_times):
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
         if any(
             pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
-            packages.packages.items()
+            packages.LOADED.packages.items()
         ):
             return True
 
@@ -597,7 +597,7 @@ class Game:
 
         # Save the new cache modification date.
         self.mod_times.clear()
-        for pack_id, pack in packages.packages.items():
+        for pack_id, pack in packages.LOADED.packages.items():
             self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
@@ -721,6 +721,7 @@ class Game:
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
+                        packset=packages.LOADED,  # TODO
                         selected_style=style,
                         resources=resources,
                     ))

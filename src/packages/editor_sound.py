@@ -1,3 +1,4 @@
+"""Adds sounds useable in the editor."""
 from packages import PakObject, ParseData, ExportData
 from srctools import Property
 
@@ -11,9 +12,9 @@ class EditorSound(PakObject):
     The values in 'keys' will form the soundscript body.
     """
     def __init__(self, snd_name: str, data: Property) -> None:
-        self.id = 'BEE2_Editor.' + snd_name
+        self.id = snd_name
         self.data = data
-        data.name = self.id
+        data.name = 'BEE2_Editor.' + self.id
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'EditorSound':
@@ -27,6 +28,4 @@ class EditorSound(PakObject):
     def export(exp_data: ExportData):
         """Export EditorSound objects."""
         # Just command the game to do the writing.
-        exp_data.game.add_editor_sounds(
-            EditorSound.all()
-        )
+        exp_data.game.add_editor_sounds(exp_data.packset.all_obj(EditorSound))

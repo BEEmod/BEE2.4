@@ -32,7 +32,7 @@ import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
 from packages import (
-    packages as PACKAGES,
+    LOADED as PACKSET,
     find_packages,
     LOGGER as packages_logger
 )
@@ -65,7 +65,7 @@ def get_package(file: Path) -> RawFileSystem:
 
         if pack_id == '*' and last_package:
             try:
-                fsys = PACKAGES[last_package].fsys
+                fsys = PACKSET.packages[last_package].fsys
             except KeyError:
                 continue
             if isinstance(fsys, RawFileSystem):
@@ -77,7 +77,7 @@ def get_package(file: Path) -> RawFileSystem:
             pack_id = last_package
 
         try:
-            fsys = PACKAGES[pack_id.casefold()].fsys
+            fsys = PACKSET.packages[pack_id.casefold()].fsys
         except KeyError:
             continue
         if isinstance(fsys, RawFileSystem):
@@ -138,7 +138,7 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
 
         target_systems = []
 
-        for package in PACKAGES.values():
+        for package in PACKSET.packages.values():
             if not isinstance(package.fsys, RawFileSystem):
                 # In a zip or the like.
                 continue
@@ -161,9 +161,9 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
 
 def print_package_ids() -> None:
     """Print all the packages out."""
-    id_len = max(len(pack.id) for pack in PACKAGES.values())
+    id_len = max(len(pack.id) for pack in PACKSET.packages.values())
     row_count = 128 // (id_len + 2)
-    for i, pack in enumerate(sorted(pack.id for pack in PACKAGES.values()), start=1):
+    for i, pack in enumerate(sorted(pack.id for pack in PACKSET.packages.values()), start=1):
         print(' {0:<{1}} '.format(pack, id_len), end='')
         if i % row_count == 0:
             print()
@@ -195,7 +195,7 @@ async def main(files: List[str]) -> int:
     packages_logger.setLevel(logging.ERROR)
     async with trio.open_nursery() as nursery:
         for loc in get_package_locs():
-            await find_packages(nursery, loc)
+            await find_packages(nursery, PACKSET, loc)
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')

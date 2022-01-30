@@ -94,7 +94,7 @@ class PackList(PakObject, allow_mult=True):
 
         pack_block = Property('PackList', [])
 
-        for pack in PackList.all():  # type: PackList
+        for pack in exp_data.packset.all_obj(PackList):
             # Build a
             # "Pack_id"
             # {

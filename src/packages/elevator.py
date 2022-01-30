@@ -2,7 +2,7 @@ from srctools import Property
 from packages import ParseData, ExportData, SelitemData, PakObject, Style
 
 
-class Elevator(PakObject):
+class Elevator(PakObject, needs_foreground=True):
     """An elevator video definition.
 
     This is mainly defined just for Valve's items - you can't pack BIKs.

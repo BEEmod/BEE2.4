@@ -11,7 +11,7 @@ from app.SubPane import SubPane
 from app import TK_ROOT
 from BEE2_config import GEN_OPTS
 from consts import MusicChannel
-from packages import Music
+from packages import PackagesSet, Music
 from localisation import gettext
 
 BTN_EXPAND = '▽'
@@ -107,25 +107,19 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
                 win.readonly = has_inst
 
 
-def load_selitems() -> None:
-    """Load the selector items early, to correspond with the loadscreen order."""
-    for item in Music.all():
-        SEL_ITEMS[item.id] = SelItem.from_data(
-            item.id,
-            item.selitem_data,
-            item.get_attrs()
-        )
-
-
-async def make_widgets(frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
+async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
     """Generate the UI components, and return the base window."""
 
     def for_channel(channel: MusicChannel) -> List[SelItem]:
         """Get the items needed for a specific channel."""
         music_list = []
-        for music in Music.all():
+        for music in packset.all_obj(Music):
             if music.provides_channel(channel):
-                selitem = SEL_ITEMS[music.id].copy()
+                selitem = SelItem.from_data(
+                    music.id,
+                    music.selitem_data,
+                    music.get_attrs(),
+                )
                 selitem.snd_sample = music.get_sample(channel)
                 music_list.append(selitem)
         return music_list

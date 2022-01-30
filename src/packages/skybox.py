@@ -5,7 +5,7 @@ from packages import (
 )
 
 
-class Skybox(PakObject):
+class Skybox(PakObject, needs_foreground=True):
     """Configures skybox and fog settings."""
     def __init__(
         self,

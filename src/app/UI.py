@@ -13,7 +13,7 @@ import srctools.logger
 import trio
 
 import loadScreen
-from app import TK_ROOT
+from app import TK_ROOT, BEE2
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
@@ -419,7 +419,6 @@ class PalItem:
 
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
-    import sys, logging
     from app import BEE2
     LOGGER.info('Shutting down application.')
     try:
@@ -457,16 +456,15 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-def load_packages() -> None:
+def load_packages(packset: packages.PackagesSet) -> None:
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     """
     global skybox_win, voice_win, style_win, elev_win
-    global selected_style
 
-    for item in packages.Item.all():
+    for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
     sky_list: list[selWinItem] = []
@@ -478,43 +476,36 @@ def load_packages() -> None:
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, packages.Skybox.all(), {
+        (sky_list, packages.Skybox, {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, packages.QuotePack.all(), {
+        (voice_list, packages.QuotePack, {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, packages.Style.all(), {
+        (style_list, packages.Style, {
             'VID': 'has_video',
         }),
-        (elev_list, packages.Elevator.all(), {
+        (elev_list, packages.Elevator, {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, obj_list, attrs in obj_types:
-        attr_commands = [
-            # cache the operator.attrgetter funcs
-            (key, operator.attrgetter(value))
-            for key, value in attrs.items()
-        ]
+    for sel_list, obj_type, attrs in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(obj_list, key=operator.attrgetter('selitem_data.name')):
+        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
                 attrs={
-                    key: func(obj)
-                    for key, func in
-                    attr_commands
+                    key: getattr(obj, attr_name)
+                    for key, attr_name in
+                    attrs.items()
                 }
             ))
-
-    music_conf.load_selitems()
 
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
@@ -819,7 +810,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         set_game(gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
-    menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+        menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
 
 
 def set_disp_name(item, e=None) -> None:
@@ -1093,6 +1084,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         textvariable=EXPORT_CMD_VAR,
         command=functools.partial(export_editoritems, pal_ui),
     )
+    UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
     props = ttk.Frame(frame, width="50")
@@ -1100,7 +1092,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=gettext('Music: '))
-    music_win = await music_conf.make_widgets(music_frame, pane)
+    music_win = await music_conf.make_widgets(packages.LOADED, music_frame, pane)
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
@@ -1422,6 +1414,7 @@ def init_menu_bar(win: tk.Toplevel, export: Callable[[], None]) -> Tuple[tk.Menu
         accelerator=tk_tools.ACCEL_EXPORT,
     )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
+    file_menu.entryconfigure(file_menu.export_btn_index, state='disabled')
 
     file_menu.add_command(
         label=gettext("Add Game"),
@@ -1715,6 +1708,15 @@ async def init_windows() -> None:
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()
     windows['pal'].load_conf()
+
+    async def enable_export() -> None:
+        """Enable exporting only after all packages are loaded."""
+        for cls in packages.OBJ_TYPES.values():
+            await packages.LOADED.ready(cls).wait()
+        UI['pal_export'].state(('!disabled',))
+        menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+
+    BEE2.APP_NURSERY.start_soon(enable_export)
 
     def style_select_callback(style_id: str) -> None:
         """Callback whenever a new style is chosen."""
