@@ -156,7 +156,7 @@ class ObjData:
     This allows us to parse all packages before loading objects.
     """
     fsys: FileSystem
-    info_block: Property
+    info_block: Property = attr.ib(repr=False)
     pak_id: str
     disp_name: str
 
@@ -166,7 +166,7 @@ class ParseData:
     """The arguments for pak_object.parse()."""
     fsys: FileSystem
     id: str
-    info: Property
+    info: Property = attr.ib(repr=False)
     pak_id: str
     is_override: bool
 
@@ -395,7 +395,7 @@ class PackagesSet:
     packages: dict[str, Package] = attr.Factory(dict)
     # type -> id -> object
     # The object data before being parsed, and the final result.
-    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attr.Factory(lambda: defaultdict(dict))
+    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attr.ib(factory=lambda: defaultdict(dict), repr=False)
     objects: dict[Type[PakObject], dict[str, PakObject]] = attr.Factory(lambda: defaultdict(dict))
     # For overrides, a type/ID pair to the list of overrides.
     overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attr.Factory(lambda: defaultdict(list))
@@ -724,7 +724,7 @@ async def parse_package(
         await trio.sleep(0)
         if template.path.casefold().endswith('.vmf'):
             nursery.start_soon(template_brush.parse_template, pack.id, template)
-    loader.step('PAK')
+    loader.step('PAK', pack.id)
 
 
 async def parse_object(
@@ -792,7 +792,7 @@ async def parse_object(
     assert obj_id.casefold() not in packset.objects[obj_class], f'{obj_class}("{obj_id}") = {object_}'
     packset.objects[obj_class][obj_id.casefold()] = object_
     if loader is not None:
-        loader.step("OBJ")
+        loader.step("OBJ", obj_id)
 
 
 class Package:
