@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Union
 
+import trio
 from srctools.dmx import Element
 from tkinter import filedialog
 from tkinter import ttk
@@ -583,18 +584,20 @@ async def make_widgets() -> None:
 
     nbook.enable_traversal()
 
-    map_frame = ttk.Frame(nbook)
+    map_frame = ttk.Frame(nbook, name='map_settings')
     # note: Tab name
     nbook.add(map_frame, text=gettext('Map Settings'))
-    await make_map_widgets(map_frame)
 
-    comp_frame = ttk.Frame(nbook)
+    comp_frame = ttk.Frame(nbook, name='comp_settings')
     # note: Tab name
     nbook.add(comp_frame, text=gettext('Compile Settings'))
-    make_comp_widgets(comp_frame)
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(make_map_widgets, map_frame)
+        nursery.start_soon(make_comp_widgets, comp_frame)
 
 
-def make_comp_widgets(frame: ttk.Frame):
+async def make_comp_widgets(frame: ttk.Frame) -> None:
     """Create widgets for the compiler settings pane.
 
     These are generally things that are aesthetic, and to do with the file and
@@ -827,7 +830,7 @@ def make_comp_widgets(frame: ttk.Frame):
     refresh_counts(reload=False)
 
 
-async def make_map_widgets(frame: ttk.Frame):
+async def make_map_widgets(frame: ttk.Frame) -> None:
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.

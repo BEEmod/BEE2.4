@@ -254,19 +254,19 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
         tool_col=3,
     )
 
-    nbook = ttk.Notebook(window)
+    nbook = ttk.Notebook(window, name='nbook')
 
     nbook.grid(row=0, column=0, sticky=NSEW)
     window.rowconfigure(0, weight=1)
     window.columnconfigure(0, weight=1)
     nbook.enable_traversal()
 
-    stylevar_frame = ttk.Frame(nbook)
+    stylevar_frame = ttk.Frame(nbook, name='stylevars')
     stylevar_frame.rowconfigure(0, weight=1)
     stylevar_frame.columnconfigure(0, weight=1)
     nbook.add(stylevar_frame, text=gettext('Styles'))
 
-    item_config_frame = ttk.Frame(nbook)
+    item_config_frame = ttk.Frame(nbook, name='itemvars')
     nbook.add(item_config_frame, text=gettext('Items'))
 
     async with trio.open_nursery() as nursery:
