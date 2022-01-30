@@ -35,17 +35,6 @@ OBJ_TYPES: dict[str, Type[PakObject]] = {}
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS: dict[str, FileSystem] = {}
 
-def __getattr__(name):
-    """Redirect to LOADED object."""
-    if name == 'all_obj':
-        warnings.warn('Use packages.LOADED or local PackagesSet', DeprecationWarning, stacklevel=1)
-        return LOADED.unparsed
-    elif name == 'packages':
-        warnings.warn('Use packages.LOADED or local PackagesSet', DeprecationWarning, stacklevel=1)
-        return LOADED.packages
-    else:
-        raise AttributeError(name)
-
 
 @attr.define
 class SelitemData:
