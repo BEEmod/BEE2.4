@@ -23,7 +23,7 @@ import srctools.logger
 
 from typing import (
     NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
-    Collection, Iterable, Mapping, cast,
+    Collection, Iterable, cast,
 )
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
@@ -354,7 +354,7 @@ def get_config(
     Looks for the prop_name key in the given prop_block.
     If the keyvalue has a value of "", an empty tree is returned.
     If it has children, a copy of them will be returned.
-    Otherwise the value is a filename in the zip which will be parsed.
+    Otherwise, the value is a filename in the zip which will be parsed.
 
     If source is supplied, set_cond_source() will be run.
     """
@@ -523,13 +523,13 @@ async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
-    log_item_fallbacks=False,
-    log_missing_styles=False,
-    log_missing_ent_count=False,
-    log_incorrect_packfile=False,
-    has_mel_music=False,
-    has_tag_music=False,
-) -> Mapping[str, FileSystem]:
+    log_item_fallbacks: bool=False,
+    log_missing_styles: bool=False,
+    log_missing_ent_count: bool=False,
+    log_incorrect_packfile: bool=False,
+    has_mel_music: bool=False,
+    has_tag_music: bool=False,
+) -> None:
     """Scan and read in all packages."""
     global CHECK_PACKFILE_CORRECTNESS
 
@@ -606,7 +606,6 @@ async def load_packages(
                 log_item_fallbacks, log_missing_styles,
                 styles, item_to_style,
             )
-
 
 
 async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[PakT], loader: Optional[LoadScreen]) -> None:
