@@ -507,8 +507,6 @@ def load_packages(packset: packages.PackagesSet) -> None:
                 }
             ))
 
-    music_conf.load_selitems()
-
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
 
@@ -1094,7 +1092,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=gettext('Music: '))
-    music_win = await music_conf.make_widgets(music_frame, pane)
+    music_win = await music_conf.make_widgets(packages.LOADED, music_frame, pane)
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
