@@ -607,7 +607,6 @@ async def load_packages(
                 styles, item_to_style,
             )
 
-    return PACKAGE_SYS
 
 
 async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[PakT], loader: Optional[LoadScreen]) -> None:

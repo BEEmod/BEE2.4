@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Callable, Dict, Optional
 
+import trio
 from srctools.dmx import Element
 from tkinter import *
 from tkinter import ttk
@@ -253,7 +254,7 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
         tool_col=3,
     )
 
-    UI['nbook'] = nbook = ttk.Notebook(window)
+    nbook = ttk.Notebook(window)
 
     nbook.grid(row=0, column=0, sticky=NSEW)
     window.rowconfigure(0, weight=1)
@@ -265,6 +266,16 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
     stylevar_frame.columnconfigure(0, weight=1)
     nbook.add(stylevar_frame, text=gettext('Styles'))
 
+    item_config_frame = ttk.Frame(nbook)
+    nbook.add(item_config_frame, text=gettext('Items'))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(make_stylevar_pane, stylevar_frame, update_item_vis)
+        nursery.start_soon(itemconfig.make_pane, item_config_frame)
+
+
+async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callable[[], None]) -> None:
+    """Construct the stylevar pane."""
     canvas = Canvas(stylevar_frame, highlightthickness=0)
     # need to use a canvas to allow scrolling
     canvas.grid(sticky='NSEW')
@@ -385,7 +396,3 @@ async def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable
         ).grid(row=1, column=0)
 
     canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))
-
-    item_config_frame = ttk.Frame(nbook)
-    nbook.add(item_config_frame, text=gettext('Items'))
-    await itemconfig.make_pane(item_config_frame)

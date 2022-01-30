@@ -1,4 +1,5 @@
 """Run the BEE2."""
+import functools
 from typing import Callable, Any, Optional, List
 import time
 import collections
@@ -61,7 +62,7 @@ DEFAULT_SETTINGS = {
 }
 
 
-async def init_app():
+async def init_app() -> None:
     """Initialise the application."""
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
@@ -92,21 +93,20 @@ async def init_app():
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
-    package_sys = await packages.load_packages(
-        packages.LOADED,
-        list(BEE2_config.get_package_locs()),
-        loader=loadScreen.main_loader,
-        log_item_fallbacks=GEN_OPTS.get_bool(
-            'Debug', 'log_item_fallbacks'),
-        log_missing_styles=GEN_OPTS.get_bool(
-            'Debug', 'log_missing_styles'),
-        log_missing_ent_count=GEN_OPTS.get_bool(
-            'Debug', 'log_missing_ent_count'),
-        log_incorrect_packfile=GEN_OPTS.get_bool(
-            'Debug', 'log_incorrect_packfile'),
-        has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
-        has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
-    )
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(functools.partial(
+            packages.load_packages,
+            packages.LOADED,
+            list(BEE2_config.get_package_locs()),
+            loader=loadScreen.main_loader,
+            log_item_fallbacks=GEN_OPTS.get_bool('Debug', 'log_item_fallbacks'),
+            log_missing_styles=GEN_OPTS.get_bool('Debug', 'log_missing_styles'),
+            log_missing_ent_count=GEN_OPTS.get_bool('Debug', 'log_missing_ent_count'),
+            log_incorrect_packfile=GEN_OPTS.get_bool('Debug', 'log_incorrect_packfile'),
+            has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
+            has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
+        ))
+    package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')
     APP_NURSERY.start_soon(img.init, package_sys)
     APP_NURSERY.start_soon(sound.sound_task)
@@ -114,7 +114,8 @@ async def init_app():
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
     gameMan.load_filesystems(package_sys.values())
-    UI.load_packages(packages.LOADED)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(UI.load_packages, packages.LOADED)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 
@@ -124,7 +125,8 @@ async def init_app():
         game.init_trans()
 
     LOGGER.info('Initialising UI...')
-    await UI.init_windows()  # create all windows
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(UI.init_windows)  # create all windows
     LOGGER.info('UI initialised!')
 
     if Tracer.slow:

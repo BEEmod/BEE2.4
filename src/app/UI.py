@@ -456,7 +456,7 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-def load_packages(packset: packages.PackagesSet) -> None:
+async def load_packages(packset: packages.PackagesSet) -> None:
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -1610,13 +1610,17 @@ async def init_windows() -> None:
         tool_img='icons/win_options',
         tool_col=2,
     )
-    await init_option(windows['opt'], pal_ui)
+
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(init_option, windows['opt'], pal_ui)
     loader.step('UI', 'options')
 
-    await StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(StyleVarPane.make_pane, frames['toolMenu'], view_menu, flow_picker)
     loader.step('UI', 'stylevar')
 
-    await CompilerPane.make_pane(frames['toolMenu'], view_menu)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], view_menu)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
