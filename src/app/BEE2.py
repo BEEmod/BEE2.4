@@ -1,9 +1,11 @@
 """Run the BEE2."""
-from typing import Callable, Any
+from typing import Callable, Any, Optional, List
+import time
 import collections
 
-import trio
 from outcome import Outcome, Error
+from srctools import Property
+import trio
 
 from BEE2_config import GEN_OPTS
 from app import (
@@ -125,11 +127,63 @@ async def init_app():
     await UI.init_windows()  # create all windows
     LOGGER.info('UI initialised!')
 
+    if Tracer.slow:
+        LOGGER.info('Slow tasks\n{}', '\n'.join(Tracer.slow))
+
     loadScreen.main_loader.destroy()
     # Delay this until the loop has actually run.
     # Directly run TK_ROOT.lift() in TCL, instead
     # of building a callable.
     TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
+
+
+class Tracer(trio.abc.Instrument):
+    """Track tasks to detect slow ones."""
+    slow: List[str] = []
+
+    def __init__(self) -> None:
+        self.elapsed: dict[trio.lowlevel.Task, float] = {}
+        self.start_time: dict[trio.lowlevel.Task, Optional[float]] = {}
+        self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
+
+    def task_spawned(self, task: trio.lowlevel.Task) -> None:
+        """Setup vars when a task is spawned."""
+        self.elapsed[task] = 0.0
+        self.start_time[task] = None
+        self.args[task] = task.coro.cr_frame.f_locals.copy()
+
+    def before_task_step(self, task: trio.lowlevel.Task) -> None:
+        """Begin timing this task."""
+        self.start_time[task] = time.perf_counter()
+
+    def after_task_step(self, task: trio.lowlevel.Task) -> None:
+        """Count up the time."""
+        try:
+            diff = time.perf_counter() - self.start_time[task]
+        except KeyError:
+            pass
+        else:
+            self.elapsed[task] += diff
+            self.start_time[task] = None
+
+    def task_exited(self, task: trio.lowlevel.Task) -> None:
+        """Log results when exited."""
+        elapsed = self.elapsed.pop(task, 0.0)
+        start = self.start_time.pop(task, None)
+        args = self.args.pop(task, srctools.EmptyMapping)
+        if start is not None:
+            elapsed += time.perf_counter() - start
+
+        if elapsed > 0.1:
+            args = {
+                name: val
+                for name, val in args.items()
+                if not isinstance(val, (dict, Property, packages.PackagesSet)) and (
+                    type(val).__repr__ is not object.__repr__ or  # Objects with no useful info.
+                    type(val).__str__ is not object.__str__
+                ) and 'KI_PROTECTION' not in name   # Trio flag.
+            }
+            self.slow.append(f'Task time={elapsed:.06}: {task!r}, args={args}')
 
 
 async def app_main() -> None:
@@ -184,5 +238,6 @@ def start_main() -> None:
         run_sync_soon_threadsafe=run_sync_soon_threadsafe,
         run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
+        instruments=[Tracer()] if utils.DEV_MODE else [],
     )
     TK_ROOT.mainloop()
