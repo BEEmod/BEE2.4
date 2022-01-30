@@ -13,12 +13,13 @@ whenever they are modified.
 from __future__ import annotations
 from typing import (
     overload, cast, TypeVar, Any, Type,
-    Optional, Generic, Callable, List,
+    Optional, Generic, Callable, List, Awaitable,
 )
 
 import attr
+import trio
 
-__all__ = ['EventManager', 'APP_EVENTS', 'ArgT', 'CtxT']
+__all__ = ['EventManager', 'APP_EVENTS', 'ValueChange', 'ObsValue']
 
 ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
@@ -27,7 +28,7 @@ Value2T = TypeVar('Value2T')
 NoneType = Type[None]
 
 
-class EventSpec(Generic[ArgT], List[Callable[[ArgT], Any]]):
+class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
     """The data associated with a given event.
 
     To save a bit of space, combine the list of callbacks with the other
@@ -57,30 +58,24 @@ class EventManager:
     def register(
         self, ctx: CtxT,
         arg_type: None,
-        func: Callable[[None], Any],
-        *, prime: bool=False,
+        func: Callable[[None], Awaitable[Any]],
     ) -> None: ...
     @overload
     def register(
         self, ctx: CtxT,
         arg_type: Type[ArgT],
-        func: Callable[[ArgT], Any],
-        *, prime: bool=False,
+        func: Callable[[ArgT], Awaitable[Any]],
     ) -> None: ...
     def register(
         self,
         ctx: CtxT,
         arg_type: Optional[Type[ArgT]],
-        func: Callable[[ArgT], Any],
-        *,
-        prime: bool=False,
+        func: Callable[[ArgT], Awaitable[Any]],
     ) -> None:
         """Register the given function to be called.
 
         It will recieve the events with the same context object, and
         with an instance of the argument type (no subclasses).
-        If prime is True and the event was already fired, it will be called
-        immediately with the last value.
 
         As a special case it can be registered with a None argument type
         instead of type(None).
@@ -93,15 +88,42 @@ class EventManager:
         except KeyError:
             spec = self._events[key] = EventSpec[ArgT](ctx)
         spec.append(func)
-        if prime:
-            try:
-                last_val = spec.last_result
-            except AttributeError:
-                pass
-            else:
-                func(last_val)
 
-    def __call__(self, ctx: CtxT, arg: ArgT=None) -> None:
+    @overload
+    async def register_and_prime(
+        self, ctx: CtxT,
+        arg_type: None,
+        func: Callable[[None], Awaitable[Any]],
+    ) -> None: ...
+    @overload
+    async def register_and_prime(
+        self, ctx: CtxT,
+        arg_type: Type[ArgT],
+        func: Callable[[ArgT], Awaitable[Any]],
+    ) -> None: ...
+    async def register_and_prime(
+        self,
+        ctx: CtxT,
+        arg_type: Optional[Type[ArgT]],
+        func: Callable[[ArgT], Awaitable[Any]],
+    ) -> None:
+        """Register the given function, then immediately call with the last value if present."""
+        if arg_type is None:
+            arg_type = cast('Type[ArgT]', NoneType)
+        key = (id(ctx), arg_type)
+        try:
+            spec = self._events[key]
+        except KeyError:
+            spec = self._events[key] = EventSpec[ArgT](ctx)
+        spec.append(func)
+        try:
+            last_val = spec.last_result
+        except AttributeError:
+            await trio.sleep(0)  # Checkpoint.
+        else:
+            await func(last_val)
+
+    async def __call__(self, ctx: CtxT, arg: ArgT=None) -> None:
         """Run the specified event.
 
         This is re-entrant - if called whilst the same event is already being
@@ -123,8 +145,9 @@ class EventManager:
         spec.last_result = arg
         spec.cur_calls += 1
         try:
-            for func in spec:
-                func(arg)
+            async with trio.open_nursery() as nursery:
+                for func in spec:
+                    nursery.start_soon(func, arg)
         finally:
             spec.cur_calls -= 1
 
@@ -132,19 +155,19 @@ class EventManager:
     def unregister(
         self, ctx: CtxT,
         arg_type: None,
-        func: Callable[[None], Any],
+        func: Callable[[None], Awaitable[Any]],
     ) -> None: ...
     @overload
     def unregister(
         self, ctx: CtxT,
         arg_type: Type[ArgT],
-        func: Callable[[ArgT], Any],
+        func: Callable[[ArgT], Awaitable[Any]],
     ) -> None: ...
     def unregister(
         self,
         ctx: CtxT,
         arg_type: Optional[Type[ArgT]],
-        func: Callable[[ArgT], Any],
+        func: Callable[[ArgT], Awaitable[Any]],
     ) -> None:
         """Remove the given callback.
 
@@ -179,13 +202,12 @@ class ObsValue(Generic[ValueT]):
         """Get the value."""
         return self._value
 
-    @value.setter
-    def set(self, new: ValueT) -> None:
+    async def set(self, new: ValueT) -> None:
         """Set the value, and fire the event."""
         # Note: fire the event AFTER we change the contents.
         old = self._value
         self._value = new
-        self.man(self, ValueChange(old, new))
+        await self.man(self, ValueChange(old, new))
 
     def __repr__(self) -> str:
         return f'ObsValue({self.man!r}, {self._value!r})'

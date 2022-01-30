@@ -1,19 +1,17 @@
 """Test the events manager and collections."""
-import sys
-
 import pytest
 from unittest.mock import Mock, create_autospec, call
 
-from event import EventManager, ValueChange, ObsValue, ObsList, ObsMap
+from event import EventManager, ValueChange, ObsValue
 
 
-def event_func(arg):
+async def event_func(arg):
     """Expected signature of event functions."""
     pass
 
 
-def test_simple_register() -> None:
-    """"Test registering events in the manager."""
+async def test_simple_register() -> None:
+    """Test registering events in the manager."""
     man = EventManager()
     func1 = create_autospec(event_func)
     func2 = create_autospec(event_func)
@@ -22,34 +20,34 @@ def test_simple_register() -> None:
 
     man.register(ctx1, int, func1)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
-    man(ctx1, 5)
+    await man(ctx1, 5)
 
-    func1.assert_called_once_with(5)
-    func2.assert_not_called()
+    func1.assert_awaited_once_with(5)
+    func2.assert_not_awaited()
     func1.reset_mock()
 
     # Different context, not fired.
-    man(ctx2, 12)
+    await man(ctx2, 12)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
     man.register(ctx2, int, func2)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
-    man(ctx2, 34)
-    func1.assert_not_called()
-    func2.assert_called_once_with(34)
+    await man(ctx2, 34)
+    func1.assert_not_awaited()
+    func2.assert_awaited_once_with(34)
     func2.reset_mock()
 
 
-def test_unregister() -> None:
-    """"Test unregistering events in the manager."""
+async def test_unregister() -> None:
+    """Test unregistering events in the manager."""
     man = EventManager()
     func1 = create_autospec(event_func)
     func2 = create_autospec(event_func)
@@ -57,10 +55,10 @@ def test_unregister() -> None:
 
     man.register(ctx, bool, func1)
     man.register(ctx, bool, func2)
-    man(ctx, True)
+    await man(ctx, True)
 
-    func1.assert_called_once_with(True)
-    func2.assert_called_once_with(True)
+    func1.assert_awaited_once_with(True)
+    func2.assert_awaited_once_with(True)
     func1.reset_mock()
     func2.reset_mock()
 
@@ -70,64 +68,64 @@ def test_unregister() -> None:
         man.unregister(45, bool, func1)
     man.unregister(ctx, bool, func1)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
-    man(ctx, False)
+    await man(ctx, False)
 
-    func1.assert_not_called()
-    func2.assert_called_once_with(False)
+    func1.assert_not_awaited()
+    func2.assert_awaited_once_with(False)
 
 
-def test_register_nonearg() -> None:
-    """"Test registering events with no arg in the manager."""
+async def test_register_nonearg() -> None:
+    """Test registering events with no arg in the manager."""
     man = EventManager()
-    func1 = Mock()
-    func2 = create_autospec(event_func)
+    func1 = create_autospec(event_func, name='func1')
+    func2 = create_autospec(event_func, name='func2')
     ctx1 = object()
     ctx2 = object()
 
     man.register(ctx1, None, func1)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
-    man(ctx1)
+    await man(ctx1)
 
-    func1.assert_called_once_with(None)
-    func2.assert_not_called()
+    func1.assert_awaited_once_with(None)
+    func2.assert_not_awaited()
     func1.reset_mock()
 
     # Different context, not fired.
-    man(ctx2)
+    await man(ctx2)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
     man.register(ctx2, None, func2)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
-    man(ctx2, None)
-    func1.assert_not_called()
-    func2.assert_called_once_with(None)
+    await man(ctx2, None)
+    func1.assert_not_awaited()
+    func2.assert_awaited_once_with(None)
     func2.reset_mock()
 
 
-def test_unregister_nonearg() -> None:
-    """"Test unregistering events in the manager."""
+async def test_unregister_nonearg() -> None:
+    """Test unregistering events in the manager."""
     man = EventManager()
-    func1 = create_autospec(event_func)
-    func2 = create_autospec(event_func)
+    func1 = create_autospec(event_func, name='func1')
+    func2 = create_autospec(event_func, name='func2')
     ctx = object()
 
     man.register(ctx, None, func1)
     man.register(ctx, None, func2)
-    man(ctx)
+    await man(ctx)
 
-    func1.assert_called_once_with(None)
-    func2.assert_called_once_with(None)
+    func1.assert_awaited_once_with(None)
+    func2.assert_awaited_once_with(None)
     func1.reset_mock()
     func2.reset_mock()
 
@@ -137,39 +135,39 @@ def test_unregister_nonearg() -> None:
         man.unregister(45, None, func1)
     man.unregister(ctx, None, func1)
 
-    func1.assert_not_called()
-    func2.assert_not_called()
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
 
-    man(ctx)
+    await man(ctx)
 
-    func1.assert_not_called()
-    func2.assert_called_once_with(None)
+    func1.assert_not_awaited()
+    func2.assert_awaited_once_with(None)
 
 
-def test_register_priming() -> None:
-    """Test the 'prime' keyword argument for events."""
+async def test_register_priming() -> None:
+    """Test the priming version of registering."""
     man = EventManager()
     func1 = create_autospec(event_func, name='func1')
     func2 = create_autospec(event_func, name='func2')
 
     # If not fired, does nothing.
-    man.register(None, int, func1, prime=True)
-    func1.assert_not_called()
-    man(None, 5)
-    func1.assert_called_once_with(5)
+    await man.register_and_prime(None, int, func1)
+    func1.assert_not_awaited()
+    await man(None, 5)
+    func1.assert_awaited_once_with(5)
 
     func1.reset_mock()
     # Now it's been fired already, the late registry can be sent it.
-    man.register(None, int, func2, prime=True)
-    func1.assert_not_called()  # This is unaffected.
-    func2.assert_called_once_with(5)
+    await man.register_and_prime(None, int, func2)
+    func1.assert_not_awaited()  # This is unaffected.
+    func2.assert_awaited_once_with(5)
 
     func1.reset_mock()
     func2.reset_mock()
 
-    man(None, 10)
-    func1.assert_called_once_with(10)
-    func2.assert_called_once_with(10)
+    await man(None, 10)
+    func1.assert_awaited_once_with(10)
+    func2.assert_awaited_once_with(10)
 
 
 def test_valuechange() -> None:
@@ -210,43 +208,45 @@ def test_valuechange_hash() -> None:
     assert ValueChange(12, 'text') not in dct
 
 
-def test_obsval_getset() -> None:
+async def test_obsval_getset() -> None:
     """Check getting/setting functions normally, unrelated to events."""
     man = EventManager()
-    holder = ObsValue(man, 45)
+    holder: ObsValue = ObsValue(man, 45)
     assert holder.value == 45
-    holder.value = 32
+
+    await holder.set(32)
     assert holder.value == 32
+
     sent = object()
-    holder.value = sent
+    await holder.set(sent)
     assert holder.value is sent
-    holder.value = holder
+
+    await holder.set(holder)
     assert holder.value is holder
 
 
-def test_obsval_fires() -> None:
+async def test_obsval_fires() -> None:
     """Check an event fires whenever the value changes."""
     man = EventManager()
-    holder = ObsValue(man, 0)
+    holder: ObsValue = ObsValue(man, 0)
     func1 = create_autospec(event_func)
     man.register(holder, ValueChange, func1)
-    func1.assert_not_called()
+    func1.assert_not_awaited()
 
     assert holder.value == 0
-    func1.assert_not_called()
+    func1.assert_not_awaited()
 
-    holder.value = 1
-    func1.assert_called_once_with(ValueChange(0, 1, None))
+    await holder.set(1)
+    func1.assert_awaited_once_with(ValueChange(0, 1))
     func1.reset_mock()
 
-    holder.value = 'v'
+    await holder.set('v')
+    func1.assert_awaited_once_with(ValueChange(1, 'v'))
 
-    func1.assert_called_once_with(ValueChange(1, 'v', None))
 
-
-def test_obsvalue_set_during_event() -> None:
+async def test_obsvalue_set_during_event() -> None:
     """Test the case where the holder is set from the event callback."""
-    # Here we're going to setup a chain of events to fire.
+    # Here we're going to set up a chain of events to fire.
     # What we want to have happen:
     # Start at 0.
     # Set to 1.
@@ -261,29 +261,30 @@ def test_obsvalue_set_during_event() -> None:
     def event(arg: ValueChange):
         assert arg.ind is arg.key is None, f"Bad key: {arg}"
         assert arg.new == holder.value, f"Wrong new val: {arg} != {holder.value}"
-        holder.value = min(3, arg.new + 1)
+        holder.set(min(3, arg.new + 1))
 
     mock = Mock(side_effect=event)
-    mock.assert_not_called()
+    mock.assert_not_awaited()
     man.register(holder, ValueChange, mock)
-    holder.value = 1
+    await holder.set(1)
     assert holder.value == 3
     assert mock.call_count == 4
     mock.assert_has_calls([
-        call(ValueChange(0, 1, None)),
-        call(ValueChange(1, 2, None)),
-        call(ValueChange(2, 3, None)),
-        call(ValueChange(3, 3, None)),
+        call(ValueChange(0, 1)),
+        call(ValueChange(1, 2)),
+        call(ValueChange(2, 3)),
+        call(ValueChange(3, 3)),
     ])
 
 
-def test_obsval_repr() -> None:
+async def test_obsval_repr() -> None:
     """Test the repr() of ObsValue."""
     man = EventManager()
-    holder = ObsValue(man, 0)
-
+    holder: ObsValue = ObsValue(man, 0)
     assert repr(holder) == f'ObsValue({man!r}, 0)'
-    holder.value = [1, 2, 3]
+
+    await holder.set([1, 2, 3])
     assert repr(holder) == f'ObsValue({man!r}, [1, 2, 3])'
-    holder.value = None
+
+    await holder.set(None)
     assert repr(holder) == f'ObsValue({man!r}, None)'
