@@ -302,141 +302,25 @@ def test_obsval_repr() -> None:
     assert repr(holder) == f'ObsValue({man!r}, None)'
 
 
-try:
-    from test.list_tests import CommonTest as CPyListTest
-    from test.mapping_tests import TestHashMappingProtocol as CPyMapTest
-except ImportError:
-    # No test package installed, can only run the ones here.
-    from unittest import TestCase as CPyListTest, TestCase as CPyMapTest
-
-    def test_no_cpython() -> None:
-        """Log that the tests aren't importable."""
-        pytest.fail("No test.list_tests and test.mapping_tests to import!")
-
-
-class CPythonObsListTests(CPyListTest):
-    """Use CPython's own tests.
-
-    This should comprehensively test that it does the same thing
-    as the original list type.
-    """
-    def test_init(self):
-        man = EventManager()
-        # Iterable arg is optional
-        self.assertEqual(self.type2test([]), self.type2test())
-
-        # Init clears previous values
-        a = self.type2test([1, 2, 3])
-        a.__init__(man)
-        self.assertEqual(a, self.type2test([]))
-
-        # Init overwrites previous values
-        a = self.type2test([1, 2, 3])
-        a.__init__(man, [4, 5, 6])
-        self.assertEqual(a, self.type2test([4, 5, 6]))
-
-        # Mutables always return a new object
-        b = self.type2test(a)
-        self.assertNotEqual(id(a), id(b))
-        self.assertEqual(a, b)
-
-    @staticmethod
-    def type2test(it=()):
-        """Replicate the normal list's parameters, so it can test this."""
-        return ObsList(EventManager(), it)
-
-    # copy() for us isn't useful or well defined.
-    # Context is compared by identity, so it won't fire the events.
-    # But returning a list is odd as well.
-    test_copy = None
-
-    # This is a extension type check, not Python code.
-    test_free_after_iterating = None
-
-    # Our repr() is and should be different.
-    test_repr = None
-
-    def test_addmul(self) -> None:
-        """Eliminate the subclass test, type2test isn't valid."""
-        u1 = self.type2test([0])
-        u2 = self.type2test([0, 1])
-        self.assertEqual(u1, u1 + self.type2test())
-        self.assertEqual(u1, self.type2test() + u1)
-        self.assertEqual(u1 + self.type2test([1]), u2)
-        self.assertEqual(self.type2test([-1]) + u1, self.type2test([-1, 0]))
-        self.assertEqual(self.type2test(), u2 * 0)
-        self.assertEqual(self.type2test(), 0 * u2)
-        self.assertEqual(self.type2test(), u2 * 0)
-        self.assertEqual(self.type2test(), 0 * u2)
-        self.assertEqual(u2, u2 * 1)
-        self.assertEqual(u2, 1 * u2)
-        self.assertEqual(u2, u2 * 1)
-        self.assertEqual(u2, 1 * u2)
-        self.assertEqual(u2 + u2, u2 * 2)
-        self.assertEqual(u2 + u2, 2 * u2)
-        self.assertEqual(u2 + u2, u2 * 2)
-        self.assertEqual(u2 + u2, 2 * u2)
-        self.assertEqual(u2 + u2 + u2, u2 * 3)
-        self.assertEqual(u2 + u2 + u2, 3 * u2)
-
-    def test_getitemoverwriteiter(self):
-        """Needs an override to pass EventManager in."""
-        # Verify that __getitem__ overrides are not recognized by __iter__
-        class T(ObsList):
-            def __getitem__(self, key):
-                return str(key) + '!!!'
-        self.assertEqual(next(iter(T(EventManager(), (1, 2)))), 1)
-
-
-class CPythonObsMapTests(CPyMapTest):
-    """Use CPython's own tests.
-
-    This should comprehensively test that it does the same thing
-    as the original dict type.
-    """
-    type2test = ObsMap
+def test_obslist_init() -> None:
     man = EventManager()
-    event_fail = False
+    # Iterable arg is optional
+    assert ObsList(man, []) == ObsList(man)
 
-    def _reference(self):
-        """Return a dictionary of values which are invariant by storage
-        in the object under test."""
-        return self._full_mapping({"1": "2", "key1": "value1", "key2": (1, 2, 3)})
+    # Init clears previous values
+    a = ObsList(man, [1, 2, 3])
+    a.__init__(man)
+    assert a == ObsList(man, [])
 
-    def _empty_mapping(self):
-        """Return an empty mapping object"""
-        return self._full_mapping({})
+    # Init overwrites previous values
+    a = ObsList(man, [1, 2, 3])
+    a.__init__(man, [4, 5, 6])
+    assert a == ObsList(man, [4, 5, 6])
 
-    def _full_mapping(self, data):
-        """Return a mapping object with the value contained in data
-        dictionary"""
-        dct = ObsMap(self.man, data)
-        if self.event_fail:
-            dct.man.register(dct, ValueChange, pytest.fail)
-        return dct
-
-    # fromkeys() for us isn't useful.
-    test_fromkeys = None
-
-    # Our constructor is different.
-    test_constructor = None
-
-    # Our repr() is and should be different.
-    test_repr = None
-
-    def test_read(self):
-        """Fail if any event is fired."""
-        self.man = EventManager()
-        try:
-            self.event_fail = True
-            super().test_read()
-        finally:
-            self.event_fail = False
-            self.man = EventManager()
-
-
-# Don't test these themselves.
-del CPyListTest, CPyMapTest
+    # Mutables always return a new object
+    b = ObsList(man, a)
+    assert id(a) != id(b)
+    assert a == b
 
 
 def test_obslist_repr() -> None:
@@ -460,6 +344,13 @@ def test_obslist_repr() -> None:
     a1 = ObsList(man, l0)
     with pytest.raises(RecursionError):
         repr(a1)
+
+
+def test_obslist_truth() -> None:
+    """Test blank lists are falsey."""
+    man = EventManager()
+    assert not ObsList(man, [])
+    assert ObsList(man, [0])
 
 
 def test_obslist_reading() -> None:
@@ -512,14 +403,17 @@ def test_obslist_setitem() -> None:
     func.assert_not_called()
 
     lst[0] = 45
+    assert [*lst] == [45, 2, 3, 4, 5, 6, 7]
     func.assert_called_once_with(ValueChange(1, 45, 0))
     func.reset_mock()
 
     lst[3] = 12
+    assert [*lst] == [45, 2, 3, 12, 5, 6, 7]
     func.assert_called_once_with(ValueChange(4, 12, 3))
     func.reset_mock()
 
     lst[1:3] = [10, 11]
+    assert [*lst] == [45, 10, 11, 12, 5, 6, 7]
     func.assert_has_calls([
         call(ValueChange(2, 10, 1)),
         call(ValueChange(3, 11, 2)),
@@ -527,8 +421,9 @@ def test_obslist_setitem() -> None:
     func.reset_mock()
     #  0  1  2  3 4 5 6
     # 45 10 11 12 5 6 7
-    # ->    50  6 7
+    # 45 10 -- 50 - 6 7
     lst[2:5] = [50]
+    assert [*lst] == [45, 10, 50, 6, 7]
     func.assert_has_calls([
         call(ValueChange(11, 50, 2)),
         call(ValueChange(12, 6, 3)),
@@ -536,7 +431,6 @@ def test_obslist_setitem() -> None:
         call(ValueChange(6, None, ind=5)),
         call(ValueChange(7, None, ind=6)),
     ])
-
 
 def test_obslist_deletion() -> None:
     """Test deleting items from the sequence."""
@@ -546,6 +440,7 @@ def test_obslist_deletion() -> None:
     man.register(seq, ValueChange, event)
 
     del seq[7]
+    assert [*seq] == [0, 1, 2, 3, 4, 5, 6, 8, 9]
     assert event.call_count == 3
     event.assert_has_calls([
         call(ValueChange(7, 8, 7)),
@@ -659,11 +554,13 @@ def test_obslist_reverse() -> None:
 def test_obslist_sort() -> None:
     """Test the inplace sort fires events."""
     man = EventManager()
-    seq = ObsList(man, [-3, 4, -2, 8, 3, 5, -9])
+    data = [-3, 4, -2, 8, 3, 5, -9]
+    seq = ObsList(man, data)
     event = create_autospec(event_func)
     man.register(seq, ValueChange, event)
 
     seq.sort()
+    assert list(seq) == sorted(data)
     assert event.call_count == 5
     event.assert_has_calls([
         call(ValueChange(-3, -9, 0)),
@@ -677,6 +574,7 @@ def test_obslist_sort() -> None:
     event.reset_mock()
 
     seq.sort(key=abs, reverse=True)
+    assert seq == sorted(data, key=abs, reverse=True)
     assert event.call_count == 6
     event.assert_has_calls([
         # call(ValueChange(-9, -9, 0)),
@@ -689,7 +587,29 @@ def test_obslist_sort() -> None:
     ])
 
 
-def test_obsmap_repr():
+def test_obslist_addmul() -> None:
+    """Based on CPython tests."""
+    man = EventManager()
+
+    u1 = ObsList(man, [0])
+    u2 = ObsList(man, [0, 1])
+    assert u1 == u1 + ObsList(man)
+    assert u1 == ObsList(man) + u1
+    assert u1 + ObsList(man, [1]) == u2
+    assert ObsList(man, [-1]) + u1 == ObsList(man, [-1, 0])
+    assert ObsList(man) == u2 * 0
+    assert ObsList(man) == 0 * u2
+    assert u2 == u2 * 1
+    assert u2 == 1 * u2
+    assert u2 + u2 == u2 * 2
+    assert u2 + u2 == 2 * u2
+    assert u2 + u2 == u2 * 2
+    assert u2 + u2 == 2 * u2
+    assert u2 + u2 + u2, u2 * 3
+    assert u2 + u2 + u2, 3 * u2
+
+
+def test_obsmap_repr() -> None:
     """Same as test.test_mapping.TestHashMappingProtocol, but with our repr."""
     man = EventManager()
     man_repr = repr(man)  # Contains the memory address.
@@ -713,7 +633,7 @@ def test_obsmap_repr():
         repr(d)
 
 
-def test_obsmap_setting():
+def test_obsmap_setting() -> None:
     man = EventManager()
     dct: ObsMap = ObsMap(man, {1: False})
     event = create_autospec(event_func)
@@ -752,7 +672,7 @@ def test_obsmap_setting():
     event.reset_mock()
 
 
-def test_obsmap_setdefault():
+def test_obsmap_setdefault() -> None:
     """An event should only fire if the key isn't present."""
     man = EventManager()
     dct: ObsMap = ObsMap(man, {'present': True})
