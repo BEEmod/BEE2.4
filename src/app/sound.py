@@ -13,7 +13,7 @@ import shutil
 
 import trio
 
-from app import TK_ROOT
+from app import TK_ROOT, config
 from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
 import srctools.logger
 import utils
@@ -22,13 +22,11 @@ __all__ = [
     'SamplePlayer',
 
     'pyglet_version',
-    'play_sound', 'fx',
-    'fx_blockable', 'block_fx',
+    'fx', 'fx_blockable', 'block_fx',
 ]
 
 LOGGER = srctools.logger.get_logger(__name__)
 SAMPLE_WRITE_PATH = utils.conf_location('music_sample/music')
-play_sound = True
 # Nursery to hold sound-related tasks. We can cancel this to shutdown sound logic.
 _nursery: trio.Nursery | None = None
 
@@ -83,7 +81,7 @@ class NullSound:
         This waits for a certain amount of time between retriggering sounds
         so they don't overlap.
         """
-        if play_sound and self._block_count == 0:
+        if play_fx() and self._block_count == 0:
             self._block_count += 1
             try:
                 await self.fx(sound)
@@ -127,7 +125,7 @@ class PygletSound(NullSound):
     async def fx(self, sound: str) -> None:
         """Play a sound effect."""
         global sounds
-        if play_sound:
+        if play_fx():
             try:
                 snd = self.sources[sound]
             except KeyError:
@@ -199,6 +197,10 @@ def block_fx() -> None:
 def has_sound() -> bool:
     """Return if the sound system is functional."""
     return isinstance(sounds, PygletSound)
+
+def play_fx() -> bool:
+    """Return if sounds should play."""
+    return config.get_cur_conf(config.GenOptions).play_sounds
 
 if utils.WIN and not utils.FROZEN:
     # Add a libs folder for FFmpeg dlls.
