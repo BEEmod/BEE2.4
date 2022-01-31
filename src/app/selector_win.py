@@ -513,7 +513,7 @@ class PreviewWindow:
 
         self.win.deiconify()
         self.win.lift()
-        utils.center_win(self.win, parent.win)
+        tk_tools.center_win(self.win, parent.win)
         if parent.modal:
             parent.win.grab_release()
             self.win.grab_set()
@@ -1286,7 +1286,7 @@ class SelectorWin:
             self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
 
-        utils.center_win(self.win, parent=self.parent)
+        app.tk_tools.center_win(self.win, parent=self.parent)
 
         self.sel_item(self.selected)
         self.win.after(2, self.flow_items)

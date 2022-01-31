@@ -295,7 +295,7 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         """Show the window."""
         drag_man.load_icons()
         window.deiconify()
-        utils.center_win(window, TK_ROOT)
+        tk_tools.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
     await config.set_and_run_ui_callback(Layout, apply_config)

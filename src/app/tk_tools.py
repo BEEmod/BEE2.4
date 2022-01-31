@@ -5,7 +5,7 @@ General code used for tkinter portions.
 import functools
 import sys
 from enum import Enum
-from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Literal
+from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Tuple, Literal
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -331,6 +331,51 @@ else:
 def event_cancel(*args, **kwargs) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
+
+
+DISABLE_ADJUST = False
+
+
+def adjust_inside_screen(
+    x: int,
+    y: int,
+    win,
+    horiz_bound: int=14,
+    vert_bound: int=45,
+) -> Tuple[int, int]:
+    """Adjust a window position to ensure it fits inside the screen.
+
+    The new value is returned.
+    If utils.DISABLE_ADJUST is set to True, this is disabled.
+    """
+    if DISABLE_ADJUST:  # Allow disabling this adjustment
+        return x, y     # for multi-window setups
+    max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
+    max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
+
+    if x < horiz_bound:
+        x = horiz_bound
+    elif x > max_x:
+        x = max_x
+
+    if y < vert_bound:
+        y = vert_bound
+    elif y > max_y:
+        y = max_y
+    return x, y
+
+
+def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel]=None) -> None:
+    """Center a subwindow to be inside a parent window."""
+    if parent is None:
+        parent = window.nametowidget(window.winfo_parent())
+
+    x = parent.winfo_rootx() + (parent.winfo_width()-window.winfo_width())//2
+    y = parent.winfo_rooty() + (parent.winfo_height()-window.winfo_height())//2
+
+    x, y = adjust_inside_screen(x, y, window)
+
+    window.geometry(f'+{x}+{y}')
 
 
 def _default_validator(value) -> str:

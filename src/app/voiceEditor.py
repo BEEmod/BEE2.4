@@ -13,7 +13,6 @@ from app import img, TK_ROOT
 import srctools.logger
 from app import tk_tools
 from localisation import gettext
-import utils
 from BEE2_config import ConfigFile
 from app.tooltip import add_tooltip
 from srctools import Property
@@ -303,7 +302,7 @@ def show(quote_pack):
     add_tabs()
 
     win.deiconify()
-    utils.center_win(win)  # Center inside the parent
+    tk_tools.center_win(win)  # Center inside the parent
     win.lift()
 
 

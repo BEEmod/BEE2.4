@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Iterable
 from tkinter import ttk, messagebox
 import tkinter as tk
-from app import TK_ROOT
+from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from localisation import gettext
@@ -25,7 +25,7 @@ def show() -> None:
     window.deiconify()
     window.lift(TK_ROOT)
     window.grab_set()
-    utils.center_win(window, TK_ROOT)
+    tk_tools.center_win(window, TK_ROOT)
     window.update()
     list_widget.refresh()
 

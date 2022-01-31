@@ -2,14 +2,14 @@ from typing import Callable, Any, Union
 
 import tkinter as tk
 from tkinter import ttk
-from BEE2_config import GEN_OPTS
 
-from app import tooltip
-from app import tk_tools
+import srctools
+
+from BEE2_config import GEN_OPTS
+from app import tooltip, tk_tools
 from app.img import Handle as ImgHandle, apply as apply_img
 from localisation import gettext
 import utils
-import srctools
 from app import sound
 
 
@@ -155,7 +155,7 @@ class SubPane(tk.Toplevel):
         if y is None:
             y = self.winfo_y()
 
-        x, y = utils.adjust_inside_screen(x, y, win=self)
+        x, y = tk_tools.adjust_inside_screen(x, y, win=self)
         self.geometry('{!s}x{!s}+{!s}+{!s}'.format(
             max(10, width),
             max(10, height),
@@ -184,11 +184,11 @@ class SubPane(tk.Toplevel):
     def follow_main(self, e=None) -> None:
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
-        x, y = utils.adjust_inside_screen(
+        x, y = tk_tools.adjust_inside_screen(
             x=self.parent.winfo_x()+self.relX,
             y=self.parent.winfo_y()+self.relY,
             win=self,
-            )
+        )
         self.geometry('+'+str(x)+'+'+str(y))
         self.parent.focus()
 

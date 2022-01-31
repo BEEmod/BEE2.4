@@ -551,7 +551,7 @@ def refresh_back_details():
 def show_window() -> None:
     window.deiconify()
     window.lift()
-    utils.center_win(window, TK_ROOT)
+    tk_tools.center_win(window, TK_ROOT)
     # Load our game data!
     ui_refresh_game()
     window.update()

@@ -8,7 +8,6 @@ import tkinter as tk
 import webbrowser
 import functools
 
-
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 from localisation import gettext
@@ -491,7 +490,7 @@ class Dialog(tk.Toplevel):
 
         self.deiconify()
         self.update_idletasks()
-        utils.center_win(self, TK_ROOT)
+        tk_tools.center_win(self, TK_ROOT)
 
 
 def make_help_menu(parent: tk.Menu):

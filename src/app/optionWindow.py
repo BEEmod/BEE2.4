@@ -11,7 +11,6 @@ from BEE2_config import GEN_OPTS
 from app.config import AfterExport
 from app.tooltip import add_tooltip
 
-import utils
 import srctools.logger
 from app import (
     contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT,
@@ -66,7 +65,7 @@ def show() -> None:
     """Display the option window."""
     win.deiconify()
     contextWin.hide_context()  # Ensure this closes
-    utils.center_win(win)
+    tk_tools.center_win(win)
 
 
 def load() -> None:
@@ -81,7 +80,7 @@ def save() -> None:
         var.save()  # type: ignore
 
     sound.play_sound = PLAY_SOUND.get()
-    utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
+    tk_tools.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
     logWindow.HANDLER.set_visible(SHOW_LOG_WIN.get())
     loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 

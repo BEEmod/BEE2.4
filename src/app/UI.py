@@ -19,7 +19,6 @@ from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 from app import sound as snd
-import BEE2_config
 import packages
 from app import img
 from app import itemconfig
@@ -1696,7 +1695,7 @@ async def init_windows() -> None:
         else:
             TK_ROOT.geometry(f'{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
     else:
-        start_x, start_y = utils.adjust_inside_screen(
+        start_x, start_y = tk_tools.adjust_inside_screen(
             start_x,
             start_y,
             win=TK_ROOT,

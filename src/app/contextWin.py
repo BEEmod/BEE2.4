@@ -19,7 +19,6 @@ from tkinter import messagebox
 from .richTextBox import tkRichText
 from . import (
     itemPropWin, itemconfig, tkMarkdown, tooltip, tk_tools,
-    optionWindow,
     sound,
     img,
     UI,
@@ -401,7 +400,7 @@ def adjust_position(e=None) -> None:
     # window
     icon_widget = wid['subitem', pos_for_item(selected_sub_item.subKey)]
 
-    loc_x, loc_y = utils.adjust_inside_screen(
+    loc_x, loc_y = tk_tools.adjust_inside_screen(
         x=(
             selected_sub_item.label.winfo_rootx()
             + window.winfo_rootx()
