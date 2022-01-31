@@ -3,6 +3,7 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
+from enum import Enum
 from typing import (
     TypeVar, Callable, ClassVar, Generic, Protocol, NewType, cast,
     List, Optional, Tuple, Type, Dict,
@@ -431,3 +432,10 @@ class LastSelected(Data):
         else:
             elem['selected'] = self.id
         return elem
+
+
+class AfterExport(Enum):
+    """Specifies what happens after exporting."""
+    NORMAL = 0  # Stay visible
+    MINIMISE = 1  # Minimise to tray
+    QUIT = 2  # Quit the app.

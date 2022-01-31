@@ -7,9 +7,8 @@ from tkinter import ttk
 from tkinter import messagebox
 from typing import Callable, List, Tuple, Dict, Any
 
-from enum import Enum
-
 from BEE2_config import GEN_OPTS
+from app.config import AfterExport
 from app.tooltip import add_tooltip
 
 import utils
@@ -24,13 +23,6 @@ import loadScreen
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-
-class AfterExport(Enum):
-    """Specifies what happens after exporting."""
-    NORMAL = 0  # Stay visible
-    MINIMISE = 1  # Minimise to tray
-    QUIT = 2  # Quit the app.
 
 UI: Dict[str, Any] = {}
 AFTER_EXPORT_ACTION = IntVar(

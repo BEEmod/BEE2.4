@@ -773,10 +773,10 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
                 'Hammer to ensure editor wall previews are changed.'
             )
 
-        chosen_action = optionWindow.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
+        chosen_action = config.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
         want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
 
-        if want_launch or chosen_action is not optionWindow.AfterExport.NORMAL:
+        if want_launch or chosen_action is not config.AfterExport.NORMAL:
             do_action = messagebox.askyesno(
                 'BEEMOD2',
                 message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
@@ -792,11 +792,11 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
             if want_launch:
                 gameMan.selected_game.launch()
 
-            if chosen_action is optionWindow.AfterExport.NORMAL:
+            if chosen_action is config.AfterExport.NORMAL:
                 pass
-            elif chosen_action is optionWindow.AfterExport.MINIMISE:
+            elif chosen_action is config.AfterExport.MINIMISE:
                 TK_ROOT.iconify()
-            elif chosen_action is optionWindow.AfterExport.QUIT:
+            elif chosen_action is config.AfterExport.QUIT:
                 quit_application()
                 # We never return from this.
             else:
