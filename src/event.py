@@ -25,7 +25,6 @@ ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
 ValueT = TypeVar('ValueT')
 Value2T = TypeVar('Value2T')
-NoneType = Type[None]
 
 
 class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
@@ -81,7 +80,7 @@ class EventManager:
         instead of type(None).
         """
         if arg_type is None:
-            arg_type = cast('Type[ArgT]', NoneType)
+            arg_type = cast('Type[ArgT]', type(None))
         key = (id(ctx), arg_type)
         try:
             spec = self._events[key]
@@ -109,7 +108,7 @@ class EventManager:
     ) -> None:
         """Register the given function, then immediately call with the last value if present."""
         if arg_type is None:
-            arg_type = cast('Type[ArgT]', NoneType)
+            arg_type = cast('Type[ArgT]', type(None))
         key = (id(ctx), arg_type)
         try:
             spec = self._events[key]

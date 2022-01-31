@@ -1,6 +1,6 @@
 """Test the events manager and collections."""
 import pytest
-from unittest.mock import Mock, create_autospec, call
+from unittest.mock import AsyncMock, create_autospec, call
 
 from event import EventManager, ValueChange, ObsValue
 
@@ -258,12 +258,12 @@ async def test_obsvalue_set_during_event() -> None:
     man = EventManager()
     holder = ObsValue(man, 0)
 
-    def event(arg: ValueChange):
-        assert arg.ind is arg.key is None, f"Bad key: {arg}"
+    async def event(arg: ValueChange):
+        """Event fired when registered."""
         assert arg.new == holder.value, f"Wrong new val: {arg} != {holder.value}"
-        holder.set(min(3, arg.new + 1))
+        await holder.set(min(3, arg.new + 1))
 
-    mock = Mock(side_effect=event)
+    mock = AsyncMock(side_effect=event)
     mock.assert_not_awaited()
     man.register(holder, ValueChange, mock)
     await holder.set(1)
