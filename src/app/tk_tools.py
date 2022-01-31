@@ -13,7 +13,7 @@ from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
-from app import TK_ROOT
+from app import TK_ROOT, config
 
 try:
     # Python 3.6+
@@ -333,9 +333,6 @@ def event_cancel(*args, **kwargs) -> str:
     return 'break'
 
 
-DISABLE_ADJUST = False
-
-
 def adjust_inside_screen(
     x: int,
     y: int,
@@ -346,10 +343,10 @@ def adjust_inside_screen(
     """Adjust a window position to ensure it fits inside the screen.
 
     The new value is returned.
-    If utils.DISABLE_ADJUST is set to True, this is disabled.
     """
-    if DISABLE_ADJUST:  # Allow disabling this adjustment
-        return x, y     # for multi-window setups
+    # Allow disabling this adjustment for multi-window setups
+    if not config.get_cur_conf(config.GenOptions).keep_win_inside:
+        return x, y
     max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
     max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
 

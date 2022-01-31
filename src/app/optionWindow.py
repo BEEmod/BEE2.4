@@ -79,7 +79,6 @@ def save() -> None:
     for var in VARS.values():
         var.save()  # type: ignore
 
-    tk_tools.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
     logWindow.HANDLER.set_visible(SHOW_LOG_WIN.get())
     loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 
