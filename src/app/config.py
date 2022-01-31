@@ -17,6 +17,8 @@ from srctools import KeyValError, Property, logger
 from srctools.dmx import Element
 
 import utils
+from BEE2_config import GEN_OPTS
+
 
 LOGGER = logger.get_logger(__name__)
 
@@ -439,3 +441,118 @@ class AfterExport(Enum):
     NORMAL = 0  # Stay visible
     MINIMISE = 1  # Minimise to tray
     QUIT = 2  # Quit the app.
+
+
+@register('Options')
+@attr.frozen
+class GenOptions(Data):
+    """General app config options, mainly booleans. These are all changed in the options window."""
+    # What to do after exporting.
+    after_export_action: AfterExport = AfterExport.NORMAL
+    launch_after_export: bool = True
+
+    play_sounds: bool = True
+    keep_win_inside: bool = True
+    force_load_ontop: bool = True
+    splash_stay_ontop: bool = True
+
+    # Stuff mainly for devs.
+    show_log_win: bool = False
+    preserve_resources: bool = False
+    dev_mode: bool = False
+    log_missing_styles: bool = False
+    log_item_fallbacks: bool = False
+    log_incorrect_packfile: bool = False
+    force_all_editor_models: bool = False
+
+    @classmethod
+    def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
+        """Parse from the GEN_OPTS config file."""
+        res = {}
+        try:
+            res['after_export_action'] = AfterExport(GEN_OPTS.get_int(
+                'General', 'after_export_action',
+                0,
+            ))
+        except ValueError:
+            res['after_export_action'] = AfterExport.NORMAL
+
+        for field in gen_opts_bool:
+            old_name = old_gen_opts.get(field.name, field.name)
+            print('OPT: ', 'Debug' if old_name in old_gen_opts_debug else 'General',
+                old_name)
+            res[field.name] = GEN_OPTS.get_bool(
+                'Debug' if old_name in old_gen_opts_debug else 'General',
+                old_name,
+                field.default
+            )
+
+        return {'': GenOptions(**res)}
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'GenOptions':
+        """Parse KV1 values."""
+        assert version == 1
+        res = {}
+        try:
+            res['after_export_action'] = AfterExport(data.int('after_export', 0))
+        except ValueError:
+            res['after_export_action'] = AfterExport.NORMAL
+        for field in gen_opts_bool:
+            res[field.name] = data.bool(field.name, field.default)
+        return GenOptions(**res)
+
+    def export_kv1(self) -> Property:
+        """Produce KV1 values."""
+        prop = Property('', [
+            Property('after_export', str(self.after_export_action.value))
+        ])
+        for field in gen_opts_bool:
+            prop[field.name] = '1' if getattr(self, field.name) else '0'
+        return prop
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
+        """Parse DMX configuration."""
+        assert version == 1
+        res = {}
+        try:
+            res['after_export_action'] = AfterExport(data['after_export'].val_int)
+        except (KeyError, ValueError):
+            res['after_export_action'] = AfterExport.NORMAL
+        for field in gen_opts_bool:
+            try:
+                res[field.name] = data[field.name].val_bool
+            except KeyError:
+                res[field.name] = field.default
+        return GenOptions(**res)
+
+    def export_dmx(self) -> Element:
+        """Produce DMX configuration."""
+        elem = Element('Options', 'DMElement')
+        elem['after_export'] = self.after_export_action.value
+        for field in gen_opts_bool:
+            elem[field.name] = getattr(self, field.name)
+        return elem
+
+
+# We can handle the boolean values uniformly.
+old_gen_opts = {
+    'launch_after_export': 'launch_game',
+    'dev_mode': 'development_mode',
+    'preserve_resources': 'preserve_bee2_resource_dir'
+}
+old_gen_opts_debug = {
+    'development_mode',
+    'force_all_editor_models',
+    'log_incorrect_packfile',
+    'log_item_fallbacks',
+    'log_missing_ent_count',
+    'log_missing_styles',
+    'show_log_win',
+}
+gen_opts_bool = [
+    field
+    for field in attr.fields_dict(GenOptions).values()
+    if field.default in (True, False)
+]
