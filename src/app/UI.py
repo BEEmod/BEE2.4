@@ -622,7 +622,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
 
 def current_style() -> packages.Style:
     """Return the currently selected style."""
-    return packages.Style.by_id(selected_style)
+    return packages.LOADED.obj_by_id(packages.Style, selected_style)
 
 
 def reposition_panes() -> None:
@@ -772,13 +772,12 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
                 'Hammer to ensure editor wall previews are changed.'
             )
 
-        chosen_action = config.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
-        want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
+        conf = config.get_cur_conf(config.GenOptions)
 
-        if want_launch or chosen_action is not config.AfterExport.NORMAL:
+        if conf.launch_after_export or conf.after_export is not config.AfterExport.NORMAL:
             do_action = messagebox.askyesno(
                 'BEEMOD2',
-                message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
+                message + optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export],
                 parent=TK_ROOT,
             )
         else:  # No action to do, so just show an OK.
@@ -788,18 +787,18 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         # Do the desired action - if quit, we don't bother to update UI.
         if do_action:
             # Launch first so quitting doesn't affect this.
-            if want_launch:
+            if conf.launch_after_export:
                 gameMan.selected_game.launch()
 
-            if chosen_action is config.AfterExport.NORMAL:
+            if conf.after_export is config.AfterExport.NORMAL:
                 pass
-            elif chosen_action is config.AfterExport.MINIMISE:
+            elif conf.after_export is config.AfterExport.MINIMISE:
                 TK_ROOT.iconify()
-            elif chosen_action is config.AfterExport.QUIT:
+            elif conf.after_export is config.AfterExport.QUIT:
                 quit_application()
                 # We never return from this.
             else:
-                raise ValueError('Unknown action "{}"'.format(chosen_action))
+                raise ValueError(f'Unknown action "{conf.after_export}"')
 
         # Select the last_export palette, so reloading loads this item selection.
         pal_ui.select_palette(paletteUI.UUID_EXPORT)
