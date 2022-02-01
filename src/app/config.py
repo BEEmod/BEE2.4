@@ -448,7 +448,7 @@ class AfterExport(Enum):
 class GenOptions(Data):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # What to do after exporting.
-    after_export_action: AfterExport = AfterExport.NORMAL
+    after_export: AfterExport = AfterExport.NORMAL
     launch_after_export: bool = True
 
     play_sounds: bool = True
@@ -471,12 +471,12 @@ class GenOptions(Data):
         """Parse from the GEN_OPTS config file."""
         res = {}
         try:
-            res['after_export_action'] = AfterExport(GEN_OPTS.get_int(
+            res['after_export'] = AfterExport(GEN_OPTS.get_int(
                 'General', 'after_export_action',
                 0,
             ))
         except ValueError:
-            res['after_export_action'] = AfterExport.NORMAL
+            res['after_export'] = AfterExport.NORMAL
 
         for field in gen_opts_bool:
             old_name = old_gen_opts.get(field.name, field.name)
@@ -496,9 +496,9 @@ class GenOptions(Data):
         assert version == 1
         res = {}
         try:
-            res['after_export_action'] = AfterExport(data.int('after_export', 0))
+            res['after_export'] = AfterExport(data.int('after_export', 0))
         except ValueError:
-            res['after_export_action'] = AfterExport.NORMAL
+            res['after_export'] = AfterExport.NORMAL
         for field in gen_opts_bool:
             res[field.name] = data.bool(field.name, field.default)
         return GenOptions(**res)
@@ -506,7 +506,7 @@ class GenOptions(Data):
     def export_kv1(self) -> Property:
         """Produce KV1 values."""
         prop = Property('', [
-            Property('after_export', str(self.after_export_action.value))
+            Property('after_export', str(self.after_export.value))
         ])
         for field in gen_opts_bool:
             prop[field.name] = '1' if getattr(self, field.name) else '0'
@@ -518,9 +518,9 @@ class GenOptions(Data):
         assert version == 1
         res = {}
         try:
-            res['after_export_action'] = AfterExport(data['after_export'].val_int)
+            res['after_export'] = AfterExport(data['after_export'].val_int)
         except (KeyError, ValueError):
-            res['after_export_action'] = AfterExport.NORMAL
+            res['after_export'] = AfterExport.NORMAL
         for field in gen_opts_bool:
             try:
                 res[field.name] = data[field.name].val_bool
@@ -531,7 +531,7 @@ class GenOptions(Data):
     def export_dmx(self) -> Element:
         """Produce DMX configuration."""
         elem = Element('Options', 'DMElement')
-        elem['after_export'] = self.after_export_action.value
+        elem['after_export'] = self.after_export.value
         for field in gen_opts_bool:
             elem[field.name] = getattr(self, field.name)
         return elem

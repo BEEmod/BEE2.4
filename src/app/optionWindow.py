@@ -65,7 +65,7 @@ def show() -> None:
 def load() -> None:
     """Load the current settings from config."""
     conf = config.get_cur_conf(config.GenOptions)
-    AFTER_EXPORT_ACTION.set(conf.after_export_action.value)
+    AFTER_EXPORT_ACTION.set(conf.after_export.value)
     for name, var in VARS:
         var.set(getattr(conf, name))
 
@@ -73,7 +73,7 @@ def load() -> None:
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     res: Dict[str, Any] = {
-        'after_export_action': AfterExport(AFTER_EXPORT_ACTION.get())
+        'after_export': AfterExport(AFTER_EXPORT_ACTION.get())
     }
     for name, var in VARS:
         res[name] = var.get()
