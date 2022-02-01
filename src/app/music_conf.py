@@ -263,5 +263,3 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         set_collapsed()
     else:
         set_expanded()
-
-    return base_win

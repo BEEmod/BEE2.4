@@ -1091,7 +1091,9 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=gettext('Music: '))
-    music_win = await music_conf.make_widgets(packages.LOADED, music_frame, pane)
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
+    music_win = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
@@ -1158,7 +1160,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     )
 
     if utils.WIN:
-        # On windows, the buttons get inset on the left a bit. Inset everything
+        # On Windows, the buttons get inset on the left a bit. Inset everything
         # else to adjust.
         left_pad = (1, 0)
     else:
@@ -1656,7 +1658,7 @@ async def init_windows() -> None:
     loader.step('UI', 'voiceline')
     contextWin.init_widgets()
     loader.step('UI', 'contextwin')
-    optionWindow.init_widgets()
+    await optionWindow.init_widgets()
     loader.step('UI', 'optionwindow')
     init_drag_icon()
     loader.step('UI', 'drag_icon')

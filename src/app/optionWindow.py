@@ -3,6 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import tkinter as tk
+import trio
 from tkinter import ttk, messagebox
 from typing import Callable, List, Tuple, Dict
 
@@ -161,7 +162,7 @@ def make_checkbox(
     return widget
 
 
-def init_widgets() -> None:
+async def init_widgets() -> None:
     """Create all the widgets."""
     nbook = ttk.Notebook(win)
     nbook.grid(
@@ -176,15 +177,17 @@ def init_widgets() -> None:
 
     fr_general = ttk.Frame(nbook)
     nbook.add(fr_general, text=gettext('General'))
-    init_gen_tab(fr_general)
 
     fr_win = ttk.Frame(nbook)
     nbook.add(fr_win, text=gettext('Windows'))
-    init_win_tab(fr_win)
 
     fr_dev = ttk.Frame(nbook)
     nbook.add(fr_dev, text=gettext('Development'))
-    init_dev_tab(fr_dev)
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(init_gen_tab, fr_general)
+        nursery.start_soon(init_win_tab, fr_win)
+        nursery.start_soon(init_dev_tab, fr_dev)
 
     ok_cancel = ttk.Frame(win)
     ok_cancel.grid(row=1, column=0, padx=5, pady=5, sticky='E')
@@ -208,7 +211,7 @@ def init_widgets() -> None:
     save()  # And ensure they are applied to other windows
 
 
-def init_gen_tab(f: ttk.Frame) -> None:
+async def init_gen_tab(f: ttk.Frame) -> None:
     """Make widgets in the 'General' tab."""
     def load_after_export() -> None:
         """Read the 'After Export' radio set."""
@@ -303,7 +306,7 @@ def init_gen_tab(f: ttk.Frame) -> None:
     )
 
 
-def init_win_tab(f: ttk.Frame) -> None:
+async def init_win_tab(f: ttk.Frame) -> None:
     """Optionsl relevant to specific windows."""
     keep_inside = make_checkbox(
         f,
@@ -339,7 +342,7 @@ def init_win_tab(f: ttk.Frame) -> None:
     ).grid(row=1, column=0, sticky='EW')
 
 
-def init_dev_tab(f: ttk.Frame) -> None:
+async def init_dev_tab(f: ttk.Frame) -> None:
     """Various options useful for development."""
     f.columnconfigure(0, weight=1)
     f.columnconfigure(2, weight=1)
