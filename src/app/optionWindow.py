@@ -5,7 +5,7 @@ from pathlib import Path
 import tkinter as tk
 import trio
 from tkinter import ttk, messagebox
-from typing import Any, Callable, List, Tuple, Dict
+from typing import Any, List, Tuple, Dict
 
 import attr
 import srctools.logger
@@ -16,7 +16,6 @@ from app.tooltip import add_tooltip
 
 from app import (
     contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT, config,
-    PLAY_SOUND, KEEP_WIN_INSIDE, FORCE_LOAD_ONTOP, SHOW_LOG_WIN,
     LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE,
 )
 from localisation import gettext
@@ -253,11 +252,7 @@ async def init_gen_tab(f: ttk.Frame) -> None:
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
     if sound.has_sound():
-        mute = make_checkbox(
-            f, 'play_sounds',
-            desc=gettext('Play Sounds'),
-            var=PLAY_SOUND,
-        )
+        mute = make_checkbox(f, name='play_sounds', desc=gettext('Play Sounds'))
     else:
         mute = ttk.Checkbutton(
             f,
@@ -291,14 +286,12 @@ async def init_win_tab(f: ttk.Frame) -> None:
             'Prevent sub-windows from moving outside the screen borders. '
             'If you have multiple monitors, disable this.'
         ),
-        var=KEEP_WIN_INSIDE,
     )
     keep_inside.grid(row=0, column=0, sticky=tk.W)
 
     make_checkbox(
         f, 'splash_stay_ontop',
         desc=gettext('Keep loading screens on top'),
-        var=FORCE_LOAD_ONTOP,
         tooltip=gettext(
             "Force loading screens to be on top of other windows. "
             "Since they don't appear on the taskbar/dock, they can't be "
@@ -378,7 +371,6 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     make_checkbox(
         f, 'show_log_win',
         desc=gettext('Show Log Window'),
-        var=SHOW_LOG_WIN,
         tooltip=gettext('Show the log file in real-time.'),
     ).grid(row=2, column=2, columnspan=2, sticky='W')
 
