@@ -460,6 +460,7 @@ class GenOptions(Data):
     show_log_win: bool = False
     preserve_resources: bool = False
     dev_mode: bool = False
+    log_missing_ent_count: bool = False
     log_missing_styles: bool = False
     log_item_fallbacks: bool = False
     log_incorrect_packfile: bool = False

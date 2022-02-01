@@ -5,15 +5,17 @@ from pathlib import Path
 import tkinter as tk
 import trio
 from tkinter import ttk, messagebox
-from typing import Callable, List, Tuple, Dict
+from typing import Any, Callable, List, Tuple, Dict
+
+import attr
+import srctools.logger
 
 from BEE2_config import GEN_OPTS
 from app.config import AfterExport
 from app.tooltip import add_tooltip
 
-import srctools.logger
 from app import (
-    contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT,
+    contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT, config,
     PLAY_SOUND, KEEP_WIN_INSIDE, FORCE_LOAD_ONTOP, SHOW_LOG_WIN,
     LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE,
 )
@@ -36,10 +38,8 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], str] = {
     (AfterExport.QUIT, True): gettext('\nLaunch Game and quit BEE2?'),
 }
 
-refresh_callbacks: List[Callable[[], None]] = []  # functions called to apply settings.
-
-# All the auto-created checkbox variables
-VARS: Dict[Tuple[str, str], tk.Variable] = {}
+# The checkbox variables, along with the GenOptions attribute they control.
+VARS: List[Tuple[str, tk.Variable]] = []
 
 
 def reset_all_win() -> None:
@@ -65,20 +65,26 @@ def show() -> None:
 
 def load() -> None:
     """Load the current settings from config."""
-    for var in VARS.values():
-        var.load()  # type: ignore
+    conf = config.get_cur_conf(config.GenOptions)
+    AFTER_EXPORT_ACTION.set(conf.after_export_action.value)
+    for name, var in VARS:
+        var.set(getattr(conf, name))
 
 
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
-    for var in VARS.values():
-        var.save()  # type: ignore
+    res: Dict[str, Any] = {
+        'after_export_action': AfterExport(AFTER_EXPORT_ACTION.get())
+    }
+    for name, var in VARS:
+        res[name] = var.get()
+    config.store_conf(config.GenOptions(**res))
 
-    logWindow.HANDLER.set_visible(SHOW_LOG_WIN.get())
-    loadScreen.set_force_ontop(FORCE_LOAD_ONTOP.get())
 
-    for func in refresh_callbacks:
-        func()
+async def apply_config(conf: config.GenOptions) -> None:
+    """Used to apply the configuration to all windows."""
+    logWindow.HANDLER.set_visible(conf.show_log_win)
+    loadScreen.set_force_ontop(conf.force_load_ontop)
 
 
 def clear_caches() -> None:
@@ -121,39 +127,26 @@ def clear_caches() -> None:
 
 def make_checkbox(
     frame: tk.Misc,
-    section: str,
-    item: str,
+    name: str,
     desc: str,
-    default: bool=False,
     var: tk.BooleanVar=None,
     tooltip='',
 ) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
 
-    section and item are the location in GEN_OPTS for this config.
+    name is the attribute in GenConf for this checkbox.
     If var is set, it'll be used instead of an auto-created variable.
     desc is the text put next to the checkbox.
-    default is the default value of the variable, if var is None.
     frame is the parent frame.
     """
+    field = attr.fields_dict(config.GenOptions)[name]
+
     if var is None:
-        var = tk.BooleanVar(name=f'opt_{section.casefold()}_{item}', value=default)
-    else:
-        default = var.get()
+        var = tk.BooleanVar(name=f'gen_opt_{name}')
+    # Ensure it's a valid attribute.
+    assert name in config.GenOptions.__annotations__, config.GenOptions.__annotations__
 
-    VARS[section, item] = var
-
-    def save_opt() -> None:
-        """Save the checkbox's values."""
-        GEN_OPTS[section][item] = srctools.bool_as_int(var.get())
-
-    def load_opt() -> None:
-        """Load the checkbox's values."""
-        var.set(GEN_OPTS.get_bool(section, item, default))
-    load_opt()
-
-    var.save = save_opt
-    var.load = load_opt
+    VARS.append((name, var))
     widget = ttk.Checkbutton(frame, variable=var, text=desc)
 
     if tooltip:
@@ -202,29 +195,20 @@ async def init_widgets() -> None:
         win.withdraw()
         load()
 
+
     ok_btn = ttk.Button(ok_cancel, text=gettext('OK'), command=ok)
     cancel_btn = ttk.Button(ok_cancel, text=gettext('Cancel'), command=cancel)
     ok_btn.grid(row=0, column=0)
     cancel_btn.grid(row=0, column=1)
     win.protocol("WM_DELETE_WINDOW", cancel)
 
-    save()  # And ensure they are applied to other windows
+    load()  # Load the existing config.
+    # Then apply to other windows.
+    await config.set_and_run_ui_callback(config.GenOptions, apply_config)
 
 
 async def init_gen_tab(f: ttk.Frame) -> None:
     """Make widgets in the 'General' tab."""
-    def load_after_export() -> None:
-        """Read the 'After Export' radio set."""
-        AFTER_EXPORT_ACTION.set(GEN_OPTS.get_int(
-            'General',
-            'after_export_action',
-            AFTER_EXPORT_ACTION.get()
-        ))
-
-    def save_after_export() -> None:
-        """Save the 'After Export' radio set."""
-        GEN_OPTS['General']['after_export_action'] = str(AFTER_EXPORT_ACTION.get())
-
     after_export_frame = ttk.LabelFrame(f, text=gettext('After Export:'))
     after_export_frame.grid(
         row=0,
@@ -233,11 +217,6 @@ async def init_gen_tab(f: ttk.Frame) -> None:
         sticky='NS',
         padx=(0, 10),
     )
-
-    VARS['General', 'after_export_action'] = AFTER_EXPORT_ACTION
-    AFTER_EXPORT_ACTION.load = load_after_export
-    AFTER_EXPORT_ACTION.save = save_after_export
-    load_after_export()
 
     exp_nothing = ttk.Radiobutton(
         after_export_frame,
@@ -267,8 +246,7 @@ async def init_gen_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         after_export_frame,
-        section='General',
-        item='launch_Game',
+        'launch_after_export',
         var=LAUNCH_AFTER_EXPORT,
         desc=gettext('Launch Game'),
         tooltip=gettext('After exporting, launch the selected game automatically.'),
@@ -276,9 +254,7 @@ async def init_gen_tab(f: ttk.Frame) -> None:
 
     if sound.has_sound():
         mute = make_checkbox(
-            f,
-            section='General',
-            item='play_sounds',
+            f, 'play_sounds',
             desc=gettext('Play Sounds'),
             var=PLAY_SOUND,
         )
@@ -309,9 +285,7 @@ async def init_gen_tab(f: ttk.Frame) -> None:
 async def init_win_tab(f: ttk.Frame) -> None:
     """Optionsl relevant to specific windows."""
     keep_inside = make_checkbox(
-        f,
-        section='General',
-        item='keep_win_inside',
+        f, 'keep_win_inside',
         desc=gettext('Keep windows inside screen'),
         tooltip=gettext(
             'Prevent sub-windows from moving outside the screen borders. '
@@ -322,9 +296,7 @@ async def init_win_tab(f: ttk.Frame) -> None:
     keep_inside.grid(row=0, column=0, sticky=tk.W)
 
     make_checkbox(
-        f,
-        section='General',
-        item='splash_stay_ontop',
+        f, 'splash_stay_ontop',
         desc=gettext('Keep loading screens on top'),
         var=FORCE_LOAD_ONTOP,
         tooltip=gettext(
@@ -348,9 +320,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     f.columnconfigure(2, weight=1)
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='log_missing_ent_count',
+        f, 'log_missing_ent_count',
         desc=gettext('Log missing entity counts'),
         tooltip=gettext(
             'When loading items, log items with missing entity counts in their properties.txt file.'
@@ -358,9 +328,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=0, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='log_missing_styles',
+        f, 'log_missing_styles',
         desc=gettext("Log when item doesn't have a style"),
         tooltip=gettext(
             'Log items have no applicable version for a particular style. This usually means it '
@@ -369,9 +337,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=1, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='log_item_fallbacks',
+        f, 'log_item_fallbacks',
         desc=gettext("Log when item uses parent's style"),
         tooltip=gettext(
             'Log when an item reuses a variant from a parent style (1970s using 1950s items, '
@@ -380,9 +346,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=2, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='log_incorrect_packfile',
+        f, 'log_incorrect_packfile',
         desc=gettext("Log missing packfile resources"),
         tooltip=gettext(
             'Log when the resources a "PackList" refers to are not '
@@ -392,9 +356,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=3, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='development_mode',
+        f, 'dev_mode',
         var=DEV_MODE,
         desc=gettext("Development Mode"),
         tooltip=gettext(
@@ -404,9 +366,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=0, column=2, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='General',
-        item='preserve_bee2_resource_dir',
+        f, 'preserve_resources',
         desc=gettext('Preserve Game Directories'),
         var=PRESERVE_RESOURCES,
         tooltip=gettext(
@@ -416,18 +376,14 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=1, column=2, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='show_log_win',
+        f, 'show_log_win',
         desc=gettext('Show Log Window'),
         var=SHOW_LOG_WIN,
         tooltip=gettext('Show the log file in real-time.'),
     ).grid(row=2, column=2, columnspan=2, sticky='W')
 
     make_checkbox(
-        f,
-        section='Debug',
-        item='force_all_editor_models',
+        f, 'force_all_editor_models',
         desc=gettext("Force Editor Models"),
         tooltip=gettext(
             'Make all props_map_editor models available for use. Portal 2 has a limit of 1024 '
@@ -472,19 +428,19 @@ def get_report_file(filename: str) -> Path:
 
 def report_all_obj() -> None:
     """Print a list of every object type and ID."""
-    from packages import OBJ_TYPES
+    from packages import OBJ_TYPES, LOADED
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(obj_type.all())} {type_name}:\n')
-            for obj in obj_type.all():
+            f.write(f'{len(LOADED.all_obj(obj_type))} {type_name}:\n')
+            for obj in LOADED.all_obj(obj_type):
                 f.write(f'- {obj.id}\n')
 
 
 def report_items() -> None:
     """Print out all the item IDs used, with subtypes."""
-    from packages import Item
+    from packages import Item, LOADED
     with get_report_file('items.txt').open('w') as f:
-        for item in sorted(Item.all(), key=lambda it: it.id):
+        for item in sorted(LOADED.all_obj(Item), key=lambda it: it.id):
             for vers_name, version in item.versions.items():
                 if len(item.versions) == 1:
                     f.write(f'- `<{item.id}>`\n')
