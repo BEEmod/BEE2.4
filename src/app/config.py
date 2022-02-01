@@ -3,6 +3,7 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
+import logging
 from enum import Enum
 from typing import (
     TypeVar, Callable, ClassVar, Generic, Protocol, NewType, cast,
@@ -456,8 +457,11 @@ class GenOptions(Data):
     force_load_ontop: bool = True
     splash_stay_ontop: bool = True
 
-    # Stuff mainly for devs.
+    # Log window.
     show_log_win: bool = False
+    log_win_level: str = 'INFO'
+
+    # Stuff mainly for devs.
     preserve_resources: bool = False
     dev_mode: bool = False
     log_missing_ent_count: bool = False
@@ -469,7 +473,9 @@ class GenOptions(Data):
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
-        res = {}
+        res = {
+            'log_win_level': GEN_OPTS['Debug']['window_log_level']
+        }
         try:
             res['after_export'] = AfterExport(GEN_OPTS.get_int(
                 'General', 'after_export_action',
@@ -480,8 +486,6 @@ class GenOptions(Data):
 
         for field in gen_opts_bool:
             old_name = old_gen_opts.get(field.name, field.name)
-            print('OPT: ', 'Debug' if old_name in old_gen_opts_debug else 'General',
-                old_name)
             res[field.name] = GEN_OPTS.get_bool(
                 'Debug' if old_name in old_gen_opts_debug else 'General',
                 old_name,
@@ -494,19 +498,25 @@ class GenOptions(Data):
     def parse_kv1(cls, data: Property, version: int) -> 'GenOptions':
         """Parse KV1 values."""
         assert version == 1
-        res = {}
         try:
-            res['after_export'] = AfterExport(data.int('after_export', 0))
+            after_export = AfterExport(data.int('after_export', 0))
         except ValueError:
-            res['after_export'] = AfterExport.NORMAL
-        for field in gen_opts_bool:
-            res[field.name] = data.bool(field.name, field.default)
-        return GenOptions(**res)
+            after_export = AfterExport.NORMAL
+
+        return GenOptions(
+            after_export=after_export,
+            log_win_level=data['log_win_level', 'INFO'],
+            **{
+                field.name: data.bool(field.name, field.default)
+                for field in gen_opts_bool
+            },
+        )
 
     def export_kv1(self) -> Property:
         """Produce KV1 values."""
         prop = Property('', [
-            Property('after_export', str(self.after_export.value))
+            Property('after_export', str(self.after_export.value)),
+            Property('log_win_level', self.log_win_level),
         ])
         for field in gen_opts_bool:
             prop[field.name] = '1' if getattr(self, field.name) else '0'
@@ -541,7 +551,7 @@ class GenOptions(Data):
 old_gen_opts = {
     'launch_after_export': 'launch_game',
     'dev_mode': 'development_mode',
-    'preserve_resources': 'preserve_bee2_resource_dir'
+    'preserve_resources': 'preserve_bee2_resource_dir',
 }
 old_gen_opts_debug = {
     'development_mode',

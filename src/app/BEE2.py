@@ -67,6 +67,7 @@ async def init_app() -> None:
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
     config.read_settings()
+    conf = config.get_cur_conf(config.GenOptions)
 
     # Special case, load in this early so it applies.
     utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')
@@ -81,8 +82,9 @@ async def init_app() -> None:
     if utils.MAC:
         TK_ROOT.lift()
 
-    logWindow.HANDLER.set_visible(GEN_OPTS.get_bool('Debug', 'show_log_win'))
-    logWindow.HANDLER.setLevel(GEN_OPTS['Debug']['window_log_level'])
+    logWindow.HANDLER.set_visible(conf.show_log_win)
+    logWindow.HANDLER.setLevel(conf.log_win_level)
+    APP_NURSERY.start_soon(logWindow.setting_apply)
 
     LOGGER.debug('Loading settings...')
 

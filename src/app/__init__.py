@@ -103,12 +103,16 @@ def on_error(
         pass
 
     try:
-        from BEE2_config import GEN_OPTS
-        # Try to turn on the logging window for next time..
-        GEN_OPTS.load()
-        GEN_OPTS['Debug']['show_log_win'] = '1'
-        GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
-        GEN_OPTS.save()
+        from app import config
+        import attr
+        # Try to turn on the logging window for next time...
+        conf = config.get_cur_conf(config.GenOptions)
+        config.store_conf(attr.evolve(
+            conf,
+            show_log_win=True,
+            log_win_level='DEBUG',
+        ))
+        config.write_settings()
     except Exception:
         # Ignore failures...
         pass
