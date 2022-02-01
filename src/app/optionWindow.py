@@ -57,8 +57,10 @@ win.withdraw()
 
 def show() -> None:
     """Display the option window."""
+    # Re-apply, so the vars update.
+    load()
     win.deiconify()
-    contextWin.hide_context()  # Ensure this closes
+    contextWin.hide_context()  # Ensure this closes.
     tk_tools.center_win(win)
 
 
@@ -187,6 +189,7 @@ async def init_widgets() -> None:
     def ok() -> None:
         """Close and apply changes."""
         save()
+        config.apply_conf(config.GenOptions)
         win.withdraw()
 
     def cancel() -> None:
