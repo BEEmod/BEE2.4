@@ -283,15 +283,6 @@ async def init_gen_tab(f: ttk.Frame) -> None:
 
 async def init_win_tab(f: ttk.Frame) -> None:
     """Optionsl relevant to specific windows."""
-    keep_inside = make_checkbox(
-        f, 'keep_win_inside',
-        desc=gettext('Keep windows inside screen'),
-        tooltip=gettext(
-            'Prevent sub-windows from moving outside the screen borders. '
-            'If you have multiple monitors, disable this.'
-        ),
-    )
-    keep_inside.grid(row=0, column=0, sticky=tk.W)
 
     make_checkbox(
         f, 'force_load_ontop',
@@ -301,14 +292,30 @@ async def init_win_tab(f: ttk.Frame) -> None:
             "Since they don't appear on the taskbar/dock, they can't be "
             "brought to the top easily again."
         ),
+    ).grid(row=0, column=0, sticky='W')
+    make_checkbox(
+        f, 'compact_splash',
+        desc=gettext('Use compact splash screen'),
+        tooltip=gettext(
+            "Use an alternate smaller splash screen, which takes up less screen space."
+        ),
     ).grid(row=0, column=1, sticky='E')
+
+    make_checkbox(
+        f, 'keep_win_inside',
+        desc=gettext('Keep windows inside screen'),
+        tooltip=gettext(
+            'Prevent sub-windows from moving outside the screen borders. '
+            'If you have multiple monitors, disable this.'
+        ),
+    ).grid(row=1, column=0, sticky='W')
 
     ttk.Button(
         f,
         text=gettext('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
         command=lambda: reset_all_win(),
-    ).grid(row=1, column=0, sticky='EW')
+    ).grid(row=1, column=1, sticky='E')
 
 
 async def init_dev_tab(f: ttk.Frame) -> None:
