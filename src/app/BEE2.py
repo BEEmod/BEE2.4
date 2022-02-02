@@ -75,8 +75,8 @@ async def init_app() -> None:
 
     LOGGER.debug('Starting loading screen...')
     loadScreen.main_loader.set_length('UI', 16)
-    loadScreen.set_force_ontop(GEN_OPTS.get_bool('General', 'splash_stay_ontop'))
-    loadScreen.show_main_loader(GEN_OPTS.get_bool('General', 'compact_splash'))
+    loadScreen.set_force_ontop(conf.force_load_ontop)
+    loadScreen.show_main_loader(conf.compact_splash)
 
     # OS X starts behind other windows, fix that.
     if utils.MAC:

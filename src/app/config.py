@@ -455,7 +455,7 @@ class GenOptions(Data):
     play_sounds: bool = True
     keep_win_inside: bool = True
     force_load_ontop: bool = True
-    splash_stay_ontop: bool = True
+    compact_splash: bool = True
 
     # Log window.
     show_log_win: bool = False
@@ -552,6 +552,7 @@ old_gen_opts = {
     'launch_after_export': 'launch_game',
     'dev_mode': 'development_mode',
     'preserve_resources': 'preserve_bee2_resource_dir',
+    'force_load_ontop': 'splash_stay_ontop',
 }
 old_gen_opts_debug = {
     'development_mode',

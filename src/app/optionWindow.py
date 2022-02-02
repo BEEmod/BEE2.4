@@ -86,6 +86,7 @@ async def apply_config(conf: config.GenOptions) -> None:
     """Used to apply the configuration to all windows."""
     logWindow.HANDLER.set_visible(conf.show_log_win)
     loadScreen.set_force_ontop(conf.force_load_ontop)
+    # We don't propagate compact splash, that isn't important after the UI loads.
 
 
 def clear_caches() -> None:
@@ -293,7 +294,7 @@ async def init_win_tab(f: ttk.Frame) -> None:
     keep_inside.grid(row=0, column=0, sticky=tk.W)
 
     make_checkbox(
-        f, 'splash_stay_ontop',
+        f, 'force_load_ontop',
         desc=gettext('Keep loading screens on top'),
         tooltip=gettext(
             "Force loading screens to be on top of other windows. "
