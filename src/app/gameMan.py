@@ -24,7 +24,7 @@ import copy
 import webbrowser
 from atomicwrites import atomic_write
 
-from BEE2_config import ConfigFile, GEN_OPTS
+from BEE2_config import ConfigFile
 from srctools import (
     Vec, VPK, Vec_tuple,
     Property,
@@ -33,7 +33,7 @@ from srctools import (
 )
 import srctools.logger
 import srctools.fgd
-from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE
+from app import backup, config, tk_tools, resource_gen, TK_ROOT, DEV_MODE
 from localisation import gettext
 import loadScreen
 import packages.template_brush
@@ -525,7 +525,7 @@ class Game:
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
-        if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+        if config.get_cur_conf(config.GenOptions).preserve_resources:
             # Skipped always
             return False
 
@@ -826,7 +826,7 @@ class Game:
             self.edit_gameinfo(True)
             export_screen.step('EXP', 'gameinfo')
 
-            if not GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+            if not config.get_cur_conf(config.GenOptions).preserve_resources:
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
@@ -929,7 +929,7 @@ class Game:
         unused ones.
         """
         # If set, force them all to be present.
-        force_on = GEN_OPTS.get_bool('Debug', 'force_all_editor_models')
+        force_on = config.get_cur_conf(config.GenOptions).force_all_editor_models
 
         used_models = {
             str(mdl.with_suffix('')).casefold()
