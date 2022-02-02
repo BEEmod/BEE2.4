@@ -73,9 +73,10 @@ def load() -> None:
 
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
-    res: Dict[str, Any] = {
-        'after_export': AfterExport(AFTER_EXPORT_ACTION.get())
-    }
+    # Preserve options set elsewhere.
+    res = attr.asdict(config.get_cur_conf(config.GenOptions), recurse=False)
+
+    res['after_export'] = AfterExport(AFTER_EXPORT_ACTION.get())
     for name, var in VARS:
         res[name] = var.get()
     config.store_conf(config.GenOptions(**res))
