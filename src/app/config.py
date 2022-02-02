@@ -463,6 +463,7 @@ class GenOptions(Data):
     keep_win_inside: bool = attr.ib(default=True, metadata={'legacy': 'General'})
     force_load_ontop: bool = attr.ib(default=True, metadata={'legacy': 'General:splash_stay_ontop'})
     compact_splash: bool = attr.ib(default=True, metadata={'legacy': 'General'})
+    music_collapsed: bool = attr.ib(default=True, metadata={'legacy': 'Last_Selected'})
 
     # Log window.
     show_log_win: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})

@@ -5,11 +5,11 @@ import tkinter
 
 from srctools import FileSystemChain, FileSystem
 import srctools.logger
+import attr
 
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
-from app import TK_ROOT
-from BEE2_config import GEN_OPTS
+from app import TK_ROOT, config
 from consts import MusicChannel
 from packages import PackagesSet, Music
 from localisation import gettext
@@ -35,7 +35,7 @@ def load_filesystems(systems: Iterable[FileSystem]):
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(music_id: str, *, sel_item: bool=False) -> None:
+def set_suggested(music_id: str) -> None:
     """Set the music ID that is suggested for the base.
 
     If sel_item is true, select the suggested item as well.
@@ -93,7 +93,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
         music_id = '<NONE>'
     # If collapsed, the hidden ones follow the base always.
     if channel is channel.BASE:
-        set_suggested(music_id, sel_item=is_collapsed)
+        set_suggested(music_id)
 
         # If we have an instance, it's "custom" behaviour, and so disable
         # all the subparts.
@@ -107,7 +107,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
                 win.readonly = has_inst
 
 
-async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane) -> SelectorWin:
+async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane) -> None:
     """Generate the UI components, and return the base window."""
 
     def for_channel(channel: MusicChannel) -> List[SelItem]:
@@ -124,7 +124,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
                 music_list.append(selitem)
         return music_list
 
-    base_win = WINDOWS[MusicChannel.BASE] = SelectorWin(
+    WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
         save_id='music_base',
@@ -203,7 +203,8 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         """Configure for the collapsed state."""
         global is_collapsed
         is_collapsed = True
-        GEN_OPTS['Last_Selected']['music_collapsed'] = '1'
+        conf = config.get_cur_conf(config.GenOptions)
+        config.store_conf(attr.evolve(conf, music_collapsed=True))
         base_lbl['text'] = gettext('Music: ')
         toggle_btn_exit()
 
@@ -217,7 +218,8 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         """Configure for the expanded state."""
         global is_collapsed
         is_collapsed = False
-        GEN_OPTS['Last_Selected']['music_collapsed'] = '0'
+        conf = config.get_cur_conf(config.GenOptions)
+        config.store_conf(attr.evolve(conf, music_collapsed=False))
         base_lbl['text'] = gettext('Base: ')
         toggle_btn_exit()
         for wid in exp_widgets:
@@ -259,7 +261,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 
-    if GEN_OPTS.get_bool('Last_Selected', 'music_collapsed', True):
+    if config.get_cur_conf(config.GenOptions).music_collapsed:
         set_collapsed()
     else:
         set_expanded()
