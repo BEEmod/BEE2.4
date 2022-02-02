@@ -3,12 +3,10 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
-import logging
 from enum import Enum
 from typing import (
-    TypeVar, Callable, ClassVar, Generic, Protocol, NewType, cast,
-    List, Optional, Tuple, Type, Dict,
-    Awaitable, Iterator,
+    TypeVar, Callable, Generic, Protocol, NewType, cast,
+    Optional, Type, Dict, Awaitable, Iterator,
 )
 
 import attr
@@ -384,24 +382,23 @@ async def apply_pal_conf(conf: Config) -> None:
 class LastSelected(Data):
     """Used for several general items, specifies the last selected one for restoration."""
     id: Optional[str] = None
-    # For legacy parsing, old to new save IDs.
-    legacy: ClassVar[List[Tuple[str, str]]] = {
-        ('Style', 'styles'),
-        ('Skybox', 'skyboxes'),
-        ('Voice', 'voicelines'),
-        ('Elevator', 'elevators'),
-        ('Music_Base', 'music_base'),
-        ('Music_Tbeam', 'music_tbeam'),
-        ('Music_Bounce', 'music_bounce'),
-        ('Music_Speed', 'music_speed'),
-    }
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'LastSelected']:
         """Parse legacy config data."""
         result = {}
         last_sel = conf.find_key('LastSelected', or_blank=True)
-        for old, new in cls.legacy:
+        # Old -> new save IDs
+        for old, new in [
+            ('Style', 'styles'),
+            ('Skybox', 'skyboxes'),
+            ('Voice', 'voicelines'),
+            ('Elevator', 'elevators'),
+            ('Music_Base', 'music_base'),
+            ('Music_Tbeam', 'music_tbeam'),
+            ('Music_Bounce', 'music_bounce'),
+            ('Music_Speed', 'music_speed'),
+        ]:
             try:
                 result[new] = cls(last_sel[old])
             except LookupError:
