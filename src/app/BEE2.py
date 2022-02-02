@@ -28,13 +28,6 @@ DEFAULT_SETTINGS = {
         'package': 'packages/',
     },
     'General': {
-        'preserve_BEE2_resource_dir': '0',
-        'allow_any_folder_as_game': '0',
-        'play_sounds': '1',
-        'palette_save_settings': '0',
-        'splash_stay_ontop': '1',
-        'compact_splash': '0',
-
         # A token used to indicate the time the current cache/ was extracted.
         # This tells us whether to copy it to the game folder.
         'cache_time': '0',
@@ -50,14 +43,6 @@ DEFAULT_SETTINGS = {
         'log_missing_ent_count': '0',
         # Warn if a file is missing that a packfile refers to
         'log_incorrect_packfile': '0',
-
-        # Determines if additional options are displayed.
-        'development_mode': '0',
-
-        # Show the log window on startup
-        'show_log_win': '0',
-        # The lowest level which will be shown.
-        'window_log_level': 'INFO',
     },
 }
 
