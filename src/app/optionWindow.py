@@ -16,7 +16,7 @@ from app.tooltip import add_tooltip
 
 from app import (
     contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT, config,
-    LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE,
+    LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, BEE2
 )
 from localisation import gettext
 import loadScreen
@@ -190,7 +190,7 @@ async def init_widgets() -> None:
     def ok() -> None:
         """Close and apply changes."""
         save()
-        config.apply_conf(config.GenOptions)
+        BEE2.APP_NURSERY.start_soon(config.apply_conf, config.GenOptions)
         win.withdraw()
 
     def cancel() -> None:
