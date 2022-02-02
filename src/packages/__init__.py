@@ -11,7 +11,7 @@ import attr
 import trio
 
 import srctools
-from app import tkMarkdown, img, lazy_conf, BEE2
+from app import tkMarkdown, img, lazy_conf
 import utils
 import consts
 from app.packageMan import PACK_CONFIG
@@ -558,6 +558,7 @@ async def load_packages(
     ))
 
     # Load either now, or in background.
+    from app.BEE2 import APP_NURSERY  # Prevent circular import
     async with trio.open_nursery() as nursery:
         for obj_class, objs in packset.unparsed.items():
             if obj_class.needs_foreground:
@@ -566,7 +567,7 @@ async def load_packages(
                     packset, obj_class, objs, loader,
                 )
             else:
-                BEE2.APP_NURSERY.start_soon(
+                APP_NURSERY.start_soon(
                     parse_type,
                     packset, obj_class, objs, None,
                 )
