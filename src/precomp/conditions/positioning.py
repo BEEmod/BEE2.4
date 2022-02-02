@@ -1,6 +1,9 @@
 import math
 from typing import Tuple, Dict, Set, Callable
 
+from srctools.vmf import EntityGroup
+
+import utils
 from precomp.conditions import (
     make_flag, make_result, resolve_offset,
     DIRECTIONS,
@@ -109,10 +112,33 @@ def brush_at_loc(
     tile_types: Set[tiling.TileType] = set()
     both_colors = False
 
+    # Place info_targets to mark where we're checking.
+    # These are hidden in a visgroup.
+    if utils.DEV_MODE:
+        try:
+            [visgroup] = [vis for vis in inst.map.vis_tree if vis.name == 'TileAtLoc']
+        except ValueError:
+            visgroup = inst.map.create_visgroup('TileAtLoc')
+        first_trace = inst.map.create_ent('info_target', origin=pos, targetname=inst['targetname'])
+        first_trace.vis_shown = False
+        first_trace.visgroup_ids.add(visgroup.id)
+    else:
+        visgroup = first_trace = None
+
     if 'pos2' in props:
         pos2 = props.vec('pos2')
         pos2.z -= 64  # Subtract so origin is the floor-position
         pos2.localise(origin, angles)
+
+        if visgroup is not None and first_trace is not None:
+            # Place a second for the bounding box, grouped with the first.
+            second_trace = inst.map.create_ent('info_target', origin=pos2, targetname=inst['targetname'])
+            second_trace.vis_shown = False
+            second_trace.visgroup_ids.add(visgroup.id)
+            group = EntityGroup(inst.map)
+            inst.map.groups[group.id] = group
+            first_trace.groups.add(group.id)
+            second_trace.groups.add(group.id)
 
         bbox_min, bbox_max = Vec.bbox(round(pos, 6), round(pos2, 6))
 
@@ -145,6 +171,7 @@ def brush_at_loc(
             tile_type = tiling.TileType.BLACK
     else:
         # Single tile.
+        pos2 = pos
         try:
             tiledef, u, v = tiling.find_tile(pos, norm)
         except KeyError:
@@ -154,6 +181,10 @@ def brush_at_loc(
             if should_remove:
                 tiledef[u, v] = tiling.TileType.VOID
         tile_types.add(tile_type)
+
+    LOGGER.debug('PosIsSolid check {} - {} @ {} = {}', pos, pos2, norm, tile_types)
+    if first_trace is not None:
+        first_trace.comments = 'Tiles: ' + ' '.join([t.name for t in tile_types])
 
     if result_var:
         if tile_type.is_tile:
