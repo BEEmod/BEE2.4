@@ -1,12 +1,14 @@
 import os
 from typing import List
 
-import srctools
-from packages import (
-    PakObject, ParseData, LOGGER, CHECK_PACKFILE_CORRECTNESS,
-    ExportData,
-)
 from srctools import Property
+import srctools.logger
+
+from app import config
+from packages import PakObject, ParseData, ExportData
+
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class PackList(PakObject, allow_mult=True):
@@ -55,7 +57,8 @@ class PackList(PakObject, allow_mult=True):
         if not files:
             raise ValueError('"{}" has no files to pack!'.format(data.id))
 
-        if CHECK_PACKFILE_CORRECTNESS:
+        # Check to see if the zip contains the resources referred to by the packfile.
+        if config.get_cur_conf(config.GenOptions).log_incorrect_packfile:
             # Use normpath so sep differences are ignored, plus case.
             resources = {
                 os.path.normpath(file.path).casefold()
@@ -73,11 +76,7 @@ class PackList(PakObject, allow_mult=True):
                 #  Check to make sure the files exist...
                 file = os.path.join('resources', os.path.normpath(file)).casefold()
                 if file not in resources:
-                    LOGGER.warning(
-                        'Warning: "{file}" not in zip! ({pak_id})',
-                        file=file,
-                        pak_id=data.pak_id,
-                    )
+                    LOGGER.warning('Warning: "{}" not in zip! ({})', file, data.pak_id)
 
         return cls(data.id, files)
 

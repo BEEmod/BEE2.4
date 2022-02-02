@@ -7,14 +7,14 @@ from __future__ import annotations
 import operator
 import re
 import copy
-from typing import NamedTuple, Iterable, Match, cast
+from typing import Iterable, Match, cast
 from pathlib import PurePosixPath as FSPath
 
 import attr
 from srctools import FileSystem, Property, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
 
-from app import tkMarkdown, img, lazy_conf, DEV_MODE
+from app import tkMarkdown, img, lazy_conf, DEV_MODE, config
 from packages import (
     PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
@@ -826,7 +826,7 @@ def parse_item_folder(
             all_icon=all_icon,
         )
 
-        if Item.log_ent_count and not folders[fold].ent_count:
+        if not folders[fold].ent_count and config.get_cur_conf(config.GenOptions).log_missing_ent_count:
             LOGGER.warning(
                 '"{}:{}" has missing entity count!',
                 pak_id,
@@ -889,8 +889,6 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
 
 
 async def assign_styled_items(
-    log_fallbacks: bool,
-    log_missing_styles: bool,
     all_styles: Iterable[Style],
     item: Item,
 ) -> None:
@@ -1021,7 +1019,8 @@ async def assign_styled_items(
                 if base_style.id in styles:
                     # Copy the values for the parent to the child style
                     styles[style.id] = styles[base_style.id]
-                    if log_fallbacks and not item.unstyled:
+                    # If requested, log this.
+                    if not item.unstyled and config.get_cur_conf(config.GenOptions).log_item_fallbacks:
                         LOGGER.warning(
                             'Item "{}" using parent "{}" for "{}"!',
                             item.id, base_style.id, style.id,
@@ -1029,7 +1028,7 @@ async def assign_styled_items(
                     break
             else:
                 # No parent matches!
-                if log_missing_styles and not item.unstyled:
+                if not item.unstyled and config.get_cur_conf(config.GenOptions).log_missing_styles:
                     LOGGER.warning(
                         'Item "{}"{} using inappropriate style for "{}"!',
                         item.id, vers_desc, style.id,

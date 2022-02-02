@@ -86,10 +86,6 @@ async def init_app() -> None:
             packages.LOADED,
             list(BEE2_config.get_package_locs()),
             loader=loadScreen.main_loader,
-            log_item_fallbacks=GEN_OPTS.get_bool('Debug', 'log_item_fallbacks'),
-            log_missing_styles=GEN_OPTS.get_bool('Debug', 'log_missing_styles'),
-            log_missing_ent_count=GEN_OPTS.get_bool('Debug', 'log_missing_ent_count'),
-            log_incorrect_packfile=GEN_OPTS.get_bool('Debug', 'log_incorrect_packfile'),
             has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
             has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
         ))

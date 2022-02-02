@@ -196,9 +196,6 @@ CORRIDOR_COUNTS = {
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'.casefold()
 
-# Check to see if the zip contains the resources referred to by the packfile.
-CHECK_PACKFILE_CORRECTNESS = False
-
 VPK_OVERRIDE_README = """\
 Files in this folder will be written to the VPK during every BEE2 export.
 Use to override resources as you please.
@@ -512,19 +509,10 @@ async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
-    log_item_fallbacks: bool=False,
-    log_missing_styles: bool=False,
-    log_missing_ent_count: bool=False,
-    log_incorrect_packfile: bool=False,
     has_mel_music: bool=False,
     has_tag_music: bool=False,
 ) -> None:
     """Scan and read in all packages."""
-    global CHECK_PACKFILE_CORRECTNESS
-
-    Item.log_ent_count = log_missing_ent_count
-    CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
-
     async with trio.open_nursery() as find_nurs:
         for pak_dir in pak_dirs:
             find_nurs.start_soon(find_packages, find_nurs, packset, pak_dir)
@@ -590,11 +578,7 @@ async def load_packages(
     styles = packset.all_obj(Style)
     async with trio.open_nursery() as nursery:
         for item_to_style in packset.all_obj(Item):
-            nursery.start_soon(
-                assign_styled_items,
-                log_item_fallbacks, log_missing_styles,
-                styles, item_to_style,
-            )
+            nursery.start_soon(assign_styled_items, styles, item_to_style)
 
 
 async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[PakT], loader: Optional[LoadScreen]) -> None:
