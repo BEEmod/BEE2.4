@@ -780,6 +780,7 @@ def run_background(
                     SCREENS[scr_id] = screen
                 elif operation == 'quit_daemon':
                     # Shutdown.
+                    log_pipe_send.send('quit')
                     TK_ROOT.quit()
                     return
                 elif operation == 'set_force_ontop':

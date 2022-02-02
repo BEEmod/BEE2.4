@@ -58,7 +58,14 @@ async def setting_apply() -> None:
     """Monitor and apply setting changes from the log window."""
     while True:
         # TODO: Ideally use a Trio object for this pipe so it doesn't need to thread.
-        cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv)
+        # If cancelled, this is going to continue receiving in an abandoned thread - so the data
+        # is potentially lost. But this should only be cancelled if the app's quitting, so that's
+        # fine.
+        try:
+            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, cancellable=True)
+        except BrokenPipeError:
+            # Pipe failed, we're useless.
+            return
         if cmd == 'level':
             TextHandler.setLevel(HANDLER, param)
             conf = config.get_cur_conf(config.GenOptions)
@@ -66,5 +73,7 @@ async def setting_apply() -> None:
         elif cmd == 'visible':
             conf = config.get_cur_conf(config.GenOptions)
             config.store_conf(attr.evolve(conf, show_log_win=param))
+        elif cmd == 'quit':
+            return
         else:
             raise ValueError(f'Unknown command {cmd}({param})!')
