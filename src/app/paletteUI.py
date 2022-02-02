@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Awaitable, Callable
 from uuid import UUID
 
-from srctools.dmx import Element, Attribute
+from srctools.dmx import Element
 from tkinter import ttk, messagebox
 import tkinter as tk
 
@@ -11,7 +11,6 @@ from srctools import Property
 import srctools.logger
 import attr
 
-import BEE2_config
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
 from app import tk_tools, paletteLoader, config, TK_ROOT, img, BEE2
 from localisation import gettext
@@ -53,7 +52,7 @@ class PaletteState(config.Data):
         )}
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'PaletteState':
+    def parse_kv1(cls, data: Property, version: int) -> PaletteState:
         """Parse Keyvalues data."""
         assert version == 1
         try:
@@ -68,6 +67,18 @@ class PaletteState(config.Data):
             Property('selected', self.selected.hex),
             Property('save_settings', srctools.bool_as_int(self.save_settings)),
         ])
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> PaletteState:
+        """Parse DMX data."""
+        try:
+            uuid = UUID(bytes=data['selected'].val_bytes)
+        except (LookupError, ValueError):
+            uuid = UUID_PORTAL2
+        return PaletteState(
+            uuid,
+            data['save_settings'].val_bool,
+        )
 
     def export_dmx(self) -> Element:
         """Export to a DMX."""
