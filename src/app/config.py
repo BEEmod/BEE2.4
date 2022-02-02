@@ -452,27 +452,30 @@ class AfterExport(Enum):
 @attr.frozen
 class GenOptions(Data):
     """General app config options, mainly booleans. These are all changed in the options window."""
-    # What to do after exporting.
-    after_export: AfterExport = AfterExport.NORMAL
-    launch_after_export: bool = True
+    # The boolean values are handled the same way, using the metadata to record the old legacy names.
+    # If the name has a :, the first is the section and the second is the name.
+    # Otherwise, it's just the section name and the attr name is the same as the option name.
 
-    play_sounds: bool = True
-    keep_win_inside: bool = True
-    force_load_ontop: bool = True
-    compact_splash: bool = True
+    after_export: AfterExport = AfterExport.NORMAL
+    launch_after_export: bool = attr.ib(default=True, metadata={'legacy': 'General:launch_game'})
+
+    play_sounds: bool = attr.ib(default=True, metadata={'legacy': 'General'})
+    keep_win_inside: bool = attr.ib(default=True, metadata={'legacy': 'General'})
+    force_load_ontop: bool = attr.ib(default=True, metadata={'legacy': 'General:splash_stay_ontop'})
+    compact_splash: bool = attr.ib(default=True, metadata={'legacy': 'General'})
 
     # Log window.
-    show_log_win: bool = False
+    show_log_win: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
     log_win_level: str = 'INFO'
 
     # Stuff mainly for devs.
-    preserve_resources: bool = False
-    dev_mode: bool = False
-    log_missing_ent_count: bool = False
-    log_missing_styles: bool = False
-    log_item_fallbacks: bool = False
-    log_incorrect_packfile: bool = False
-    force_all_editor_models: bool = False
+    preserve_resources: bool = attr.ib(default=False, metadata={'legacy': 'General:preserve_bee2_resource_dir'})
+    dev_mode: bool = attr.ib(default=False, metadata={'legacy': 'Debug:development_mode'})
+    log_missing_ent_count: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
+    log_missing_styles: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
+    log_item_fallbacks: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
+    log_incorrect_packfile: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
+    force_all_editor_models: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
@@ -489,12 +492,12 @@ class GenOptions(Data):
             res['after_export'] = AfterExport.NORMAL
 
         for field in gen_opts_bool:
-            old_name = old_gen_opts.get(field.name, field.name)
-            res[field.name] = GEN_OPTS.get_bool(
-                'Debug' if old_name in old_gen_opts_debug else 'General',
-                old_name,
-                field.default
-            )
+            section: str = field.metadata['legacy']
+            try:
+                section, name = section.split(':')
+            except ValueError:
+                name = field.name
+            res[field.name] = GEN_OPTS.get_bool(section, name, field.default)
 
         return {'': GenOptions(**res)}
 
@@ -550,22 +553,7 @@ class GenOptions(Data):
             elem[field.name] = getattr(self, field.name)
         return elem
 
-# We can handle the boolean values uniformly.
-old_gen_opts = {
-    'launch_after_export': 'launch_game',
-    'dev_mode': 'development_mode',
-    'preserve_resources': 'preserve_bee2_resource_dir',
-    'force_load_ontop': 'splash_stay_ontop',
-}
-old_gen_opts_debug = {
-    'development_mode',
-    'force_all_editor_models',
-    'log_incorrect_packfile',
-    'log_item_fallbacks',
-    'log_missing_ent_count',
-    'log_missing_styles',
-    'show_log_win',
-}
+
 gen_opts_bool = [
     field
     for field in attr.fields_dict(GenOptions).values()
