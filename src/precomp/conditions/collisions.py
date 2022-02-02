@@ -23,8 +23,8 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
         - off1, off2: May be repeated in any order, to apply shifts to the positions.
           Each must have a 'dir' and 'dist' value pair. The direction is scaled by the distance,
           then added to the position.
-    - Remove: Remove bounding boxes from this item with the tags specified in the value.
-        Alternatively specify "*" to remove all from this item.
+    - Remove: Remove bounding boxes from this item if they have all the tags specified in this value.
+        Alternatively specify "*" to remove all bounding boxes from this item.
     - TrackPlat: Add a bounding box across the whole of a track platform's movement volume. This
         takes the same parameters as BBox, but the orientation is relative to the tracks not the
         platform. The volume is placed relative to each track end instance, then those are combined
@@ -74,7 +74,9 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
             else:
                 tags = frozenset(map(str.casefold, inst.fixup.substitute(prop.value).split()))
                 for bbox in coll.collisions_for_item(name):
-                    if bbox.tags & tags:
+                    # Require all remove tags to match before removing.
+                    # Users can use multiple for OR.
+                    if tags.issubset(bbox.tags):
                         coll.remove_bbox(bbox)
         elif prop.name in ('bbox', 'trackplat'):
             pos1 = Vec.from_str(inst.fixup.substitute(prop['pos1']), -64, -64, -64)
