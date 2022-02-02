@@ -11,7 +11,7 @@ from typing import Iterable, Match, cast
 from pathlib import PurePosixPath as FSPath
 
 import attr
-from srctools import FileSystem, Property, VMF, logger
+from srctools import FileSystem, Property, VMF, Vec, logger
 from srctools.tokenizer import Tokenizer, Token
 
 from app import tkMarkdown, img, lazy_conf, DEV_MODE, config
@@ -22,6 +22,7 @@ from packages import (
 from editoritems import Item as EditorItem, InstCount
 from connections import Config as ConnConfig
 import editoritems_vmf
+import collisions
 import utils
 
 
@@ -280,13 +281,40 @@ class ItemVariant:
                     )
                 self.icons[item.name] = bee2_icon
             elif pal_icon is not None:
-                # If a previous BEE icon was present, remove so we use the VTF.
+                # If a previous BEE icon was present, remove it so we use the VTF.
                 self.icons.pop(item.name, None)
 
             if pal_name is not None:
                 subtype.pal_name = pal_name
             if pal_icon is not None:
                 subtype.pal_icon = pal_icon
+
+        if 'Collisions' in props:
+            # Adjust collisions.
+            if len(editor) != 1:
+                raise ValueError(
+                    'Cannot specify instances for multiple '
+                    f'editoritems blocks in {source}!'
+                )
+            editor[0].collisions = editor[0].collisions.copy()
+            for coll_prop in props.find_children('Collisions'):
+                if coll_prop.name == 'remove':
+                    if coll_prop.value == '*':
+                        editor[0].collisions.clear()
+                    else:
+                        tags = frozenset(map(str.casefold, coll_prop.value.split()))
+                        editor[0].collisions = [
+                            coll for coll in editor[0].collisions
+                            if not tags.issubset(coll.tags)
+                        ]
+                elif coll_prop.name == 'bbox':
+                    editor[0].collisions.append(collisions.BBox(
+                        coll_prop.vec('pos1'), coll_prop.vec('pos2'),
+                        tags=frozenset(map(str.casefold, coll_prop['tags', ''].split())),
+                        contents=collisions.CollideType.parse(coll_prop['type', 'SOLID']),
+                    ))
+                else:
+                    raise ValueError(f'Unknown collision type "{coll_prop.real_name}" in {source}')
 
         if 'Instances' in props:
             if len(editor) != 1:
