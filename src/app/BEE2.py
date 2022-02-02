@@ -69,9 +69,9 @@ async def init_app() -> None:
     config.read_settings()
     conf = config.get_cur_conf(config.GenOptions)
 
-    # Special case, load in this early so it applies.
-    utils.DEV_MODE = GEN_OPTS.get_bool('Debug', 'development_mode')
-    DEV_MODE.set(utils.DEV_MODE)
+    # Special case, load in this early, so it applies.
+    utils.DEV_MODE = conf.dev_mode
+    DEV_MODE.set(conf.dev_mode)
 
     LOGGER.debug('Starting loading screen...')
     loadScreen.main_loader.set_length('UI', 16)
