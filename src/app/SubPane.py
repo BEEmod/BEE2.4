@@ -3,10 +3,7 @@ from typing import Callable, Any, Union
 import tkinter as tk
 from tkinter import ttk
 
-import srctools
-
-from BEE2_config import GEN_OPTS
-from app import tooltip, tk_tools
+from app import tooltip, tk_tools, config
 from app.img import Handle as ImgHandle, apply as apply_img
 from localisation import gettext
 import utils
@@ -18,17 +15,10 @@ from app import sound
 # icons too much. This retracts the padding so they are more square
 # around the images instead of wasting space.
 style = ttk.Style()
-style.configure(
-    'Toolbar.TButton',
-    padding='-20',
-)
+style.configure('Toolbar.TButton', padding='-20',)
 
 
-def make_tool_button(
-    frame: tk.Misc,
-    img: str,
-    command: Callable[[], Any]
-) -> ttk.Button:
+def make_tool_button(frame: tk.Misc, img: str, command: Callable[[], Any]) -> ttk.Button:
     """Make a toolbar icon."""
     button = ttk.Button(
         frame,
@@ -156,12 +146,7 @@ class SubPane(tk.Toplevel):
             y = self.winfo_y()
 
         x, y = tk_tools.adjust_inside_screen(x, y, win=self)
-        self.geometry('{!s}x{!s}+{!s}+{!s}'.format(
-            max(10, width),
-            max(10, height),
-            x,
-            y,
-        ))
+        self.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{x!s}+{y!s}')
 
         self.relX = x - self.parent.winfo_x()
         self.relY = y - self.parent.winfo_y()
@@ -194,42 +179,35 @@ class SubPane(tk.Toplevel):
 
     def save_conf(self) -> None:
         """Write configuration to the config file."""
-        if not self.can_save:
-            return
-        opt_block = GEN_OPTS['win_state']
-        opt_block[self.win_name + '_visible'] = srctools.bool_as_int(self.visible.get())
-        opt_block[self.win_name + '_x'] = str(self.relX)
-        opt_block[self.win_name + '_y'] = str(self.relY)
-        if self.can_resize_x:
-            opt_block[self.win_name + '_width'] = str(self.winfo_width())
-        if self.can_resize_y:
-            opt_block[self.win_name + '_height'] = str(self.winfo_height())
+        if self.can_save:
+            config.store_conf(config.WindowState(
+                visible=self.visible.get(),
+                x=self.relX,
+                y=self.relY,
+                width=self.winfo_width() if self.can_resize_x else -1,
+                height=self.winfo_height() if self.can_resize_y else -1,
+            ), self.win_name)
 
     def load_conf(self) -> None:
         """Load configuration from our config file."""
         try:
-            if self.can_resize_x:
-                width = int(GEN_OPTS['win_state'][self.win_name + '_width'])
-            else:
-                width = self.winfo_reqwidth()
-            if self.can_resize_y:
-                height = int(GEN_OPTS['win_state'][self.win_name + '_height'])
-            else:
-                height = self.winfo_reqheight()
+            state = config.get_cur_conf(config.WindowState, self.win_name)
+        except KeyError:
+            pass  # No configured state.
+        else:
+            width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
+            height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
             self.deiconify()
 
-            self.geometry('{!s}x{!s}'.format(width, height))
+            self.geometry(f'{width}x{height}')
             self.sizefrom('user')
 
-            self.relX = int(GEN_OPTS['win_state'][self.win_name + '_x'])
-            self.relY = int(GEN_OPTS['win_state'][self.win_name + '_y'])
+            self.relX, self.relY = state.x, state.y
 
             self.follow_main()
             self.positionfrom('user')
-        except (ValueError, KeyError):
-            pass
-        if not GEN_OPTS.get_bool('win_state', self.win_name + '_visible', True):
-            self.after(150, self.hide_win)
+            if not state.visible:
+                self.after(150, self.hide_win)
 
         # Prevent this until here, so the <config> event won't erase our
         #  settings

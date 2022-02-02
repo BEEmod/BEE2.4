@@ -217,8 +217,12 @@ def store_conf(data: DataT, data_id: str='') -> None:
     info: ConfType[DataT] = _TYPE_TO_TYPE[type(data)]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-    _CUR_CONFIG.setdefault(info, {})[data_id] = data
+    if type(data) is not WindowState:  # This is really spammy.
+        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
+    try:
+        _CUR_CONFIG[info][data_id] = data
+    except KeyError:
+        _CUR_CONFIG[info] = {data_id: data}
 
 
 def parse_conf(props: Property) -> Config:
@@ -546,7 +550,6 @@ class GenOptions(Data):
             elem[field.name] = getattr(self, field.name)
         return elem
 
-
 # We can handle the boolean values uniformly.
 old_gen_opts = {
     'launch_after_export': 'launch_game',
@@ -568,3 +571,85 @@ gen_opts_bool = [
     for field in attr.fields_dict(GenOptions).values()
     if field.default in (True, False)
 ]
+
+
+@register('PaneState', uses_id=True)
+@attr.frozen
+class WindowState(Data):
+    """Holds the position and size of windows."""
+    x: int
+    y: int
+    width: int
+    height: int
+    visible: bool
+
+    @classmethod
+    def parse_legacy(cls, conf: Property) -> Dict[str, 'WindowState']:
+        """Convert old GEN_OPTS configuration."""
+        opt_block = GEN_OPTS['win_state']
+        names: set[str] = set()
+        for name in opt_block.keys():
+            try:
+                name, _ = name.rsplit('_', 1)
+            except ValueError:
+                continue
+            names.add(name)
+        return {
+            name: WindowState(
+                x=GEN_OPTS.getint('win_state', name + '_x', -1),
+                y=GEN_OPTS.getint('win_state', name + '_y', -1),
+                width=GEN_OPTS.getint('win_state', name + '_width', -1),
+                height=GEN_OPTS.getint('win_state', name + '_height', -1),
+                visible=GEN_OPTS.getboolean('win_state', name + '_visible', True)
+            )
+            for name in names
+        }
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'WindowState':
+        """Parse keyvalues1 data."""
+        return WindowState(
+            data.int('x', -1),
+            data.int('y', -1),
+            data.int('width', -1),
+            data.int('height', -1),
+            data.bool('visible', True),
+        )
+
+    def export_kv1(self) -> Property:
+        """Create keyvalues1 data."""
+        prop = Property('', [
+            Property('visible', '1' if self.visible else '0'),
+            Property('x', str(self.x)),
+            Property('y', str(self.y)),
+        ])
+        if self.width >= 0:
+            prop['width'] = str(self.width)
+        if self.height >= 0:
+            prop['height'] = str(self.height)
+        return prop
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'WindowState':
+        """Parse DMX configuation."""
+        pos = data['pos'].val_vec2
+        width = data['width'].val_int if 'width' in data else -1
+        height = data['height'].val_int if 'height' in data else -1
+        return WindowState(
+            x=int(pos.x),
+            y=int(pos.y),
+            width=width,
+            height=height,
+            visible=data['visible'].val_bool,
+        )
+
+    def export_dmx(self) -> Element:
+        """Create DMX configuation."""
+        elem = Element('', '')
+        elem['visible'] = self.visible
+        elem['pos'] = (self.x, self.y)
+        if self.width >= 0:
+            elem['width'] = self.width
+        if self.height >= 0:
+            elem['height'] = self.height
+        return elem
