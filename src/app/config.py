@@ -448,7 +448,7 @@ class AfterExport(Enum):
     QUIT = 2  # Quit the app.
 
 
-@register('Options')
+@register('Options', palette_stores=False)
 @attr.frozen
 class GenOptions(Data):
     """General app config options, mainly booleans. These are all changed in the options window."""
@@ -573,7 +573,7 @@ gen_opts_bool = [
 ]
 
 
-@register('PaneState', uses_id=True)
+@register('PaneState', uses_id=True, palette_stores=False)
 @attr.frozen
 class WindowState(Data):
     """Holds the position and size of windows."""
