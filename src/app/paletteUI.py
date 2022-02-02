@@ -43,13 +43,13 @@ class PaletteState(config.Data):
         """Convert the legacy config options to the new format."""
         # These are all in the GEN_OPTS config.
         try:
-            selected_uuid = UUID(hex=BEE2_config.GEN_OPTS.get_val('Last_Selected', 'palette_uuid', ''))
+            selected_uuid = UUID(hex=config.LEGACY_CONF.get_val('Last_Selected', 'palette_uuid', ''))
         except ValueError:
             selected_uuid = UUID_PORTAL2
 
         return {'': cls(
             selected_uuid,
-            BEE2_config.GEN_OPTS.get_bool('General', 'palette_save_settings'),
+            config.LEGACY_CONF.get_bool('General', 'palette_save_settings'),
         )}
 
     @classmethod

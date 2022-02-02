@@ -16,7 +16,7 @@ from srctools import KeyValError, Property, logger
 from srctools.dmx import Element
 
 import utils
-from BEE2_config import GEN_OPTS
+from BEE2_config import GEN_OPTS as LEGACY_CONF
 
 
 LOGGER = logger.get_logger(__name__)
@@ -480,10 +480,10 @@ class GenOptions(Data):
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
         res = {
-            'log_win_level': GEN_OPTS['Debug']['window_log_level']
+            'log_win_level': LEGACY_CONF['Debug']['window_log_level']
         }
         try:
-            res['after_export'] = AfterExport(GEN_OPTS.get_int(
+            res['after_export'] = AfterExport(LEGACY_CONF.get_int(
                 'General', 'after_export_action',
                 0,
             ))
@@ -496,7 +496,7 @@ class GenOptions(Data):
                 section, name = section.split(':')
             except ValueError:
                 name = field.name
-            res[field.name] = GEN_OPTS.get_bool(section, name, field.default)
+            res[field.name] = LEGACY_CONF.get_bool(section, name, field.default)
 
         return {'': GenOptions(**res)}
 
@@ -573,7 +573,7 @@ class WindowState(Data):
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'WindowState']:
         """Convert old GEN_OPTS configuration."""
-        opt_block = GEN_OPTS['win_state']
+        opt_block = LEGACY_CONF['win_state']
         names: set[str] = set()
         for name in opt_block.keys():
             try:
@@ -583,11 +583,11 @@ class WindowState(Data):
             names.add(name)
         return {
             name: WindowState(
-                x=GEN_OPTS.getint('win_state', name + '_x', -1),
-                y=GEN_OPTS.getint('win_state', name + '_y', -1),
-                width=GEN_OPTS.getint('win_state', name + '_width', -1),
-                height=GEN_OPTS.getint('win_state', name + '_height', -1),
-                visible=GEN_OPTS.getboolean('win_state', name + '_visible', True)
+                x=LEGACY_CONF.getint('win_state', name + '_x', -1),
+                y=LEGACY_CONF.getint('win_state', name + '_y', -1),
+                width=LEGACY_CONF.getint('win_state', name + '_width', -1),
+                height=LEGACY_CONF.getint('win_state', name + '_height', -1),
+                visible=LEGACY_CONF.getboolean('win_state', name + '_visible', True)
             )
             for name in names
         }
