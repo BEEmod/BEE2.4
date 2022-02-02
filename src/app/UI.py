@@ -1370,7 +1370,7 @@ def set_game(game: 'gameMan.Game') -> None:
     This updates the title bar to match, and saves it into the config.
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
-    GEN_OPTS['Last_Selected']['game'] = game.name
+    config.store_conf(config.LastSelected(game.name), 'game')
     text = gettext('Export to "{}"...').format(game.name)
 
     if game.cache_invalid():

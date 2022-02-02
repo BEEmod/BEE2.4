@@ -34,16 +34,6 @@ DEFAULT_SETTINGS = {
         # We need this value to detect just removing a package.
         'cache_pack_count': '0',
     },
-    'Debug': {
-        # Log whenever items fallback to the parent style
-        'log_item_fallbacks': '0',
-        # Print message for items that have no match for a style
-        'log_missing_styles': '0',
-        # Print message for items that are missing ent_count values
-        'log_missing_ent_count': '0',
-        # Warn if a file is missing that a packfile refers to
-        'log_incorrect_packfile': '0',
-    },
 }
 
 
@@ -74,9 +64,12 @@ async def init_app() -> None:
     LOGGER.debug('Loading settings...')
 
     gameMan.load()
-    gameMan.set_game_by_name(
-        GEN_OPTS.get_val('Last_Selected', 'Game', ''),
-        )
+    try:
+        last_game = config.get_cur_conf(config.LastSelected, 'game')
+    except KeyError:
+        pass
+    else:
+        gameMan.set_game_by_name(last_game.id)
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')

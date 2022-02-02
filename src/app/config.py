@@ -390,6 +390,7 @@ class LastSelected(Data):
         last_sel = conf.find_key('LastSelected', or_blank=True)
         # Old -> new save IDs
         for old, new in [
+            ('Game', 'game'),
             ('Style', 'styles'),
             ('Skybox', 'skyboxes'),
             ('Voice', 'voicelines'),
