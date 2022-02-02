@@ -579,9 +579,9 @@ class WindowState(Data):
     """Holds the position and size of windows."""
     x: int
     y: int
-    width: int
-    height: int
-    visible: bool
+    width: int = -1
+    height: int = -1
+    visible: bool = True
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'WindowState']:

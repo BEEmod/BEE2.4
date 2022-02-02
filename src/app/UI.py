@@ -428,8 +428,10 @@ def quit_application() -> None:
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
     if TK_ROOT.winfo_viewable():
-        GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
-        GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
+        config.store_conf(config.WindowState(
+            x=TK_ROOT.winfo_rootx(),
+            y=TK_ROOT.winfo_rooty(),
+        ), 'main_window')
 
     try:
         config.write_settings()
@@ -1683,24 +1685,21 @@ async def init_windows() -> None:
 
     # Position windows according to remembered settings:
     try:
-        start_x = int(GEN_OPTS['win_state']['main_window_x'])
-        start_y = int(GEN_OPTS['win_state']['main_window_y'])
-    except (ValueError, KeyError):
+        main_win_state = config.get_cur_conf(config.WindowState, 'main_window')
+    except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
         if TK_ROOT.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50:
             TK_ROOT.geometry(
-                '+' + str(windows['pal'].winfo_reqwidth() + 50) +
-                '+' + str(TK_ROOT.winfo_rooty())
-                )
+                f'+{windows["pal"].winfo_reqwidth() + 50}+{TK_ROOT.winfo_rooty()}'
+            )
         else:
             TK_ROOT.geometry(f'{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
     else:
         start_x, start_y = tk_tools.adjust_inside_screen(
-            start_x,
-            start_y,
+            main_win_state.x, main_win_state.y,
             win=TK_ROOT,
-            )
+        )
         TK_ROOT.geometry(f'+{start_x}+{start_y}')
     TK_ROOT.update_idletasks()
 
