@@ -10,7 +10,6 @@ from typing import Any, List, Tuple, Dict
 import attr
 import srctools.logger
 
-from BEE2_config import GEN_OPTS
 from app.config import AfterExport
 from app.tooltip import add_tooltip
 
@@ -94,8 +93,6 @@ def clear_caches() -> None:
 
      This will force package resources to be extracted again.
      """
-    import packages
-
     message = gettext(
         'Package cache times have been reset. '
         'These will now be extracted during the next export.'
@@ -104,22 +101,16 @@ def clear_caches() -> None:
     for game in gameMan.all_games:
         game.mod_times.clear()
         game.save()
-    GEN_OPTS['General']['cache_time'] = '0'
-
-    for pack_id in packages.LOADED.packages:
-        packages.PACK_CONFIG[pack_id]['ModTime'] = '0'
 
     # This needs to be disabled, since otherwise we won't actually export
     # anything...
-    if PRESERVE_RESOURCES.get():
-        PRESERVE_RESOURCES.set(False)
+    conf = config.get_cur_conf(config.GenOptions)
+    if conf.preserve_resources:
+        config.store_conf(attr.evolve(conf, preserve_resources=False))
         message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
 
-    save()  # Save any option changes.
-
     gameMan.CONFIG.save_check()
-    GEN_OPTS.save_check()
-    packages.PACK_CONFIG.save_check()
+    config.write_settings()
 
     # Since we've saved, dismiss this window.
     win.withdraw()
