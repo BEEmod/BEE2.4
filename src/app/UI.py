@@ -698,6 +698,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
     UI['pal_export'].state(('disabled',))
     menus['file'].entryconfigure(menus['file'].export_btn_index, state='disabled')
     TK_ROOT.update_idletasks()
+    conf = config.get_cur_conf(config.GenOptions)
     try:
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
@@ -737,11 +738,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
 
                 # The others don't have one, so it defaults to None.
             },
-            should_refresh=not GEN_OPTS.get_bool(
-                'General',
-                'preserve_BEE2_resource_dir',
-                False,
-            )
+            should_refresh=not conf.preserve_resources,
         )
 
         if not success:
@@ -773,8 +770,6 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
                 '\n\nWarning: VPK files were not exported, quit Portal 2 and '
                 'Hammer to ensure editor wall previews are changed.'
             )
-
-        conf = config.get_cur_conf(config.GenOptions)
 
         if conf.launch_after_export or conf.after_export is not config.AfterExport.NORMAL:
             do_action = messagebox.askyesno(
