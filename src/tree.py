@@ -1,8 +1,8 @@
 """Wraps the Rtree package, adding typing and usage of our Vec class."""
 from srctools.math import Vec
-from typing import Generic, TypeVar, Iterator, List, Tuple, Union
+from typing import Generic, TypeVar, Iterator, List, Tuple
 
-import attr
+import attrs
 from rtree import index  # type: ignore
 
 ValueT = TypeVar('ValueT')
@@ -10,7 +10,7 @@ PROPS = index.Property()
 PROPS.dimension = 3
 
 
-@attr.frozen
+@attrs.frozen
 class ValueHolder(Generic[ValueT]):
     """Holds the list of values."""
     values: List[ValueT]

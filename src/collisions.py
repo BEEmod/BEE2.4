@@ -5,7 +5,7 @@ import operator
 from enum import Flag, auto as enum_auto
 from typing import Iterable, Iterator, Sequence, overload
 
-import attr
+import attrs
 import functools
 
 from srctools import Entity, Side, VMF, conv_bool, logger
@@ -17,7 +17,7 @@ import consts
 LOGGER = logger.get_logger(__name__)
 
 
-@attr.define
+@attrs.define
 class NonBBoxError(ValueError):
     """Raised to indicate a bbox is a line or point, not a plane or bounding box."""
     min_x: int
@@ -83,7 +83,7 @@ EXPORT_KVALUES: Sequence[CollideType] = [
 ]
 
 
-@attr.frozen(init=False)
+@attrs.frozen(init=False)
 class BBox:
     """An axis aligned volume for collision.
 

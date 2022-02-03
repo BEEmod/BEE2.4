@@ -16,7 +16,7 @@ from typing import (
     Optional, Generic, Callable, List, Awaitable,
 )
 
-import attr
+import attrs
 import trio
 
 __all__ = ['EventManager', 'APP_EVENTS', 'ValueChange', 'ObsValue']
@@ -183,7 +183,7 @@ class EventManager:
 APP_EVENTS = EventManager()
 
 
-@attr.frozen
+@attrs.frozen
 class ValueChange(Generic[ValueT]):
     """The event which is fired when a value changes."""
     old: ValueT
