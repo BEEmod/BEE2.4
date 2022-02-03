@@ -3,8 +3,7 @@
 from __future__ import annotations
 from collections.abc import Iterator, Iterable
 
-import attr
-
+import attrs
 from srctools import Vec, Property, Entity, VMF, Solid, Matrix, Angle
 import srctools.logger
 
@@ -24,7 +23,7 @@ PUSH_TRIGS: dict[tuple[float, float, float], Entity] = {}
 VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
 
 
-@attr.define
+@attrs.define
 class Config:
     """Configuration for a vactube item set."""
     inst_corner: list[str]
@@ -41,21 +40,21 @@ class Config:
     # For straight instances, a size (multiple of 128) -> instance.
     inst_straight: dict[int, str]
     # And those sizes from large to small.
-    inst_straight_sizes: list[int] = attr.ib(init=False)
+    inst_straight_sizes: list[int] = attrs.field(init=False)
     @inst_straight_sizes.default
     def _straight_size(self) -> list[int]:
         return sorted(self.inst_straight.keys(), reverse=True)
 
 
-@attr.define
+@attrs.define
 class Marker:
     """A single node point."""
-    ent: Entity = attr.ib(on_setattr=attr.setters.frozen)
+    ent: Entity = attrs.field(on_setattr=attrs.setters.frozen)
     conf: Config
     size: int
     no_prev: bool = True
     next: str | None = None
-    orient: Matrix = attr.ib(init=False, on_setattr=attr.setters.frozen)
+    orient: Matrix = attrs.field(init=False, on_setattr=attrs.setters.frozen)
 
     # noinspection PyUnresolvedReferences
     @orient.default

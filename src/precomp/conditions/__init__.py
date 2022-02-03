@@ -41,17 +41,17 @@ from decimal import Decimal
 from enum import Enum
 from typing import Generic, TypeVar, Any, Callable, TextIO
 
-import attr
-
-from precomp import instanceLocs, rand, collisions
-import consts
+import attrs
 import srctools.logger
-import utils
 from srctools import (
     Property,
     Vec_tuple, Vec,
     VMF, Entity, Output, Solid, Angle, Matrix,
 )
+
+from precomp import instanceLocs, rand, collisions
+import consts
+import utils
 
 
 COND_MOD_NAME = 'Main Conditions'
@@ -181,12 +181,12 @@ class Unsatisfiable(Exception):
 RES_EXHAUSTED = object()
 
 
-@attr.define
+@attrs.define
 class Condition:
     """A single condition which may be evaluated."""
-    flags: list[Property] = attr.Factory(list)
-    results: list[Property] = attr.Factory(list)
-    else_results: list[Property] = attr.Factory(list)
+    flags: list[Property] = attrs.Factory(list)
+    results: list[Property] = attrs.Factory(list)
+    else_results: list[Property] = attrs.Factory(list)
     priority: Decimal = Decimal()
     source: str = None
 

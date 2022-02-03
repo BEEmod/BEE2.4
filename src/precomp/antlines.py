@@ -5,8 +5,7 @@ from collections.abc import Iterator
 from enum import Enum
 import math
 
-import attr
-
+import attrs
 from srctools import Vec, Angle, Matrix, Property, conv_float, logger
 from srctools.vmf import VMF, overlay_bounds, make_overlay
 
@@ -23,7 +22,7 @@ class SegType(Enum):
     CORNER = 1
 
 
-@attr.define
+@attrs.define
 class AntTex:
     """Represents a single texture, and the parameters it has."""
     texture: str
@@ -67,7 +66,7 @@ class AntTex:
         return AntTex(tex, scale, static)
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class AntType:
     """Defines the style of antline to use.
 
@@ -76,11 +75,11 @@ class AntType:
 
     Corners can be omitted, if corner/straight antlines are the same.
     """
-    tex_straight: list[AntTex] = attr.ib()
-    tex_corner: list[AntTex] = attr.ib()
+    tex_straight: list[AntTex]
+    tex_corner: list[AntTex]
 
-    broken_straight: list[AntTex] = attr.ib()
-    broken_corner: list[AntTex] = attr.ib()
+    broken_straight: list[AntTex]
+    broken_corner: list[AntTex]
     broken_chance: float
 
     @classmethod
@@ -131,7 +130,7 @@ class AntType:
         )
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Segment:
     """A single section of an antline - a straight section or corner.
 
@@ -142,7 +141,7 @@ class Segment:
     start: Vec
     end: Vec
     # The brushes this segment is attached to.
-    tiles: set[tiling.TileDef] = attr.ib(factory=set)
+    tiles: set[tiling.TileDef] = attrs.Factory(set)
 
     @property
     def on_floor(self) -> bool:
@@ -179,7 +178,7 @@ class Segment:
             yield run_start, self.end, last_type
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Antline:
     """A complete antline."""
     name: str

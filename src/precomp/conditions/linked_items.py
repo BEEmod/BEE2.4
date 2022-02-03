@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Optional, Callable
 from enum import Enum
 import math
-import attr
 
+import attrs
 from srctools import Property, VMF, Entity
 import srctools.logger
 
@@ -22,7 +22,7 @@ class AntlineHandling(Enum):
     MOVE = 'move'
 
 
-@attr.define
+@attrs.define
 class Config:
     """Configuration for linked items."""
     group: str  # For reporting.

@@ -1,7 +1,7 @@
 """Records the collisions for each item."""
 from typing import Dict, List
 
-import attr
+import attrs
 from srctools import Angle, Entity, Matrix, VMF, Vec
 from srctools.vmf import EntityGroup
 
@@ -10,13 +10,13 @@ from editoritems import Item
 from tree import RTree
 
 
-@attr.define
+@attrs.define
 class Collisions:
     """All the collisions for items in the map."""
     # Bounding box -> items with that bounding box.
-    _by_bbox: RTree[BBox] = attr.ib(factory=RTree, repr=False, eq=False)
+    _by_bbox: RTree[BBox] = attrs.field(factory=RTree, repr=False, eq=False)
     # Item names -> bounding boxes of that item
-    _by_name: Dict[str, List[BBox]] = attr.Factory(dict)
+    _by_name: Dict[str, List[BBox]] = attrs.Factory(dict)
 
     def add(self, bbox: BBox) -> None:
         """Add the given bounding box to the map."""

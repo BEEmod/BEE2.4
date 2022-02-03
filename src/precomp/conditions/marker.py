@@ -1,18 +1,18 @@
 """Conditions that read/write a set of positional markers."""
 from __future__ import annotations
 
-import attr
-
-from precomp.conditions import make_flag, make_result
+import attrs
 from srctools import Property, Entity, Vec, Matrix, Angle
 import srctools.logger
+
+from precomp.conditions import make_flag, make_result
 
 # TODO: switch to R-tree etc.
 MARKERS: list[Marker] = []
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-@attr.define
+@attrs.define
 class Marker:
     """A marker placed in the map."""
     pos: Vec

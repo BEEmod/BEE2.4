@@ -2,11 +2,10 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import Iterator, Callable
-
-import itertools
 from enum import Enum
-import attr
+import itertools
 
+import attrs
 import srctools.logger
 import srctools.vmf
 from srctools.vmf import VMF, Solid, Entity, Side, Output
@@ -87,14 +86,14 @@ class FizzInst(Enum):
     BASE = 'base_inst'  # If set, swap the instance to this.
 
 
-@attr.frozen
+@attrs.frozen
 class MatModify:
     """Data for injected material modify controls."""
     name: str
     mat_var: str
 
 
-@attr.frozen
+@attrs.frozen
 class FizzBeam:
     """Configuration for env_beams added across fizzlers."""
     offset: list[Vec]

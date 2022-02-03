@@ -2,8 +2,7 @@
 from typing import List, MutableMapping, Optional, Dict, Set
 from weakref import WeakKeyDictionary
 
-import attr
-
+import attrs
 from srctools import Entity, VMF
 import srctools.logger
 
@@ -139,12 +138,12 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
 }
 
 
-@attr.define
+@attrs.define
 class TraitInfo:
     """The info associated for each instance."""
     item_class: ItemClass = ItemClass.UNCLASSED
     item_id: Optional[str] = None
-    traits: Set[str] = attr.ib(factory=set)
+    traits: Set[str] = attrs.Factory(set)
 
 # Maps entities to their traits.
 ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()

@@ -14,8 +14,8 @@ import math
 from enum import Enum
 from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
-import attr
 
+import attrs
 from srctools import Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
@@ -421,7 +421,7 @@ def _make_patterns() -> None:
 _make_patterns()
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Panel:
     # noinspection PyUnresolvedReferences
     """Represents a potentially dynamic specially positioned part of a tile.
@@ -450,9 +450,9 @@ class Panel:
     inst: Entity
     pan_type: PanelType
     thickness: int
-    bevels: set[tuple[int, int]] = attr.ib(converter=set)
+    bevels: set[tuple[int, int]] = attrs.field(converter=set)
 
-    points: set[tuple[int, int]] = attr.ib(factory={
+    points: set[tuple[int, int]] = attrs.Factory({
         (x, y)
         for x in range(4)
         for y in range(4)
@@ -461,7 +461,7 @@ class Panel:
     nodraw: bool = False
     seal: bool  = False
     steals_bullseye: bool = False
-    offset: Vec = attr.ib(factory=Vec)
+    offset: Vec = attrs.Factory(Vec)
 
     def same_item(self, inst: Entity) -> bool:
         """Check if the two instances come from the same item.
@@ -2180,7 +2180,7 @@ def generate_brushes(vmf: VMF) -> None:
             over.remove()
 
 
-@attr.define(frozen=False)
+@attrs.define(frozen=False)
 class Tideline:
     """Temporary data used to hold the in-progress tideline overlays."""
     over: Entity

@@ -4,7 +4,7 @@ import abc
 from enum import Enum
 from pathlib import Path
 
-import attr
+import attrs
 
 import srctools.logger
 from precomp import rand
@@ -848,7 +848,7 @@ class GenRandom(Generator):
         return rand.seed(b'tex_rand', loc).choice(self.textures[tex_name])
 
 
-@attr.define
+@attrs.define
 class Clump:
     """Represents a region of map, used to create rectangular sections with the same pattern."""
     x1: float

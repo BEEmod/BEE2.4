@@ -5,34 +5,34 @@ This includes Unstationary Scaffolds and Vactubes.
 from __future__ import annotations
 from typing import Optional, Iterator, TypeVar, Generic, Iterable
 
-import attr
+from srctools import Entity, Matrix, Angle, Vec
+import attrs
 
 from precomp import connections
-from srctools import Entity, VMF, Matrix, Angle, Vec
 from precomp.connections import Item
 
 __all__ = ['Node', 'chain']
 ConfT = TypeVar('ConfT')
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Node(Generic[ConfT]):
     """Represents a single node in the chain."""
-    item: Item = attr.ib(init=True)
-    conf: ConfT = attr.ib(init=True)
+    item: Item = attrs.field(init=True)
+    conf: ConfT = attrs.field(init=True)
 
     # Origin and angles of the instance.
-    pos = attr.ib(init=False, default=attr.Factory(
+    pos = attrs.field(init=False, default=attrs.Factory(
         lambda self: Vec.from_str(self.item.inst['origin']), takes_self=True,
     ))
-    orient = attr.ib(init=False, default=attr.Factory(
+    orient = attrs.field(init=False, default=attrs.Factory(
         lambda self: Matrix.from_angle(Angle.from_str(self.item.inst['angles'])),
         takes_self=True,
     ))
 
     # The links between nodes
-    prev: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
-    next: Optional[Node[ConfT]] = attr.ib(default=None, init=False)
+    prev: Optional[Node[ConfT]] = attrs.field(default=None, init=False)
+    next: Optional[Node[ConfT]] = attrs.field(default=None, init=False)
 
     @property
     def inst(self) -> Entity:

@@ -9,8 +9,8 @@ from typing import Union, Optional, Tuple, Mapping, Iterable, Iterator
 from decimal import Decimal
 from enum import Enum
 from operator import attrgetter
-import attr
 
+import attrs
 from srctools import Property
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import Vec, Angle, Matrix, to_matrix
@@ -66,7 +66,7 @@ class AfterPickMode(Enum):
     NODRAW = '2'  # Convert to nodraw.
 
 
-@attr.define
+@attrs.define
 class UnparsedTemplate:
     """Holds the location of a template that hasn't been parsed yet."""
     id: str
@@ -74,13 +74,13 @@ class UnparsedTemplate:
     path: str
 
 
-@attr.define
+@attrs.define
 class TemplateEntity:
     """One of the several entities defined in templates."""
     visgroups: set[str]  # Visgroups applied to this entity.
 
 
-@attr.define
+@attrs.define
 class ColorPicker(TemplateEntity):
     """Color pickers allow applying the existing colors onto faces."""
     offset: Vec
@@ -99,7 +99,7 @@ class ColorPicker(TemplateEntity):
     force_tex_black: str
 
 
-@attr.define
+@attrs.define
 class VoxelSetter(TemplateEntity):
     """Set all tiles in a tiledef."""
     offset: Vec
@@ -108,14 +108,14 @@ class VoxelSetter(TemplateEntity):
     force: bool  # Force overwrite existing values.
 
 
-@attr.define
+@attrs.define
 class TileSetter(VoxelSetter):
     """Set tiles in a particular position."""
     color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
     picker_name: str  # Name of colorpicker to use for the color.
 
 
-@attr.define
+@attrs.define
 class CollisionDef(TemplateEntity):
     """Adds a bounding box to the map."""
     bbox: collisions.BBox
@@ -200,7 +200,7 @@ TEMP_COLOUR_INVERT = {
 }
 
 
-@attr.define(frozen=True)
+@attrs.define(frozen=True)
 class ExportedTemplate:
     """The result of importing a template.
 

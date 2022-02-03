@@ -5,7 +5,7 @@ This also handles Bomb-type Paint Droppers.
 from typing import ClassVar, Dict, Optional, Union
 import collections
 
-import attr
+import attrs
 from srctools import Entity, Vec, VMF, Angle, logger
 
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
@@ -18,14 +18,14 @@ LOGGER = logger.get_logger(__name__)
 PLATES: Dict[str, Union['AngledPlate', 'StraightPlate', 'PaintDropper']] = {}
 
 
-@attr.define
+@attrs.define
 class FaithPlate:
     """A Faith Plate."""
     VISGROUP: ClassVar[str] = ''  # Visgroup name for the generated trigger.
     inst: Entity
     trig: Entity
-    trig_offset: Vec = attr.ib(init=False, factory=Vec().copy)
-    template: Optional[template_brush.Template] = attr.ib(init=False, default=None)
+    trig_offset: Vec = attrs.field(init=False, factory=Vec().copy)
+    template: Optional[template_brush.Template] = attrs.field(init=False, default=None)
 
     @property
     def name(self) -> str:
@@ -41,14 +41,14 @@ class FaithPlate:
         return f'<{type(self).__name__} "{vars(self)}">'
 
 
-@attr.define
+@attrs.define
 class AngledPlate(FaithPlate):
     """A faith plate with an angled trajectory."""
     VISGROUP: ClassVar[str] = 'angled'
     target: Union[Vec, tiling.TileDef]
 
 
-@attr.define
+@attrs.define
 class StraightPlate(FaithPlate):
     """A faith plate with a straight trajectory."""
     VISGROUP: ClassVar[str] = 'straight'

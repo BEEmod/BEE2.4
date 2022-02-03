@@ -2,7 +2,7 @@
 from __future__ import annotations
 from enum import Enum
 from typing import Callable, Union
-import attr
+import attrs
 
 from precomp import instanceLocs, connections, conditions, antlines, tiling
 import srctools.logger
@@ -50,7 +50,7 @@ class NodeType(Enum):
     LASER = 'laser'
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Node:
     """A node placed in the map."""
     type: NodeType
