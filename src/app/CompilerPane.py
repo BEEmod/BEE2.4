@@ -17,7 +17,7 @@ import io
 
 from PIL import Image, ImageTk
 from atomicwrites import atomic_write
-import attr
+import attrs
 
 from srctools import Property, bool_as_int
 from srctools.logger import get_logger
@@ -160,7 +160,7 @@ cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old
 
 
 @config.register('CompilerPane')
-@attr.frozen
+@attrs.frozen
 class CompilePaneState(config.Data):
     """State saved in palettes.
 
@@ -171,7 +171,7 @@ class CompilePaneState(config.Data):
     """
     sshot_type: str = 'AUTO'
     sshot_cleanup: bool = False
-    sshot_cust: bytes = attr.ib(repr=False, default=b'')
+    sshot_cust: bytes = attrs.field(repr=False, default=b'')
     spawn_elev: bool = False
     player_mdl: str = 'PETI'
     use_voice_priority: bool = False
@@ -397,7 +397,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
 
 def sel_corr_callback(sel_item: str, corr_name: str) -> None:
     """Callback for saving the result of selecting a corridor."""
-    config.store_conf(attr.evolve(
+    config.store_conf(attrs.evolve(
         config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         **{'corr_' + corr_name: 0 if sel_item is None else int(sel_item)},
     ))
@@ -503,7 +503,7 @@ def find_screenshot(e=None) -> None:
             f.write(buf.getvalue())
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-        config.store_conf(attr.evolve(
+        config.store_conf(attrs.evolve(
             config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             sshot_cust=buf.getvalue(),
         ))
@@ -525,7 +525,7 @@ def set_screen_type() -> None:
         window.winfo_width(),
         window.winfo_reqheight(),
     ))
-    config.store_conf(attr.evolve(
+    config.store_conf(attrs.evolve(
         config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         sshot_type=chosen,
     ))
@@ -847,7 +847,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
 
     def set_voice_priority() -> None:
         """Called when the voiceline priority is changed."""
-        config.store_conf(attr.evolve(
+        config.store_conf(attrs.evolve(
             config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
         ))
@@ -879,7 +879,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
 
     def elev_changed(state: bool) -> None:
         """Called when an elevator is selected."""
-        config.store_conf(attr.evolve(
+        config.store_conf(attrs.evolve(
             config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             spawn_elev=state,
         ))
@@ -971,7 +971,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     def set_model(e: tk.Event) -> None:
         """Save the selected player model."""
         model = PLAYER_MODELS_REV[player_model_var.get()]
-        config.store_conf(attr.evolve(
+        config.store_conf(attrs.evolve(
             config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             player_mdl=model,
         ))

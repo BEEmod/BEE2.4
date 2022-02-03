@@ -1,4 +1,4 @@
-attrs>=20.3.0
+attrs>=21.4.0
 mistletoe>=0.7.2
 Pillow>=8.3.2
 pyglet==1.5.18

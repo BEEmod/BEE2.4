@@ -18,7 +18,7 @@ import math
 import random
 from typing import Optional, Union, Iterable, Mapping, Callable, Any, AbstractSet
 
-import attr
+import attrs
 from srctools.dmx import Attribute, Element, ValueType
 from srctools.filesys import FileSystemChain
 import srctools.logger
@@ -103,10 +103,10 @@ AttrValues = Union[str, Iterable[str], bool, Vec]
 
 
 @config.register('SelectorWindow', palette_stores=False, uses_id=True)
-@attr.frozen
+@attrs.frozen
 class WindowState(config.Data):
     """The immutable window state stored in config files for restoration next launch."""
-    open_groups: Mapping[str, bool] = attr.Factory({}.copy)
+    open_groups: Mapping[str, bool] = attrs.Factory({}.copy)
     width: int = 0
     height: int = 0
 
@@ -165,7 +165,7 @@ class WindowState(config.Data):
         return elem
 
 
-@attr.define
+@attrs.define
 class AttrDef:
     """Configuration for attributes shown on selector labels."""
     id: str

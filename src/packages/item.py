@@ -10,7 +10,7 @@ import copy
 from typing import Iterable, Match, cast
 from pathlib import PurePosixPath as FSPath
 
-import attr
+import attrs
 from srctools import FileSystem, Property, VMF, Vec, logger
 from srctools.tokenizer import Tokenizer, Token
 
@@ -32,7 +32,7 @@ LOGGER = logger.get_logger(__name__)
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 
 
-@attr.frozen
+@attrs.frozen
 class UnParsedItemVariant:
     """The desired variant for an item, before we've figured out the dependencies."""
     pak_id: str  # The package that defined this variant.
@@ -372,7 +372,7 @@ class ItemVariant:
         return editor
 
 
-@attr.define
+@attrs.define
 class Version:
     """Versions are a set of styles defined for an item.
 

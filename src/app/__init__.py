@@ -3,7 +3,7 @@ import tkinter as tk
 from types import TracebackType
 from typing import Type
 import utils
-import trio  # Import first, so it monkeypatch traceback before us.
+import trio  # Import first, so it monkeypatches traceback before us.
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
@@ -104,10 +104,10 @@ def on_error(
 
     try:
         from app import config
-        import attr
+        import attrs
         # Try to turn on the logging window for next time...
         conf = config.get_cur_conf(config.GenOptions)
-        config.store_conf(attr.evolve(
+        config.store_conf(attrs.evolve(
             conf,
             show_log_win=True,
             log_win_level='DEBUG',

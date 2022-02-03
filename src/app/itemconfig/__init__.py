@@ -9,7 +9,7 @@ import tkinter as tk
 from srctools import EmptyMapping, Property, Vec, logger
 from srctools.dmx import Element
 import trio
-import attr
+import attrs
 
 import app.config
 from packages import PakObject, ExportData, ParseData, desc_parse
@@ -74,7 +74,7 @@ def parse_color(color: str) -> Tuple[int, int, int]:
 
 
 @app.config.register('ItemVar', uses_id=True)
-@attr.frozen
+@attrs.frozen
 class WidgetConfig(app.config.Data):
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
@@ -123,7 +123,7 @@ class WidgetConfig(app.config.Data):
         return elem
 
 
-@attr.define
+@attrs.define
 class Widget:
     """Common logic for both kinds of widget that can appear on a ConfigGroup."""
     group_id: str
@@ -139,7 +139,7 @@ class Widget:
         return self.create_func is not widget_item_variant
 
 
-@attr.define
+@attrs.define
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
     value: tk.StringVar
@@ -166,13 +166,13 @@ class SingleWidget(Widget):
         self.value.trace_add('write', on_changed)
 
 
-@attr.define
+@attrs.define
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     multi_func: MultiCreateFunc  # Function to create and arrange the block of widgets.
     use_inf: bool  # For timer, is infinite valid?
     values: list[tuple[str, tk.StringVar]]
-    ui_cbacks: dict[str, UpdateFunc] = attr.Factory(dict)
+    ui_cbacks: dict[str, UpdateFunc] = attrs.Factory(dict)
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""

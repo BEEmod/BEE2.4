@@ -9,7 +9,7 @@ from typing import (
     Optional, Type, Dict, Awaitable, Iterator,
 )
 
-import attr
+import attrs
 import trio
 from atomicwrites import atomic_write
 from srctools import KeyValError, Property, logger
@@ -94,7 +94,7 @@ class Data(Protocol):
         raise NotImplementedError
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ConfType(Generic[DataT]):
     """Holds information about a type of configuration data."""
     cls: Type[DataT]
@@ -106,7 +106,7 @@ class ConfType(Generic[DataT]):
     # applies the data to the UI. This way we know it can be done safely now.
     # If data was loaded from the config, the callback is immediately awaited.
     # One is provided independently for each ID, so it can be sent to the right object.
-    callback: Dict[str, Callable[[DataT], Awaitable]] = attr.ib(factory=dict, repr=False)
+    callback: Dict[str, Callable[[DataT], Awaitable]] = attrs.field(factory=dict, repr=False)
 
 
 _NAME_TO_TYPE: Dict[str, ConfType] = {}
@@ -378,7 +378,7 @@ async def apply_pal_conf(conf: Config) -> None:
 
 
 @register('LastSelected', uses_id=True)
-@attr.frozen
+@attrs.frozen
 class LastSelected(Data):
     """Used for several general items, specifies the last selected one for restoration."""
     id: Optional[str] = None
@@ -447,7 +447,7 @@ class AfterExport(Enum):
 
 
 @register('Options', palette_stores=False)
-@attr.frozen
+@attrs.frozen
 class GenOptions(Data):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
@@ -455,26 +455,26 @@ class GenOptions(Data):
     # Otherwise, it's just the section name and the attr name is the same as the option name.
 
     after_export: AfterExport = AfterExport.NORMAL
-    launch_after_export: bool = attr.ib(default=True, metadata={'legacy': 'General:launch_game'})
+    launch_after_export: bool = attrs.field(default=True, metadata={'legacy': 'General:launch_game'})
 
-    play_sounds: bool = attr.ib(default=True, metadata={'legacy': 'General'})
-    keep_win_inside: bool = attr.ib(default=True, metadata={'legacy': 'General'})
-    force_load_ontop: bool = attr.ib(default=True, metadata={'legacy': 'General:splash_stay_ontop'})
-    compact_splash: bool = attr.ib(default=True, metadata={'legacy': 'General'})
-    music_collapsed: bool = attr.ib(default=True, metadata={'legacy': 'Last_Selected'})
+    play_sounds: bool = attrs.field(default=True, metadata={'legacy': 'General'})
+    keep_win_inside: bool = attrs.field(default=True, metadata={'legacy': 'General'})
+    force_load_ontop: bool = attrs.field(default=True, metadata={'legacy': 'General:splash_stay_ontop'})
+    compact_splash: bool = attrs.field(default=True, metadata={'legacy': 'General'})
+    music_collapsed: bool = attrs.field(default=True, metadata={'legacy': 'Last_Selected'})
 
     # Log window.
-    show_log_win: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
+    show_log_win: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_win_level: str = 'INFO'
 
     # Stuff mainly for devs.
-    preserve_resources: bool = attr.ib(default=False, metadata={'legacy': 'General:preserve_bee2_resource_dir'})
-    dev_mode: bool = attr.ib(default=False, metadata={'legacy': 'Debug:development_mode'})
-    log_missing_ent_count: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
-    log_missing_styles: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
-    log_item_fallbacks: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
-    log_incorrect_packfile: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
-    force_all_editor_models: bool = attr.ib(default=False, metadata={'legacy': 'Debug'})
+    preserve_resources: bool = attrs.field(default=False, metadata={'legacy': 'General:preserve_bee2_resource_dir'})
+    dev_mode: bool = attrs.field(default=False, metadata={'legacy': 'Debug:development_mode'})
+    log_missing_ent_count: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    log_missing_styles: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    log_incorrect_packfile: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
@@ -555,13 +555,13 @@ class GenOptions(Data):
 
 gen_opts_bool = [
     field
-    for field in attr.fields_dict(GenOptions).values()
+    for field in attrs.fields(GenOptions)
     if field.default in (True, False)
 ]
 
 
 @register('PaneState', uses_id=True, palette_stores=False)
-@attr.frozen
+@attrs.frozen
 class WindowState(Data):
     """Holds the position and size of windows."""
     x: int

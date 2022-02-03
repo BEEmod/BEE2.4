@@ -15,7 +15,7 @@ import itertools
 import logging
 
 from PIL import ImageTk, Image, ImageDraw
-import attr
+import attrs
 import trio
 
 from srctools import Vec, Property
@@ -214,7 +214,7 @@ def _load_file(
     return image
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Handle:
     """Represents an image that may be reloaded as required.
 
@@ -224,16 +224,16 @@ class Handle:
     width: int
     height: int
 
-    _cached_pil: Image.Image | None = attr.ib(init=False, default=None, repr=False)
-    _cached_tk: ImageTk.PhotoImage | None = attr.ib(init=False, default=None, repr=False)
+    _cached_pil: Image.Image | None = attrs.field(init=False, default=None, repr=False)
+    _cached_tk: ImageTk.PhotoImage | None = attrs.field(init=False, default=None, repr=False)
 
-    _users: set[WidgetWeakRef | Handle] = attr.ib(init=False, factory=set, repr=False)
+    _users: set[WidgetWeakRef | Handle] = attrs.field(init=False, factory=set, repr=False)
     # If set, get_tk()/get_pil() was used.
-    _force_loaded: bool = attr.ib(init=False, default=False)
+    _force_loaded: bool = attrs.field(init=False, default=False)
     # If true, this is in the queue to load.
-    _loading: bool = attr.ib(init=False, default=False)
+    _loading: bool = attrs.field(init=False, default=False)
     # When no users are present, schedule cleaning up the handle's data to reuse.
-    _cancel_cleanup: trio.CancelScope = attr.ib(init=False, factory=trio.CancelScope, repr=False)
+    _cancel_cleanup: trio.CancelScope = attrs.field(init=False, factory=trio.CancelScope, repr=False)
 
     # Determines whether get_pil() and get_tk() can be called directly.
     allow_raw: ClassVar[bool] = False
@@ -560,7 +560,7 @@ class Handle:
             self._cached_tk = self._cached_pil = None
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgColor(Handle):
     """An image containing a solid color."""
     red: int
@@ -585,7 +585,7 @@ class ImgAlpha(Handle):
         return Image.new('RGBA', (self.width or 16, self.height or 16), (0, 0, 0, 0))
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgFile(Handle):
     """An image loaded from a package."""
     uri: utils.PackagePath
@@ -601,7 +601,7 @@ class ImgFile(Handle):
         return _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgBuiltin(Handle):
     """An image loaded from builtin UI resources."""
     uri: utils.PackagePath
@@ -613,7 +613,7 @@ class ImgBuiltin(Handle):
         return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.ANTIALIAS)
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgSprite(Handle):
     """An image loaded from builtin UI resources, with nearest-neighbour resizing."""
     uri: utils.PackagePath
@@ -625,7 +625,7 @@ class ImgSprite(Handle):
         return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.NEAREST)
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgComposite(Handle):
     """An image composed of multiple layers composited together."""
     layers: Sequence[Handle]
@@ -652,7 +652,7 @@ class ImgComposite(Handle):
         return img
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgCrop(Handle):
     """An image that crops another down to only show part."""
     source: Handle
@@ -689,7 +689,7 @@ class ImgCrop(Handle):
         return image
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class ImgIcon(Handle):
     """An image containing the PeTI background with a centered icon."""
     icon_name: str

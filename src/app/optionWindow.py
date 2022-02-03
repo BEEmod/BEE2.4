@@ -5,9 +5,9 @@ from pathlib import Path
 import tkinter as tk
 import trio
 from tkinter import ttk, messagebox
-from typing import Any, List, Tuple, Dict
+from typing import List, Tuple, Dict
 
-import attr
+import attrs
 import srctools.logger
 
 from app.config import AfterExport
@@ -74,7 +74,7 @@ def load() -> None:
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     # Preserve options set elsewhere.
-    res = attr.asdict(config.get_cur_conf(config.GenOptions), recurse=False)
+    res = attrs.asdict(config.get_cur_conf(config.GenOptions), recurse=False)
 
     res['after_export'] = AfterExport(AFTER_EXPORT_ACTION.get())
     for name, var in VARS:
@@ -107,7 +107,7 @@ def clear_caches() -> None:
     # anything...
     conf = config.get_cur_conf(config.GenOptions)
     if conf.preserve_resources:
-        config.store_conf(attr.evolve(conf, preserve_resources=False))
+        config.store_conf(attrs.evolve(conf, preserve_resources=False))
         message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
 
     gameMan.CONFIG.save_check()
@@ -133,8 +133,6 @@ def make_checkbox(
     desc is the text put next to the checkbox.
     frame is the parent frame.
     """
-    field = attr.fields_dict(config.GenOptions)[name]
-
     if var is None:
         var = tk.BooleanVar(name=f'gen_opt_{name}')
     # Ensure it's a valid attribute.

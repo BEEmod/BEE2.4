@@ -1,18 +1,18 @@
 """Help menu and associated dialogs."""
 from enum import Enum
 from typing import NamedTuple, Dict
-
-import attr
 from tkinter import ttk
 import tkinter as tk
 import webbrowser
 import functools
 
+import attrs
+import srctools
+
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
 from localisation import gettext
 import utils
-import srctools
 
 # For version info
 import PIL
@@ -48,8 +48,9 @@ def steam_url(name):
     return 'steam://store/' + utils.STEAM_IDS[name]
 
 
-@attr.s(auto_attribs=True)
+@attrs.frozen
 class WebResource:
+    """Definition for the links in the help menu."""
     name: str
     url: str
     icon: ResIcon

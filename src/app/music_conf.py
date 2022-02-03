@@ -5,7 +5,7 @@ import tkinter
 
 from srctools import FileSystemChain, FileSystem
 import srctools.logger
-import attr
+import attrs
 
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
@@ -204,7 +204,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         global is_collapsed
         is_collapsed = True
         conf = config.get_cur_conf(config.GenOptions)
-        config.store_conf(attr.evolve(conf, music_collapsed=True))
+        config.store_conf(attrs.evolve(conf, music_collapsed=True))
         base_lbl['text'] = gettext('Music: ')
         toggle_btn_exit()
 
@@ -219,7 +219,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         global is_collapsed
         is_collapsed = False
         conf = config.get_cur_conf(config.GenOptions)
-        config.store_conf(attr.evolve(conf, music_collapsed=False))
+        config.store_conf(attrs.evolve(conf, music_collapsed=False))
         base_lbl['text'] = gettext('Base: ')
         toggle_btn_exit()
         for wid in exp_widgets:

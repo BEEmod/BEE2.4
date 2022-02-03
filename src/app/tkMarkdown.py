@@ -6,12 +6,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 import urllib.parse
 
+import attrs
 from mistletoe import block_token as btok, span_token as stok
 import mistletoe
-import attr
+import srctools.logger
 
 from app.img import Handle as ImgHandle
-import srctools.logger
 import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -21,7 +21,7 @@ class Block:
     """The kinds of data contained in MarkdownData."""
 
 
-@attr.frozen
+@attrs.frozen
 class TextSegment(Block):
     """Each section added in text blocks."""
     text: str  # The text to show
@@ -29,7 +29,7 @@ class TextSegment(Block):
     url: str | None  # If set, the text should be given this URL as a callback.
 
 
-@attr.define
+@attrs.define
 class Image(Block):
     """An image."""
     handle: ImgHandle
@@ -42,14 +42,14 @@ _HR = [
 ]
 
 
-@attr.define
+@attrs.define
 class MarkdownData:
     """The output of the conversion, a set of tags and link references for callbacks.
 
     Blocks are a list of data.
     """
     # External users shouldn't modify directly, so make it readonly.
-    blocks: Sequence[Block] = attr.ib(factory=[].copy)
+    blocks: Sequence[Block] = attrs.field(factory=[].copy)
     # RichTextBox strips the newlines later on, so we can join with these preserved.
     _unstripped: bool = True
 

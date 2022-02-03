@@ -7,7 +7,7 @@ import warnings
 from collections import defaultdict
 from pathlib import Path
 
-import attr
+import attrs
 import trio
 
 import srctools
@@ -36,7 +36,7 @@ OBJ_TYPES: dict[str, Type[PakObject]] = {}
 PACKAGE_SYS: dict[str, FileSystem] = {}
 
 
-@attr.define
+@attrs.define
 class SelitemData:
     """Options which are displayed on the selector window."""
     name: str  # Longer full name.
@@ -49,7 +49,7 @@ class SelitemData:
     group: Optional[str]
     sort_key: str
     # The packages used to define this, used for debugging.
-    packages: frozenset[str] = attr.Factory(frozenset)
+    packages: frozenset[str] = attrs.Factory(frozenset)
 
     @classmethod
     def parse(cls, info: Property, pack_id: str) -> SelitemData:
@@ -138,29 +138,29 @@ class SelitemData:
         )
 
 
-@attr.define
+@attrs.define
 class ObjData:
     """Temporary data stored when parsing info.txt, but before .parse() is called.
 
     This allows us to parse all packages before loading objects.
     """
     fsys: FileSystem
-    info_block: Property = attr.ib(repr=False)
+    info_block: Property = attrs.field(repr=False)
     pak_id: str
     disp_name: str
 
 
-@attr.define
+@attrs.define
 class ParseData:
     """The arguments for pak_object.parse()."""
     fsys: FileSystem
     id: str
-    info: Property = attr.ib(repr=False)
+    info: Property = attrs.field(repr=False)
     pak_id: str
     is_override: bool
 
 
-@attr.define
+@attrs.define
 class ExportData:
     """The arguments to pak_object.export()."""
     # Usually str, but some items pass other things.
@@ -178,7 +178,7 @@ class ExportData:
     resources: dict[str, bytes]
 
 
-@attr.define
+@attrs.define
 class CorrDesc:
     """Name, description and icon for each corridor in a style."""
     name: str = ''
@@ -372,22 +372,22 @@ def set_cond_source(props: Property, source: str) -> None:
         cond['__src__'] = source
 
 
-@attr.define
+@attrs.define
 class PackagesSet:
     """Holds all the data pared from packages.
 
     This is swapped out to reload packages.
     """
-    packages: dict[str, Package] = attr.Factory(dict)
+    packages: dict[str, Package] = attrs.Factory(dict)
     # type -> id -> object
     # The object data before being parsed, and the final result.
-    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attr.ib(factory=lambda: defaultdict(dict), repr=False)
-    objects: dict[Type[PakObject], dict[str, PakObject]] = attr.Factory(lambda: defaultdict(dict))
+    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attrs.field(factory=lambda: defaultdict(dict), repr=False)
+    objects: dict[Type[PakObject], dict[str, PakObject]] = attrs.Factory(lambda: defaultdict(dict))
     # For overrides, a type/ID pair to the list of overrides.
-    overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attr.Factory(lambda: defaultdict(list))
+    overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
 
     # Indicates if an object type has been fully parsed.
-    _type_ready: dict[Type[PakObject], trio.Event] = attr.ib(init=False, factory=dict)
+    _type_ready: dict[Type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
 
     def ready(self, cls: Type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""

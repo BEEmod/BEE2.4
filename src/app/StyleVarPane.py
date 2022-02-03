@@ -12,7 +12,7 @@ import itertools
 
 from srctools import Property, bool_as_int, conv_bool
 from srctools.logger import get_logger
-import attr
+import attrs
 
 from packages import Style, StyleVar
 from app.SubPane import SubPane
@@ -118,7 +118,7 @@ def mandatory_unlocked() -> bool:
 
 
 @config.register('StyleVar', uses_id=True)
-@attr.frozen
+@attrs.frozen
 class StyleVarState(config.Data):
     """Holds style var state stored in configs."""
     value: bool = False

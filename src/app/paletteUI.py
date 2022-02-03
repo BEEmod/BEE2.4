@@ -9,7 +9,7 @@ import tkinter as tk
 
 from srctools import Property
 import srctools.logger
-import attr
+import attrs
 
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
 from app import tk_tools, paletteLoader, config, TK_ROOT, img, BEE2
@@ -28,7 +28,7 @@ __all__ = [
 
 
 @config.register('Palette', palette_stores=False)
-@attr.frozen
+@attrs.frozen
 class PaletteState(config.Data):
     """Data related to palettes which is restored next run.
 

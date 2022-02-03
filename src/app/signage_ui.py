@@ -5,7 +5,7 @@ from tkinter import ttk
 
 from srctools import Property
 import srctools.logger
-import attr
+import attrs
 
 from app import dragdrop, img, tk_tools, config, TK_ROOT
 from packages import Signage, Style
@@ -60,10 +60,10 @@ def export_data() -> List[Tuple[str, str]]:
 
 
 @config.register('Signage')
-@attr.frozen
+@attrs.frozen
 class Layout(config.Data):
     """A layout of selected signs."""
-    signs: Mapping[int, str] = attr.Factory(DEFAULT_IDS.copy)
+    signs: Mapping[int, str] = attrs.Factory(DEFAULT_IDS.copy)
 
     @classmethod
     def parse_legacy(cls, props: Property) -> Dict[str, 'Layout']:
