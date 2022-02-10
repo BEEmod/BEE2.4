@@ -759,7 +759,7 @@ def load_config(conf: Property):
         if isinstance(gentor, GenRandom):
             if gen_portal is None:
                 gentor.set_enum(
-                    (tex_key, str(mat))
+                    (tex_key, mat)
                     for tex_key, mat in tex_defaults.items()
                 )
             else:
@@ -818,12 +818,13 @@ def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
         if generator.category is GenCat.OVERLAYS:
             continue
 
-        materials = {
-            mat_name
+        # We don't care about the configured scale/rotation, just the mat.
+        materials: set[str] = {
+            mat_conf.mat
             for (mat_cat, mats) in generator.textures.items()
             #  Skip these special mats.
             if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap')
-            for mat_name in mats
+            for mat_conf in mats
         }
 
         for mat_name in materials:
@@ -926,7 +927,7 @@ class Generator(abc.ABC):
                 # Set it to itself to silence the warning.
                 ANTIGEL_MATS[mat_conf.mat.casefold()] = mat_conf.mat
             else:
-                return MaterialConf(antigel_tex, mat_conf.scale, mat_conf.rotation)
+                return attrs.evolve(mat_conf, mat=antigel_tex)
 
         return mat_conf
 
@@ -974,9 +975,11 @@ class GenRandom(Generator):
         # way we're effectively comparing by identity.
         self.enum_data: Dict[int, str] = {}
 
-    def set_enum(self, defaults: Iterable[Tuple[str, str]]) -> None:
+    def set_enum(self, defaults: Iterable[Tuple[str, MaterialConf | str]]) -> None:
         """For OVERLAY and SPECIAL, allow also passing in the enum constants."""
         for key, default in defaults:
+            if isinstance(default, MaterialConf):
+                default = default.mat
             if type(default) != str:
                 self.enum_data[id(default)] = key
 
