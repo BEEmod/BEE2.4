@@ -1,4 +1,5 @@
 """Manages the list of textures used for brushes, and how they are applied."""
+from __future__ import annotations
 import itertools
 import abc
 from enum import Enum
@@ -110,6 +111,56 @@ class Orient(Enum):
     def z(self) -> float:
         """Return the Z value of the normal expected for this surface."""
         return self.value
+
+
+class Rotation(Enum):
+    """Valid 90-degree rotation values."""
+    NONE = 0
+    CCW = 90
+    HALF = 180
+    CW = 270
+
+    @classmethod
+    def parse(cls, value: str) -> Rotation:
+        """Parse a string into a rotation value."""
+        try:
+            angle = round(int(value))
+        except (TypeError, ValueError, OverflowError):
+            LOGGER.warning('Non-numeric rotation value "{}"!', value)
+            return Rotation.NONE
+        angle %= 360
+        try:
+            return cls(angle)
+        except ValueError:
+            LOGGER.warning('Rotation values must be multiples of 90 degrees, not {}!', angle)
+            return Rotation.NONE
+
+
+@attrs.frozen
+class MaterialConf:
+    """Texture, rotation, scale to apply."""
+    mat: str
+    scale: float = 0.25
+    rotation: Rotation = Rotation.NONE
+
+    @classmethod
+    def parse(cls, prop: Property) -> MaterialConf:
+        """Parse a property block."""
+        if not prop.has_children():
+            return MaterialConf(prop.value)
+        try:
+            material = prop['material']
+        except LookupError:
+            raise ValueError('Material definition must have "material" key!') from None
+        scale = prop.float('scale', 0.25)
+        if scale <= 0.0:
+            LOGGER.warning('Material scale should be positive, not {}!', scale)
+            scale = 0.25
+        try:
+            rotation = Rotation.parse(prop['rotation'])
+        except LookupError:
+            rotation = Rotation.NONE
+        return cls(material, scale, rotation)
 
 
 GEN_CATS = {
