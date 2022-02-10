@@ -141,6 +141,15 @@ class QuarterRot(Enum):
             LOGGER.warning('Rotation values must be multiples of 90 degrees, not {}!', angle)
             return QuarterRot.NONE
 
+    def __add__(self, other: QuarterRot) -> QuarterRot:
+        """Adding two rotations concatenates them."""
+        return QuarterRot((self.value + other.value) % 360)
+
+    @property
+    def flips_uv(self) -> bool:
+        """Returns if the horizontal/vertical directions have swapped."""
+        return self.value in [90, 270]
+
     @property
     def mat_x(self) -> Matrix:
         """Return the matrix performing this rotation, around the X axis."""
@@ -300,6 +309,12 @@ class TileSize(str, Enum):
         """Return the number of 32-size tiles this takes up horizontally."""
         return self.size[1]
 
+    @property
+    def is_rect(self) -> bool:
+        """Return if this is a non-square shape."""
+        width, height = self.size
+        return width != height
+
 GENERATORS: Dict[
     Union[GenCat, Tuple[GenCat, Orient, Portalable]],
     'Generator'
@@ -409,6 +424,7 @@ OPTION_DEFAULTS = {
     'ScaleUp256': False,  # In addition to TILE_DOUBLE, use 1x1 at 2x scale.
     'Antigel_Bullseye': False,  # If true, allow bullseyes on antigel panels.
     'Algorithm': 'RAND',  # The algorithm to use for tiles.
+    'MixRotation': False,  # If true, randomly rotate all tiles by adding 3 copies of each. True on ceilings always.
 
     # For clumping algorithm, the sizes to generate.
     'Clump_length': 4,  # Long direction max
@@ -449,11 +465,19 @@ def format_gen_key(
         return f'{gen_cat.value}.{portal}.{orient}'
 
 
-def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> Dict[str, Any]:
+def parse_options(
+    settings: Dict[str, Any],
+    global_settings: Dict[str, Any],
+    mix_rotation_default: bool = OPTION_DEFAULTS['MixRotation'],
+) -> Dict[str, Any]:
     """Parse the options for a generator block."""
     options = {}
     for opt, default in OPTION_DEFAULTS.items():
         opt = opt.casefold()
+        # We want to change the default for this on ceilings/floors.
+        if opt == 'mixrotation':
+            default = mix_rotation_default
+
         try:
             value = settings[opt]
         except KeyError:
@@ -611,6 +635,7 @@ def load_config(conf: Property):
         if isinstance(gen_key, GenCat):
             # It's a non-tile generator.
             is_tile = False
+            is_ceil = False
             try:
                 gen_conf = conf_for_gen[gen_key, None, None]
             except KeyError:
@@ -633,13 +658,14 @@ def load_config(conf: Property):
                         Property('Algorithm', 'RAND'),
                     ])
                 ])
+            is_ceil = gen_key[1] is Orient.CEIL
 
         # First parse the options.
         all_options[gen_key] = parse_options({
             prop.name or '': prop.value
             for prop in
             gen_conf.find_children('Options')
-        }, global_options)
+        }, global_options, is_ceil)
 
         all_weights[gen_key] = weights = DEFAULT_WEIGHTS.copy()
         textures: dict[str, list[MaterialConf]] = {}
@@ -661,6 +687,18 @@ def load_config(conf: Property):
                     prop.value for prop in
                     gen_conf.find_all('1x2')
                 ]
+
+            if all_options[gen_key]['mixrotation']:
+                # Automatically rotate tiles.
+                for tex_name, old_tex in textures.items():
+                    assert isinstance(tex_name, TileSize)
+                    textures[tex_name] = [
+                        attrs.evolve(mat, rotation=mat.rotation + new_rot)
+                        for mat in old_tex
+                        for new_rot in QuarterRot
+                        # For rectangular sizes, only allow 0/180.
+                        if not tex_name.is_rect or not new_rot.flips_uv
+                    ]
 
             # If not provided, use defaults. Otherwise, ignore them entirely.
             if not any(textures.values()):
