@@ -157,6 +157,11 @@ class TileType(Enum):
         return self.value <= 10
 
     @property
+    def is_mergeable(self) -> bool:
+        """If this can be merged with adjacient tiles."""
+        return self.value <= 11
+
+    @property
     def is_white(self) -> bool:
         """Is this portalable?"""
         return self.name.startswith('WHITE')
@@ -1390,7 +1395,7 @@ class TileDef:
             return False
 
         if self._sub_tiles is not None:
-            return all(self[uv].is_simple for uv in UVS)
+            return all(self[uv].is_mergeable for uv in UVS)
         else:
             return self.base_type.is_simple
 

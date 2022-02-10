@@ -221,15 +221,17 @@ def generate_plane(
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
     grid_pos: Plane[TileDef] = Plane()
 
-    subtile_pos = Plane(default=SubTile(TileType.VOID, False))
+    VOID = TileType.VOID
+    subtile_pos = Plane(default=SubTile(VOID, False))
 
     for tile in tiles:
         pos = tile.pos_front
         u_full = int((pos[u_axis] - 64) // 32)
         v_full = int((pos[v_axis] - 64) // 32)
         for u, v, tile_type in tile:
-            subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel)
-            grid_pos[u_full + u, v_full + v] = tile
+            if tile_type is not VOID:
+                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel)
+                grid_pos[u_full + u, v_full + v] = tile
     # Now, reprocess subtiles into textures by repeatedly spreading.
     texture_plane: Plane[TexDef] = Plane()
     while subtile_pos:
