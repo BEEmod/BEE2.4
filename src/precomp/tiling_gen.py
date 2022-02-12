@@ -323,11 +323,12 @@ def generate_plane(
                 max_height = height // size.height
                 width = round(rng.triangular(1, max_width, min(1.5, max_width))) * size.width
                 height = round(rng.triangular(1, max_height, min(1.5, max_height))) * size.height
+            mat_conf = rng.choice(gen.get_all(size))
             tex_def = make_texdef(
-                rng.choice(gen.get_all(size)),
+                mat_conf,
                 subtile.antigel,
-                (1 + max_u - width) % size.width,
-                (1 + max_v - height) % size.height,
+                (1 + max_u - width) % mat_conf.tile_size.width,
+                (1 + max_v - height) % mat_conf.tile_size.height,
             )
         else:
             # Not a tile, must be nodraw.
