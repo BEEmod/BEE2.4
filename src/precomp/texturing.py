@@ -245,9 +245,12 @@ class MaterialConf:
     mat: str
     scale: float = 1.0
     rotation: QuarterRot = QuarterRot.NONE
+    # For tile materials, the original size of the surface.
+    # This is used for aligning UVs correctly.
+    tile_size: TileSize = TileSize.TILE_4x4
 
     @classmethod
-    def parse(cls, prop: Property) -> MaterialConf:
+    def parse(cls, prop: Property, tile_size: TileSize = TileSize.TILE_4x4) -> MaterialConf:
         """Parse a property block."""
         if not prop.has_children():
             return MaterialConf(prop.value)
@@ -263,7 +266,7 @@ class MaterialConf:
             rotation = QuarterRot.parse(prop['rotation'])
         except LookupError:
             rotation = QuarterRot.NONE
-        return cls(material, scale, rotation)
+        return cls(material, tile_size, scale, rotation)
 
     def __bool__(self) -> bool:
         """Blank materials are falsey."""
@@ -732,10 +735,11 @@ def load_config(conf: Property):
         if is_tile:
             # Tile generator, always have all tile sizes, and
             # only use the defaults if no textures were specified.
-            for tex_name in TileSize:
-                textures[tex_name] = [
-                    MaterialConf.parse(prop) for prop in
-                    gen_conf.find_all(str(tex_name))
+            tile_size: TileSize
+            for tile_size in TileSize:
+                textures[tile_size] = [
+                    MaterialConf.parse(prop, tile_size) for prop in
+                    gen_conf.find_all(str(tile_size))
                 ]
 
             if '1x2' in gen_conf and not has_block_mats:
