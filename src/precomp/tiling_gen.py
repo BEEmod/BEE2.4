@@ -34,20 +34,9 @@ class TexDef:
     u_off: float = 0.0
     v_off: float = 0.0
     scale: float = 0.25  # 0.25 or 0.5 for double.
-    # Four required bevels.
-    bevels: tuple[bool, bool, bool, bool] = (True, True, True, True)
 
-    def with_bevels(self, umin: bool, umax: bool, vmin: bool, vmax: bool) -> TexDef:
-        """Reconfigure with bevels."""
-        return make_texdef(
-            self.tex,
-            self.antigel,
-            self.u_off,
-            self.v_off,
-            self.scale,
-            (umin, umax, vmin, vmax),
-        )
 
+# We're making huge numbers of these, cache them.
 make_subtile = functools.lru_cache(maxsize=None)(SubTile)
 make_texdef = functools.lru_cache(maxsize=32)(TexDef)
 TEXDEF_NODRAW = TexDef(MaterialConf(consts.Tools.NODRAW))
@@ -80,31 +69,44 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
 }
 
 
+def _compute_bevel(tile: TileDef, u: int, v: int, neighbour: SubTile | None) -> bool:
+    if neighbour is None:
+        # We know we don't modify the tiledefs while generating.
+        return tile.should_bevel(u, v)
+    if neighbour.type is TileType.VOID:  # Always bevel towards instances.
+        return True
+    if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
+        return False
+    # We know we don't modify the tiledefs while generating.
+    return tile.should_bevel(u, v)
+
+
 def bevel_split(
-    rect_points: Plane[bool],
+    texture_plane: Plane[TexDef],
     tile_pos: Plane[TileDef],
-) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
+    orig_tiles: Plane[SubTile],
+) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool], TexDef]]:
     """Split the optimised segments to produce the correct bevelling."""
-    for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
+    for min_u, min_v, max_u, max_v, texdef in grid_optim.optimise(texture_plane):
         u_range = range(min_u, max_u + 1)
         v_range = range(min_v, max_v + 1)
 
         # These are sort of reversed around, which is a little confusing.
         # Bevel U is facing in the U direction, running across the V.
         bevel_umins: list[bool] = [
-            tile_pos[min_u, v].should_bevel(-1, 0)
+            _compute_bevel(tile_pos[min_u, v], -1, 0, orig_tiles[min_u-1, v])
             for v in v_range
         ]
         bevel_umaxes: list[bool] = [
-            tile_pos[max_u, v].should_bevel(1, 0)
+            _compute_bevel(tile_pos[max_u, v], 1, 0, orig_tiles[max_u+1, v])
             for v in v_range
         ]
         bevel_vmins: list[bool] = [
-            tile_pos[u, min_v].should_bevel(0, -1)
+            _compute_bevel(tile_pos[u, min_v], 0, -1, orig_tiles[u, min_v-1])
             for u in u_range
         ]
         bevel_vmaxes: list[bool] = [
-            tile_pos[u, max_v].should_bevel(0, 1)
+            _compute_bevel(tile_pos[u, max_v], 0, 1, orig_tiles[u, min_v+1])
             for u in u_range
         ]
 
@@ -119,6 +121,7 @@ def bevel_split(
                     min_u + u_ind_max,
                     min_v + v_ind_max,
                     bevel_u + bevel_v,
+                    texdef
                 )
 
 
@@ -232,6 +235,9 @@ def generate_plane(
             if tile_type is not VOID:
                 subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel)
                 grid_pos[u_full + u, v_full + v] = tile
+
+    orig_tiles = subtile_pos.copy()
+    orig_tiles.default = None
     # Now, reprocess subtiles into textures by repeatedly spreading.
     texture_plane: Plane[TexDef] = Plane()
     while subtile_pos:
@@ -326,18 +332,13 @@ def generate_plane(
         else:
             # Not a tile, must be nodraw.
             tex_def = TEXDEF_NODRAW
+
         for u in range(max_u-width+1, max_u+1):
             for v in range(max_v-height+1, max_v+1):
                 del subtile_pos[u, v]
-                tile = grid_pos[u, v]
-                texture_plane[u, v] = tex_def.with_bevels(
-                    _cached_bevel(tile, -1, 0),
-                    _cached_bevel(tile, +1, 0),
-                    _cached_bevel(tile, 0, -1),
-                    _cached_bevel(tile, 0, +1),
-                )
+                texture_plane[u, v] = tex_def
 
-    for min_u, min_v, max_u, max_v, tex_def in grid_optim.optimise(texture_plane):
+    for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
         center = normal * plane_dist + Vec.with_axes(
             # Compute avg(32*min, 32*max)
             # = (32 * min + 32 * max) / 2
@@ -351,7 +352,7 @@ def generate_plane(
             normal,
             tex_def.tex,
             texturing.SPECIAL.get(center, 'behind', antigel=tex_def.antigel),
-            bevels=tex_def.bevels,
+            bevels=bevels,
             width=(1 + max_u - min_u) * 32,
             height=(1 + max_v - min_v) * 32,
             antigel=tex_def.antigel,
