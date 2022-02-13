@@ -170,6 +170,7 @@ class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
+
 class Unsatisfiable(Exception):
     """Raised by flags to indicate they currently will always be false with all instances.
 
@@ -274,13 +275,60 @@ class Condition:
                 results.remove(res)
 
 
-AnnCallT = TypeVar('AnnCallT')
+AnnResT = TypeVar('AnnResT')
+# TODO: want TypeVarTuple, but can't specify Map[Type, AnnArgT]
+AnnArg1T = TypeVar('AnnArg1T')
+AnnArg2T = TypeVar('AnnArg2T')
+AnnArg3T = TypeVar('AnnArg3T')
+AnnArg4T = TypeVar('AnnArg4T')
+AnnArg5T = TypeVar('AnnArg5T')
 
 
+@overload
 def annotation_caller(
-    func: Callable[..., AnnCallT],
-    *parms: type,
-) -> tuple[Callable[..., AnnCallT], list[type]]:
+    func: Callable[..., AnnResT],
+    __parm1: Type[AnnArg1T],
+) -> tuple[
+    Callable[[AnnArg1T], AnnResT],
+    tuple[Type[AnnArg1T]]
+]: ...
+@overload
+def annotation_caller(
+    func: Callable[..., AnnResT],
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T],  /,
+) -> tuple[
+    Callable[[AnnArg1T, AnnArg2T], AnnResT],
+    tuple[Type[AnnArg1T], Type[AnnArg2T]]
+]: ...
+@overload
+def annotation_caller(
+    func: Callable[..., AnnResT],
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T], /,
+) -> tuple[
+    Callable[[AnnArg1T, AnnArg2T, AnnArg3T], AnnResT],
+    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T]],
+]: ...
+@overload
+def annotation_caller(
+    func: Callable[..., AnnResT],
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T], parm4: Type[AnnArg4T], /,
+) -> tuple[
+    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T], AnnResT],
+    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T]],
+]: ...
+@overload
+def annotation_caller(
+    func: Callable[..., AnnResT],
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T],
+    parm4: Type[AnnArg4T], parm5: Type[AnnArg5T], /,
+) -> tuple[
+    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T], AnnResT],
+    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg4T], Type[AnnArg5T]],
+]: ...
+def annotation_caller(
+    func: Callable[..., AnnResT], /,
+    *parms: Type,
+) -> tuple[Callable[..., AnnResT], Tuple[type]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
