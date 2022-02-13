@@ -38,7 +38,7 @@ if utils.WIN:
     # Ensure everything has our icon (including dialogs)
     TK_ROOT.wm_iconbitmap(default=ICO_PATH)
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
         window.wm_iconbitmap(ICO_PATH)
 
@@ -56,7 +56,7 @@ if utils.WIN:
     LISTBOX_BG_SEL_COLOR = '#0078D7'
     LISTBOX_BG_COLOR = 'white'
 elif utils.MAC:
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """ Call OS-X's specific api for setting the window icon."""
         TK_ROOT.tk.call(
             'tk::mac::iconBitmap',
@@ -76,7 +76,7 @@ else:  # Linux
     from app import img
     app_icon = img.get_app_icon(ICO_PATH)
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
         # Weird argument order for default=True...
         window.wm_iconphoto(True, app_icon)
@@ -266,13 +266,13 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
-    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False):
+    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Optional[Callable]:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
-            def deco_2(func):
+            def deco_2(func2: EventFuncT) -> EventFuncT:
                 """Used as a decorator - must be called second with the function."""
-                bind_func(wid, func, add)
-                return func
+                bind_func(wid, func2, add)
+                return func2
             return deco_2
         else:
             # Normally, call directly
@@ -282,53 +282,50 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
 if utils.MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
     @_bind_event_handler
-    def bind_leftclick(wid, func, add=False):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held.
-        """
-        def event_handler(e):
+    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
+        """On OSX, left-clicks are converted to right-clicks when control is held."""
+        def event_handler(e: tk.Event) -> None:
+            """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
-            if e.state & 4 == 0:
+            if not isinstance(e.state, int) or e.state & 4 == 0:
                 func(e)
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid, func, add=False):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held."""
-        def event_handler(e):
+    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
+        """On OSX, left-clicks are converted to right-clicks when control is held."""
+        def event_handler(e: tk.Event) -> None:
+            """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
-            if e.state & 4 == 0:
+            if not isinstance(e.state, int) or e.state & 4 == 0:
                 func(e)
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid, func, add=False):
+    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
         wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
     @_bind_event_handler
-    def bind_leftclick(wid, func, add=False):
+    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid, func, add=False):
+    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid, func, add=False):
+    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
 
-def event_cancel(*args, **kwargs) -> str:
+def event_cancel(*args: Any, **kwargs: Any) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
 
@@ -336,7 +333,7 @@ def event_cancel(*args, **kwargs) -> str:
 def adjust_inside_screen(
     x: int,
     y: int,
-    win,
+    win: Union[tk.Tk, tk.Toplevel],
     horiz_bound: int=14,
     vert_bound: int=45,
 ) -> Tuple[int, int]:
@@ -375,7 +372,7 @@ def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplev
     window.geometry(f'+{x}+{y}')
 
 
-def _default_validator(value) -> str:
+def _default_validator(value: str) -> str:
     if not value.strip():
         raise ValueError("A value must be provided!")
     return value
@@ -395,7 +392,7 @@ class BasicQueryValidator(simpledialog.Dialog):
         self.__initial = initial
         super().__init__(parent, title)
 
-    def body(self, master):
+    def body(self, master: tk.Frame) -> ttk.Entry:
         """Ensure the window icon is changed, and copy code from askstring's internals."""
         super().body(master)
         set_window_icon(self)
@@ -420,7 +417,6 @@ class BasicQueryValidator(simpledialog.Dialog):
         else:
             return True
 
-Query = None
 if Query is not None:
     class QueryValidator(Query):
         """Implement using IDLE's better code for this."""
@@ -441,7 +437,7 @@ if Query is not None:
                 self.showerror(exc.args[0])
                 return None
 else:
-    QueryValidator = BasicQueryValidator
+    QueryValidator = BasicQueryValidator  # type: ignore
 
 
 def prompt(
@@ -470,14 +466,14 @@ class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low, high):
+    def set(self, low: float, high: float) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
             self.grid_remove()
         else:
             self.grid()
-        super(HidingScroll, self).set(low, high)
+        super().set(low, high)
 
 
 class ReadOnlyEntry(ttk.Entry):
@@ -485,22 +481,21 @@ class ReadOnlyEntry(ttk.Entry):
 
     See http://tkinter.unpythonic.net/wiki/ReadOnlyText
     """
-    def __init__(self, master, **opt):
-
-        opt['exportselection'] = 0 # Don't let it write to clipboard
-        opt['takefocus'] = 0 # Ignore when tabbing
+    def __init__(self, master: tk.Misc, **opt: Any) -> None:
+        opt['exportselection'] = 0  # Don't let it write to clipboard
+        opt['takefocus'] = 0  # Ignore when tabbing
         super().__init__(master, **opt)
 
         self.redirector = redir = WidgetRedirector(self)
         # These two TK commands are used for all text operations,
         # so cancelling them stops anything from happening.
-        self.insert = redir.register('insert', event_cancel)
-        self.delete = redir.register('delete', event_cancel)
+        setattr(self, 'insert', redir.register('insert', event_cancel))
+        setattr(self, 'delete', redir.register('delete', event_cancel))
 
 
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice]=None, **kw) -> None:
+    def __init__(self, master: tk.Misc, range: Union[range, slice]=None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -551,7 +546,7 @@ class FileField(ttk.Frame):
     browser: commondialog.Dialog
     def __init__(
         self,
-        master,
+        master: tk.Misc,
         is_dir: bool=False,
         loc: str='',
         callback: Callable[[str], None]=None,

@@ -39,7 +39,7 @@ import warnings
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Any, Callable, TextIO
+from typing import Generic, TypeVar, Any, Callable, TextIO, Tuple, Type, overload, cast
 
 import attrs
 import srctools.logger
@@ -407,7 +407,7 @@ def annotation_caller(
 
     if inputs == outputs:
         # Matches already, don't need to do anything.
-        return func, ann_order
+        return func, tuple(ann_order)
 
     # Double function to make a closure, to allow reference to the function
     # more directly.
@@ -431,7 +431,7 @@ def annotation_caller(
         )
     except AttributeError:
         pass
-    return reorder_func, ann_order
+    return reorder_func, tuple(ann_order)
 
 
 CallResultT = TypeVar('CallResultT')
@@ -445,22 +445,22 @@ def conv_setup_pair(
     Callable[[Entity], CallResultT]
 ]:
     """Convert the old explict setup function into a new closure."""
-    setup_wrap, ann_order = annotation_caller(
+    setup_wrap, _ = annotation_caller(
         setup,
         srctools.VMF, Property,
     )
-    result_wrap, ann_order = annotation_caller(
+    result_wrap, _ = annotation_caller(
         result,
         srctools.VMF, Entity, Property,
     )
 
-    def func(vmf: srctools.VMF, prop: Property):
+    def func(vmf: srctools.VMF, prop: Property) -> Callable[[Entity], CallResultT]:
         """Replacement function which performs the legacy behaviour."""
         # The old system for setup functions - smuggle them in by
         # setting Property.value to an arbitrary object.
         smuggle = Property(prop.real_name, setup_wrap(vmf, prop))
 
-        def closure(ent: Entity) -> object:
+        def closure(ent: Entity) -> CallResultT:
             """Use the closure to store the smuggled setup data."""
             return result_wrap(vmf, ent, smuggle)
 
@@ -477,7 +477,7 @@ class CondCall(Generic[CallResultT]):
     """
     __slots__ = ['func', 'group', '_cback', '_setup_data']
     _cback: Callable[
-        [srctools.VMF, collisions.Collisions, Entity | None, Property],
+        [srctools.VMF, collisions.Collisions, Entity, Property],
         CallResultT | Callable[[Entity], CallResultT],
     ]
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
@@ -508,9 +508,13 @@ class CondCall(Generic[CallResultT]):
             try:
                 cback = self._setup_data[id(conf)]
             except KeyError:
-                # The None here is the entity, which is always unused
-                # for setup functions!
-                cback = self._setup_data[id(conf)] = self._cback(ent.map, coll, None, conf)
+                # The entity should never be used in setup functions. Pass a dummy object
+                # so errors occur if it's used.
+                cback = self._setup_data[id(conf)] = self._cback(
+                    ent.map, coll,
+                    cast(Entity, object()),
+                    conf,
+                )
 
             if not callable(cback):
                 # We don't actually have a setup func,
@@ -525,7 +529,7 @@ class CondCall(Generic[CallResultT]):
     @property
     def __doc__(self) -> str | None:
         """Description of the callback's behaviour."""
-        return self.func.__doc__
+        return getattr(self.func, '__doc__', None)
 
 
 def _get_cond_group(func: Any) -> str:
@@ -548,7 +552,7 @@ def add_meta(func: CallableT, priority: Decimal | int, only_once=True) -> None:
     # This adds a condition result like "func" (with quotes), which cannot
     # be entered into property files.
     # The qualified name will be unique across modules.
-    name = '"' + func.__qualname__ + '"'
+    name = f'"{func.__qualname__}"'
     LOGGER.debug(
         "Adding metacondition ({}) with priority {!s}!",
         name,

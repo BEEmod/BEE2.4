@@ -5,6 +5,7 @@ This produces a stream of values, which are fed into richTextBox to display.
 from __future__ import annotations
 from collections.abc import Sequence
 import urllib.parse
+import types
 
 import attrs
 from mistletoe import block_token as btok, span_token as stok
@@ -79,11 +80,12 @@ class TKRenderer(mistletoe.BaseRenderer):
         self.package: str | None = None
         super().__init__()
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: type[BaseException], exc_val: BaseException, exc_tb: types.TracebackType) -> None:
         self._list_stack.clear()
         self.package = None
 
     def render(self, token: btok.BlockToken) -> MarkdownData:
+        """Indicate the correct types for this."""
         return super().render(token)
 
     def render_inner(self, token: stok.SpanToken | btok.BlockToken) -> MarkdownData:

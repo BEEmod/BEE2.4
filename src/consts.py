@@ -51,7 +51,7 @@ class MaterialGroupMeta(EnumMeta):
     _value2member_map_: dict[str, Any]  # Enum defines.
 
     @classmethod
-    def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwargs: Any) -> Mapping[str, Any]:
+    def __prepare__(mcs, cls: str, bases: tuple[type, ...], **kwargs: Any) -> Mapping[str, Any]:
         """Override Enum class-dict type.
 
         This makes string-values lowercase when set.
@@ -67,7 +67,7 @@ class MaterialGroupMeta(EnumMeta):
         assert isinstance(namespace, _MaterialGroupNS)
         return super().__new__(mcs, name, bases, namespace.mapping, **kwds)
 
-    def __contains__(cls, value) -> bool:
+    def __contains__(cls, value: object) -> bool:
         """MaterialGroup can check if strings are equal to a member."""
         if isinstance(value, str):
             return value.casefold() in cls._value2member_map_
@@ -92,17 +92,21 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
       to any members.
     * str(member) == member.value
     """
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Compare case-insensitively."""
         if isinstance(other, Side):
             other = other.mat
-        return self.value == other.casefold()
+        if isinstance(other, str):
+            return self.value == other.casefold()
+        return NotImplemented
 
-    def __ne__(self, other) -> bool:
+    def __ne__(self, other: object) -> bool:
         """Compare case-insensitively."""
         if isinstance(other, Side):
             other = other.mat
-        return self.value != other.casefold()
+        if isinstance(other, str):
+            return self.value != other.casefold()
+        return NotImplemented
 
     def __str__(self) -> str:
         return self.value

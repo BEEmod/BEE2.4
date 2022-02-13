@@ -2,7 +2,7 @@
 from __future__ import annotations
 from collections import deque
 from typing import (
-    TypeVar, Any, NoReturn, Generic, Type, Optional, Tuple,
+    TypeVar, Any, NoReturn, Generic, Type, Optional, Tuple, TYPE_CHECKING,
     SupportsInt, Union, Callable,
     Sequence, Iterator, Iterable, Mapping, Dict, Generator,
     KeysView, ValuesView, ItemsView
@@ -151,15 +151,18 @@ def fix_cur_directory() -> None:
     os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 
 
-def _run_bg_daemon(*args) -> None:
-    """Helper to make loadScreen not need to import bg_daemon.
+if TYPE_CHECKING:
+    from bg_daemon import run_background as run_bg_daemon
+else:
+    def run_bg_daemon(*args) -> None:
+        """Helper to make loadScreen not need to import bg_daemon.
 
-    Instead we can redirect the import through here, which is a module
-    both processes need to import. Then the main process doesn't need
-    to import bg_daemon, and the daemon doesn't need to import loadScreen.
-    """
-    import bg_daemon
-    bg_daemon.run_background(*args)
+        Instead we can redirect the import through here, which is a module
+        both processes need to import. Then the main process doesn't need
+        to import bg_daemon, and the daemon doesn't need to import loadScreen.
+        """
+        import bg_daemon
+        bg_daemon.run_background(*args)
 
 
 class CONN_TYPES(Enum):
@@ -307,7 +310,7 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
         self._registry: dict[str, FuncT] = {}
         self.allowed_attrs = set(attrs)
 
-    def __call__(self, *names: str, **kwargs) -> Callable[[FuncT], FuncT]:
+    def __call__(self, *names: str, **kwargs: Any) -> Callable[[FuncT], FuncT]:
         """Add a function to the dict."""
         if not names:
             raise TypeError('No names passed!')
@@ -443,7 +446,7 @@ class PackagePath:
     def __hash__(self) -> int:
         return hash((self.package, self.path))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, str):
             other = self.parse(other, self.package)
         elif not isinstance(other, PackagePath):
@@ -599,7 +602,7 @@ def restart_app() -> NoReturn:
     os.execv(sys.executable, args)
 
 
-def quit_app(status=0) -> NoReturn:
+def quit_app(status: int=0) -> NoReturn:
     """Quit the application."""
     sys.exit(status)
 
@@ -635,7 +638,7 @@ def unset_readonly(file: os.PathLike) -> None:
 def merge_tree(
     src: str,
     dst: str,
-    copy_function=shutil.copy2,
+    copy_function: Callable[[str, str], None]=shutil.copy2,
 ) -> None:
     """Recursively copy a directory tree to a destination, which may exist.
 

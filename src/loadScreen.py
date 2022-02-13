@@ -214,7 +214,7 @@ def shutdown() -> None:
 # Initialise the daemon.
 # noinspection PyProtectedMember
 BG_PROC = multiprocessing.Process(
-    target=utils._run_bg_daemon,
+    target=utils.run_bg_daemon,
     args=(
         _PIPE_DAEMON_SEND,
         _PIPE_DAEMON_REC,
