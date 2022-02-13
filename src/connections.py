@@ -59,7 +59,7 @@ class InputType(Enum):
     DAISYCHAIN = 'daisychain'
 
     @property
-    def is_logic(self):
+    def is_logic(self) -> bool:
         """Is this a logic gate?"""
         return self.value in ('and_logic', 'or_logic')
 
@@ -91,7 +91,7 @@ class OutNames(str, Enum):
     OUT_DEACT = 'ON_DEACTIVATED'
 
 
-def _intern_out(out: Optional[Tuple[Optional[str], str]]) -> Optional[Tuple[Optional[str], str]]:
+def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | None:
     if out is None:
         return None
     out_name, output = out
@@ -105,8 +105,8 @@ class Config:
 
     This is shared by all items of the same type.
     """
-    output_act: Optional[Tuple[Optional[str], str]]
-    output_deact: Optional[Tuple[Optional[str], str]]
+    output_act: tuple[str | None, str] | None
+    output_deact: tuple[str | None, str] | None
 
     def __init__(
         self,
@@ -125,21 +125,21 @@ class Config:
         sec_disable_cmd: Iterable[Output]=(),
 
         output_type: ConnType=ConnType.DEFAULT,
-        output_act: Optional[Tuple[Optional[str], str]]=None,
-        output_deact: Optional[Tuple[Optional[str], str]]=None,
+        output_act: tuple[str | None, str] | None=None,
+        output_deact: tuple[str | None, str] | None=None,
 
         lock_cmd: Iterable[Output]=(),
         unlock_cmd: Iterable[Output]=(),
-        output_lock: Optional[Tuple[Optional[str], str]]=None,
-        output_unlock: Optional[Tuple[Optional[str], str]]=None,
+        output_lock: tuple[str | None, str] | None=None,
+        output_unlock: tuple[str | None, str] | None=None,
         inf_lock_only: bool=False,
 
-        timer_sound_pos: Optional[Vec]=None,
+        timer_sound_pos: Vec | None=None,
         timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
 
-        timer_start: Optional[List[Tuple[Optional[str], str]]]=None,
-        timer_stop: Optional[List[Tuple[Optional[str], str]]]=None,
+        timer_start: list[tuple[str | None, str]] | None=None,
+        timer_stop: list[tuple[str | None, str]] | None=None,
     ):
         self.id = id
 
@@ -219,10 +219,10 @@ class Config:
         self.output_unlock = output_unlock
 
     @staticmethod
-    def parse(item_id: str, conf: Property):
+    def parse(item_id: str, conf: Property) -> Config:
         """Read the item type info from the given config."""
 
-        def get_outputs(prop_name):
+        def get_outputs(prop_name: str) -> list[Output]:
             """Parse all the outputs with this name."""
             return [
                 Output.parse(prop)
@@ -309,7 +309,7 @@ class Config:
                 item_id, conf['DualType'],
             )) from None
 
-        def get_input(prop_name: str):
+        def get_input(prop_name: str) -> tuple[str | None, str] | None:
             """Parse an input command."""
             try:
                 return Output.parse_name(conf[prop_name])
