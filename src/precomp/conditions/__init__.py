@@ -77,6 +77,7 @@ ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
 
 
+CallableT = TypeVar('CallableT', bound=Callable)
 # The return values for 2-stage results and flags.
 FlagCallable = Callable[[Entity], bool]
 ResultCallable = Callable[[Entity], object]
@@ -489,7 +490,7 @@ def _get_cond_group(func: Any) -> str:
         return group
 
 
-def add_meta(func, priority: Decimal | int, only_once=True):
+def add_meta(func: CallableT, priority: Decimal | int, only_once=True) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -523,17 +524,17 @@ def add_meta(func, priority: Decimal | int, only_once=True):
     ALL_META.append((name, dec_priority, wrapper))
 
 
-def meta_cond(priority: int=0, only_once: bool=True):
+def meta_cond(priority: int=0, only_once: bool=True) -> Callable[[CallableT], CallableT]:
     """Decorator version of add_meta."""
-    def x(func):
+    def x(func: CallableT) -> CallableT:
         add_meta(func, priority, only_once)
         return func
     return x
 
 
-def make_flag(orig_name: str, *aliases: str):
+def make_flag(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
     """Decorator to add flags to the lookup."""
-    def x(func):
+    def x(func: CallableT) -> CallableT:
         wrapper = CondCall(func, _get_cond_group(func))
         ALL_FLAGS.append((orig_name, aliases, wrapper))
         FLAG_LOOKUP[orig_name.casefold()] = wrapper
@@ -543,7 +544,7 @@ def make_flag(orig_name: str, *aliases: str):
     return x
 
 
-def make_result(orig_name: str, *aliases: str):
+def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
@@ -552,7 +553,7 @@ def make_result(orig_name: str, *aliases: str):
         if name.casefold() != folded_name
     ])
 
-    def x(result_func):
+    def x(result_func: CallableT) -> CallableT:
         """Create the result when the function is supplied."""
         # Legacy setup func support.
         try:
@@ -577,13 +578,13 @@ def make_result(orig_name: str, *aliases: str):
     return x
 
 
-def make_result_setup(*names: str):
+def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
     """Legacy setup function for results. This is no longer used."""
     # Users can't do anything about this, don't bother them.
     if utils.DEV_MODE:
         warnings.warn('Use closure system instead.', DeprecationWarning, stacklevel=2)
 
-    def x(func: Callable[..., Any]):
+    def x(func: CallableT) -> CallableT:
         for name in names:
             if name.casefold() in RESULT_LOOKUP:
                 raise ValueError('Legacy setup called after making result!')
@@ -592,7 +593,7 @@ def make_result_setup(*names: str):
     return x
 
 
-def add(prop_block):
+def add(prop_block: Property) -> None:
     """Parse and add a condition to the list."""
     con = Condition.parse(prop_block)
     if con.results or con.else_results:
