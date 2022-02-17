@@ -106,7 +106,7 @@ AttrValues = Union[str, Iterable[str], bool, Vec]
 @attrs.frozen
 class WindowState(config.Data):
     """The immutable window state stored in config files for restoration next launch."""
-    open_groups: Mapping[str, bool] = attrs.Factory({}.copy)
+    open_groups: Mapping[str, bool] = attrs.Factory(dict)
     width: int = 0
     height: int = 0
 
@@ -172,6 +172,8 @@ class AttrDef:
     desc: str
     default: AttrValues
     type: AttrTypes
+
+    label: ttk.Label = attrs.field(init=False)
 
     @classmethod
     def string(cls, attr_id: str, desc='', default: str='') -> AttrDef:
@@ -333,8 +335,8 @@ class Item:
         long_name: Optional[str] = None,
         icon: Optional[img.Handle]=None,
         large_icon: Optional[img.Handle] = None,
-        previews: list[img.Handle] = (),
-        authors: Iterable[str]=(),
+        previews: Iterable[img.Handle] = (),
+        authors: Iterable[str] = (),
         desc: Union[MarkdownData, str] = MarkdownData(),
         group: str = '',
         sort_key: Optional[str] = None,
@@ -518,7 +520,7 @@ class PreviewWindow:
             parent.win.grab_release()
             self.win.grab_set()
 
-    def hide(self) -> None:
+    def hide(self, _: Event | None = None) -> None:
         """Swap grabs if the parent is modal."""
         if self.parent.modal:
             self.win.grab_release()
@@ -938,6 +940,8 @@ class SelectorWin:
             stretch='never',
         )
 
+        # Wide before short.
+        self.attrs = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
         if attributes:
             attrs_frame = ttk.Frame(self.prop_frm)
             attrs_frame.grid(
@@ -950,39 +954,29 @@ class SelectorWin:
             attrs_frame.columnconfigure(0, weight=1)
             attrs_frame.columnconfigure(1, weight=1)
 
-            self.attr = {}
             # Add in all the attribute labels
             index = 0
-            # Wide before short.
-            attr_order = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
-            for attrib in attr_order:
+            for attr in self.attrs:
                 attr_frame = ttk.Frame(attrs_frame)
-                desc_label = ttk.Label(
-                    attr_frame,
-                    text=attrib.desc,
-                )
-                self.attr[attrib.id] = val_label = ttk.Label(
-                    attr_frame,
-                )
+                desc_label = ttk.Label(attr_frame, text=attr.desc)
+                attr.label = ttk.Label(attr_frame)
 
-                val_label.default = attrib.default
-                val_label.type = attrib.type
-                if attrib.type is AttrTypes.BOOL:
+                if attr.type is AttrTypes.BOOL:
                     # It's a tick/cross label
-                    if attrib.default:
-                        img.apply(val_label, ICON_CHECK)
+                    if attr.default:
+                        img.apply(attr.label, ICON_CHECK)
                     else:
-                        img.apply(val_label, ICON_CROSS)
-                elif attrib.type is AttrTypes.COLOR:
+                        img.apply(attr.label, ICON_CROSS)
+                elif attr.type is AttrTypes.COLOR:
                     # A small colour swatch.
-                    val_label.configure(relief=RAISED)
+                    attr.label.configure(relief=RAISED)
                     # Show the color value when hovered.
-                    add_tooltip(val_label)
+                    add_tooltip(attr.label)
 
                 desc_label.grid(row=0, column=0,  sticky=E)
-                val_label.grid(row=0, column=1, sticky=W)
+                attr.label.grid(row=0, column=1, sticky=W)
                 # Wide ones have their own row, narrow ones are two to a row
-                if attrib.type.is_wide:
+                if attr.type.is_wide:
                     if index % 2:  # Row has a single narrow, skip the empty space.
                         index += 1
                     attr_frame.grid(
@@ -1006,8 +1000,6 @@ class SelectorWin:
                             sticky=W,
                         )
                     index += 1
-        else:
-            self.attr = None
 
         self.set_disp()
         self.refresh()
@@ -1286,7 +1278,7 @@ class SelectorWin:
             self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
 
-        app.tk_tools.center_win(self.win, parent=self.parent)
+        tk_tools.center_win(self.win, parent=self.parent)
 
         self.sel_item(self.selected)
         self.win.after(2, self.flow_items)
@@ -1406,35 +1398,32 @@ class SelectorWin:
             else:
                 self.prop_reset.state(('disabled',))
 
-        if self.attr:
-            # Set the attribute items.
-            for attr_id, label in self.attr.items():
-                val = item.attrs.get(attr_id, label.default)
+        # Set the attribute items.
+        for attr in self.attrs:
+            val = item.attrs.get(attr.id, attr.default)
 
-                if label.type is AttrTypes.BOOL:
-                    if val:
-                        img.apply(label, ICON_CHECK)
-                    else:
-                        img.apply(label, ICON_CROSS)
-                elif label.type is AttrTypes.COLOR:
-                    assert isinstance(val, Vec)
-                    img.apply(label, img.Handle.color(val, 16, 16))
-                    # Display the full color when hovering..
-                    # i18n: Tooltip for colour swatch.
-                    set_tooltip(label, gettext('Color: R={r}, G={g}, B={b}').format(
-                        r=int(val.x), g=int(val.y), b=int(val.z),
-                    ))
-                elif label.type is AttrTypes.LIST:
-                    # Join the values (in alphabetical order)
-                    assert isinstance(val, Iterable), repr(val)
-                    label['text'] = ', '.join(sorted(val))
-                elif label.type is AttrTypes.STRING:
-                    # Just a string.
-                    label['text'] = str(val)
+            if attr.type is AttrTypes.BOOL:
+                if val:
+                    img.apply(attr.label, ICON_CHECK)
                 else:
-                    raise ValueError(
-                        'Invalid attribute type: "{}"'.format(label.type)
-                    )
+                    img.apply(attr.label, ICON_CROSS)
+            elif attr.type is AttrTypes.COLOR:
+                assert isinstance(val, Vec)
+                img.apply(attr.label, img.Handle.color(val, 16, 16))
+                # Display the full color when hovering..
+                # i18n: Tooltip for colour swatch.
+                set_tooltip(attr.label, gettext('Color: R={r}, G={g}, B={b}').format(
+                    r=int(val.x), g=int(val.y), b=int(val.z),
+                ))
+            elif attr.type is AttrTypes.LIST:
+                # Join the values (in alphabetical order)
+                assert isinstance(val, Iterable), repr(val)
+                attr.label['text'] = ', '.join(sorted(val))
+            elif attr.type is AttrTypes.STRING:
+                # Just a string.
+                attr.label['text'] = str(val)
+            else:
+                raise ValueError(f'Invalid attribute type: "{attr.type}"')
 
     def key_navigate(self, event: Event) -> None:
         """Navigate using arrow keys.
