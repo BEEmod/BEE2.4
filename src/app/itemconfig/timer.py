@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import AsyncIterator, List, Tuple
 
 import tkinter as tk
+from tkinter import ttk
 from srctools import Property, conv_int, logger
 
 from app.itemconfig import UpdateFunc, WidgetLookup, WidgetLookupMulti, multi_grid
@@ -24,7 +25,7 @@ def timer_values(min_value: int, max_value: int) -> List[str]:
 
 @WidgetLookupMulti('Timer', 'MinuteSeconds')
 async def widget_minute_seconds_multi(
-        parent: tk.Frame,
+        parent: ttk.Frame,
         values: List[Tuple[str, tk.StringVar]], conf: Property
 ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
     """For timers, display in a more compact form."""
@@ -36,7 +37,7 @@ async def widget_minute_seconds_multi(
 
 
 @WidgetLookup('Timer', 'MinuteSeconds')
-async def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_minute_seconds(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.

@@ -386,7 +386,7 @@ class Version:
     id: str
     isolate: bool
     styles: dict[str, ItemVariant]
-    def_style: ItemVariant | str
+    def_style: ItemVariant
 
     def __repr__(self) -> str:
         return f'<Version "{self.id}">'
@@ -498,7 +498,8 @@ class Item(PakObject, needs_foreground=True):
                         "can't inherit from itself!"
                     )
             versions[ver_id] = version = Version(
-                ver_id, ver_name, ver_isolate, styles, def_style,
+                ver_id, ver_name, ver_isolate, styles,
+                cast(ItemVariant, def_style),  # Temporary, will be fixed in setup_style_tree()
             )
 
             # The first version is the 'default',
@@ -1028,7 +1029,7 @@ async def assign_styled_items(
         assert all(isinstance(variant, ItemVariant) for variant in styles.values()), styles
 
         # Fix this reference to point to the actual value.
-        vers.def_style = vers.styles[vers.def_style]
+        vers.def_style = vers.styles[cast(str, vers.def_style)]
 
         if DEV_MODE.get():
             # Check each editoritem definition for some known issues.

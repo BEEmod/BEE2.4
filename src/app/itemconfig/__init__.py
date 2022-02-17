@@ -5,6 +5,7 @@ from typing import (
 )
 from tkinter import ttk
 import tkinter as tk
+import itertools
 
 from srctools import EmptyMapping, Property, Vec, logger
 from srctools.dmx import Element
@@ -28,7 +29,7 @@ UpdateFunc = Callable[[str], Awaitable[None]]
 # The function is passed a parent frame, StringVar, and Property block.
 # The widget to be installed should be returned, and a callback to refresh the UI.
 SingleCreateFunc = Callable[
-    [tk.Frame, tk.StringVar, Property],
+    [ttk.Frame, tk.StringVar, Property],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
 WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets')
@@ -37,7 +38,7 @@ WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets')
 # instead. The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc = Callable[
-    [tk.Frame, List[Tuple[str, tk.StringVar]], Property],
+    [ttk.Frame, List[Tuple[str, tk.StringVar]], Property],
     AsyncIterator[Tuple[str, UpdateFunc]]
 ]
 WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-Widgets')
@@ -147,10 +148,10 @@ class SingleWidget(Widget):
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
-        if isinstance(data.values, list):
-            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
-        else:
+        if isinstance(data.values, str):
             self.value.set(data.values)
+        else:
+            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
 
     def __attrs_post_init__(self) -> None:
         """Add functions to recompute state/UI when changed."""
@@ -229,7 +230,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    async def parse(cls, data: ParseData) -> PakObject:
+    async def parse(cls, data: ParseData) -> 'ConfigGroup':
         """Parse the config group from info.txt."""
         props = data.info
 
@@ -267,7 +268,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
             name = wid['Label']
             tooltip = wid['Tooltip', '']
             default_prop = wid.find_key('Default', '')
-            values: Union[List[Tuple[str, tk.StringVar]], tk.StringVar]
+            values: list[tuple[str, tk.StringVar]]
 
             conf = app.config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
@@ -287,7 +288,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                values: list[tuple[str, tk.StringVar]] = []
+                values = []
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if conf.values is EmptyMapping:
                         # No new conf, check the old conf.
@@ -374,9 +375,8 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
     def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""
         return {
-            wid.id
-            for wid_cat in (self.widgets, self.multi_widgets)
-            for wid in wid_cat
+            wid.id for wid in
+            itertools.chain(self.widgets, self.multi_widgets)
         }
 
     @staticmethod
@@ -505,7 +505,7 @@ async def make_pane(parent: ttk.Frame) -> None:
 
 def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     """For widgets without a multi version, do it generically."""
-    async def generic_func(parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+    async def generic_func(parent: ttk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
         """Generically make a set of labels."""
         for row, (tim_val, var) in enumerate(values):
             if tim_val == 'inf':
@@ -547,7 +547,7 @@ def widget_sfx(*args) -> None:
 
 
 @WidgetLookup('itemvariant', 'variant')
-async def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.

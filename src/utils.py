@@ -2,10 +2,9 @@
 from __future__ import annotations
 from collections import deque
 from typing import (
-    TypeVar, Any, NoReturn, Generic, Type, Optional, Tuple, TYPE_CHECKING,
-    SupportsInt, Union, Callable,
-    Sequence, Iterator, Iterable, Mapping, Dict, Generator,
-    KeysView, ValuesView, ItemsView
+    TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING,
+    SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator,
+    KeysView, ValuesView, ItemsView,
 )
 import logging
 import os
@@ -146,7 +145,7 @@ def conf_location(path: str) -> Path:
 def fix_cur_directory() -> None:
     """Change directory to the location of the executable.
 
-    Otherwise we can't find our files!
+    Otherwise, we can't find our files!
     """
     os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 
@@ -157,7 +156,7 @@ else:
     def run_bg_daemon(*args) -> None:
         """Helper to make loadScreen not need to import bg_daemon.
 
-        Instead we can redirect the import through here, which is a module
+        Instead, we can redirect the import through here, which is a module
         both processes need to import. Then the main process doesn't need
         to import bg_daemon, and the daemon doesn't need to import loadScreen.
         """
@@ -214,7 +213,7 @@ FuncT = TypeVar('FuncT', bound=Callable)
 EnumT = TypeVar('EnumT', bound=Enum)
 
 
-def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
+def freeze_enum_props(cls: type[EnumT]) -> type[EnumT]:
     """Make a enum with property getters more efficent.
 
     Call the getter on each member, and then replace it with a dict lookup.
@@ -224,11 +223,11 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
             continue
         data = {}
-        data_exc: Dict[EnumT, Tuple[BaseException, Optional[TracebackType]]] = {}
+        data_exc: dict[EnumT, tuple[BaseException, TracebackType | None]] = {}
 
         exc: Exception
         enum: EnumT
-        tb: Optional[TracebackType]
+        tb: TracebackType | None
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
@@ -262,7 +261,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, Tuple[BaseException, Optional[TracebackType]]],
+    data_exc: Mapping[EnumT, tuple[BaseException, TracebackType | None]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -361,9 +360,9 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
     def __len__(self) -> int:
         return len(set(self._registry.values()))
 
-    def __getitem__(self, names: Union[str, tuple[str]]) -> FuncT:
+    def __getitem__(self, names: str | tuple[str, ...]) -> FuncT:
         if isinstance(names, str):
-            names = names,
+            names = (names, )
 
         for name in names:
             if self.casefold:
@@ -373,23 +372,21 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
             except KeyError:
                 pass
         else:
-            raise KeyError('No function with names {}!'.format(
-                ', '.join(names),
-            ))
+            raise KeyError(f'No function with names {", ".join(names)}!')
 
     def __setitem__(
         self,
-        names: Union[str, tuple[str, ...]],
+        names: str | tuple[str, ...],
         func: FuncT,
     ) -> None:
         if isinstance(names, str):
-            names = names,
+            names = (names, )
 
         for name in names:
             if self.casefold:
                 name = name.casefold()
             if name in self._registry:
-                raise ValueError('Overwrote {!r}!'.format(name))
+                raise ValueError(f'Overwrote {name!r}!')
             self._registry[name] = func
 
     def __delitem__(self, name: str) -> None:
@@ -508,7 +505,7 @@ if WIN:
         import ctypes
         # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getasynckeystate
         GetAsyncKeyState = ctypes.windll.User32.GetAsyncKeyState
-        GetAsyncKeyState.returntype = ctypes.c_short
+        GetAsyncKeyState.restype = ctypes.c_short
         GetAsyncKeyState.argtypes = [ctypes.c_int]
         VK_SHIFT = 0x10
         # Most significant bit set if currently held.
@@ -607,7 +604,7 @@ def quit_app(status: int=0) -> NoReturn:
     sys.exit(status)
 
 
-def set_readonly(file: Union[bytes, str]) -> None:
+def set_readonly(file: str | bytes | os.PathLike) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
@@ -621,7 +618,7 @@ def set_readonly(file: Union[bytes, str]) -> None:
     )
 
 
-def unset_readonly(file: os.PathLike) -> None:
+def unset_readonly(file: str | bytes | os.PathLike) -> None:
     """Set the writeable flag on a file."""
     # Get the old flags
     flags = os.stat(file).st_mode

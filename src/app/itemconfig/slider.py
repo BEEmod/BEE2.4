@@ -20,7 +20,7 @@ def decimal_points(num: float) -> int:
 
 
 @WidgetLookup('range', 'slider')
-async def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
+async def widget_slider(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a slider for setting a number in a range."""
     limit_min = conf.float('min', 0)
     limit_max = conf.float('max', 100)
@@ -29,7 +29,7 @@ async def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
     # We have to manually translate the UI position to a value.
     ui_min = 0
     ui_max = abs(math.ceil((limit_max - limit_min) / step))
-    ui_var = tk.StringVar()
+    ui_var = tk.DoubleVar()
 
     # The formatting of the text display is a little complex.
     # We want to keep the same number of decimal points for all values.
@@ -51,8 +51,9 @@ async def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
             var.set(new_pos)
 
     async def update_ui(new_value: str) -> None:
+        """Apply the configured value to the UI."""
         off = (float(new_value) - limit_min) / step
-        ui_var.set(str(round(off)))
+        ui_var.set(round(off))
 
     await update_ui(var.get())
 

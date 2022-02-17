@@ -6,6 +6,7 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
+from typing import Optional, Union, Any, Type, IO
 from pathlib import Path
 from collections.abc import Iterable, Iterator
 
@@ -40,8 +41,6 @@ import packages.template_brush
 import editoritems
 import utils
 
-from typing import Optional, Union, Any, Type, IO
-
 
 try:
     from importlib.resources import read_binary as imp_res_read_binary
@@ -58,7 +57,7 @@ selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
 
 # Translated text from basemodui.txt.
-TRANS_DATA = {}
+TRANS_DATA: dict[str, str] = {}
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -447,16 +446,16 @@ class Game:
                         )
                     continue
 
-                with atomic_write(info_path, overwrite=True, encoding='utf8') as file:
+                with atomic_write(info_path, overwrite=True, encoding='utf8') as file2:
                     for line in data:
-                        file.write(line)
+                        file2.write(line)
         if not add_line:
             # Restore the original files!
 
-            for name, file, ext in FILES_TO_BACKUP:
-                item_path = self.abs_path(file + ext)
-                backup_path = self.abs_path(file + '_original' + ext)
-                old_version = self.abs_path(file + '_styles' + ext)
+            for name, filename, ext in FILES_TO_BACKUP:
+                item_path = self.abs_path(f"{filename}{ext}")
+                backup_path = self.abs_path(f'{filename}_original{ext}')
+                old_version = self.abs_path(f'{filename}_styles{ext}')
                 if os.path.isfile(old_version):
                     LOGGER.info('Restoring Stylechanger version of "{}"!', name)
                     shutil.copy(old_version, item_path)
@@ -534,12 +533,11 @@ class Game:
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
-        if any(
+        return any(
             pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
             packages.LOADED.packages.items()
-        ):
-            return True
+        )
 
     def refresh_cache(self, already_copied: set[str]) -> None:
         """Copy over the resource files into this game.
@@ -584,12 +582,12 @@ class Game:
         for path in [INST_PATH, 'bee2']:
             abs_path = self.abs_path(path)
             for dirpath, dirnames, filenames in os.walk(abs_path):
-                for file in filenames:
+                for filename in filenames:
                     # Keep VMX backups, disabled editor models, and the coop
                     # gun instance.
-                    if file.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
+                    if filename.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
                         continue
-                    path = os.path.join(dirpath, file)
+                    path = os.path.join(dirpath, filename)
 
                     if path.casefold() not in already_copied:
                         LOGGER.info('Deleting: {}', path)
@@ -908,13 +906,13 @@ class Game:
                 LOGGER.info('Writing {}...', filename)
                 loc = Path(self.abs_path(filename))
                 loc.parent.mkdir(parents=True, exist_ok=True)
-                with loc.open('wb') as f:
-                    f.write(data)
+                with loc.open('wb') as f1:
+                    f1.write(data)
 
             if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
                 os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
-                with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
-                    TAG_COOP_INST_VMF.export(f)
+                with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f2:
+                    TAG_COOP_INST_VMF.export(f2)
 
             export_screen.reset()  # Hide loading screen, we're done
             return True, vpk_success
@@ -991,14 +989,14 @@ class Game:
                 )
         if fizz_colors:
             os.makedirs(self.abs_path('bee2/materials/bee2/fizz_sides/'), exist_ok=True)
-        for fizz_color, (alpha, fizz_vortex_color) in fizz_colors.items():
+        for fizz_color_vec, (alpha, fizz_vortex_color) in fizz_colors.items():
             file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(
-                round(fizz_color.x * 255),
-                round(fizz_color.y * 255),
-                round(fizz_color.z * 255),
+                round(fizz_color_vec.x * 255),
+                round(fizz_color_vec.y * 255),
+                round(fizz_color_vec.z * 255),
             )
             with open(file_path, 'w') as f:
-                f.write(FIZZLER_EDGE_MAT.format(Vec(fizz_color), fizz_vortex_color))
+                f.write(FIZZLER_EDGE_MAT.format(Vec(fizz_color_vec), fizz_vortex_color))
                 if alpha != 1:
                     # Add the alpha value, but replace 0.5 -> .5 to save a char.
                     f.write('$outputintensity {}\n'.format(format(alpha, 'g').replace('0.', '.')))
@@ -1219,9 +1217,10 @@ def make_tag_coop_inst(tag_loc: str):
 
     ent_count = len(vmf.entities)
 
-    def logic_pos():
+    def logic_pos() -> Iterator[Vec]:
         """Put the entities in a nice circle..."""
         while True:
+            ang: float
             for ang in range(0, ent_count):
                 ang *= 360/ent_count
                 yield Vec(16*math.sin(ang), 16*math.cos(ang), 32)

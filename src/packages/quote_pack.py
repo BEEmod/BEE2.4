@@ -60,7 +60,7 @@ class QuotePack(PakObject, needs_foreground=True):
             monitor_data = data.info.find_key('monitor')
         except NoKeyError:
             mon_studio = mon_cam_loc = None
-            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0.0
             mon_studio_actor = ''
             turret_hate = False
         else:
