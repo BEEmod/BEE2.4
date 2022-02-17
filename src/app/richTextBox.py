@@ -148,17 +148,6 @@ class tkRichText(tkinter.Text):
             super().insert("end", text_data)
             return
 
-        # Strip newlines from the start and end of text.
-        if text_data._unstripped and len(text_data.blocks) > 1:
-            first = text_data.blocks[0]
-            if isinstance(first, tkMarkdown.TextSegment) and first.text.startswith('\n'):
-                text_data.blocks[0] = tkMarkdown.TextSegment(first.text.lstrip('\n'), first.tags, first.url)
-
-            last = text_data.blocks[-1]
-            if isinstance(last, tkMarkdown.TextSegment) and last.text.endswith('\n'):
-                text_data.blocks[-1] = tkMarkdown.TextSegment(last.text.rstrip('\n'), last.tags, last.url)
-            text_data._unstripped = True
-
         segment: tkMarkdown.TextSegment
         for i, block in enumerate(text_data.blocks):
             if isinstance(block, tkMarkdown.TextSegment):
@@ -176,7 +165,13 @@ class tkRichText(tkinter.Text):
                     tags = block.tags + (cmd_tag, 'link')
                 else:
                     tags = block.tags
-                super().insert('end', block.text, tags)
+                # Strip newlines from the beginning and end of the textbox.
+                text = block.text
+                if i == 0:
+                    text = text.lstrip('\n')
+                elif i + 1 == len(text_data.blocks):
+                    text = text.rstrip('\n')
+                super().insert('end', text, tags)
             elif isinstance(block, tkMarkdown.Image):
                 super().insert('end', '\n')
                 # TODO: Setup apply to handle this?

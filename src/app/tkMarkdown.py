@@ -51,8 +51,6 @@ class MarkdownData:
     """
     # External users shouldn't modify directly, so make it readonly.
     blocks: Sequence[Block] = attrs.field(factory=[].copy)
-    # RichTextBox strips the newlines later on, so we can join with these preserved.
-    _unstripped: bool = True
 
     def __bool__(self) -> bool:
         """Empty data is false."""
