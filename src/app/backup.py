@@ -30,7 +30,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
 
-UI = {}  # Holds all the widgets
+UI: Dict[str, Any] = {}  # Holds all the widgets
 
 menus = {}  # For standalone application, generate menu bars
 

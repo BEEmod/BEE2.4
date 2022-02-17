@@ -1,6 +1,6 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import trio
 from srctools.dmx import Element
@@ -362,22 +362,18 @@ async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callabl
 
     for var in VAR_LIST:
         tk_vars[var.id] = IntVar(value=var.enabled)
-        args = {
-            'variable': tk_vars[var.id],
-            'text': var.name,
-        }
         desc = make_desc(var)
         if var.applies_to_all():
             # Available in all styles - put with the hardcoded variables.
             all_pos += 1
 
-            checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, **args)
+            checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id], text=var.name)
             chk.grid(row=all_pos, column=0, sticky="W", padx=3)
             tooltip.add_tooltip(chk, desc)
         else:
             # Swap between checkboxes depending on style.
-            checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
-            checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
+            checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id], text=var.name)
+            checkbox_other[var.id] = ttk.Checkbutton(frm_other, variable=tk_vars[var.id], text=var.name)
 
             tooltip.add_tooltip(checkbox_chosen[var.id], desc)
             tooltip.add_tooltip(checkbox_other[var.id], desc)

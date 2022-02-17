@@ -232,7 +232,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
-                value.fget.__globals__[cls.__name__] = cls  # type: ignore
+                value.fget.__globals__[cls.__name__] = cls
             except AttributeError:
                 pass
             try:

@@ -51,7 +51,7 @@ class MaterialGroupMeta(EnumMeta):
     _value2member_map_: dict[str, Any]  # Enum defines.
 
     @classmethod
-    def __prepare__(mcs, cls: str, bases: tuple[type, ...], **kwargs: Any) -> Mapping[str, Any]:
+    def __prepare__(mcs, cls: str, bases: tuple[type, ...], /, **kwargs: Any) -> Mapping[str, Any]:
         """Override Enum class-dict type.
 
         This makes string-values lowercase when set.
@@ -65,7 +65,8 @@ class MaterialGroupMeta(EnumMeta):
         It accesses attributes, so it can't have our wrapper.
         """
         assert isinstance(namespace, _MaterialGroupNS)
-        return super().__new__(mcs, name, bases, namespace.mapping, **kwds)
+        # Is always enum._EnumDict, but that's private.
+        return super().__new__(mcs, name, bases, cast(Any, namespace.mapping), **kwds)
 
     def __contains__(cls, value: object) -> bool:
         """MaterialGroup can check if strings are equal to a member."""

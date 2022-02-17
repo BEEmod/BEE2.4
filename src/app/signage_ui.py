@@ -18,7 +18,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 
-drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
+drag_man = dragdrop.Manager[Signage](window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)

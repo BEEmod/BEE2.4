@@ -7,7 +7,8 @@ various item properties.
 - open_event is the TK callback version of showProps(), which gets the
   clicked widget from the event
 """
-from typing import Dict, Optional
+from __future__ import annotations
+from typing import Any
 from enum import Enum
 import functools
 import webbrowser
@@ -18,10 +19,7 @@ from tkinter import messagebox
 
 from .richTextBox import tkRichText
 from . import (
-    itemPropWin, itemconfig, tkMarkdown, tooltip, tk_tools,
-    sound,
-    img,
-    UI,
+    itemPropWin, itemconfig, tkMarkdown, tooltip, tk_tools, sound, img, UI,
     TK_ROOT, DEV_MODE,
 )
 import utils
@@ -32,10 +30,12 @@ from localisation import gettext
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-wid = {}
+wid: dict[str, Any] = {}
+wid_subitem: dict[int, ttk.Label] = {}
+wid_sprite: dict[SPR, ttk.Label] = {}
 
-selected_item: 'UI.Item'
-selected_sub_item: 'UI.PalItem'
+selected_item: UI.Item
+selected_sub_item: UI.PalItem
 
 version_lookup = []
 
@@ -56,7 +56,7 @@ SUBITEM_POS = {
     5: (+0,  1,  2,  3,  4),  # 00000
 }
 
-ROT_TYPES: Dict[RotHandle, str] = {
+ROT_TYPES: dict[RotHandle, str] = {
     #  Image names that correspond to editoritems values
     RotHandle.NONE:     "rot_0",
     RotHandle.QUAD:     "rot_4",
@@ -112,12 +112,12 @@ IMG_ALPHA = img.Handle.blank(64, 64)
 
 def set_sprite(pos: SPR, sprite: str) -> None:
     """Set one of the property sprites to a value."""
-    widget = wid['sprite', pos]
+    widget = wid_sprite[pos]
     img.apply(widget, img.Handle.sprite('icons/' + sprite, 32, 32))
     tooltip.set_tooltip(widget, SPRITE_TOOL[sprite])
 
 
-def pos_for_item(ind: int) -> Optional[int]:
+def pos_for_item(ind: int) -> int | None:
     """Get the index the specified subitem is located at."""
     positions = SUBITEM_POS[len(selected_item.visual_subtypes)]
     for pos, sub in enumerate(positions):
@@ -127,7 +127,7 @@ def pos_for_item(ind: int) -> Optional[int]:
         return None
 
 
-def ind_for_pos(pos: int) -> Optional[int]:
+def ind_for_pos(pos: int) -> int | None:
     """Return the subtype index for the specified position."""
     ind = SUBITEM_POS[len(selected_item.visual_subtypes)][pos]
     if ind == -1:
@@ -256,10 +256,10 @@ def load_item_data() -> None:
             icon = IMG_ALPHA
         else:
             icon = selected_item.get_icon(selected_item.visual_subtypes[pos])
-        img.apply(wid['subitem', ind], icon)
-        wid['subitem', ind]['relief'] = 'flat'
+        img.apply(wid_subitem[ind], icon)
+        wid_subitem[ind]['relief'] = 'flat'
 
-    wid['subitem', pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
+    wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data.authors)
     wid['name']['text'] = selected_sub_item.name
@@ -317,7 +317,7 @@ def load_item_data() -> None:
             set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
-                tooltip.set_tooltip(wid['sprite', SPR.INPUT], gettext(
+                tooltip.set_tooltip(wid_sprite[SPR.INPUT], gettext(
                     'Excursion Funnels accept a on/off '
                     'input and a directional input.'
                 ))
@@ -367,7 +367,7 @@ def load_item_data() -> None:
         set_sprite(SPR.OUTPUT, 'out_none')
         set_sprite(SPR.ROTATION, 'rot_36')
         tooltip.set_tooltip(
-            wid['sprite', SPR.ROTATION],
+            wid_sprite[SPR.ROTATION],
             SPRITE_TOOL['rot_36'] + gettext(
                 'This item can be rotated on the floor to face 360 '
                 'degrees, for Reflection Cubes only.'
@@ -398,7 +398,7 @@ def adjust_position(e=None) -> None:
     # Calculate the pixel offset between the window and the subitem in
     # the properties dialog, and shift if needed to keep it inside the
     # window
-    icon_widget = wid['subitem', pos_for_item(selected_sub_item.subKey)]
+    icon_widget = wid_subitem[pos_for_item(selected_sub_item.subKey)]
 
     loc_x, loc_y = tk_tools.adjust_inside_screen(
         x=(
@@ -475,17 +475,11 @@ def init_widgets() -> None:
     sub_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=4)
     for i in range(5):
-        wid['subitem', i] = ttk.Label(sub_frame)
-        img.apply(wid['subitem', i], IMG_ALPHA)
-        wid['subitem', i].grid(row=0, column=i)
-        tk_tools.bind_leftclick(
-            wid['subitem', i],
-            functools.partial(sub_sel, i),
-        )
-        tk_tools.bind_rightclick(
-            wid['subitem', i],
-            functools.partial(sub_open, i),
-        )
+        wid_subitem[i] = ttk.Label(sub_frame)
+        img.apply(wid_subitem[i], IMG_ALPHA)
+        wid_subitem[i].grid(row=0, column=i)
+        tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
+        tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
 
     ttk.Label(f, text=gettext("Description:"), anchor="sw").grid(
         row=5,
@@ -498,7 +492,7 @@ def init_widgets() -> None:
     # sprites: inputs, outputs, rotation handle, occupied/embed state,
     # desiredFacing
     for spr_id in SPR:
-        wid['sprite', spr_id] = sprite = ttk.Label(spr_frame, relief="raised")
+        wid_sprite[spr_id] = sprite = ttk.Label(spr_frame, relief="raised")
         img.apply(sprite, img.Handle.sprite('icons/ap_grey', 32, 32))
         sprite.grid(row=0, column=spr_id.value)
         tooltip.add_tooltip(sprite)

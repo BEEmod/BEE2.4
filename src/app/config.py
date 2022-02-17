@@ -5,7 +5,7 @@ They can then fetch the current state and store new state.
 """
 from enum import Enum
 from typing import (
-    TypeVar, Callable, Generic, Protocol, NewType, cast,
+    Any, TypeVar, Callable, Generic, Protocol, NewType, cast,
     Optional, Type, Dict, Awaitable, Iterator,
 )
 
@@ -479,17 +479,16 @@ class GenOptions(Data):
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
-        res = {
-            'log_win_level': LEGACY_CONF['Debug']['window_log_level']
-        }
+        log_win_level = LEGACY_CONF['Debug']['window_log_level']
         try:
-            res['after_export'] = AfterExport(LEGACY_CONF.get_int(
+            after_export = AfterExport(LEGACY_CONF.get_int(
                 'General', 'after_export_action',
                 0,
             ))
         except ValueError:
-            res['after_export'] = AfterExport.NORMAL
+            after_export = AfterExport.NORMAL
 
+        res = {}
         for field in gen_opts_bool:
             section: str = field.metadata['legacy']
             try:
@@ -498,7 +497,11 @@ class GenOptions(Data):
                 name = field.name
             res[field.name] = LEGACY_CONF.get_bool(section, name, field.default)
 
-        return {'': GenOptions(**res)}
+        return {'': GenOptions(
+            after_export=after_export,
+            log_win_level=log_win_level,
+            **res,
+        )}
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'GenOptions':
