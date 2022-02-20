@@ -55,6 +55,13 @@ BTN_STOP = '■'
 BTN_PREV = '⟨'
 BTN_NEXT = '⟩'
 
+font_normal: tk_font.Font = tk_font.nametofont('TkMenuFont')
+# Make a font for showing suggested items in the context menu
+font_suggested = font_normal.copy()
+font_suggested['weight'] = tk_font.BOLD
+# Make a font for previewing the suggested items
+font_mouseover: tk_font.Font = font_normal.copy()
+font_mouseover['slant'] = tk_font.ITALIC
 
 class NAV_KEYS(Enum):
     """Enum representing keys used for shifting through items.
@@ -207,11 +214,9 @@ class AttrDef:
 
 class GroupHeader(ttk.Frame):
     """The widget used for group headers."""
-    def __init__(self, win: Selector, title: str) -> None:
+    def __init__(self, win: Window, title: str) -> None:
         self.parent = win
-        super().__init__(
-            win.pal_frame,
-        )
+        super().__init__(win.pal_frame)
 
         sep_left = ttk.Separator(self)
         sep_left.grid(row=0, column=0, sticky='EW')
@@ -220,7 +225,7 @@ class GroupHeader(ttk.Frame):
         self.title = ttk.Label(
             self,
             text=title,
-            font=win.norm_font,
+            font=font_normal,
             width=len(title) + 2,
             anchor='center',
         )
@@ -495,7 +500,8 @@ class PreviewWindow:
 
     def show(self, parent: Selector, item: Item) -> None:
         """Show the window."""
-        self.win.transient(parent.win)
+        toplevel = parent.window.toplevel
+        self.win.transient(toplevel)
         self.win.title(gettext('{} Preview').format(item.longName))
 
         self.parent = parent
@@ -512,16 +518,16 @@ class PreviewWindow:
 
         self.win.deiconify()
         self.win.lift()
-        tk_tools.center_win(self.win, parent.win)
+        tk_tools.center_win(self.win, toplevel)
         if parent.modal:
-            parent.win.grab_release()
+            toplevel.grab_release()
             self.win.grab_set()
 
     def hide(self, _: tk.Event | None = None) -> None:
         """Swap grabs if the parent is modal."""
         if self.parent.modal:
             self.win.grab_release()
-            self.parent.win.grab_set()
+            self.parent.window.toplevel.grab_set()
         self.win.withdraw()
 
     def cycle(self, off: int) -> None:
@@ -531,6 +537,14 @@ class PreviewWindow:
 
 
 _PREVIEW = PreviewWindow()
+
+
+@attrs.frozen
+class InitInfo:
+    """Holds the data provided in the constructor for later use."""
+    parent: tk.Tk | tk.Toplevel
+    title: str
+    attributes: Iterable[AttrDef]
 
 
 class Selector:
@@ -546,8 +560,6 @@ class Selector:
     - callback: A function called whenever an item is chosen. The first
       argument is the selected ID.
     - callback_params: A list of additional parameters given to the callback.
-
-    - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
     """
     def __init__(
@@ -614,6 +626,11 @@ class Selector:
         - readonly_desc will be displayed on the widget tooltip when readonly.
         - modal: If True, the window will block others while open.
         """
+        self._init_info = InitInfo(
+            parent,
+            title,
+            attributes,
+        )
         self.noneItem = Item(
             name='<NONE>',
             short_name='',
@@ -643,12 +660,11 @@ class Selector:
             self.callback = None
             self.callback_params = []
 
-        # Currently suggested item objects. This would be a set, but we want to randomly pick.
+        # The currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested: list[Item] = []
         # While the user hovers over the "suggested" button, cycle through random items. But we
         # want to apply that specific item when clicked.
         self._suggested_rollover: Item | None = None
-        self._suggest_lbl: list[ttk.Label | ttk.LabelFrame] = []
 
         # Should we have the 'reset to default' button?
         self.has_def = has_def
@@ -688,34 +704,11 @@ class Selector:
         self._readonly = False
         self.modal = modal
 
-        self.win = tk.Toplevel(parent, name='selwin_' + save_id)
-        self.win.withdraw()
-        self.win.title("BEE2 - " + title)
-        self.win.transient(master=parent)
-
-        # Allow resizing in X and Y.
-        self.win.resizable(True, True)
-
-        tk_tools.set_window_icon(self.win)
-
-        # Run our quit command when the exit button is pressed, or Escape
-        # on the keyboard.
-        self.win.protocol("WM_DELETE_WINDOW", self.exit)
-        self.win.bind("<Escape>", self.exit)
-
-        # Allow navigating with arrow keys.
-        self.win.bind("<KeyPress>", self.key_navigate)
-
-        # A map from group name -> header widget
-        self.group_widgets: dict[str, GroupHeader] = {}
         # A map from folded name -> display name
         self.group_names: dict[str, str] = {}
         self.grouped_items: dict[str, list[Item]] = {}
         # A list of casefolded group names in the display order.
         self.group_order: list[str] = []
-
-        # The maximum number of items that fits per row (set in flow_items)
-        self.item_width = 1
 
         # The ID used to persist our window state across sessions.
         self.save_id = save_id.casefold()
@@ -723,284 +716,25 @@ class Selector:
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
-        if desc:
-            self.desc_label = ttk.Label(
-                self.win,
-                name='desc_label',
-                text=desc,
-                justify='left',
-                anchor='w',
-                width=5,  # Keep a small width, so this doesn't affect the
-                # initial window size.
-            )
-            self.desc_label.grid(row=0, column=0, sticky='EW')
-        else:
-            self.desc_label = None
-
-        # PanedWindow allows resizing the two areas independently.
-        self.pane_win = tk.PanedWindow(
-            self.win,
-            name='area_panes',
-            orient='horizontal',
-            sashpad=2,  # Padding above/below panes
-            sashwidth=3,  # Width of border
-            sashrelief='raised',  # Raise the border between panes
-        )
-        self.pane_win.grid(row=1, column=0, sticky="NSEW")
-        self.win.columnconfigure(0, weight=1)
-        self.win.rowconfigure(1, weight=1)
-
-        shim = ttk.Frame(self.pane_win, relief="sunken")
-        shim.rowconfigure(0, weight=1)
-        shim.columnconfigure(0, weight=1)
-
-        # We need to use a canvas to allow scrolling.
-        self.wid_canvas = tk.Canvas(shim, highlightthickness=0, name='pal_canvas')
-        self.wid_canvas.grid(row=0, column=0, sticky="NSEW")
-
-        # Add another frame inside to place labels on.
-        self.pal_frame = ttk.Frame(self.wid_canvas)
-        self.wid_canvas.create_window(1, 1, window=self.pal_frame, anchor="nw")
-
-        self.wid_scroll = tk_tools.HidingScroll(
-            shim,
-            name='scrollbar',
-            orient='vertical',
-            command=self.wid_canvas.yview,
-        )
-        self.wid_scroll.grid(row=0, column=1, sticky="NS")
-        self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
-
-        tk_tools.add_mousewheel(self.wid_canvas, self.win)
-
-        # Holds all the widgets which provide info for the current item.
-        self.prop_frm = ttk.Frame(self.pane_win, name='prop_frame', borderwidth=4, relief='raised')
-        self.prop_frm.columnconfigure(1, weight=1)
-
-        # Border around the selected item icon.
-        width, height = ICON_SIZE_LRG
-        self.prop_icon_frm = ttk.Frame(
-            self.prop_frm,
-            name='prop_icon_frame',
-            borderwidth=4,
-            relief='raised',
-            width=width,
-            height=height,
-        )
-        self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
-
-        self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
-        img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
-        self.prop_icon.grid(row=0, column=0)
-        self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
-        tk_tools.bind_leftclick(self.prop_icon, self._icon_clicked)
-
-        name_frame = ttk.Frame(self.prop_frm)
-
-        self.prop_name = ttk.Label(
-            name_frame,
-            name='prop_name',
-            text="",
-            justify='center',
-            font=("Helvetica", 12, "bold"),
-        )
-        name_frame.grid(row=1, column=0, columnspan=4)
-        name_frame.columnconfigure(0, weight=1)
-        self.prop_name.grid(row=0, column=0)
-
-        # For music items, add a '>' button to play sound samples
         if sound_sys is not None and sound.has_sound():
-            self.samp_button = samp_button = ttk.Button(
-                name_frame,
-                name='sample_button',
-                text=BTN_PLAY,
-                width=2,
-            )
-            samp_button.grid(row=0, column=1)
-            add_tooltip(
-                samp_button,
-                gettext("Play a sample of this item."),
-            )
-
             # On start/stop, update the button label.
-            self.sampler = sound.SamplePlayer(
-                stop_callback=functools.partial(operator.setitem, samp_button, 'text', BTN_PLAY),
-                start_callback=functools.partial(operator.setitem, samp_button, 'text', BTN_STOP),
-                system=sound_sys,
-            )
-            samp_button['command'] = self.sampler.play_sample
-            samp_button.state(('disabled',))
+            self.sampler = sound.SamplePlayer(sound_sys)
         else:
             self.sampler = None
 
-        self.prop_author = ttk.Label(self.prop_frm, text="Author")
-        self.prop_author.grid(row=2, column=0, columnspan=4)
-
-        self.prop_desc_frm = ttk.Frame(self.prop_frm, relief="sunken")
-        self.prop_desc_frm.grid(row=4, column=0, columnspan=4, sticky="nsew")
-        self.prop_desc_frm.rowconfigure(0, weight=1)
-        self.prop_desc_frm.columnconfigure(0, weight=1)
-        self.prop_frm.rowconfigure(4, weight=1)
-
-        self.prop_desc = tkRichText(
-            self.prop_desc_frm,
-            name='prop_desc',
-            width=40,
-            height=4,
-            font="TkSmallCaptionFont",
-        )
-        self.prop_desc.grid(
-            row=0,
-            column=0,
-            padx=(2, 0),
-            pady=2,
-            sticky='nsew',
-        )
-
-        self.prop_scroll = tk_tools.HidingScroll(
-            self.prop_desc_frm,
-            name='desc_scroll',
-            orient='vertical',
-            command=self.prop_desc.yview,
-        )
-        self.prop_scroll.grid(
-            row=0,
-            column=1,
-            sticky="ns",
-            padx=(0, 2),
-            pady=2,
-        )
-        self.prop_desc['yscrollcommand'] = self.prop_scroll.set
-
-        ttk.Button(
-            self.prop_frm,
-            name='btn_ok',
-            text=gettext("OK"),
-            command=self.save,
-        ).grid(
-            row=6,
-            column=0,
-            padx=(8, 8),
-        )
-
-        if self.has_def:
-            self.prop_reset = ttk.Button(
-                self.prop_frm,
-                name='btn_suggest',
-                text=gettext("Select Suggested"),
-                command=self.sel_suggested,
-            )
-            self.prop_reset.grid(
-                row=6,
-                column=1,
-                sticky='ew',
-            )
-
-        ttk.Button(
-            self.prop_frm,
-            name='btn_cancel',
-            text=gettext("Cancel"),
-            command=self.exit,
-        ).grid(
-            row=6,
-            column=2,
-            padx=(8, 8),
-        )
-
-        self.win.option_add('*tearOff', False)
-        self.context_menu = tk.Menu(self.win)
-
-        self.norm_font: tk_font.Font = tk_font.nametofont('TkMenuFont')
-
-        # Make a font for showing suggested items in the context menu
-        self.sugg_font: tk_font.Font = self.norm_font.copy()
-        self.sugg_font['weight'] = tk_font.BOLD
-
-        # Make a font for previewing the suggested items
-        self.mouseover_font: tk_font.Font = self.norm_font.copy()
-        self.mouseover_font['slant'] = tk_font.ITALIC
+        self.context_menu = tk.Menu(parent)
 
         # The headers for the context menu
         self.context_menus: dict[str, tk.Menu] = {}
         # The widget used to control which menu option is selected.
         self.context_var = tk.StringVar()
 
-        self.pane_win.add(shim)
-        self.pane_win.add(self.prop_frm)
-
-        # Force a minimum size for the two parts
-        self.pane_win.paneconfigure(shim, minsize=100, stretch='always')
-        self.prop_frm.update_idletasks()  # Update reqwidth()
-        self.pane_win.paneconfigure(
-            self.prop_frm,
-            minsize=200,
-            stretch='never',
-        )
-
-        # Wide before short.
-        self.attrs = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
-        if attributes:
-            attrs_frame = ttk.Frame(self.prop_frm)
-            attrs_frame.grid(
-                row=5,
-                column=0,
-                columnspan=3,
-                sticky='ew',
-                padx=5,
-            )
-            attrs_frame.columnconfigure(0, weight=1)
-            attrs_frame.columnconfigure(1, weight=1)
-
-            # Add in all the attribute labels
-            index = 0
-            for attr in self.attrs:
-                attr_frame = ttk.Frame(attrs_frame)
-                desc_label = ttk.Label(attr_frame, text=attr.desc)
-                attr.label = ttk.Label(attr_frame)
-
-                if attr.type is AttrTypes.BOOL:
-                    # It's a tick/cross label
-                    if attr.default:
-                        img.apply(attr.label, ICON_CHECK)
-                    else:
-                        img.apply(attr.label, ICON_CROSS)
-                elif attr.type is AttrTypes.COLOR:
-                    # A small colour swatch.
-                    attr.label.configure(relief='raised')
-                    # Show the color value when hovered.
-                    add_tooltip(attr.label)
-
-                desc_label.grid(row=0, column=0, sticky='e')
-                attr.label.grid(row=0, column=1, sticky='w')
-                # Wide ones have their own row, narrow ones are two to a row
-                if attr.type.is_wide:
-                    if index % 2:  # Row has a single narrow, skip the empty space.
-                        index += 1
-                    attr_frame.grid(
-                        row=index // 2,
-                        column=0, columnspan=2,
-                        sticky='w',
-                    )
-                    index += 2
-                else:
-                    if index % 2:  # Right.
-                        ttk.Separator(orient='vertical').grid(row=index // 2, column=1, sticky='NS')
-                        attr_frame.grid(
-                            row=index // 2,
-                            column=2,
-                            sticky='E',
-                        )
-                    else:
-                        attr_frame.grid(
-                            row=index // 2,
-                            column=0,
-                            sticky='W',
-                        )
-                    index += 1
-
         self.set_disp()
+
+        # Will be deferred.
+        self.window = Window.construct(self, self._init_info)
+        self._init_info = None
         self.refresh()
-        self.wid_canvas.bind("<Configure>", self.flow_items)
 
     async def _load_selected(self, selected: config.LastSelected) -> None:
         """Load a new selected item."""
@@ -1098,13 +832,13 @@ class Selector:
                 raise ValueError(f'Item {item} reused on a different selector!')
             item._selector = self
 
-            if item.button is None:  # New, create the button widget.
+            if item.button is None and self.window is not None:  # New, create the button widget.
                 if item is self.noneItem:
-                    item.button = ttk.Button(self.pal_frame, name='item_none')
+                    item.button = ttk.Button(self.window.pal_frame, name='item_none')
                     item.context_lbl = item.context_lbl
                 else:
                     item.button = ttk.Button(
-                        self.pal_frame,
+                        self.window.pal_frame,
                         name='item_' + item.name,
                         text=item.shortName,
                         compound='top',
@@ -1118,8 +852,8 @@ class Selector:
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = item.group
-            if group_key not in self.group_widgets:
-                self.group_widgets[group_key] = GroupHeader(self, self.group_names[group_key])
+            if group_key not in self.window.group_widgets:
+                self.window.group_widgets[group_key] = GroupHeader(self.window, self.group_names[group_key])
 
             try:
                 menu = self.context_menus[group_key]
@@ -1154,8 +888,8 @@ class Selector:
             # Set a custom attribute to keep track of the menu's index.
             # The one at the end is the one we just added.
             menu._context_index = self.context_menu.index('end')
-        if self.win.winfo_ismapped():
-            self.flow_items()
+        if self.window.toplevel.winfo_ismapped():
+            self.window.flow_items()
 
     def exit(self, _: tk.Event = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
@@ -1178,16 +912,16 @@ class Selector:
             state = WindowState(
                 open_groups={
                     grp_id: grp.visible
-                    for grp_id, grp in self.group_widgets.items()
+                    for grp_id, grp in self.window.group_widgets.items()
                 },
-                width=self.win.winfo_width(),
-                height=self.win.winfo_height(),
+                width=self.window.toplevel.winfo_width(),
+                height=self.window.toplevel.winfo_height(),
             )
             config.store_conf(state, self.save_id)
 
         if self.modal:
-            self.win.grab_release()
-        self.win.withdraw()
+            self.window.toplevel.grab_release()
+        self.window.toplevel.withdraw()
         self.set_disp()
         self.do_callback()
 
@@ -1198,9 +932,9 @@ class Selector:
         # initialised.
         if self.display:
             if self.is_suggested():
-                self.display['font'] = self.sugg_font
+                self.display['font'] = font_suggested
             else:
-                self.display['font'] = self.norm_font
+                self.display['font'] = font_normal
 
         if self.selected == self.noneItem:
             self.chosen_id = None
@@ -1216,7 +950,7 @@ class Selector:
     def rollover_suggest(self) -> None:
         """Pick a suggested item when the button is moused over, and keep cycling."""
         if self.can_suggest():
-            self.display['font'] = self.mouseover_font
+            self.display['font'] = font_mouseover
             self._pick_suggested(force=True)
 
     def _pick_suggested(self, force=False) -> None:
@@ -1225,13 +959,6 @@ class Selector:
             self._suggested_rollover = random.choice(self.suggested)
             self.disp_label.set(self._suggested_rollover.context_lbl)
             self.display.after(1000, self._pick_suggested)
-
-    def _icon_clicked(self, _: tk.Event) -> None:
-        """When the large image is clicked, either show the previews or play sounds."""
-        if self.sampler:
-            self.sampler.play_sample()
-        elif self.selected.previews:
-            _PREVIEW.show(self, self.selected)
 
     def open_win(self, _: tk.Event = None, *, force_open=False) -> object:
         """Display the window."""
@@ -1257,28 +984,28 @@ class Selector:
                 )
                 for grp_id, is_open in state.open_groups.items():
                     try:
-                        self.group_widgets[grp_id].visible = is_open
+                        self.window.group_widgets[grp_id].visible = is_open
                     except KeyError:  # Stale config, ignore.
                         LOGGER.warning(
                             '({}): invalid selectorwin group: "{}"',
                             self.save_id, grp_id,
                         )
                 if state.width > 0 or state.height > 0:
-                    width = state.width if state.width > 0 else self.win.winfo_reqwidth()
-                    height = state.height if state.height > 0 else self.win.winfo_reqheight()
-                    self.win.geometry(f'{width}x{height}')
+                    width = state.width if state.width > 0 else self.window.toplevel.winfo_reqwidth()
+                    height = state.height if state.height > 0 else self.window.toplevel.winfo_reqheight()
+                    self.window.toplevel.geometry(f'{width}x{height}')
 
-        self.win.deiconify()
-        self.win.lift()
+        self.window.toplevel.deiconify()
+        self.window.toplevel.lift()
 
         if self.modal:
-            self.win.grab_set()
-        self.win.focus_force()  # Focus here to deselect the textbox
+            self.window.toplevel.grab_set()
+        self.window.toplevel.focus_force()  # Focus here to deselect the textbox
 
-        tk_tools.center_win(self.win, parent=self.parent)
+        tk_tools.center_win(self.window.toplevel, parent=self.parent)
 
         self.sel_item(self.selected)
-        self.win.after(2, self.flow_items)
+        self.window.toplevel.after(2, self.window.flow_items)
         return None
 
     def open_context(self, _: tk.Event = None) -> None:
@@ -1336,6 +1063,413 @@ class Selector:
 
     def sel_item(self, item: Item, _: tk.Event = None) -> None:
         """Select the specified item."""
+        self.selected = item
+        if self.window is not None:
+            self.window.sel_item(item)
+
+    def __contains__(self, obj: str | Item) -> bool:
+        """Determine if the given SelWinItem or item ID is in this item list."""
+        if obj == '<None>':
+            return self.noneItem in self.item_list
+        elif isinstance(obj, Item):
+            return obj in self.item_list
+        else:
+            for item in self.item_list:
+                if item.name == obj:
+                    return True
+            return False
+
+    def is_suggested(self) -> bool:
+        """Return whether the current item is a suggested one."""
+        return self.selected in self.suggested
+
+    def can_suggest(self) -> bool:
+        """Check if a new item can be suggested."""
+        if not self.suggested:
+            return False
+        if len(self.suggested) > 1:
+            return True
+        # If we suggest one item which is selected, that's
+        # pointless.
+        return self.suggested != [self.selected]
+
+    def _set_context_font(self, item, suggested: bool) -> None:
+        """Set the font of an item, and its parent group."""
+        if item._context_ind is None:
+            return
+        new_font = font_suggested if suggested else font_normal
+        if item.group:
+            group_key = item.group.casefold()
+            menu = self.context_menus[group_key]
+
+            # Apply the font to the group header as well, if suggested.
+            if suggested:
+                self.window.group_widgets[group_key].title['font'] = new_font
+
+                # Also highlight the menu
+                # noinspection PyUnresolvedReferences
+                self.context_menu.entryconfig(
+                    menu._context_index,  # Use a custom attr to keep track of this...
+                    font=new_font,
+                )
+        else:
+            menu = self.context_menu
+        menu.entryconfig(item._context_ind, font=new_font)
+
+    def set_suggested(self, suggested: AbstractSet[str]=frozenset()) -> None:
+        """Set the suggested items to the set of IDs.
+
+        If it is empty, the suggested ID will be cleared.
+        If "<NONE>" is present, the None item will be included.
+        """
+        self.suggested.clear()
+        # Reset all the header fonts, if any item in that group is highlighted it'll
+        # re-bold it.
+        for group_key, header in self.window.group_widgets.items():
+            header.title['font'] = font_normal
+            try:
+                # noinspection PyProtectedMember, PyUnresolvedReferences
+                ind = self.context_menus[group_key]._context_index
+            except AttributeError:
+                pass
+            else:
+                self.context_menu.entryconfig(ind, font=font_normal)
+
+        self._set_context_font(self.noneItem, '<NONE>' in suggested)
+
+        for item in self.item_list:
+            if item.name in suggested:
+                self._set_context_font(item, True)
+                self.suggested.append(item)
+            else:
+                self._set_context_font(item, False)
+
+        self.set_disp()  # Update the textbox if needed
+        # Reposition all our items, but only if we're visible.
+        if self.window is not None and self.window.toplevel.winfo_ismapped():
+            self.window.flow_items()
+
+
+@attrs.define(eq=False)
+class Window:
+    """The window opened by the selector."""
+    sel: Selector = attrs.field()  # Backref to the selector.
+
+    # A map from group name -> header widget
+    group_widgets: dict[str, GroupHeader] = attrs.field(init=False, factory=dict)
+
+    # The maximum number of items that fits per row (set in flow_items)
+    item_width: int = attrs.field(init=False, default=1)
+
+    # All assigned in construct().
+    toplevel: tk.Toplevel = attrs.field(init=False)
+    wid_canvas: tk.Canvas = attrs.field(init=False)
+    wid_scroll: tk_tools.HidingScroll = attrs.field(init=False)
+    desc_label: ttk.Label | None = attrs.field(init=False)
+    pal_frame: ttk.Frame = attrs.field(init=False)
+    samp_button: ttk.Button = attrs.field(init=False)
+    pane_win: tk.PanedWindow = attrs.field(init=False)
+
+    prop_frm: ttk.Frame = attrs.field(init=False)
+    prop_icon_frm: ttk.Frame = attrs.field(init=False)
+    prop_icon: ttk.Label = attrs.field(init=False)
+    prop_name: ttk.Label = attrs.field(init=False)
+    prop_author: ttk.Label = attrs.field(init=False)
+    prop_desc_frm: ttk.Frame = attrs.field(init=False)
+    prop_desc: tkRichText = attrs.field(init=False)
+    prop_scroll: tk_tools.HidingScroll = attrs.field(init=False)
+    prop_reset: ttk.Button = attrs.field(init=False)
+
+    _suggest_lbl: list[ttk.Label | ttk.LabelFrame] = attrs.field(init=False, factory=list)
+    attrs: list[AttrDef] = attrs.field(init=False)
+
+    @classmethod
+    def construct(cls, sel: Selector, info: InitInfo) -> Window:
+        """Construct the window gradually."""
+        self = cls(sel)
+        self.toplevel = toplevel = tk.Toplevel(info.parent, name='selwin_' + sel.save_id)
+        toplevel.withdraw()
+        toplevel.title("BEE2 - " + info.title)
+        toplevel.transient(master=info.parent)
+
+        # Allow resizing in X and Y.
+        toplevel.resizable(True, True)
+
+        tk_tools.set_window_icon(self.toplevel)
+
+        # Run our quit command when the exit button is pressed, or Escape
+        # on the keyboard.
+        toplevel.protocol("WM_DELETE_WINDOW", sel.exit)
+        toplevel.bind("<Escape>", sel.exit)
+
+        # Allow navigating with arrow keys.
+        toplevel.bind("<KeyPress>", self.key_navigate)
+
+        if sel.description:
+            self.desc_label = ttk.Label(
+                toplevel,
+                name='desc_label',
+                text=sel.description,
+                justify='left',
+                anchor='w',
+                width=5,  # Keep a small width, so this doesn't affect the
+                # initial window size.
+            )
+            self.desc_label.grid(row=0, column=0, sticky='EW')
+        else:
+            self.desc_label = None
+
+        # PanedWindow allows resizing the two areas independently.
+        self.pane_win = tk.PanedWindow(
+            toplevel,
+            name='area_panes',
+            orient='horizontal',
+            sashpad=2,  # Padding above/below panes
+            sashwidth=3,  # Width of border
+            sashrelief='raised',  # Raise the border between panes
+        )
+        self.pane_win.grid(row=1, column=0, sticky="NSEW")
+        toplevel.columnconfigure(0, weight=1)
+        toplevel.rowconfigure(1, weight=1)
+
+        shim = ttk.Frame(self.pane_win, relief="sunken")
+        shim.rowconfigure(0, weight=1)
+        shim.columnconfigure(0, weight=1)
+
+        # We need to use a canvas to allow scrolling.
+        self.wid_canvas = tk.Canvas(shim, highlightthickness=0, name='pal_canvas')
+        self.wid_canvas.grid(row=0, column=0, sticky="NSEW")
+
+        # Add another frame inside to place labels on.
+        self.pal_frame = ttk.Frame(self.wid_canvas)
+        self.wid_canvas.create_window(1, 1, window=self.pal_frame, anchor="nw")
+
+        self.wid_scroll = tk_tools.HidingScroll(
+            shim,
+            name='scrollbar',
+            orient='vertical',
+            command=self.wid_canvas.yview,
+        )
+        self.wid_scroll.grid(row=0, column=1, sticky="NS")
+        self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
+
+        tk_tools.add_mousewheel(self.wid_canvas, self.toplevel)
+
+        # Holds all the widgets which provide info for the current item.
+        self.prop_frm = ttk.Frame(self.pane_win, name='prop_frame', borderwidth=4, relief='raised')
+        self.prop_frm.columnconfigure(1, weight=1)
+
+        # Border around the selected item icon.
+        width, height = ICON_SIZE_LRG
+        self.prop_icon_frm = ttk.Frame(
+            self.prop_frm,
+            name='prop_icon_frame',
+            borderwidth=4,
+            relief='raised',
+            width=width,
+            height=height,
+        )
+        self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
+
+        self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
+        img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
+        self.prop_icon.grid(row=0, column=0)
+        self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
+        tk_tools.bind_leftclick(self.prop_icon, self._icon_clicked)
+
+        name_frame = ttk.Frame(self.prop_frm)
+
+        self.prop_name = ttk.Label(
+            name_frame,
+            name='prop_name',
+            text="",
+            justify='center',
+            font=("Helvetica", 12, "bold"),
+        )
+        name_frame.grid(row=1, column=0, columnspan=4)
+        name_frame.columnconfigure(0, weight=1)
+        self.prop_name.grid(row=0, column=0)
+
+        # For music items, add a '>' button to play sound samples
+        if sel.sampler is not None:
+            self.samp_button = samp_button = ttk.Button(
+                name_frame,
+                name='sample_button',
+                text=BTN_PLAY,
+                width=2,
+            )
+            sel.sampler.stop_callback = functools.partial(operator.setitem, samp_button, 'text', BTN_PLAY),
+            sel.sampler.start_callback = functools.partial(operator.setitem, samp_button, 'text', BTN_STOP),
+            samp_button.grid(row=0, column=1)
+            add_tooltip(
+                samp_button,
+                gettext("Play a sample of this item."),
+            )
+
+            samp_button['command'] = sel.sampler.play_sample
+            samp_button.state(('disabled',))
+
+        self.prop_author = ttk.Label(self.prop_frm, text="Author")
+        self.prop_author.grid(row=2, column=0, columnspan=4)
+
+        self.prop_desc_frm = ttk.Frame(self.prop_frm, relief="sunken")
+        self.prop_desc_frm.grid(row=4, column=0, columnspan=4, sticky="nsew")
+        self.prop_desc_frm.rowconfigure(0, weight=1)
+        self.prop_desc_frm.columnconfigure(0, weight=1)
+        self.prop_frm.rowconfigure(4, weight=1)
+
+        self.prop_desc = tkRichText(
+            self.prop_desc_frm,
+            name='prop_desc',
+            width=40,
+            height=4,
+            font="TkSmallCaptionFont",
+        )
+        self.prop_desc.grid(
+            row=0,
+            column=0,
+            padx=(2, 0),
+            pady=2,
+            sticky='nsew',
+        )
+
+        self.prop_scroll = tk_tools.HidingScroll(
+            self.prop_desc_frm,
+            name='desc_scroll',
+            orient='vertical',
+            command=self.prop_desc.yview,
+        )
+        self.prop_scroll.grid(
+            row=0,
+            column=1,
+            sticky="ns",
+            padx=(0, 2),
+            pady=2,
+        )
+        self.prop_desc['yscrollcommand'] = self.prop_scroll.set
+
+        ttk.Button(
+            self.prop_frm,
+            name='btn_ok',
+            text=gettext("OK"),
+            command=sel.save,
+        ).grid(
+            row=6,
+            column=0,
+            padx=(8, 8),
+        )
+
+        if sel.has_def:
+            self.prop_reset = ttk.Button(
+                self.prop_frm,
+                name='btn_suggest',
+                text=gettext("Select Suggested"),
+                command=sel.sel_suggested,
+            )
+            self.prop_reset.grid(
+                row=6,
+                column=1,
+                sticky='ew',
+            )
+
+        ttk.Button(
+            self.prop_frm,
+            name='btn_cancel',
+            text=gettext("Cancel"),
+            command=sel.exit,
+        ).grid(
+            row=6,
+            column=2,
+            padx=(8, 8),
+        )
+
+        toplevel.option_add('*tearOff', False)
+
+        self.pane_win.add(shim)
+        self.pane_win.add(self.prop_frm)
+
+        # Force a minimum size for the two parts
+        self.pane_win.paneconfigure(shim, minsize=100, stretch='always')
+        self.prop_frm.update_idletasks()  # Update reqwidth()
+        self.pane_win.paneconfigure(
+            self.prop_frm,
+            minsize=200,
+            stretch='never',
+        )
+
+        # Wide before short.
+        self.attrs = sorted(info.attributes, key=lambda at: 0 if at.type.is_wide else 1)
+        if self.attrs:
+            attrs_frame = ttk.Frame(self.prop_frm)
+            attrs_frame.grid(
+                row=5,
+                column=0,
+                columnspan=3,
+                sticky='ew',
+                padx=5,
+            )
+            attrs_frame.columnconfigure(0, weight=1)
+            attrs_frame.columnconfigure(1, weight=1)
+
+            # Add in all the attribute labels
+            index = 0
+            for attr in self.attrs:
+                attr_frame = ttk.Frame(attrs_frame)
+                desc_label = ttk.Label(attr_frame, text=attr.desc)
+                attr.label = ttk.Label(attr_frame)
+
+                if attr.type is AttrTypes.BOOL:
+                    # It's a tick/cross label
+                    if attr.default:
+                        img.apply(attr.label, ICON_CHECK)
+                    else:
+                        img.apply(attr.label, ICON_CROSS)
+                elif attr.type is AttrTypes.COLOR:
+                    # A small colour swatch.
+                    attr.label.configure(relief='raised')
+                    # Show the color value when hovered.
+                    add_tooltip(attr.label)
+
+                desc_label.grid(row=0, column=0, sticky='e')
+                attr.label.grid(row=0, column=1, sticky='w')
+                # Wide ones have their own row, narrow ones are two to a row
+                if attr.type.is_wide:
+                    if index % 2:  # Row has a single narrow, skip the empty space.
+                        index += 1
+                    attr_frame.grid(
+                        row=index // 2,
+                        column=0, columnspan=2,
+                        sticky='w',
+                    )
+                    index += 2
+                else:
+                    if index % 2:  # Right.
+                        ttk.Separator(orient='vertical').grid(row=index // 2, column=1, sticky='NS')
+                        attr_frame.grid(
+                            row=index // 2,
+                            column=2,
+                            sticky='E',
+                        )
+                    else:
+                        attr_frame.grid(
+                            row=index // 2,
+                            column=0,
+                            sticky='W',
+                        )
+                    index += 1
+
+        self.wid_canvas.bind("<Configure>", self.flow_items)
+        return self
+
+    def _icon_clicked(self, _: tk.Event) -> None:
+        """When the large image is clicked, either show the previews or play sounds."""
+        if self.sampler:
+            self.sampler.play_sample()
+        elif self.selected.previews:
+            _PREVIEW.show(self.sel, self.selected)
+
+    def sel_item(self, item: Item, _: tk.Event = None) -> None:
+        """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -1349,14 +1483,14 @@ class Selector:
         img.apply(self.prop_icon, icon)
         self.prop_icon_frm.configure(width=icon.width, height=icon.height)
 
-        if item.previews and not self.sampler:
+        if item.previews and not self.sel.sampler:
             self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
         else:
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
         if DEV_MODE.get():
             # Show the ID of the item in the description
-            if item is self.noneItem:
+            if item is self.sel.noneItem:
                 text = tkMarkdown.convert('**ID:** *NONE*', None)
             else:
                 text = tkMarkdown.convert(f'**ID:** `{item.package}`{":" if item.package else ""}`{item.name}`', None)
@@ -1368,27 +1502,26 @@ class Selector:
         else:
             self.prop_desc.set_text(item.desc)
 
-        self.selected.button.state(('!alternate',))
-        self.selected = item
+        self.sel.selected.button.state(('!alternate',))
         item.button.state(('alternate',))
         self.scroll_to(item)
 
-        if self.sampler:
+        if self.sel.sampler:
             is_playing = self.sampler.is_playing
-            self.sampler.stop()
+            self.sel.sampler.stop()
 
-            self.sampler.cur_file = item.snd_sample
-            if self.sampler.cur_file:
+            self.sel.sampler.cur_file = item.snd_sample
+            if self.sel.sampler.cur_file:
                 self.samp_button.state(('!disabled',))
 
                 if is_playing:
                     # Start the sampler again, so it plays the current item!
-                    self.sampler.play_sample()
+                    self.sel.sampler.play_sample()
             else:
                 self.samp_button.state(('disabled',))
 
-        if self.has_def:
-            if self.can_suggest():
+        if self.sel.has_def:
+            if self.sel.can_suggest():
                 self.prop_reset.state(('!disabled',))
             else:
                 self.prop_reset.state(('disabled',))
@@ -1435,15 +1568,15 @@ class Selector:
             return
 
         if key is NAV_KEYS.PLAY_SOUND:
-            if self.sampler is not None:
-                self.sampler.play_sample()
+            if self.sel.sampler is not None:
+                self.sel.sampler.play_sample()
             return
         elif key is NAV_KEYS.ENTER:
-            self.save()
+            self.sel.save()
             return
 
-        cur_group_name = self.selected.group.casefold()
-        cur_group = self.grouped_items[cur_group_name]
+        cur_group_name = self.sel.selected.group.casefold()
+        cur_group = self.sel.grouped_items[cur_group_name]
         # Force the current group to be visible, so you can see what's
         # happening.
         self.group_widgets[cur_group_name].visible = True
@@ -1452,7 +1585,7 @@ class Selector:
         # (skipping hidden ones). Force-include
         ordered_groups = [
             group_name
-            for group_name in self.group_order
+            for group_name in self.sel.group_order
             if self.group_widgets[group_name].visible
         ]
 
@@ -1504,22 +1637,22 @@ class Selector:
         If the index is above or below, it will jump to neighbouring groups.
         """
         if group_ind < 0:  # Jump to the first item, out of bounds
-            first_group = self.grouped_items[self.group_order[0]]
+            first_group = self.sel.grouped_items[self.sel.group_order[0]]
             self.sel_item(first_group[0])
             return
         elif group_ind >= len(group_list):  # Ditto, last group
-            last_group = self.grouped_items[self.group_order[-1]]
+            last_group = self.sel.grouped_items[self.sel.group_order[-1]]
             self.sel_item(last_group[-1])
             return
 
-        cur_group = self.grouped_items[group_list[group_ind]]
+        cur_group = self.sel.grouped_items[group_list[group_ind]]
 
         # Go back a group..
         if item_ind < 0:
             if group_ind == 0:  # First group - can't go back further!
                 self.sel_item(cur_group[0])
             else:
-                prev_group = self.grouped_items[group_list[group_ind - 1]]
+                prev_group = self.sel.grouped_items[group_list[group_ind - 1]]
                 if is_vert:
                     # Jump to the same horizontal position..
                     row_num = math.ceil(len(prev_group) / self.item_width)
@@ -1582,10 +1715,10 @@ class Selector:
 
         # If only the '' group is present, force it to be visible, and hide
         # the header.
-        no_groups = self.group_order == ['']
+        no_groups = (self.sel.group_order == [''])
 
-        for group_key in self.group_order:
-            items = self.grouped_items[group_key]
+        for group_key in self.sel.group_order:
+            items = self.sel.grouped_items[group_key]
             group_wid = self.group_widgets[group_key]
 
             if no_groups:
@@ -1607,7 +1740,7 @@ class Selector:
 
             # Place each item
             for i, item in enumerate(items):
-                if item in self.suggested:
+                if item in self.sel.suggested:
                     # Reuse an existing suggested label.
                     try:
                         sugg_lbl = self._suggest_lbl[suggest_ind]
@@ -1675,86 +1808,3 @@ class Selector:
             (y - (top - bottom) // 2)
             / height
         )
-
-    def __contains__(self, obj: str | Item) -> bool:
-        """Determine if the given SelWinItem or item ID is in this item list."""
-        if obj == '<None>':
-            return self.noneItem in self.item_list
-        elif isinstance(obj, Item):
-            return obj in self.item_list
-        else:
-            for item in self.item_list:
-                if item.name == obj:
-                    return True
-            return False
-
-    def is_suggested(self) -> bool:
-        """Return whether the current item is a suggested one."""
-        return self.selected in self.suggested
-
-    def can_suggest(self) -> bool:
-        """Check if a new item can be suggested."""
-        if not self.suggested:
-            return False
-        if len(self.suggested) > 1:
-            return True
-        # If we suggest one item which is selected, that's
-        # pointless.
-        return self.suggested != [self.selected]
-
-    # noinspection PyProtectedMember
-    def _set_context_font(self, item, suggested: bool) -> None:
-        """Set the font of an item, and its parent group."""
-        if item._context_ind is None:
-            return
-        new_font = self.sugg_font if suggested else self.norm_font
-        if item.group:
-            group_key = item.group.casefold()
-            menu = self.context_menus[group_key]
-
-            # Apply the font to the group header as well, if suggested.
-            if suggested:
-                self.group_widgets[group_key].title['font'] = new_font
-
-                # Also highlight the menu
-                # noinspection PyUnresolvedReferences
-                self.context_menu.entryconfig(
-                    menu._context_index,  # Use a custom attr to keep track of this...
-                    font=new_font,
-                )
-        else:
-            menu = self.context_menu
-        menu.entryconfig(item._context_ind, font=new_font)
-
-    def set_suggested(self, suggested: AbstractSet[str]=frozenset()) -> None:
-        """Set the suggested items to the set of IDs.
-
-        If it is empty, the suggested ID will be cleared.
-        If "<NONE>" is present, the None item will be included.
-        """
-        self.suggested.clear()
-        # Reset all the header fonts, if any item in that group is highlighted it'll
-        # re-bold it.
-        for group_key, header in self.group_widgets.items():
-            header.title['font'] = self.norm_font
-            try:
-                # noinspection PyProtectedMember, PyUnresolvedReferences
-                ind = self.context_menus[group_key]._context_index
-            except AttributeError:
-                pass
-            else:
-                self.context_menu.entryconfig(ind, font=self.norm_font)
-
-        self._set_context_font(self.noneItem, '<NONE>' in suggested)
-
-        for item in self.item_list:
-            if item.name in suggested:
-                self._set_context_font(item, True)
-                self.suggested.append(item)
-            else:
-                self._set_context_font(item, False)
-
-        self.set_disp()  # Update the textbox if needed
-        # Reposition all our items, but only if we're visible.
-        if self.win.winfo_ismapped():
-            self.flow_items()
