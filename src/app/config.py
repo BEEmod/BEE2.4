@@ -5,8 +5,8 @@ They can then fetch the current state and store new state.
 """
 from enum import Enum
 from typing import (
-    Any, TypeVar, Callable, Generic, Protocol, NewType, cast,
-    Optional, Type, Dict, Awaitable, Iterator,
+    TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
+    Type, Dict, Awaitable, Iterator,
 )
 
 import attrs
@@ -166,11 +166,17 @@ async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awai
         await func(cast(DataT, data_map[data_id]))
 
 
-async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
+async def apply_conf(info_or_type: Union[ConfType[DataT], Type[DataT]], /, data_id: str= '') -> None:
     """Apply the current settings for this config type and ID.
 
     If the data_id is not passed, all settings will be applied.
     """
+    info: ConfType[DataT]
+    if isinstance(info_or_type, ConfType):
+        info = info_or_type
+    else:
+        info = _TYPE_TO_TYPE[info_or_type]
+
     if data_id:
         if not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
@@ -183,8 +189,13 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
             assert isinstance(data, info.cls), info
             await cb(data)
     else:
+        try:
+            data_map = _CUR_CONFIG[info]
+        except KeyError:
+            LOGGER.warning('{}[:] has no UI callback!', info.name)
+            return
         async with trio.open_nursery() as nursery:
-            for dat_id, data in _CUR_CONFIG[info].items():
+            for dat_id, data in data_map.items():
                 try:
                     cb = info.callback[dat_id]
                 except KeyError:
@@ -193,7 +204,7 @@ async def apply_conf(info: ConfType[DataT], data_id: str='') -> None:
                     nursery.start_soon(cb, data)
 
 
-def get_cur_conf(cls: Type[DataT], data_id: str='', default: Optional[DataT] = None) -> DataT:
+def get_cur_conf(cls: Type[DataT], data_id: str='', default: Union[DataT, None] = None) -> DataT:
     """Fetch the currently active config for this ID."""
     info: ConfType[DataT] = _TYPE_TO_TYPE[cls]
     if data_id and not info.uses_id:
@@ -381,7 +392,7 @@ async def apply_pal_conf(conf: Config) -> None:
 @attrs.frozen
 class LastSelected(Data):
     """Used for several general items, specifies the last selected one for restoration."""
-    id: Optional[str] = None
+    id: Union[str, None] = None
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'LastSelected']:
