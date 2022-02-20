@@ -16,16 +16,15 @@ import loadScreen
 from app import TK_ROOT, BEE2
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 from app import sound as snd
 import packages
-from app import img
-from app import itemconfig
 import utils
 import consts
 from localisation import gettext
 from app import (
+    img,
+    itemconfig,
     tk_tools,
     SubPane,
     voiceEditor,
@@ -40,6 +39,7 @@ from app import (
     backup as backup_win,
     tooltip,
     signage_ui,
+    selector_win,
     paletteUI,
     music_conf,
     config,
@@ -55,10 +55,10 @@ UI = {}
 menus = {}
 
 # These panes.
-skybox_win: SelectorWin
-voice_win: SelectorWin
-style_win: SelectorWin
-elev_win: SelectorWin
+skybox_win: selector_win.Selector
+voice_win: selector_win.Selector
+style_win: selector_win.Selector
+elev_win: selector_win.Selector
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -468,10 +468,10 @@ async def load_packages(packset: packages.PackagesSet) -> None:
     for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
-    sky_list: list[selWinItem] = []
-    voice_list: list[selWinItem] = []
-    style_list: list[selWinItem] = []
-    elev_list: list[selWinItem] = []
+    sky_list: list[selector_win.Item] = []
+    voice_list: list[selector_win.Item] = []
+    style_list: list[selector_win.Item] = []
+    elev_list: list[selector_win.Item] = []
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
@@ -496,9 +496,9 @@ async def load_packages(packset: packages.PackagesSet) -> None:
 
     for sel_list, obj_type, attrs in obj_types:
         # Extract the display properties out of the object, and create
-        # a SelectorWin item to display with.
+        # a Selector item to display with.
         for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
-            sel_list.append(selWinItem.from_data(
+            sel_list.append(selector_win.Item.from_data(
                 obj.id,
                 obj.selitem_data,
                 attrs={
@@ -534,7 +534,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
             pass
         suggested_refresh()
 
-    skybox_win = SelectorWin(
+    skybox_win = selector_win.Selector(
         TK_ROOT,
         sky_list,
         save_id='skyboxes',
@@ -548,12 +548,12 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         callback=win_callback,
         callback_params=['Skybox'],
         attributes=[
-            SelAttr.bool('3D', gettext('3D Skybox'), False),
-            SelAttr.color('COLOR', gettext('Fog Color')),
+            selector_win.AttrDef.bool('3D', gettext('3D Skybox'), False),
+            selector_win.AttrDef.color('COLOR', gettext('Fog Color')),
         ],
     )
 
-    voice_win = SelectorWin(
+    voice_win = selector_win.Selector(
         TK_ROOT,
         voice_list,
         save_id='voicelines',
@@ -570,13 +570,13 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         },
         callback=voice_callback,
         attributes=[
-            SelAttr.list('CHAR', gettext('Characters'), ['??']),
-            SelAttr.bool('TURRET', gettext('Turret Shoot Monitor'), False),
-            SelAttr.bool('MONITOR', gettext('Monitor Visuals'), False),
+            selector_win.AttrDef.list('CHAR', gettext('Characters'), ['??']),
+            selector_win.AttrDef.bool('TURRET', gettext('Turret Shoot Monitor'), False),
+            selector_win.AttrDef.bool('MONITOR', gettext('Monitor Visuals'), False),
         ],
     )
 
-    style_win = SelectorWin(
+    style_win = selector_win.Selector(
         TK_ROOT,
         style_list,
         save_id='styles',
@@ -594,11 +594,11 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
-            SelAttr.bool('VID', gettext('Elevator Videos'), default=True),
+            selector_win.AttrDef.bool('VID', gettext('Elevator Videos'), default=True),
         ]
     )
 
-    elev_win = SelectorWin(
+    elev_win = selector_win.Selector(
         TK_ROOT,
         elev_list,
         save_id='elevators',
@@ -617,7 +617,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         callback=win_callback,
         callback_params=['Elevator'],
         attributes=[
-            SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
+            selector_win.AttrDef.bool('ORIENT', gettext('Multiple Orientations')),
         ]
     )
 

@@ -207,7 +207,7 @@ class AttrDef:
 
 class GroupHeader(ttk.Frame):
     """The widget used for group headers."""
-    def __init__(self, win: SelectorWin, title: str) -> None:
+    def __init__(self, win: Selector, title: str) -> None:
         self.parent = win
         super().__init__(
             win.pal_frame,
@@ -367,7 +367,7 @@ class Item:
         # The button widget for this item.
         self.button: ttk.Button | None= None
         # The selector window we belong to.
-        self._selector: SelectorWin | None = None
+        self._selector: Selector | None = None
         # The position on the menu this item is located at.
         # This is needed to change the font.
         self._context_ind: int | None = None
@@ -483,7 +483,7 @@ class PreviewWindow:
         self.win.columnconfigure(1, weight=1)
         self.win.rowconfigure(0, weight=1)
 
-        self.parent: SelectorWin | None = None
+        self.parent: Selector | None = None
 
         self.prev_btn = ttk.Button(
             self.win, text=BTN_PREV, command=functools.partial(self.cycle, -1))
@@ -493,7 +493,7 @@ class PreviewWindow:
         self.img: list[img.Handle] = []
         self.index = 0
 
-    def show(self, parent: SelectorWin, item: Item) -> None:
+    def show(self, parent: Selector, item: Item) -> None:
         """Show the window."""
         self.win.transient(parent.win)
         self.win.title(gettext('{} Preview').format(item.longName))
@@ -533,7 +533,7 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
-class SelectorWin:
+class Selector:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates

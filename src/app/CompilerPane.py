@@ -36,7 +36,7 @@ LOGGER = get_logger(__name__)
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR: dict[str, selector_win.SelectorWin] = {}
+CORRIDOR: dict[str, selector_win.Selector] = {}
 CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
 
 CORRIDOR_DESC = tkMarkdown.convert('', None)
@@ -365,7 +365,7 @@ def make_corr_wid(corr_name: str, title: str) -> None:
     """Create the corridor widget and items."""
     length = CORRIDOR_COUNTS[corr_name]
 
-    CORRIDOR[corr_name] = sel = selector_win.SelectorWin(
+    CORRIDOR[corr_name] = sel = selector_win.Selector(
         TK_ROOT,
         [
             selector_win.Item(

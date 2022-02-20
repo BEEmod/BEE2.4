@@ -154,7 +154,7 @@ class Music(PakObject, needs_foreground=True):
         return bool(children.sound[channel])
 
     def get_attrs(self) -> dict[str, bool]:
-        """Generate attributes for SelectorWin."""
+        """Generate attributes for Selector."""
         attrs = {
             channel.name: self.has_channel(channel)
             for channel in MusicChannel

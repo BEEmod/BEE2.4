@@ -7,9 +7,8 @@ from srctools import FileSystemChain, FileSystem
 import srctools.logger
 import attrs
 
-from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
-from app import TK_ROOT, config
+from app import TK_ROOT, config, selector_win
 from consts import MusicChannel
 from packages import PackagesSet, Music
 from localisation import gettext
@@ -21,8 +20,8 @@ BTN_CONTRACT_HOVER = '▲'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-WINDOWS: Dict[MusicChannel, SelectorWin] = {}
-SEL_ITEMS: Dict[str, SelItem] = {}
+WINDOWS: Dict[MusicChannel, selector_win.Selector] = {}
+SEL_ITEMS: Dict[str, selector_win.Item] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
 
@@ -110,12 +109,12 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
 async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane) -> None:
     """Generate the UI components, and return the base window."""
 
-    def for_channel(channel: MusicChannel) -> List[SelItem]:
+    def for_channel(channel: MusicChannel) -> List[selector_win.Item]:
         """Get the items needed for a specific channel."""
         music_list = []
         for music in packset.all_obj(Music):
             if music.provides_channel(channel):
-                selitem = SelItem.from_data(
+                selitem = selector_win.Item.from_data(
                     music.id,
                     music.selitem_data,
                     music.get_attrs(),
@@ -124,7 +123,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
                 music_list.append(selitem)
         return music_list
 
-    WINDOWS[MusicChannel.BASE] = SelectorWin(
+    WINDOWS[MusicChannel.BASE] = selector_win.Selector(
         TK_ROOT,
         for_channel(MusicChannel.BASE),
         save_id='music_base',
@@ -139,14 +138,14 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         callback=selwin_callback,
         callback_params=[MusicChannel.BASE],
         attributes=[
-            SelAttr.bool('SPEED', gettext('Propulsion Gel SFX')),
-            SelAttr.bool('BOUNCE', gettext('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', gettext('Excursion Funnel Music')),
-            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
+            selector_win.AttrDef.bool('SPEED', gettext('Propulsion Gel SFX')),
+            selector_win.AttrDef.bool('BOUNCE', gettext('Repulsion Gel SFX')),
+            selector_win.AttrDef.bool('TBEAM', gettext('Excursion Funnel Music')),
+            selector_win.AttrDef.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
         ],
     )
 
-    WINDOWS[MusicChannel.TBEAM] = SelectorWin(
+    WINDOWS[MusicChannel.TBEAM] = selector_win.Selector(
         TK_ROOT,
         for_channel(MusicChannel.TBEAM),
         save_id='music_tbeam',
@@ -158,11 +157,11 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         callback=selwin_callback,
         callback_params=[MusicChannel.TBEAM],
         attributes=[
-            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
+            selector_win.AttrDef.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
         ],
     )
 
-    WINDOWS[MusicChannel.BOUNCE] = SelectorWin(
+    WINDOWS[MusicChannel.BOUNCE] = selector_win.Selector(
         TK_ROOT,
         for_channel(MusicChannel.BOUNCE),
         save_id='music_bounce',
@@ -175,7 +174,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         callback_params=[MusicChannel.BOUNCE],
     )
 
-    WINDOWS[MusicChannel.SPEED] = SelectorWin(
+    WINDOWS[MusicChannel.SPEED] = selector_win.Selector(
         TK_ROOT,
         for_channel(MusicChannel.SPEED),
         save_id='music_speed',
