@@ -501,7 +501,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
             sel_list.append(selector_win.Item.from_data(
                 obj.id,
                 obj.selitem_data,
-                attrs={
+                attrib={
                     key: getattr(obj, attr_name)
                     for key, attr_name in
                     attrs.items()

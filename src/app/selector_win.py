@@ -414,8 +414,8 @@ class Item:
             )
 
     @classmethod
-    def from_data(cls, obj_id, data: SelitemData, attrs: Mapping[str, AttrValues] = None) -> Item:
-        """Create a selector Item from a SelitemData tuple."""
+    def from_data(cls, obj_id, data: SelitemData, attrib: Mapping[str, AttrValues] = None) -> Item:
+        """Create a selector Item from a SelitemData instance."""
         return Item(
             name=obj_id,
             short_name=data.short_name,
@@ -427,7 +427,7 @@ class Item:
             desc=data.desc,
             group=data.group,
             sort_key=data.sort_key,
-            attributes=attrs,
+            attributes=attrib,
             package=', '.join(sorted(data.packages)),
         )
 
@@ -488,7 +488,7 @@ class PreviewWindow:
         self.win.columnconfigure(1, weight=1)
         self.win.rowconfigure(0, weight=1)
 
-        self.parent: Selector | None = None
+        self.parent: Window | None = None
 
         self.prev_btn = ttk.Button(
             self.win, text=BTN_PREV, command=functools.partial(self.cycle, -1))
@@ -498,10 +498,9 @@ class PreviewWindow:
         self.img: list[img.Handle] = []
         self.index = 0
 
-    def show(self, parent: Selector, item: Item) -> None:
+    def show(self, parent: Window, item: Item) -> None:
         """Show the window."""
-        toplevel = parent.window.toplevel
-        self.win.transient(toplevel)
+        self.win.transient(parent.toplevel)
         self.win.title(gettext('{} Preview').format(item.longName))
 
         self.parent = parent
@@ -518,16 +517,16 @@ class PreviewWindow:
 
         self.win.deiconify()
         self.win.lift()
-        tk_tools.center_win(self.win, toplevel)
+        tk_tools.center_win(self.win, parent.toplevel)
         if parent.modal:
-            toplevel.grab_release()
+            parent.toplevel.grab_release()
             self.win.grab_set()
 
     def hide(self, _: tk.Event | None = None) -> None:
         """Swap grabs if the parent is modal."""
         if self.parent.modal:
             self.win.grab_release()
-            self.parent.window.toplevel.grab_set()
+            self.parent.toplevel.grab_set()
         self.win.withdraw()
 
     def cycle(self, off: int) -> None:
@@ -545,6 +544,7 @@ class InitInfo:
     parent: tk.Tk | tk.Toplevel
     title: str
     attributes: Iterable[AttrDef]
+    sound_sys: FileSystemChain | None
 
 
 class Selector:
@@ -626,11 +626,8 @@ class Selector:
         - readonly_desc will be displayed on the widget tooltip when readonly.
         - modal: If True, the window will block others while open.
         """
-        self._init_info = InitInfo(
-            parent,
-            title,
-            attributes,
-        )
+        # Stash these for the Window.construct() call.
+        self._init_info = InitInfo(parent, title, attributes, sound_sys)
         self.noneItem = Item(
             name='<NONE>',
             short_name='',
@@ -716,12 +713,6 @@ class Selector:
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
-        if sound_sys is not None and sound.has_sound():
-            # On start/stop, update the button label.
-            self.sampler = sound.SamplePlayer(sound_sys)
-        else:
-            self.sampler = None
-
         self.context_menu = tk.Menu(parent)
 
         # The headers for the context menu
@@ -732,7 +723,7 @@ class Selector:
         self.set_disp()
 
         # Will be deferred.
-        self.window = Window.construct(self, self._init_info)
+        self.window: Window | None = Window.construct(self, self._init_info)
         self._init_info = None
         self.refresh()
 
@@ -899,8 +890,8 @@ class Selector:
     def save(self, _: tk.Event = None) -> None:
         """Save the selected item into the textbox."""
         # Stop sample sounds if they're playing
-        if self.sampler is not None:
-            self.sampler.stop()
+        if self.window is not None and self.window.sampler is not None:
+            self.window.sampler.stop()
 
         for item in self.item_list:
             if item.button is not None:
@@ -1181,7 +1172,8 @@ class Window:
     prop_reset: ttk.Button = attrs.field(init=False)
 
     _suggest_lbl: list[ttk.Label | ttk.LabelFrame] = attrs.field(init=False, factory=list)
-    attrs: list[AttrDef] = attrs.field(init=False)
+    attrib: list[AttrDef] = attrs.field(init=False)
+    sampler: sound.SamplePlayer | None = attrs.field(init=False, default=None)
 
     @classmethod
     def construct(cls, sel: Selector, info: InitInfo) -> Window:
@@ -1291,22 +1283,27 @@ class Window:
         self.prop_name.grid(row=0, column=0)
 
         # For music items, add a '>' button to play sound samples
-        if sel.sampler is not None:
+
+        if info.sound_sys is not None and sound.has_sound():
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 name='sample_button',
                 text=BTN_PLAY,
                 width=2,
             )
-            sel.sampler.stop_callback = functools.partial(operator.setitem, samp_button, 'text', BTN_PLAY),
-            sel.sampler.start_callback = functools.partial(operator.setitem, samp_button, 'text', BTN_STOP),
+            # On start/stop, update the button label.
+            self.sampler = sound.SamplePlayer(
+                info.sound_sys,
+                stop_callback=functools.partial(operator.setitem, samp_button, 'text', BTN_PLAY),
+                start_callback=functools.partial(operator.setitem, samp_button, 'text', BTN_STOP),
+            )
             samp_button.grid(row=0, column=1)
             add_tooltip(
                 samp_button,
                 gettext("Play a sample of this item."),
             )
 
-            samp_button['command'] = sel.sampler.play_sample
+            samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
 
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
@@ -1398,8 +1395,8 @@ class Window:
         )
 
         # Wide before short.
-        self.attrs = sorted(info.attributes, key=lambda at: 0 if at.type.is_wide else 1)
-        if self.attrs:
+        self.attrib = sorted(info.attributes, key=lambda at: 0 if at.type.is_wide else 1)
+        if self.attrib:
             attrs_frame = ttk.Frame(self.prop_frm)
             attrs_frame.grid(
                 row=5,
@@ -1413,7 +1410,7 @@ class Window:
 
             # Add in all the attribute labels
             index = 0
-            for attr in self.attrs:
+            for attr in self.attrib:
                 attr_frame = ttk.Frame(attrs_frame)
                 desc_label = ttk.Label(attr_frame, text=attr.desc)
                 attr.label = ttk.Label(attr_frame)
@@ -1466,7 +1463,7 @@ class Window:
         if self.sampler:
             self.sampler.play_sample()
         elif self.selected.previews:
-            _PREVIEW.show(self.sel, self.selected)
+            _PREVIEW.show(self, self.selected)
 
     def sel_item(self, item: Item, _: tk.Event = None) -> None:
         """Select the specified item."""
@@ -1483,7 +1480,7 @@ class Window:
         img.apply(self.prop_icon, icon)
         self.prop_icon_frm.configure(width=icon.width, height=icon.height)
 
-        if item.previews and not self.sel.sampler:
+        if item.previews and not self.sampler:
             self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
         else:
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
@@ -1506,17 +1503,17 @@ class Window:
         item.button.state(('alternate',))
         self.scroll_to(item)
 
-        if self.sel.sampler:
+        if self.sampler:
             is_playing = self.sampler.is_playing
-            self.sel.sampler.stop()
+            self.sampler.stop()
 
-            self.sel.sampler.cur_file = item.snd_sample
-            if self.sel.sampler.cur_file:
+            self.sampler.cur_file = item.snd_sample
+            if self.sampler.cur_file:
                 self.samp_button.state(('!disabled',))
 
                 if is_playing:
                     # Start the sampler again, so it plays the current item!
-                    self.sel.sampler.play_sample()
+                    self.sampler.play_sample()
             else:
                 self.samp_button.state(('disabled',))
 
@@ -1527,7 +1524,7 @@ class Window:
                 self.prop_reset.state(('disabled',))
 
         # Set the attribute items.
-        for attr in self.attrs:
+        for attr in self.attrib:
             val = item.attrs.get(attr.id, attr.default)
 
             if attr.type is AttrTypes.BOOL:
@@ -1568,8 +1565,8 @@ class Window:
             return
 
         if key is NAV_KEYS.PLAY_SOUND:
-            if self.sel.sampler is not None:
-                self.sel.sampler.play_sample()
+            if self.sampler is not None:
+                self.sampler.play_sample()
             return
         elif key is NAV_KEYS.ENTER:
             self.sel.save()

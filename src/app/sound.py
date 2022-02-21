@@ -234,13 +234,17 @@ def clean_sample_folder() -> None:
 
 class SamplePlayer:
     """Handles playing a single audio file, and allows toggling it on/off."""
-    def __init__(self, system: FileSystemChain) -> None:
-        """Initialise the sample-playing manager.
-        """
+    def __init__(
+        self,
+        system: FileSystemChain,
+        start_callback: Callable[[], None] = lambda: None,
+        stop_callback: Callable[[], None] = lambda: None,
+    ) -> None:
+        """Initialise the sample-playing manager."""
         self.player: Optional[pyglet.media.Player] = None
         self.after: Optional[str] = None
-        self.start_callback: Callable[[], None] = lambda: None
-        self.stop_callback: Callable[[], None] = lambda: None
+        self.start_callback = start_callback
+        self.stop_callback = stop_callback
         self.cur_file: Optional[str] = None
         # The system we need to cleanup.
         self._handle: Optional[IO[bytes]] = None
