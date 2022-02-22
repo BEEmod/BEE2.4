@@ -1753,3 +1753,10 @@ async def init_windows() -> None:
     style_select_callback(style_win.chosen_id)
     await set_palette(pal_ui.selected)
     pal_ui.update_state()
+
+    style_win.start_loading()
+    voice_win.start_loading()
+    skybox_win.start_loading()
+    elev_win.start_loading()
+    for win in music_conf.WINDOWS.values():
+        win.start_loading()

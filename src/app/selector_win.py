@@ -6,6 +6,9 @@ Each item has a description, author, and icon.
 """
 from __future__ import annotations
 from typing import Union, Iterable, Mapping, Callable, Any, AbstractSet
+
+import trio
+from typing_extensions import assert_never
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -25,7 +28,7 @@ import srctools.logger
 
 from app.richTextBox import tkRichText
 from app.tooltip import add_tooltip, set_tooltip
-from app import tkMarkdown, tk_tools, sound, config, img, TK_ROOT, DEV_MODE
+from app import tkMarkdown, tk_tools, sound, config, img, TK_ROOT, DEV_MODE, BEE2
 from packages import SelitemData
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
@@ -87,6 +90,14 @@ class NAV_KEYS(Enum):
 
     # Space plays the current item.
     PLAY_SOUND = 'space'
+
+
+class LoadState(Enum):
+    """Current window-loading state."""
+    UNLOADED = 'unloaded'  # Just window built.
+    BACKGROUND = 'background'  # Gradually loading.
+    USER_REQUEST = 'user'   # User clicked, load ASAP.
+    LOADED = 'loaded'   # Fully loaded, window is non-None.
 
 
 @utils.freeze_enum_props
@@ -697,8 +708,8 @@ class Selector:
                 self.selected = self.item_list[0]
 
         self.orig_selected = self.selected
-        self.parent = parent
         self._readonly = False
+        self._load_state = LoadState.UNLOADED
         self.modal = modal
 
         # A map from folded name -> display name
@@ -723,9 +734,7 @@ class Selector:
         self.set_disp()
 
         # Will be deferred.
-        self.window: Window | None = Window.construct(self, self._init_info)
-        self._init_info = None
-        self.refresh()
+        self.window: Window | None = None
 
     async def _load_selected(self, selected: config.LastSelected) -> None:
         """Load a new selected item."""
@@ -843,7 +852,7 @@ class Selector:
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = item.group
-            if group_key not in self.window.group_widgets:
+            if self.window is not None and group_key not in self.window.group_widgets:
                 self.window.group_widgets[group_key] = GroupHeader(self.window, self.group_names[group_key])
 
             try:
@@ -879,7 +888,7 @@ class Selector:
             # Set a custom attribute to keep track of the menu's index.
             # The one at the end is the one we just added.
             menu._context_index = self.context_menu.index('end')
-        if self.window.toplevel.winfo_ismapped():
+        if self.window is not None and self.window.toplevel.winfo_ismapped():
             self.window.flow_items()
 
     def exit(self, _: tk.Event = None) -> None:
@@ -899,7 +908,8 @@ class Selector:
                 item.button.state(('!alternate', '!pressed', '!active'))
                 img.apply(item.button, None)
 
-        if not self.first_open:  # We've got state to store.
+        # We've got state to store.
+        if not self.first_open and self.window is not None and self.window.toplevel.winfo_ismapped():
             state = WindowState(
                 open_groups={
                     grp_id: grp.visible
@@ -910,9 +920,10 @@ class Selector:
             )
             config.store_conf(state, self.save_id)
 
-        if self.modal:
-            self.window.toplevel.grab_release()
-        self.window.toplevel.withdraw()
+        if self.window is not None:
+            if self.modal:
+                self.window.toplevel.grab_release()
+            self.window.toplevel.withdraw()
         self.set_disp()
         self.do_callback()
 
@@ -951,53 +962,34 @@ class Selector:
             self.disp_label.set(self._suggested_rollover.context_lbl)
             self.display.after(1000, self._pick_suggested)
 
-    def open_win(self, _: tk.Event = None, *, force_open=False) -> object:
-        """Display the window."""
-        if self._readonly and not force_open:
+    def open_win(self, _: tk.Event = None) -> object:
+        """Accelerate loading if required, or open immediately."""
+        if self._readonly:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
 
-        for item in self.item_list:
-            if item.button is not None:
-                img.apply(item.button, item.icon)
-
-        # Restore configured states.
-        if self.first_open:
-            self.first_open = False
-            try:
-                state = config.get_cur_conf(WindowState, self.save_id)
-            except KeyError:
-                pass
-            else:
-                LOGGER.debug(
-                    'Restoring saved selectorwin state "{}" = {}',
-                    self.save_id, state,
-                )
-                for grp_id, is_open in state.open_groups.items():
-                    try:
-                        self.window.group_widgets[grp_id].visible = is_open
-                    except KeyError:  # Stale config, ignore.
-                        LOGGER.warning(
-                            '({}): invalid selectorwin group: "{}"',
-                            self.save_id, grp_id,
-                        )
-                if state.width > 0 or state.height > 0:
-                    width = state.width if state.width > 0 else self.window.toplevel.winfo_reqwidth()
-                    height = state.height if state.height > 0 else self.window.toplevel.winfo_reqheight()
-                    self.window.toplevel.geometry(f'{width}x{height}')
-
-        self.window.toplevel.deiconify()
-        self.window.toplevel.lift()
-
-        if self.modal:
-            self.window.toplevel.grab_set()
-        self.window.toplevel.focus_force()  # Focus here to deselect the textbox
-
-        tk_tools.center_win(self.window.toplevel, parent=self.parent)
-
-        self.sel_item(self.selected)
-        self.window.toplevel.after(2, self.window.flow_items)
+        if self._load_state is LoadState.LOADED:
+            self.window.open()  # Pop open the window.
+        elif self._load_state is LoadState.UNLOADED:
+            # Not yet loaded, start doing that.
+            BEE2.APP_NURSERY.start_soon(Window.construct, self)
+            self._load_state = LoadState.USER_REQUEST
+        elif self._load_state is LoadState.USER_REQUEST:
+            pass  # Already requesting, nothing to do.
+        elif self._load_state is LoadState.BACKGROUND:
+            # Upgrade to request, show waiting cursor.
+            self._load_state = LoadState.USER_REQUEST
+            if self.display is not None:
+                self.display['cursor'] = tk_tools.Cursors.WAIT
+        else:
+            assert_never(self._load_state)
         return None
+
+    def start_loading(self) -> None:
+        """Begin background loading the window."""
+        if self._load_state is LoadState.UNLOADED:
+            BEE2.APP_NURSERY.start_soon(Window.construct, self)
+            self._load_state = LoadState.BACKGROUND
 
     def open_context(self, _: tk.Event = None) -> None:
         """Dislay the context window at the text widget."""
@@ -1086,6 +1078,7 @@ class Selector:
 
     def _set_context_font(self, item, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
+        # noinspection PyProtectedMember
         if item._context_ind is None:
             return
         new_font = font_suggested if suggested else font_normal
@@ -1095,7 +1088,8 @@ class Selector:
 
             # Apply the font to the group header as well, if suggested.
             if suggested:
-                self.window.group_widgets[group_key].title['font'] = new_font
+                if self.window is not None:
+                    self.window.group_widgets[group_key].title['font'] = new_font
 
                 # Also highlight the menu
                 # noinspection PyUnresolvedReferences
@@ -1105,6 +1099,8 @@ class Selector:
                 )
         else:
             menu = self.context_menu
+        # noinspection PyProtectedMember
+        LOGGER.debug('Entry config: {}.font = {}', item._context_ind, new_font)
         menu.entryconfig(item._context_ind, font=new_font)
 
     def set_suggested(self, suggested: AbstractSet[str]=frozenset()) -> None:
@@ -1116,15 +1112,16 @@ class Selector:
         self.suggested.clear()
         # Reset all the header fonts, if any item in that group is highlighted it'll
         # re-bold it.
-        for group_key, header in self.window.group_widgets.items():
-            header.title['font'] = font_normal
-            try:
-                # noinspection PyProtectedMember, PyUnresolvedReferences
-                ind = self.context_menus[group_key]._context_index
-            except AttributeError:
-                pass
-            else:
-                self.context_menu.entryconfig(ind, font=font_normal)
+        if self.window is not None:
+            for group_key, header in self.window.group_widgets.items():
+                header.title['font'] = font_normal
+                try:
+                    # noinspection PyProtectedMember, PyUnresolvedReferences
+                    ind = self.context_menus[group_key]._context_index
+                except AttributeError:
+                    pass
+                else:
+                    self.context_menu.entryconfig(ind, font=font_normal)
 
         self._set_context_font(self.noneItem, '<NONE>' in suggested)
 
@@ -1154,6 +1151,7 @@ class Window:
 
     # All assigned in construct().
     toplevel: tk.Toplevel = attrs.field(init=False)
+    parent: tk.Tk | tk.Toplevel = attrs.field(init=False)
     wid_canvas: tk.Canvas = attrs.field(init=False)
     wid_scroll: tk_tools.HidingScroll = attrs.field(init=False)
     desc_label: ttk.Label | None = attrs.field(init=False)
@@ -1175,11 +1173,22 @@ class Window:
     attrib: list[AttrDef] = attrs.field(init=False)
     sampler: sound.SamplePlayer | None = attrs.field(init=False, default=None)
 
+    async def delay(self) -> None:
+        """Let other tasks run if this is backgrounded."""
+        if self.sel._load_state is LoadState.BACKGROUND:
+            await trio.sleep(0.2)
+        else:
+            await trio.sleep(0)
+
     @classmethod
-    def construct(cls, sel: Selector, info: InitInfo) -> Window:
+    async def construct(cls, sel: Selector) -> None:
         """Construct the window gradually."""
-        self = cls(sel)
+        LOGGER.debug('Construct {}', sel.save_id)
+        info = sel._init_info
+        assert info is not None
+        self: Window = cls(sel)
         self.toplevel = toplevel = tk.Toplevel(info.parent, name='selwin_' + sel.save_id)
+        self.parent = info.parent
         toplevel.withdraw()
         toplevel.title("BEE2 - " + info.title)
         toplevel.transient(master=info.parent)
@@ -1197,6 +1206,7 @@ class Window:
         # Allow navigating with arrow keys.
         toplevel.bind("<KeyPress>", self.key_navigate)
 
+        await self.delay()
         if sel.description:
             self.desc_label = ttk.Label(
                 toplevel,
@@ -1211,6 +1221,7 @@ class Window:
         else:
             self.desc_label = None
 
+        await self.delay()
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = tk.PanedWindow(
             toplevel,
@@ -1228,6 +1239,7 @@ class Window:
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
 
+        await self.delay()
         # We need to use a canvas to allow scrolling.
         self.wid_canvas = tk.Canvas(shim, highlightthickness=0, name='pal_canvas')
         self.wid_canvas.grid(row=0, column=0, sticky="NSEW")
@@ -1246,6 +1258,7 @@ class Window:
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
 
         tk_tools.add_mousewheel(self.wid_canvas, self.toplevel)
+        await self.delay()
 
         # Holds all the widgets which provide info for the current item.
         self.prop_frm = ttk.Frame(self.pane_win, name='prop_frame', borderwidth=4, relief='raised')
@@ -1263,6 +1276,7 @@ class Window:
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
+        await self.delay()
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
         img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
         self.prop_icon.grid(row=0, column=0)
@@ -1284,6 +1298,7 @@ class Window:
 
         # For music items, add a '>' button to play sound samples
 
+        await self.delay()
         if info.sound_sys is not None and sound.has_sound():
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
@@ -1306,6 +1321,7 @@ class Window:
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
 
+        await self.delay()
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
         self.prop_author.grid(row=2, column=0, columnspan=4)
 
@@ -1315,6 +1331,7 @@ class Window:
         self.prop_desc_frm.columnconfigure(0, weight=1)
         self.prop_frm.rowconfigure(4, weight=1)
 
+        await self.delay()
         self.prop_desc = tkRichText(
             self.prop_desc_frm,
             name='prop_desc',
@@ -1329,7 +1346,7 @@ class Window:
             pady=2,
             sticky='nsew',
         )
-
+        await self.delay()
         self.prop_scroll = tk_tools.HidingScroll(
             self.prop_desc_frm,
             name='desc_scroll',
@@ -1345,6 +1362,8 @@ class Window:
         )
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
 
+        await self.delay()
+
         ttk.Button(
             self.prop_frm,
             name='btn_ok',
@@ -1356,6 +1375,7 @@ class Window:
             padx=(8, 8),
         )
 
+        await self.delay()
         if sel.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
@@ -1380,6 +1400,7 @@ class Window:
             padx=(8, 8),
         )
 
+        await self.delay()
         toplevel.option_add('*tearOff', False)
 
         self.pane_win.add(shim)
@@ -1394,6 +1415,7 @@ class Window:
             stretch='never',
         )
 
+        await self.delay()
         # Wide before short.
         self.attrib = sorted(info.attributes, key=lambda at: 0 if at.type.is_wide else 1)
         if self.attrib:
@@ -1454,9 +1476,18 @@ class Window:
                             sticky='W',
                         )
                     index += 1
+                await self.delay()
 
+        LOGGER.debug('Fully loaded: {}', self.sel.save_id)
         self.wid_canvas.bind("<Configure>", self.flow_items)
-        return self
+        sel.window = self
+        show_win = sel._load_state is LoadState.USER_REQUEST
+        sel._load_state = LoadState.LOADED
+        # Discard, no longer needed.
+        sel._init_info = None
+        sel.refresh()
+        if show_win:
+            self.open()
 
     def _icon_clicked(self, _: tk.Event) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
@@ -1549,6 +1580,49 @@ class Window:
                 attr.label['text'] = str(val)
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
+
+    def open(self) -> None:
+        """Open the window."""
+        for item in self.sel.item_list:
+            if item.button is not None:
+                img.apply(item.button, item.icon)
+
+        # Restore configured states.
+        if self.sel.first_open:
+            self.sel.first_open = False
+            try:
+                state = config.get_cur_conf(WindowState, self.sel.save_id)
+            except KeyError:
+                pass
+            else:
+                LOGGER.debug(
+                    'Restoring saved selectorwin state "{}" = {}',
+                    self.sel.save_id, state,
+                )
+                for grp_id, is_open in state.open_groups.items():
+                    try:
+                        self.group_widgets[grp_id].visible = is_open
+                    except KeyError:  # Stale config, ignore.
+                        LOGGER.warning(
+                            '({}): invalid selectorwin group: "{}"',
+                            self.sel.save_id, grp_id,
+                        )
+                if state.width > 0 or state.height > 0:
+                    width = state.width if state.width > 0 else self.toplevel.winfo_reqwidth()
+                    height = state.height if state.height > 0 else self.toplevel.winfo_reqheight()
+                    self.toplevel.geometry(f'{width}x{height}')
+
+        self.toplevel.deiconify()
+        self.toplevel.lift()
+
+        if self.sel.modal:
+            self.toplevel.grab_set()
+        self.toplevel.focus_force()  # Focus here to deselect the textbox
+
+        tk_tools.center_win(self.toplevel, parent=self.parent)
+
+        self.sel.sel_item(self.sel.selected)
+        self.toplevel.after(2, self.flow_items)
 
     def key_navigate(self, event: tk.Event) -> None:
         """Navigate using arrow keys.
