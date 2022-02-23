@@ -20,7 +20,7 @@ def _run_main_loop(*args, **kwargs) -> None:
 
 _main_loop_running = False
 _orig_mainloop = TK_ROOT.mainloop
-TK_ROOT.mainloop = _run_main_loop
+setattr(TK_ROOT, 'mainloop', _run_main_loop)
 del _run_main_loop
 
 

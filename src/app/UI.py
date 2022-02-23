@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
-from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any
+from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
 import itertools
 import operator
 import random
@@ -49,10 +49,10 @@ from app import (
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Holds the TK Toplevels, frames, widgets and menus
-windows = {}
-frames = {}
-UI = {}
-menus = {}
+windows: Dict[str, Any] = {}  # Toplevel | SubPane
+frames: Dict[str, tk.Frame] = {}
+UI: Dict[str, Any] = {}  # Various widgets.
+menus: Dict[str, tk.Menu] = {}
 
 # These panes.
 skybox_win: SelectorWin
@@ -1048,7 +1048,7 @@ def pal_shuffle() -> None:
 # initMainWind generates the main frames that hold all the panes to
 # make it easy to move them around if needed
 
-async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
+async def init_option(pane: SubPane.SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1160,7 +1160,7 @@ async def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         # else to adjust.
         left_pad = (1, 0)
     else:
-        left_pad = 0
+        left_pad = (0, 0)
 
     # Make all the selector window textboxes
     (await style_win.widget(props)).grid(row=0, column=1, sticky='EW', padx=left_pad)
@@ -1384,7 +1384,7 @@ def set_game(game: 'gameMan.Game') -> None:
     EXPORT_CMD_VAR.set(text)
 
 
-def init_menu_bar(win: tk.Toplevel, export: Callable[[], None]) -> Tuple[tk.Menu, tk.Menu]:
+def init_menu_bar(win: Union[tk.Tk, tk.Toplevel], export: Callable[[], None]) -> Tuple[tk.Menu, tk.Menu]:
     """Create the top menu bar.
 
     This returns the View and palette menus, for later population.
