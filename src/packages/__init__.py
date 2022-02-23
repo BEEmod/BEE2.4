@@ -196,23 +196,6 @@ CORRIDOR_COUNTS = {
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'.casefold()
 
-VPK_OVERRIDE_README = """\
-Files in this folder will be written to the VPK during every BEE2 export.
-Use to override resources as you please.
-"""
-
-
-# The folder we want to copy our VPKs to.
-VPK_FOLDER = {
-    # The last DLC released by Valve - this is the one that we
-    # overwrite with a VPK file.
-    utils.STEAM_IDS['PORTAL2']: 'portal2_dlc3',
-    utils.STEAM_IDS['DEST_AP']: 'portal2_dlc3',
-
-    # This doesn't have VPK files, and is higher priority.
-    utils.STEAM_IDS['APERTURE TAG']: 'portal2',
-}
-
 
 class NoVPKExport(Exception):
     """Raised to indicate that VPK files weren't copied."""
