@@ -8,7 +8,7 @@ import string
 import time
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
-from typing import List, TYPE_CHECKING, Dict, Any
+from typing import List, TYPE_CHECKING, Dict, Any, Optional
 from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
@@ -167,16 +167,15 @@ class P2C:
             title=self.title,
         )
 
-    def make_item(self) -> CheckItem:
+    def make_item(self) -> CheckItem['P2C']:
         """Make a corresponding CheckItem object."""
-        chk = CheckItem(
+        return CheckItem(
             self.title,
             (gettext('Coop') if self.is_coop else gettext('SP')),
             self.mod_time,
-            hover_text=self.desc
+            hover_text=self.desc,
+            user=self,
         )
-        chk.p2c = self
-        return chk
 
 
 class Date:
@@ -294,7 +293,7 @@ def load_game(game: 'gameMan.Game'):
         refresh_game_details()
 
 
-def find_puzzles(game: 'gameMan.Game'):
+def find_puzzles(game: 'gameMan.Game') -> Optional[str]:
     """Find the path for the p2c files."""
     # The puzzles are located in:
     # <game_folder>/portal2/puzzles/<steam_id>
@@ -314,9 +313,9 @@ def find_puzzles(game: 'gameMan.Game'):
     return None
 
 
-def backup_maps(maps):
+def backup_maps(maps: List[P2C]) -> None:
     """Copy the given maps to the backup."""
-    back_zip = BACKUPS['backup_zip']  # type: ZipFile
+    back_zip: ZipFile = BACKUPS['backup_zip']
 
     # Allow removing old maps when we overwrite objects
     map_dict = {
@@ -351,7 +350,7 @@ def backup_maps(maps):
     refresh_back_details()
 
 
-def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
+def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
     """Perform an automatic backup for the given game.
 
     We do this seperately since we don't need to read the property files.
@@ -424,15 +423,15 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
                 loader.step(AUTO_BACKUP_STAGE)
 
 
-def save_backup():
+def save_backup() -> None:
     """Save the backup file."""
     # We generate it from scratch, since that's the only way to remove
     # files.
     new_zip_data = BytesIO()
     new_zip = ZipFile(new_zip_data, 'w', compression=ZIP_LZMA)
 
-    maps = [
-        item.p2c
+    maps: list[P2C] = [
+        item.user
         for item in
         UI['back_details'].items
     ]
@@ -447,7 +446,7 @@ def save_backup():
     copy_loader.set_length('COPY', len(maps))
 
     with copy_loader:
-        for p2c in maps:  # type: P2C
+        for p2c in maps:
             old_zip = p2c.zip_file
             map_path = p2c.filename + '.p2c'
             scr_path = p2c.filename + '.jpg'
@@ -479,7 +478,7 @@ def save_backup():
         p2c.zip_file = new_zip
 
 
-def restore_maps(maps: List[P2C]):
+def restore_maps(maps: List[P2C]) -> None:
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:
@@ -645,7 +644,7 @@ def ui_refresh_game() -> None:
 def ui_backup_sel() -> None:
     """Backup selected maps."""
     backup_maps([
-        item.p2c
+        item.user
         for item in
         UI['game_details'].items
         if item.state
@@ -655,7 +654,7 @@ def ui_backup_sel() -> None:
 def ui_backup_all() -> None:
     """Backup all maps."""
     backup_maps([
-        item.p2c
+        item.user
         for item in
         UI['game_details'].items
     ])
@@ -664,7 +663,7 @@ def ui_backup_all() -> None:
 def ui_restore_sel() -> None:
     """Restore selected maps."""
     restore_maps([
-        item.p2c
+        item.user
         for item in
         UI['back_details'].items
         if item.state
@@ -674,18 +673,16 @@ def ui_restore_sel() -> None:
 def ui_restore_all() -> None:
     """Backup all maps."""
     restore_maps([
-        item.p2c
-        for item in
-        UI['back_details'].items
+        item.user
+        for item in UI['back_details'].items
     ])
 
 
 def ui_delete_backup() -> None:
     """Delete the selected items in the backup."""
     BACKUPS['back'] = [
-        item.p2c
-        for item in
-        UI['back_details'].items
+        item.user
+        for item in UI['back_details'].items
         if not item.state
     ]
 
@@ -699,16 +696,16 @@ def ui_delete_game() -> None:
         LOGGER.warning('No game selected to delete from?')
         return
 
-    game_detail = UI['game_details']  # type: CheckDetails
+    game_detail: CheckDetails[P2C] = UI['game_details']
 
     to_delete = [
-        item.p2c
+        item.user
         for item in
         game_detail.items
         if item.state
     ]
     to_keep = [
-        item.p2c
+        item.user
         for item in
         game_detail.items
         if not item.state
@@ -733,7 +730,7 @@ def ui_delete_game() -> None:
     deleting_loader.set_length('DELETE', len(to_delete))
     try:
         with deleting_loader:
-            for p2c in to_delete:  # type: P2C
+            for p2c in to_delete:
                 scr_path = p2c.filename + '.jpg'
                 map_path = p2c.filename + '.p2c'
                 abs_scr = os.path.join(game_dir, scr_path)

@@ -6,7 +6,7 @@ be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
 from __future__ import annotations
-from collections.abc import Iterable, Iterator
+from typing import Generic, Optional, TypeVar, Iterable, Iterator
 from tkinter import ttk, font
 import tkinter as tk
 import functools
@@ -26,6 +26,7 @@ ROW_HEIGHT = 16
 ROW_PADDING = 2
 
 BODY_FONT = font.nametofont('TkDefaultFont')
+UserT = TypeVar('UserT')
 
 style = ttk.Style()
 style.configure('CheckDetails.TCheckbutton', background='white')
@@ -67,16 +68,16 @@ class Header:
         self.sorter['background'] = ''
 
 
-class Item:
-    """Represents one item in a CheckDetails list.
-
-    """
+class Item(Generic[UserT]):
+    """Represents one item in a CheckDetails list."""
+    user: UserT
     def __init__(
         self,
         *values: str,
         hover_text: str='',
         lock_check: bool=False,
         state: bool=False,
+        user: UserT | None = None,
     ) -> None:
         """Initialise an item.
         - values are the text to show in each column, in order.
@@ -85,6 +86,7 @@ class Item:
             in the column width.
         - If lock_check is true, this checkbox cannot be changed.
         - state is the initial state of the checkbox.
+        - user can be set to any value.
         """
         self.values = values
         self.state_var = tk.BooleanVar(value=bool(state))
@@ -93,6 +95,8 @@ class Item:
         self.locked = lock_check
         self.hover_text = hover_text  # Readonly.
         self.val_widgets: list[tk.Label] = []
+        if user is not None:
+            self.user = user
 
     def make_widgets(self, master: CheckDetails) -> None:
         """Create the widgets for this item."""
@@ -191,12 +195,12 @@ class Item:
         self.check.state(['!pressed'])
 
 
-class CheckDetails(ttk.Frame):
+class CheckDetails(ttk.Frame, Generic[UserT]):
     """A widget which displays items in a row with various attributes."""
     def __init__(
         self,
         parent: tk.Misc,
-        items: Iterable[Item]=(),
+        items: Iterable[Item[UserT]]=(),
         headers: Iterable[str]=(),
         add_sizegrip: bool=False,
     ) -> None:
@@ -210,7 +214,7 @@ class CheckDetails(ttk.Frame):
         super().__init__(parent)
 
         self.parent = parent
-        self.items: list[Item] = []
+        self.items: list[Item[UserT]] = []
         self.sort_ind: int | None = None
         self.rev_sort = False  # Should we sort in reverse?
 
