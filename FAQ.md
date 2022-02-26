@@ -106,7 +106,7 @@ This is also possible; however, the refraction shader used by light strips isn't
 
 ### Can you add lights that are toggled by an input?
 
-The Source engine has very strict limits on toggleable lights. Only two dynamic lights can affect a single surface, and only 32 possible combinations of light states can exist across the entire map. This makes toggleable lights infeasible for a mod such as BEE2, as the majority of users are not going to be aware of these restrictions. Additionally, darkness is not meant to be used as a test element. It doesn't actually affect the puzzle in any way and is just annoying. So while this is technically possible to an extent, it's not going to be implemented either way.
+The Source engine has very strict limits on toggleable lights. Only two dynamic lights can affect a single surface, and only 32 possible combinations of light states can exist across the entire map. This makes toggleable lights infeasible for a mod such as BEE2, as the majority of users are not going to be aware of these restrictions. So while this is technically possible to an extent, it's not going to be implemented.
 
 ### I exported my BEE2.4 map to Hammer and it won't compile/music won't play/<some other issue\>.
 
