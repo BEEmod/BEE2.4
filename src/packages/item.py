@@ -11,12 +11,13 @@ from typing import Iterable, Match, cast
 from pathlib import PurePosixPath as FSPath
 
 import attrs
+import trio
 from srctools import FileSystem, Property, VMF, Vec, logger
 from srctools.tokenizer import Tokenizer, Token
 
 from app import tkMarkdown, img, lazy_conf, DEV_MODE, config
 from packages import (
-    PakObject, ParseData, ExportData, Style,
+    PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
 )
 from editoritems import Item as EditorItem, InstCount
@@ -587,6 +588,17 @@ class Item(PakObject, needs_foreground=True):
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
 
+    @classmethod
+    async def post_parse(cls, packset: PackagesSet) -> None:
+        """After styles and items are done, assign all the versions."""
+        # This has to be done after styles.
+        await packset.ready(Style).wait()
+        LOGGER.info('Allocating styled items...')
+        styles = packset.all_obj(Style)
+        async with trio.open_nursery() as nursery:
+            for item_to_style in packset.all_obj(Item):
+                nursery.start_soon(assign_styled_items, styles, item_to_style)
+
     @staticmethod
     def export(exp_data: ExportData) -> None:
         """Export all items into the configs.
@@ -917,10 +929,7 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
     return new_conf
 
 
-async def assign_styled_items(
-    all_styles: Iterable[Style],
-    item: Item,
-) -> None:
+async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
     """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each

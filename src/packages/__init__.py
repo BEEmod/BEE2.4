@@ -559,15 +559,6 @@ async def load_packages(
                     packset, obj_class, objs, None,
                 )
 
-    # This has to be done after styles.
-    await packset.ready(Style).wait()
-    await packset.ready(Item).wait()
-    LOGGER.info('Allocating styled items...')
-    styles = packset.all_obj(Style)
-    async with trio.open_nursery() as nursery:
-        for item_to_style in packset.all_obj(Item):
-            nursery.start_soon(assign_styled_items, styles, item_to_style)
-
 
 async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[PakT], loader: Optional[LoadScreen]) -> None:
     """Parse all of a specific object type."""
@@ -1056,7 +1047,7 @@ def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:
 
 
 # Load all the package object classes, registering them in the process.
-from packages.item import Item, assign_styled_items
+from packages.item import Item
 from packages.stylevar import StyleVar
 from packages.elevator import Elevator
 from packages.editor_sound import EditorSound
