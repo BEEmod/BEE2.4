@@ -100,8 +100,8 @@ try:
     from _compiled_version import BEE_VERSION  # type: ignore
 except ImportError:
     # We're running from src/, so data is in the folder above that.
-    # Go up once from the file to its containing folder, then to the parent.
-    _INSTALL_ROOT = Path(sys.argv[0]).resolve().parent.parent
+    # Go up once from us to its containing folder, then to the parent.
+    _INSTALL_ROOT = Path(__file__).resolve().parent.parent
 
     BEE_VERSION = get_git_version(_INSTALL_ROOT)
     FROZEN = False
