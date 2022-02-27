@@ -371,6 +371,8 @@ class PackagesSet:
 
     # Indicates if an object type has been fully parsed.
     _type_ready: dict[Type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
+    # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
+    _parsed: set[Type[PakObject]] = attrs.field(init=False, factory=set)
 
     def ready(self, cls: Type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
@@ -386,12 +388,14 @@ class PackagesSet:
 
     def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
-        assert self.ready(cls).is_set(), cls
+        if cls not in self._parsed:
+            raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast('Collection[PakT]', self.objects[cls].values())
 
     def obj_by_id(self, cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
-        assert self.ready(cls).is_set(), cls
+        if cls not in self._parsed:
+            raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast(PakT, self.objects[cls][object_id.casefold()])
 
 
@@ -574,9 +578,12 @@ async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable
                 packset, obj_class, obj_id, loader,
             )
     LOGGER.info('Post-process {} objects...', obj_class.__name__)
-    # Set first, allowing post parse to wait until later.
-    packset.ready(obj_class).set()
+    # Tricky, we want to let post_parse() call all_obj() etc, but not let other blocked tasks
+    # run until post_parse finishes. So use two flags.
+    # noinspection PyProtectedMember
+    packset._parsed.add(obj_class)
     await obj_class.post_parse(packset)
+    packset.ready(obj_class).set()
 
 
 async def parse_package(
