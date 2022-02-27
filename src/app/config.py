@@ -20,6 +20,7 @@ from BEE2_config import GEN_OPTS as LEGACY_CONF
 
 
 LOGGER = logger.get_logger(__name__)
+LOGGER.setLevel('INFO')  # Debug messages are spammy.
 
 
 def read_settings() -> None:
@@ -226,8 +227,7 @@ def store_conf(data: DataT, data_id: str='') -> None:
     info: ConfType[DataT] = _TYPE_TO_TYPE[type(data)]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    if type(data) is not WindowState:  # This is really spammy.
-        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
+    LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
     try:
         _CUR_CONFIG[info][data_id] = data
     except KeyError:
