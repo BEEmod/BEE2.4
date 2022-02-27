@@ -1005,7 +1005,7 @@ class Style(PakObject, needs_foreground=True):
 
 def desc_parse(
     info: Property,
-    desc_id: str,
+    source: str,
     pak_id: str,
     *,
     prop_name: str='description',
@@ -1019,7 +1019,7 @@ def desc_parse(
         if prop.has_children():
             for line in prop:
                 if line.name and not has_warning:
-                    LOGGER.warning('Old desc format: {}', desc_id)
+                    LOGGER.warning('Old desc format: {}', source)
                     has_warning = True
                 lines.append(line.value)
         else:
