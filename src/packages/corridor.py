@@ -6,10 +6,13 @@ from typing import Dict, Tuple, List
 from enum import Enum
 
 import attrs
+import srctools.logger
 
 from app import img, tkMarkdown
 import packages
 
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 class GameMode(Enum):
     """The game mode this uses."""
@@ -39,11 +42,12 @@ COUNTS = {
 }
 # For converting style corridor definitions, the item IDs of corridors.
 ITEMS = [
-    (GameMode.SP, Direction.ENTRY, 'ITEM_ENTRY_DOOR'),
-    (GameMode.SP, Direction.EXIT, 'ITEM_EXIT_DOOR'),
-    (GameMode.COOP, Direction.ENTRY, 'ITEM_COOP_ENTRY_DOOR'),
-    (GameMode.COOP, Direction.EXIT, 'ITEM_COOP_EXIT_DOOR'),
+    (GameMode.SP, Direction.ENTRY, 'ITEM_ENTRY_DOOR', 'sp_entry'),
+    (GameMode.SP, Direction.EXIT, 'ITEM_EXIT_DOOR', 'sp_exit'),
+    (GameMode.COOP, Direction.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
+    (GameMode.COOP, Direction.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
 ]
+DESC = tkMarkdown.MarkdownData.text('')
 
 
 @attrs.frozen
@@ -51,7 +55,7 @@ class Corridor:
     """An individual corridor definition. """
     instance: str
     name: str
-    desc: tkMarkdown.MarkdownData
+    desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
     authors: List[str]
 
@@ -100,7 +104,7 @@ def parse_specifier(specifier: str) -> CorrKind:
     return mode, direction, orient
 
 
-@attrs.define
+@attrs.define(slots=False)
 class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
     id: str
@@ -135,6 +139,65 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 self.corridors[key] = corr_over
             else:
                 corr_base.extend(corr_over)
+
+    @classmethod
+    async def post_parse(cls, packset: packages.PackagesSet) -> None:
+        """After items are parsed, convert definitions in the item into these groups."""
+        # Need both of these to be parsed.
+        await packset.ready(packages.Item).wait()
+        await packset.ready(packages.Style).wait()
+        for mode, direction, item_id, variant_attr in ITEMS:
+            try:
+                item = packset.obj_by_id(packages.Item, item_id)
+            except KeyError:
+                continue
+            count = COUNTS[mode, direction]
+            for vers in item.versions.values():
+                for style_id, variant in vers.styles.items():
+                    try:
+                        style = packset.obj_by_id(packages.Style, style_id)
+                    except KeyError:
+                        continue
+                    try:
+                        corridors = packset.obj_by_id(cls, style_id)
+                    except KeyError:
+                        corridors = cls(style_id, {})
+                        packset.add(corridors)
+
+                    # If the item has corridors defined, transfer to this.
+                    had_legacy = False
+                    for ind in range(count):
+                        try:
+                            inst = variant.editor.instances[ind]
+                        except IndexError:
+                            LOGGER.warning('Corridor {}:{} does not have enough instances!', style_id, item_id)
+                            break
+                        if not inst.inst:
+                            continue
+                        if variant_attr:
+                            style_info = style.corridors[variant_attr, ind + 1]
+                            corridor = Corridor(
+                                instance=str(inst.inst),
+                                name=style_info.name,
+                                images=[style_info.icon],
+                                authors=style.selitem_data.auth,
+                                desc=tkMarkdown.MarkdownData.text(style_info.desc),
+                            )
+                        else:
+                            corridor = Corridor(
+                                instance=str(inst.inst),
+                                name='Corridor',
+                                images=[],
+                                authors=style.selitem_data.auth,
+                                desc=DESC,
+                            )
+                        corridors.corridors.setdefault(
+                            (mode, direction, CorrOrient.HORIZONTAL),
+                            [],
+                        ).append(corridor)
+                        had_legacy = True
+                    if had_legacy:
+                        LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
 
     @staticmethod
     def export(exp_data: packages.ExportData) -> None:
