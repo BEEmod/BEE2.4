@@ -364,8 +364,8 @@ class PackagesSet:
     packages: dict[str, Package] = attrs.Factory(dict)
     # type -> id -> object
     # The object data before being parsed, and the final result.
-    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attrs.field(factory=lambda: defaultdict(dict), repr=False)
-    objects: dict[Type[PakObject], dict[str, PakObject]] = attrs.Factory(lambda: defaultdict(dict))
+    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attrs.field(factory=dict, repr=False)
+    objects: dict[Type[PakObject], dict[str, PakObject]] = attrs.Factory(dict)
     # For overrides, a type/ID pair to the list of overrides.
     overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
 
@@ -517,6 +517,11 @@ async def load_packages(
             'No Clean Style package! This is required for some '
             'essential resources and objects.'
         )
+
+    # Ensure all objects are in the dicts.
+    for obj_type in OBJ_TYPES.values():
+        packset.unparsed[obj_type] = {}
+        packset.objects[obj_type] = {}
 
     async with trio.open_nursery() as nursery:
         for pack in packset.packages.values():
