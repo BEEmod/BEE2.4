@@ -58,6 +58,7 @@ class Corridor:
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
     authors: List[str]
+    legacy_ind: int = 0  # 1-7 for old configurations from editoritems.
 
 
 def parse_specifier(specifier: str) -> CorrKind:
@@ -182,6 +183,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[style_info.icon],
                                 authors=style.selitem_data.auth,
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
+                                legacy_ind=ind,
                             )
                         else:
                             corridor = Corridor(
@@ -190,6 +192,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[],
                                 authors=style.selitem_data.auth,
                                 desc=DESC,
+                                legacy_ind=ind,
                             )
                         corridors.corridors.setdefault(
                             (mode, direction, CorrOrient.HORIZONTAL),
