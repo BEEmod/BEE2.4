@@ -5,7 +5,7 @@ from typing import List, Set, NamedTuple, Iterator
 
 import srctools.logger
 import vbsp
-from precomp import options as vbsp_options, packing, conditions, rand
+from precomp import mapinfo, options as vbsp_options, packing, conditions, rand
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output, Entity
 
@@ -54,7 +54,7 @@ def has_responses() -> bool:
     return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
 
 
-def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, voice_attrs: dict) -> None:
+def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, info: mapinfo.Info) -> None:
     """Write the coop responses information into the map."""
     config = ConfigFile('bee2/resp_voice.cfg', in_conf_folder=False)
     response_block = QUOTE_DATA.find_key('CoopResponses', or_blank=True)
@@ -75,7 +75,7 @@ def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, voice_attrs: di
             continue
 
         voice_attr = RESP_HAS_NAMES.get(section.name, '')
-        if voice_attr and not voice_attrs[voice_attr]:
+        if voice_attr and not info.has_attr(voice_attr):
             # This response category isn't present.
             continue
 
@@ -117,8 +117,8 @@ def res_quote_event(res: Property):
 
 
 def find_group_quotes(
-    vmf: VMF,
     coll: Collisions,
+    info: mapinfo.Info,
     group: Property,
     mid_quotes,
     allow_mid_voices,
@@ -145,7 +145,7 @@ def find_group_quotes(
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_flag(flag, coll, fake_inst):
+            if not conditions.check_flag(flag, coll, info, fake_inst):
                 valid_quote = False
                 break
 
@@ -441,10 +441,10 @@ def get_studio_loc() -> Vec:
 
 
 def add_voice(
-    voice_attrs: dict,
     style_vars: dict,
     vmf: VMF,
     coll: Collisions,
+    info: mapinfo.Info,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""
@@ -515,7 +515,7 @@ def add_voice(
 
     if has_responses():
         LOGGER.info('Generating responses data..')
-        encode_coop_responses(vmf, quote_loc, allow_dings, voice_attrs)
+        encode_coop_responses(vmf, quote_loc, allow_dings, info)
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         if not file:
@@ -560,8 +560,8 @@ def add_voice(
 
         possible_quotes = sorted(
             find_group_quotes(
-                vmf,
                 coll,
+                info,
                 group,
                 mid_quotes,
                 use_dings=use_dings,
