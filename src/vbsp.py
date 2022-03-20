@@ -1896,7 +1896,7 @@ def main() -> None:
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf, coll)
+        conditions.check_all(vmf, coll, info)
         add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)
