@@ -3,13 +3,7 @@ from contextlib import suppress
 from srctools import Property, Vec, Output, VMF
 import srctools.logger
 
-from precomp.conditions import (
-    make_result, RES_EXHAUSTED,
-)
-from precomp import instanceLocs
-from precomp import connections
-from precomp import options
-from precomp import conditions
+from precomp import instanceLocs, connections, options, conditions
 import consts
 import vbsp
 
@@ -19,8 +13,8 @@ COND_MOD_NAME = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 
-@make_result('ResizeableTrigger')
-def res_resizeable_trigger(vmf: VMF, res: Property):
+@conditions.make_result('ResizeableTrigger')
+def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) -> object:
     """Replace two markers with a trigger brush.
 
     This is run once to affect all of an item.
@@ -63,7 +57,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
     del inst  # Make sure we don't use this later.
 
     if not marker_names:  # No markers in the map - abort
-        return RES_EXHAUSTED
+        return conditions.RES_EXHAUSTED
 
     item_id = res['markerItem']
 
@@ -95,7 +89,7 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
 
     # Display preview overlays if it's preview mode, and the config is true
     pre_act = pre_deact = None
-    if vbsp.IS_PREVIEW and options.get_itemconf(res['previewConf', ''], False):
+    if not info.is_publishing and options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
         preview_scale = res.float('previewScale', 0.25)
@@ -263,4 +257,4 @@ def res_resizeable_trigger(vmf: VMF, res: Property):
         for conn in mark1.outputs | mark2.outputs:
             conn.from_item = item
 
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED

@@ -617,11 +617,11 @@ def set_player_portalgun(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(vmf: VMF) -> None:
+def add_screenshot_logic(vmf: VMF, info: mapinfo.Info) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
-    ).upper() == 'AUTO' and IS_PREVIEW:
+    ).upper() == 'AUTO' and info.is_preview:
         SSHOT_FNAME = 'instances/bee2/logic/screenshot_logic.vmf'
         vmf.create_ent(
             classname='func_instance',
@@ -1915,7 +1915,7 @@ def main() -> None:
         # from parameters.
         vmf.spawn['BEE2_is_peti'] = True
         # Set this so VRAD can know.
-        vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
+        vmf.spawn['BEE2_is_preview'] = info.is_preview
 
         save(vmf, new_path)
         if not skip_vbsp:
