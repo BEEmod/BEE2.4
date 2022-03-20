@@ -46,7 +46,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, Set, Iterable, Optional
+from typing import Any, Dict, Tuple, Set, Iterable, Optional, cast
 
 
 COND_MOD_NAME = 'VBSP'
@@ -1474,9 +1474,8 @@ def add_extra_ents(vmf: VMF, info: mapinfo.Info) -> None:
     music.add(
         vmf,
         loc,
-        settings['music_conf'],  # type: ignore
-        info.attrs,
-        info.is_sp,
+        cast(Property, settings['music_conf']),
+        info,
     )
 
     LOGGER.info('Adding global ents...')
