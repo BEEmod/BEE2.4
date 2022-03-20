@@ -26,6 +26,7 @@ from precomp import (
     brushLoc,
     bottomlessPit,
     instanceLocs,
+    mapinfo,
     cubes,
     template_brush,
     texturing,
@@ -801,7 +802,7 @@ def set_elev_videos(vmf: VMF) -> None:
         )
 
 
-def get_map_info(vmf: VMF) -> None:
+def get_map_info(vmf: VMF) -> mapinfo.Info:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -835,7 +836,6 @@ def get_map_info(vmf: VMF) -> None:
     if elev_override:
         # Make conditions set appropriately
         LOGGER.info('Forcing elevator spawn!')
-        IS_PREVIEW = False
 
     # Door frames use the same instance for both the entry and exit doors,
     # and it'd be useful to distinguish between them. Add an instvar to help.
@@ -1005,6 +1005,15 @@ def get_map_info(vmf: VMF) -> None:
             exit_corr_type,
             exit_corr_name,
         )
+    info = mapinfo.Info(
+        is_publishing=not IS_PREVIEW,
+        start_at_elevator=elev_override or not IS_PREVIEW,
+        is_coop=GAME_MODE == 'COOP',
+        attrs=settings['has_attr'],  # Todo: remove from settings.
+    )
+    if elev_override:  # Legacy logic, this is conflated.
+        IS_PREVIEW = False
+    return info
 
 
 def mod_entryexit(
@@ -1458,7 +1467,7 @@ def change_overlays(vmf: VMF) -> None:
                 over[prop] = val.join(' ')
 
 
-def add_extra_ents(vmf: VMF, game_mode: str) -> None:
+def add_extra_ents(vmf: VMF, info: mapinfo.Info) -> None:
     """Add the various extra instances to the map."""
     loc = options.get(Vec, 'global_ents_loc')
 
@@ -1466,8 +1475,8 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
         vmf,
         loc,
         settings['music_conf'],  # type: ignore
-        settings['has_attr'],
-        game_mode == 'SP',
+        info.attrs,
+        info.is_sp,
     )
 
     LOGGER.info('Adding global ents...')
@@ -1870,7 +1879,7 @@ def main() -> None:
 
         rand.init_seed(vmf)
 
-        get_map_info(vmf)
+        info = get_map_info(vmf)
         change_ents(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
@@ -1888,7 +1897,7 @@ def main() -> None:
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
         conditions.check_all(vmf, coll)
-        add_extra_ents(vmf, GAME_MODE)
+        add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
