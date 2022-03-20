@@ -8,7 +8,7 @@ from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
 
 from precomp import options
-from precomp.conditions import make_flag, make_result, RES_EXHAUSTED, Unsatisfiable
+from precomp.conditions import make_flag, make_result, RES_EXHAUSTED, Unsatisfiable, MapInfo
 import vbsp
 import utils
 
@@ -41,12 +41,12 @@ def flag_stylevar(flag: Property) -> bool:
 
 
 @make_flag('has')
-def flag_voice_has(flag: Property) -> bool:
+def flag_voice_has(info: MapInfo, flag: Property) -> bool:
     """Checks if the given Voice Attribute is present.
 
     Use the NOT flag to invert if needed.
     """
-    return global_bool(vbsp.settings['has_attr'][flag.value.casefold()])
+    return global_bool(info.has_attr(flag.value))
 
 
 @make_flag('has_music')
@@ -106,15 +106,20 @@ def res_cave_portrait() -> bool:
 
 
 @make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(flag: Property) -> bool:
+def flag_game_mode(info: MapInfo, flag: Property) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
     """
-    import vbsp
-    return global_bool(vbsp.GAME_MODE.casefold() == flag.value.casefold())
+    mode = flag.value.casefold()
+    if mode == 'sp':
+        return global_bool(info.is_sp)
+    elif mode == 'coop':
+        return global_bool(info.is_coop)
+    else:
+        raise ValueError(f'Unknown gamemode "{flag.value}"!')
 
 
 @make_flag('ifPreview', 'preview')
-def flag_is_preview(flag: Property) -> bool:
+def flag_is_preview(info: MapInfo, flag: Property) -> bool:
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -123,7 +128,8 @@ def flag_is_preview(flag: Property) -> bool:
 
     Preview mode is always `False` when publishing.
     """
-    return global_bool(vbsp.IS_PREVIEW == conv_bool(flag.value, False))
+    expect_preview = conv_bool(flag.value, False)
+    return global_bool(expect_preview == (not info.start_at_elevator))
 
 
 @make_flag('hasExitSignage')
@@ -161,7 +167,7 @@ def res_set_style_var(res: Property) -> bool:
 
 
 @make_result('has')
-def res_set_voice_attr(res: Property) -> object:
+def res_set_voice_attr(info: MapInfo, res: Property) -> object:
     """Sets a number of Voice Attributes.
 
     Each child property will be set. The value is ignored, but must
@@ -169,9 +175,9 @@ def res_set_voice_attr(res: Property) -> object:
     """
     if res.has_children():
         for opt in res:
-            vbsp.settings['has_attr'][opt.name] = True
+            info.set_attr(opt.name)
     else:
-        vbsp.settings['has_attr'][res.value.casefold()] = True
+        info.set_attr(res.value)
     return RES_EXHAUSTED
 
 
