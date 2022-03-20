@@ -5,7 +5,7 @@ from srctools import Property, Vec, Entity, Angle
 import srctools
 
 from precomp import collisions, conditions, rand
-from precomp.conditions import Condition, RES_EXHAUSTED, make_flag, make_result
+from precomp.conditions import Condition, RES_EXHAUSTED, make_flag, make_result, MapInfo
 
 COND_MOD_NAME = 'Randomisation'
 
@@ -30,7 +30,7 @@ def flag_random(res: Property) -> Callable[[Entity], bool]:
 
 
 @make_result('random')
-def res_random(coll: collisions.Collisions, res: Property) -> conditions.ResultCallable:
+def res_random(coll: collisions.Collisions, info: MapInfo, res: Property) -> conditions.ResultCallable:
     """Randomly choose one of the sub-results to execute.
 
     The `chance` value defines the percentage chance for any result to be
@@ -78,11 +78,11 @@ def res_random(coll: collisions.Collisions, res: Property) -> conditions.ResultC
             pass
         elif choice.name == 'group':
             for sub_res in choice:
-                if Condition.test_result(coll, inst, sub_res) is RES_EXHAUSTED:
+                if Condition.test_result(coll, info, inst, sub_res) is RES_EXHAUSTED:
                     sub_res.name = 'nop'
                     sub_res.value = ''
         else:
-            if Condition.test_result(coll, inst, choice) is RES_EXHAUSTED:
+            if Condition.test_result(coll, info, inst, choice) is RES_EXHAUSTED:
                 choice.name = 'nop'
                 choice.value = ''
     return apply_random

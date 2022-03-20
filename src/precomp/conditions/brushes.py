@@ -9,7 +9,7 @@ from srctools.math import Vec, Angle, Matrix, to_matrix
 import srctools.logger
 
 from precomp import (
-    conditions, tiling, texturing, rand,
+    conditions, tiling, texturing, rand, mapinfo,
     instance_traits, brushLoc, faithplate, template_brush,
 )
 import vbsp
@@ -370,7 +370,7 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('TemplateBrush')
-def res_import_template(vmf: VMF, coll: Collisions, res: Property):
+def res_import_template(vmf: VMF, coll: Collisions, info: mapinfo.Info, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only
@@ -590,7 +590,7 @@ def res_import_template(vmf: VMF, coll: Collisions, res: Property):
             return
 
         for vis_flag_block in visgroup_instvars:
-            if all(conditions.check_flag(flag, coll, inst) for flag in vis_flag_block):
+            if all(conditions.check_flag(flag, coll, info, inst) for flag in vis_flag_block):
                 visgroups.add(vis_flag_block.real_name)
 
         force_colour = conf_force_colour
