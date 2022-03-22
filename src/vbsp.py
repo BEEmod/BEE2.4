@@ -328,13 +328,13 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(vmf: VMF) -> None:
+def set_player_model(vmf: VMF, info: mapinfo.Info) -> None:
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
     # We don't change the player model in Coop, or if Bendy is selected.
 
-    if GAME_MODE == 'COOP':  # Not in coop..
+    if info.is_coop:  # Not in coop..
         return
 
     loc = options.get(Vec, 'global_ents_loc')
@@ -401,7 +401,7 @@ def set_player_model(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(vmf: VMF) -> None:
+def set_player_portalgun(vmf: VMF, info: mapinfo.Info) -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -463,7 +463,7 @@ def set_player_portalgun(vmf: VMF) -> None:
             origin=ent_pos,
         )
 
-        if GAME_MODE == 'SP':
+        if info.is_sp:
             vmf.create_ent(
                 classname='weapon_portalgun',
                 targetname='__pgun_template',
@@ -515,7 +515,7 @@ def set_player_portalgun(vmf: VMF) -> None:
 
         # Detect the group ID of portals placed in the map, and write to
         # the entities what we determine.
-        if GAME_MODE == 'COOP':
+        if info.is_coop:
             port_ids = (0, 1, 2)
         else:
             port_ids = (0, )
@@ -573,7 +573,7 @@ def set_player_portalgun(vmf: VMF) -> None:
                 '_mark_held_cube()',
             ))
 
-        if GAME_MODE == 'SP':
+        if info.is_sp:
             logic_auto.add_out(Output(
                 'OnMapSpawn',
                 '@portalgun',
@@ -632,7 +632,7 @@ def add_screenshot_logic(vmf: VMF, info: mapinfo.Info) -> None:
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(vmf: VMF) -> None:
+def add_fog_ents(vmf: VMF, info: mapinfo.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.get(Vec, 'global_ents_loc')
     vmf.create_ent(
@@ -730,7 +730,7 @@ def add_fog_ents(vmf: VMF) -> None:
             only_once=True,
         ))
 
-    if GAME_MODE == 'SP':
+    if info.is_sp:
         logic_auto.add_out(Output(
             'OnMapSpawn',
             '!player',
@@ -755,14 +755,14 @@ def add_fog_ents(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(vmf: VMF) -> None:
+def set_elev_videos(vmf: VMF, info: mapinfo.Info) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
     LOGGER.info('Elevator type: {}', vid_type.upper())
 
-    if vid_type == 'none' or GAME_MODE == 'COOP':
-        # The style doesn't have an elevator...
+    if vid_type == 'none' or info.is_coop:
+        # No elevator exists!
         return
     elif vid_type == 'bsod':
         # This uses different video shaping!

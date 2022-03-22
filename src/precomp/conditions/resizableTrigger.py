@@ -132,7 +132,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
         inst1 = mark1.inst
         inst2 = mark2.inst
 
-        is_coop = coop_var is not None and vbsp.GAME_MODE == 'COOP' and (
+        is_coop = coop_var is not None and info.is_coop and (
             inst1.fixup.bool(coop_var) or
             inst2.fixup.bool(coop_var)
         )

@@ -731,12 +731,12 @@ CHECKPOINT_NEIGHBOURS.remove(Vec(0, 0, 0))
 
 
 @conditions.make_result('CheckpointTrigger')
-def res_checkpoint_trigger(inst: Entity, res: Property) -> None:
+def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Property) -> None:
     """Generate a trigger underneath coop checkpoint items.
 
     """
 
-    if vbsp.GAME_MODE == 'SP':
+    if info.is_sp:
         # We can't have a respawn dropper in singleplayer.
         # Not generating the trigger means it's not going to
         # do anything.

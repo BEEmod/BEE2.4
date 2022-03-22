@@ -49,9 +49,9 @@ fake_inst = VMF().create_ent(
 )
 
 
-def has_responses() -> bool:
+def has_responses(info: mapinfo.Info) -> bool:
     """Check if we have any valid 'response' data for Coop."""
-    return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
+    return info.is_coop and 'CoopResponses' in QUOTE_DATA
 
 
 def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, info: mapinfo.Info) -> None:
@@ -513,7 +513,7 @@ def add_voice(
 
     LOGGER.info('Quote events: {}', list(QUOTE_EVENTS.keys()))
 
-    if has_responses():
+    if has_responses(info):
         LOGGER.info('Generating responses data..')
         encode_coop_responses(vmf, quote_loc, allow_dings, info)
 
@@ -533,18 +533,15 @@ def add_voice(
         'General', 'player_model', 'PETI',
     ).casefold()
 
-    is_coop = (vbsp.GAME_MODE == 'COOP')
-    is_sp = (vbsp.GAME_MODE == 'SP')
-
     player_flags = {
-        'sp': is_sp,
-        'coop': is_coop,
-        'atlas': is_coop or player_model == 'atlas',
-        'pbody': is_coop or player_model == 'pbody',
-        'bendy': is_sp and player_model == 'peti',
-        'chell': is_sp and player_model == 'sp',
-        'human': is_sp and player_model in ('peti', 'sp'),
-        'robot': is_coop or player_model in ('atlas', 'pbody'),
+        'sp': info.is_sp,
+        'coop': info.is_coop,
+        'atlas': info.is_coop or player_model == 'atlas',
+        'pbody': info.is_coop or player_model == 'pbody',
+        'bendy': info.is_sp and player_model == 'peti',
+        'chell': info.is_sp and player_model == 'sp',
+        'human': info.is_sp and player_model in ('peti', 'sp'),
+        'robot': info.is_coop or player_model in ('atlas', 'pbody'),
     }
     # All which are True.
     player_flag_set = {val for val, flag in player_flags.items() if flag}
@@ -612,7 +609,7 @@ def add_voice(
         # This ensures it is heard regardless of location.
         # This is used for Cave and core Wheatley.
         LOGGER.info('Using microphones...')
-        if vbsp.GAME_MODE == 'SP':
+        if info.is_sp:
             vmf.create_ent(
                 classname='env_microphone',
                 targetname='player_speaker_sp',
