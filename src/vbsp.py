@@ -66,9 +66,7 @@ settings: Dict[str, Dict[str, Any]] = {
 
 BEE2_config = ConfigFile('compile.cfg')
 
-GAME_MODE = 'ERR'  # SP or COOP?
-# Are we in preview mode? (Spawn in entry door instead of elevator)
-IS_PREVIEW = 'ERR'  # type: bool
+GAME_MODE = 'ERR'  # SP or COOP?]
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
@@ -811,7 +809,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
     - SP/COOP status
     - if in preview mode
     """
-    global GAME_MODE, IS_PREVIEW
+    global GAME_MODE
 
     file_coop_entry = instanceLocs.get_special_inst('coopEntry')
     file_coop_exit = instanceLocs.get_special_inst('coopExit')
@@ -858,6 +856,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
     entry_door_frame = exit_door_frame = None
 
     filenames = Counter()
+    no_player_start: set[bool] = set()
 
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
@@ -890,6 +889,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
                 override_sp_exit,
                 is_exit=True,
             )
+            no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
             entry_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
@@ -903,6 +903,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
                 elev_override,
                 override_sp_entry,
             )
+            no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
             exit_corr_name = item['targetname']
@@ -915,6 +916,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
                 override_coop_corr,
                 is_exit=True,
             )
+            no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file_coop_entry == file:
             GAME_MODE = 'COOP'
             entry_corr_name = item['targetname']
@@ -953,18 +955,18 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
         for file, count in filenames.most_common()
     ]))
 
-    LOGGER.info("Game Mode: " + GAME_MODE)
-    LOGGER.info("Is Preview: " + str(IS_PREVIEW))
+    LOGGER.info("Game Mode: {}", GAME_MODE)
+    LOGGER.info("Player Start: {}", no_player_start)
 
     if GAME_MODE == 'ERR':
-        raise Exception(
-            'Unknown game mode - Map missing exit room!'
-        )
-    if IS_PREVIEW == 'ERR':
+        raise Exception('Unknown game mode - Map missing exit room!')
+    if not no_player_start:
         raise Exception(
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
         )
+    if len(no_player_start) > 2:
+        raise Exception("Preview mode is both enabled and disabled! Recompile the map!")
 
     # Now check the door frames, to allow distinguishing between
     # the entry and exit frames.
@@ -1005,14 +1007,14 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
             exit_corr_type,
             exit_corr_name,
         )
+    [is_publishing] = no_player_start
     info = mapinfo.Info(
-        is_publishing=not IS_PREVIEW,
-        start_at_elevator=elev_override or not IS_PREVIEW,
+        is_publishing=is_publishing,
+        start_at_elevator=elev_override or is_publishing,
         is_coop=GAME_MODE == 'COOP',
         attrs=settings['has_attr'],  # Todo: remove from settings.
     )
-    if elev_override:  # Legacy logic, this is conflated.
-        IS_PREVIEW = False
+    LOGGER.info('Map global info: {}', info)
     return info
 
 
@@ -1031,7 +1033,6 @@ def mod_entryexit(
     This returns the corridor used - 1-7, 'up', or 'down'.
     The corridor used is also copied to '$corr_index'.
     """
-    global IS_PREVIEW
     normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
 
     if is_exit:
@@ -1043,12 +1044,9 @@ def mod_entryexit(
     vert_down = instanceLocs.get_special_inst(resolve_name + 'Down')
     files = instanceLocs.get_special_inst(resolve_name)
 
-    # The coop spawn instance doesn't have no_player_start..
-    if 'no_player_start' in inst.fixup:
-        if elev_override:
-            inst.fixup['no_player_start'] = '1'
-        else:
-            IS_PREVIEW = not srctools.conv_bool(inst.fixup['no_player_start'])
+    # The coop spawn instance doesn't have no_player_start...
+    if 'no_player_start' in inst.fixup and elev_override:
+        inst.fixup['no_player_start'] = '1'
 
     if normal == (0, 0, 1) and vert_up is not None:
         LOGGER.info(
