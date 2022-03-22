@@ -26,6 +26,7 @@ from precomp import (
     brushLoc,
     bottomlessPit,
     instanceLocs,
+    mapinfo,
     cubes,
     template_brush,
     texturing,
@@ -45,7 +46,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, Set, Iterable, Optional
+from typing import Any, Dict, Literal, Tuple, Set, Iterable, Optional, cast
 
 
 COND_MOD_NAME = 'VBSP'
@@ -64,10 +65,6 @@ settings: Dict[str, Dict[str, Any]] = {
 }
 
 BEE2_config = ConfigFile('compile.cfg')
-
-GAME_MODE = 'ERR'  # SP or COOP?
-# Are we in preview mode? (Spawn in entry door instead of elevator)
-IS_PREVIEW = 'ERR'  # type: bool
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
@@ -221,13 +218,13 @@ def load_map(map_path: str) -> VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF, coll: Collisions):
+def add_voice(vmf: VMF, coll: Collisions, info: mapinfo.Info) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
-        voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
         coll=coll,
         vmf=vmf,
+        info=info,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
@@ -329,13 +326,13 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(vmf: VMF) -> None:
+def set_player_model(vmf: VMF, info: mapinfo.Info) -> None:
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
     # We don't change the player model in Coop, or if Bendy is selected.
 
-    if GAME_MODE == 'COOP':  # Not in coop..
+    if info.is_coop:  # Not in coop..
         return
 
     loc = options.get(Vec, 'global_ents_loc')
@@ -402,7 +399,7 @@ def set_player_model(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(vmf: VMF) -> None:
+def set_player_portalgun(vmf: VMF, info: mapinfo.Info) -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -464,7 +461,7 @@ def set_player_portalgun(vmf: VMF) -> None:
             origin=ent_pos,
         )
 
-        if GAME_MODE == 'SP':
+        if info.is_sp:
             vmf.create_ent(
                 classname='weapon_portalgun',
                 targetname='__pgun_template',
@@ -516,7 +513,7 @@ def set_player_portalgun(vmf: VMF) -> None:
 
         # Detect the group ID of portals placed in the map, and write to
         # the entities what we determine.
-        if GAME_MODE == 'COOP':
+        if info.is_coop:
             port_ids = (0, 1, 2)
         else:
             port_ids = (0, )
@@ -574,7 +571,7 @@ def set_player_portalgun(vmf: VMF) -> None:
                 '_mark_held_cube()',
             ))
 
-        if GAME_MODE == 'SP':
+        if info.is_sp:
             logic_auto.add_out(Output(
                 'OnMapSpawn',
                 '@portalgun',
@@ -616,11 +613,11 @@ def set_player_portalgun(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(vmf: VMF) -> None:
+def add_screenshot_logic(vmf: VMF, info: mapinfo.Info) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
-    ).upper() == 'AUTO' and IS_PREVIEW:
+    ).upper() == 'AUTO' and info.is_preview:
         SSHOT_FNAME = 'instances/bee2/logic/screenshot_logic.vmf'
         vmf.create_ent(
             classname='func_instance',
@@ -633,7 +630,7 @@ def add_screenshot_logic(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(vmf: VMF) -> None:
+def add_fog_ents(vmf: VMF, info: mapinfo.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.get(Vec, 'global_ents_loc')
     vmf.create_ent(
@@ -731,7 +728,7 @@ def add_fog_ents(vmf: VMF) -> None:
             only_once=True,
         ))
 
-    if GAME_MODE == 'SP':
+    if info.is_sp:
         logic_auto.add_out(Output(
             'OnMapSpawn',
             '!player',
@@ -756,14 +753,14 @@ def add_fog_ents(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(vmf: VMF) -> None:
+def set_elev_videos(vmf: VMF, info: mapinfo.Info) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
     LOGGER.info('Elevator type: {}', vid_type.upper())
 
-    if vid_type == 'none' or GAME_MODE == 'COOP':
-        # The style doesn't have an elevator...
+    if vid_type == 'none' or info.is_coop:
+        # No elevator exists!
         return
     elif vid_type == 'bsod':
         # This uses different video shaping!
@@ -801,7 +798,7 @@ def set_elev_videos(vmf: VMF) -> None:
         )
 
 
-def get_map_info(vmf: VMF) -> None:
+def get_map_info(vmf: VMF) -> mapinfo.Info:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -810,8 +807,6 @@ def get_map_info(vmf: VMF) -> None:
     - SP/COOP status
     - if in preview mode
     """
-    global GAME_MODE, IS_PREVIEW
-
     file_coop_entry = instanceLocs.get_special_inst('coopEntry')
     file_coop_exit = instanceLocs.get_special_inst('coopExit')
     file_sp_exit = instanceLocs.get_special_inst('spExit')
@@ -835,7 +830,6 @@ def get_map_info(vmf: VMF) -> None:
     if elev_override:
         # Make conditions set appropriately
         LOGGER.info('Forcing elevator spawn!')
-        IS_PREVIEW = False
 
     # Door frames use the same instance for both the entry and exit doors,
     # and it'd be useful to distinguish between them. Add an instvar to help.
@@ -858,6 +852,9 @@ def get_map_info(vmf: VMF) -> None:
     entry_door_frame = exit_door_frame = None
 
     filenames = Counter()
+    # Use sets, so we can detect contradictory instances.
+    no_player_start: set[bool] = set()
+    game_mode: set[Literal['SP', 'COOP']] = set()
 
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
@@ -874,7 +871,7 @@ def get_map_info(vmf: VMF) -> None:
         file = item['file'].casefold()
         filenames[file] += 1
         if file in file_sp_exit_corr:
-            GAME_MODE = 'SP'
+            game_mode.add('SP')
             # In SP mode the same instance is used for entry and exit door
             # frames. Use the position of the item to distinguish the two.
             # We need .rotate() since they could be in the same block.
@@ -890,8 +887,9 @@ def get_map_info(vmf: VMF) -> None:
                 override_sp_exit,
                 is_exit=True,
             )
+            no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file in file_sp_entry_corr:
-            GAME_MODE = 'SP'
+            game_mode.add('SP')
             entry_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
             entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
@@ -903,8 +901,9 @@ def get_map_info(vmf: VMF) -> None:
                 elev_override,
                 override_sp_entry,
             )
+            no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file in file_coop_corr:
-            GAME_MODE = 'COOP'
+            game_mode.add('COOP')
             exit_corr_name = item['targetname']
             exit_fixup = item.fixup
             exit_corr_type = mod_entryexit(
@@ -915,8 +914,9 @@ def get_map_info(vmf: VMF) -> None:
                 override_coop_corr,
                 is_exit=True,
             )
+            no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file_coop_entry == file:
-            GAME_MODE = 'COOP'
+            game_mode.add('COOP')
             entry_corr_name = item['targetname']
             entry_fixup = item.fixup
             mod_entryexit(
@@ -926,13 +926,13 @@ def get_map_info(vmf: VMF) -> None:
                 elev_override,
             )
         elif file_coop_exit == file:
-            GAME_MODE = 'COOP'
+            game_mode.add('COOP')
             # Elevator instances don't get named - fix that...
             item['targetname'] = 'coop_exit'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
         elif file_sp_exit == file or file_sp_entry == file:
-            GAME_MODE = 'SP'
+            game_mode.add('SP')
             if elev_override:
                 item.fixup['no_player_start'] = '1'
             # Elevator instances don't get named - fix that...
@@ -953,18 +953,21 @@ def get_map_info(vmf: VMF) -> None:
         for file, count in filenames.most_common()
     ]))
 
-    LOGGER.info("Game Mode: " + GAME_MODE)
-    LOGGER.info("Is Preview: " + str(IS_PREVIEW))
+    LOGGER.info("Game Mode: {}", game_mode)
+    LOGGER.info("Player Start: {}", no_player_start)
 
-    if GAME_MODE == 'ERR':
-        raise Exception(
-            'Unknown game mode - Map missing exit room!'
-        )
-    if IS_PREVIEW == 'ERR':
+    if not game_mode:
+        raise Exception('Unknown game mode - Map missing exit room!')
+    elif len(game_mode) > 2:
+        raise Exception('Both singleplayer and coop corridors present! This is nonsensical!')
+
+    if not no_player_start:
         raise Exception(
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
         )
+    if len(no_player_start) > 2:
+        raise Exception("Preview mode is both enabled and disabled! Recompile the map!")
 
     # Now check the door frames, to allow distinguishing between
     # the entry and exit frames.
@@ -985,7 +988,15 @@ def get_map_info(vmf: VMF) -> None:
             if exit_fixup is not None:
                 door_frame.fixup.update(exit_fixup)
 
-    if GAME_MODE == 'COOP':
+    [is_publishing] = no_player_start
+    info = mapinfo.Info(
+        is_publishing=is_publishing,
+        start_at_elevator=elev_override or is_publishing,
+        is_coop='COOP' in game_mode,
+        attrs=settings['has_attr'],  # Todo: remove from settings.
+    )
+
+    if info.is_coop:
         mod_doorframe(
             exit_door_frame,
             'ITEM_COOP_EXIT_DOOR',
@@ -1005,6 +1016,8 @@ def get_map_info(vmf: VMF) -> None:
             exit_corr_type,
             exit_corr_name,
         )
+    LOGGER.info('Map global info: {}', info)
+    return info
 
 
 def mod_entryexit(
@@ -1022,7 +1035,6 @@ def mod_entryexit(
     This returns the corridor used - 1-7, 'up', or 'down'.
     The corridor used is also copied to '$corr_index'.
     """
-    global IS_PREVIEW
     normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
 
     if is_exit:
@@ -1034,12 +1046,9 @@ def mod_entryexit(
     vert_down = instanceLocs.get_special_inst(resolve_name + 'Down')
     files = instanceLocs.get_special_inst(resolve_name)
 
-    # The coop spawn instance doesn't have no_player_start..
-    if 'no_player_start' in inst.fixup:
-        if elev_override:
-            inst.fixup['no_player_start'] = '1'
-        else:
-            IS_PREVIEW = not srctools.conv_bool(inst.fixup['no_player_start'])
+    # The coop spawn instance doesn't have no_player_start...
+    if 'no_player_start' in inst.fixup and elev_override:
+        inst.fixup['no_player_start'] = '1'
 
     if normal == (0, 0, 1) and vert_up is not None:
         LOGGER.info(
@@ -1458,16 +1467,15 @@ def change_overlays(vmf: VMF) -> None:
                 over[prop] = val.join(' ')
 
 
-def add_extra_ents(vmf: VMF, game_mode: str) -> None:
+def add_extra_ents(vmf: VMF, info: mapinfo.Info) -> None:
     """Add the various extra instances to the map."""
     loc = options.get(Vec, 'global_ents_loc')
 
     music.add(
         vmf,
         loc,
-        settings['music_conf'],  # type: ignore
-        settings['has_attr'],
-        game_mode == 'SP',
+        cast(Property, settings['music_conf']),
+        info,
     )
 
     LOGGER.info('Adding global ents...')
@@ -1870,7 +1878,7 @@ def main() -> None:
 
         rand.init_seed(vmf)
 
-        get_map_info(vmf)
+        info = get_map_info(vmf)
         change_ents(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
@@ -1887,8 +1895,8 @@ def main() -> None:
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf, coll)
-        add_extra_ents(vmf, GAME_MODE)
+        conditions.check_all(vmf, coll, info)
+        add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
@@ -1907,7 +1915,7 @@ def main() -> None:
         # from parameters.
         vmf.spawn['BEE2_is_peti'] = True
         # Set this so VRAD can know.
-        vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
+        vmf.spawn['BEE2_is_preview'] = info.is_preview
 
         save(vmf, new_path)
         if not skip_vbsp:

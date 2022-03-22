@@ -26,14 +26,14 @@ TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
 
 
 @conditions.make_result('ATLAS_SpawnPoint')
-def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
+def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, res: Property) -> object:
     """Create the spawn point for ATLAS in the entry corridor.
 
     It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
     The two parameters `origin` and `angles` must be set to determine the required position, or `facing` can be set for older files.
     If `global` is set, the spawn point will be absolute instead of relative to the current instance.
     """
-    if vbsp.GAME_MODE != 'COOP':
+    if not info.is_coop:
         return conditions.RES_EXHAUSTED
 
     is_tag = options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
@@ -139,7 +139,7 @@ def ap_tag_modifications(vmf: VMF):
 
 
 @conditions.make_result('TagFizzler')
-def res_make_tag_fizzler(vmf: VMF, res: Property):
+def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> conditions.ResultCallable:
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
@@ -163,7 +163,7 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
     import vbsp
     if options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
-        # So simply remove the fizzler.
+        # So simply remove the fizzler when called.
         return Entity.remove
 
     def make_tag_fizz(inst: Entity) -> None:
@@ -376,10 +376,8 @@ def res_make_tag_fizzler(vmf: VMF, res: Property):
         fizzler.tag_on_neg = neg_blue or neg_oran
 
         # Now make the trigger ents. We special-case these since they need to
-        # swap
-        # depending on the sign config and position.
-
-        if vbsp.GAME_MODE == 'COOP':
+        # swap depending on the sign config and position.
+        if info.is_coop:
             # We need ATLAS-specific triggers.
             pos_trig = vmf.create_ent(classname='trigger_playerteam')
             neg_trig = vmf.create_ent(classname='trigger_playerteam')

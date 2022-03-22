@@ -1,6 +1,5 @@
 """Map info is a collection of global information about the current map."""
 from collections import defaultdict
-from enum import Enum
 from typing import Dict, Set
 
 import attrs
@@ -19,6 +18,16 @@ class Info:
     def is_sp(self) -> bool:
         """Check if this is in singleplayer mode."""
         return not self.is_coop
+
+    @property
+    def is_preview(self) -> bool:
+        """Check if this is preview mode."""
+        return not self.is_publishing
+
+    @property
+    def start_in_corridor(self) -> bool:
+        """Check if we start in the corridor."""
+        return not self.start_at_elevator
 
     def has_attr(self, name: str) -> bool:
         """Check if this attribute is present in the map."""
