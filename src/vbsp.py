@@ -46,7 +46,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, Set, Iterable, Optional, cast
+from typing import Any, Dict, Literal, Tuple, Set, Iterable, Optional, cast
 
 
 COND_MOD_NAME = 'VBSP'
@@ -65,8 +65,6 @@ settings: Dict[str, Dict[str, Any]] = {
 }
 
 BEE2_config = ConfigFile('compile.cfg')
-
-GAME_MODE = 'ERR'  # SP or COOP?]
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
@@ -809,8 +807,6 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
     - SP/COOP status
     - if in preview mode
     """
-    global GAME_MODE
-
     file_coop_entry = instanceLocs.get_special_inst('coopEntry')
     file_coop_exit = instanceLocs.get_special_inst('coopExit')
     file_sp_exit = instanceLocs.get_special_inst('spExit')
@@ -856,7 +852,9 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
     entry_door_frame = exit_door_frame = None
 
     filenames = Counter()
+    # Use sets, so we can detect contradictory instances.
     no_player_start: set[bool] = set()
+    game_mode: set[Literal['SP', 'COOP']] = set()
 
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
@@ -873,7 +871,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
         file = item['file'].casefold()
         filenames[file] += 1
         if file in file_sp_exit_corr:
-            GAME_MODE = 'SP'
+            game_mode.add('SP')
             # In SP mode the same instance is used for entry and exit door
             # frames. Use the position of the item to distinguish the two.
             # We need .rotate() since they could be in the same block.
@@ -891,7 +889,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
             )
             no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file in file_sp_entry_corr:
-            GAME_MODE = 'SP'
+            game_mode.add('SP')
             entry_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
             entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
@@ -905,7 +903,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
             )
             no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file in file_coop_corr:
-            GAME_MODE = 'COOP'
+            game_mode.add('COOP')
             exit_corr_name = item['targetname']
             exit_fixup = item.fixup
             exit_corr_type = mod_entryexit(
@@ -918,7 +916,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
             )
             no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
         elif file_coop_entry == file:
-            GAME_MODE = 'COOP'
+            game_mode.add('COOP')
             entry_corr_name = item['targetname']
             entry_fixup = item.fixup
             mod_entryexit(
@@ -928,13 +926,13 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
                 elev_override,
             )
         elif file_coop_exit == file:
-            GAME_MODE = 'COOP'
+            game_mode.add('COOP')
             # Elevator instances don't get named - fix that...
             item['targetname'] = 'coop_exit'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
         elif file_sp_exit == file or file_sp_entry == file:
-            GAME_MODE = 'SP'
+            game_mode.add('SP')
             if elev_override:
                 item.fixup['no_player_start'] = '1'
             # Elevator instances don't get named - fix that...
@@ -955,11 +953,14 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
         for file, count in filenames.most_common()
     ]))
 
-    LOGGER.info("Game Mode: {}", GAME_MODE)
+    LOGGER.info("Game Mode: {}", game_mode)
     LOGGER.info("Player Start: {}", no_player_start)
 
-    if GAME_MODE == 'ERR':
+    if not game_mode:
         raise Exception('Unknown game mode - Map missing exit room!')
+    elif len(game_mode) > 2:
+        raise Exception('Both singleplayer and coop corridors present! This is nonsensical!')
+
     if not no_player_start:
         raise Exception(
             "Can't determine if preview is enabled "
@@ -987,7 +988,15 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
             if exit_fixup is not None:
                 door_frame.fixup.update(exit_fixup)
 
-    if GAME_MODE == 'COOP':
+    [is_publishing] = no_player_start
+    info = mapinfo.Info(
+        is_publishing=is_publishing,
+        start_at_elevator=elev_override or is_publishing,
+        is_coop='COOP' in game_mode,
+        attrs=settings['has_attr'],  # Todo: remove from settings.
+    )
+
+    if info.is_coop:
         mod_doorframe(
             exit_door_frame,
             'ITEM_COOP_EXIT_DOOR',
@@ -1007,13 +1016,6 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
             exit_corr_type,
             exit_corr_name,
         )
-    [is_publishing] = no_player_start
-    info = mapinfo.Info(
-        is_publishing=is_publishing,
-        start_at_elevator=elev_override or is_publishing,
-        is_coop=GAME_MODE == 'COOP',
-        attrs=settings['has_attr'],  # Todo: remove from settings.
-    )
     LOGGER.info('Map global info: {}', info)
     return info
 
