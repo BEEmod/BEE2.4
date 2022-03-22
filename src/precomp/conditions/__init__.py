@@ -28,6 +28,7 @@ only parsing configuration options once, and is expected to be used with a
 closure.
 """
 from __future__ import annotations
+import functools
 import inspect
 import io
 import importlib
@@ -349,11 +350,10 @@ def annotation_caller(
     ]
 
     # For forward references and 3.7+ stringified arguments.
-
     # Remove 'return' temporarily so we don't parse that, since we don't care.
-    ann = getattr(func, '__annotations__', None)
-    if ann is not None:
-        return_val = ann.pop('return', allowed_kinds)  # Sentinel
+    ann_dict = getattr(func, '__annotations__', None)
+    if ann_dict is not None:
+        return_val = ann_dict.pop('return', allowed_kinds)  # Sentinel
     else:
         return_val = None
     try:
@@ -366,8 +366,8 @@ def annotation_caller(
         )
         sys.exit(1)  # Suppress duplicate exception capture.
     finally:
-        if ann is not None and return_val is not allowed_kinds:
-            ann['return'] = return_val
+        if ann_dict is not None and return_val is not allowed_kinds:
+            ann_dict['return'] = return_val
 
     ann_order: list[type] = []
 
@@ -406,33 +406,31 @@ def annotation_caller(
 
     assert '_' not in outputs, 'Need more variables!'
 
-    if inputs == outputs:
-        # Matches already, don't need to do anything.
-        return func, tuple(ann_order)
+    comma_inp = ', '.join(inputs)
+    comma_out = ', '.join(outputs)
 
-    # Double function to make a closure, to allow reference to the function
-    # more directly.
     # Lambdas are expressions, so we can return the result directly.
-    reorder_func = eval(
-        '(lambda func: lambda {}: func({}))(func)'.format(
-            ', '.join(inputs),
-            ', '.join(outputs),
-        ),
-        {'func': func},
-    )
+    reorder_func = _make_reorderer(comma_inp, comma_out)(func)
     # Add some introspection attributes to this generated function.
     try:
         reorder_func.__name__ = func.__name__
         reorder_func.__qualname__ = func.__qualname__
         reorder_func.__wrapped__ = func
-        reorder_func.__doc__ = '{0}({1}) -> {0}({2})'.format(
-            func.__name__,
-            ', '.join(inputs),
-            ', '.join(outputs),
-        )
+        reorder_func.__doc__ = f'{func.__name__}({comma_inp}) -> {func.__name__}({comma_out})'
     except AttributeError:
         pass
     return reorder_func, tuple(ann_order)
+
+
+@functools.lru_cache(maxsize=None)
+def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable], Callable]:
+    """Build a function that does reordering for annotation caller.
+
+    This allows the code objects to be cached.
+    It's a closure over the function, to allow reference to the function more directly.
+    This also means it can be reused for other funcs with the same order.
+    """
+    return eval(f'lambda func: lambda {inputs}: func({outputs})')
 
 
 CallResultT = TypeVar('CallResultT')
