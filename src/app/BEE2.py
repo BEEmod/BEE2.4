@@ -1,6 +1,6 @@
 """Run the BEE2."""
 import functools
-from typing import Callable, Any, Optional, List, Tuple
+from typing import Awaitable, Callable, Any, Optional, List, Tuple
 import time
 import collections
 
@@ -167,13 +167,13 @@ class Tracer(trio.abc.Instrument):
             self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={args}'))
 
 
-async def app_main() -> None:
+async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     """The main loop for Trio."""
     global APP_NURSERY
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
-        await init_app()
+        await init()
         await trio.sleep_forever()
 
 
@@ -189,7 +189,7 @@ def done_callback(result: Outcome):
     TK_ROOT.quit()
 
 
-def start_main() -> None:
+def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
     """Starts the TK and Trio loops.
 
     See https://github.com/richardsheridan/trio-guest/.
@@ -215,7 +215,7 @@ def start_main() -> None:
 
     LOGGER.debug('Starting Trio loop.')
     trio.lowlevel.start_guest_run(
-        app_main,
+        app_main, init,
         run_sync_soon_threadsafe=run_sync_soon_threadsafe,
         run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
