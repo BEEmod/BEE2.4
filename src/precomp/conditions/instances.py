@@ -2,7 +2,7 @@
 
 """
 from __future__ import annotations
-from typing import Union, Callable, Tuple, Dict
+from typing import Any, Union, Callable, Tuple, Dict
 import operator
 
 import srctools.logger
@@ -102,7 +102,7 @@ def flag_has_trait(inst: Entity, flag: Property) -> bool:
     return flag.value.casefold() in instance_traits.get(inst)
 
 
-INSTVAR_COMP: dict[str, Callable[[object, object], bool]] = {
+INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
     '=': operator.eq,
     '==': operator.eq,
 
@@ -160,7 +160,7 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
     except ValueError:
         pass
     try:
-        return comp_func(val_a, val_b)
+        return bool(comp_func(val_a, val_b))
     except (TypeError, ValueError) as e:
         LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
         return False
