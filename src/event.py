@@ -12,8 +12,8 @@ whenever they are modified.
 """
 from __future__ import annotations
 from typing import (
-    overload, cast, TypeVar, Any, Type,
-    Optional, Generic, Callable, List, Awaitable,
+    overload, get_origin, TypeVar, Any, Type,
+    Optional, Generic, Callable, List, Awaitable
 )
 
 import attrs
@@ -25,6 +25,7 @@ ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
 ValueT = TypeVar('ValueT')
 Value2T = TypeVar('Value2T')
+NoneType: Type[None] = type(None)
 
 
 class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
@@ -43,6 +44,17 @@ class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
         self.ctx = ctx
         self.cur_calls = 0
         # Leave last_result unset as a sentinel.
+
+
+def _get_arg_type(arg_type: object) -> Type:
+    """Given the arg type, pull out the actual type to key with."""
+    if arg_type is None:
+        return NoneType
+    # Allow passing subscripted generics.
+    origin = get_origin(arg_type)
+    if origin is not None:
+        return origin
+    return type(arg_type)
 
 
 class EventManager:
@@ -79,9 +91,7 @@ class EventManager:
         As a special case it can be registered with a None argument type
         instead of type(None).
         """
-        if arg_type is None:
-            arg_type = cast('Type[ArgT]', type(None))
-        key = (id(ctx), arg_type)
+        key = (id(ctx), _get_arg_type(arg_type))
         try:
             spec = self._events[key]
         except KeyError:
@@ -107,9 +117,7 @@ class EventManager:
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None:
         """Register the given function, then immediately call with the last value if present."""
-        if arg_type is None:
-            arg_type = cast('Type[ArgT]', type(None))
-        key = (id(ctx), arg_type)
+        key = (id(ctx), _get_arg_type(arg_type))
         try:
             spec = self._events[key]
         except KeyError:
@@ -172,10 +180,8 @@ class EventManager:
 
         If it is not registered, raise LookupError.
         """
-        if arg_type is None:
-            arg_type = cast(Type[ArgT], type(None))
         try:
-            self._events[id(ctx), arg_type].remove(func)
+            self._events[id(ctx), _get_arg_type(arg_type)].remove(func)
         except (KeyError, ValueError):
             raise LookupError(ctx, arg_type, func) from None
 
