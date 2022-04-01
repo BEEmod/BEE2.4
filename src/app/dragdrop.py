@@ -195,20 +195,11 @@ class Manager(Generic[ItemT]):
 
         row = col = 0
         for slot in slots:
-            if slot._pos_type in ['place', 'pack', 'grid']:
-                raise ValueError("Can't add already positioned slot!")
-
-            obj_id = canv.create_window(
+            slot.canvas(
+                canv,
                 spacing + col * item_width,
                 spacing + row * item_height,
-                width=self.width,
-                height=self.height,
-                anchor='nw',
-                window=slot._lbl,
-                tags=(_CANV_TAG, ),
             )
-            slot._pos_type = f'_canvas_{obj_id}'
-
             col += 1
             if col > col_count:
                 col = 0
@@ -492,6 +483,20 @@ class Slot(Generic[ItemT]):
         """Pack-position this slot."""
         self._pos_type = 'pack'
         self._lbl.pack(*args, **kwargs)
+
+    def canvas(self, canv: tkinter.Canvas, x: int, y: int) -> None:
+        """Position this slot on a canvas."""
+        if self._pos_type in ['place', 'pack', 'grid']:
+            raise ValueError("Can't add already positioned slot!")
+        obj_id = canv.create_window(
+            x, y,
+            width=self.man.width,
+            height=self.man.height,
+            anchor='nw',
+            window=self._lbl,
+            tags=(_CANV_TAG,),
+        )
+        self._pos_type = f'_canvas_{obj_id}'
 
     def hide(self) -> None:
         """Remove this slot from the set position manager."""
