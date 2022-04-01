@@ -75,7 +75,7 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
 # Used to dump a list of the flags, results, meta-conditions
 ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
-ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
 
 
@@ -289,7 +289,7 @@ AnnArg5T = TypeVar('AnnArg5T')
 @overload
 def annotation_caller(
     func: Callable[..., AnnResT],
-    __parm1: Type[AnnArg1T],
+    parm1: Type[AnnArg1T], /,
 ) -> tuple[
     Callable[[AnnArg1T], AnnResT],
     tuple[Type[AnnArg1T]]
@@ -324,13 +324,13 @@ def annotation_caller(
     parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T],
     parm4: Type[AnnArg4T], parm5: Type[AnnArg5T], /,
 ) -> tuple[
-    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T], AnnResT],
+    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T], AnnResT],
     tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T]],
 ]: ...
 def annotation_caller(
     func: Callable[..., AnnResT], /,
-    *parms: Type,
-) -> tuple[Callable[..., AnnResT], Tuple[type]]:
+    *parms: type,
+) -> tuple[Callable[..., AnnResT], Tuple[type, ...]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
@@ -474,11 +474,7 @@ class CondCall(Generic[CallResultT]):
 
     This should be called to execute it.
     """
-    __slots__ = ['func', 'group', '_cback', '_setup_data']
-    _cback: Callable[
-        [srctools.VMF, collisions.Collisions, MapInfo, Entity, Property],
-        CallResultT | Callable[[Entity], CallResultT],
-    ]
+    __slots__ = ['func', 'group', '_cback', '_setup_data', '__doc__']
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
 
     def __init__(
@@ -488,15 +484,23 @@ class CondCall(Generic[CallResultT]):
     ):
         self.func = func
         self.group = group
-        self._cback, arg_order = annotation_caller(
+        cback, arg_order = annotation_caller(
             func,
             srctools.VMF, collisions.Collisions, MapInfo, Entity, Property,
         )
+        self._cback: Callable[
+            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Property],
+            CallResultT | Callable[[Entity], CallResultT],
+        ] = cback
         if Entity not in arg_order:
             # We have setup functions.
             self._setup_data = {}
         else:
             self._setup_data = None
+        try:
+            self.__doc__ = func.__doc__
+        except AttributeError:
+            pass
 
     def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Property) -> CallResultT:
         """Execute the callback."""
@@ -525,11 +529,6 @@ class CondCall(Generic[CallResultT]):
 
             return cback(ent)
 
-    @property
-    def __doc__(self) -> str | None:
-        """Description of the callback's behaviour."""
-        return getattr(self.func, '__doc__', None)
-
 
 def _get_cond_group(func: Any) -> str:
     """Get the condition group hint for a function."""
@@ -541,7 +540,7 @@ def _get_cond_group(func: Any) -> str:
         return group
 
 
-def add_meta(func: CallableT, priority: Decimal | int, only_once=True) -> None:
+def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=True) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -586,7 +585,7 @@ def meta_cond(priority: int=0, only_once: bool=True) -> Callable[[CallableT], Ca
 def make_flag(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
     """Decorator to add flags to the lookup."""
     def x(func: CallableT) -> CallableT:
-        wrapper = CondCall(func, _get_cond_group(func))
+        wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
         ALL_FLAGS.append((orig_name, aliases, wrapper))
         FLAG_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
@@ -616,7 +615,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             # Combine the legacy functions into one using a closure.
             func = conv_setup_pair(setup_func, result_func)
 
-        wrapper = CondCall(func, _get_cond_group(result_func))
+        wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
             RESULT_LOOKUP[name.casefold()] = wrapper
@@ -1233,7 +1232,7 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property):
+def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> ResultCallable:
     """Run the same flag multiple times with different arguments.
 
     `method` is the way the search is done - `first`, `last`, `random`, or `all`.
@@ -1247,8 +1246,8 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property):
     """
     flag_name = ''
     method = SWITCH_TYPE.FIRST
-    raw_cases = []
-    default = []
+    raw_cases: list[Property] = []
+    default: list[Property] = []
     rand_seed = ''
     for prop in res:
         if prop.has_children():
