@@ -1,18 +1,21 @@
 """Implements drag/drop logic."""
+from enum import Enum
 from collections import defaultdict
 from tkinter import ttk, messagebox
-import tkinter
-import utils
-from app import sound, img, TK_ROOT, tk_tools
-from enum import Enum
-from srctools.logger import get_logger
 from typing import (
     Union, Generic, Any, TypeVar, Protocol,
     Optional, Callable,
     List, Tuple, Dict, Iterator, Iterable,
 )
+import tkinter
 
-__all__ = ['Manager', 'Slot', 'ItemProto']
+from srctools.logger import get_logger
+
+from app import sound, img, TK_ROOT, tk_tools, background_run
+import utils
+import event
+
+__all__ = ['Manager', 'Slot', 'ItemProto', 'ItemGroupProto']
 LOGGER = get_logger(__name__)
 
 
@@ -35,7 +38,7 @@ _CANV_TAG = '_BEE2_dragdrop_item'
 
 
 class Event(Enum):
-    """Callbacks that can be registered to be called by the manager."""
+    """Context for manager events. All take the relevant slot as arg."""
     # Fires when items are right-clicked on. If one is registered, the gear
     # icon appears.
     CONFIG = 'config'
@@ -89,10 +92,7 @@ class Manager(Generic[ItemT]):
         # While dragging, the place we started at.
         self._cur_prev_slot: Optional[Slot[ItemT]] = None
 
-        self._callbacks: Dict[Event, List[Callable[[Slot], None]]] = {
-            event: []
-            for event in Event
-        }
+        self.event = event.EventManager()
 
         self._drag_win = drag_win = tkinter.Toplevel(master)
         drag_win.withdraw()
@@ -213,15 +213,6 @@ class Manager(Generic[ItemT]):
             col_count * item_width + spacing,
             (row + 1) * item_height + spacing,
         )
-
-    def reg_callback(self, event: Event, func: Callable[['Slot'], Any]) -> None:
-        """Register a callback."""
-        self._callbacks[event].append(func)
-
-    def _fire_callback(self, event: Event, slot: 'Slot') -> None:
-        """Fire all the registered callbacks."""
-        for cback in self._callbacks[event]:
-            cback(slot)
 
     def _pos_slot(self, x: float, y: float) -> 'Optional[Slot[ItemT]]':
         """Find the slot under this X,Y (if any)."""
@@ -549,7 +540,7 @@ class Slot(Generic[ItemT]):
                 y=self._lbl.winfo_height() - padding,
                 anchor='se',
             )
-        self.man._fire_callback(Event.HOVER_ENTER, self)
+        background_run(self.man.event, Event.HOVER_ENTER, self)
 
         if self._text_lbl:
             self._text_lbl.place(
@@ -566,12 +557,12 @@ class Slot(Generic[ItemT]):
             self._info_btn.place_forget()
         if self._text_lbl:
             self._text_lbl.place_forget()
-        self.man._fire_callback(Event.HOVER_EXIT, self)
+        background_run(self.man.event, Event.HOVER_EXIT, self)
 
     def _evt_configure(self, event: tkinter.Event) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
         if self.contents:
-            self.man._fire_callback(Event.CONFIG, self)
+            background_run(self.man.event, Event.CONFIG, self)
 
 
 def test() -> None:

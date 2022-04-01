@@ -1,6 +1,7 @@
 """Configures which signs are defined for the Signage item."""
 from typing import Iterable, Mapping, Optional, Sequence, Tuple, List, Dict, Union
 import tkinter as tk
+import trio
 from tkinter import ttk
 
 from srctools import Property
@@ -10,15 +11,13 @@ import attrs
 from app import dragdrop, img, tk_tools, config, TK_ROOT
 from packages import Signage, Style
 from localisation import gettext
-import BEE2_config
-import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 
-drag_man = dragdrop.Manager[Signage](window)
+drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)
@@ -200,56 +199,52 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         LOGGER.warning('No arrow signage defined!')
         sign_arrow = None
 
-    hover_arrow = False
-    hover_toggle_id = None
-    hover_sign: Optional[Signage] = None
+    hover_scope: Optional[trio.CancelScope] = None
 
-    def hover_toggle() -> None:
-        """Toggle between arrows and dual icons."""
-        nonlocal hover_arrow, hover_toggle_id
-        hover_arrow = not hover_arrow
+    async def on_hover(hovered: dragdrop.Slot[Signage]) -> None:
+        """Show the signage when hovered, then toggle."""
+        nonlocal hover_scope
+        hover_sign = hovered.contents
         if hover_sign is None:
+            await on_leave(hovered)
             return
-        if hover_arrow and sign_arrow:
-            left = hover_sign.dnd_icon
-            right = sign_arrow.dnd_icon
-        else:
-            try:
-                left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
-            except KeyError:
-                left = hover_sign.dnd_icon
-            try:
-                right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
-            except KeyError:
-                right = IMG_BLANK
-        img.apply(preview_left, left)
-        img.apply(preview_right, right)
-        hover_toggle_id = TK_ROOT.after(1000, hover_toggle)
+        if hover_scope is not None:
+            hover_scope.cancel()
 
-    def on_hover(slot: dragdrop.Slot[Signage]) -> None:
-        """Show the signage when hovered."""
-        nonlocal hover_arrow, hover_sign
-        if slot.contents is not None:
-            name_label['text'] = gettext('Signage: {}').format(slot.contents.name)
-            hover_sign = slot.contents
-            hover_arrow = True
-            hover_toggle()
-        else:
-            on_leave(slot)
+        name_label['text'] = gettext('Signage: {}').format(hover_sign.name)
 
-    def on_leave(slot: dragdrop.Slot[Signage]) -> None:
+        sng_left = hover_sign.dnd_icon
+        sng_right = sign_arrow.dnd_icon if sign_arrow is not None else IMG_BLANK
+        try:
+            dbl_left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+        except KeyError:
+            dbl_left = hover_sign.dnd_icon
+        try:
+            dbl_right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+        except KeyError:
+            dbl_right = IMG_BLANK
+
+        with trio.CancelScope() as hover_scope:
+            while True:
+                img.apply(preview_left, sng_left)
+                img.apply(preview_right, sng_right)
+                await trio.sleep(1.0)
+                img.apply(preview_left, dbl_left)
+                img.apply(preview_right, dbl_right)
+                await trio.sleep(1.0)
+
+    async def on_leave(hovered: dragdrop.Slot[Signage]) -> None:
         """Reset the visible sign when left."""
-        nonlocal hover_toggle_id, hover_sign
+        nonlocal hover_scope
         name_label['text'] = ''
-        hover_sign = None
-        if hover_toggle_id is not None:
-            TK_ROOT.after_cancel(hover_toggle_id)
-            hover_toggle_id = None
+        if hover_scope is not None:
+            hover_scope.cancel()
+            hover_scope = None
         img.apply(preview_left, IMG_BLANK)
         img.apply(preview_right, IMG_BLANK)
 
-    drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
-    drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
+    drag_man.event.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
+    drag_man.event.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
 
     for i in SIGN_IND:
         SLOTS_SELECTED[i] = slot = drag_man.slot(
