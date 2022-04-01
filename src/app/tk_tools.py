@@ -5,7 +5,10 @@ General code used for tkinter portions.
 import functools
 import sys
 from enum import Enum
-from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Tuple, Literal
+from typing import (
+    Generic, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Tuple, Literal,
+)
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -653,3 +656,52 @@ class FileField(ttk.Frame):
     def _text_configure(self, e: tk.Event) -> None:
         """Truncate text every time the text widget resizes."""
         self._text_var.set(self._truncate(self._location))
+
+
+EnumT = TypeVar('EnumT')
+
+
+class EnumButton(Generic[EnumT]):
+    """Provides a set of buttons for toggling between enum values."""
+    def __init__(
+        self,
+        master: tk.Misc,
+        *values: Tuple[EnumT, str],
+        callback: Callable[[EnumT], Any] = lambda x: None,
+    ) -> None:
+        self.frame = ttk.Frame(master)
+        self._current = values[0][0]
+        self.buttons: dict[EnumT, ttk.Button] = {}
+        self.callback = callback
+
+        for x, (val, label) in enumerate(values):
+            btn = ttk.Button(
+                self.frame, text=label,
+                # Make partial do the method binding.
+                command=functools.partial(EnumButton._select, self, val),
+            )
+            btn.grid(row=0, column=x)
+            self.buttons[val] = btn
+            if x == 0:
+                btn.state(['pressed'])
+
+        if len(self.buttons) != len(values):
+            raise ValueError('No duplicates allowed, got: ' + repr(list(values)))
+
+    def _select(self, value: EnumT) -> None:
+        """Select a specific value."""
+        if value is not self._current:
+            self.buttons[self._current].state(['!pressed'])
+            self._current = value
+            self.buttons[self._current].state(['pressed'])
+            self.callback(value)
+
+    @property
+    def current(self) -> EnumT:
+        """Return the currently selected button."""
+        return self._current
+
+    @current.setter
+    def current(self, value: EnumT) -> None:
+        """Change the currently selected button."""
+        self._select(value)
