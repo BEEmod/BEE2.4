@@ -14,7 +14,7 @@ import attrs
 
 import app.config
 from packages import PakObject, ExportData, ParseData, desc_parse
-from app import UI, signage_ui, tkMarkdown, sound, tk_tools, BEE2
+from app import UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, BEE2
 from app.tooltip import add_tooltip
 import BEE2_config
 import utils
@@ -162,7 +162,7 @@ class SingleWidget(Widget):
             val = self.value.get()
             app.config.store_conf(WidgetConfig(val), save_id)
             if self.ui_cback is not None:
-                BEE2.APP_NURSERY.start_soon(self.ui_cback, val)
+                background_run(self.ui_cback, val)
 
         self.value.trace_add('write', on_changed)
 
@@ -205,7 +205,7 @@ class MultiWidget(Widget):
             except KeyError:
                 pass
             else:
-                BEE2.APP_NURSERY.start_soon(cback, var.get())
+                background_run(cback, var.get())
             app.config.store_conf(WidgetConfig({
                 num: sub_var.get()
                 for num, sub_var in self.values

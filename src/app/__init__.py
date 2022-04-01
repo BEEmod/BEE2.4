@@ -1,7 +1,9 @@
 """The package containg all UI code."""
 import tkinter as tk
 from types import TracebackType
-from typing import Type
+from typing import Any, Awaitable, Callable, Optional, Type
+from typing_extensions import TypeVarTuple, Unpack
+
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
 
@@ -9,6 +11,9 @@ import trio  # Import first, so it monkeypatches traceback before us.
 # before most of TKinter will function. So doing it here does it first.
 TK_ROOT = tk.Tk()
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
+
+# The nursery where UI tasks etc are run in.
+_APP_NURSERY: Optional[trio.Nursery] = None
 
 
 def _run_main_loop(*args, **kwargs) -> None:
@@ -51,11 +56,8 @@ def tk_error(
         exc_info=(exc_type, exc_value, exc_tb),
     )
 
-    try:
-        from app.BEE2 import APP_NURSERY
-        APP_NURSERY.cancel_scope.cancel()
-    except Exception:
-        logger.exception("Couldn't cancel:")
+    if _APP_NURSERY is not None:
+        _APP_NURSERY.cancel_scope.cancel()
 
 TK_ROOT.report_callback_exception = tk_error
 
@@ -116,6 +118,21 @@ def on_error(
     except Exception:
         # Ignore failures...
         pass
+
+
+BGRunArgsT = TypeVarTuple('BGRunArgsT')
+
+
+def background_run(
+    func: Callable[[Unpack[BGRunArgsT]], Awaitable[Any]], /,
+    *args: Unpack[BGRunArgsT],
+    name: Optional[str] = None,
+) -> None:
+    """When the UI is live, begin this specified task."""
+    if _APP_NURSERY is None:
+        raise ValueError('App nursery has not started.')
+    _APP_NURSERY.start_soon(func, *args, name=name)
+
 
 # Various configuration booleans.
 LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')

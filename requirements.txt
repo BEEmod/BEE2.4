@@ -11,3 +11,4 @@ outcome>=1.1.0  # Trio dependency
 versioningit>=0.3.0
 srctools >= 2.2.4
 rtree>=0.9.7
+typing_extensions>=4.1.1

@@ -12,7 +12,7 @@ import srctools.logger
 import attrs
 
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
-from app import tk_tools, paletteLoader, config, TK_ROOT, img, BEE2
+from app import background_run, tk_tools, paletteLoader, config, TK_ROOT, img, BEE2
 from localisation import gettext
 
 
@@ -132,7 +132,7 @@ class PaletteUI:
         # We need to delay this a frame, so the selection completes.
         self.ui_treeview.tag_bind(
             TREE_TAG_PALETTES, '<ButtonPress>',
-            lambda e: BEE2.APP_NURSERY.start_soon(self.event_select_tree),
+            lambda e: background_run(self.event_select_tree),
         )
 
         # Avoid re-registering the double-lambda, just do it here.
@@ -279,7 +279,7 @@ class PaletteUI:
                     # If we remake the palette menus inside this event handler, it tries
                     # to select the old menu item (likely), so a crash occurs. Delay until
                     # another frame.
-                    command=lambda: BEE2.APP_NURSERY.start_soon(self.event_select_menu),
+                    command=lambda: background_run(self.event_select_menu),
                     variable=self.var_pal_select,
                     image=gear_img,
                     compound='left',
@@ -348,7 +348,7 @@ class PaletteUI:
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
         self.select_palette(paletteLoader.UUID_PORTAL2)
-        BEE2.APP_NURSERY.start_soon(self.set_items, self.selected)
+        background_run(self.set_items, self.selected)
 
     def event_save(self) -> None:
         """Save the current palette over the original name."""

@@ -13,7 +13,7 @@ import srctools.logger
 import trio
 
 import loadScreen
-from app import TK_ROOT, BEE2
+from app import TK_ROOT, BEE2, background_run
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
@@ -418,12 +418,12 @@ class PalItem:
 
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
-    from app import BEE2
+    import app
     LOGGER.info('Shutting down application.')
-    try:
-        BEE2.APP_NURSERY.cancel_scope.cancel()
-    except AttributeError:
-        pass
+    # noinspection PyProtectedMember
+    if app._APP_NURSERY is not None:
+        # noinspection PyProtectedMember
+        app._APP_NURSERY.cancel_scope.cancel()
 
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
@@ -1714,7 +1714,7 @@ async def init_windows() -> None:
         UI['pal_export'].state(('!disabled',))
         menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
 
-    BEE2.APP_NURSERY.start_soon(enable_export)
+    background_run(enable_export)
 
     def style_select_callback(style_id: str) -> None:
         """Callback whenever a new style is chosen."""

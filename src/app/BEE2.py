@@ -10,10 +10,10 @@ import trio
 
 from BEE2_config import GEN_OPTS
 from app import (
-    TK_ROOT, DEV_MODE, tk_error,
-    sound, img, gameMan, music_conf,
+    TK_ROOT, sound, img, gameMan, music_conf,
     UI, logWindow, config,
 )
+import app
 import loadScreen
 import packages
 import utils
@@ -46,7 +46,7 @@ async def init_app() -> None:
 
     # Special case, load in this early, so it applies.
     utils.DEV_MODE = conf.dev_mode
-    DEV_MODE.set(conf.dev_mode)
+    app.DEV_MODE.set(conf.dev_mode)
 
     LOGGER.debug('Starting loading screen...')
     loadScreen.main_loader.set_length('UI', 16)
@@ -59,7 +59,7 @@ async def init_app() -> None:
 
     logWindow.HANDLER.set_visible(conf.show_log_win)
     logWindow.HANDLER.setLevel(conf.log_win_level)
-    APP_NURSERY.start_soon(logWindow.setting_apply)
+    app.background_run(logWindow.setting_apply)
 
     LOGGER.debug('Loading settings...')
 
@@ -84,8 +84,8 @@ async def init_app() -> None:
         ))
     package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')
-    APP_NURSERY.start_soon(img.init, package_sys)
-    APP_NURSERY.start_soon(sound.sound_task)
+    app.background_run(img.init, package_sys)
+    app.background_run(sound.sound_task)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
@@ -172,7 +172,7 @@ async def app_main() -> None:
     global APP_NURSERY
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
-        APP_NURSERY = nursery
+        app._APP_NURSERY = nursery
         await init_app()
         await trio.sleep_forever()
 
@@ -182,7 +182,7 @@ def done_callback(result: Outcome):
     from app import UI
     if isinstance(result, Error):
         LOGGER.error('Trio exited with exception', exc_info=result.error)
-        tk_error(type(result.error), result.error, result.error.__traceback__)
+        app.tk_error(type(result.error), result.error, result.error.__traceback__)
     else:
         LOGGER.debug('Trio exited normally.')
     UI.quit_application()
