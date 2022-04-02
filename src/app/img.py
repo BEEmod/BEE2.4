@@ -494,12 +494,14 @@ class Handle:
 
     def _decref(self, ref: 'WidgetWeakRef | Handle') -> None:
         """A label was no longer set to this handle."""
-        if self._force_loaded or (self._cached_tk is None and self._cached_pil is None):
+        if self._force_loaded:
             return
         self._users.discard(ref)
         for child in self._children():
             child._decref(self)
-        if not self._users and _load_nursery is not None:
+        if _load_nursery is None:
+            return  # Not loaded, can't unload.
+        if not self._users and (self._cached_tk is not None or self._cached_pil is not None):
             # Schedule this handle to be cleaned up, and store a cancel scope so that
             # can be aborted.
             self._cancel_cleanup = trio.CancelScope()
