@@ -1,8 +1,13 @@
 """Implements UI for selecting corridors."""
 from tkinter import ttk
 import tkinter as tk
+from enum import Enum
+from typing import Dict, List
 
+from srctools import Property
+from srctools.dmx import Element
 import srctools.logger
+import attrs
 import trio
 
 from app import TK_ROOT, config, dragdrop, img, sound, tk_tools
@@ -10,13 +15,31 @@ from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
 import consts
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+WIDTH = 96 + (32 if utils.MAC else 16)
+HEIGHT = 64 + 51
+
+
+class RandMode(Enum):
+    """Kind of randomisation to use."""
+    SINGLE = 'single'
+    EDITOR = 'editor'  # 4 or 7, depending on editor instance count.
+    ALL = 'all'  # Use all regardless.
 
 
 class Selector:
     """Corridor selection UI."""
+    win: tk.Toplevel
+    dragdrop: dragdrop.Manager[corridor.Corridor]
+
+    # Current corridor on the right side.
+    wid_image: ttk.Label
+    wid_title: ttk.Label
+    wid_desc: tkRichText
+
     def __init__(self) -> None:
         self.win = tk.Toplevel(TK_ROOT)
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
@@ -43,6 +66,8 @@ class Selector:
         self.wid_desc = tkRichText(frm_right)
         self.wid_desc.grid(row=2, column=0, sticky='nsew')
         frm_right.rowconfigure(2, weight=1)
+
+        ttk.Button(frm_right, text=gettext('Close'), command=self.hide).grid(row=3, column=0)
 
         update = self.update
 
@@ -71,18 +96,24 @@ class Selector:
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
 
-        self.dragdrop = dragdrop.Manager[corridor.Corridor](self.win)
+        self.dragdrop = drop = dragdrop.Manager(self.win, size=(WIDTH, HEIGHT))
+        self.selected = [
+            drop.slot_target(frm_left)
+            for _ in range(7)
+        ]
 
     def show(self) -> None:
         """Display the window."""
+        self.dragdrop.load_icons()
         self.win.deiconify()
 
     def hide(self) -> None:
         """Hide the window."""
         self.win.withdraw()
+        self.dragdrop.unload_icons()
 
-    def update(self, _) -> None:
-        """Called when the list of corridors needs to be rebuilt."""
+    async def update(self, _) -> None:
+        """Called to reposition the corridors."""
         LOGGER.info(
             'Mode: {}, Dir: {}, Orient: {}',
             self.btn_mode.current, self.btn_direction.current, self.btn_orient.current,
