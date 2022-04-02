@@ -247,9 +247,8 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     drag_man.event.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
 
     for i in SIGN_IND:
-        SLOTS_SELECTED[i] = slot = drag_man.slot(
+        SLOTS_SELECTED[i] = slot = drag_man.slot_target(
             frame_selected,
-            source=False,
             label=f'00:{i:02g}'
         )
         row, col = divmod(i-3, 4)
@@ -264,15 +263,11 @@ async def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
 
     for sign in sorted(Signage.all(), key=lambda s: s.name):
         if not sign.hidden:
-            slot = drag_man.slot(canv_all, source=True)
+            slot = drag_man.slot_source(canv_all)
             slot.contents = sign
 
     drag_man.flow_slots(canv_all, drag_man.sources())
-
-    canv_all.bind(
-        '<Configure>',
-        lambda e: drag_man.flow_slots(canv_all, drag_man.sources()),
-    )
+    canv_all.bind('<Configure>', lambda e: drag_man.flow_slots(canv_all, drag_man.sources()))
 
     def hide_window() -> None:
         """Hide the window."""

@@ -40,7 +40,7 @@ _CANV_TAG = '_BEE2_dragdrop_item'
 
 
 class Event(Enum):
-    """Context for manager events. All take the relevant slot as arg."""
+    """Context for manager events. They take the relevant slot as arg, or always None."""
     # Fires when items are right-clicked on. If one is registered, the gear
     # icon appears.
     CONFIG = 'config'
@@ -48,6 +48,12 @@ class Event(Enum):
     # Mouse over or out of the items (including drag item).
     HOVER_ENTER = 'hover_enter'
     HOVER_EXIT = 'hover_exit'
+
+
+class SlotType(Enum):
+    """Kind of slot."""
+    TARGET = 'target'
+    SOURCE = 'source'
 
 
 def in_bbox(
@@ -105,24 +111,35 @@ class Manager(Generic[ItemT]):
         drag_lbl.grid(row=0, column=0)
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
-    def slot(
+    def slot_target(
         self,
         parent: tkinter.Misc,
-        *,
-        source: bool,
         label: str='',
     ) -> Slot[ItemT]:
-        """Add a slot to this group.
+        """Add a slot to this group, which can have items added/removed.
 
         Parameters:
             - parent: Parent widget for the slot.
-            - source: If True this cannot be edited, and produces
-              copies of the contained item. If False, users can remove
-              items.
             - label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        slot: Slot[ItemT] = Slot(self, parent, source, label)
+        slot: Slot[ItemT] = Slot(self, parent, SlotType.TARGET, label)
+        self._slots.append(slot)
+        return slot
+
+    def slot_source(
+        self,
+        parent: tkinter.Misc,
+        label: str='',
+    ) -> Slot[ItemT]:
+        """Add a readonly slot to this group which the user can fetch copies from.
+
+        Parameters:
+            - parent: Parent widget for the slot.
+            - label: Set to a short string to be displayed in the lower-left.
+              Intended for numbers.
+        """
+        slot: Slot[ItemT] = Slot(self, parent, SlotType.SOURCE, label)
         self._slots.append(slot)
         return slot
 
@@ -368,22 +385,21 @@ class Slot(Generic[ItemT]):
     # we're on the canvas with ID XX.
     _pos_type: Optional[str]
 
-    # If true, this can't be changed, and dragging out of it produces a second
-    # reference to the contents.
-    is_source: bool
+    # The kind of slot.
+    type: SlotType
     man: Manager  # Our drag/drop controller.
 
     def __init__(
         self,
         man: Manager,
         parent: tkinter.Misc,
-        is_source: bool,
+        kind: SlotType,
         label: str,
     ) -> None:
         """Internal only, use Manager.slot()."""
 
         self.man = man
-        self.is_source = is_source
+        self.kind = kind
         self._contents = None
         self._pos_type = None
         self._lbl = tkinter.Label(parent)
@@ -428,8 +444,13 @@ class Slot(Generic[ItemT]):
 
     @property
     def is_target(self) -> bool:
-        """Check if this is a non-source, target slot."""
-        return not self.is_source
+        """Check if this is a target slot."""
+        return self.kind is SlotType.TARGET
+
+    @property
+    def is_source(self) -> bool:
+        """Check if this is a source slot."""
+        return self.kind is SlotType.SOURCE
 
     @property
     def contents(self) -> Optional[ItemT]:
@@ -467,7 +488,7 @@ class Slot(Generic[ItemT]):
             self.man._display_item(self._lbl, value)
 
     def __repr__(self) -> str:
-        return f'<dragdrop.Slot {id(self):016x}, source={self.is_source}, contents={self._contents!r}>'
+        return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
 
     def grid(self, *args, **kwargs) -> None:
         """Grid-position this slot."""
@@ -662,14 +683,14 @@ async def test() -> None:
 
     for y in range(8):
         for x in range(4):
-            slot = manager.slot(left_frm, source=False, label=(format(x + 4*y, '02') if y < 3 else ''))
+            slot = manager.slot_target(left_frm, label=(format(x + 4*y, '02') if y < 3 else ''))
             slot.grid(column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
 
     for i, item in enumerate(items):
-            slot = manager.slot(right_canv, source=True, label=format(i+1, '02'))
-            slot_src.append(slot)
-            slot.contents = item
+        slot = manager.slot_source(right_canv, label=format(i+1, '02'))
+        slot_src.append(slot)
+        slot.contents = item
 
     def configure(e):
         manager.flow_slots(right_canv, slot_src)
