@@ -2,6 +2,8 @@
 from __future__ import annotations
 from enum import Enum
 from collections import defaultdict
+
+import trio
 from tkinter import ttk, messagebox
 from typing import (
     Union, Generic, TypeVar, Protocol, Optional,
@@ -464,6 +466,9 @@ class Slot(Generic[ItemT]):
             # Just update myself.
             self.man._display_item(self._lbl, value)
 
+    def __repr__(self) -> str:
+        return f'<dragdrop.Slot {id(self):016x}, source={self.is_source}, contents={self._contents!r}>'
+
     def grid(self, *args, **kwargs) -> None:
         """Grid-position this slot."""
         self._pos_type = 'grid'
@@ -571,16 +576,27 @@ class Slot(Generic[ItemT]):
             background_run(self.man.event, Event.CONFIG, self)
 
 
-def test() -> None:
+async def test() -> None:
     """Test the GUI."""
-    from BEE2_config import GEN_OPTS
-    from packages import find_packages, PACKAGE_SYS
+    import BEE2_config
+    from app import config
+    import packages
+
+    BEE2_config.GEN_OPTS.load()
+    config.read_settings()
 
     # Setup images to read from packages.
     print('Loading packages for images.')
-    GEN_OPTS.load()
-    find_packages(GEN_OPTS['Directories']['package'])
-    img.load_filesystems(PACKAGE_SYS)
+    async with trio.open_nursery() as pack_nursery:
+        for loc in BEE2_config.get_package_locs():
+            pack_nursery.start_soon(
+                packages.find_packages,
+                pack_nursery,
+                packages.LOADED,
+                loc,
+            )
+    background_run(img.init, packages.PACKAGE_SYS)
+    background_run(sound.sound_task)
     print('Done.')
 
     left_frm = ttk.Frame(TK_ROOT)
@@ -612,15 +628,15 @@ def test() -> None:
         def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)
 
-    manager = Manager[TestItem](TK_ROOT, config_icon=True)
+    manager: Manager[TestItem] = Manager(TK_ROOT, config_icon=True)
 
     def func(ev):
-        def call(slot):
+        async def call(slot: Slot[TestItem]) -> None:
             print('Cback: ', ev, slot)
         return call
 
-    for event in Event:
-        manager.reg_callback(event, func(event))
+    for evt in Event:
+        manager.event.register(evt, Slot[TestItem], func(evt))
 
     PAK_CLEAN = 'BEE2_CLEAN_STYLE'
     PAK_ELEM = 'VALVE_TEST_ELEM'
@@ -675,16 +691,21 @@ def test() -> None:
     name_lbl = ttk.Label(TK_ROOT, text='')
     name_lbl.grid(row=3, column=0)
 
-    def enter(slot):
-        if slot.contents is not None:
-            name_lbl['text'] = 'Name: ' + slot.contents.name
+    async def evt_enter(evt_slot: Slot[TestItem]) -> None:
+        if evt_slot.contents is not None:
+            name_lbl['text'] = 'Name: ' + evt_slot.contents.name
 
-    def exit(slot):
+    async def evt_exit(evt_slot: Slot[TestItem]) -> None:
         name_lbl['text'] = ''
 
-    manager.reg_callback(Event.HOVER_ENTER, enter)
-    manager.reg_callback(Event.HOVER_EXIT, exit)
-    manager.reg_callback(Event.CONFIG, lambda slot: messagebox.showinfo('Hello World', str(slot.contents)))
+    async def evt_config(evt_slot: Slot[TestItem]) -> None:
+        messagebox.showinfo('Hello World', str(evt_slot.contents))
+
+    manager.event.register(Event.HOVER_ENTER, Slot[TestItem], evt_enter)
+    manager.event.register(Event.HOVER_EXIT, Slot[TestItem], evt_exit)
+    manager.event.register(Event.CONFIG, Slot[TestItem], evt_config)
 
     TK_ROOT.deiconify()
-    TK_ROOT.mainloop()
+    with trio.CancelScope() as scope:
+        TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
+        await trio.sleep_forever()

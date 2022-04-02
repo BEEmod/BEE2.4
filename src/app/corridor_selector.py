@@ -1,12 +1,11 @@
 """Implements UI for selecting corridors."""
-from typing import Callable, Final
-
 from tkinter import ttk
 import tkinter as tk
 
 import srctools.logger
+import trio
 
-from app import TK_ROOT, config, img, sound, tk_tools
+from app import TK_ROOT, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
@@ -45,30 +44,34 @@ class Selector:
         self.wid_desc.grid(row=2, column=0, sticky='nsew')
         frm_right.rowconfigure(2, weight=1)
 
+        update = self.update
+
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
             button_frm,
             (corridor.GameMode.SP, gettext('SP')),
             (corridor.GameMode.COOP, gettext('Coop')),
-            callback=self._evt_modechange,
+            callback=update,
         )
         self.btn_direction = tk_tools.EnumButton(
             button_frm,
             (corridor.Direction.ENTRY, gettext('Entry')),
             (corridor.Direction.EXIT, gettext('Exit')),
-            callback=self._evt_modechange,
+            callback=update,
         )
         self.btn_orient = tk_tools.EnumButton(
             button_frm,
             (corridor.CorrOrient.FLAT, gettext('Flat')),
             (corridor.CorrOrient.UP, gettext('Upward')),
             (corridor.CorrOrient.DN, gettext('Downward')),
-            callback=self._evt_modechange,
+            callback=update,
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
+
+        self.dragdrop = dragdrop.Manager[corridor.Corridor](self.win)
 
     def show(self) -> None:
         """Display the window."""
@@ -78,8 +81,14 @@ class Selector:
         """Hide the window."""
         self.win.withdraw()
 
-    def _evt_modechange(self, _):
-        """Called when any of the radio pushbuttons are pressed."""
+    def update(self, _) -> None:
+        """Called when the list of corridors needs to be rebuilt."""
+        LOGGER.info(
+            'Mode: {}, Dir: {}, Orient: {}',
+            self.btn_mode.current, self.btn_direction.current, self.btn_orient.current,
+        )
+
+
 async def test() -> None:
     from app import background_run
     background_run(img.init, {})
@@ -88,3 +97,6 @@ async def test() -> None:
     test_sel = Selector()
     config.read_settings()
     test_sel.show()
+    with trio.CancelScope() as scope:
+        test_sel.win.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
+        await trio.sleep_forever()

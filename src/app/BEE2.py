@@ -116,6 +116,7 @@ async def init_app() -> None:
     # Directly run TK_ROOT.lift() in TCL, instead
     # of building a callable.
     TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
+    await trio.sleep_forever()
 
 
 class Tracer(trio.abc.Instrument):
@@ -174,7 +175,6 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
         await init()
-        await trio.sleep_forever()
 
 
 def done_callback(result: Outcome):
