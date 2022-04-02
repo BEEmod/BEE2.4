@@ -1,10 +1,10 @@
 """Implements drag/drop logic."""
+from __future__ import annotations
 from enum import Enum
 from collections import defaultdict
 from tkinter import ttk, messagebox
 from typing import (
-    Union, Generic, Any, TypeVar, Protocol,
-    Optional, Callable,
+    Union, Generic, TypeVar, Protocol, Optional,
     List, Tuple, Dict, Iterator, Iterable,
 )
 import tkinter
@@ -80,8 +80,7 @@ class Manager(Generic[ItemT]):
         """
         self.width, self.height = size
 
-        self._targets: List[Slot[ItemT]] = []
-        self._sources: List[Slot[ItemT]] = []
+        self._slots: List[Slot[ItemT]] = []
 
         self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
 
@@ -105,12 +104,12 @@ class Manager(Generic[ItemT]):
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
     def slot(
-        self: 'Manager[ItemT]',
+        self,
         parent: tkinter.Misc,
         *,
         source: bool,
         label: str='',
-    ) -> 'Slot[ItemT]':
+    ) -> Slot[ItemT]:
         """Add a slot to this group.
 
         Parameters:
@@ -122,61 +121,60 @@ class Manager(Generic[ItemT]):
               Intended for numbers.
         """
         slot: Slot[ItemT] = Slot(self, parent, source, label)
-        if source:
-            self._sources.append(slot)
-        else:
-            self._targets.append(slot)
-
+        self._slots.append(slot)
         return slot
 
     def remove(self, slot: 'Slot[ItemT]') -> None:
         """Remove the specified slot."""
-        (self._sources if slot.is_source else self._targets).remove(slot)
+        self._slots.remove(slot)
 
     def load_icons(self) -> None:
         """Load in all the item icons."""
         # Count the number of items in each group to find
         # which should have group icons.
         groups: Dict[Optional[str], int] = defaultdict(int)
-        for slot in self._targets:
-            groups[getattr(slot.contents, 'dnd_group', None)] += 1
+        for slot in self._slots:
+            if not slot.is_source:
+                groups[getattr(slot.contents, 'dnd_group', None)] += 1
 
         groups[None] = 2  # This must always be ungrouped.
 
-        for slot in self._targets:
-            self._display_item(
-                slot._lbl,
-                slot.contents,
-                groups[getattr(slot.contents, 'dnd_group', None)] == 1
-            )
-
-        for slot in self._sources:
-            # These are never grouped.
-            self._display_item(slot._lbl, slot.contents)
+        for slot in self._slots:
+            if slot.is_source:
+                # These are never grouped.
+                self._display_item(slot._lbl, slot.contents)
+            else:
+                self._display_item(
+                    slot._lbl,
+                    slot.contents,
+                    groups[getattr(slot.contents, 'dnd_group', None)] == 1
+                )
 
         if self._cur_drag is not None:
             self._display_item(self._drag_lbl, self._cur_drag)
 
     def unload_icons(self) -> None:
         """Reset all icons to blank. This way they can be destroyed."""
-        for slot in self._sources:
-            img.apply(slot._lbl, self._img_blank)
-        for slot in self._targets:
+        for slot in self._slots:
             img.apply(slot._lbl, self._img_blank)
         img.apply(self._drag_lbl, self._img_blank)
 
-    def sources(self) -> 'Iterator[Slot[ItemT]]':
+    def sources(self) -> Iterator[Slot[ItemT]]:
         """Yield all source slots."""
-        return iter(self._sources)
+        for slot in self._slots:
+            if slot.is_source:
+                yield slot
 
-    def targets(self) -> 'Iterator[Slot[ItemT]]':
+    def targets(self) -> Iterator[Slot[ItemT]]:
         """Yield all target slots."""
-        return iter(self._targets)
+        for slot in self._slots:
+            if not slot.is_source:
+                yield slot
 
     def flow_slots(
         self,
         canv: tkinter.Canvas,
-        slots: 'Iterable[Slot[ItemT]]',
+        slots: Iterable[Slot[ItemT]],
         spacing: int=16 if utils.MAC else 8,
     ) -> None:
         """Place all the slots in a grid on the provided canvas.
@@ -214,10 +212,10 @@ class Manager(Generic[ItemT]):
             (row + 1) * item_height + spacing,
         )
 
-    def _pos_slot(self, x: float, y: float) -> 'Optional[Slot[ItemT]]':
+    def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
         """Find the slot under this X,Y (if any)."""
-        for slot in self._targets:
-            if slot._pos_type is not None:
+        for slot in self._slots:
+            if not slot.is_source and slot._pos_type is not None:
                 lbl = slot._lbl
                 if in_bbox(
                     x, y,
@@ -254,7 +252,8 @@ class Manager(Generic[ItemT]):
             # None to do..
             return
         group_slots = [
-            slot for slot in self._targets
+            slot for slot in self._slots
+            if not slot.is_source
             if getattr(slot.contents, 'dnd_group', None) == group
         ]
 
@@ -262,7 +261,7 @@ class Manager(Generic[ItemT]):
         for slot in group_slots:
             self._display_item(slot._lbl, slot.contents, has_group)
 
-    def _start(self, slot: 'Slot[ItemT]', event: tkinter.Event) -> None:
+    def _start(self, slot: Slot[ItemT], event: tkinter.Event) -> None:
         """Start the drag."""
         if slot.contents is None:
             return  # Can't pick up blank...
@@ -282,8 +281,8 @@ class Manager(Generic[ItemT]):
                 pass
             else:
                 if group is not None:
-                    for other_slot in self._targets:
-                        if getattr(other_slot.contents, 'dnd_group', None) == group:
+                    for other_slot in self._slots:
+                        if other_slot.is_target and getattr(other_slot.contents, 'dnd_group', None) == group:
                             break
                     else:
                         # None present.
@@ -414,7 +413,7 @@ class Slot(Generic[ItemT]):
             img.apply(self._info_btn, img.Handle.builtin('icons/gear', 10, 10))
 
             @tk_tools.bind_leftclick(self._info_btn)
-            def info_button_click(e):
+            def info_button_click(e: tkinter.Event) -> object:
                 """Trigger the callback whenever the gear button was pressed."""
                 config_event(e)
                 # Cancel the event sequence, so it doesn't travel up to the main
@@ -426,6 +425,11 @@ class Slot(Generic[ItemT]):
             self._info_btn = None
 
     @property
+    def is_target(self) -> bool:
+        """Check if this is a non-source, target slot."""
+        return not self.is_source
+
+    @property
     def contents(self) -> Optional[ItemT]:
         """Get the item in this slot, or None if empty."""
         return self._contents
@@ -435,15 +439,15 @@ class Slot(Generic[ItemT]):
         """Set the item in this slot."""
         old_cont = self._contents
 
-        if value is not None and not self.is_source:
+        if value is not None and self.is_target:
             # Make sure this isn't already present.
-            for slot in self.man._targets:
-                if slot.contents is value:
+            for slot in self.man._slots:
+                if slot.is_target and slot.contents is value:
                     slot.contents = None
         # Then set us.
         self._contents = value
 
-        if not self.is_source:
+        if self.is_target:
             # Update items in the previous group, so they gain the group icon
             # if only one now exists.
             self.man._group_update(getattr(old_cont, 'dnd_group', None))
@@ -511,7 +515,9 @@ class Slot(Generic[ItemT]):
         if self.is_source:
             # Add this item to the first free position.
             item = self.contents
-            for slot in self.man._targets:
+            for slot in self.man._slots:
+                if not slot.is_target:
+                    continue
                 if slot.contents is None:
                     slot.contents = item
                     sound.fx('config')
@@ -549,7 +555,7 @@ class Slot(Generic[ItemT]):
                 anchor='sw',
             )
 
-    def _evt_hover_exit(self, event: tkinter.Event) -> None:
+    def _evt_hover_exit(self, _: tkinter.Event) -> None:
         """Fired when the cursor stops hovering over the item."""
         self._lbl['relief'] = 'flat'
 
@@ -559,7 +565,7 @@ class Slot(Generic[ItemT]):
             self._text_lbl.place_forget()
         background_run(self.man.event, Event.HOVER_EXIT, self)
 
-    def _evt_configure(self, event: tkinter.Event) -> None:
+    def _evt_configure(self, _: tkinter.Event) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
         if self.contents:
             background_run(self.man.event, Event.CONFIG, self)
