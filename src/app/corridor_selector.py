@@ -80,3 +80,11 @@ class Selector:
 
     def _evt_modechange(self, _):
         """Called when any of the radio pushbuttons are pressed."""
+async def test() -> None:
+    from app import background_run
+    background_run(img.init, {})
+    background_run(sound.sound_task)
+
+    test_sel = Selector()
+    config.read_settings()
+    test_sel.show()
