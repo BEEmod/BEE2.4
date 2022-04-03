@@ -58,7 +58,10 @@ class Corridor:
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
     authors: List[str]
-    legacy_ind: int = 0  # 1-7 for old configurations from editoritems.
+    # Indicates the initial corridor items if 1-7.
+    orig_index: int = 0
+    # If this was converted from editoritems.txt
+    legacy: bool = False
 
 
 def parse_specifier(specifier: str) -> CorrKind:
@@ -127,6 +130,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     img.Handle.parse(subprop, data.pak_id, 256, 192)
                     for subprop in prop.find_all('Image')
                 ],
+                orig_index=prop.int('DefaultIndex', 0),
+                legacy=False,
             ))
 
         return CorridorGroup(data.id, dict(corridors))
@@ -183,7 +188,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[style_info.icon],
                                 authors=style.selitem_data.auth,
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
-                                legacy_ind=ind,
+                                orig_index=ind + 1,
+                                legacy=True,
                             )
                         else:
                             corridor = Corridor(
@@ -192,7 +198,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[],
                                 authors=style.selitem_data.auth,
                                 desc=DESC,
-                                legacy_ind=ind,
+                                orig_index=ind + 1,
+                                legacy=True,
                             )
                         corridors.corridors.setdefault(
                             (mode, direction, CorrOrient.HORIZONTAL),
