@@ -74,7 +74,7 @@ class Data(Protocol):
     @classmethod
     def parse_legacy(cls: Type[DataT], conf: Property) -> Dict[str, DataT]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
-        raise NotImplementedError
+        return {}
 
     @classmethod
     def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
