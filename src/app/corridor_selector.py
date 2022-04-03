@@ -12,17 +12,16 @@ import trio
 
 import event
 import packages
-from app import TK_ROOT, config, dragdrop, img, sound, tk_tools
+from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
-import consts
 import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-WIDTH = 96 + (32 if utils.MAC else 16)
-HEIGHT = 64 + 51
+WIDTH = corridor.IMG_WIDTH_SML + (32 if utils.MAC else 16)
+HEIGHT = corridor.IMG_HEIGHT_SML + 51
 
 
 class RandMode(Enum):
@@ -131,14 +130,13 @@ class Selector:
 
     def __init__(self, packset: packages.PackagesSet) -> None:
         self.win = tk.Toplevel(TK_ROOT)
+        self.win.withdraw()
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
 
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
 
         frm_left = ttk.Frame(self.win, relief="sunken")
-        frm_left.rowconfigure(0, weight=1)
-        frm_left.columnconfigure(0, weight=1)
         frm_left.grid(row=0, column=0, sticky='nsew')
 
         frm_right = ttk.Frame(self.win)
@@ -186,9 +184,21 @@ class Selector:
         self.events.register(self.btn_direction, corridor.Direction, refresh)
         self.events.register(self.btn_orient, corridor.CorrOrient, refresh)
 
-        self.canvas = tk.Canvas(frm_left)
-        self.canvas.grid(row=1, column=0, columnspan=3, sticky='nsew')
+        canv_frame = ttk.Frame(frm_left)
+        canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew')
+        canv_frame.rowconfigure(0, weight=1)
+        canv_frame.columnconfigure(0, weight=1)
+        frm_left.columnconfigure(0, weight=1)
         frm_left.rowconfigure(1, weight=1)
+
+        self.canvas = tk.Canvas(canv_frame)
+        self.canvas.grid(row=0, column=0, sticky='nsew')
+        scrollbar = ttk.Scrollbar(canv_frame, orient='vertical', command=self.canvas.yview)
+        scrollbar.grid(row=0, column=1, sticky='ns')
+        self.canvas['yscrollcommand'] = scrollbar.set
+
+        reflow = self.reflow  # Avoid making self a cell var.
+        self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
         self.drag_man = drop = dragdrop.Manager(self.win, size=(WIDTH, HEIGHT))
         self.selected = [
@@ -211,9 +221,9 @@ class Selector:
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
         style_id = config.get_cur_conf(
-            config.LastSelected, 'Style',
-            config.LastSelected('BEE2_CLEAN_STYLE'),
-        ).id or 'BEE2_CLEAN_STYLE'
+            config.LastSelected, 'styles',
+            config.LastSelected('BEE2_CLEAN'),
+        ).id or 'BEE2_CLEAN'
         try:
             self.corr_group = packset.obj_by_id(corridor.CorridorGroup, style_id)
         except KeyError:
@@ -228,26 +238,25 @@ class Selector:
 
     async def refresh(self, _=None) -> None:
         """Called to update the slots with new items if the corridor set changes."""
-        LOGGER.info(
-            'Mode: {}, Dir: {}, Orient: {}',
-            self.btn_mode.current, self.btn_direction.current, self.btn_orient.current,
-        )
-        self.conf_id = CorridorConf.get_id(
-            self.corr_group.id,
-            self.btn_mode.current,
-            self.btn_direction.current,
-            self.btn_orient.current,
-        )
+        mode = self.btn_mode.current
+        direction = self.btn_direction.current
+        orient = self.btn_orient.current
+        self.conf_id = CorridorConf.get_id(self.corr_group.id, mode, direction, orient)
         conf = config.get_cur_conf(CorridorConf, self.conf_id, CorridorConf())
 
-        corr_list = self.corr_group.corridors[
-            self.btn_mode.current,
-            self.btn_direction.current,
-            self.btn_orient.current,
-        ]
+        try:
+            corr_list = self.corr_group.corridors[mode, direction, orient]
+        except KeyError:
+            # Up/down can have missing ones.
+            if orient is corridor.CorrOrient.HORIZONTAL:
+                LOGGER.warning(
+                    'No flat corridor for {}:{}_{}! {}',
+                    self.corr_group.id, mode.value, direction.value,
+                )
+            corr_list = []
 
         # Ensure enough flexible slots exist to hold all of them, and clear em all.
-        for slot in self.drag_man.flexi_slots():
+        for slot in self.drag_man.all_slots():
             slot.contents = None
         for _ in range(len(corr_list) - self.unused_count):
             self.drag_man.slot_flexi(self.canvas)
@@ -260,21 +269,25 @@ class Selector:
                     slot.contents = inst_to_corr.pop(sel_id.casefold())
                 except KeyError:
                     LOGGER.warning('Unknown corridor instance "{}" in config!')
-            for slot, corr in zip(
-                self.drag_man.flexi_slots(),
-                sorted(inst_to_corr, key=lambda corr: corr.name),
-            ):
-                slot.contents = corr
         else:
             # No configuration, populate with the defaults.
             for corr in corr_list:
                 if corr.orig_index > 0:
                     self.selected[corr.orig_index - 1].contents = corr
+
+        # Put all remaining in flexi slots.
+        for slot, corr in zip(
+            self.drag_man.flexi_slots(),
+            sorted(inst_to_corr.values(), key=lambda corr: corr.name),
+        ):
+            slot.contents = corr
+        self.drag_man.load_icons()
         await self.reflow()
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
-        self.drag_man.flow_slots(self.canvas, [*self.drag_man.targets(), *self.drag_man.flexi_slots()])
+        yoff = self.drag_man.flow_slots(self.canvas, self.selected, tag='sel_1')
+        self.drag_man.flow_slots(self.canvas, self.drag_man.flexi_slots(), yoff=yoff, tag='unselected')
 
 
 async def test() -> None:

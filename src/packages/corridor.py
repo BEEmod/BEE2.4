@@ -10,6 +10,7 @@ import srctools.logger
 
 from app import img, tkMarkdown
 import packages
+import editoritems
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -49,6 +50,14 @@ ITEMS = [
 ]
 DESC = tkMarkdown.MarkdownData.text('')
 
+IMG_WIDTH_SML = 96
+IMG_HEIGHT_SML = 64
+ICON_GENERIC_SML = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_SML, IMG_HEIGHT_SML)
+
+IMG_WIDTH_LRG = 256
+IMG_HEIGHT_LRG = 192
+ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
+
 
 @attrs.frozen
 class Corridor:
@@ -57,6 +66,7 @@ class Corridor:
     name: str
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
+    dnd_icon: img.Handle
     authors: List[str]
     # Indicates the initial corridor items if 1-7.
     orig_index: int = 0
@@ -121,19 +131,29 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         for prop in data.info:
             if prop.name in {'id'}:
                 continue
+            images = [
+                img.Handle.parse(subprop, data.pak_id, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
+                for subprop in prop.find_all('Image')
+            ]
+            if 'icon' in prop:
+                icon = img.Handle.parse(prop.find_key('icon'), data.pak_id, IMG_WIDTH_SML, IMG_HEIGHT_SML)
+            elif images:
+                icon = images[0].resize(IMG_WIDTH_SML, IMG_HEIGHT_SML)
+            else:
+                icon = ICON_GENERIC_SML
+            if not images:
+                images.append(ICON_GENERIC_LRG)
+
             corridors[parse_specifier(prop.name)].append(Corridor(
                 instance=prop['instance'],
                 name=prop['Name', 'Corridor'],
                 authors=packages.sep_values(prop['authors', '']),
                 desc=packages.desc_parse(prop, '', data.pak_id),
-                images=[
-                    img.Handle.parse(subprop, data.pak_id, 256, 192)
-                    for subprop in prop.find_all('Image')
-                ],
                 orig_index=prop.int('DefaultIndex', 0),
+                images=images,
+                dnd_icon=icon,
                 legacy=False,
             ))
-
         return CorridorGroup(data.id, dict(corridors))
 
     def add_over(self: CorridorGroup, override: CorridorGroup) -> None:
@@ -170,6 +190,22 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         corridors = cls(style_id, {})
                         packset.add(corridors)
 
+                    corr_list = corridors.corridors.setdefault(
+                        (mode, direction, CorrOrient.HORIZONTAL),
+                        [],
+                    )
+                    if not corr_list:
+                        # Look for parent styles with definitions to inherit.
+                        for parent_style in style.bases[1:]:
+                            try:
+                                parent_group = packset.obj_by_id(CorridorGroup, parent_style.id)
+                                parent_corr = parent_group.corridors[mode, direction, CorrOrient.HORIZONTAL]
+                            except KeyError:
+                                continue
+                            for corridor in parent_corr:
+                                if not corridor.legacy:
+                                    corr_list.append(corridor)
+
                     # If the item has corridors defined, transfer to this.
                     had_legacy = False
                     for ind in range(count):
@@ -178,14 +214,15 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         except IndexError:
                             LOGGER.warning('Corridor {}:{} does not have enough instances!', style_id, item_id)
                             break
-                        if not inst.inst:
+                        if inst.inst == editoritems.FSPath():  # Blank, not used.
                             continue
                         if variant_attr:
                             style_info = style.corridors[variant_attr, ind + 1]
                             corridor = Corridor(
                                 instance=str(inst.inst),
                                 name=style_info.name,
-                                images=[style_info.icon],
+                                images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
+                                dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
                                 authors=style.selitem_data.auth,
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 orig_index=ind + 1,
@@ -195,16 +232,14 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             corridor = Corridor(
                                 instance=str(inst.inst),
                                 name='Corridor',
-                                images=[],
+                                images=[ICON_GENERIC_LRG],
+                                dnd_icon=ICON_GENERIC_SML,
                                 authors=style.selitem_data.auth,
                                 desc=DESC,
                                 orig_index=ind + 1,
                                 legacy=True,
                             )
-                        corridors.corridors.setdefault(
-                            (mode, direction, CorrOrient.HORIZONTAL),
-                            [],
-                        ).append(corridor)
+                        corr_list.append(corridor)
                         had_legacy = True
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)

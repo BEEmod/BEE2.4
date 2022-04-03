@@ -228,6 +228,10 @@ class Manager(Generic[ItemT]):
             if slot.is_flexi:
                 yield slot
 
+    def all_slots(self) -> Iterator[Slot[ItemT]]:
+        """Yield all slots."""
+        return iter(self._slots)
+
     def flow_slots(
         self,
         canv: tkinter.Canvas,
