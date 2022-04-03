@@ -5,11 +5,12 @@ from enum import Enum
 from typing import Dict, List
 
 from srctools import Property
-from srctools.dmx import Element
+from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 import srctools.logger
 import attrs
 import trio
 
+import packages
 from app import TK_ROOT, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
@@ -30,6 +31,70 @@ class RandMode(Enum):
     ALL = 'all'  # Use all regardless.
 
 
+@config.register('Corridor', uses_id=True)
+@attrs.frozen
+class CorridorConf(config.Data):
+    """The current configuration for a corridor."""
+    selected: List[str] = attrs.Factory(list)
+    random: RandMode = RandMode.EDITOR
+
+    @staticmethod
+    def get_id(
+        style: str,
+        mode: corridor.GameMode,
+        direction: corridor.Direction,
+        orient: corridor.CorrOrient,
+    ) -> str:
+        """Given the style and kind of corridor, return the ID for config lookup."""
+        return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'CorridorConf':
+        """Parse from KeyValues1 configs."""
+        assert version == 1, version
+        corr = [
+            prop.value
+            for prop in data.find_children('selected')
+        ]
+        try:
+            rand = RandMode(data['random', 'editor'])
+        except ValueError:
+            rand = RandMode.EDITOR
+
+        return CorridorConf(corr, rand)
+
+    def export_kv1(self) -> Property:
+        """Serialise to a Keyvalues1 config."""
+        return Property('Corridor', [
+            Property('random', self.random.value),
+            Property('Selected', [
+                Property('Corridor', corr)
+                for corr in self.selected
+            ])
+        ])
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'CorridorConf':
+        """Parse from DMX configs."""
+        assert version == 1, version
+        try:
+            rand = RandMode(data['random'].val_str)
+        except (KeyError, TypeError, ValueError):
+            rand = RandMode.EDITOR
+        try:
+            corr = list(data['selected'].iter_str())
+        except KeyError:
+            corr = []
+
+        return CorridorConf(corr, rand)
+
+    def export_dmx(self) -> Element:
+        """Serialise to DMX configs."""
+        elem = Element('Corridor', 'DMEConfig')
+        elem['random'] = self.random.value
+        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
+        selected.extend(self.selected)
+        return elem
 class Selector:
     """Corridor selection UI."""
     win: tk.Toplevel
