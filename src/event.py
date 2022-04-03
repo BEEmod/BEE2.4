@@ -18,9 +18,10 @@ from typing import (
 
 import attrs
 import trio
+import srctools.logger
 
 __all__ = ['EventManager', 'APP_EVENTS', 'ValueChange', 'ObsValue']
-
+LOGGER = srctools.logger.get_logger(__name__)
 ArgT = TypeVar('ArgT')
 CtxT = TypeVar('CtxT')
 ValueT = TypeVar('ValueT')
@@ -48,13 +49,15 @@ class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
 
 def _get_arg_type(arg_type: object) -> Type:
     """Given the arg type, pull out the actual type to key with."""
-    if arg_type is None:
+    if arg_type is None:  # Special case.
         return NoneType
     # Allow passing subscripted generics.
     origin = get_origin(arg_type)
     if origin is not None:
         return origin
-    return type(arg_type)
+    if isinstance(arg_type, type):
+        return arg_type
+    raise ValueError(f'{arg_type!r} is not an argument type!')
 
 
 class EventManager:
@@ -64,6 +67,7 @@ class EventManager:
 
     def __init__(self) -> None:
         self._events = {}
+        self.log = False
 
     @overload
     def register(
@@ -140,7 +144,11 @@ class EventManager:
         try:
             spec = self._events[id(ctx), type(arg)]
         except KeyError:
+            if self.log:
+                LOGGER.debug('{:x} -> {!r}({!r}), not found.\nValid: {}', id(self), ctx, arg, self._events)
             return
+        if self.log:
+            LOGGER.debug('{:x} -> {!r}({!r}) = {}', id(self), ctx, arg, spec)
 
         if spec.cur_calls:
             try:
