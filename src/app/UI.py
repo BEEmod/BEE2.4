@@ -13,7 +13,7 @@ import srctools.logger
 import trio
 
 import loadScreen
-from app import TK_ROOT, BEE2, background_run
+from app import TK_ROOT, background_run
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
@@ -35,6 +35,7 @@ from app import (
     StyleVarPane,
     CompilerPane,
     item_search,
+    corridor_selector,
     optionWindow,
     helpMenu,
     backup as backup_win,
@@ -1617,7 +1618,10 @@ async def init_windows() -> None:
     loader.step('UI', 'stylevar')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], view_menu)
+        corridor = corridor_selector.Selector(packages.LOADED)
+        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], view_menu, corridor)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(corridor.refresh)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
@@ -1748,6 +1752,7 @@ async def init_windows() -> None:
             win.set_suggested(sugg_val)
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
+        background_run(corridor.refresh)
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)

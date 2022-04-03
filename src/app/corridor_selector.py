@@ -95,17 +95,40 @@ class CorridorConf(config.Data):
         elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
         selected.extend(self.selected)
         return elem
+
+
+# If no groups are defined for a style, use this.
+FALLBACK = corridor.CorridorGroup(
+    '<Fallback>',
+    {
+        (mode, direction, orient): []
+        for mode in corridor.GameMode
+        for direction in corridor.Direction
+        for orient in corridor.CorrOrient
+    }
+)
+
+
 class Selector:
     """Corridor selection UI."""
     win: tk.Toplevel
-    dragdrop: dragdrop.Manager[corridor.Corridor]
+    drag_man: dragdrop.Manager[corridor.Corridor]
 
     # Current corridor on the right side.
     wid_image: ttk.Label
     wid_title: ttk.Label
     wid_desc: tkRichText
 
-    def __init__(self) -> None:
+    # The 7 selected slots, and the rest.
+    selected: List[dragdrop.Slot[corridor.Corridor]]
+    unused: List[dragdrop.Slot[corridor.Corridor]]
+
+    # The current corridor group for the selected style, and the config ID to save/load.
+    # These are updated by load_corridors().
+    corr_group: corridor.CorridorGroup
+    conf_id: str
+
+    def __init__(self, packset: packages.PackagesSet) -> None:
         self.win = tk.Toplevel(TK_ROOT)
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
 
@@ -134,7 +157,7 @@ class Selector:
 
         ttk.Button(frm_right, text=gettext('Close'), command=self.hide).grid(row=3, column=0)
 
-        update = self.update
+        refresh = self.refresh
 
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
@@ -142,47 +165,114 @@ class Selector:
             button_frm,
             (corridor.GameMode.SP, gettext('SP')),
             (corridor.GameMode.COOP, gettext('Coop')),
-            callback=update,
+            callback=refresh,
         )
         self.btn_direction = tk_tools.EnumButton(
             button_frm,
             (corridor.Direction.ENTRY, gettext('Entry')),
             (corridor.Direction.EXIT, gettext('Exit')),
-            callback=update,
+            callback=refresh,
         )
         self.btn_orient = tk_tools.EnumButton(
             button_frm,
             (corridor.CorrOrient.FLAT, gettext('Flat')),
             (corridor.CorrOrient.UP, gettext('Upward')),
             (corridor.CorrOrient.DN, gettext('Downward')),
-            callback=update,
+            callback=refresh,
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
 
-        self.dragdrop = drop = dragdrop.Manager(self.win, size=(WIDTH, HEIGHT))
+        self.canvas = tk.Canvas(frm_left)
+        self.canvas.grid(row=1, column=0, columnspan=3, sticky='nsew')
+        frm_left.rowconfigure(1, weight=1)
+
+        self.drag_man = drop = dragdrop.Manager(self.win, size=(WIDTH, HEIGHT))
         self.selected = [
-            drop.slot_target(frm_left)
+            drop.slot_target(self.canvas)
             for _ in range(7)
         ]
+        self.unused_count = 0
+        self.load_corridors(packset)
 
     def show(self) -> None:
         """Display the window."""
-        self.dragdrop.load_icons()
+        self.drag_man.load_icons()
         self.win.deiconify()
 
     def hide(self) -> None:
         """Hide the window."""
         self.win.withdraw()
-        self.dragdrop.unload_icons()
+        self.drag_man.unload_icons()
 
-    async def update(self, _) -> None:
-        """Called to reposition the corridors."""
+    def load_corridors(self, packset: packages.PackagesSet) -> None:
+        """Fetch the current set of corridors from this style."""
+        style_id = config.get_cur_conf(
+            config.LastSelected, 'Style',
+            config.LastSelected('BEE2_CLEAN_STYLE'),
+        ).id or 'BEE2_CLEAN_STYLE'
+        try:
+            self.corr_group = packset.obj_by_id(corridor.CorridorGroup, style_id)
+        except KeyError:
+            LOGGER.warning('No corridors defined for style "{}"', style_id)
+            self.corr_group = FALLBACK
+        self.conf_id = CorridorConf.get_id(
+            style_id,
+            self.btn_mode.current,
+            self.btn_direction.current,
+            self.btn_orient.current,
+        )
+
+    async def refresh(self, _=None) -> None:
+        """Called to update the slots with new items if the corridor set changes."""
         LOGGER.info(
             'Mode: {}, Dir: {}, Orient: {}',
             self.btn_mode.current, self.btn_direction.current, self.btn_orient.current,
         )
+        self.conf_id = CorridorConf.get_id(
+            self.corr_group.id,
+            self.btn_mode.current,
+            self.btn_direction.current,
+            self.btn_orient.current,
+        )
+        conf = config.get_cur_conf(CorridorConf, self.conf_id, CorridorConf())
+
+        corr_list = self.corr_group.corridors[
+            self.btn_mode.current,
+            self.btn_direction.current,
+            self.btn_orient.current,
+        ]
+
+        # Ensure enough flexible slots exist to hold all of them, and clear em all.
+        for slot in self.drag_man.flexi_slots():
+            slot.contents = None
+        for _ in range(len(corr_list) - self.unused_count):
+            self.drag_man.slot_flexi(self.canvas)
+        self.unused_count = len(corr_list)
+
+        inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
+        if conf.selected:
+            for slot, sel_id in zip(self.selected, conf.selected):
+                try:
+                    slot.contents = inst_to_corr.pop(sel_id.casefold())
+                except KeyError:
+                    LOGGER.warning('Unknown corridor instance "{}" in config!')
+            for slot, corr in zip(
+                self.drag_man.flexi_slots(),
+                sorted(inst_to_corr, key=lambda corr: corr.name),
+            ):
+                slot.contents = corr
+        else:
+            # No configuration, populate with the defaults.
+            for corr in corr_list:
+                if corr.orig_index > 0:
+                    self.selected[corr.orig_index - 1].contents = corr
+        await self.reflow()
+
+    async def reflow(self, _=None) -> None:
+        """Called to reposition the corridors."""
+        self.drag_man.flow_slots(self.canvas, [*self.drag_man.targets(), *self.drag_man.flexi_slots()])
 
 
 async def test() -> None:
@@ -190,7 +280,7 @@ async def test() -> None:
     background_run(img.init, {})
     background_run(sound.sound_task)
 
-    test_sel = Selector()
+    test_sel = Selector(packages.LOADED)
     config.read_settings()
     test_sel.show()
     with trio.CancelScope() as scope:
