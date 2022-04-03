@@ -1752,6 +1752,7 @@ async def init_windows() -> None:
             win.set_suggested(sugg_val)
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
+        corridor.load_corridors(packages.LOADED)
         background_run(corridor.refresh)
 
     style_win.callback = style_select_callback
