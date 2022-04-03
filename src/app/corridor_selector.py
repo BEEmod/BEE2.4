@@ -136,7 +136,7 @@ class Selector:
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
 
-        frm_left = ttk.Frame(self.win, relief="sunken")
+        frm_left = ttk.Frame(self.win)
         frm_left.grid(row=0, column=0, sticky='nsew')
 
         frm_right = ttk.Frame(self.win)
@@ -184,8 +184,8 @@ class Selector:
         self.events.register(self.btn_direction, corridor.Direction, refresh)
         self.events.register(self.btn_orient, corridor.CorrOrient, refresh)
 
-        canv_frame = ttk.Frame(frm_left)
-        canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew')
+        canv_frame = ttk.Frame(frm_left, relief="sunken")
+        canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
         canv_frame.rowconfigure(0, weight=1)
         canv_frame.columnconfigure(0, weight=1)
         frm_left.columnconfigure(0, weight=1)

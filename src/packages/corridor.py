@@ -50,8 +50,8 @@ ITEMS = [
 ]
 EMPTY_DESC = tkMarkdown.MarkdownData.text('')
 
-IMG_WIDTH_SML = 96
-IMG_HEIGHT_SML = 64
+IMG_WIDTH_SML = 144
+IMG_HEIGHT_SML = 96
 ICON_GENERIC_SML = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_SML, IMG_HEIGHT_SML)
 
 IMG_WIDTH_LRG = 256
