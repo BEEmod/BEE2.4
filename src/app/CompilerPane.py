@@ -22,7 +22,7 @@ import attrs
 from srctools import Property, bool_as_int
 from srctools.logger import get_logger
 
-from app import SubPane, img, tkMarkdown, tk_tools, config, TK_ROOT, selector_win
+from app import SubPane, img, tkMarkdown, tk_tools, config, TK_ROOT, selector_win, corridor_selector
 from app.tooltip import add_tooltip, set_tooltip
 from localisation import gettext
 from packages import CORRIDOR_COUNTS, CorrDesc
@@ -564,7 +564,7 @@ def make_setter(section: str, config: str, variable: tk.Variable, state_var: str
     variable.trace_add('write', callback)
 
 
-async def make_widgets() -> None:
+async def make_widgets(corr: corridor_selector.Selector) -> None:
     """Create the compiler options pane.
 
     """
@@ -593,7 +593,7 @@ async def make_widgets() -> None:
     nbook.add(comp_frame, text=gettext('Compile Settings'))
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(make_map_widgets, map_frame)
+        nursery.start_soon(make_map_widgets, map_frame, corr)
         nursery.start_soon(make_comp_widgets, comp_frame)
 
 
@@ -830,7 +830,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     refresh_counts(reload=False)
 
 
-async def make_map_widgets(frame: ttk.Frame) -> None:
+async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -> None:
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.
@@ -951,6 +951,12 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
         anchor='e',
     ).grid(row=2, column=0, sticky='ew', padx=2)
 
+    ttk.Button(
+        corr_frame,
+        text=gettext('Select Corridors'),
+        command=corr.show,
+    ).grid(row=3, column=0, columnspan=2)
+
     model_frame = ttk.LabelFrame(
         frame,
         text=gettext('Player Model (SP):'),
@@ -983,7 +989,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     model_frame.columnconfigure(0, weight=1)
 
 
-async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
+async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_selector.Selector) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
@@ -999,7 +1005,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    await make_widgets()
+    await make_widgets(corr)
     await config.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
