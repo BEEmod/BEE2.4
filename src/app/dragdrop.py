@@ -548,6 +548,10 @@ class Slot(Generic[ItemT]):
             # Source pickers never group items.
             new_group = None
 
+        if self.is_flexi and (old_cont is None) != (value is None):
+            # We're showing/hiding, we need to redraw.
+            background_run(self.man.event, Event.FLEXI_FLOW, self)
+
         if new_group is not None:
             # Update myself and the entire group to get the group
             # icon if required.
