@@ -233,13 +233,16 @@ class Manager(Generic[ItemT]):
         canv: tkinter.Canvas,
         slots: Iterable[Slot[ItemT]],
         spacing: int=16 if utils.MAC else 8,
-    ) -> None:
+        yoff: int=0,
+        tag: str=_CANV_TAG,
+    ) -> int:
         """Place all the slots in a grid on the provided canvas.
 
-        Any previously added slots will be removed.
-        padding is the amount added on each side of each slot.
+        Any previously added slots with the same tag will be removed.
+        - spacing is the amount added on each side of each slot.
+        - yoff is the offset from the top, the new height is then returned to allow chaining.
         """
-        canv.delete(_CANV_TAG)
+        canv.delete(tag)
         item_width = self.width + spacing * 2
         item_height = self.width + spacing * 2
 
@@ -253,7 +256,8 @@ class Manager(Generic[ItemT]):
             slot.canvas(
                 canv,
                 spacing + col * item_width,
-                spacing + row * item_height,
+                yoff + spacing + row * item_height,
+                tag,
             )
             col += 1
             if col > col_count:
@@ -263,11 +267,13 @@ class Manager(Generic[ItemT]):
         if col == 0:
             row -= 1
 
+        height = yoff + (row + 1) * item_height + spacing
         canv['scrollregion'] = (
             0, 0,
             col_count * item_width + spacing,
-            (row + 1) * item_height + spacing,
+            height,
         )
+        return height
 
     def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
         """Find the slot under this X,Y (if any). Sources are ignored."""
@@ -564,7 +570,7 @@ class Slot(Generic[ItemT]):
         self._pos_type = 'pack'
         self._lbl.pack(*args, **kwargs)
 
-    def canvas(self, canv: tkinter.Canvas, x: int, y: int) -> None:
+    def canvas(self, canv: tkinter.Canvas, x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""
         if self._pos_type in ['place', 'pack', 'grid']:
             raise ValueError("Can't add already positioned slot!")
@@ -574,7 +580,7 @@ class Slot(Generic[ItemT]):
             height=self.man.height,
             anchor='nw',
             window=self._lbl,
-            tags=(_CANV_TAG,),
+            tags=(tag,),
         )
         self._pos_type = f'_canvas_{obj_id}'
 
