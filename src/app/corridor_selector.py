@@ -10,6 +10,7 @@ import srctools.logger
 import attrs
 import trio
 
+import event
 import packages
 from app import TK_ROOT, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
@@ -157,32 +158,33 @@ class Selector:
 
         ttk.Button(frm_right, text=gettext('Close'), command=self.hide).grid(row=3, column=0)
 
-        refresh = self.refresh
+        self.events = event.EventManager()
 
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
-            button_frm,
+            button_frm, self.events,
             (corridor.GameMode.SP, gettext('SP')),
             (corridor.GameMode.COOP, gettext('Coop')),
-            callback=refresh,
         )
         self.btn_direction = tk_tools.EnumButton(
-            button_frm,
+            button_frm, self.events,
             (corridor.Direction.ENTRY, gettext('Entry')),
             (corridor.Direction.EXIT, gettext('Exit')),
-            callback=refresh,
         )
         self.btn_orient = tk_tools.EnumButton(
-            button_frm,
+            button_frm, self.events,
             (corridor.CorrOrient.FLAT, gettext('Flat')),
             (corridor.CorrOrient.UP, gettext('Upward')),
             (corridor.CorrOrient.DN, gettext('Downward')),
-            callback=refresh,
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
+        refresh = self.refresh
+        self.events.register(self.btn_mode, corridor.GameMode, refresh)
+        self.events.register(self.btn_direction, corridor.Direction, refresh)
+        self.events.register(self.btn_orient, corridor.CorrOrient, refresh)
 
         self.canvas = tk.Canvas(frm_left)
         self.canvas.grid(row=1, column=0, columnspan=3, sticky='nsew')

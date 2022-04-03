@@ -6,7 +6,7 @@ import functools
 import sys
 from enum import Enum
 from typing import (
-    Generic, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Awaitable, Generic, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
     Tuple, Literal,
 )
 
@@ -16,7 +16,8 @@ from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
-from app import TK_ROOT, config
+import event
+from app import TK_ROOT, background_run, config
 
 try:
     # Python 3.6+
@@ -662,17 +663,20 @@ EnumT = TypeVar('EnumT')
 
 
 class EnumButton(Generic[EnumT]):
-    """Provides a set of buttons for toggling between enum values."""
+    """Provides a set of buttons for toggling between enum values.
+
+    The event manager recives an event with this as the context and the value as the arg when changed.
+    """
     def __init__(
         self,
         master: tk.Misc,
+        event_man: event.EventManager,
         *values: Tuple[EnumT, str],
-        callback: Callable[[EnumT], Any] = lambda x: None,
     ) -> None:
         self.frame = ttk.Frame(master)
         self._current = values[0][0]
         self.buttons: dict[EnumT, ttk.Button] = {}
-        self.callback = callback
+        self.events = event_man
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
@@ -694,7 +698,7 @@ class EnumButton(Generic[EnumT]):
             self.buttons[self._current].state(['!pressed'])
             self._current = value
             self.buttons[self._current].state(['pressed'])
-            self.callback(value)
+            background_run(self.events, self, value)
 
     @property
     def current(self) -> EnumT:
