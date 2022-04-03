@@ -48,7 +48,7 @@ ITEMS = [
     (GameMode.COOP, Direction.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
     (GameMode.COOP, Direction.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
 ]
-DESC = tkMarkdown.MarkdownData.text('')
+EMPTY_DESC = tkMarkdown.MarkdownData.text('')
 
 IMG_WIDTH_SML = 96
 IMG_HEIGHT_SML = 64
@@ -235,7 +235,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[ICON_GENERIC_LRG],
                                 dnd_icon=ICON_GENERIC_SML,
                                 authors=style.selitem_data.auth,
-                                desc=DESC,
+                                desc=EMPTY_DESC,
                                 orig_index=ind + 1,
                                 legacy=True,
                             )
