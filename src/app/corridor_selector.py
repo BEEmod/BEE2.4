@@ -16,12 +16,12 @@ from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
-import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-WIDTH = corridor.IMG_WIDTH_SML + (32 if utils.MAC else 16)
-HEIGHT = corridor.IMG_HEIGHT_SML + 51
+WIDTH = corridor.IMG_WIDTH_SML + 16
+HEIGHT = corridor.IMG_HEIGHT_SML + 16
+ICON_BLANK = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 
 
 class RandMode(Enum):
@@ -145,7 +145,7 @@ class Selector:
 
         self.wid_image = ttk.Label(frm_right)
         self.wid_image.grid(row=0, column=0, sticky='ew')
-        img.apply(self.wid_image, img.Handle.builtin('BEE2/corr_generic', 256, 192))
+        img.apply(self.wid_image, ICON_BLANK)
 
         self.wid_title = ttk.Label(frm_right, text='Corridor')
         self.wid_title.grid(row=1, column=0, sticky='ew')
@@ -201,6 +201,14 @@ class Selector:
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
         self.drag_man = drop = dragdrop.Manager(self.win, size=(WIDTH, HEIGHT))
+        drop.event.register(
+            dragdrop.Event.HOVER_ENTER, dragdrop.Slot[corridor.Corridor],
+            self.show_corr,
+        )
+        drop.event.register(
+            dragdrop.Event.FLEXI_FLOW, dragdrop.Slot[corridor.Corridor],
+            self.reflow,
+        )
         self.selected = [
             drop.slot_target(self.canvas)
             for _ in range(7)
@@ -282,12 +290,37 @@ class Selector:
         ):
             slot.contents = corr
         self.drag_man.load_icons()
+
+        # Reset item display, it's invalid.
+        img.apply(self.wid_image, ICON_BLANK)
+        self.wid_title['text'] = ''
+        self.wid_desc.set_text(corridor.EMPTY_DESC)
+        # Reposition everything.
         await self.reflow()
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
         yoff = self.drag_man.flow_slots(self.canvas, self.selected, tag='sel_1')
-        self.drag_man.flow_slots(self.canvas, self.drag_man.flexi_slots(), yoff=yoff, tag='unselected')
+        self.drag_man.flow_slots(
+            self.canvas, (
+                slot for slot in
+                self.drag_man.flexi_slots()
+                if slot.contents is not None
+            ),
+            yoff=yoff,
+            tag='unselected',
+        )
+
+    async def show_corr(self, slot: dragdrop.Slot[corridor.Corridor]) -> None:
+        """Display the specified corridor on hover."""
+        if slot.contents is not None:
+            corr = slot.contents
+            if corr.images:
+                img.apply(self.wid_image, corr.images[0])
+            else:
+                img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
+            self.wid_title['text'] = corr.name
+            self.wid_desc.set_text(corr.desc)
 
 
 async def test() -> None:
