@@ -235,7 +235,7 @@ class Handle:
     # When no users are present, schedule cleaning up the handle's data to reuse.
     _cancel_cleanup: trio.CancelScope = attrs.field(init=False, factory=trio.CancelScope, repr=False)
 
-    # Determines whether get_pil() and get_tk() can be called directly.
+    # Determines whether `get_pil()` and `get_tk()` can be called directly.
     allow_raw: ClassVar[bool] = False
     # Whether the result can be transparent.
     alpha_result: ClassVar[bool] = False
@@ -253,6 +253,10 @@ class Handle:
     def _to_key(cls, args: tuple) -> tuple:
         """Override in subclasses to convert mutable attributes to deduplicate."""
         return args
+
+    def resize(self: HandleT, width: int, height: int) -> HandleT:
+        """Return a copy with a different size."""
+        raise NotImplementedError
 
     @classmethod
     def _deduplicate(cls: Type[HandleT], width: int | tuple[int, int], height: int, *args: Any) -> HandleT:
@@ -586,6 +590,10 @@ class ImgAlpha(Handle):
         """Produce an image of this size with transparent pixels."""
         return Image.new('RGBA', (self.width or 16, self.height or 16), (0, 0, 0, 0))
 
+    def resize(self, width: int, height: int) -> ImgAlpha:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height)
+
 
 @attrs.define(eq=False)
 class ImgFile(Handle):
@@ -602,6 +610,10 @@ class ImgFile(Handle):
 
         return _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
 
+    def resize(self, width: int, height: int) -> ImgFile:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.uri)
+
 
 @attrs.define(eq=False)
 class ImgBuiltin(Handle):
@@ -614,6 +626,10 @@ class ImgBuiltin(Handle):
         """Load from the builtin UI resources."""
         return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.ANTIALIAS)
 
+    def resize(self, width: int, height: int) -> ImgBuiltin:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.uri)
+
 
 @attrs.define(eq=False)
 class ImgSprite(Handle):
@@ -625,6 +641,10 @@ class ImgSprite(Handle):
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources, but use nearest-neighbour resizing."""
         return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.NEAREST)
+
+    def resize(self, width: int, height: int) -> ImgSprite:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.uri)
 
 
 @attrs.define(eq=False)
@@ -652,6 +672,13 @@ class ImgComposite(Handle):
                 child = child.convert('RGBA')
             img.alpha_composite(child)
         return img
+
+    def resize(self, width: int, height: int) -> ImgComposite:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, [
+            img.resize(width, height)
+            for img in self.layers
+        ])
 
 
 @attrs.define(eq=False)
@@ -690,6 +717,10 @@ class ImgCrop(Handle):
             image = image.resize((self.width, self.height), resample=Image.ANTIALIAS)
         return image
 
+    def resize(self, width: int, height: int) -> ImgCrop:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.source, self.bounds, self.transpose)
+
 
 @attrs.define(eq=False)
 class ImgIcon(Handle):
@@ -713,6 +744,10 @@ class ImgIcon(Handle):
             img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
 
         return img
+
+    def resize(self, width: int, height: int) -> ImgIcon:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.icon_name)
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
