@@ -248,7 +248,7 @@ class Manager(Generic[ItemT]):
         """
         canv.delete(tag)
         item_width = self.width + spacing * 2
-        item_height = self.width + spacing * 2
+        item_height = self.height + spacing * 2
 
         col_count = (canv.winfo_width() - spacing) // item_width - 1
         if col_count < 1:
