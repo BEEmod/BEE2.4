@@ -1,6 +1,7 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
 from typing import Mapping, cast, Any, TypeVar, Type, MutableMapping, Iterator
+from typing_extensions import Literal
 from enum import Enum, EnumMeta
 from srctools import Side
 
@@ -263,12 +264,12 @@ class MusicChannel(Enum):
 
 # Outputs we need to use to make a math_counter act like
 # the specified logic gate.
-COUNTER_AND_ON = 'OnHitMax'
-COUNTER_AND_OFF = 'OnChangedFromMax'
+COUNTER_AND_ON: Final = 'OnHitMax'
+COUNTER_AND_OFF: Final = 'OnChangedFromMax'
 
-COUNTER_OR_ON = 'OnChangedFromMin'
-COUNTER_OR_OFF = 'OnHitMin'
+COUNTER_OR_ON: Final = 'OnChangedFromMin'
+COUNTER_OR_OFF: Final = 'OnHitMin'
 
-SEL_ICON_SIZE = 96  # Size of the selector win icons
-SEL_ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.
-SEL_ICON_CROP_SHRINK = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.
+SEL_ICON_SIZE: Final = 96  # Size of the selector win icons
+SEL_ICON_SIZE_LRG: Final = (256, 192)  # Size of the larger icon shown in description.
+SEL_ICON_CROP_SHRINK: Final = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.
