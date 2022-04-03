@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, Tuple, List
-from enum import Enum
+from typing import Dict, List
 
 import attrs
 import srctools.logger
@@ -11,42 +10,17 @@ import srctools.logger
 from app import img, tkMarkdown
 import packages
 import editoritems
+from consts import CORRIDOR_COUNTS, CorrKind, CorrOrient, CorrDir, GameMode
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-class GameMode(Enum):
-    """The game mode this uses."""
-    SP = 'sp'
-    COOP = 'coop'
-
-
-class Direction(Enum):
-    """The direction of the corridor."""
-    ENTRY = 'entry'
-    EXIT = 'exit'
-
-
-class CorrOrient(Enum):
-    """The orientation of the corridor, up/down are new."""
-    HORIZONTAL = 'horizontal'
-    FLAT = HORIZ = HORIZONTAL
-    UP = 'up'
-    DOWN = DN = 'down'
-
-CorrKind = Tuple[GameMode, Direction, CorrOrient]
-COUNTS = {
-    (GameMode.SP, Direction.ENTRY): 7,
-    (GameMode.SP, Direction.EXIT): 4,
-    (GameMode.COOP, Direction.ENTRY): 1,
-    (GameMode.COOP, Direction.EXIT): 4,
-}
 # For converting style corridor definitions, the item IDs of corridors.
 ITEMS = [
-    (GameMode.SP, Direction.ENTRY, 'ITEM_ENTRY_DOOR', 'sp_entry'),
-    (GameMode.SP, Direction.EXIT, 'ITEM_EXIT_DOOR', 'sp_exit'),
-    (GameMode.COOP, Direction.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
-    (GameMode.COOP, Direction.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
+    (GameMode.SP, CorrDir.ENTRY, 'ITEM_ENTRY_DOOR', 'sp_entry'),
+    (GameMode.SP, CorrDir.EXIT, 'ITEM_EXIT_DOOR', 'sp_exit'),
+    (GameMode.COOP, CorrDir.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
+    (GameMode.COOP, CorrDir.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
 ]
 EMPTY_DESC = tkMarkdown.MarkdownData.text('')
 
@@ -78,10 +52,10 @@ def parse_specifier(specifier: str) -> CorrKind:
     """Parse a string like 'sp_entry' or 'exit_coop_dn' into the 3 enums."""
     orient: CorrOrient | None = None
     mode: GameMode | None = None
-    direction: Direction | None = None
+    direction: CorrDir | None = None
     for part in specifier.casefold().split('_'):
         try:
-            parsed_dir = Direction(part)
+            parsed_dir = CorrDir(part)
         except ValueError:
             pass
         else:
@@ -177,7 +151,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 item = packset.obj_by_id(packages.Item, item_id)
             except KeyError:
                 continue
-            count = COUNTS[mode, direction]
+            count = CORRIDOR_COUNTS[mode, direction]
             for vers in item.versions.values():
                 for style_id, variant in vers.styles.items():
                     try:

@@ -10,6 +10,7 @@ import srctools.logger
 import attrs
 import trio
 
+import consts
 import event
 import packages
 from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
@@ -41,9 +42,9 @@ class CorridorConf(config.Data):
     @staticmethod
     def get_id(
         style: str,
-        mode: corridor.GameMode,
-        direction: corridor.Direction,
-        orient: corridor.CorrOrient,
+        mode: consts.GameMode,
+        direction: consts.CorrDir,
+        orient: consts.CorrOrient,
     ) -> str:
         """Given the style and kind of corridor, return the ID for config lookup."""
         return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
@@ -102,9 +103,9 @@ FALLBACK = corridor.CorridorGroup(
     '<Fallback>',
     {
         (mode, direction, orient): []
-        for mode in corridor.GameMode
-        for direction in corridor.Direction
-        for orient in corridor.CorrOrient
+        for mode in consts.GameMode
+        for direction in consts.CorrDir
+        for orient in consts.CorrOrient
     }
 )
 
@@ -162,27 +163,27 @@ class Selector:
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
             button_frm, self.events,
-            (corridor.GameMode.SP, gettext('SP')),
-            (corridor.GameMode.COOP, gettext('Coop')),
+            (consts.GameMode.SP, gettext('SP')),
+            (consts.GameMode.COOP, gettext('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
             button_frm, self.events,
-            (corridor.Direction.ENTRY, gettext('Entry')),
-            (corridor.Direction.EXIT, gettext('Exit')),
+            (consts.CorrDir.ENTRY, gettext('Entry')),
+            (consts.CorrDir.EXIT, gettext('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
             button_frm, self.events,
-            (corridor.CorrOrient.FLAT, gettext('Flat')),
-            (corridor.CorrOrient.UP, gettext('Upward')),
-            (corridor.CorrOrient.DN, gettext('Downward')),
+            (consts.CorrOrient.FLAT, gettext('Flat')),
+            (consts.CorrOrient.UP, gettext('Upward')),
+            (consts.CorrOrient.DN, gettext('Downward')),
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
         refresh = self.refresh
-        self.events.register(self.btn_mode, corridor.GameMode, refresh)
-        self.events.register(self.btn_direction, corridor.Direction, refresh)
-        self.events.register(self.btn_orient, corridor.CorrOrient, refresh)
+        self.events.register(self.btn_mode, consts.GameMode, refresh)
+        self.events.register(self.btn_direction, consts.CorrDir, refresh)
+        self.events.register(self.btn_orient, consts.CorrOrient, refresh)
 
         canv_frame = ttk.Frame(frm_left, relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -256,7 +257,7 @@ class Selector:
             corr_list = self.corr_group.corridors[mode, direction, orient]
         except KeyError:
             # Up/down can have missing ones.
-            if orient is corridor.CorrOrient.HORIZONTAL:
+            if orient is consts.CorrOrient.HORIZONTAL:
                 LOGGER.warning(
                     'No flat corridor for {}:{}_{}! {}',
                     self.corr_group.id, mode.value, direction.value,
