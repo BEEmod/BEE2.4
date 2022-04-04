@@ -210,6 +210,7 @@ class Selector:
             dragdrop.Event.FLEXI_FLOW, dragdrop.Slot[corridor.Corridor],
             self.reflow,
         )
+        drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
         self.selected = [
             drop.slot_target(self.canvas)
             for _ in range(7)
@@ -226,6 +227,14 @@ class Selector:
         """Hide the window."""
         self.win.withdraw()
         self.drag_man.unload_icons()
+
+    async def _on_changed(self, _: None) -> None:
+        """Store configuration when changed."""
+        selected = [
+            slot.contents.instance if slot.contents is not None else ''
+            for slot in self.selected
+        ]
+        config.store_conf(CorridorConf(selected), self.conf_id)
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
@@ -259,7 +268,7 @@ class Selector:
             # Up/down can have missing ones.
             if orient is consts.CorrOrient.HORIZONTAL:
                 LOGGER.warning(
-                    'No flat corridor for {}:{}_{}! {}',
+                    'No flat corridor for {}:{}_{}!',
                     self.corr_group.id, mode.value, direction.value,
                 )
             corr_list = []
@@ -274,6 +283,8 @@ class Selector:
         inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
         if conf.selected:
             for slot, sel_id in zip(self.selected, conf.selected):
+                if not sel_id:
+                    continue
                 try:
                     slot.contents = inst_to_corr.pop(sel_id.casefold())
                 except KeyError:

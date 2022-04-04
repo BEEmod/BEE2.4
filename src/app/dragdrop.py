@@ -40,10 +40,14 @@ _CANV_TAG = '_BEE2_dragdrop_item'
 
 
 class Event(Enum):
-    """Context for manager events. They take the relevant slot as arg, or always None."""
+    """Context for manager events. They provide either a relevant slot or None as the argument."""
     # Fires when items are right-clicked on. If one is registered, the gear
     # icon appears.
     CONFIG = 'config'
+
+    # Fired when any slot is modified. This occurs only once if two swap etc.
+    # The parameter is None.
+    MODIFIED = 'modified'
 
     # When flexi slots are present, called when they're filled/emptied.
     FLEXI_FLOW = 'flexi_flow'
@@ -408,20 +412,23 @@ class Manager(Generic[ItemT]):
         dest = self._pos_slot(evt.x_root, evt.y_root)
 
         if dest:  # We have a target.
-            # If either is flexi, swap.
-            if self._cur_prev_slot.is_flexi or dest.is_flexi:
+            # If we have flexi slots, swap.
+            if self._has_flexi:
                 self._cur_prev_slot.contents = dest.contents
             dest.contents = self._cur_drag
+            background_run(self.event, Event.MODIFIED)
         elif self._has_flexi:
             # We have flexi targets, it goes there.
             for slot in self._slots:
                 if slot.is_flexi and slot.contents is None:
                     slot.contents = self._cur_drag
+                    background_run(self.event, Event.MODIFIED)
                     break
             else:
                 LOGGER.warning('Ran out of FLEXI slots, dropped item: {}', self._cur_drag)
         # No target, and we dragged off an existing target, delete.
         elif not self._cur_prev_slot.is_source:
+            background_run(self.event, Event.MODIFIED)
             sound.fx('delete')
 
         self._cur_drag = None
@@ -622,6 +629,7 @@ class Slot(Generic[ItemT]):
                     sound.fx('config')
                     if self.is_flexi:
                         self.contents = None
+                    background_run(self.man.event, Event.MODIFIED)
                     return
                 elif slot.contents is item:
                     # It's already on the board, don't change anything.
@@ -636,6 +644,7 @@ class Slot(Generic[ItemT]):
                 if slot.is_flexi and slot.is_visible and slot.contents is None:
                     slot.contents = self.contents
                     self.contents = None
+                    background_run(self.man.event, Event.MODIFIED)
                     sound.fx('config')
                     return
             else:
@@ -643,6 +652,7 @@ class Slot(Generic[ItemT]):
         else:
             # Fast-delete this.
             self.contents = None
+            background_run(self.man.event, Event.MODIFIED)
             sound.fx('delete')
 
     def _evt_hover_enter(self, event: tkinter.Event) -> None:

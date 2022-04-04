@@ -5,7 +5,7 @@ They can then fetch the current state and store new state.
 """
 from enum import Enum
 from typing import (
-    TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
+    Any, TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator,
 )
 
@@ -546,7 +546,7 @@ class GenOptions(Data):
     def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
         """Parse DMX configuration."""
         assert version == 1
-        res = {}
+        res: dict[str, Any] = {}
         try:
             res['after_export'] = AfterExport(data['after_export'].val_int)
         except (KeyError, ValueError):
