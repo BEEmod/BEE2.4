@@ -214,10 +214,9 @@ class Selector:
                     LOGGER.warning('Unknown corridor instance "{}" in config!')
         else:
             # No configuration, populate with the defaults.
-            for corr in corr_list:
-                if corr.orig_index > 0:
-                    self.selected[corr.orig_index - 1].contents = corr
-                    del inst_to_corr[corr.instance.casefold()]
+            for slot, corr in zip(self.selected, self.corr_group.defaults(mode, direction, orient)):
+                slot.contents = corr
+                del inst_to_corr[corr.instance.casefold()]
 
         # Put all remaining in flexi slots.
         for slot, corr in zip(

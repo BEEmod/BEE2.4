@@ -1,5 +1,7 @@
 """Defines individual corridors to allow swapping which are used."""
 from __future__ import annotations
+
+import pickle
 from collections import defaultdict
 from typing import Dict, List
 from enum import Enum
@@ -49,6 +51,7 @@ class Corridor:
     orig_index: int = 0
     # If this was converted from editoritems.txt
     legacy: bool = False
+
 
 class RandMode(Enum):
     """Kind of randomisation to use."""
@@ -292,6 +295,28 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         had_legacy = True
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
+                    
+    def defaults(self, mode: GameMode, direction: CorrDir, orient: CorrOrient) -> list[Corridor]:
+        """Fetch the default corridor set for this mode, direction and orientation."""
+        try:
+            corr_list = self.corridors[mode, direction, orient]
+        except KeyError:
+            if orient is CorrOrient.HORIZONTAL:
+                LOGGER.warning(
+                    'No corridors defined for {}:{}_{}',
+                    self.id, mode.value, direction.value,
+                )
+            return []
+        
+        output = [
+            corr 
+            for corr in corr_list
+            if corr.orig_index > 0
+        ]
+        # Sort so missing indexes are skipped.
+        output.sort(key=lambda corr: corr.orig_index)
+        # Ignore extras beyond the actual size.
+        return output[:CORRIDOR_COUNTS[mode, direction]]
 
     @staticmethod
     def export(exp_data: packages.ExportData) -> None:
