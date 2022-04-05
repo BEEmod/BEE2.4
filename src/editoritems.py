@@ -1635,8 +1635,16 @@ class Item:
         self.overlays.append(Overlay(material, center, size, rotation))
 
     @classmethod
-    def export(cls, f: _TextFile, items: Iterable[Item], renderables: Mapping[RenderableType, Renderable]) -> None:
-        """Write a full editoritems file out."""
+    def export(
+        cls, f: _TextFile,
+        items: Iterable[Item],
+        renderables: Mapping[RenderableType, Renderable],
+        id_filenames: bool = False,
+    ) -> None:
+        """Write a full editoritems file out.
+
+        If id_filenames are enabled, items all use "instances/id/<item_id>/sub_<subtype>.vmf".
+        """
         f.write('"ItemData"\n{\n')
         for item in items:
             item.export_one(f)
@@ -1653,8 +1661,11 @@ class Item:
             f.write('\t}\n')
         f.write('}\n')
 
-    def export_one(self, f: _TextFile) -> None:
-        """Write a single item out to a file."""
+    def export_one(self, f: _TextFile, id_filenames: bool = False) -> None:
+        """Write a single item out to a file.
+
+        If id_filenames are enabled, items all use "instances/id/<item_id>/sub_<subtype>.vmf".
+        """
         f.write('"Item"\n\t{\n')
         if self.cls is not ItemClass.UNCLASSED:
             f.write(f'\t"Type"      "{self.id}"\n')
@@ -1704,8 +1715,11 @@ class Item:
             f.write('\t\t"Instances"\n\t\t\t{\n')
             for i, inst in enumerate(self.instances):
                 f.write(f'\t\t\t"{i}"\n\t\t\t\t{{\n')
-                file = inst.inst
-                if inst.inst == FSPath():
+                if id_filenames:
+                    file = FSPath("instances", "id", self.id, f"sub_{i}.vmf")
+                else:
+                    file = inst.inst
+                if file == FSPath():  # Don't write just a ".".
                     f.write('\t\t\t\t"Name" ""\n')
                 elif inst.ent_count or inst.brush_count or inst.face_count:
                     f.write(f'\t\t\t\t"Name"           "{file}"\n')
