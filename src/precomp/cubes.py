@@ -1004,8 +1004,8 @@ def res_set_dropper_off(inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('ChangeCubeType', 'SetCubeType')
-def flag_cube_type(inst: Entity, res: Property):
-    """Change the cube type of a cube item
+def res_change_cube_type(inst: Entity, res: Property) -> None:
+    """Change the cube type of a cube item.
 
     This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and instances
     marked as a custom dropperless cube.
@@ -1023,7 +1023,7 @@ def flag_cube_type(inst: Entity, res: Property):
 
 
 @conditions.make_result('CubeFilter')
-def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
+def res_cube_filter(vmf: VMF, inst: Entity, res: Property) -> None:
     """Given a set of cube-type IDs, generate a filter for them.
 
     Each cube should be the name of an ID, with `!` before to exclude it.
@@ -1106,7 +1106,7 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> None:
 
 
 @conditions.meta_cond(priority=-750, only_once=True)
-def link_cubes(vmf: VMF):
+def link_cubes(vmf: VMF) -> None:
     """Determine the cubes set based on instance settings.
 
     This sets data, but doesn't implement the changes.

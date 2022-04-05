@@ -350,7 +350,7 @@ def _resolve(path: str) -> List[str]:
 
 def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[str]:
     """Pick out the subitems from a list."""
-    output = []
+    output: List[Union[str, int]] = []
     for val in comma_list.split(','):
         folded_value = val.strip().casefold()
         if folded_value.startswith('bee2_'):
