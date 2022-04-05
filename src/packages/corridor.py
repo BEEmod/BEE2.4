@@ -318,7 +318,72 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # Ignore extras beyond the actual size.
         return output[:CORRIDOR_COUNTS[mode, direction]]
 
-    @staticmethod
-    def export(exp_data: packages.ExportData) -> None:
+    @classmethod
+    def export(cls, exp_data: packages.ExportData) -> None:
         """Override editoritems with the new corridor specifier."""
-        pass
+        style_id = exp_data.selected_style.id
+        try:
+            group = exp_data.packset.obj_by_id(cls, style_id)
+        except KeyError:
+            raise AssertionError(f'No corridor group for style "{style_id}"!')
+
+        export: Dict[CorrKind, List[str]] = {}
+        blank = Config()
+        for mode, direction, orient in itertools.product(GameMode, CorrDir, CorrOrient):
+            conf = config.get_cur_conf(
+                Config,
+                Config.get_id(style_id, mode, direction, orient),
+                blank,
+            )
+            count = CORRIDOR_COUNTS[mode, direction]
+            try:
+                inst_to_corr = {
+                    corr.instance.casefold(): corr
+                    for corr in group.corridors[mode, direction, orient]
+                }
+            except KeyError:
+                # None defined?
+                if orient is CorrOrient.HORIZONTAL:
+                    LOGGER.warning(
+                        'No corridors defined for {}:{}_{}', 
+                        style_id, mode.value, direction.value
+                    )
+                export[mode, direction, orient] = []
+                continue
+
+            if not conf.selected:  # Use default setup.
+                export[mode, direction, orient] = [
+                    corr.instance for corr in
+                    group.defaults(mode, direction, orient)
+                ]
+                continue
+            
+            if conf.random is RandMode.SINGLE:
+                try:
+                    chosen = [inst_to_corr[conf.selected[0]]]
+                except KeyError:
+                    LOGGER.warning('Invalid corridor "{}"!', conf.selected[0])
+                    chosen = group.defaults(mode, direction, orient)
+            elif conf.random is RandMode.EDITOR:
+                chosen = [
+                    corr
+                    for corr_id in conf.selected[:count]
+                    if (corr := inst_to_corr.get(corr_id)) is not None
+                ]
+            elif conf.random is RandMode.ALL:
+                chosen = group.corridors[mode, direction, orient]
+            else:
+                raise AssertionError(conf.random)
+            if not chosen:
+                LOGGER.warning(
+                    'No corridors selected for {}:{}_{}_{}', 
+                    style_id, 
+                    mode.value, direction.value, orient.value,
+                )
+                chosen = group.defaults(mode, direction, orient)
+            export[mode, direction, orient] = [corr.instance for corr in chosen]
+            
+        # Now write out.
+        LOGGER.info('Writing corridor configuration...')
+        with open(exp_data.game.abs_path('bin/bee2/corridors.bin'), 'wb') as file:
+            pickle.dump(export, file, protocol=pickle.HIGHEST_PROTOCOL)
