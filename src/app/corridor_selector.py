@@ -1,13 +1,9 @@
 """Implements UI for selecting corridors."""
 from tkinter import ttk
 import tkinter as tk
-from enum import Enum
-from typing import Dict, List
+from typing import List
 
-from srctools import Property
-from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 import srctools.logger
-import attrs
 import trio
 
 import consts
@@ -23,79 +19,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 WIDTH = corridor.IMG_WIDTH_SML + 16
 HEIGHT = corridor.IMG_HEIGHT_SML + 16
 ICON_BLANK = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
-
-
-class RandMode(Enum):
-    """Kind of randomisation to use."""
-    SINGLE = 'single'
-    EDITOR = 'editor'  # 4 or 7, depending on editor instance count.
-    ALL = 'all'  # Use all regardless.
-
-
-@config.register('Corridor', uses_id=True)
-@attrs.frozen
-class CorridorConf(config.Data):
-    """The current configuration for a corridor."""
-    selected: List[str] = attrs.Factory(list)
-    random: RandMode = RandMode.EDITOR
-
-    @staticmethod
-    def get_id(
-        style: str,
-        mode: consts.GameMode,
-        direction: consts.CorrDir,
-        orient: consts.CorrOrient,
-    ) -> str:
-        """Given the style and kind of corridor, return the ID for config lookup."""
-        return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'CorridorConf':
-        """Parse from KeyValues1 configs."""
-        assert version == 1, version
-        corr = [
-            prop.value
-            for prop in data.find_children('selected')
-        ]
-        try:
-            rand = RandMode(data['random', 'editor'])
-        except ValueError:
-            rand = RandMode.EDITOR
-
-        return CorridorConf(corr, rand)
-
-    def export_kv1(self) -> Property:
-        """Serialise to a Keyvalues1 config."""
-        return Property('Corridor', [
-            Property('random', self.random.value),
-            Property('Selected', [
-                Property('Corridor', corr)
-                for corr in self.selected
-            ])
-        ])
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'CorridorConf':
-        """Parse from DMX configs."""
-        assert version == 1, version
-        try:
-            rand = RandMode(data['random'].val_str)
-        except (KeyError, TypeError, ValueError):
-            rand = RandMode.EDITOR
-        try:
-            corr = list(data['selected'].iter_str())
-        except KeyError:
-            corr = []
-
-        return CorridorConf(corr, rand)
-
-    def export_dmx(self) -> Element:
-        """Serialise to DMX configs."""
-        elem = Element('Corridor', 'DMEConfig')
-        elem['random'] = self.random.value
-        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
-        selected.extend(self.selected)
-        return elem
 
 
 # If no groups are defined for a style, use this.
@@ -234,7 +157,7 @@ class Selector:
             slot.contents.instance if slot.contents is not None else ''
             for slot in self.selected
         ]
-        config.store_conf(CorridorConf(selected), self.conf_id)
+        config.store_conf(corridor.Config(selected), self.conf_id)
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
@@ -247,7 +170,7 @@ class Selector:
         except KeyError:
             LOGGER.warning('No corridors defined for style "{}"', style_id)
             self.corr_group = FALLBACK
-        self.conf_id = CorridorConf.get_id(
+        self.conf_id = corridor.Config.get_id(
             style_id,
             self.btn_mode.current,
             self.btn_direction.current,
@@ -259,8 +182,8 @@ class Selector:
         mode = self.btn_mode.current
         direction = self.btn_direction.current
         orient = self.btn_orient.current
-        self.conf_id = CorridorConf.get_id(self.corr_group.id, mode, direction, orient)
-        conf = config.get_cur_conf(CorridorConf, self.conf_id, CorridorConf())
+        self.conf_id = corridor.Config.get_id(self.corr_group.id, mode, direction, orient)
+        conf = config.get_cur_conf(corridor.Config, self.conf_id, corridor.Config())
 
         try:
             corr_list = self.corr_group.corridors[mode, direction, orient]

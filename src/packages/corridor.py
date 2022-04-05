@@ -1,13 +1,16 @@
 """Defines individual corridors to allow swapping which are used."""
 from __future__ import annotations
-
 from collections import defaultdict
 from typing import Dict, List
+from enum import Enum
+import itertools
 
 import attrs
 import srctools.logger
+from srctools import Property
+from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 
-from app import img, tkMarkdown
+from app import img, tkMarkdown, config
 import packages
 import editoritems
 from consts import CORRIDOR_COUNTS, CorrKind, CorrOrient, CorrDir, GameMode
@@ -46,6 +49,78 @@ class Corridor:
     orig_index: int = 0
     # If this was converted from editoritems.txt
     legacy: bool = False
+
+class RandMode(Enum):
+    """Kind of randomisation to use."""
+    SINGLE = 'single'
+    EDITOR = 'editor'  # 4 or 7, depending on editor instance count.
+    ALL = 'all'  # Use all regardless.
+
+
+@config.register('Corridor', uses_id=True)
+@attrs.frozen
+class Config(config.Data):
+    """The current configuration for a corridor."""
+    selected: List[str] = attrs.Factory(list)
+    random: RandMode = RandMode.EDITOR
+
+    @staticmethod
+    def get_id(
+        style: str,
+        mode: GameMode,
+        direction: CorrDir,
+        orient: CorrOrient,
+    ) -> str:
+        """Given the style and kind of corridor, return the ID for config lookup."""
+        return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'Config':
+        """Parse from KeyValues1 configs."""
+        assert version == 1, version
+        corr = [
+            prop.value
+            for prop in data.find_children('selected')
+        ]
+        try:
+            rand = RandMode(data['random', 'editor'])
+        except ValueError:
+            rand = RandMode.EDITOR
+
+        return Config(corr, rand)
+
+    def export_kv1(self) -> Property:
+        """Serialise to a Keyvalues1 config."""
+        return Property('Corridor', [
+            Property('random', self.random.value),
+            Property('Selected', [
+                Property('Corridor', corr)
+                for corr in self.selected
+            ])
+        ])
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'Config':
+        """Parse from DMX configs."""
+        assert version == 1, version
+        try:
+            rand = RandMode(data['random'].val_str)
+        except (KeyError, TypeError, ValueError):
+            rand = RandMode.EDITOR
+        try:
+            corr = list(data['selected'].iter_str())
+        except KeyError:
+            corr = []
+
+        return cls(corr, rand)
+
+    def export_dmx(self) -> Element:
+        """Serialise to DMX configs."""
+        elem = Element('Corridor', 'DMEConfig')
+        elem['random'] = self.random.value
+        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
+        selected.extend(self.selected)
+        return elem
 
 
 def parse_specifier(specifier: str) -> CorrKind:
