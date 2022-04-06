@@ -154,7 +154,7 @@ class Selector:
     async def _on_changed(self, _: None) -> None:
         """Store configuration when changed."""
         selected = [
-            slot.contents.instance if slot.contents is not None else ''
+            slot.contents.instance.casefold() if slot.contents is not None else ''
             for slot in self.selected
         ]
         config.store_conf(corridor.Config(selected), self.conf_id)

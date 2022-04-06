@@ -368,7 +368,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 chosen = [
                     corr
                     for corr_id in conf.selected[:count]
-                    if (corr := inst_to_corr.get(corr_id)) is not None
+                    if (corr := inst_to_corr.get(corr_id.casefold())) is not None
                 ]
             elif conf.random is RandMode.ALL:
                 chosen = group.corridors[mode, direction, orient]
