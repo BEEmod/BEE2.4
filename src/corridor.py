@@ -1,6 +1,8 @@
 """Data structure for specifying custom corridors."""
 from enum import Enum
 from typing import Tuple, Mapping
+
+import attrs
 from typing_extensions import Final, TypeAlias, Literal
 
 
@@ -32,3 +34,13 @@ CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = 
     (GameMode.COOP, Direction.ENTRY): 1,
     (GameMode.COOP, Direction.EXIT): 4,
 }
+
+
+@attrs.frozen
+class Corridor:
+    """An individual corridor definition. """
+    instance: str
+    # Indicates the initial corridor items if 1-7.
+    orig_index: int
+    # If this was converted from editoritems.txt
+    legacy: bool

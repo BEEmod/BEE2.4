@@ -15,7 +15,7 @@ from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 from app import img, tkMarkdown, config
 import packages
 import editoritems
-from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode
+from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode, Corridor
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -39,18 +39,21 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 
 
 @attrs.frozen
-class Corridor:
-    """An individual corridor definition. """
-    instance: str
+class CorridorUI(Corridor):
+    """Additional data only useful for the UI. """
     name: str
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
     dnd_icon: img.Handle
     authors: List[str]
-    # Indicates the initial corridor items if 1-7.
-    orig_index: int = 0
-    # If this was converted from editoritems.txt
-    legacy: bool = False
+
+    def strip_ui(self) -> Corridor:
+        """Strip these UI attributes for the compiler export."""
+        return Corridor(
+            instance=self.instance,
+            orig_index=self.orig_index,
+            legacy=self.legacy,
+        )
 
 
 class RandMode(Enum):
@@ -174,12 +177,12 @@ def parse_specifier(specifier: str) -> CorrKind:
 class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
     id: str
-    corridors: Dict[CorrKind, List[Corridor]]
+    corridors: Dict[CorrKind, List[CorridorUI]]
 
     @classmethod
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
         """Parse from the file."""
-        corridors: dict[CorrKind, list[Corridor]] = defaultdict(list)
+        corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
         for prop in data.info:
             if prop.name in {'id'}:
                 continue
@@ -196,7 +199,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            corridors[parse_specifier(prop.name)].append(Corridor(
+            corridors[parse_specifier(prop.name)].append(CorridorUI(
                 instance=prop['instance'],
                 name=prop['Name', 'Corridor'],
                 authors=packages.sep_values(prop['authors', '']),
@@ -270,7 +273,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             continue
                         if variant_attr:
                             style_info = style.corridors[variant_attr, ind + 1]
-                            corridor = Corridor(
+                            corridor = CorridorUI(
                                 instance=str(inst.inst),
                                 name=style_info.name,
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
@@ -281,7 +284,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 legacy=True,
                             )
                         else:
-                            corridor = Corridor(
+                            corridor = CorridorUI(
                                 instance=str(inst.inst),
                                 name='Corridor',
                                 images=[ICON_GENERIC_LRG],
@@ -296,7 +299,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
                     
-    def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[Corridor]:
+    def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""
         try:
             corr_list = self.corridors[mode, direction, orient]
@@ -327,7 +330,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         except KeyError:
             raise AssertionError(f'No corridor group for style "{style_id}"!')
 
-        export: Dict[CorrKind, List[str]] = {}
+        export: Dict[CorrKind, List[Corridor]] = {}
         blank = Config()
         for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
             conf = config.get_cur_conf(
@@ -353,7 +356,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
             if not conf.selected:  # Use default setup.
                 export[mode, direction, orient] = [
-                    corr.instance for corr in
+                    corr.strip_ui() for corr in
                     group.defaults(mode, direction, orient)
                 ]
                 continue
@@ -381,7 +384,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     mode.value, direction.value, orient.value,
                 )
                 chosen = group.defaults(mode, direction, orient)
-            export[mode, direction, orient] = [corr.instance for corr in chosen]
+            export[mode, direction, orient] = list(map(CorridorUI.strip_ui, chosen))
             
         # Now write out.
         LOGGER.info('Writing corridor configuration...')
