@@ -15,17 +15,17 @@ from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 from app import img, tkMarkdown, config
 import packages
 import editoritems
-from consts import CORRIDOR_COUNTS, CorrKind, CorrOrient, CorrDir, GameMode
+from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # For converting style corridor definitions, the item IDs of corridors.
 ITEMS = [
-    (GameMode.SP, CorrDir.ENTRY, 'ITEM_ENTRY_DOOR', 'sp_entry'),
-    (GameMode.SP, CorrDir.EXIT, 'ITEM_EXIT_DOOR', 'sp_exit'),
-    (GameMode.COOP, CorrDir.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
-    (GameMode.COOP, CorrDir.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
+    (GameMode.SP, Direction.ENTRY, 'ITEM_ENTRY_DOOR', 'sp_entry'),
+    (GameMode.SP, Direction.EXIT, 'ITEM_EXIT_DOOR', 'sp_exit'),
+    (GameMode.COOP, Direction.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
+    (GameMode.COOP, Direction.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
 ]
 EMPTY_DESC = tkMarkdown.MarkdownData.text('')
 
@@ -71,8 +71,8 @@ class Config(config.Data):
     def get_id(
         style: str,
         mode: GameMode,
-        direction: CorrDir,
-        orient: CorrOrient,
+        direction: Direction,
+        orient: Orient,
     ) -> str:
         """Given the style and kind of corridor, return the ID for config lookup."""
         return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
@@ -128,12 +128,12 @@ class Config(config.Data):
 
 def parse_specifier(specifier: str) -> CorrKind:
     """Parse a string like 'sp_entry' or 'exit_coop_dn' into the 3 enums."""
-    orient: CorrOrient | None = None
+    orient: Orient | None = None
     mode: GameMode | None = None
-    direction: CorrDir | None = None
+    direction: Direction | None = None
     for part in specifier.casefold().split('_'):
         try:
-            parsed_dir = CorrDir(part)
+            parsed_dir = Direction(part)
         except ValueError:
             pass
         else:
@@ -142,7 +142,7 @@ def parse_specifier(specifier: str) -> CorrKind:
             direction = parsed_dir
             continue
         try:
-            parsed_orient = CorrOrient[part.upper()]
+            parsed_orient = Orient[part.upper()]
         except KeyError:
             pass
         else:
@@ -162,7 +162,7 @@ def parse_specifier(specifier: str) -> CorrKind:
         raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
 
     if orient is None:  # Allow omitting this additional variant.
-        orient = CorrOrient.HORIZONTAL
+        orient = Orient.HORIZONTAL
     if direction is None:
         raise ValueError(f'Direction must be specified in "{specifier}"!')
     if mode is None:
@@ -243,7 +243,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         packset.add(corridors)
 
                     corr_list = corridors.corridors.setdefault(
-                        (mode, direction, CorrOrient.HORIZONTAL),
+                        (mode, direction, Orient.HORIZONTAL),
                         [],
                     )
                     if not corr_list:
@@ -251,7 +251,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         for parent_style in style.bases[1:]:
                             try:
                                 parent_group = packset.obj_by_id(CorridorGroup, parent_style.id)
-                                parent_corr = parent_group.corridors[mode, direction, CorrOrient.HORIZONTAL]
+                                parent_corr = parent_group.corridors[mode, direction, Orient.HORIZONTAL]
                             except KeyError:
                                 continue
                             for corridor in parent_corr:
@@ -296,12 +296,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
                     
-    def defaults(self, mode: GameMode, direction: CorrDir, orient: CorrOrient) -> list[Corridor]:
+    def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[Corridor]:
         """Fetch the default corridor set for this mode, direction and orientation."""
         try:
             corr_list = self.corridors[mode, direction, orient]
         except KeyError:
-            if orient is CorrOrient.HORIZONTAL:
+            if orient is Orient.HORIZONTAL:
                 LOGGER.warning(
                     'No corridors defined for {}:{}_{}',
                     self.id, mode.value, direction.value,
@@ -329,7 +329,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
         export: Dict[CorrKind, List[str]] = {}
         blank = Config()
-        for mode, direction, orient in itertools.product(GameMode, CorrDir, CorrOrient):
+        for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
             conf = config.get_cur_conf(
                 Config,
                 Config.get_id(style_id, mode, direction, orient),
@@ -343,7 +343,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 }
             except KeyError:
                 # None defined?
-                if orient is CorrOrient.HORIZONTAL:
+                if orient is Orient.HORIZONTAL:
                     LOGGER.warning(
                         'No corridors defined for {}:{}_{}', 
                         style_id, mode.value, direction.value

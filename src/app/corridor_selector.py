@@ -6,13 +6,13 @@ from typing import List
 import srctools.logger
 import trio
 
-import consts
 import event
 import packages
 from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
+from corridor import GameMode, Direction, Orient
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -26,9 +26,9 @@ FALLBACK = corridor.CorridorGroup(
     '<Fallback>',
     {
         (mode, direction, orient): []
-        for mode in consts.GameMode
-        for direction in consts.CorrDir
-        for orient in consts.CorrOrient
+        for mode in GameMode
+        for direction in Direction
+        for orient in Orient
     }
 )
 
@@ -86,27 +86,27 @@ class Selector:
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
             button_frm, self.events,
-            (consts.GameMode.SP, gettext('SP')),
-            (consts.GameMode.COOP, gettext('Coop')),
+            (GameMode.SP, gettext('SP')),
+            (GameMode.COOP, gettext('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
             button_frm, self.events,
-            (consts.CorrDir.ENTRY, gettext('Entry')),
-            (consts.CorrDir.EXIT, gettext('Exit')),
+            (Direction.ENTRY, gettext('Entry')),
+            (Direction.EXIT, gettext('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
             button_frm, self.events,
-            (consts.CorrOrient.FLAT, gettext('Flat')),
-            (consts.CorrOrient.UP, gettext('Upward')),
-            (consts.CorrOrient.DN, gettext('Downward')),
+            (Orient.FLAT, gettext('Flat')),
+            (Orient.UP, gettext('Upward')),
+            (Orient.DN, gettext('Downward')),
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
         refresh = self.refresh
-        self.events.register(self.btn_mode, consts.GameMode, refresh)
-        self.events.register(self.btn_direction, consts.CorrDir, refresh)
-        self.events.register(self.btn_orient, consts.CorrOrient, refresh)
+        self.events.register(self.btn_mode, GameMode, refresh)
+        self.events.register(self.btn_direction, Direction, refresh)
+        self.events.register(self.btn_orient, Orient, refresh)
 
         canv_frame = ttk.Frame(frm_left, relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -189,7 +189,7 @@ class Selector:
             corr_list = self.corr_group.corridors[mode, direction, orient]
         except KeyError:
             # Up/down can have missing ones.
-            if orient is consts.CorrOrient.HORIZONTAL:
+            if orient is Orient.HORIZONTAL:
                 LOGGER.warning(
                     'No flat corridor for {}:{}_{}!',
                     self.corr_group.id, mode.value, direction.value,

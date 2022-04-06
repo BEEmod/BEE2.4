@@ -1,7 +1,7 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import Mapping, Tuple, cast, Any, TypeVar, Type, MutableMapping, Iterator
-from typing_extensions import TypeAlias, Final, Literal
+from typing import Mapping, cast, Any, TypeVar, Type, MutableMapping, Iterator
+from typing_extensions import Final
 from enum import Enum, EnumMeta
 from srctools import Side
 
@@ -16,11 +16,10 @@ __all__ = [
     'Signage', 'Antlines',
     'Goo', 'Fizzler',
     'Special', 'Tools',
-    'FixupVars', 'GameMode',
+    'FixupVars',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
     'COUNTER_OR_ON', 'COUNTER_OR_OFF',
     'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG', 'SEL_ICON_CROP_SHRINK',
-    'CorrKind', 'CorrDir', 'CorrOrient', 'CORRIDOR_COUNTS',
 ]
 
 
@@ -262,35 +261,6 @@ class MusicChannel(Enum):
     BOUNCE = 'bouncegel'  # Jumping on repulsion gel.
     SPEED = 'speedgel'  # Moving fast horizontally
 
-
-class GameMode(Enum):
-    """Possible game modes."""
-    SP = 'sp'
-    COOP = 'coop'
-
-
-class CorrDir(Enum):
-    """The direction of a corridor."""
-    ENTRY = 'entry'
-    EXIT = 'exit'
-
-
-class CorrOrient(Enum):
-    """The orientation of the corridor, up/down are new."""
-    HORIZONTAL = 'horizontal'
-    FLAT = HORIZ = HORIZONTAL
-    UP = 'up'
-    DOWN = DN = 'down'
-
-
-CorrKind: TypeAlias = Tuple[GameMode, CorrDir, CorrOrient]
-# Number of default instances for each kind.
-CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, CorrDir], Literal[1, 4, 7]]] = {
-    (GameMode.SP, CorrDir.ENTRY): 7,
-    (GameMode.SP, CorrDir.EXIT): 4,
-    (GameMode.COOP, CorrDir.ENTRY): 1,
-    (GameMode.COOP, CorrDir.EXIT): 4,
-}
 
 # Outputs we need to use to make a math_counter act like
 # the specified logic gate.
