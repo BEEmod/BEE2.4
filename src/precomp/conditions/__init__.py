@@ -51,7 +51,7 @@ from srctools import (
 )
 
 from precomp import instanceLocs, rand, collisions
-from precomp.mapinfo import Info as MapInfo
+from precomp.corridor import Info as MapInfo
 import consts
 import utils
 

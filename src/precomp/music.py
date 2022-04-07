@@ -2,7 +2,7 @@
 from typing import Set, List
 
 from srctools import VMF, Vec, Property, Output
-from precomp import mapinfo, options, conditions
+from precomp import corridor, options, conditions
 from consts import MusicChannel as Channel
 import srctools.logger
 
@@ -13,7 +13,7 @@ def add(
     vmf: VMF,
     loc: Vec,
     conf: Property,
-    info: mapinfo.Info,
+    info: corridor.Info,
 ) -> None:
     """Add music to the map."""
     LOGGER.info("Adding Music...")

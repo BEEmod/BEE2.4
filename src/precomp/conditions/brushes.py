@@ -9,7 +9,7 @@ from srctools.math import Vec, Angle, Matrix, to_matrix
 import srctools.logger
 
 from precomp import (
-    conditions, tiling, texturing, rand, mapinfo,
+    conditions, tiling, texturing, rand, corridor,
     instance_traits, brushLoc, faithplate, template_brush,
 )
 import vbsp

@@ -26,7 +26,7 @@ from precomp import (
     brushLoc,
     bottomlessPit,
     instanceLocs,
-    mapinfo,
+    corridor,
     cubes,
     template_brush,
     texturing,
@@ -218,7 +218,7 @@ def load_map(map_path: str) -> VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF, coll: Collisions, info: mapinfo.Info) -> None:
+def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
         style_vars=settings['style_vars'],
@@ -326,7 +326,7 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(vmf: VMF, info: mapinfo.Info) -> None:
+def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
@@ -399,7 +399,7 @@ def set_player_model(vmf: VMF, info: mapinfo.Info) -> None:
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(vmf: VMF, info: mapinfo.Info) -> None:
+def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -613,7 +613,7 @@ def set_player_portalgun(vmf: VMF, info: mapinfo.Info) -> None:
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(vmf: VMF, info: mapinfo.Info) -> None:
+def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
@@ -630,7 +630,7 @@ def add_screenshot_logic(vmf: VMF, info: mapinfo.Info) -> None:
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(vmf: VMF, info: mapinfo.Info) -> None:
+def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.get(Vec, 'global_ents_loc')
     vmf.create_ent(
@@ -753,7 +753,7 @@ def add_fog_ents(vmf: VMF, info: mapinfo.Info) -> None:
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(vmf: VMF, info: mapinfo.Info) -> None:
+def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -798,7 +798,7 @@ def set_elev_videos(vmf: VMF, info: mapinfo.Info) -> None:
         )
 
 
-def get_map_info(vmf: VMF) -> mapinfo.Info:
+def get_map_info(vmf: VMF) -> corridor.Info:
     """Determine various attributes about the map.
 
     This also set the 'preview in elevator' options and forces
@@ -989,7 +989,7 @@ def get_map_info(vmf: VMF) -> mapinfo.Info:
                 door_frame.fixup.update(exit_fixup)
 
     [is_publishing] = no_player_start
-    info = mapinfo.Info(
+    info = corridor.Info(
         is_publishing=is_publishing,
         start_at_elevator=elev_override or is_publishing,
         is_coop='COOP' in game_mode,
@@ -1467,7 +1467,7 @@ def change_overlays(vmf: VMF) -> None:
                 over[prop] = val.join(' ')
 
 
-def add_extra_ents(vmf: VMF, info: mapinfo.Info) -> None:
+def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the various extra instances to the map."""
     loc = options.get(Vec, 'global_ents_loc')
 

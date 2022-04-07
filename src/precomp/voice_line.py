@@ -5,7 +5,7 @@ from typing import List, Set, NamedTuple, Iterator
 
 import srctools.logger
 import vbsp
-from precomp import mapinfo, options as vbsp_options, packing, conditions, rand
+from precomp import corridor, options as vbsp_options, packing, conditions, rand
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output, Entity
 
@@ -49,12 +49,12 @@ fake_inst = VMF().create_ent(
 )
 
 
-def has_responses(info: mapinfo.Info) -> bool:
+def has_responses(info: corridor.Info) -> bool:
     """Check if we have any valid 'response' data for Coop."""
     return info.is_coop and 'CoopResponses' in QUOTE_DATA
 
 
-def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, info: mapinfo.Info) -> None:
+def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, info: corridor.Info) -> None:
     """Write the coop responses information into the map."""
     config = ConfigFile('bee2/resp_voice.cfg', in_conf_folder=False)
     response_block = QUOTE_DATA.find_key('CoopResponses', or_blank=True)
@@ -118,7 +118,7 @@ def res_quote_event(res: Property):
 
 def find_group_quotes(
     coll: Collisions,
-    info: mapinfo.Info,
+    info: corridor.Info,
     group: Property,
     mid_quotes,
     allow_mid_voices,
@@ -444,7 +444,7 @@ def add_voice(
     style_vars: dict,
     vmf: VMF,
     coll: Collisions,
-    info: mapinfo.Info,
+    info: corridor.Info,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""
