@@ -370,7 +370,7 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('TemplateBrush')
-def res_import_template(vmf: VMF, coll: Collisions, info: mapinfo.Info, res: Property):
+def res_import_template(vmf: VMF, coll: Collisions, info: corridor.Info, res: Property):
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only

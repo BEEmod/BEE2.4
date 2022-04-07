@@ -474,7 +474,7 @@ class CondCall(Generic[CallResultT]):
 
     This should be called to execute it.
     """
-    __slots__ = ['func', 'group', '_cback', '_setup_data', '__doc__']
+    __slots__ = ['func', 'group', '_cback', '_setup_data']
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
 
     def __init__(
