@@ -1,6 +1,6 @@
 """Data structure for specifying custom corridors."""
 from enum import Enum
-from typing import Tuple, Mapping
+from typing import Dict, List, Tuple, Mapping
 
 import attrs
 from typing_extensions import Final, TypeAlias, Literal
@@ -26,16 +26,6 @@ class Orient(Enum):
     DOWN = DN = 'down'
 
 
-CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]
-# Number of default instances for each kind.
-CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
-    (GameMode.SP, Direction.ENTRY): 7,
-    (GameMode.SP, Direction.EXIT): 4,
-    (GameMode.COOP, Direction.ENTRY): 1,
-    (GameMode.COOP, Direction.EXIT): 4,
-}
-
-
 @attrs.frozen
 class Corridor:
     """An individual corridor definition. """
@@ -44,3 +34,16 @@ class Corridor:
     orig_index: int
     # If this was converted from editoritems.txt
     legacy: bool
+
+
+# The order of the keys we use.
+CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]
+# The data in the pickle file we write for the compiler to read.
+ExportedConf: TypeAlias = Dict[CorrKind, List[Corridor]]
+# Number of default instances for each kind.
+CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
+    (GameMode.SP, Direction.ENTRY): 7,
+    (GameMode.SP, Direction.EXIT): 4,
+    (GameMode.COOP, Direction.ENTRY): 1,
+    (GameMode.COOP, Direction.EXIT): 4,
+}

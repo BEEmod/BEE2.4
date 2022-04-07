@@ -9,24 +9,24 @@ import itertools
 
 import attrs
 import srctools.logger
-from srctools import Property
+from srctools import Property, Vec
 from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 
 from app import img, tkMarkdown, config
 import packages
 import editoritems
-from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode, Corridor
+from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode, Corridor, ExportedConf
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # For converting style corridor definitions, the item IDs of corridors.
-ITEMS = [
-    (GameMode.SP, Direction.ENTRY, 'ITEM_ENTRY_DOOR', 'sp_entry'),
-    (GameMode.SP, Direction.EXIT, 'ITEM_EXIT_DOOR', 'sp_exit'),
-    (GameMode.COOP, Direction.ENTRY, 'ITEM_COOP_ENTRY_DOOR', ''),
-    (GameMode.COOP, Direction.EXIT, 'ITEM_COOP_EXIT_DOOR', 'coop'),
-]
+ITEMS = {
+    'ITEM_ENTRY_DOOR': (GameMode.SP, Direction.ENTRY, 'sp_entry'),
+    'ITEM_EXIT_DOOR': (GameMode.SP, Direction.EXIT, 'sp_exit'),
+    'ITEM_COOP_ENTRY_DOOR': (GameMode.COOP, Direction.ENTRY, ''),
+    'ITEM_COOP_EXIT_DOOR': (GameMode.COOP, Direction.EXIT, 'coop'),
+}
 EMPTY_DESC = tkMarkdown.MarkdownData.text('')
 
 IMG_WIDTH_SML = 144
@@ -227,7 +227,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # Need both of these to be parsed.
         await packset.ready(packages.Item).wait()
         await packset.ready(packages.Style).wait()
-        for mode, direction, item_id, variant_attr in ITEMS:
+        for item_id, (mode, direction, variant_attr) in ITEMS.items():
             try:
                 item = packset.obj_by_id(packages.Item, item_id)
             except KeyError:
@@ -330,7 +330,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         except KeyError:
             raise AssertionError(f'No corridor group for style "{style_id}"!')
 
-        export: Dict[CorrKind, List[Corridor]] = {}
+        export: ExportedConf = {}
         blank = Config()
         for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
             conf = config.get_cur_conf(
@@ -390,3 +390,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         LOGGER.info('Writing corridor configuration...')
         with open(exp_data.game.abs_path('bin/bee2/corridors.bin'), 'wb') as file:
             pickle.dump(export, file, protocol=pickle.HIGHEST_PROTOCOL)
+            
+        # Change out all the instances in items to names following a pattern.
+        # This allows the compiler to easily recognise. Also force 64-64-64 offset.
+        for item in exp_data.all_items:
+            try:
+                (mode, direction, _) = ITEMS[item.id]
+            except KeyError:
+                continue
+            count = CORRIDOR_COUNTS[mode, direction]
+            # For all items these are at the start.
+            for i in range(1, count + 1):
+                item.set_inst(i, editoritems.InstCount(
+                    f'instances/bee2_corridor/{mode.value}/{direction.value}/corr_{i}.vmf'
+                ))
+            item.offset = Vec(64, 64, 64)

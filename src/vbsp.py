@@ -73,7 +73,11 @@ IGNORED_OVERLAYS = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, editoritems.Item]]:
+def load_settings() -> Tuple[
+    antlines.AntType, antlines.AntType,
+    Dict[str, editoritems.Item],
+    corridor.ExportedConf,
+]:
     """Load in all our settings from vbsp_config."""
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
@@ -156,6 +160,10 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     # Fizzler data
     fizzler.read_configs(conf)
 
+    # Selected corridors.
+    with open('bee2/corridors.bin', 'rb') as bf:
+        corridor_conf: corridor.ExportedConf = pickle.load(bf)
+
     # Signage items
     from precomp.conditions.signage import load_signs
     load_signs(conf)
@@ -203,7 +211,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     })
 
     LOGGER.info("Settings Loaded!")
-    return ant_floor, ant_wall, id_to_item
+    return ant_floor, ant_wall, id_to_item, corridor_conf
 
 
 def load_map(map_path: str) -> VMF:
@@ -1539,7 +1547,7 @@ def main() -> None:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        ant_floor, ant_wall, id_to_item = load_settings()
+        ant_floor, ant_wall, id_to_item, corridor_conf = load_settings()
 
         vmf = load_map(path)
         coll = Collisions()
@@ -1559,7 +1567,11 @@ def main() -> None:
 
         rand.init_seed(vmf)
 
-        info = corridor.analyse_and_modify(vmf, BEE2_config, settings['has_attr'])
+        info = corridor.analyse_and_modify(
+            vmf, corridor_conf,
+            elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
+            voice_attrs=settings['has_attr'],
+        )
         change_ents(vmf)
 
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
