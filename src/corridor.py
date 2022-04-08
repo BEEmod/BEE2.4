@@ -1,9 +1,11 @@
 """Data structure for specifying custom corridors."""
 from enum import Enum
 from typing import Dict, List, Tuple, Mapping
+from typing_extensions import Final, TypeAlias, Literal
 
 import attrs
-from typing_extensions import Final, TypeAlias, Literal
+
+import utils
 
 
 class GameMode(Enum):
@@ -18,12 +20,22 @@ class Direction(Enum):
     EXIT = 'exit'
 
 
+@utils.freeze_enum_props
 class Orient(Enum):
     """The orientation of the corridor, up/down are new."""
     HORIZONTAL = 'horizontal'
     FLAT = HORIZ = HORIZONTAL
     UP = 'up'
     DOWN = DN = 'down'
+
+    @property
+    def flipped(self) -> 'Orient':
+        """Return the orient flipped along Z."""
+        if self is Orient.UP:
+            return Orient.DN
+        if self is Orient.DN:
+            return Orient.UP
+        return self
 
 
 @attrs.frozen

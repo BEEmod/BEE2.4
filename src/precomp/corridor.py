@@ -99,8 +99,7 @@ def analyse_and_modify(
         #   presence of certain instances.
         # - Switch the entry/exit corridors to particular ones if specified
         #   in compile.cfg
-        # Also build a set of all instances, to make a condition check easy
-        # later
+        # Also build a set of all instances, to make a condition check easy later.
 
         file = item['file'].casefold()
 
@@ -126,6 +125,11 @@ def analyse_and_modify(
                 corr_orient = Orient.DN
             else:
                 corr_orient = Orient.HORIZONTAL
+            corr_attach = corr_orient
+            # entry_up is on the floor, so you go *up*.
+            if corr_dir is Direction.ENTRY:
+                corr_orient = corr_orient.flipped
+
             max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
             poss_corr = conf[corr_mode, corr_dir, corr_orient]
             if not poss_corr:
@@ -154,6 +158,10 @@ def analyse_and_modify(
                 chosen_entry = chosen
             else:
                 chosen_exit = chosen
+
+            item.fixup['$type'] = corr_dir.value
+            item.fixup['$direction'] = corr_orient.value
+            item.fixup['$attach'] = corr_attach.value
 
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
