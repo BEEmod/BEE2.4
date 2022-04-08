@@ -42,6 +42,8 @@ class Orient(Enum):
 class Corridor:
     """An individual corridor definition. """
     instance: str
+    # Fixup values which are set on the corridor instance.
+    fixups: Mapping[str, str]
     # Indicates the initial corridor items if 1-7.
     orig_index: int
     # If this was converted from editoritems.txt

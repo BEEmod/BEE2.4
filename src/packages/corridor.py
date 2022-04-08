@@ -54,6 +54,7 @@ class CorridorUI(Corridor):
             instance=self.instance,
             orig_index=self.orig_index,
             legacy=self.legacy,
+            fixups=self.fixups,
         )
 
 
@@ -210,6 +211,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 images=images,
                 dnd_icon=icon,
                 legacy=prop.bool('legacy'),
+                fixups={
+                    subprop.name: subprop.value
+                    for subprop in prop.find_children('fixups')
+                },
             ))
         return CorridorGroup(data.id, dict(corridors))
 

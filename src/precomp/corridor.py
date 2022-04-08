@@ -162,6 +162,8 @@ def analyse_and_modify(
             item.fixup['$type'] = corr_dir.value
             item.fixup['$direction'] = corr_orient.value
             item.fixup['$attach'] = corr_attach.value
+            # Do after so it overwrites these automatic ones.
+            item.fixup.update(chosen.fixups)
 
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
