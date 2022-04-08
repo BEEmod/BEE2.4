@@ -105,6 +105,18 @@ def res_cave_portrait() -> bool:
     return global_bool(options.get(int, 'cave_port_skin') is not None)
 
 
+@make_flag('entryCorridor')
+def res_check_entry_corridor(info: MapInfo, flag: Property) -> bool:
+    """Check the selected entry corridor matches this filename."""
+    return global_bool(info.corr_entry.instance.casefold() == flag.value.casefold())
+
+
+@make_flag('entryCorridor')
+def res_check_exit_corridor(info: MapInfo, flag: Property) -> bool:
+    """Check the selected exit corridor matches this filename."""
+    return global_bool(info.corr_exit.instance.casefold() == flag.value.casefold())
+
+
 @make_flag('ifMode', 'iscoop', 'gamemode')
 def flag_game_mode(info: MapInfo, flag: Property) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
