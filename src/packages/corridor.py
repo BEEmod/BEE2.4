@@ -400,8 +400,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 continue
             count = CORRIDOR_COUNTS[mode, direction]
             # For all items these are at the start.
-            for i in range(1, count + 1):
+            for i in range(count):
                 item.set_inst(i, editoritems.InstCount(
-                    f'instances/bee2_corridor/{mode.value}/{direction.value}/corr_{i}.vmf'
+                    f'instances/bee2_corridor/{mode.value}/{direction.value}/corr_{i + 1}.vmf'
                 ))
             item.offset = Vec(64, 64, 64)
