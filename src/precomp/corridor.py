@@ -1,11 +1,10 @@
 """Modify and anylsyse corridors in the map."""
 from __future__ import annotations
-
-from collections import defaultdict, Counter
+from collections import Counter
 from typing import Dict
 
 import attrs
-from srctools import Entity, Matrix, VMF, Vec, Angle
+from srctools import Matrix, VMF, Vec, Angle
 import srctools.logger
 
 import consts
@@ -86,7 +85,7 @@ def analyse_and_modify(
     chosen_entry: Corridor | None = None
     chosen_exit: Corridor | None = None
 
-    filenames = Counter()
+    filenames: Counter[str] = Counter()
     # Use sets, so we can detect contradictory instances.
     seen_no_player_start: set[bool] = set()
     seen_game_modes: set[GameMode] = set()
@@ -136,7 +135,7 @@ def analyse_and_modify(
                 )
             elif len(poss_corr) > max_count:
                 # More than the entropy we have, use our randomisation.
-                chosen = rand.seed(file).choice(poss_corr)
+                chosen = rand.seed(b'corridor', file).choice(poss_corr)
                 LOGGER.info(
                     '{}_{}_{} corridor randomised to {}',
                     corr_mode.value, corr_dir.value, corr_orient.value, chosen,

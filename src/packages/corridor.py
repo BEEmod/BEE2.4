@@ -12,7 +12,7 @@ import srctools.logger
 from srctools import Property, Vec
 from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 
-from app import img, tkMarkdown, config
+from app import img, lazy_conf, tkMarkdown, config
 import packages
 import editoritems
 from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode, Corridor, ExportedConf
@@ -42,6 +42,7 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
     name: str
+    config: lazy_conf.LazyConf
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
     dnd_icon: img.Handle
@@ -118,7 +119,7 @@ class Config(config.Data):
         except KeyError:
             corr = []
 
-        return cls(corr, rand)
+        return Config(corr, rand)
 
     def export_dmx(self) -> Element:
         """Serialise to DMX configs."""
@@ -205,6 +206,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 authors=packages.sep_values(prop['authors', '']),
                 desc=packages.desc_parse(prop, '', data.pak_id),
                 orig_index=prop.int('DefaultIndex', 0),
+                config=packages.get_config(prop, 'items', data.pak_id, source='Corridor ' + prop.name),
                 images=images,
                 dnd_icon=icon,
                 legacy=False,
@@ -280,6 +282,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
                                 authors=style.selitem_data.auth,
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
+                                config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
                                 legacy=True,
                             )
@@ -291,6 +294,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 dnd_icon=ICON_GENERIC_SML,
                                 authors=style.selitem_data.auth,
                                 desc=EMPTY_DESC,
+                                config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
                                 legacy=True,
                             )
@@ -298,7 +302,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         had_legacy = True
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
-                    
+
     def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""
         try:
@@ -384,13 +388,16 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     mode.value, direction.value, orient.value,
                 )
                 chosen = group.defaults(mode, direction, orient)
+
+            for corr in chosen:
+                exp_data.vbsp_conf.extend(corr.config())
             export[mode, direction, orient] = list(map(CorridorUI.strip_ui, chosen))
-            
+
         # Now write out.
         LOGGER.info('Writing corridor configuration...')
         with open(exp_data.game.abs_path('bin/bee2/corridors.bin'), 'wb') as file:
             pickle.dump(export, file, protocol=pickle.HIGHEST_PROTOCOL)
-            
+
         # Change out all the instances in items to names following a pattern.
         # This allows the compiler to easily recognise. Also force 64-64-64 offset.
         for item in exp_data.all_items:
