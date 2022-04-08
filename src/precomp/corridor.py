@@ -228,6 +228,10 @@ def analyse_and_modify(
         corr_entry=chosen_entry,
         corr_exit=chosen_exit,
     )
+    instanceLocs.set_chosen_corridor(game_mode, {
+        Direction.ENTRY: chosen_entry,
+        Direction.EXIT: chosen_exit,
+    })
 
     LOGGER.info('Map global info: {}', info)
     return info

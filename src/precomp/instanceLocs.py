@@ -15,6 +15,7 @@ from typing import (
     Callable, Optional, Union,
     List, Dict, Tuple, TypeVar, Iterable,
 )
+import corridor
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -25,7 +26,7 @@ INSTANCE_FILES: Dict[str, List[str]] = {}
 # Note this is imperfect - two items could reuse the same instance.
 ITEM_FOR_FILE: Dict[str, Tuple[str, Union[int, str]]] = {}
 
-_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+]) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
+_RE_DEFS = re.compile(r'\s* (\[ [^][]+] | < [^<>]+ >) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
     \s*<
     \s*([^:]+)
@@ -64,8 +65,6 @@ SPECIAL_INST: Dict[str, str] = {
 
     'coopExit':         '<ITEM_COOP_ENTRY_DOOR:3>',
     'coopEntry':        '<ITEM_COOP_ENTRY_DOOR:0>',
-    'coopEntryUp':      '<ITEM_COOP_ENTRY_DOOR:bee2_vert_up>',
-    'coopEntryDown':    '<ITEM_COOP_ENTRY_DOOR:bee2_vert_down>',
     'spExit':           '<ITEM_ENTRY_DOOR:10>',
     'spEntry':          '<ITEM_ENTRY_DOOR:9>',
 
@@ -77,8 +76,6 @@ SPECIAL_INST: Dict[str, str] = {
     'spExitCorr2':      '<ITEM_EXIT_DOOR:1>',
     'spExitCorr3':      '<ITEM_EXIT_DOOR:2>',
     'spExitCorr4':      '<ITEM_EXIT_DOOR:3>',
-    'spExitCorrUp':     '<ITEM_EXIT_DOOR:bee2_vert_up>',
-    'spExitCorrDown':   '<ITEM_EXIT_DOOR:bee2_vert_down>',
 
     'spEntryCorr':      '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
     'spEntryCorr1':     '<ITEM_ENTRY_DOOR:0>',
@@ -88,16 +85,12 @@ SPECIAL_INST: Dict[str, str] = {
     'spEntryCorr5':     '<ITEM_ENTRY_DOOR:4>',
     'spEntryCorr6':     '<ITEM_ENTRY_DOOR:5>',
     'spEntryCorr7':     '<ITEM_ENTRY_DOOR:6>',
-    'spEntryCorrUp':    '<ITEM_ENTRY_DOOR:bee2_vert_up>',
-    'spEntryCorrDown':  '<ITEM_ENTRY_DOOR:bee2_vert_down>',
 
     'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
     'coopCorr1':    '<ITEM_COOP_EXIT_DOOR:0>',
     'coopCorr2':    '<ITEM_COOP_EXIT_DOOR:1>',
     'coopCorr3':    '<ITEM_COOP_EXIT_DOOR:2>',
     'coopCorr4':    '<ITEM_COOP_EXIT_DOOR:3>',
-    'coopCorrUp':   '<ITEM_COOP_EXIT_DOOR:bee2_vert_up>',
-    'coopCorrDown': '<ITEM_COOP_EXIT_DOOR:bee2_vert_down>',
 
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # Although unused by default, editoritems allows having different instances
@@ -134,7 +127,15 @@ SPECIAL_INST: Dict[str, str] = {
 # The resolved versions of SPECIAL_INST
 INST_SPECIAL: Dict[str, List[str]] = {}
 
-# Gives names to reusable instance fields, so you don't need to remember
+# Categories and prefixes for the corridors, so can update the values after
+CORR_SPECIALS = [
+    (corridor.GameMode.SP, corridor.Direction.ENTRY, 'spentrycorr'),
+    (corridor.GameMode.SP, corridor.Direction.EXIT, 'spexitcorr'),
+    (corridor.GameMode.COOP, corridor.Direction.ENTRY, 'coopentry'),
+    (corridor.GameMode.COOP, corridor.Direction.EXIT, 'coopcorr'),
+]
+
+# Give names to reusable instance fields, so you don't need to remember
 # indexes
 SUBITEMS: Dict[str, Union[int, Tuple[int, ...]]] = {
     # Cube
@@ -219,6 +220,7 @@ SPECIAL_INST_FOLDED = {
 def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
     cust_instances: dict[str, str]
+    EMPTY = editoritems.FSPath()
     for item in items:
         # Extra definitions: key -> filename.
         # Make sure to do this first, so numbered instances are set in
@@ -231,11 +233,14 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
-            str(inst.inst).casefold()
+            '' if inst.inst == EMPTY else str(inst.inst).casefold()
             for inst in item.instances
         ]
         for ind, inst in enumerate(item.instances):
-            ITEM_FOR_FILE[str(inst.inst).casefold()] = (item.id, ind)
+            fname = str(inst.inst).casefold()
+            # Not real instances.
+            if fname != '.' and not fname.startswith('instances/bee2_corridor/'):
+                ITEM_FOR_FILE[fname] = (item.id, ind)
 
     INST_SPECIAL.clear()
     INST_SPECIAL.update({
@@ -243,6 +248,33 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
         for key, val_string in
         SPECIAL_INST.items()
     })
+
+
+def set_chosen_corridor(
+    sel_mode: corridor.GameMode,
+    selected: Dict[corridor.Direction, corridor.Corridor],
+) -> None:
+    """Alter our stored corridor filenames to include the selected corridor.
+
+    If the corridor isn't present it's forced to [], otherwise it holds the single selected.
+    The numbered ones are filled in for those legacy corridors only.
+    """
+    for mode, direction, prefix in CORR_SPECIALS:
+        count = corridor.CORRIDOR_COUNTS[mode, direction]
+        item_id = f"ITEM_{'COOP_' if mode is corridor.GameMode.COOP else ''}{direction.name}_DOOR"
+        if mode is sel_mode:
+            corr = selected[direction]
+            INST_SPECIAL[prefix] = [corr.instance]
+            for i in range(1, count + 1):
+                INST_SPECIAL[f'{prefix}{i}'] = [corr.instance] if corr.orig_index == i else []
+            # Update raw item IDs too. Pretend it's repeated for all.
+            ITEM_FOR_FILE[corr.instance.casefold()] = (item_id, 0)
+            INSTANCE_FILES[item_id.casefold()][:count] = [corr.instance] * count
+        else:  # Not being used.
+            INST_SPECIAL[prefix] = []
+            for i in range(1, count + 1):
+                INST_SPECIAL[f'{prefix}{i}'] = []
+            INSTANCE_FILES[item_id.casefold()][:count] = [''] * count
 
 
 def resolve(path: str, silent: bool=False) -> List[str]:
