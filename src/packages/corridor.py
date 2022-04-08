@@ -209,7 +209,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 config=packages.get_config(prop, 'items', data.pak_id, source='Corridor ' + prop.name),
                 images=images,
                 dnd_icon=icon,
-                legacy=False,
+                legacy=prop.bool('legacy'),
             ))
         return CorridorGroup(data.id, dict(corridors))
 
