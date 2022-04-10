@@ -264,17 +264,20 @@ def set_chosen_corridor(
         item_id = f"ITEM_{'COOP_' if mode is corridor.GameMode.COOP else ''}{direction.name}_DOOR"
         if mode is sel_mode:
             corr = selected[direction]
-            INST_SPECIAL[prefix] = [corr.instance]
+            inst = corr.instance.casefold()
+            INST_SPECIAL[prefix] = [inst]
             for i in range(1, count + 1):
-                INST_SPECIAL[f'{prefix}{i}'] = [corr.instance] if corr.orig_index == i else []
+                INST_SPECIAL[f'{prefix}{i}'] = [inst] if corr.orig_index == i else []
             # Update raw item IDs too. Pretend it's repeated for all.
-            ITEM_FOR_FILE[corr.instance.casefold()] = (item_id, 0)
-            INSTANCE_FILES[item_id.casefold()][:count] = [corr.instance] * count
+            ITEM_FOR_FILE[inst] = (item_id, 0)
+            INSTANCE_FILES[item_id.casefold()][:count] = [inst] * count
         else:  # Not being used.
             INST_SPECIAL[prefix] = []
             for i in range(1, count + 1):
                 INST_SPECIAL[f'{prefix}{i}'] = []
             INSTANCE_FILES[item_id.casefold()][:count] = [''] * count
+    # Clear since these were evaluated before.
+    _resolve.cache_clear()
 
 
 def resolve(path: str, silent: bool=False) -> List[str]:
