@@ -289,6 +289,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
+                                fixups={},
                                 legacy=True,
                             )
                         else:
@@ -301,6 +302,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 desc=EMPTY_DESC,
                                 config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
+                                fixups={},
                                 legacy=True,
                             )
                         corr_list.append(corridor)
