@@ -120,6 +120,11 @@ class Selector:
         scrollbar = ttk.Scrollbar(canv_frame, orient='vertical', command=self.canvas.yview)
         scrollbar.grid(row=0, column=1, sticky='ns')
         self.canvas['yscrollcommand'] = scrollbar.set
+        self.unsel_div = self.canvas.create_line(
+            0, 0, 1024, 0,
+            width=2,
+            fill='black',
+        )
 
         reflow = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
@@ -202,10 +207,12 @@ class Selector:
         for _ in range(len(corr_list) - self.unused_count):
             self.drag_man.slot_flexi(self.canvas)
         self.unused_count = len(corr_list)
+        # Never fill the invisible slots.
+        fillable = self.selected[:corridor.CORRIDOR_COUNTS[mode, direction]]
 
         inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
         if conf.selected:
-            for slot, sel_id in zip(self.selected, conf.selected):
+            for slot, sel_id in zip(fillable, conf.selected):
                 if not sel_id:
                     continue
                 try:
@@ -214,7 +221,7 @@ class Selector:
                     LOGGER.warning('Unknown corridor instance "{}" in config!')
         else:
             # No configuration, populate with the defaults.
-            for slot, corr in zip(self.selected, self.corr_group.defaults(mode, direction, orient)):
+            for slot, corr in zip(fillable, self.corr_group.defaults(mode, direction, orient)):
                 slot.contents = corr
                 del inst_to_corr[corr.instance.casefold()]
 
@@ -235,7 +242,22 @@ class Selector:
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
-        yoff = self.drag_man.flow_slots(self.canvas, self.selected, tag='sel_1')
+        count = corridor.CORRIDOR_COUNTS[self.btn_mode.current, self.btn_direction.current]
+        # The first item is always visible.
+        yoff = self.drag_man.flow_slots(self.canvas, self.selected[:1], tag='sel_1')
+        if count >= 4:
+            yoff = self.drag_man.flow_slots(self.canvas, self.selected[1:4], tag='sel_2', yoff=yoff)
+        else:
+            self.canvas.delete('sel_2')
+        if count >= 7:
+            yoff = self.drag_man.flow_slots(self.canvas, self.selected[4:], tag='sel_3', yoff=yoff)
+        else:
+            self.canvas.delete('sel_3')
+
+        yoff += 16
+        self.canvas.coords(self.unsel_div, 8, yoff, self.canvas.winfo_width()-16, yoff)
+        yoff += 16
+
         self.drag_man.flow_slots(
             self.canvas, (
                 slot for slot in
