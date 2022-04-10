@@ -120,9 +120,9 @@ def analyse_and_modify(
             origin = Vec.from_str(item['origin'])
             norm = orient.up()
             if norm.z > 0.5:
-                corr_orient = Orient.UP
-            elif norm.z < -0.5:
                 corr_orient = Orient.DN
+            elif norm.z < -0.5:
+                corr_orient = Orient.UP
             else:
                 corr_orient = Orient.HORIZONTAL
             corr_attach = corr_orient
