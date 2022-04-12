@@ -1,5 +1,5 @@
 """Adds various traits to instances, based on item classes."""
-from typing import List, MutableMapping, Optional, Dict, Set
+from typing import List, MutableMapping, Optional, Dict, Set, Union
 from weakref import WeakKeyDictionary
 
 import attrs
@@ -9,6 +9,7 @@ import srctools.logger
 from precomp.instanceLocs import ITEM_FOR_FILE
 from precomp.collisions import Collisions
 from editoritems import Item, ItemClass
+from corridor import parse_filename as parse_corr_filename, CORR_TO_ID
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -89,13 +90,13 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
         {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner', SKIP_COLL},
     ],
     ItemClass.DOOR_ENTRY_SP: [
-        {'corridor_1', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_2', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_3', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_4', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_5', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_6', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_7', 'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white', 'preplaced', SKIP_COLL},
         {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black', 'preplaced', SKIP_COLL},
         {'entry_elevator', 'elevator', 'sp_corridor', 'preplaced', SKIP_COLL},
@@ -103,10 +104,10 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
         {'arrival_departure_transition', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_EXIT_SP: [
-        {'corridor_1', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_2', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_3', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_4', 'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'preplaced'},
         {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white', 'preplaced', SKIP_COLL},
         {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black', 'preplaced', SKIP_COLL},
     ],
@@ -118,10 +119,10 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
         {'arrival_departure_transition', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_EXIT_COOP: [
-        {'corridor_1', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_2', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_3', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_4', 'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
         {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white', 'preplaced', SKIP_COLL},
         {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black', 'preplaced', SKIP_COLL},
     ],
@@ -189,11 +190,19 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
         inst_file = inst['file'].casefold()
         if not inst_file:
             continue
-        try:
-            item_id, item_ind = ITEM_FOR_FILE[inst_file]
-        except KeyError:
-            LOGGER.warning('Unknown instance "{}"!', inst['file'])
-            continue
+
+        item_ind: Union[str, int]
+        # Special case, corridors.
+        corr_info = parse_corr_filename(inst_file)
+        if corr_info is not None:
+            corr_mode, corr_dir, item_ind = corr_info
+            item_id = CORR_TO_ID[corr_mode, corr_dir]
+        else:
+            try:
+                item_id, item_ind = ITEM_FOR_FILE[inst_file]
+            except KeyError:
+                LOGGER.warning('Unknown instance "{}"!', inst['file'])
+                continue
 
         # BEE2_xxx special instance, shouldn't be in the original map...
         if isinstance(item_ind, str):
@@ -219,7 +228,6 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
             info.traits |= CLASS_ATTRS[item_class][item_ind]
         except (IndexError, KeyError):
             pass
-
 
         if SKIP_COLL in info.traits:
             # Don't add collision, even if it's defined. This is say the tbeam frame instance, or
