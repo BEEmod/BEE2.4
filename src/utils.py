@@ -209,7 +209,7 @@ CONN_LOOKUP = {
 del N, S, E, W
 
 RetT = TypeVar('RetT')
-FuncT = TypeVar('FuncT', bound=Callable)
+LookupT = TypeVar('LookupT')
 EnumT = TypeVar('EnumT', bound=Enum)
 
 
@@ -288,7 +288,7 @@ if hasattr(zipfile, '_SharedFile'):
     zipfile._SharedFile = _SharedZipFile  # type: ignore
 
 
-class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
+class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
     """A dict for holding callback functions.
 
     Functions are added by using this as a decorator. Positional arguments
@@ -306,10 +306,10 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
     ) -> None:
         self.casefold = casefold
         self.__name__ = name
-        self._registry: dict[str, FuncT] = {}
+        self._registry: dict[str, LookupT] = {}
         self.allowed_attrs = set(attrs)
 
-    def __call__(self, *names: str, **kwargs: Any) -> Callable[[FuncT], FuncT]:
+    def __call__(self, *names: str, **kwargs: Any) -> Callable[[LookupT], LookupT]:
         """Add a function to the dict."""
         if not names:
             raise TypeError('No names passed!')
@@ -321,7 +321,7 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
                 f'Allowed: {", ".join(self.allowed_attrs)}'
             )
 
-        def callback(func: FuncT) -> FuncT:
+        def callback(func: LookupT) -> LookupT:
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
@@ -341,7 +341,7 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
             return NotImplemented
         return self._registry == conv
 
-    def __iter__(self) -> Iterator[FuncT]:
+    def __iter__(self) -> Iterator[LookupT]:
         """Yield all the functions."""
         return iter(self.values())
 
@@ -349,18 +349,18 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
         """Yield all the valid IDs."""
         return self._registry.keys()
 
-    def values(self) -> ValuesView[FuncT]:
+    def values(self) -> ValuesView[LookupT]:
         """Yield all the functions."""
         return self._registry.values()
 
-    def items(self) -> ItemsView[str, FuncT]:
+    def items(self) -> ItemsView[str, LookupT]:
         """Return pairs of (ID, func)."""
         return self._registry.items()
 
     def __len__(self) -> int:
         return len(set(self._registry.values()))
 
-    def __getitem__(self, names: str | tuple[str, ...]) -> FuncT:
+    def __getitem__(self, names: str | tuple[str, ...]) -> LookupT:
         if isinstance(names, str):
             names = (names, )
 
@@ -377,7 +377,7 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
     def __setitem__(
         self,
         names: str | tuple[str, ...],
-        func: FuncT,
+        func: LookupT,
     ) -> None:
         if isinstance(names, str):
             names = (names, )
@@ -403,7 +403,7 @@ class FuncLookup(Generic[FuncT], Mapping[str, FuncT]):
             name = name.casefold()
         return name in self._registry
 
-    def functions(self) -> set[FuncT]:
+    def functions(self) -> set[LookupT]:
         """Return the set of functions in this mapping."""
         return set(self._registry.values())
 

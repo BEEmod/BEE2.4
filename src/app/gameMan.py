@@ -833,7 +833,7 @@ class Game:
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
             with atomic_write(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), overwrite=True, encoding='utf8') as editor_file:
-                editoritems.Item.export(editor_file, all_items, renderables)
+                editoritems.Item.export(editor_file, all_items, renderables, id_filenames=False)
             export_screen.step('EXP', 'editoritems')
 
             LOGGER.info('Writing Editoritems database...')

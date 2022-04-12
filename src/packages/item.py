@@ -499,8 +499,11 @@ class Item(PakObject, needs_foreground=True):
                         "can't inherit from itself!"
                     )
             versions[ver_id] = version = Version(
-                ver_id, ver_name, ver_isolate, styles,
-                cast(ItemVariant, def_style),  # Temporary, will be fixed in setup_style_tree()
+                id=ver_id,
+                name=ver_name,
+                isolate=ver_isolate,
+                styles=styles,
+                def_style=cast(ItemVariant, def_style),  # Temporary, will be fixed in setup_style_tree()
             )
 
             # The first version is the 'default',

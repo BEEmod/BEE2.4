@@ -1,7 +1,7 @@
 """Logical flags used to combine others (AND, OR, NOT, etc)."""
 from precomp.collisions import Collisions
-from precomp.conditions import make_flag, check_flag, MapInfo
-from srctools import Entity, Property, VMF
+from precomp.conditions import make_flag, check_flag, MapInfo, Unsatisfiable
+from srctools import Entity, Property
 
 
 COND_MOD_NAME = 'Logic'
@@ -19,9 +19,19 @@ def flag_and(inst: Entity, coll: Collisions, info: MapInfo, flag: Property):
 @make_flag('OR')
 def flag_or(inst: Entity, coll: Collisions, info: MapInfo, flag: Property):
     """The OR group evaluates True if any sub-flags are True."""
+    satisfiable = False
     for sub_flag in flag:
-        if check_flag(sub_flag, coll, info, inst):
-            return True
+        try:
+            res = check_flag(sub_flag, coll, info, inst, can_skip=True)
+        except Unsatisfiable:
+            pass
+        else:
+            satisfiable = True
+            if res:
+                return True
+    if not satisfiable:
+        # All raised, we raise too.
+        raise Unsatisfiable
     return False
 
 
