@@ -1551,7 +1551,16 @@ def main() -> None:
 
         vmf = load_map(path)
         coll = Collisions()
+
         instance_traits.set_traits(vmf, id_to_item, coll)
+
+        rand.init_seed(vmf)
+
+        info = corridor.analyse_and_modify(
+            vmf, corridor_conf,
+            elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
+            voice_attrs=settings['has_attr'],
+        )
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1563,14 +1572,6 @@ def main() -> None:
             settings['style_vars']['enableshapesignageframe'],
             antline_wall=ant_wall,
             antline_floor=ant_floor,
-        )
-
-        rand.init_seed(vmf)
-
-        info = corridor.analyse_and_modify(
-            vmf, corridor_conf,
-            elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
-            voice_attrs=settings['has_attr'],
         )
         change_ents(vmf)
 
