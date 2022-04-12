@@ -15,17 +15,20 @@ from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 from app import img, lazy_conf, tkMarkdown, config
 import packages
 import editoritems
-from corridor import CORRIDOR_COUNTS, CorrKind, Orient, Direction, GameMode, Corridor, ExportedConf
+from corridor import (
+    CorrKind, Orient, Direction, GameMode,
+    CORRIDOR_COUNTS, ID_TO_CORR,
+    Corridor, ExportedConf,
+)
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# For converting style corridor definitions, the item IDs of corridors.
-ITEMS = {
-    'ITEM_ENTRY_DOOR': (GameMode.SP, Direction.ENTRY, 'sp_entry'),
-    'ITEM_EXIT_DOOR': (GameMode.SP, Direction.EXIT, 'sp_exit'),
-    'ITEM_COOP_ENTRY_DOOR': (GameMode.COOP, Direction.ENTRY, ''),
-    'ITEM_COOP_EXIT_DOOR': (GameMode.COOP, Direction.EXIT, 'coop'),
+# For converting style corridor definitions, this indicates the attribute the old data was stored in.
+FALLBACKS = {
+    (GameMode.SP, Direction.ENTRY): 'sp_entry',
+    (GameMode.SP, Direction.EXIT): 'sp_exit',
+    (GameMode.COOP, Direction.EXIT): 'coop',
 }
 EMPTY_DESC = tkMarkdown.MarkdownData.text('')
 
@@ -234,7 +237,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # Need both of these to be parsed.
         await packset.ready(packages.Item).wait()
         await packset.ready(packages.Style).wait()
-        for item_id, (mode, direction, variant_attr) in ITEMS.items():
+        for item_id, (mode, direction) in ID_TO_CORR.items():
             try:
                 item = packset.obj_by_id(packages.Item, item_id)
             except KeyError:
@@ -278,6 +281,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             break
                         if inst.inst == editoritems.FSPath():  # Blank, not used.
                             continue
+                        variant_attr = FALLBACKS.get((mode, direction), '')
                         if variant_attr:
                             style_info = style.corridors[variant_attr, ind + 1]
                             corridor = CorridorUI(
@@ -409,7 +413,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # This allows the compiler to easily recognise. Also force 64-64-64 offset.
         for item in exp_data.all_items:
             try:
-                (mode, direction, _) = ITEMS[item.id]
+                (mode, direction) = ID_TO_CORR[item.id]
             except KeyError:
                 continue
             count = CORRIDOR_COUNTS[mode, direction]

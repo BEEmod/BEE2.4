@@ -261,7 +261,7 @@ def set_chosen_corridor(
     """
     for mode, direction, prefix in CORR_SPECIALS:
         count = corridor.CORRIDOR_COUNTS[mode, direction]
-        item_id = f"ITEM_{'COOP_' if mode is corridor.GameMode.COOP else ''}{direction.name}_DOOR"
+        item_id = corridor.CORR_TO_ID[mode, direction]
         if mode is sel_mode:
             corr = selected[direction]
             inst = corr.instance.casefold()

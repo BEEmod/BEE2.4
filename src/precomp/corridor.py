@@ -10,7 +10,11 @@ import srctools.logger
 import consts
 import utils
 from . import instanceLocs, rand
-from corridor import GameMode, Direction, Orient, Corridor, CORRIDOR_COUNTS, ExportedConf
+from corridor import (
+    GameMode, Direction, Orient,
+    CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
+    Corridor, ExportedConf, parse_filename,
+)
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -102,17 +106,9 @@ def analyse_and_modify(
         # Also build a set of all instances, to make a condition check easy later.
 
         file = item['file'].casefold()
-
-        if file.startswith('instances/bee2_corridor/'):
-            # It's a corridor, parse out which one.
-            # instances/bee2_corridor/{mode}/{direction}/corr_{i}.vmf
-            parts = file.split('/')
-            try:
-                corr_mode = GameMode(parts[2])
-                corr_dir = Direction(parts[3])
-                corr_ind = int(parts[4][5:-4]) - 1
-            except ValueError:
-                raise ValueError(f'Unknown corridor filename "{item["file"]}"!') from None
+        corr_info = parse_filename(item['file'])
+        if corr_info is not None:
+            corr_mode, corr_dir, corr_ind = corr_info
             seen_game_modes.add(corr_mode)
             if 'no_player_start' in item.fixup:
                 seen_no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
