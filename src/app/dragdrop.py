@@ -23,17 +23,26 @@ LOGGER = get_logger(__name__)
 
 class ItemProto(Protocol):
     """Protocol draggable items satisfy."""
-    dnd_icon: img.Handle  # Image for the item.
+    @property
+    def dnd_icon(self) -> img.Handle:
+        """Image for the item."""
+        return img.Handle.error(0, 0)
 
 
 class ItemGroupProto(ItemProto, Protocol):
     """Additional values required when grouping."""
-    dnd_group: Optional[str]  # If set, the group an item belongs to.
-    # If only one item is present for a group, it uses this.
-    dnd_group_icon: Optional[img.Handle]
+    @property
+    def dnd_group(self) -> Optional[str]:
+        """If set, the group an item belongs to."""
+        return None
+
+    @property
+    def dnd_group_icon(self) -> Optional[img.Handle]:
+        """If only one item is present for a group, it uses this."""
+        return None
 
 
-ItemT = TypeVar('ItemT', bound=Union[ItemProto, ItemGroupProto])  # The object the items move around.
+ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'

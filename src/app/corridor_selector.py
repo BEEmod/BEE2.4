@@ -36,7 +36,7 @@ FALLBACK = corridor.CorridorGroup(
 class Selector:
     """Corridor selection UI."""
     win: tk.Toplevel
-    drag_man: dragdrop.Manager[corridor.Corridor]
+    drag_man: dragdrop.Manager[corridor.CorridorUI]
 
     # Current corridor on the right side.
     wid_image: ttk.Label
@@ -44,8 +44,8 @@ class Selector:
     wid_desc: tkRichText
 
     # The 7 selected slots, and the rest.
-    selected: List[dragdrop.Slot[corridor.Corridor]]
-    unused: List[dragdrop.Slot[corridor.Corridor]]
+    selected: List[dragdrop.Slot[corridor.CorridorUI]]
+    unused: List[dragdrop.Slot[corridor.CorridorUI]]
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -129,13 +129,13 @@ class Selector:
         reflow = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
-        self.drag_man = drop = dragdrop.Manager(self.win, size=(WIDTH, HEIGHT))
+        self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](self.win, size=(WIDTH, HEIGHT))
         drop.event.register(
-            dragdrop.Event.HOVER_ENTER, dragdrop.Slot[corridor.Corridor],
+            dragdrop.Event.HOVER_ENTER, dragdrop.Slot[corridor.CorridorUI],
             self.show_corr,
         )
         drop.event.register(
-            dragdrop.Event.FLEXI_FLOW, dragdrop.Slot[corridor.Corridor],
+            dragdrop.Event.FLEXI_FLOW, dragdrop.Slot[corridor.CorridorUI],
             self.reflow,
         )
         drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
@@ -268,7 +268,7 @@ class Selector:
             tag='unselected',
         )
 
-    async def show_corr(self, slot: dragdrop.Slot[corridor.Corridor]) -> None:
+    async def show_corr(self, slot: dragdrop.Slot[corridor.CorridorUI]) -> None:
         """Display the specified corridor on hover."""
         if slot.contents is not None:
             corr = slot.contents
