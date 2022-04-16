@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import pickle
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Tuple, Mapping
+from typing_extensions import Final
 from enum import Enum
 import itertools
 
@@ -26,19 +27,19 @@ from corridor import (
 LOGGER = srctools.logger.get_logger(__name__)
 
 # For converting style corridor definitions, this indicates the attribute the old data was stored in.
-FALLBACKS = {
+FALLBACKS: Final[Mapping[Tuple[GameMode, Direction], str]] = {
     (GameMode.SP, Direction.ENTRY): 'sp_entry',
     (GameMode.SP, Direction.EXIT): 'sp_exit',
     (GameMode.COOP, Direction.EXIT): 'coop',
 }
-EMPTY_DESC = tkMarkdown.MarkdownData.text('')
+EMPTY_DESC: Final = tkMarkdown.MarkdownData.text('')
 
-IMG_WIDTH_SML = 144
-IMG_HEIGHT_SML = 96
+IMG_WIDTH_SML: Final = 144
+IMG_HEIGHT_SML: Final = 96
 ICON_GENERIC_SML = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_SML, IMG_HEIGHT_SML)
 
-IMG_WIDTH_LRG = 256
-IMG_HEIGHT_LRG = 192
+IMG_WIDTH_LRG: Final = 256
+IMG_HEIGHT_LRG: Final = 192
 ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
 
 
@@ -274,6 +275,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
                     # If the item has corridors defined, transfer to this.
                     had_legacy = False
+                    dup_check = {corr.instance.casefold() for corr in corr_list}
                     for ind in range(count):
                         try:
                             inst = variant.editor.instances[ind]
@@ -282,11 +284,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             break
                         if inst.inst == editoritems.FSPath():  # Blank, not used.
                             continue
+                        fname = str(inst.inst)
+                        if (folded := fname.casefold()) in dup_check:
+                            # Duplicate? Skip.
+                            continue
+                        dup_check.add(folded)
+
+                        # Find the old definition to glean some info.
                         variant_attr = FALLBACKS.get((mode, direction), '')
                         if variant_attr:
                             style_info = style.corridors[variant_attr, ind + 1]
                             corridor = CorridorUI(
-                                instance=str(inst.inst),
+                                instance=fname,
                                 name=style_info.name,
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
                                 dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
@@ -299,7 +308,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             )
                         else:
                             corridor = CorridorUI(
-                                instance=str(inst.inst),
+                                instance=fname,
                                 name='Corridor',
                                 images=[ICON_GENERIC_LRG],
                                 dnd_icon=ICON_GENERIC_SML,
@@ -321,8 +330,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 for (mode, direction, orient), corridors in corridor_group.corridors.items():
                     dup_check = set()
                     for corr in corridors:
-                        folded = corr.instance.casefold()
-                        if folded in dup_check:
+                        if (folded := corr.instance.casefold()) in dup_check:
                             raise ValueError(
                                 f'Duplicate corridor instance in '
                                 f'{corridor_group.id}:{mode.value}_{direction.value}_'
