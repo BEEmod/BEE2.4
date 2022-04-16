@@ -12,6 +12,7 @@ import srctools.logger
 from srctools import Property, Vec
 from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 
+import utils
 from app import img, lazy_conf, tkMarkdown, config
 import packages
 import editoritems
@@ -250,12 +251,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     except KeyError:
                         continue
                     try:
-                        corridors = packset.obj_by_id(cls, style_id)
+                        corridor_group = packset.obj_by_id(cls, style_id)
                     except KeyError:
-                        corridors = cls(style_id, {})
-                        packset.add(corridors)
+                        corridor_group = cls(style_id, {})
+                        packset.add(corridor_group)
 
-                    corr_list = corridors.corridors.setdefault(
+                    corr_list = corridor_group.corridors.setdefault(
                         (mode, direction, Orient.HORIZONTAL),
                         [],
                     )
@@ -313,6 +314,21 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         had_legacy = True
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
+
+        if utils.DEV_MODE:
+            # Check no duplicate corridors exist.
+            for corridor_group in packset.all_obj(cls):
+                for (mode, direction, orient), corridors in corridor_group.corridors.items():
+                    dup_check = set()
+                    for corr in corridors:
+                        folded = corr.instance.casefold()
+                        if folded in dup_check:
+                            raise ValueError(
+                                f'Duplicate corridor instance in '
+                                f'{corridor_group.id}:{mode.value}_{direction.value}_'
+                                f'{orient.value}!\n {corr.instance}'
+                            )
+                        dup_check.add(folded)
 
     def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""
