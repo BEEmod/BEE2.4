@@ -49,7 +49,7 @@ class StyleVPK(PakObject):
         self.dir = directory
 
     @classmethod
-    async def parse(cls, data: ParseData) -> None:
+    async def parse(cls, data: ParseData) -> 'StyleVPK':
         """Read the VPK file from the package."""
         vpk_name = data.info['filename']
 

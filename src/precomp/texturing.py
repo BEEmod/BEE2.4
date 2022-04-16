@@ -606,7 +606,7 @@ def load_config(conf: Property):
             algo = options['algorithm']
             gen_cat, gen_orient, gen_portal = gen_key
             try:
-                generator: Type[Generator] = GEN_CLASSES[algo]
+                generator = GEN_CLASSES[algo]
             except KeyError:
                 raise ValueError('Invalid algorithm "{}" for {}!'.format(
                     algo, gen_key

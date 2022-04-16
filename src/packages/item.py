@@ -961,6 +961,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
         # it'll all be ItemVariant.
         styles: dict[str, UnParsedItemVariant | ItemVariant | None] = vers.styles  # type: ignore
         for sty_id, conf in styles.items():
+            assert isinstance(conf, UnParsedItemVariant)
             to_change.append((sty_id, conf))
             # Not done yet
             styles[sty_id] = None

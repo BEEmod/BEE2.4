@@ -82,11 +82,7 @@ def modify(conf: ConfigFile, game_folder: Path) -> None:
             )
             diff = datetime.now() - date
             if diff.total_seconds() > 2 * 3600:
-                LOGGER.info(
-                    'Screenshot "{scr}" too old ({diff!s})',
-                    scr=scr_shot,
-                    diff=diff,
-                )
+                LOGGER.info('Screenshot "{}" too old ({!s})', scr_shot, diff)
                 continue
 
             # If we got here, it's a good screenshot!
