@@ -1553,6 +1553,8 @@ def main() -> None:
         coll = Collisions()
 
         instance_traits.set_traits(vmf, id_to_item, coll)
+        # Must be before corridors!
+        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
         rand.init_seed(vmf)
 
@@ -1574,8 +1576,6 @@ def main() -> None:
             antline_floor=ant_floor,
         )
         change_ents(vmf)
-
-        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
         fizzler.parse_map(vmf, settings['has_attr'])
         barriers.parse_map(vmf, settings['has_attr'])
