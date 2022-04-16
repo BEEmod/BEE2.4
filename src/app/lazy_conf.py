@@ -3,8 +3,11 @@ from __future__ import annotations
 from typing import Callable, Pattern
 import functools
 
+import trio
 from srctools import Property, logger, KeyValError
-from app import DEV_MODE
+from srctools.filesys import File
+
+import app
 import packages
 import utils
 
@@ -58,15 +61,19 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 			packages.set_cond_source(props, source)
 		return props
 
-	if DEV_MODE.get():
-		# Parse immediately, to check syntax.
-		try:
-			with file.open_str() as f:
-				Property.parse(f)
-		except (KeyValError, FileNotFoundError, UnicodeDecodeError):
-			LOGGER.exception('Unable to read "{}"', path)
-
+	if app.DEV_MODE.get():
+		app.background_run(devmod_check, file, path)
 	return loader
+
+
+async def devmod_check(file: File, path: utils.PackagePath) -> None:
+	"""In dev mode, parse files in the background to ensure they exist and have valid syntax."""
+	# Parse immediately, to check syntax.
+	try:
+		with file.open_str() as f:
+			await trio.to_thread.run_sync(Property.parse, f, cancellable=True)
+	except (KeyValError, FileNotFoundError, UnicodeDecodeError):
+		LOGGER.exception('Unable to read "{}"', path)
 
 
 def concat(a: LazyConf, b: LazyConf) -> LazyConf:
