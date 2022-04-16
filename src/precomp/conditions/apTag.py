@@ -38,15 +38,15 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
 
     is_tag = options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
 
-    origin = res.vec('origin')
+    origin = Vec.from_str(inst.fixup.substitute(res['origin', '0 0 0']))
     if 'angles' in res:
-        angles = Angle.from_str(res['angles'])
+        angles = Angle.from_str(inst.fixup.substitute(res['angles']))
     else:
         # Older system, specify the forward direction.
-        angles = res.vec('facing', z=1).to_angle()
+        angles = Vec.from_str(inst.fixup.substitute(res['facing'], '0 0 1'), z=1).to_angle()
 
     # Some styles might want to ignore the instance we're running on.
-    if not res.bool('global'):
+    if not srctools.conv_bool(inst.fixup.substitute(res['global', '0'])):
         orient = Matrix.from_angle(Angle.from_str(inst['angles']))
         origin @= orient
         angles @= orient
