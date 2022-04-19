@@ -46,13 +46,25 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Literal, Tuple, Set, Iterable, Optional, cast
-
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, cast
+from typing_extensions import TypedDict, Literal
 
 COND_MOD_NAME = 'VBSP'
 
-# Configuration data extracted from VBSP_config
-settings: Dict[str, Dict[str, Any]] = {
+
+class _Settings(TypedDict):
+    """Configuration data extracted from VBSP_config. TODO: Eliminate and make local vars."""
+    textures: Dict[str, Any]
+    options: Dict[str, Any]
+    fog: Dict[str, Any]
+    elevator: Dict[str, str]
+    music_conf: Optional[Property]
+
+    style_vars: Dict[str, bool]
+    has_attr: Dict[str, bool]
+    packtrigger: Dict[List[str]]
+
+settings: _Settings = {
     "textures":       {},
     "options":        {},
     "fog":            {},
@@ -112,8 +124,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
-            settings['style_vars'][
-                var.name.casefold()] = srctools.conv_bool(var.value)
+            settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
     # Load in templates locations.
     template_brush.load_templates('bee2/templates.lst')

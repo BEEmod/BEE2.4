@@ -41,7 +41,7 @@ CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
 
 CORRIDOR_DESC = tkMarkdown.convert('', None)
 
-COMPILE_DEFAULTS = {
+COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
     'Screenshot': {
         'Type': 'AUTO',
         'Loc': '',
