@@ -412,13 +412,19 @@ class Manager(Generic[ItemT]):
         """User released the item."""
         if self._cur_drag is None or self._cur_prev_slot is None:
             return
-
-        sound.fx('config')
         self._drag_win.grab_release()
         self._drag_win.withdraw()
         self._drag_win.unbind(tk_tools.EVENTS['LEFT_MOVE'])
 
         dest = self._pos_slot(evt.x_root, evt.y_root)
+
+        if dest is self._cur_prev_slot:
+            # Dropped on itself, do nothing.
+            self._cur_drag = None
+            self._cur_prev_slot = None
+            return
+
+        sound.fx('config')
 
         if dest:  # We have a target.
             # If we have flexi slots, swap.
