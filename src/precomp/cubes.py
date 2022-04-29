@@ -36,6 +36,7 @@ DROPPERLESS_OFFSET = 22 - 64
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
+# We also snap to nearest voxel, to allow cubes to use an offset handle.
 CUBE_POS: dict[tuple[float, float, float], CubePair] = {}
 
 # Prevents duplicating different filter entities. A number of different keys are used depending on
@@ -583,12 +584,17 @@ class CubePair:
             ]
 
         # Ensure we can look up the pair by origin and instance.
+        # Round to the nearest voxel to allow the cube to be offset.
         if dropper is not None:
+            pos = Vec.from_str(dropper['origin'])
+            pos = (pos - 64.0) // 128
+            CUBE_POS[pos.as_tuple()] = self
             INST_TO_PAIR[dropper] = self
-            CUBE_POS[Vec.from_str(dropper['origin']).as_tuple()] = self
         if cube is not None:
+            pos = Vec.from_str(cube['origin'])
+            pos = (pos - 64.0) // 128
+            CUBE_POS[pos.as_tuple()] = self
             INST_TO_PAIR[cube] = self
-            CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
         # Cache of comp_kv_setters adding outputs to dropper ents.
         self._kv_setters: dict[str, Entity] = {}
@@ -1276,16 +1282,17 @@ def link_cubes(vmf: VMF) -> None:
         orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
         with suppress(KeyError):
-            pairs.append(CUBE_POS[origin.as_tuple()])
+            pos = (origin - 64.0) // 128
+            pairs.append(CUBE_POS[pos.as_tuple()])
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
         # placed on the illusory cube item under them.
         if orient.up().z > 0.9:
-            pos = brushLoc.POS.raycast_world(
+            pos = (brushLoc.POS.raycast_world(
                 origin,
                 direction=(0, 0, 1),
-            )
+            ) - 64.0) // 128
             with suppress(KeyError):
                 pairs.append(CUBE_POS[pos.as_tuple()])
 
