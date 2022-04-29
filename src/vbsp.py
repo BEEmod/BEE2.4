@@ -62,7 +62,7 @@ class _Settings(TypedDict):
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
-    packtrigger: Dict[List[str]]
+    packtrigger: Dict[str, List[str]]
 
 settings: _Settings = {
     "textures":       {},
