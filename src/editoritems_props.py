@@ -16,7 +16,7 @@ def _unknown_parse(value: str) -> str:
     return value
 
 
-@attrs.define(eq=False)
+@attrs.define(eq=False, getstate_setstate=False)
 class ItemPropKind(Generic[ValueT]):
     """A type of property for an item."""
     # Property name for this. This is case-sensitive!
@@ -35,10 +35,6 @@ class ItemPropKind(Generic[ValueT]):
     parse: Callable[[str], ValueT] = attrs.field(kw_only=True)
     export: Callable[[ValueT], str] = attrs.field(kw_only=True, default=str)
 
-    def __attrs_post_init__(self) -> None:
-        """Register all the defined properties."""
-        PROP_TYPES[self.id.casefold()] = self
-
     @classmethod
     def unknown(cls, id: str) -> 'ItemPropKind[str]':
         """Create a kind for an unknown property."""
@@ -54,6 +50,18 @@ class ItemPropKind(Generic[ValueT]):
     def is_unknown(self) -> bool:
         """Check if this is an unknown property."""
         return self.parse is _unknown_parse
+
+    def __reduce__(self) -> str | tuple:
+        """Handle pickling specially.
+
+        For known props, we fetch the object by ID.
+        For unknown props, we simply recreate.
+        This means we don't try pickling the parse/export functions.
+        """
+        try:
+            return _known_to_attr[self]
+        except KeyError:
+            return (ItemPropKind.unknown, (self.id,))
 
 
 class ItemProp(Generic[ValueT]):
@@ -80,21 +88,11 @@ class ItemProp(Generic[ValueT]):
         """Parse string form into the appropriate value."""
         return self.kind.parse(value)
 
-    def __getstate__(self) -> tuple:
-        return (self.kind.id, self.default, self.index, self.allow_user_default)
-
-    def __setstate__(self, state: tuple) -> None:
-        (kind_id, self.default, self.index, self.allow_user_default) = state
-        try:
-            self.kind = PROP_TYPES[kind_id]
-        except KeyError:
-            # Unknown property. Typechecker can't understand "ValueT = str"...
-            self.kind = ItemPropKind.unknown(kind_id)  # type: ignore
-            self.default = str(self.default)  # type: ignore
-
 
 # ID -> class
 PROP_TYPES: dict[str, ItemPropKind] = {}
+# class to name in this module, for pickling.
+_known_to_attr: dict[ItemPropKind, str] = {}
 
 
 def bool_prop(
@@ -665,5 +663,13 @@ prop_glass_type = enum_prop(
 )
 
 
-# Now, clear the method so any further types constructed are temporary.
-del ItemPropKind.__attrs_post_init__
+# Register everything.
+_known_to_attr.update({
+    prop: name
+    for name, prop in globals().items()
+    if isinstance(prop, ItemPropKind)
+})
+PROP_TYPES.update({
+    prop.id.casefold(): prop
+    for prop in _known_to_attr.keys()
+})
