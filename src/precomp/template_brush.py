@@ -235,7 +235,7 @@ class Template:
     """Represents a template before it's imported into a map."""
     _data: dict[str, tuple[list[Solid], list[Solid], list[Entity]]]
     def __init__(
-        self,
+        self, *,
         temp_id: str,
         visgroup_names: set[str],
         world: dict[str, list[Solid]],
@@ -628,19 +628,19 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             coll.append(CollisionDef(bbox, visgroups))
 
     return Template(
-        loc.id,
-        set(visgroup_names.values()),
-        world_ents,
-        detail_ents,
-        overlay_ents,
-        conf['skip_faces'].split(),
-        conf['realign_faces'].split(),
-        conf['overlay_faces'].split(),
-        conf['vertical_faces'].split(),
-        color_pickers,
-        tile_setters,
-        voxel_setters,
-        coll,
+        temp_id=loc.id,
+        visgroup_names=set(visgroup_names.values()),
+        world=world_ents,
+        detail=detail_ents,
+        overlays=overlay_ents,
+        skip_faces=conf['skip_faces'].split(),
+        realign_faces=conf['realign_faces'].split(),
+        overlay_transfer_faces=conf['overlay_faces'].split(),
+        vertical_faces=conf['vertical_faces'].split(),
+        color_pickers=color_pickers,
+        tile_setters=tile_setters,
+        voxel_setters=voxel_setters,
+        coll=coll,
     )
 
 
