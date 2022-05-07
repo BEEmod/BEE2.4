@@ -261,18 +261,6 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         (mode, direction, Orient.HORIZONTAL),
                         [],
                     )
-                    if not corr_list:
-                        # Look for parent styles with definitions to inherit.
-                        for parent_style in style.bases[1:]:
-                            try:
-                                parent_group = packset.obj_by_id(CorridorGroup, parent_style.id)
-                                parent_corr = parent_group.corridors[mode, direction, Orient.HORIZONTAL]
-                            except KeyError:
-                                continue
-                            for corridor in parent_corr:
-                                if not corridor.legacy:
-                                    corr_list.append(corridor)
-
                     # If the item has corridors defined, transfer to this.
                     had_legacy = False
                     dup_check = {corr.instance.casefold() for corr in corr_list}
@@ -323,6 +311,21 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         had_legacy = True
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
+
+                    if not corr_list:
+                        # Look for parent styles with definitions to inherit.
+                        for parent_style in style.bases[1:]:
+                            try:
+                                parent_group = packset.obj_by_id(CorridorGroup, parent_style.id)
+                                parent_corr = parent_group.corridors[mode, direction, Orient.HORIZONTAL]
+                            except KeyError:
+                                continue
+                            if not parent_corr:
+                                continue
+                            for corridor in parent_corr:
+                                if not corridor.legacy:
+                                    corr_list.append(corridor)
+                            break # Only do first parent.
 
         if utils.DEV_MODE:
             # Check no duplicate corridors exist.
