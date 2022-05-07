@@ -586,13 +586,11 @@ class CubePair:
         # Ensure we can look up the pair by origin and instance.
         # Round to the nearest voxel to allow the cube to be offset.
         if dropper is not None:
-            pos = Vec.from_str(dropper['origin'])
-            pos = (pos - 64.0) // 128
+            pos = Vec.from_str(dropper['origin']) // 128
             CUBE_POS[pos.as_tuple()] = self
             INST_TO_PAIR[dropper] = self
         if cube is not None:
-            pos = Vec.from_str(cube['origin'])
-            pos = (pos - 64.0) // 128
+            pos = Vec.from_str(cube['origin']) // 128
             CUBE_POS[pos.as_tuple()] = self
             INST_TO_PAIR[cube] = self
 
@@ -1282,17 +1280,16 @@ def link_cubes(vmf: VMF) -> None:
         orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
         with suppress(KeyError):
-            pos = (origin - 64.0) // 128
-            pairs.append(CUBE_POS[pos.as_tuple()])
+            pairs.append(CUBE_POS[(origin // 128).as_tuple()])
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
         # placed on the illusory cube item under them.
         if orient.up().z > 0.9:
-            pos = (brushLoc.POS.raycast_world(
+            pos = brushLoc.POS.raycast_world(
                 origin,
                 direction=(0, 0, 1),
-            ) - 64.0) // 128
+            ) // 128
             with suppress(KeyError):
                 pairs.append(CUBE_POS[pos.as_tuple()])
 
