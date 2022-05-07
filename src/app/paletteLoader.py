@@ -277,7 +277,9 @@ class Palette:
         except NoKeyError:
             settings = None
         else:
-            settings = config.parse_conf(settings_conf)
+            settings, upgraded_settings = config.parse_conf(settings_conf)
+            if upgraded_settings:
+                needs_save = True
 
         pal = Palette(
             name,
