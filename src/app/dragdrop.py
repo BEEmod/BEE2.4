@@ -462,7 +462,10 @@ class Slot(Generic[ItemT]):
     _text_lbl: Optional[tkinter.Label]
     _info_btn: Optional[tkinter.Label]
     # Our main widget.
-    _lbl: tkinter.Label
+    _lbl: ttk.Label
+
+    # Optional ability to highlight a specific slot.
+    _is_highlighted: bool
 
     # The current thing in the slot.
     _contents: Optional[ItemT]
@@ -488,7 +491,8 @@ class Slot(Generic[ItemT]):
         self.kind = kind
         self._contents = None
         self._pos_type = None
-        self._lbl = tkinter.Label(parent)
+        self._lbl = ttk.Label(parent, anchor='center')
+        self._selected = False
         img.apply(self._lbl, man._img_blank)
         tk_tools.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
@@ -547,6 +551,19 @@ class Slot(Generic[ItemT]):
     def is_visible(self) -> bool:
         """Check if this slot is currently displayed."""
         return self._pos_type is not None
+
+    @property
+    def highlight(self) -> bool:
+        """Allows setting/getting if the slot has an alternate selection state."""
+        return self._is_highlighted
+
+    @highlight.setter
+    def highlight(self, value: bool) -> None:
+        """Allows setting/getting if the slot has an alternate selection state."""
+        self._is_highlighted = bool(value)
+        self._lbl['background'] = (
+            '#5AD2D2' if self._is_highlighted else ''
+        )
 
     @property
     def contents(self) -> Optional[ItemT]:
