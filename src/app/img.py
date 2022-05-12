@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, ClassVar, Iterator, Literal, TypeVar, Union, Type, cast
+from typing_extensions import TypeAlias, Final
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
 from tkinter import ttk
@@ -27,7 +28,7 @@ from app import TK_ROOT
 import utils
 
 # Widgets with an image attribute that can be set.
-tkImgWidgets = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
+tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 tkImgWidgetsT = TypeVar(
     'tkImgWidgetsT',
     tk.Label, ttk.Label,
@@ -36,7 +37,7 @@ tkImgWidgetsT = TypeVar(
     Union[tk.Button, ttk.Button],
 )
 # WeakRef is only generic in stubs!
-WidgetWeakRef = Union[
+WidgetWeakRef: TypeAlias = Union[
     'WeakRef[tk.Label]', 'WeakRef[ttk.Label]',
     'WeakRef[tk.Label | ttk.Label]',
     'WeakRef[tk.Button]', 'WeakRef[ttk.Button]',
@@ -61,8 +62,12 @@ PACK_SYSTEMS: dict[str, FileSystem] = {}
 logging.getLogger('PIL').setLevel(logging.INFO)
 
 # Colour of the palette item background
-PETI_ITEM_BG = (229, 232, 233)
-PETI_ITEM_BG_HEX = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
+PETI_ITEM_BG: Final = (229, 232, 233)
+PETI_ITEM_BG_HEX: Final = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
+
+FLIP_LEFT_RIGHT: Final = Image.FLIP_LEFT_RIGHT
+FLIP_TOP_BOTTOM: Final = Image.FLIP_TOP_BOTTOM
+FLIP_ROTATE: Final = Image.ROTATE_180
 
 
 def _load_special(path: str) -> Image.Image:
@@ -410,7 +415,7 @@ class Handle:
 
     def crop(
         self,
-        bounds: tuple[int, int, int, int],
+        bounds: tuple[int, int, int, int] | None = None,
         transpose: int | None = None,
         width: int = 0, height: int = 0,
     ) -> ImgCrop:
@@ -650,6 +655,7 @@ class ImgSprite(Handle):
 @attrs.define(eq=False)
 class ImgComposite(Handle):
     """An image composed of multiple layers composited together."""
+    alpha_result: ClassVar[bool] = True
     layers: Sequence[Handle]
 
     @classmethod
@@ -684,8 +690,9 @@ class ImgComposite(Handle):
 @attrs.define(eq=False)
 class ImgCrop(Handle):
     """An image that crops another down to only show part."""
+    alpha_result: ClassVar[bool] = True
     source: Handle
-    bounds: tuple[int, int, int, int]  # left, top, right, bottom coords.
+    bounds: tuple[int, int, int, int] | None  # left, top, right, bottom coords.
     # Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
     transpose: Literal[0, 1, 3] | None
 
@@ -709,7 +716,9 @@ class ImgCrop(Handle):
         if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
             image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
 
-        image = image.crop(self.bounds)
+        if self.bounds is not None:
+            image = image.crop(self.bounds)
+
         if self.transpose is not None:
             image = image.transpose(self.transpose)
 
