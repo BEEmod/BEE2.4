@@ -1,7 +1,7 @@
 """Implements UI for selecting corridors."""
 from tkinter import ttk
 import tkinter as tk
-from typing import List, Optional
+from typing import Optional, List, Sequence, Literal
 from typing_extensions import TypeAlias, Final
 
 import srctools.logger
@@ -20,6 +20,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 WIDTH: Final = corridor.IMG_WIDTH_SML + 16
 HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
 ICON_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
+ARROW_LEFT = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
+ARROW_RIGHT = ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 Slot: TypeAlias = dragdrop.Slot[corridor.CorridorUI]
 
 # If no groups are defined for a style, use this.
@@ -46,6 +48,9 @@ class Selector:
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
     sticky_corr: Optional[corridor.CorridorUI]
+    # Currently selected image.
+    cur_images: Sequence[img.Handle]
+    img_ind: int
 
     # The 7 selected slots, and the rest.
     selected: List[Slot]
@@ -72,9 +77,22 @@ class Selector:
         frm_right.grid(row=0, column=1, sticky='ns')
 
         self.sticky_corr = None
-        self.wid_image = ttk.Label(frm_right)
-        self.wid_image.grid(row=0, column=0, sticky='ew')
+        self.img_ind = 0
+        frm_img = ttk.Frame(frm_right, relief='raised', width=2)
+        frm_img.grid(row=0, column=0, sticky='ew')
+
+        sel_img = self._sel_img
+        self.wid_image_left = ttk.Button(frm_img, command=lambda: sel_img(-1))
+        self.wid_image = ttk.Label(frm_img)
+        self.wid_image_right = ttk.Button(frm_img, command=lambda: sel_img(1))
+
+        self.wid_image_left.grid(row=0, column=0, sticky='ns')
+        self.wid_image.grid(row=0, column=1, sticky='nsew')
+        self.wid_image_right.grid(row=0, column=2, sticky='ns')
+
+        img.apply(self.wid_image_left, ARROW_LEFT)
         img.apply(self.wid_image, ICON_BLANK)
+        img.apply(self.wid_image_right, ARROW_RIGHT)
 
         self.wid_title = ttk.Label(frm_right, text='')
         self.wid_title.grid(row=1, column=0, sticky='ew')
@@ -298,16 +316,36 @@ class Selector:
     def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
         """Display the specified corridor, or reset if None."""
         if corr is not None:
-            if corr.images:
-                img.apply(self.wid_image, corr.images[0])
-            else:
-                img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
+            self.img_ind = 0
+            self.cur_images = corr.images
+            self._sel_img(0)  # Updates the buttons.
+
             self.wid_title['text'] = corr.name
             self.wid_desc.set_text(corr.desc)
         else:  # Reset.
             self.wid_title['text'] = ''
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             img.apply(self.wid_image, ICON_BLANK)
+            self.wid_image_left.state(('disabled', ))
+            self.wid_image_right.state(('disabled', ))
+
+    def _sel_img(self, direction: Literal[-1, 0, 1]) -> None:
+        """Go forward or backwards in the preview images."""
+        max_ind = len(self.cur_images) - 1
+        self.img_ind += direction
+        # Order this and the comparisons so size = 0 means index is forced to 0 with both
+        # hidden.
+        if self.img_ind > max_ind:
+            self.img_ind = max_ind
+        if self.img_ind < 0:
+            self.img_ind = 0
+
+        if self.cur_images:
+            img.apply(self.wid_image, self.cur_images[self.img_ind])
+        else:
+            img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
+        self.wid_image_left.state(('!disabled', ) if self.img_ind > 0 else ('disabled', ))
+        self.wid_image_right.state(('!disabled', ) if self.img_ind < max_ind else ('disabled', ))
 
 
 async def test() -> None:
