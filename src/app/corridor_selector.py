@@ -1,7 +1,8 @@
 """Implements UI for selecting corridors."""
 from tkinter import ttk
 import tkinter as tk
-from typing import List
+from typing import List, Optional
+from typing_extensions import TypeAlias, Final
 
 import srctools.logger
 import trio
@@ -16,10 +17,10 @@ from corridor import GameMode, Direction, Orient
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-WIDTH = corridor.IMG_WIDTH_SML + 16
-HEIGHT = corridor.IMG_HEIGHT_SML + 16
-ICON_BLANK = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
-
+WIDTH: Final = corridor.IMG_WIDTH_SML + 16
+HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
+ICON_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
+Slot: TypeAlias = dragdrop.Slot[corridor.CorridorUI]
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
@@ -38,14 +39,17 @@ class Selector:
     win: tk.Toplevel
     drag_man: dragdrop.Manager[corridor.CorridorUI]
 
-    # Current corridor on the right side.
+    # Widgets to display info about the corridor on the right side.
     wid_image: ttk.Label
     wid_title: ttk.Label
     wid_desc: tkRichText
+    # When you click a corridor, it's saved here and displayed when others aren't
+    # moused over. Reset on style/group swap.
+    sticky_corr: Optional[corridor.CorridorUI]
 
     # The 7 selected slots, and the rest.
-    selected: List[dragdrop.Slot[corridor.CorridorUI]]
-    unused: List[dragdrop.Slot[corridor.CorridorUI]]
+    selected: List[Slot]
+    unused: List[Slot]
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -67,11 +71,12 @@ class Selector:
         frm_right.columnconfigure(0, weight=1)
         frm_right.grid(row=0, column=1, sticky='ns')
 
+        self.sticky_corr = None
         self.wid_image = ttk.Label(frm_right)
         self.wid_image.grid(row=0, column=0, sticky='ew')
         img.apply(self.wid_image, ICON_BLANK)
 
-        self.wid_title = ttk.Label(frm_right, text='Corridor')
+        self.wid_title = ttk.Label(frm_right, text='')
         self.wid_title.grid(row=1, column=0, sticky='ew')
 
         self.wid_desc = tkRichText(frm_right)
@@ -130,14 +135,10 @@ class Selector:
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
         self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](self.win, size=(WIDTH, HEIGHT))
-        drop.event.register(
-            dragdrop.Event.HOVER_ENTER, dragdrop.Slot[corridor.CorridorUI],
-            self.show_corr,
-        )
-        drop.event.register(
-            dragdrop.Event.FLEXI_FLOW, dragdrop.Slot[corridor.CorridorUI],
-            self.reflow,
-        )
+        drop.event.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
+        drop.event.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
+        drop.event.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
+        drop.event.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
         drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
         self.selected = [
             drop.slot_target(self.canvas)
@@ -163,6 +164,9 @@ class Selector:
             for slot in self.selected
         ]
         config.store_conf(corridor.Config(selected), self.conf_id)
+        # Fix up the highlight, if it was moved.
+        for slot in self.drag_man.all_slots():
+            slot.highlight = slot.contents is not None and slot.contents is self.sticky_corr
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
@@ -203,6 +207,7 @@ class Selector:
 
         # Ensure enough flexible slots exist to hold all of them, and clear em all.
         for slot in self.drag_man.all_slots():
+            slot.highlight = False
             slot.contents = None
         for _ in range(len(corr_list) - self.unused_count):
             self.drag_man.slot_flexi(self.canvas)
@@ -234,9 +239,8 @@ class Selector:
         self.drag_man.load_icons()
 
         # Reset item display, it's invalid.
-        img.apply(self.wid_image, ICON_BLANK)
-        self.wid_title['text'] = ''
-        self.wid_desc.set_text(corridor.EMPTY_DESC)
+        self.sticky_corr = None
+        self.disp_corr(None)
         # Reposition everything.
         await self.reflow()
 
@@ -268,16 +272,42 @@ class Selector:
             tag='unselected',
         )
 
-    async def show_corr(self, slot: dragdrop.Slot[corridor.CorridorUI]) -> None:
-        """Display the specified corridor on hover."""
+    async def evt_hover_enter(self, slot: Slot) -> None:
+        """Display the specified corridor temporarily on hover."""
         if slot.contents is not None:
-            corr = slot.contents
+            self.disp_corr(slot.contents)
+
+    async def evt_hover_exit(self, slot: Slot) -> None:
+        """When leaving, reset to the sticky corridor."""
+        if self.sticky_corr is not None:
+            self.disp_corr(self.sticky_corr)
+        else:
+            self.disp_corr(None)
+
+    async def evt_redropped(self, slot: Slot) -> None:
+        """Fires when a slot is dropped back on itself. This is effectively a left-click."""
+        if slot.contents is not None:
+            if self.sticky_corr is not None:
+                # Clear the old one.
+                for slot in self.drag_man.all_slots():
+                    slot.highlight = False
+            slot.highlight = True
+            self.sticky_corr = slot.contents
+            self.disp_corr(self.sticky_corr)
+
+    def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
+        """Display the specified corridor, or reset if None."""
+        if corr is not None:
             if corr.images:
                 img.apply(self.wid_image, corr.images[0])
             else:
                 img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
             self.wid_title['text'] = corr.name
             self.wid_desc.set_text(corr.desc)
+        else:  # Reset.
+            self.wid_title['text'] = ''
+            self.wid_desc.set_text(corridor.EMPTY_DESC)
+            img.apply(self.wid_image, ICON_BLANK)
 
 
 async def test() -> None:
