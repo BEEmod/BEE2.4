@@ -58,6 +58,9 @@ class Event(Enum):
     # The parameter is None.
     MODIFIED = 'modified'
 
+    # Fired when a slot is dropped on itself - allows detecting a left click.
+    REDROPPED = 'redropped'
+
     # When flexi slots are present, called when they're filled/emptied.
     FLEXI_FLOW = 'flexi_flow'
 
@@ -419,7 +422,9 @@ class Manager(Generic[ItemT]):
         dest = self._pos_slot(evt.x_root, evt.y_root)
 
         if dest is self._cur_prev_slot:
-            # Dropped on itself, do nothing.
+            # Dropped on itself, fire special event, put the item back.
+            background_run(self.event, Event.REDROPPED, dest)
+            dest.contents = self._cur_drag
             self._cur_drag = None
             self._cur_prev_slot = None
             return
