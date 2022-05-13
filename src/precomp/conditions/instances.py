@@ -153,14 +153,16 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
 
     val_a = inst.fixup.substitute(val_a, default='')
     val_b = inst.fixup.substitute(val_b, default='')
+    comp_a: str | float
+    comp_b: str | float
     try:
         # Convert to floats if possible, otherwise handle both as strings.
         # That ensures we normalise different number formats (1 vs 1.0)
-        val_a, val_b = float(val_a), float(val_b)
+        comp_a, comp_b = float(val_a), float(val_b)
     except ValueError:
-        pass
+        comp_a, comp_b = val_a, val_b
     try:
-        return bool(comp_func(val_a, val_b))
+        return bool(comp_func(comp_a, comp_b))
     except (TypeError, ValueError) as e:
         LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
         return False
@@ -240,8 +242,8 @@ def res_add_inst_var(inst: Entity, res: Property):
         res_add_suffix(inst, res)
 
 
-@make_result('setInstVar', 'assign', 'setFixupVar')
-def res_set_inst_var(inst: Entity, res: Property):
+@conditions.make_result('setInstVar', 'assign', 'setFixupVar')
+def res_set_inst_var(inst: Entity, res: Property) -> None:
     """Set an instance variable to the given value.
 
     Values follow the format `$start_enabled 1`, with or without the `$`.
@@ -251,9 +253,12 @@ def res_set_inst_var(inst: Entity, res: Property):
     inst.fixup[var_name] = inst.fixup.substitute(val, allow_invert=True)
 
 
-@make_result_setup('mapInstVar')
-def res_map_inst_var_setup(res: Property) -> Tuple[str, str, Dict[str, str]]:
-    """Pre-parse the variable table."""
+@conditions.make_result('mapInstVar')
+def res_map_inst_var(res: Property) -> conditions.ResultCallable:
+    """Set one instance var based on the value of another.
+
+    The first value is the in -> out var, and all following are values to map.
+    """
     table: dict[str, str] = {}
     res_iter = iter(res)
     first_prop = next(res_iter)
@@ -261,24 +266,13 @@ def res_map_inst_var_setup(res: Property) -> Tuple[str, str, Dict[str, str]]:
     for prop in res_iter:
         table[prop.real_name] = prop.value
 
-    out = in_name, out_name, table
-    return out if all(out) else None
-
-
-@make_result('mapInstVar')
-def res_map_inst_var(inst: Entity, res: Property) -> None:
-    """Set one instance var based on the value of another.
-
-    The first value is the in -> out var, and all following are values to map.
-    """
-    in_name: str
-    out_name: str
-    table: dict[str, str]
-    in_name, out_name, table = res.value
-    try:
-        inst.fixup[out_name] = table[inst.fixup[in_name]]
-    except KeyError:
-        pass
+    def modify_inst(inst: Entity) -> None:
+        """Map the variables on an instance."""
+        try:
+            inst.fixup[out_name] = table[inst.fixup[in_name]]
+        except KeyError:
+            pass
+    return modify_inst
 
 
 @make_result('clearOutputs', 'clearOutput')
@@ -345,30 +339,8 @@ GLOBAL_INPUT_ENTS: dict[Union[str, None, object], Entity] = {}
 ON_LOAD = object()
 
 
-@make_result_setup('GlobalInput')
-def res_global_input_setup(res: Property) -> tuple[str, Output]:
-    """Pre-parse the global input."""
-    if res.has_children():
-        name = res['name', '']
-        if not name and res.bool('alsoonload'):
-            name = ON_LOAD
-        inp_name, inp_command = Output.parse_name(res['input'])
-        return name, Output(
-            out=res['output', 'OnTrigger'],
-            targ=res['target', ''],
-            inp=inp_command,
-            inst_in=inp_name,
-            delay=srctools.conv_float(res['delay', '']),
-            param=res['param', ''],
-        )
-    else:
-        out = Output.parse(res)
-        out.output = ''  # Don't need to store GlobalInput...
-        return '', out
-
-
-@make_result('GlobalInput')
-def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
+@conditions.make_result('GlobalInput')
+def res_global_input(vmf: VMF, res: Property) -> conditions.ResultCallable:
     """Trigger an input either on map spawn, or when a relay is triggered.
 
     Arguments:
@@ -386,48 +358,63 @@ def res_global_input(vmf: VMF, inst: Entity, res: Property) -> None:
     Alternatively pass a string VMF-style output, which only provides
     OnMapSpawn functionality.
     """
-    relay_name, out = res.value
-
-    output: Output = out.copy()
-
-    if output.target:
-        output.target = conditions.local_name(
-            inst,
-            inst.fixup.substitute(output.target),
+    on_load = False
+    if res.has_children():
+        name = res['name', '']
+        if not name and res.bool('alsoonload'):
+            name = ''
+            on_load = True
+        inp_name, inp_command = Output.parse_name(res['input'])
+        relay_name = name
+        conf_output = Output(
+            out=res['output', 'OnTrigger'],
+            targ=res['target', ''],
+            inp=inp_command,
+            inst_in=inp_name,
+            delay=srctools.conv_float(res['delay', '']),
+            param=res['param', ''],
         )
     else:
-        output.target = inst['targetname']
+        conf_output = Output.parse(res)
+        conf_output.output = ''  # Don't need to store GlobalInput...
+        # relay_name = ''
 
-    if relay_name is ON_LOAD:
-        relay_name = ''
-        on_load = True
-    else:
-        relay_name = inst.fixup.substitute(relay_name)
-        on_load = False
+    def add_global(inst: Entity) -> None:
+        """Add the output."""
+        output = conf_output.copy()
 
-    output.output = inst.fixup.substitute(output.output)
-    output.params = inst.fixup.substitute(output.params)
-    if output.inst_in is not None:
-        output.inst_in = inst.fixup.substitute(output.inst_in)
-    if output.inst_out is not None:
-        output.input = inst.fixup.substitute(output.input)
-
-    if on_load:
-        try:
-            ent = GLOBAL_INPUT_ENTS[ON_LOAD]
-        except KeyError:
-            ent = GLOBAL_INPUT_ENTS[ON_LOAD] = vmf.create_ent(
-                'logic_auto',
-                origin=options.get(Vec, 'global_ents_loc'),
-                spawnflags='0',  # Don't remove on fire.
+        if output.target:
+            output.target = conditions.local_name(
+                inst,
+                inst.fixup.substitute(output.target),
             )
-        load_out = output.copy()
-        output.output = 'OnMapSpawn'
-        load_out.output = 'OnLoadGame'
-        output.only_once = True
-        ent.add_out(output, load_out)
-    else:
-        global_input(vmf, inst['origin'], output, relay_name)
+        else:
+            output.target = inst['targetname']
+
+        output.output = inst.fixup.substitute(output.output)
+        output.params = inst.fixup.substitute(output.params)
+        if output.inst_in is not None:
+            output.inst_in = inst.fixup.substitute(output.inst_in)
+        if output.inst_out is not None:
+            output.input = inst.fixup.substitute(output.input)
+
+        if on_load:
+            try:
+                ent = GLOBAL_INPUT_ENTS[ON_LOAD]
+            except KeyError:
+                ent = GLOBAL_INPUT_ENTS[ON_LOAD] = vmf.create_ent(
+                    'logic_auto',
+                    origin=options.get(Vec, 'global_ents_loc'),
+                    spawnflags='0',  # Don't remove on fire.
+                )
+            load_out = output.copy()
+            output.output = 'OnMapSpawn'
+            load_out.output = 'OnLoadGame'
+            output.only_once = True
+            ent.add_out(output, load_out)
+        else:
+            global_input(vmf, inst['origin'], output, inst.fixup.substitute(relay_name))
+    return add_global
 
 
 def global_input(
