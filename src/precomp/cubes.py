@@ -440,23 +440,23 @@ class CubeType:
 
         cube_item_id = conf['itemid']
 
-        packlist = conf.find_key('Pack', '')
-        if packlist.has_children():
+        packlist_prop = conf.find_key('Pack', '')
+        if packlist_prop.has_children():
             # Each file individually
             packlist = [
-                prop.value for prop in packlist
+                prop.value for prop in packlist_prop
             ]
         else:
             # One value - packlist ID
-            packlist = packlist.value
+            packlist = packlist_prop.value
 
-        packlist_color = conf.find_key('PackColor', '')
-        if packlist_color.has_children():
+        packlist_color_prop = conf.find_key('PackColor', '')
+        if packlist_color_prop.has_children():
             packlist_color = [
-                prop.value for prop in packlist_color
+                prop.value for prop in packlist_color_prop
             ]
         else:
-            packlist_color = packlist_color.value
+            packlist_color = packlist_color_prop.value
 
         try:
             cube_type = CubeEntType(conf['cubetype'].upper())
@@ -1050,7 +1050,7 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('VScriptCubePredicate')
-def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> None:
+def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> object:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
     This produces a script to include, which will define the specified function
@@ -1118,6 +1118,7 @@ def link_cubes(vmf: VMF) -> None:
     # cube or dropper -> cubetype or droppertype value.
     inst_to_type: dict[str, CubeType | DropperType] = {}
 
+    obj_type: CubeType | DropperType
     for obj_type in itertools.chain(CUBE_TYPES.values(), DROPPER_TYPES.values()):
         for inst in obj_type.instances:
             inst_to_type[inst] = obj_type
