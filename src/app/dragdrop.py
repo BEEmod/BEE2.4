@@ -423,8 +423,8 @@ class Manager(Generic[ItemT]):
 
         if dest is self._cur_prev_slot:
             # Dropped on itself, fire special event, put the item back.
-            background_run(self.event, Event.REDROPPED, dest)
             dest.contents = self._cur_drag
+            background_run(self.event, Event.REDROPPED, dest)
             self._cur_drag = None
             self._cur_prev_slot = None
             return

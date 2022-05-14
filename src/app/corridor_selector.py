@@ -304,11 +304,11 @@ class Selector:
 
     async def evt_redropped(self, slot: Slot) -> None:
         """Fires when a slot is dropped back on itself. This is effectively a left-click."""
-        if slot.contents is not None:
+        if slot.contents is not None and self.sticky_corr is not slot.contents:
             if self.sticky_corr is not None:
                 # Clear the old one.
-                for slot in self.drag_man.all_slots():
-                    slot.highlight = False
+                for old_slot in self.drag_man.all_slots():
+                    old_slot.highlight = False
             slot.highlight = True
             self.sticky_corr = slot.contents
             self.disp_corr(self.sticky_corr)
