@@ -98,7 +98,7 @@ Used software / libraries in the BEE2.4:
 * [Python][python] `{py_ver}`
 * [FFmpeg][ffmpeg] licensed under the [LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html). Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
-[pyglet]: https://bitbucket.org/pyglet/pyglet/wiki/Home
+[pyglet]: https://pyglet.org/
 [avbin]: https://avbin.github.io/AVbin/Home/Home.html
 [pillow]: http://pillow.readthedocs.io
 [perlin_noise]: https://github.com/caseman/noise
