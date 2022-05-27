@@ -19,11 +19,14 @@ from corridor import GameMode, Direction, Orient
 LOGGER = srctools.logger.get_logger(__name__)
 WIDTH: Final = corridor.IMG_WIDTH_SML + 16
 HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
-ICON_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
-ARROW_LEFT = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
-ARROW_RIGHT = ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 Slot: TypeAlias = dragdrop.Slot[corridor.CorridorUI]
 
+IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
+IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
+IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
+# TODO: Variants for other OSes with appropriate colouring.
+IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, 144)
+SELECTED_COLOR: Final = (20, 176, 255)
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
     '<Fallback>',
@@ -90,9 +93,9 @@ class Selector:
         self.wid_image.grid(row=0, column=1, sticky='nsew')
         self.wid_image_right.grid(row=0, column=2, sticky='ns')
 
-        img.apply(self.wid_image_left, ARROW_LEFT)
-        img.apply(self.wid_image, ICON_BLANK)
-        img.apply(self.wid_image_right, ARROW_RIGHT)
+        img.apply(self.wid_image_left, IMG_ARROW_LEFT)
+        img.apply(self.wid_image, IMG_CORR_BLANK)
+        img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
 
         self.wid_title = ttk.Label(frm_right, text='')
         self.wid_title.grid(row=1, column=0, sticky='ew')
