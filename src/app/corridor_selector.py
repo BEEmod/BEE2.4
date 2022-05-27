@@ -25,7 +25,7 @@ IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HE
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
 IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 # TODO: Variants for other OSes with appropriate colouring.
-IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, 144)
+IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, HEIGHT)
 SELECTED_COLOR: Final = (20, 176, 255)
 
 # If no groups are defined for a style, use this.
@@ -280,6 +280,8 @@ class Selector:
         ):
             slot.contents = corr
 
+        if self.sel_count < 1:
+            self.sel_count = 1
         if self.sel_count > len(corr_list):
             self.sel_count = len(corr_list)
 
@@ -293,11 +295,28 @@ class Selector:
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
-        self.drag_man.flow_slots(self.canvas, (
+        corr_order = [
             slot for slot in
-            self.drag_man.flexi_slots()
+            self.slots
             if slot.contents is not None
-        ))
+        ]
+        self.drag_man.flow_slots(self.canvas, corr_order)
+        try:
+            slot = corr_order[self.sel_count - 1]
+        except IndexError:
+            # No corridors, hide it.
+            self.canvas.coords(
+                self.sel_handle_pos,
+                -16, 0,
+            )
+            self.canvas.delete('selector_bg')
+            return
+
+        x, y = slot.canvas_pos(self.canvas)
+        self.canvas.coords(
+            self.sel_handle_pos,
+            x + WIDTH, y - 2,
+        )
 
     async def evt_hover_enter(self, slot: Slot) -> None:
         """Display the specified corridor temporarily on hover."""
