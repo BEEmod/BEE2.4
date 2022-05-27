@@ -9,6 +9,7 @@ import trio
 
 import event
 import packages
+
 from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
@@ -70,6 +71,7 @@ class Selector:
         self.img_ind = 0
         self.slots = []
         self.sel_count = 0
+        self.sel_handle_moving = False
 
         self.win = tk.Toplevel(TK_ROOT)
         self.win.withdraw()
@@ -165,6 +167,9 @@ class Selector:
             anchor='nw',
             window=self.sel_handle,
         )
+        self.sel_handle.bind(tk_tools.EVENTS['LEFT'], self._evt_sel_pickup)
+        self.sel_handle.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_sel_move)
+        self.sel_handle.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_sel_drop)
 
         self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](self.win, size=(WIDTH, HEIGHT))
         drop.event.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
@@ -183,7 +188,6 @@ class Selector:
             )
             self.sel_count = random.randint(1, count)
             background_run(self.reflow)
-        self.sel_handle.bind(tk_tools.EVENTS['LEFT'], shuffle)
 
     def show(self) -> None:
         """Display the window."""
@@ -197,6 +201,10 @@ class Selector:
 
     async def _on_changed(self, _: None) -> None:
         """Store configuration when changed."""
+        self.store_conf()
+
+    def store_conf(self) -> None:
+        """Store the configuration for the current corridor."""
         slots = [
             slot.contents.instance.casefold() if slot.contents is not None else ''
             for slot in self.slots
@@ -304,6 +312,8 @@ class Selector:
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
+        # Move empties to the end.
+        self.slots.sort(key=lambda slt: 1 if slt.contents is not None else 0)
         corr_order = [
             slot for slot in
             self.slots
@@ -325,7 +335,7 @@ class Selector:
         for row_off in range(0, len(corr_order), pos.columns):
             if row_off < self.sel_count <= row_off + pos.columns:
                 # Placing selector on this row.
-                x = pos.xpos(self.sel_count - row_off)
+                x = pos.xpos(self.sel_count - row_off - 1)
                 y = pos.ypos(row_off // pos.columns)
                 self.canvas.coords(
                     self.sel_handle_pos,
@@ -375,6 +385,46 @@ class Selector:
             slot.highlight = True
             self.sticky_corr = slot.contents
             self.disp_corr(self.sticky_corr)
+
+    def _evt_sel_pickup(self, _: tk.Event) -> None:
+        """Fired when clicking on the selector handle."""
+        self.sel_handle_moving = True
+        self.sel_handle.grab_set_global()
+        sound.fx('config')
+
+    def _evt_sel_move(self, e: tk.Event) -> None:
+        """Fired when moving the selector handle."""
+        if not self.sel_handle_moving:
+            return
+        slots = [
+            slot for slot in
+            self.slots
+            if slot.contents is not None
+        ]
+        if not slots:
+            return
+        pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
+        x = e.x_root - self.canvas.winfo_rootx()
+        y = e.y_root - self.canvas.winfo_rooty()
+        row = max(0, (y - pos.spacing) // pos.item_height)
+        col = max(0, (x - pos.spacing) // pos.item_width)
+
+        if col >= pos.columns:
+            col = pos.columns - 1
+        new = pos.columns * row + col + 1
+        if new > len(slots):
+            new = len(slots)
+
+        if self.sel_count != new:
+            self.sel_count = new
+            background_run(self.reflow)
+
+    def _evt_sel_drop(self, _: tk.Event) -> None:
+        """Fired when dropping the selector handle."""
+        self.sel_handle_moving = False
+        self.sel_handle.grab_release()
+        self.store_conf()
+        sound.fx('config')
 
     def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
         """Display the specified corridor, or reset if None."""

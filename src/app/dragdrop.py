@@ -125,7 +125,7 @@ class Positioner:
         self.width = canvas.winfo_width()
         self.height = canvas.winfo_height()
 
-        self.columns = (self.width - spacing) // self.item_width - 1
+        self.columns = (self.width - spacing) // self.item_width
         if self.columns < 1:
             # Can't fit, they're going to stick out.
             self.columns = 1
@@ -162,7 +162,7 @@ class Positioner:
             x = self.xpos(self.current)
             slot.canvas(self.canvas, x, self.yoff, tag)
             self.current += 1
-            if self.current > self.columns:
+            if self.current >= self.columns:
                 self.advance_row()
 
 
