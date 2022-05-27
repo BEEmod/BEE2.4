@@ -5,7 +5,6 @@ import pickle
 from collections import defaultdict
 from typing import Dict, List, Tuple, Mapping
 from typing_extensions import Final
-from enum import Enum
 import itertools
 
 import attrs
@@ -63,19 +62,12 @@ class CorridorUI(Corridor):
         )
 
 
-class RandMode(Enum):
-    """Kind of randomisation to use."""
-    SINGLE = 'single'
-    EDITOR = 'editor'  # 4 or 7, depending on editor instance count.
-    ALL = 'all'  # Use all regardless.
-
-
-@config.register('Corridor', uses_id=True)
+@config.register('Corridor', uses_id=True, version=1)
 @attrs.frozen
 class Config(config.Data):
     """The current configuration for a corridor."""
-    selected: List[str] = attrs.Factory(list)
-    random: RandMode = RandMode.EDITOR
+    slots: List[str] = attrs.Factory(list)
+    selected: int = 0  # Number of corridors to use.
 
     @staticmethod
     def get_id(
@@ -93,22 +85,18 @@ class Config(config.Data):
         assert version == 1, version
         corr = [
             prop.value
-            for prop in data.find_children('selected')
+            for prop in data.find_children('corridors')
         ]
-        try:
-            rand = RandMode(data['random', 'editor'])
-        except ValueError:
-            rand = RandMode.EDITOR
-
-        return Config(corr, rand)
+        selected = data.int('selected')
+        return Config(corr, min(len(corr), selected))
 
     def export_kv1(self) -> Property:
         """Serialise to a Keyvalues1 config."""
         return Property('Corridor', [
-            Property('random', self.random.value),
-            Property('Selected', [
+            Property('selected', str(self.selected)),
+            Property('Corridors', [
                 Property('Corridor', corr)
-                for corr in self.selected
+                for corr in self.slots
             ])
         ])
 
@@ -117,22 +105,21 @@ class Config(config.Data):
         """Parse from DMX configs."""
         assert version == 1, version
         try:
-            rand = RandMode(data['random'].val_str)
-        except (KeyError, TypeError, ValueError):
-            rand = RandMode.EDITOR
-        try:
-            corr = list(data['selected'].iter_str())
+            corr = list(data['corridors'].iter_str())
         except KeyError:
             corr = []
-
-        return Config(corr, rand)
+        try:
+            selected = data['selected'].val_int
+        except (KeyError, ValueError):
+            selected = 0
+        return Config(corr, min(len(corr), selected))
 
     def export_dmx(self) -> Element:
         """Serialise to DMX configs."""
         elem = Element('Corridor', 'DMEConfig')
-        elem['random'] = self.random.value
-        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
-        selected.extend(self.selected)
+        elem['selected'] = self.selected
+        elem['corridors'] = selected = DMAttr.array('corridors', DMXValue.STR)
+        selected.extend(self.slots)
         return elem
 
 
