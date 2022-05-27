@@ -25,8 +25,8 @@ IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HE
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
 IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 # TODO: Variants for other OSes with appropriate colouring.
-IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, HEIGHT)
-SELECTED_COLOR: Final = (20, 176, 255)
+IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, 120)
+SELECTED_COLOR: Final = '#14B0FF'
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
@@ -158,14 +158,12 @@ class Selector:
         reflow = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
-        self.sel_handle = ttk.Label(self.canvas, cursor=tk_tools.Cursors.MOVE_ITEM)
+        self.sel_handle = ttk.Label(self.canvas, cursor=tk_tools.Cursors.MOVE_ITEM, border=0)
         img.apply(self.sel_handle, IMG_SELECTOR)
         self.sel_handle_pos = self.canvas.create_window(
             128, 128,
             anchor='nw',
             window=self.sel_handle,
-            width=IMG_SELECTOR.width,
-            height=IMG_SELECTOR.height,
         )
 
         self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](self.win, size=(WIDTH, HEIGHT))
@@ -175,6 +173,17 @@ class Selector:
         drop.event.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
         drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
         self.load_corridors(packset)
+
+        def shuffle(_) -> None:
+            """Temp function for testing."""
+            import random
+            count = sum(
+                1 for slot in self.slots
+                if slot.contents is not None
+            )
+            self.sel_count = random.randint(1, count)
+            background_run(self.reflow)
+        self.sel_handle.bind(tk_tools.EVENTS['LEFT'], shuffle)
 
     def show(self) -> None:
         """Display the window."""
@@ -300,23 +309,49 @@ class Selector:
             self.slots
             if slot.contents is not None
         ]
-        self.drag_man.flow_slots(self.canvas, corr_order)
-        try:
-            slot = corr_order[self.sel_count - 1]
-        except IndexError:
-            # No corridors, hide it.
+        self.canvas.delete('slots')
+        self.canvas.delete('sel_bg')
+
+        if not corr_order:
+            # No corridors, hide selector.
             self.canvas.coords(
                 self.sel_handle_pos,
                 -16, 0,
             )
-            self.canvas.delete('selector_bg')
             return
 
-        x, y = slot.canvas_pos(self.canvas)
-        self.canvas.coords(
-            self.sel_handle_pos,
-            x + WIDTH, y - 2,
-        )
+        pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
+        selecting = True
+        for row_off in range(0, len(corr_order), pos.columns):
+            if row_off < self.sel_count <= row_off + pos.columns:
+                # Placing selector on this row.
+                x = pos.xpos(self.sel_count - row_off)
+                y = pos.ypos(row_off // pos.columns)
+                self.canvas.coords(
+                    self.sel_handle_pos,
+                    x + WIDTH, y - 6,
+                )
+                selecting = False
+                self.canvas.create_rectangle(
+                    0, y - 4,
+                    x + WIDTH,
+                    y + HEIGHT + 4,
+                    fill=SELECTED_COLOR,
+                    outline='',
+                    tags=('sel_bg', ),
+                )
+            elif selecting:
+                # On another row, extend all the way.
+                y = pos.ypos(row_off // pos.columns)
+                self.canvas.create_rectangle(
+                    0, y - 4,
+                    pos.width, y + HEIGHT + 4,
+                    fill=SELECTED_COLOR,
+                    outline='',
+                    tags=('sel_bg', ),
+                )
+        pos.place_slots(corr_order, 'slots')
+        pos.resize_canvas()
 
     async def evt_hover_enter(self, slot: Slot) -> None:
         """Display the specified corridor temporarily on hover."""
