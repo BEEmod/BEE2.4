@@ -13,7 +13,7 @@ from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
-from corridor import GameMode, Direction, Orient
+from corridor import GameMode, Direction, Orient, CORRIDOR_COUNTS
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -27,6 +27,7 @@ IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 # TODO: Variants for other OSes with appropriate colouring.
 IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, 144)
 SELECTED_COLOR: Final = (20, 176, 255)
+
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
     '<Fallback>',
@@ -55,9 +56,9 @@ class Selector:
     cur_images: Sequence[img.Handle]
     img_ind: int
 
-    # The 7 selected slots, and the rest.
-    selected: List[Slot]
-    unused: List[Slot]
+    # The slots items are on.
+    slots: List[Slot]
+    sel_count: int # Number which are being used.
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -65,6 +66,11 @@ class Selector:
     conf_id: str
 
     def __init__(self, packset: packages.PackagesSet) -> None:
+        self.sticky_corr = None
+        self.img_ind = 0
+        self.slots = []
+        self.sel_count = 0
+
         self.win = tk.Toplevel(TK_ROOT)
         self.win.withdraw()
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
@@ -78,9 +84,6 @@ class Selector:
         frm_right = ttk.Frame(self.win)
         frm_right.columnconfigure(0, weight=1)
         frm_right.grid(row=0, column=1, sticky='ns')
-
-        self.sticky_corr = None
-        self.img_ind = 0
         frm_img = ttk.Frame(frm_right, relief='raised', width=2)
         frm_img.grid(row=0, column=0, sticky='ew')
 
@@ -155,17 +158,22 @@ class Selector:
         reflow = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
+        self.sel_handle = ttk.Label(self.canvas, cursor=tk_tools.Cursors.MOVE_ITEM)
+        img.apply(self.sel_handle, IMG_SELECTOR)
+        self.sel_handle_pos = self.canvas.create_window(
+            128, 128,
+            anchor='nw',
+            window=self.sel_handle,
+            width=IMG_SELECTOR.width,
+            height=IMG_SELECTOR.height,
+        )
+
         self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](self.win, size=(WIDTH, HEIGHT))
         drop.event.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
         drop.event.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
         drop.event.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
         drop.event.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
         drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
-        self.selected = [
-            drop.slot_target(self.canvas)
-            for _ in range(7)
-        ]
-        self.unused_count = 0
         self.load_corridors(packset)
 
     def show(self) -> None:
@@ -180,11 +188,16 @@ class Selector:
 
     async def _on_changed(self, _: None) -> None:
         """Store configuration when changed."""
-        selected = [
+        slots = [
             slot.contents.instance.casefold() if slot.contents is not None else ''
-            for slot in self.selected
+            for slot in self.slots
         ]
-        config.store_conf(corridor.Config(selected), self.conf_id)
+        # Drop empties at the end.
+        while slots and not slots[-1]:
+            slots.pop()
+
+        config.store_conf(corridor.Config(slots, min(len(self.slots), self.sel_count)), self.conf_id)
+
         # Fix up the highlight, if it was moved.
         for slot in self.drag_man.all_slots():
             slot.highlight = slot.contents is not None and slot.contents is self.sticky_corr
@@ -226,37 +239,50 @@ class Selector:
                 )
             corr_list = []
 
-        # Ensure enough flexible slots exist to hold all of them, and clear em all.
-        for slot in self.drag_man.all_slots():
+        # Ensure enough slots exist to hold all of them, and clear em all.
+        for slot in self.slots:
             slot.highlight = False
             slot.contents = None
-        for _ in range(len(corr_list) - self.unused_count):
-            self.drag_man.slot_flexi(self.canvas)
-        self.unused_count = len(corr_list)
-        # Never fill the invisible slots.
-        fillable = self.selected[:corridor.CORRIDOR_COUNTS[mode, direction]]
+        for _ in range(len(corr_list) + 1 - len(self.slots)):
+            self.slots.append(self.drag_man.slot_flexi(self.canvas))
 
         inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
+        next_slot = 0
         if conf.selected:
-            for slot, sel_id in zip(fillable, conf.selected):
+            self.sel_count = conf.selected
+            for i, sel_id in enumerate(conf.slots):
                 if not sel_id:
+                    # If empty slots are before the cursor, shift it to compensate.
+                    if i <= self.sel_count:
+                        self.sel_count -= 1
                     continue
                 try:
-                    slot.contents = inst_to_corr.pop(sel_id.casefold())
+                    self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
                 except KeyError:
                     LOGGER.warning('Unknown corridor instance "{}" in config!')
+                    if i <= self.sel_count:
+                        self.sel_count -= 1
+                else:
+                    next_slot += 1
         else:
             # No configuration, populate with the defaults.
-            for slot, corr in zip(fillable, self.corr_group.defaults(mode, direction, orient)):
+            defaults = self.corr_group.defaults(mode, direction, orient)
+            for slot, corr in zip(self.slots, defaults):
                 slot.contents = corr
                 del inst_to_corr[corr.instance.casefold()]
+            next_slot = len(defaults)
+            self.sel_count = max(next_slot, CORRIDOR_COUNTS[mode, direction])
 
-        # Put all remaining in flexi slots.
+        # Put all remaining in a spare slot.
         for slot, corr in zip(
-            self.drag_man.flexi_slots(),
+            self.slots[next_slot:],
             sorted(inst_to_corr.values(), key=lambda corr: corr.name),
         ):
             slot.contents = corr
+
+        if self.sel_count > len(corr_list):
+            self.sel_count = len(corr_list)
+
         self.drag_man.load_icons()
 
         # Reset item display, it's invalid.
@@ -267,31 +293,11 @@ class Selector:
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
-        count = corridor.CORRIDOR_COUNTS[self.btn_mode.current, self.btn_direction.current]
-        # The first item is always visible.
-        yoff = self.drag_man.flow_slots(self.canvas, self.selected[:1], tag='sel_1')
-        if count >= 4:
-            yoff = self.drag_man.flow_slots(self.canvas, self.selected[1:4], tag='sel_2', yoff=yoff)
-        else:
-            self.canvas.delete('sel_2')
-        if count >= 7:
-            yoff = self.drag_man.flow_slots(self.canvas, self.selected[4:], tag='sel_3', yoff=yoff)
-        else:
-            self.canvas.delete('sel_3')
-
-        yoff += 16
-        self.canvas.coords(self.unsel_div, 8, yoff, self.canvas.winfo_width()-16, yoff)
-        yoff += 16
-
-        self.drag_man.flow_slots(
-            self.canvas, (
-                slot for slot in
-                self.drag_man.flexi_slots()
-                if slot.contents is not None
-            ),
-            yoff=yoff,
-            tag='unselected',
-        )
+        self.drag_man.flow_slots(self.canvas, (
+            slot for slot in
+            self.drag_man.flexi_slots()
+            if slot.contents is not None
+        ))
 
     async def evt_hover_enter(self, slot: Slot) -> None:
         """Display the specified corridor temporarily on hover."""
@@ -328,7 +334,7 @@ class Selector:
         else:  # Reset.
             self.wid_title['text'] = ''
             self.wid_desc.set_text(corridor.EMPTY_DESC)
-            img.apply(self.wid_image, ICON_BLANK)
+            img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))
             self.wid_image_right.state(('disabled', ))
 
