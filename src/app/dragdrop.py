@@ -79,6 +79,14 @@ class SlotType(Enum):
     FLEXI = 'flexi'
 
 
+class GeoManager(Enum):
+    """Kind of geometry manager used for a slot."""
+    GRID = 'grid'
+    PLACE = 'place'
+    PACK = 'pack'
+    CANVAS = 'canvas'
+
+
 def in_bbox(
     x: float, y: float,
     left: float, top: float,
@@ -471,9 +479,9 @@ class Slot(Generic[ItemT]):
     _contents: Optional[ItemT]
 
     # The geometry manager used to position this.
-    # Either 'pack', 'place', 'grid', or '_canvas_XX' to indicate
-    # we're on the canvas with ID XX.
-    _pos_type: Optional[str]
+    _pos_type: Optional[GeoManager]
+    # If canvas, the tag and x/y coords.
+    _canv_info: Optional[Tuple[int, int, int]]
 
     # The kind of slot.
     type: SlotType
@@ -491,6 +499,7 @@ class Slot(Generic[ItemT]):
         self.kind = kind
         self._contents = None
         self._pos_type = None
+        self._canv_info = None
         self._lbl = ttk.Label(parent, anchor='center')
         self._selected = False
         img.apply(self._lbl, man._img_blank)
@@ -609,22 +618,25 @@ class Slot(Generic[ItemT]):
 
     def grid(self, *args, **kwargs) -> None:
         """Grid-position this slot."""
-        self._pos_type = 'grid'
+        self._pos_type = GeoManager.GRID
+        self._canv_info = None
         self._lbl.grid(*args, **kwargs)
 
     def place(self, *args, **kwargs) -> None:
         """Place-position this slot."""
-        self._pos_type = 'place'
+        self._pos_type = GeoManager.PLACE
+        self._canv_info = None
         self._lbl.place(*args, **kwargs)
 
     def pack(self, *args, **kwargs) -> None:
         """Pack-position this slot."""
-        self._pos_type = 'pack'
+        self._pos_type = GeoManager.PACK
+        self._canv_info = None
         self._lbl.pack(*args, **kwargs)
 
     def canvas(self, canv: tkinter.Canvas, x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""
-        if self._pos_type in ['place', 'pack', 'grid']:
+        if self._pos_type is not None and self._pos_type is not GeoManager.CANVAS:
             raise ValueError("Can't add already positioned slot!")
         obj_id = canv.create_window(
             x, y,
@@ -634,20 +646,31 @@ class Slot(Generic[ItemT]):
             window=self._lbl,
             tags=(tag,),
         )
-        self._pos_type = f'_canvas_{obj_id}'
+        self._pos_type = GeoManager.CANVAS
+        self._canv_info = (obj_id, x, y)
+
+    def canvas_pos(self, canv: tkinter.Canvas) -> Tuple[int, int]:
+        """If on a canvas, fetch the current x/y position."""
+        if self._canv_info is not None:
+            _, x, y = self._canv_info
+            return x, y
+        raise ValueError('Not on a canvas!')
 
     def hide(self) -> None:
         """Remove this slot from the set position manager."""
         if self._pos_type is None:
             raise ValueError('Not added to a geometry manager yet!')
-        elif self._pos_type.startswith('_canvas_'):
+        elif self._pos_type is GeoManager.CANVAS:
             # Attached via canvas, with an ID as suffix.
-            canv = self._lbl.winfo_parent()
+            canv = self._lbl.nametowidget(self._lbl.winfo_parent())
             assert isinstance(canv, tkinter.Canvas)
-            canv.delete(self._pos_type[8:])
+            assert self._canv_info is not None
+            obj_id, _, _ = self._canv_info
+            canv.delete(obj_id)
         else:
-            getattr(self._lbl, self._pos_type + '_forget')()
+            getattr(self._lbl, self._pos_type.value + '_forget')()
         self._pos_type = None
+        self._canv_info = None
 
     def _evt_start(self, event: tkinter.Event) -> None:
         """Start dragging."""
