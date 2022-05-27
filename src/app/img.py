@@ -745,12 +745,10 @@ class ImgIcon(Handle):
 
         img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
 
-        if width < ico.width or height < ico.height:
-            # Crop to the middle part.
-            img.alpha_composite(ico, source=((ico.width - width) // 2, (ico.height - height) // 2))
-        else:
+        if width >= ico.width and height >= ico.height:
             # Center the 64x64 icon.
             img.alpha_composite(ico, ((width - ico.width) // 2, (height - ico.height) // 2))
+        # Else, no room, don't bother.
 
         return img
 
