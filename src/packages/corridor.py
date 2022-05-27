@@ -367,7 +367,6 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 Config.get_id(style_id, mode, direction, orient),
                 blank,
             )
-            count = CORRIDOR_COUNTS[mode, direction]
             try:
                 inst_to_corr = {
                     corr.instance.casefold(): corr
@@ -383,29 +382,19 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 export[mode, direction, orient] = []
                 continue
 
-            if not conf.selected:  # Use default setup.
+            if not conf.slots:  # Use default setup.
                 export[mode, direction, orient] = [
                     corr.strip_ui() for corr in
                     group.defaults(mode, direction, orient)
                 ]
                 continue
-            
-            if conf.random is RandMode.SINGLE:
-                try:
-                    chosen = [inst_to_corr[conf.selected[0]]]
-                except KeyError:
-                    LOGGER.warning('Invalid corridor "{}"!', conf.selected[0])
-                    chosen = group.defaults(mode, direction, orient)
-            elif conf.random is RandMode.EDITOR:
-                chosen = [
-                    corr
-                    for corr_id in conf.selected[:count]
-                    if (corr := inst_to_corr.get(corr_id.casefold())) is not None
-                ]
-            elif conf.random is RandMode.ALL:
-                chosen = group.corridors[mode, direction, orient]
-            else:
-                raise AssertionError(conf.random)
+
+            chosen = [
+                corr
+                for corr_id in conf.slots
+                if (corr := inst_to_corr.get(corr_id.casefold())) is not None
+            ][:conf.selected]
+
             if not chosen:
                 LOGGER.warning(
                     'No corridors selected for {}:{}_{}_{}', 
