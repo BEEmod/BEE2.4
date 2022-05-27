@@ -100,6 +100,72 @@ def in_bbox(
     return True
 
 
+class Positioner:
+    """Utility for positioning slots in a grid on a canvas.
+
+    - spacing is the amount added on each side of each slot.
+    - yoff is the offset from the top, the new height is then returned to allow chaining.
+    """
+    def __init__(
+        self,
+        canvas: tkinter.Canvas,
+        width: int,
+        height: int,
+        spacing: int=16 if utils.MAC else 8,
+        yoff: int=0,
+    ) -> None:
+        self.canvas = canvas
+        self.spacing = spacing
+        self.current = 0  # Current x index.
+        self.yoff = yoff + self.spacing
+
+        self.item_width = width + spacing * 2
+        self.item_height = height + spacing * 2
+
+        self.width = canvas.winfo_width()
+        self.height = canvas.winfo_height()
+
+        self.columns = (self.width - spacing) // self.item_width - 1
+        if self.columns < 1:
+            # Can't fit, they're going to stick out.
+            self.columns = 1
+
+    def xpos(self, col: int) -> int:
+        """Return the x offset of a column"""
+        return self.spacing + col * self.item_width
+
+    def ypos(self, row: int) -> int:
+        """Return the y offset of a row."""
+        return self.yoff + row * self.item_height
+
+    def advance_row(self) -> None:
+        """Advance to the next row."""
+        self.current = 0
+        self.yoff += self.item_height
+
+    def resize_canvas(self) -> None:
+        """Set the scroll region of the canvas to fit items.
+
+        This advances a row if the last is nonempty.
+        """
+        if self.current != 0:
+            self.advance_row()
+        self.canvas['scrollregion'] = (
+            0, 0,
+            self.columns * self.item_width + self.spacing,
+            self.yoff,
+        )
+
+    def place_slots(self, slots: Iterable[Slot], tag: str, xoff: int=0) -> None:
+        """Place these slots gradually."""
+        for slot in slots:
+            x = self.xpos(self.current)
+            slot.canvas(self.canvas, x, self.yoff, tag)
+            self.current += 1
+            if self.current > self.columns:
+                self.advance_row()
+
+
 # noinspection PyProtectedMember
 class Manager(Generic[ItemT]):
     """Manages a set of drag-drop points."""
@@ -271,37 +337,10 @@ class Manager(Generic[ItemT]):
         - yoff is the offset from the top, the new height is then returned to allow chaining.
         """
         canv.delete(tag)
-        item_width = self.width + spacing * 2
-        item_height = self.height + spacing * 2
-
-        col_count = (canv.winfo_width() - spacing) // item_width - 1
-        if col_count < 1:
-            # Oh well, they're going to stick out.
-            col_count = 1
-
-        row = col = 0
-        for slot in slots:
-            slot.canvas(
-                canv,
-                spacing + col * item_width,
-                yoff + spacing + row * item_height,
-                tag,
-            )
-            col += 1
-            if col > col_count:
-                col = 0
-                row += 1
-
-        if col == 0:
-            row -= 1
-
-        height = yoff + (row + 1) * item_height + spacing
-        canv['scrollregion'] = (
-            0, 0,
-            col_count * item_width + spacing,
-            height,
-        )
-        return height
+        pos = Positioner(canv, self.width, self.height, spacing, yoff)
+        pos.place_slots(slots, tag)
+        pos.resize_canvas()
+        return pos.yoff
 
     def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
         """Find the slot under this X,Y (if any). Sources are ignored."""
