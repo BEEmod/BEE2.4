@@ -195,7 +195,7 @@ class Manager(Generic[ItemT]):
         # If dragging, the item we are dragging.
         self._cur_drag: Optional[ItemT] = None
         # While dragging, the place we started at.
-        self._cur_prev_slot: Optional[Slot[ItemT]] = None
+        self._cur_slot: Optional[Slot[ItemT]] = None
 
         self.event = event.EventManager()
 
@@ -208,6 +208,11 @@ class Manager(Generic[ItemT]):
         img.apply(drag_lbl, self._img_blank)
         drag_lbl.grid(row=0, column=0)
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
+
+    @property
+    def cur_slot(self) -> Optional[Slot[ItemT]]:
+        """If dragging, the current slot."""
+        return self._cur_slot
 
     def slot_target(
         self,
@@ -419,7 +424,7 @@ class Manager(Generic[ItemT]):
                         show_group = True
 
         self._display_item(self._drag_lbl, self._cur_drag, show_group)
-        self._cur_prev_slot = slot
+        self._cur_slot = slot
 
         sound.fx('config')
 
@@ -438,7 +443,7 @@ class Manager(Generic[ItemT]):
 
     def _evt_move(self, event: tkinter.Event) -> None:
         """Reposition the item whenever moving."""
-        if self._cur_drag is None or self._cur_prev_slot is None:
+        if self._cur_drag is None or self._cur_slot is None:
             # We aren't dragging, ignore the event.
             return
 
@@ -451,7 +456,7 @@ class Manager(Generic[ItemT]):
 
         if dest:
             self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
-        elif self._cur_prev_slot.is_source:
+        elif self._cur_slot.is_source:
             self._drag_win['cursor'] = tk_tools.Cursors.INVALID_DRAG
         elif self._has_flexi:  # If we have flexi slots, it's going back.
             self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
@@ -460,7 +465,7 @@ class Manager(Generic[ItemT]):
 
     def _evt_stop(self, evt: tkinter.Event) -> None:
         """User released the item."""
-        if self._cur_drag is None or self._cur_prev_slot is None:
+        if self._cur_drag is None or self._cur_slot is None:
             return
         self._drag_win.grab_release()
         self._drag_win.withdraw()
@@ -468,12 +473,12 @@ class Manager(Generic[ItemT]):
 
         dest = self._pos_slot(evt.x_root, evt.y_root)
 
-        if dest is self._cur_prev_slot:
+        if dest is self._cur_slot:
             # Dropped on itself, fire special event, put the item back.
             dest.contents = self._cur_drag
             background_run(self.event, Event.REDROPPED, dest)
             self._cur_drag = None
-            self._cur_prev_slot = None
+            self._cur_slot = None
             return
 
         sound.fx('config')
@@ -481,7 +486,7 @@ class Manager(Generic[ItemT]):
         if dest:  # We have a target.
             # If we have flexi slots, swap.
             if self._has_flexi:
-                self._cur_prev_slot.contents = dest.contents
+                self._cur_slot.contents = dest.contents
             dest.contents = self._cur_drag
             background_run(self.event, Event.MODIFIED)
         elif self._has_flexi:
@@ -494,12 +499,12 @@ class Manager(Generic[ItemT]):
             else:
                 LOGGER.warning('Ran out of FLEXI slots, dropped item: {}', self._cur_drag)
         # No target, and we dragged off an existing target, delete.
-        elif not self._cur_prev_slot.is_source:
+        elif not self._cur_slot.is_source:
             background_run(self.event, Event.MODIFIED)
             sound.fx('delete')
 
         self._cur_drag = None
-        self._cur_prev_slot = None
+        self._cur_slot = None
 
 
 # noinspection PyProtectedMember

@@ -312,12 +312,13 @@ class Selector:
 
     async def reflow(self, _=None) -> None:
         """Called to reposition the corridors."""
-        # Move empties to the end.
-        self.slots.sort(key=lambda slt: 1 if slt.contents is not None else 0)
+        # Move empties to the end, if not dragging.
+        if not self.drag_man.cur_slot:
+            self.slots.sort(key=lambda slt: 1 if slt.contents is not None else 2)
         corr_order = [
-            slot for slot in
-            self.slots
-            if slot.contents is not None
+            slot for slot in self.slots
+            # Even though empty, include the slot we're dragging off of.
+            if slot.contents is not None or slot is self.drag_man.cur_slot
         ]
         self.canvas.delete('slots')
         self.canvas.delete('sel_bg')
