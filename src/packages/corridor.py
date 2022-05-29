@@ -66,8 +66,8 @@ class CorridorUI(Corridor):
 @attrs.frozen
 class Config(config.Data):
     """The current configuration for a corridor."""
-    slots: List[str] = attrs.Factory(list)
-    selected: int = 0  # Number of corridors to use.
+    selected: List[str] = attrs.field(factory=list, kw_only=True)
+    unselected: List[str] = attrs.field(factory=list, kw_only=True)
 
     @staticmethod
     def get_id(
@@ -83,43 +83,49 @@ class Config(config.Data):
     def parse_kv1(cls, data: Property, version: int) -> 'Config':
         """Parse from KeyValues1 configs."""
         assert version == 1, version
-        corr = [
-            prop.value
-            for prop in data.find_children('corridors')
-        ]
-        selected = data.int('selected')
-        return Config(corr, min(len(corr), selected))
+        selected = []
+        unselected = []
+        for child in data.find_children('Corridors'):
+            if child.name == 'selected' and not child.has_children():
+                selected.append(child.value)
+            elif child.name == 'unselected' and not child.has_children():
+                unselected.append(child.value)
+
+        return Config(selected=selected, unselected=unselected)
 
     def export_kv1(self) -> Property:
         """Serialise to a Keyvalues1 config."""
-        return Property('Corridor', [
-            Property('selected', str(self.selected)),
-            Property('Corridors', [
-                Property('Corridor', corr)
-                for corr in self.slots
-            ])
-        ])
+        prop = Property('Corridors', [])
+        for corr in self.selected:
+            prop.append(Property('selected', corr))
+        for corr in self.unselected:
+            prop.append(Property('unselected', corr))
+
+        return Property('Corridor', [prop])
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'Config':
         """Parse from DMX configs."""
         assert version == 1, version
         try:
-            corr = list(data['corridors'].iter_str())
+            selected = list(data['selected'].iter_str())
         except KeyError:
-            corr = []
+            selected = []
         try:
-            selected = data['selected'].val_int
-        except (KeyError, ValueError):
-            selected = 0
-        return Config(corr, min(len(corr), selected))
+            unselected = list(data['unselected'].iter_str())
+        except KeyError:
+            unselected = []
+
+        return Config(selected=selected, unselected=unselected)
 
     def export_dmx(self) -> Element:
         """Serialise to DMX configs."""
         elem = Element('Corridor', 'DMEConfig')
-        elem['selected'] = self.selected
-        elem['corridors'] = selected = DMAttr.array('corridors', DMXValue.STR)
+        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
         selected.extend(self.slots)
+        elem['unselected'] = unselected = DMAttr.array('unselected', DMXValue.STR)
+        unselected.extend(self.slots)
+
         return elem
 
 
@@ -382,7 +388,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 export[mode, direction, orient] = []
                 continue
 
-            if not conf.slots:  # Use default setup.
+            if not conf.selected:  # Use default setup.
                 export[mode, direction, orient] = [
                     corr.strip_ui() for corr in
                     group.defaults(mode, direction, orient)
@@ -391,9 +397,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
             chosen = [
                 corr
-                for corr_id in conf.slots
+                for corr_id in conf.selected
                 if (corr := inst_to_corr.get(corr_id.casefold())) is not None
-            ][:conf.selected]
+            ]
 
             if not chosen:
                 LOGGER.warning(
