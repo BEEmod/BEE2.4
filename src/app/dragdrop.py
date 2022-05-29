@@ -6,7 +6,7 @@ from collections import defaultdict
 import trio
 from tkinter import ttk, messagebox
 from typing import (
-    Union, Generic, TypeVar, Protocol, Optional,
+    Callable, Union, Generic, TypeVar, Protocol, Optional,
     List, Tuple, Dict, Iterator, Iterable,
 )
 import tkinter
@@ -174,14 +174,17 @@ class Manager(Generic[ItemT]):
         master: Union[tkinter.Tk, tkinter.Toplevel],
         *,
         size: Tuple[int, int]=(64, 64),
-        config_icon: bool=False
+        config_icon: bool=False,
+        pick_flexi_group: Callable[[int, int], Optional[str]]=None,
     ):
         """Create a group of drag-drop slots.
 
-        size is the size of each moved image.
-        If config_icon is set, gear icons will be added to each slot to
-        configure items. This indicates the right-click option is available,
-        and makes it easier to press that.
+        - size: This is the size of each moved image.
+        - config_icon: If set, gear icons will be added to each slot to
+          configure items. This indicates the right-click option is available,
+          and makes it easier to press that.
+        - pick_flexi_group: Allows using flexi slots. This is called with a root x/y position,
+          and should return the name of the group to pick a slot from, or None if it should cancel.
         """
         self.width, self.height = size
 
@@ -190,7 +193,7 @@ class Manager(Generic[ItemT]):
         self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
 
         self.config_icon = config_icon
-        self._has_flexi = False
+        self._pick_flexi_group = pick_flexi_group
 
         # If dragging, the item we are dragging.
         self._cur_drag: Optional[ItemT] = None
@@ -249,6 +252,7 @@ class Manager(Generic[ItemT]):
     def slot_flexi(
         self,
         parent: tkinter.Misc,
+        *,
         label: str='',
     ) -> Slot[ItemT]:
         """Add a 'flexible' slot to this group.
@@ -258,19 +262,20 @@ class Manager(Generic[ItemT]):
         sources.
         Parameters:
             - parent: Parent widget for the slot.
+            - group: The group it's categorised in, should match that returned by the
+              pick_flexi_group() callback.
             - label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
+        if not self._pick_flexi_group:
+            raise ValueError('Flexi callback missing!')
         slot: Slot[ItemT] = Slot(self, parent, SlotType.FLEXI, label)
-        self._has_flexi = True
         self._slots.append(slot)
         return slot
 
     def remove(self, slot: Slot[ItemT]) -> None:
         """Remove the specified slot."""
         self._slots.remove(slot)
-        if slot.is_flexi:
-            self._has_flexi = any(slot.is_flexi for slot in self._slots)
 
     def load_icons(self) -> None:
         """Load in all the item icons."""
@@ -458,7 +463,7 @@ class Manager(Generic[ItemT]):
             self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
         elif self._cur_slot.is_source:
             self._drag_win['cursor'] = tk_tools.Cursors.INVALID_DRAG
-        elif self._has_flexi:  # If we have flexi slots, it's going back.
+        elif self._cur_slot.is_flexi:  # If it's a flexi slot, it's going back.
             self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
         else:
             self._drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
@@ -483,21 +488,22 @@ class Manager(Generic[ItemT]):
 
         sound.fx('config')
 
-        if dest:  # We have a target.
-            # If we have flexi slots, swap.
-            if self._has_flexi:
-                self._cur_slot.contents = dest.contents
-            dest.contents = self._cur_drag
-            background_run(self.event, Event.MODIFIED)
-        elif self._has_flexi:
-            # We have flexi targets, it goes there.
+        if self._cur_slot.is_flexi:
+            # It's a flexi slot, lookup the group and drop.
+            group = self._pick_flexi_group(evt.x_root, evt.y_root)
             for slot in self._slots:
                 if slot.is_flexi and slot.contents is None:
                     slot.contents = self._cur_drag
+                    slot.flexi_group = group
                     background_run(self.event, Event.MODIFIED)
                     break
             else:
-                LOGGER.warning('Ran out of FLEXI slots, dropped item: {}', self._cur_drag)
+                LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
+                self._cur_slot.contents = self._cur_drag
+                background_run(self.event, Event.REDROPPED, self._cur_slot)
+        elif dest:  # We have a target.
+            dest.contents = self._cur_drag
+            background_run(self.event, Event.MODIFIED)
         # No target, and we dragged off an existing target, delete.
         elif not self._cur_slot.is_source:
             background_run(self.event, Event.MODIFIED)
@@ -518,6 +524,8 @@ class Slot(Generic[ItemT]):
 
     # Optional ability to highlight a specific slot.
     _is_highlighted: bool
+
+    flexi_group: str  # If a flexi slot, the group.
 
     # The current thing in the slot.
     _contents: Optional[ItemT]
@@ -546,12 +554,15 @@ class Slot(Generic[ItemT]):
         self._canv_info = None
         self._lbl = ttk.Label(parent, anchor='center')
         self._selected = False
+
+        self.flexi_group = ''
+
         img.apply(self._lbl, man._img_blank)
         tk_tools.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
         self._lbl.bind('<Enter>', self._evt_hover_enter)
         self._lbl.bind('<Leave>', self._evt_hover_exit)
-
+        # Bind this not the self variable.
         config_event = self._evt_configure
         tk_tools.bind_rightclick(self._lbl, config_event)
 
@@ -722,7 +733,10 @@ class Slot(Generic[ItemT]):
 
     def _evt_fastdrag(self, event: tkinter.Event) -> None:
         """Quickly add/remove items by shift-clicking."""
-        if self.is_source or self.is_flexi:
+        if self.is_flexi:  # TODO:
+            return
+
+        if self.is_source:
             # Add this item to the first free position.
             item = self.contents
             for slot in self.man._slots:
@@ -742,17 +756,6 @@ class Slot(Generic[ItemT]):
             # Failed.
             sound.fx('delete')
         # Else: target.
-        elif self.man._has_flexi:
-            # Got flexi slots, put it there.
-            for slot in self.man._slots:
-                if slot.is_flexi and slot.is_visible and slot.contents is None:
-                    slot.contents = self.contents
-                    self.contents = None
-                    background_run(self.man.event, Event.MODIFIED)
-                    sound.fx('config')
-                    return
-            else:
-                LOGGER.warning('Ran out of FLEXI slots, dropped item: {}', self.contents)
         else:
             # Fast-delete this.
             self.contents = None

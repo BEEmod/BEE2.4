@@ -14,7 +14,7 @@ from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
-from corridor import GameMode, Direction, Orient, CORRIDOR_COUNTS
+from corridor import GameMode, Direction, Orient
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -25,9 +25,11 @@ Slot: TypeAlias = dragdrop.Slot[corridor.CorridorUI]
 IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
 IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
-# TODO: Variants for other OSes with appropriate colouring.
-IMG_SELECTOR: Final = img.Handle.builtin('BEE2/sel_divider_win', 16, 120)
 SELECTED_COLOR: Final = '#14B0FF'
+
+GRP_SELECTED: Final = 'selected'
+GRP_UNSELECTED: Final = 'unselected'
+HEADER_HEIGHT: Final = 20
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
@@ -53,13 +55,13 @@ class Selector:
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
     sticky_corr: Optional[corridor.CorridorUI]
-    # Currently selected image.
+    # The currently selected images.
     cur_images: Sequence[img.Handle]
     img_ind: int
 
     # The slots items are on.
     slots: List[Slot]
-    sel_count: int # Number which are being used.
+    sel_count: int  # Number which are being used.
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -160,34 +162,30 @@ class Selector:
         reflow = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
-        self.sel_handle = ttk.Label(self.canvas, cursor=tk_tools.Cursors.MOVE_ITEM, border=0)
-        img.apply(self.sel_handle, IMG_SELECTOR)
-        self.sel_handle_pos = self.canvas.create_window(
-            128, 128,
+        self.header_sel = tk_tools.LineHeader(self.canvas, gettext('Selected:'))
+        self.header_unsel = tk_tools.LineHeader(self.canvas, gettext('Unused:'))
+        self.header_sel_win = self.canvas.create_window(
+            0, 384,
             anchor='nw',
-            window=self.sel_handle,
+            window=self.header_sel,
         )
-        self.sel_handle.bind(tk_tools.EVENTS['LEFT'], self._evt_sel_pickup)
-        self.sel_handle.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_sel_move)
-        self.sel_handle.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_sel_drop)
+        self.header_unsel_win = self.canvas.create_window(
+            0, 384,
+            anchor='nw',
+            window=self.header_unsel,
+        )
 
-        self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](self.win, size=(WIDTH, HEIGHT))
+        self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](
+            self.win,
+            size=(WIDTH, HEIGHT),
+            pick_flexi_group=self._get_flexi_group,
+        )
         drop.event.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
         drop.event.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
         drop.event.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
         drop.event.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
         drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
         self.load_corridors(packset)
-
-        def shuffle(_) -> None:
-            """Temp function for testing."""
-            import random
-            count = sum(
-                1 for slot in self.slots
-                if slot.contents is not None
-            )
-            self.sel_count = random.randint(1, count)
-            background_run(self.reflow)
 
     def show(self) -> None:
         """Display the window."""
@@ -205,15 +203,15 @@ class Selector:
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
-        slots = [
-            slot.contents.instance.casefold() if slot.contents is not None else ''
-            for slot in self.slots
-        ]
-        # Drop empties at the end.
-        while slots and not slots[-1]:
-            slots.pop()
+        selected = []
+        unselected = []
 
-        config.store_conf(corridor.Config(slots, min(len(self.slots), self.sel_count)), self.conf_id)
+        for slot in self.slots:
+            if slot.contents is not None:
+                (selected if slot.flexi_group == GRP_SELECTED
+                 else unselected).append(slot.contents.instance.casefold())
+
+        config.store_conf(corridor.Config(selected=selected, unselected=unselected), self.conf_id)
 
         # Fix up the highlight, if it was moved.
         for slot in self.drag_man.all_slots():
@@ -260,25 +258,19 @@ class Selector:
         for slot in self.slots:
             slot.highlight = False
             slot.contents = None
+            slot.flexi_group = GRP_UNSELECTED
         for _ in range(len(corr_list) + 1 - len(self.slots)):
             self.slots.append(self.drag_man.slot_flexi(self.canvas))
 
         inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
         next_slot = 0
         if conf.selected:
-            self.sel_count = conf.selected
-            for i, sel_id in enumerate(conf.slots):
-                if not sel_id:
-                    # If empty slots are before the cursor, shift it to compensate.
-                    if i <= self.sel_count:
-                        self.sel_count -= 1
-                    continue
+            for sel_id in conf.selected:
                 try:
                     self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
+                    self.slots[next_slot].flexi_group = GRP_SELECTED
                 except KeyError:
                     LOGGER.warning('Unknown corridor instance "{}" in config!')
-                    if i <= self.sel_count:
-                        self.sel_count -= 1
                 else:
                     next_slot += 1
         else:
@@ -286,9 +278,18 @@ class Selector:
             defaults = self.corr_group.defaults(mode, direction, orient)
             for slot, corr in zip(self.slots, defaults):
                 slot.contents = corr
+                slot.flexi_group = GRP_SELECTED
                 del inst_to_corr[corr.instance.casefold()]
             next_slot = len(defaults)
-            self.sel_count = max(next_slot, CORRIDOR_COUNTS[mode, direction])
+
+        for sel_id in conf.unselected:
+            try:
+                self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
+                self.slots[next_slot].flexi_group = GRP_UNSELECTED
+            except KeyError:
+                LOGGER.warning('Unknown corridor instance "{}" in config!')
+            else:
+                next_slot += 1
 
         # Put all remaining in a spare slot.
         for slot, corr in zip(
@@ -296,11 +297,7 @@ class Selector:
             sorted(inst_to_corr.values(), key=lambda corr: corr.name),
         ):
             slot.contents = corr
-
-        if self.sel_count < 1:
-            self.sel_count = 1
-        if self.sel_count > len(corr_list):
-            self.sel_count = len(corr_list)
+            slot.flexi_group = GRP_UNSELECTED
 
         self.drag_man.load_icons()
 
@@ -322,46 +319,27 @@ class Selector:
         ]
         self.canvas.delete('slots')
         self.canvas.delete('sel_bg')
-
-        if not corr_order:
-            # No corridors, hide selector.
-            self.canvas.coords(
-                self.sel_handle_pos,
-                -16, 0,
-            )
-            return
-
         pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
-        selecting = True
-        for row_off in range(0, len(corr_order), pos.columns):
-            if row_off < self.sel_count <= row_off + pos.columns:
-                # Placing selector on this row.
-                x = pos.xpos(self.sel_count - row_off - 1)
-                y = pos.ypos(row_off // pos.columns)
-                self.canvas.coords(
-                    self.sel_handle_pos,
-                    x + WIDTH, y - 6,
-                )
-                selecting = False
-                self.canvas.create_rectangle(
-                    0, y - 4,
-                    x + WIDTH,
-                    y + HEIGHT + 4,
-                    fill=SELECTED_COLOR,
-                    outline='',
-                    tags=('sel_bg', ),
-                )
-            elif selecting:
-                # On another row, extend all the way.
-                y = pos.ypos(row_off // pos.columns)
-                self.canvas.create_rectangle(
-                    0, y - 4,
-                    pos.width, y + HEIGHT + 4,
-                    fill=SELECTED_COLOR,
-                    outline='',
-                    tags=('sel_bg', ),
-                )
-        pos.place_slots(corr_order, 'slots')
+
+        self.header_sel['width'] = pos.width
+        self.header_unsel['width'] = pos.width
+
+        self.canvas.coords(self.header_sel_win, 0, pos.yoff)
+        pos.yoff += HEADER_HEIGHT + 10
+        pos.place_slots((
+            slot for slot in corr_order
+            if slot.flexi_group == GRP_SELECTED
+        ), 'slots')
+        if pos.current:
+            pos.advance_row()
+
+        self.canvas.coords(self.header_unsel_win, 0, pos.yoff)
+        pos.yoff += HEADER_HEIGHT + 10
+
+        pos.place_slots((
+            slot for slot in corr_order
+            if slot.flexi_group != GRP_SELECTED
+        ), 'slots')
         pos.resize_canvas()
 
     async def evt_hover_enter(self, slot: Slot) -> None:
@@ -387,45 +365,14 @@ class Selector:
             self.sticky_corr = slot.contents
             self.disp_corr(self.sticky_corr)
 
-    def _evt_sel_pickup(self, _: tk.Event) -> None:
-        """Fired when clicking on the selector handle."""
-        self.sel_handle_moving = True
-        self.sel_handle.grab_set_global()
-        sound.fx('config')
-
-    def _evt_sel_move(self, e: tk.Event) -> None:
-        """Fired when moving the selector handle."""
-        if not self.sel_handle_moving:
-            return
-        slots = [
-            slot for slot in
-            self.slots
-            if slot.contents is not None
-        ]
-        if not slots:
-            return
-        pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
-        x = e.x_root - self.canvas.winfo_rootx()
-        y = e.y_root - self.canvas.winfo_rooty()
-        row = max(0, (y - pos.spacing) // pos.item_height)
-        col = max(0, (x - pos.spacing) // pos.item_width)
-
-        if col >= pos.columns:
-            col = pos.columns - 1
-        new = pos.columns * row + col + 1
-        if new > len(slots):
-            new = len(slots)
-
-        if self.sel_count != new:
-            self.sel_count = new
-            background_run(self.reflow)
-
-    def _evt_sel_drop(self, _: tk.Event) -> None:
-        """Fired when dropping the selector handle."""
-        self.sel_handle_moving = False
-        self.sel_handle.grab_release()
-        self.store_conf()
-        sound.fx('config')
+    def _get_flexi_group(self, x: int, y: int) -> Optional[str]:
+        """Return the group to drop an item into, from a mouse position."""
+        # pos, slots, row, col = self._mouse_to_pos(x, y)
+        header_y = self.header_unsel.winfo_rooty()
+        if y > header_y + HEADER_HEIGHT / 2:
+            return GRP_UNSELECTED
+        else:
+            return GRP_SELECTED
 
     def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
         """Display the specified corridor, or reset if None."""
