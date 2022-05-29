@@ -709,3 +709,25 @@ class EnumButton(Generic[EnumT]):
     def current(self, value: EnumT) -> None:
         """Change the currently selected button."""
         self._select(value)
+
+
+class LineHeader(ttk.Frame):
+    """A resizable line, with a title in the middle."""
+    def __init__(self, parent: tk.Misc, title: str) -> None:
+        super().__init__(parent)
+        sep_left = ttk.Separator(self)
+        sep_left.grid(row=0, column=0, sticky='EW')
+        self.columnconfigure(0, weight=1)
+
+        self.title = ttk.Label(
+            self,
+            text=title,
+            width=len(title) + 2,
+            font='TkMenuFont',
+            anchor='center',
+        )
+        self.title.grid(row=0, column=1)
+
+        sep_right = ttk.Separator(self)
+        sep_right.grid(row=0, column=2, sticky='EW')
+        self.columnconfigure(2, weight=1)

@@ -205,37 +205,18 @@ class AttrDef:
         return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
-class GroupHeader(ttk.Frame):
+class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
     def __init__(self, win: SelectorWin, title: str) -> None:
         self.parent = win
-        super().__init__(
-            win.pal_frame,
-        )
-
-        sep_left = ttk.Separator(self)
-        sep_left.grid(row=0, column=0, sticky='EW')
-        self.columnconfigure(0, weight=1)
-
-        self.title = ttk.Label(
-            self,
-            text=title,
-            font=win.norm_font,
-            width=len(title) + 2,
-            anchor='center',
-        )
-        self.title.grid(row=0, column=1)
-
-        sep_right = ttk.Separator(self)
-        sep_right.grid(row=0, column=2, sticky='EW')
-        self.columnconfigure(2, weight=1)
+        super().__init__(win.pal_frame, title)
 
         self.arrow = ttk.Label(
             self,
             text=GRP_EXP,
             width=2,
         )
-        self.arrow.grid(row=0, column=3)
+        self.arrow.grid(row=0, column=10)
 
         self._visible = True
 
