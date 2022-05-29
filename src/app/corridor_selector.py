@@ -30,6 +30,7 @@ SELECTED_COLOR: Final = '#14B0FF'
 GRP_SELECTED: Final = 'selected'
 GRP_UNSELECTED: Final = 'unselected'
 HEADER_HEIGHT: Final = 20
+HEADER_PAD: Final = 10
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
@@ -321,10 +322,10 @@ class Selector:
         self.canvas.delete('sel_bg')
         pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
 
-        self.header_sel['width'] = pos.width
-        self.header_unsel['width'] = pos.width
+        self.canvas.itemconfigure(self.header_sel_win, width=pos.width - 2 * HEADER_PAD)
+        self.canvas.itemconfigure(self.header_unsel_win, width=pos.width - 2 * HEADER_PAD)
 
-        self.canvas.coords(self.header_sel_win, 0, pos.yoff)
+        self.canvas.coords(self.header_sel_win, HEADER_PAD, pos.yoff)
         pos.yoff += HEADER_HEIGHT + 10
         pos.place_slots((
             slot for slot in corr_order
@@ -333,7 +334,7 @@ class Selector:
         if pos.current:
             pos.advance_row()
 
-        self.canvas.coords(self.header_unsel_win, 0, pos.yoff)
+        self.canvas.coords(self.header_unsel_win, HEADER_PAD, pos.yoff)
         pos.yoff += HEADER_HEIGHT + 10
 
         pos.place_slots((
