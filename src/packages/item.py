@@ -516,8 +516,14 @@ class Item(PakObject, needs_foreground=True):
         if def_version is None:
             raise ValueError(f'Item "{data.id}" has no versions!')
 
-        # Fill out the folders dict with the actual data
-        parsed_folders = parse_item_folder(folders_to_parse, data.fsys, data.pak_id)
+        # Parse all the folders for an item.
+        parsed_folders: dict[str, ItemVariant] = {}
+        async with trio.open_nursery() as nursery:
+            for folder in folders_to_parse:
+                nursery.start_soon(
+                    parse_item_folder,
+                    parsed_folders, folder, data.fsys, data.id, data.pak_id,
+                )
 
         # We want to ensure the number of visible subtypes doesn't change.
         subtype_counts = {
@@ -773,126 +779,135 @@ class ItemConfig(PakObject, allow_mult=True):
         pass
 
 
-def parse_item_folder(
-    folders_to_parse: set[str],
+async def parse_item_folder(
+    folders: dict[str, ItemVariant],
+    fold: str,
     filesystem: FileSystem,
+    item_id: str,
     pak_id: str,
 ) -> dict[str, ItemVariant]:
     """Parse through the data in item/ folders.
 
-    folders is a dict, with the keys set to the folder names we want.
-    The values will be filled in with itemVariant values
+    folders is a dict, which we fill in ItemVariants as required.
     """
-    folders: dict[str, ItemVariant] = {}
-    for fold in folders_to_parse:
-        prop_path = f'items/{fold}/properties.txt'
-        editor_path = f'items/{fold}/editoritems.txt'
-        config_path = f'items/{fold}/vbsp_config.cfg'
+    prop_path = f'items/{fold}/properties.txt'
+    editor_path = f'items/{fold}/editoritems.txt'
+    config_path = f'items/{fold}/vbsp_config.cfg'
 
-        first_item: EditorItem | None = None
-        extra_items: list[EditorItem] = []
-        try:
-            props = filesystem.read_prop(prop_path).find_key('Properties')
-            f = filesystem[editor_path].open_str()
-        except FileNotFoundError as err:
-            raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
-        with f:
-            tok = Tokenizer(f, editor_path)
-            for tok_type, tok_value in tok:
-                if tok_type is Token.STRING:
-                    if tok_value.casefold() != 'item':
-                        raise tok.error('Unknown item option "{}"!', tok_value)
-                    if first_item is None:
-                        first_item = EditorItem.parse_one(tok)
-                    else:
-                        extra_items.append(EditorItem.parse_one(tok))
-                elif tok_type is not Token.NEWLINE:
-                    raise tok.error(tok_type)
+    first_item: EditorItem | None = None
+    extra_items: list[EditorItem] = []
+    try:
+        props = await trio.to_thread.run_sync(filesystem.read_prop, prop_path)
+        props = props.find_key('Properties')
+        f = filesystem[editor_path].open_str()
+    except FileNotFoundError as err:
+        raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+    with f:
+        tok = Tokenizer(f, editor_path)
+        for tok_type, tok_value in tok:
+            if tok_type is Token.STRING:
+                if tok_value.casefold() != 'item':
+                    raise tok.error('Unknown item option "{}"!', tok_value)
+                if first_item is None:
+                    first_item = await trio.to_thread.run_sync(EditorItem.parse_one, tok)
+                else:
+                    extra_items.append(await trio.to_thread.run_sync(EditorItem.parse_one, tok))
+            elif tok_type is not Token.NEWLINE:
+                raise tok.error(tok_type)
 
-        if first_item is None:
-            raise ValueError(
-                f'"{pak_id}:items/{fold}/editoritems.txt has no '
-                '"Item" block!'
-            )
+    if first_item is None:
+        raise ValueError(
+            f'"{pak_id}:items/{fold}/editoritems.txt has no '
+            '"Item" block!'
+        )
 
-        try:
-            editor_vmf = VMF.parse(filesystem.read_prop(f'{editor_path[:-3]}vmf'))
-        except FileNotFoundError:
-            pass
-        else:
-            editoritems_vmf.load(first_item, editor_vmf)
-        first_item.generate_collisions()
+    if first_item.id.casefold() != item_id.casefold():
+        LOGGER.warning(
+            'Item ID "{}" does not match "{}" in "{}:items/{}/editoritems.txt"! '
+            'Info.txt ID will override, update editoritems!',
+            item_id, first_item.id, pak_id, fold,
+        )
 
-        # extra_items is any extra blocks (offset catchers, extent items).
-        # These must not have a palette section - it'll override any the user
-        # chooses.
-        for extra_item in extra_items:
-            extra_item.generate_collisions()
-            for subtype in extra_item.subtypes:
-                if subtype.pal_pos is not None:
-                    LOGGER.warning(
-                        f'"{pak_id}:items/{fold}/editoritems.txt has '
-                        f'palette set for extra item blocks. Deleting.'
-                    )
-                    subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
+    try:
+        editor_props = await trio.to_thread.run_sync(filesystem.read_prop, f'{editor_path[:-3]}vmf')
+        editor_vmf = await trio.to_thread.run_sync(VMF.parse, editor_props)
+    except FileNotFoundError:
+        pass
+    else:
+        editoritems_vmf.load(first_item, editor_vmf)
+        del editor_props, editor_vmf
+    first_item.generate_collisions()
 
-        # In files this is specified as PNG, but it's always really VTF.
-        try:
-            all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
-        except LookupError:
-            all_icon = None
-
-        folders[fold] = ItemVariant(
-            editoritems=first_item,
-            editor_extra=extra_items,
-
-            # Add the folder the item definition comes from,
-            # so we can trace it later for debug messages.
-            source=f'<{pak_id}>/items/{fold}',
-            pak_id=pak_id,
-            vbsp_config=lazy_conf.BLANK,
-
-            authors=sep_values(props['authors', '']),
-            tags=sep_values(props['tags', '']),
-            desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
-            ent_count=props['ent_count', ''],
-            url=props['infoURL', None],
-            icons={
-                prop.name: img.Handle.parse(
-                    prop, pak_id,
-                    64, 64,
-                    subfolder='items',
+    # extra_items is any extra blocks (offset catchers, extent items).
+    # These must not have a palette section - it'll override any the user
+    # chooses.
+    for extra_item in extra_items:
+        extra_item.generate_collisions()
+        for subtype in extra_item.subtypes:
+            if subtype.pal_pos is not None:
+                LOGGER.warning(
+                    f'"{pak_id}:items/{fold}/editoritems.txt has '
+                    f'palette set for extra item blocks. Deleting.'
                 )
-                for prop in
-                props.find_children('icon')
-            },
-            all_name=props['all_name', None],
-            all_icon=all_icon,
+                subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
+
+    # In files this is specified as PNG, but it's always really VTF.
+    try:
+        all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
+    except LookupError:
+        all_icon = None
+
+    folders[fold] = ItemVariant(
+        editoritems=first_item,
+        editor_extra=extra_items,
+
+        # Add the folder the item definition comes from,
+        # so we can trace it later for debug messages.
+        source=f'<{pak_id}>/items/{fold}',
+        pak_id=pak_id,
+        vbsp_config=lazy_conf.BLANK,
+
+        authors=sep_values(props['authors', '']),
+        tags=sep_values(props['tags', '']),
+        desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
+        ent_count=props['ent_count', ''],
+        url=props['infoURL', None],
+        icons={
+            prop.name: img.Handle.parse(
+                prop, pak_id,
+                64, 64,
+                subfolder='items',
+            )
+            for prop in
+            props.find_children('icon')
+        },
+        all_name=props['all_name', None],
+        all_icon=all_icon,
+    )
+
+    if not folders[fold].ent_count and config.get_cur_conf(config.GenOptions).log_missing_ent_count:
+        LOGGER.warning(
+            '"{}:{}" has missing entity count!',
+            pak_id,
+            prop_path,
         )
 
-        if not folders[fold].ent_count and config.get_cur_conf(config.GenOptions).log_missing_ent_count:
-            LOGGER.warning(
-                '"{}:{}" has missing entity count!',
-                pak_id,
-                prop_path,
-            )
-
-        # If we have one of the grouping icon definitions but not both required
-        # ones then notify the author.
-        has_name = folders[fold].all_name is not None
-        has_icon = folders[fold].all_icon is not None
-        if (has_name or has_icon or 'all' in folders[fold].icons) and (not has_name or not has_icon):
-            LOGGER.warning(
-                'Warning: "{}:{}" has incomplete grouping icon '
-                'definition!',
-                pak_id,
-                prop_path,
-            )
-        folders[fold].vbsp_config = lazy_conf.from_file(
-            utils.PackagePath(pak_id, config_path),
-            missing_ok=True,
-            source=folders[fold].source,
+    # If we have one of the grouping icon definitions but not both required
+    # ones then notify the author.
+    has_name = folders[fold].all_name is not None
+    has_icon = folders[fold].all_icon is not None
+    if (has_name or has_icon or 'all' in folders[fold].icons) and (not has_name or not has_icon):
+        LOGGER.warning(
+            'Warning: "{}:{}" has incomplete grouping icon '
+            'definition!',
+            pak_id,
+            prop_path,
         )
+    folders[fold].vbsp_config = lazy_conf.from_file(
+        utils.PackagePath(pak_id, config_path),
+        missing_ok=True,
+        source=folders[fold].source,
+    )
     return folders
 
 
