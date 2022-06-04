@@ -154,7 +154,7 @@ async def main(argv: List[str]) -> None:
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
             # Checks what the light config was set to.
-            light_args = config.get_val('General', 'vrad_compile_type')
+            light_args = config.get_val('General', 'vrad_compile_type', 'FAST')
             # If shift is held, reverse.
             if utils.check_shift():
                 if light_args == 'FAST':

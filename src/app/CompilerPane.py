@@ -156,9 +156,16 @@ COUNT_CATEGORIES = [
 ]
 
 # vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
-
-vrad_compile_type = tk.StringVar(
-    value=COMPILE_CFG.get_val('General', 'vrad_compile_type', 'FAST')
+# Checks if vrad_force_full is defined, if it is, sets vrad_compile_type to true and
+# removes vrad_force_full as it is no longer used.
+if COMPILE_CFG.get_bool('General', 'vrad_force_full'):
+    vrad_compile_type = tk.StringVar(
+        value=COMPILE_CFG.get_val('General', 'vrad_compile_type', 'FULL')
+    )
+    COMPILE_CFG.remove_option('General', 'vrad_force_full')
+else:
+    vrad_compile_type = tk.StringVar(
+        value=COMPILE_CFG.get_val('General', 'vrad_compile_type', 'FAST')
     )
 
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
@@ -725,25 +732,24 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
 
     def light_conf_swap(switch_to: str): 
         return gettext(
-            "You can hold down Shift during the start of the Lighting stage to switch to " +
-            switch_to + " lighting on the fly."
-        )
+            "You can hold down Shift during the start of the Lighting stage to switch to "
+            ) + switch_to + gettext(" lighting on the fly.")
     add_tooltip(UI['light_none'], gettext(
         "Compile with no lighting whatsoever. This significantly speeds up "
-        "compile times, but there will be no lights and the map will run in "
-        "full bright. \nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap("Fast"))
+        "compile times, but there will be no lights, gel will be invisible, "
+        "and the map will run in  full bright. \nWhen publishing, this is ignored."
+    ) + "\n\n" + light_conf_swap(gettext("Fast")))
 
     add_tooltip(UI['light_fast'], gettext(
         "Compile with lower-quality, fast lighting. This speeds up compile "
         "times, but does not appear as good. Some shadows may appear "
         "wrong.\nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap("Full"))
+    ) + "\n\n" + light_conf_swap(gettext("Full")))
     add_tooltip(UI['light_full'], gettext(
         "Compile with high-quality lighting. This looks correct, but takes "
         "longer to compute. Use if you're arranging lights.\nWhen "
         "publishing, this is always used."
-    ) + "\n\n" + light_conf_swap("Fast"))
+    ) + "\n\n" + light_conf_swap(gettext("Fast")))
 
     packfile_enable = ttk.Checkbutton(
         frame,

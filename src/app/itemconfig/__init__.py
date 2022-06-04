@@ -1,6 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Dict, Optional, Union, Callable,
+    Dict, Optional, Union, Callable, Set,
     AsyncIterator, Awaitable, Mapping, List, Tuple,
 )
 from tkinter import ttk
@@ -372,7 +372,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         # Don't display that as well.
         CONFIG_ORDER.remove(override)
 
-    def widget_ids(self):
+    def widget_ids(self) -> Set[str]:
         """Return the set of widget IDs used."""
         return {
             wid.id for wid in
