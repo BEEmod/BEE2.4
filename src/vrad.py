@@ -95,6 +95,7 @@ async def main(argv: List[str]) -> None:
             'arguments, with some extra arguments:\n'
             '-force_peti: Force enabling map conversion. \n'
             "-force_hammer: Don't convert the map at all.\n"
+            "-skip_vrad: Don't run the original VRAD after conversion.\n"
             "If not specified, the map name must be \"preview.bsp\" to be "
             "treated as PeTI."
         )
@@ -152,27 +153,39 @@ async def main(argv: List[str]) -> None:
         # Detect preview via knowing the bsp name. If we are in preview,
         # check the config file to see what was specified there.
         if os.path.basename(path) == "preview.bsp":
+            # Checks what the light config was set to.
+            light_args = config.get_val('General', 'vrad_compile_type')
             edit_args = not config.get_bool('General', 'vrad_force_full')
             # If shift is held, reverse.
             if utils.check_shift():
-                LOGGER.info('Shift held, inverting configured lighting option!')
-                edit_args = not edit_args
+                if light_args == 'FAST':
+                    light_args == 'FULL'
+                else:
+                    light_args == 'FAST'
+                LOGGER.info('Shift held, changing configured lighting option to {}!', light_args)
         else:
             # publishing - always force full lighting.
-            edit_args = False
+            light_args = 'FULL'
     else:
-        is_peti = edit_args = False
+        is_peti = False
+        light_args = 'FULL'
 
-    if '-force_peti' in args or '-force_hammer' in args:
+    if '-force_peti' in args or '-force_hammer' in args or '-skip_vrad':
         # we have override commands!
         if '-force_peti' in args:
             LOGGER.warning('OVERRIDE: Applying cheap lighting!')
-            is_peti = edit_args = True
+            is_peti = True
+            light_args = 'FAST'
         else:
             LOGGER.warning('OVERRIDE: Preserving args!')
-            is_peti = edit_args = False
+            is_peti = False
+            light_args = 'FULL'
 
-    LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
+        if '-skip_vrad' in args:
+            LOGGER.warning('OVERRIDE: VRAD will not run!')
+            light_args = 'NONE'
+
+    LOGGER.info('Final status: is_peti={}, light_args={}', is_peti, light_args)
     if not is_peti:
         # Skip everything, if the user wants these features install the Hammer Addons postcompiler.
         LOGGER.info("Hammer map detected! Skipping all transforms.")
@@ -286,12 +299,15 @@ async def main(argv: List[str]) -> None:
 
     screenshot.modify(config, game.path)
 
-    if edit_args:
+    # VRAD only runs if light_args is not set to "NONE"
+    if light_args == 'FAST':
         LOGGER.info("Forcing Cheap Lighting!")
         run_vrad(fast_args)
-    else:
+    elif light_args == 'FULL':
         LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
         run_vrad(full_args)
+    else:
+        LOGGER.info("Forcing to skip VRAD!")
 
     LOGGER.info("BEE2 VRAD hook finished!")
 

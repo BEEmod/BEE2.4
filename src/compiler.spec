@@ -21,7 +21,7 @@ elif utils.LINUX:
 else:
     suffix = ''
 
-hammeraddons = Path(SPECPATH, '../hammeraddons/')
+hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 sys.path.append(str(hammeraddons / 'src'))
 
 # Unneeded packages that cx_freeze detects:

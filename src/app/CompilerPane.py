@@ -8,7 +8,7 @@ from typing import Union
 
 import trio
 from srctools.dmx import Element
-from tkinter import filedialog
+from tkinter import Variable, filedialog
 from tkinter import ttk
 import tkinter as tk
 import base64
@@ -155,7 +155,12 @@ COUNT_CATEGORIES = [
     ),
 ]
 
-vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
+# vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
+
+vrad_compile_type = tk.StringVar(
+    value=COMPILE_CFG.get_val('General', 'vrad_compile_type', 'FAST')
+    )
+
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
@@ -569,7 +574,7 @@ async def make_widgets() -> None:
 
     """
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
-    make_setter('General', 'vrad_force_full', vrad_light_type)
+    make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
     ttk.Label(window, justify='center', text=gettext(
         "Options on this panel can be changed \n"
@@ -696,35 +701,49 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     )
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
+    UI['light_none'] = ttk.Radiobutton(
+        vrad_frame,
+        text=gettext('None'),
+        value='NONE',
+        variable=vrad_compile_type,
+    )
+    UI['light_none'].grid(row=0, column=0)
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
         text=gettext('Fast'),
-        value=0,
-        variable=vrad_light_type,
+        value='FAST',
+        variable=vrad_compile_type,
     )
-    UI['light_fast'].grid(row=0, column=0)
+    UI['light_fast'].grid(row=0, column=1)
     UI['light_full'] = ttk.Radiobutton(
         vrad_frame,
         text=gettext('Full'),
-        value=1,
-        variable=vrad_light_type,
+        value='FULL',
+        variable=vrad_compile_type,
     )
-    UI['light_full'].grid(row=0, column=1)
+    UI['light_full'].grid(row=0, column=2)
 
-    light_conf_swap = gettext(
-        "You can hold down Shift during the start of the Lighting stage to invert this "
-        "configuration on the fly."
-    )
+    def light_conf_swap(switch_to: str): 
+        return gettext(
+            "You can hold down Shift during the start of the Lighting stage to switch to " +
+            switch_to + " lighting on the fly."
+        )
+    add_tooltip(UI['light_none'], gettext(
+        "Compile with no lighting whatsoever. This significantly speeds up "
+        "compile times, but there will be no lights and the map will run in "
+        "full bright. \nWhen publishing, this is ignored."
+    ) + "\n\n" + light_conf_swap("Fast"))
+
     add_tooltip(UI['light_fast'], gettext(
         "Compile with lower-quality, fast lighting. This speeds up compile "
         "times, but does not appear as good. Some shadows may appear "
         "wrong.\nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap)
+    ) + "\n\n" + light_conf_swap("Full"))
     add_tooltip(UI['light_full'], gettext(
         "Compile with high-quality lighting. This looks correct, but takes "
         "longer to compute. Use if you're arranging lights.\nWhen "
         "publishing, this is always used."
-    ) + "\n\n" + light_conf_swap)
+    ) + "\n\n" + light_conf_swap("Fast"))
 
     packfile_enable = ttk.Checkbutton(
         frame,
