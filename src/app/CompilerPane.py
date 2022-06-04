@@ -737,7 +737,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     add_tooltip(UI['light_none'], gettext(
         "Compile with no lighting whatsoever. This significantly speeds up "
         "compile times, but there will be no lights, gel will be invisible, "
-        "and the map will run in  full bright. \nWhen publishing, this is ignored."
+        "and the map will run in fullbright. \nWhen publishing, this is ignored."
     ) + "\n\n" + light_conf_swap(gettext("Fast")))
 
     add_tooltip(UI['light_fast'], gettext(
