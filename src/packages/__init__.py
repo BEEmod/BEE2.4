@@ -19,6 +19,7 @@ from srctools import Property, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 from editoritems import Item as EditorItem, Renderable, RenderableType
+from corridor import CORRIDOR_COUNTS, GameMode, Direction
 import srctools.logger
 
 from typing import (
@@ -179,18 +180,18 @@ class ExportData:
 
 
 @attrs.define
-class CorrDesc:
-    """Name, description and icon for each corridor in a style."""
+class LegacyCorr:
+    """Legacy definitions for each corridor in a style."""
     name: str = ''
     icon: utils.PackagePath = img.PATH_BLANK
     desc: str = ''
 
 
-# Corridor type to size.
-CORRIDOR_COUNTS = {
-    'sp_entry': 7,
-    'sp_exit': 4,
-    'coop': 4,
+# Corridor enums to legacy names
+LEGACY_CORRIDORS = {
+    (GameMode.SP, Direction.ENTRY): 'sp_entry',
+    (GameMode.SP, Direction.EXIT): 'sp_exit',
+    (GameMode.COOP, Direction.EXIT): 'coop',
 }
 
 # This package contains necessary components, and must be available.
@@ -833,7 +834,7 @@ class Style(PakObject, needs_foreground=True):
         base_style: Optional[str]=None,
         has_video: bool=True,
         vpk_name: str='',
-        corridors: dict[tuple[str, int], CorrDesc]=None,
+        legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr]=None,
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
@@ -846,14 +847,16 @@ class Style(PakObject, needs_foreground=True):
         self.suggested = suggested
         self.has_video = has_video
         self.vpk_name = vpk_name
-        self.corridors: dict[tuple[str, int], CorrDesc] = {}
+        self.legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr] = {}
 
-        for group, length in CORRIDOR_COUNTS.items():
+        for (mode, direction), length in CORRIDOR_COUNTS.items():
+            if (mode, direction) not in LEGACY_CORRIDORS:
+                continue
             for i in range(1, length + 1):
                 try:
-                    self.corridors[group, i] = corridors[group, i]
+                    self.legacy_corridors[mode, direction, i] = legacy_corridors[mode, direction, i]
                 except KeyError:
-                    self.corridors[group, i] = CorrDesc()
+                    self.legacy_corridors[mode, direction, i] = LegacyCorr()
 
         self.config = config
 
@@ -891,11 +894,15 @@ class Style(PakObject, needs_foreground=True):
         )
 
         corr_conf = info.find_key('corridors', or_blank=True)
-        corridors = {}
+        legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr] = {}
 
         icon_folder = corr_conf['icon_folder', '']
 
-        for group, length in CORRIDOR_COUNTS.items():
+        for (mode, direction), length in CORRIDOR_COUNTS.items():
+            try:
+                group = LEGACY_CORRIDORS[mode, direction]
+            except KeyError:  # Coop entry
+                continue
             group_prop = corr_conf.find_key(group, or_blank=True)
             for i in range(1, length + 1):
                 prop = group_prop.find_key(str(i), '')
@@ -906,13 +913,13 @@ class Style(PakObject, needs_foreground=True):
                     icon = img.PATH_BLANK
 
                 if prop.has_children():
-                    corridors[group, i] = CorrDesc(
+                    legacy_corridors[mode, direction, i] = LegacyCorr(
                         name=prop['name', ''],
                         icon=utils.PackagePath.parse(prop['icon', icon], data.pak_id),
                         desc=prop['Desc', ''],
                     )
                 else:
-                    corridors[group, i] = CorrDesc(
+                    legacy_corridors[mode, direction, i] = LegacyCorr(
                         name=prop.value,
                         icon=icon,
                         desc='',
@@ -949,7 +956,7 @@ class Style(PakObject, needs_foreground=True):
             base_style=base,
             suggested=sugg_tup,
             has_video=has_video,
-            corridors=corridors,
+            legacy_corridors=legacy_corridors,
             vpk_name=vpk_name,
         )
 

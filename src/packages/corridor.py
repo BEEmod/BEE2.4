@@ -272,22 +272,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         dup_check.add(folded)
 
                         # Find the old definition to glean some info.
-                        variant_attr = FALLBACKS.get((mode, direction), '')
-                        if variant_attr:
-                            style_info = style.corridors[variant_attr, ind + 1]
-                            corridor = CorridorUI(
-                                instance=fname,
-                                name=style_info.name,
-                                images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
-                                dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
-                                authors=style.selitem_data.auth,
-                                desc=tkMarkdown.MarkdownData.text(style_info.desc),
-                                config=lazy_conf.BLANK,
-                                orig_index=ind + 1,
-                                fixups={},
-                                legacy=True,
-                            )
-                        else:
+                        # Coop entries don't have one.
+                        if mode is GameMode.COOP and direction is Direction.ENTRY:
                             corridor = CorridorUI(
                                 instance=fname,
                                 name='Corridor',
@@ -295,6 +281,20 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 dnd_icon=ICON_GENERIC_SML,
                                 authors=style.selitem_data.auth,
                                 desc=EMPTY_DESC,
+                                config=lazy_conf.BLANK,
+                                orig_index=ind + 1,
+                                fixups={},
+                                legacy=True,
+                            )
+                        else:
+                            style_info = style.legacy_corridors[mode, direction, ind + 1]
+                            corridor = CorridorUI(
+                                instance=fname,
+                                name=style_info.name,
+                                images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
+                                dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
+                                authors=style.selitem_data.auth,
+                                desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
                                 fixups={},
