@@ -576,7 +576,7 @@ async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Proper
 
     combobox = ttk.Combobox(
         parent,
-        exportselection=0,
+        exportselection=False,
         values=[''],
     )
     combobox.state(['readonly'])  # Prevent directly typing in values
@@ -588,4 +588,4 @@ async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Proper
 
 
 # Load all the widgets.
-from . import checkmark, color, slider, string, timer
+from . import checkmark, color, dropdown, slider, string, timer

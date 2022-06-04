@@ -1,6 +1,6 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict, Optional
 
 import trio
 from srctools.dmx import Element
@@ -321,13 +321,23 @@ async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callabl
     )
     VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
 
-    async def add_state_syncers(var_id: str, check: ttk.Checkbutton, tk_var: IntVar) -> None:
+    async def add_state_syncers(
+        var_id: str,
+        tk_var: IntVar,
+        *checks: ttk.Checkbutton,
+    ) -> None:
         """Makes functions for syncing stylevar state. """
         async def apply_state(state: StyleVarState) -> None:
             """Applies the given state."""
             tk_var.set(state.value)
         await config.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
-        check['command'] = lambda: config.store_conf(StyleVarState(tk_var.get() != 0), var_id)
+
+        def cmd_func() -> None:
+            """When clicked, store configuration."""
+            config.store_conf(StyleVarState(tk_var.get() != 0), var_id)
+
+        for check in checks:
+            check['command'] = cmd_func
 
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
@@ -358,25 +368,30 @@ async def make_stylevar_pane(stylevar_frame: ttk.Frame, update_item_vis: Callabl
             chk['command'] = on_unlock_default_set
             await config.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
         else:
-            await add_state_syncers(var.id, chk, int_var)
+            await add_state_syncers(var.id, int_var, chk)
 
-    for var in VAR_LIST:
-        tk_vars[var.id] = IntVar(value=var.enabled)
-        desc = make_desc(var)
-        if var.applies_to_all():
-            # Available in all styles - put with the hardcoded variables.
-            all_pos += 1
+    # The nursery is mainly used so constructing all the checkboxes can be done immediately,
+    # then the UI callbacks are done after.
+    async with trio.open_nursery() as nursery:
+        for var in VAR_LIST:
+            tk_vars[var.id] = int_var = IntVar(value=var.enabled)
+            desc = make_desc(var)
+            if var.applies_to_all():
+                # Available in all styles - put with the hardcoded variables.
+                all_pos += 1
 
-            checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id], text=var.name)
-            chk.grid(row=all_pos, column=0, sticky="W", padx=3)
-            tooltip.add_tooltip(chk, desc)
-        else:
-            # Swap between checkboxes depending on style.
-            checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id], text=var.name)
-            checkbox_other[var.id] = ttk.Checkbutton(frm_other, variable=tk_vars[var.id], text=var.name)
+                checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id], text=var.name)
+                chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+                tooltip.add_tooltip(chk, desc)
+                nursery.start_soon(add_state_syncers, var.id, int_var, chk)
+            else:
+                # Swap between checkboxes depending on style.
+                checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id], text=var.name)
+                checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id], text=var.name)
 
-            tooltip.add_tooltip(checkbox_chosen[var.id], desc)
-            tooltip.add_tooltip(checkbox_other[var.id], desc)
+                tooltip.add_tooltip(checkbox_chosen[var.id], desc)
+                tooltip.add_tooltip(checkbox_other[var.id], desc)
+                nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)
 
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas.update_idletasks()
