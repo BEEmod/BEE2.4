@@ -170,7 +170,7 @@ async def main(argv: List[str]) -> None:
         is_peti = False
         light_args = 'FULL'
 
-    if '-force_peti' in args or '-force_hammer' in args or '-skip_vrad':
+    if '-force_peti' in args or '-force_hammer' in args or '-skip_vrad' in args:
         # we have override commands!
         if '-force_peti' in args:
             LOGGER.warning('OVERRIDE: Applying cheap lighting!')

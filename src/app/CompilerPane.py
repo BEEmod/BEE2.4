@@ -8,7 +8,7 @@ from typing import Union
 
 import trio
 from srctools.dmx import Element
-from tkinter import Variable, filedialog
+from tkinter import filedialog
 from tkinter import ttk
 import tkinter as tk
 import base64
