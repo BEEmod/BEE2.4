@@ -3,13 +3,8 @@
 These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
-
 from typing import Union
-
-import trio
-from srctools.dmx import Element
-from tkinter import filedialog
-from tkinter import ttk
+from tkinter import filedialog, ttk
 import tkinter as tk
 import base64
 import functools
@@ -18,14 +13,15 @@ import io
 from PIL import Image, ImageTk
 from atomicwrites import atomic_write
 import attrs
+import trio
 
 from srctools import Property, bool_as_int
 from srctools.logger import get_logger
+from srctools.dmx import Element
 
-from app import SubPane, img, tkMarkdown, tk_tools, config, TK_ROOT, selector_win, corridor_selector
+from app import SubPane, tk_tools, config, TK_ROOT, corridor_selector
 from app.tooltip import add_tooltip, set_tooltip
 from localisation import gettext
-from packages import CORRIDOR_COUNTS, CorrDesc
 import BEE2_config
 import utils
 
@@ -35,11 +31,6 @@ LOGGER = get_logger(__name__)
 # The size of PeTI screenshots
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
-
-CORRIDOR: dict[str, selector_win.SelectorWin] = {}
-CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
-
-CORRIDOR_DESC = tkMarkdown.convert('', None)
 
 COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
     'Screenshot': {
@@ -53,11 +44,6 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
         'voiceline_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
-    },
-    'Corridor': {
-        'sp_entry': '1',
-        'sp_exit': '1',
-        'coop': '1',
     },
     'Counts': {
         'brush': '0',
@@ -107,9 +93,6 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
 
 packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
-
-default_lrg_icon = img.Handle.builtin('BEE2/corr_generic', selector_win.ICON_SIZE, selector_win.ICON_SIZE)
-default_sml_icon = default_lrg_icon.crop(selector_win.ICON_CROP_SHRINK)
 
 count_brush = tk.IntVar(value=0)
 count_entity = tk.IntVar(value=0)
@@ -175,9 +158,6 @@ class CompilePaneState(config.Data):
     spawn_elev: bool = False
     player_mdl: str = 'PETI'
     use_voice_priority: bool = False
-    corr_sp_entry: int = 0
-    corr_sp_exit: int = 0
-    corr_coop: int = 0
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> dict[str, CompilePaneState]:
@@ -201,8 +181,6 @@ class CompilePaneState(config.Data):
         else:
             screenshot_data = b''
 
-        corr_prop = data.find_block('corridor', or_blank=True)
-
         sshot_type = data['sshot_type', 'AUTO'].upper()
         if sshot_type not in ['AUTO', 'CUST', 'PETI']:
             LOGGER.warning('Unknown screenshot type "{}"!', sshot_type)
@@ -220,10 +198,6 @@ class CompilePaneState(config.Data):
             spawn_elev=data.bool('spawn_elev', False),
             player_mdl=player_mdl,
             use_voice_priority=data.bool('voiceline_priority', False),
-
-            corr_sp_entry=corr_prop.int('sp_entry', 0),
-            corr_sp_exit=corr_prop.int('sp_exit', 0),
-            corr_coop=corr_prop.int('coop', 0),
         )
 
     def export_kv1(self) -> Property:
@@ -234,11 +208,6 @@ class CompilePaneState(config.Data):
             Property('spawn_elev', bool_as_int(self.spawn_elev)),
             Property('player_model', self.player_mdl),
             Property('voiceline_priority', bool_as_int(self.use_voice_priority)),
-            Property('corridor', [
-                Property('sp_entry', str(self.corr_sp_entry)),
-                Property('sp_exit', str(self.corr_sp_exit)),
-                Property('coop', str(self.corr_coop)),
-            ]),
         ])
 
         # Embed the screenshot in so we can load it later.
@@ -263,9 +232,6 @@ class CompilePaneState(config.Data):
         elem['spawn_elev'] = self.spawn_elev
         elem['player_model'] = self.player_mdl
         elem['voiceline_priority'] = self.use_voice_priority
-        elem['corr_sp_entry'] = self.corr_sp_entry
-        elem['corr_sp_exit'] = self.corr_sp_exit
-        elem['corr_coop'] = self.corr_coop
         if self.sshot_type == 'CUST':
             elem['sshot_data'] = self.sshot_cust
         return elem
@@ -295,113 +261,6 @@ async def apply_state(state: CompilePaneState) -> None:
     COMPILE_CFG['General']['player_model'] = state.player_mdl
     COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
 
-    for group, win in CORRIDOR.items():
-        sel_id = getattr(state, 'corr_' + group)
-        win.sel_item_id('<NONE>' if sel_id == '0' else sel_id)
-        COMPILE_CFG['Corridor'][group] = str(sel_id)
-    COMPILE_CFG.save_check()
-
-
-def load_corridors() -> None:
-    """Parse corridors out of the config file."""
-    corridor_conf = COMPILE_CFG['CorridorNames']
-    config = {}
-    for group, length in CORRIDOR_COUNTS.items():
-        for i in range(1, length + 1):
-            config[group, i] = CorrDesc(
-                name=corridor_conf.get('{}_{}_name'.format(group, i), ''),
-                icon=utils.PackagePath.parse(corridor_conf.get('{}_{}_icon'.format(group, i), img.PATH_ERROR), 'special'),
-                desc=corridor_conf.get('{}_{}_desc'.format(group, i), ''),
-            )
-    set_corridors(config)
-
-
-def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
-    """Set the corridor data based on the passed in config."""
-    CORRIDOR_DATA.clear()
-    CORRIDOR_DATA.update(config)
-
-    corridor_conf = COMPILE_CFG['CorridorNames']
-
-    for group, length in CORRIDOR_COUNTS.items():
-        selector = CORRIDOR[group]
-        for item in selector.item_list:
-            if item.name == '<NONE>':
-                continue  # No customisation for this.
-            ind = int(item.name)
-
-            data = config[group, ind]
-
-            corridor_conf['{}_{}_name'.format(group, ind)] = data.name
-            corridor_conf['{}_{}_desc'.format(group, ind)] = data.desc
-            corridor_conf['{}_{}_icon'.format(group, ind)] = str(data.icon)
-
-            # Note: default corridor description
-            desc = data.name or gettext('Corridor')
-            item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
-
-            if data.icon:
-                item.large_icon = img.Handle.parse_uri(
-                    data.icon,
-                    *selector_win.ICON_SIZE_LRG,
-                )
-                item.icon = None
-            else:
-                item.icon = default_sml_icon
-                item.large_icon = default_lrg_icon
-
-            if data.desc:
-                item.desc = tkMarkdown.convert(data.desc, None)
-            else:
-                item.desc = CORRIDOR_DESC
-
-        selector.refresh()
-        selector.set_disp()
-
-    COMPILE_CFG.save_check()
-
-
-def make_corr_wid(corr_name: str, title: str) -> None:
-    """Create the corridor widget and items."""
-    length = CORRIDOR_COUNTS[corr_name]
-
-    CORRIDOR[corr_name] = sel = selector_win.SelectorWin(
-        TK_ROOT,
-        [
-            selector_win.Item(
-                str(i),
-                'INVALID: ' + str(i),
-            )
-            for i in range(1, length + 1)
-        ],
-        save_id='corr_' + corr_name,
-        store_last_selected=False,
-        title=title,
-        none_desc=gettext(
-            'Randomly choose a corridor. '
-            'This is saved in the puzzle data '
-            'and will not change.'
-        ),
-        none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=gettext('Random'),
-        callback=sel_corr_callback,
-        callback_params=[corr_name],
-    )
-
-    chosen_corr = COMPILE_CFG.get_int('Corridor', corr_name)
-    if chosen_corr == 0:
-        sel.sel_item_id('<NONE>')
-    else:
-        sel.sel_item_id(str(chosen_corr))
-
-
-def sel_corr_callback(sel_item: str, corr_name: str) -> None:
-    """Callback for saving the result of selecting a corridor."""
-    config.store_conf(attrs.evolve(
-        config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
-        **{'corr_' + corr_name: 0 if sel_item is None else int(sel_item)},
-    ))
-    COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
     COMPILE_CFG.save_check()
 
 
@@ -916,46 +775,11 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         "When previewing in SP, spawn just before the entry door."
     ) + "\n\n" + elev_conf_swap)
 
-    corr_frame = ttk.LabelFrame(
-        frame,
-        width=18,
-        text=gettext('Corridor:'),
-        labelanchor='n',
-    )
-    corr_frame.grid(row=3, column=0, sticky='ew')
-    corr_frame.columnconfigure(1, weight=1)
-
-    make_corr_wid('sp_entry', gettext('Singleplayer Entry Corridor'))  # i18n: corridor selector window title.
-    make_corr_wid('sp_exit', gettext('Singleplayer Exit Corridor'))  # i18n: corridor selector window title.
-    make_corr_wid('coop', gettext('Coop Exit Corridor'))  # i18n: corridor selector window title.
-
-    load_corridors()
-
-    (await CORRIDOR['sp_entry'].widget(corr_frame)).grid(row=0, column=1, sticky='ew')
-    (await CORRIDOR['sp_exit'].widget(corr_frame)).grid(row=1, column=1, sticky='ew')
-    (await CORRIDOR['coop'].widget(corr_frame)).grid(row=2, column=1, sticky='ew')
-
-    ttk.Label(
-        corr_frame,
-        text=gettext('SP Entry:'),
-        anchor='e',
-    ).grid(row=0, column=0, sticky='ew', padx=2)
-    ttk.Label(
-        corr_frame,
-        text=gettext('SP Exit:'),
-        anchor='e',
-    ).grid(row=1, column=0, sticky='ew', padx=2)
-    ttk.Label(
-        corr_frame,
-        text=gettext('Coop Exit:'),
-        anchor='e',
-    ).grid(row=2, column=0, sticky='ew', padx=2)
-
     ttk.Button(
-        corr_frame,
+        frame,
         text=gettext('Select Corridors'),
         command=corr.show,
-    ).grid(row=3, column=0, columnspan=2)
+    ).grid(row=3, column=0, sticky='ew')
 
     model_frame = ttk.LabelFrame(
         frame,
@@ -974,7 +798,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     player_mdl.state(['readonly'])
     player_mdl.grid(row=0, column=0, sticky=tk.EW)
 
-    def set_model(e: tk.Event) -> None:
+    def set_model(_: tk.Event) -> None:
         """Save the selected player model."""
         model = PLAYER_MODELS_REV[player_model_var.get()]
         config.store_conf(attrs.evolve(

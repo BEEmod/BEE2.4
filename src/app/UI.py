@@ -1646,6 +1646,7 @@ async def init_windows() -> None:
     tk_tools.bind_leftclick(TK_ROOT, contextWin.hide_context)
     tk_tools.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
     tk_tools.bind_leftclick(CompilerPane.window, contextWin.hide_context)
+    tk_tools.bind_leftclick(corridor.win, contextWin.hide_context)
     tk_tools.bind_leftclick(windows['opt'], contextWin.hide_context)
     tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
 
@@ -1739,7 +1740,6 @@ async def init_windows() -> None:
 
         signage_ui.style_changed(style_obj)
         item_search.rebuild_database()
-        CompilerPane.set_corridors(style_obj.corridors)
 
         sugg = style_obj.suggested
         win_types = (
