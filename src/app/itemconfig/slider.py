@@ -33,10 +33,11 @@ async def widget_slider(parent: ttk.Frame, var: tk.StringVar, conf: Property) ->
 
     # The formatting of the text display is a little complex.
     # We want to keep the same number of decimal points for all values.
-    txt_format = '.{}f'.format(max(
+    points = max(
         decimal_points(limit_min + step * offset)
         for offset in range(0, int(ui_max) + 1)
-    ))
+    )
+    txt_format = f'.{points}f'
     # Then we want to figure out the longest value with this format to set
     # the widget width
     widget_width = max(
@@ -45,7 +46,7 @@ async def widget_slider(parent: ttk.Frame, var: tk.StringVar, conf: Property) ->
     )
 
     def change_cmd(*args) -> None:
-        new_pos = format(limit_min + step * round(scale.get()), txt_format)
+        new_pos = format(limit_min + step * round(scale.get(), points), txt_format)
         if var.get() != new_pos:
             widget_sfx()
             var.set(new_pos)
@@ -53,7 +54,7 @@ async def widget_slider(parent: ttk.Frame, var: tk.StringVar, conf: Property) ->
     async def update_ui(new_value: str) -> None:
         """Apply the configured value to the UI."""
         off = (float(new_value) - limit_min) / step
-        ui_var.set(round(off))
+        ui_var.set(round(off, points))
 
     await update_ui(var.get())
 
