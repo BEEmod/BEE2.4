@@ -7,6 +7,7 @@
 	"Defines configuration options for a template."
 	[
 	template_id(string): "Template ID" : "" : "The ID given to this template. If set this will be loaded automatically."
+	debug(boolean): "Debug Mode" : 0 : "If true, when this template is added to the map additional ents will be placed to assist visualising its effects."
 	
 	realign_faces(sidelist): "Realign Faces" : : "Rotate and realign these faces to world." +
 	"This should be used on axis-aligned tile surfaces, to make texturing match in different templates. " +

@@ -497,10 +497,10 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = {}
         else:
             self._setup_data = None
-        try:
-            self.__doc__ = func.__doc__
-        except AttributeError:
-            pass
+
+    @property
+    def __doc__(self) -> str:
+        return self.func.__doc__
 
     def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Property) -> CallResultT:
         """Execute the callback."""

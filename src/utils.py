@@ -1,21 +1,21 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 from collections import deque
+import copyreg
 from typing import (
     TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING,
-    SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator,
+    SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
     KeysView, ValuesView, ItemsView,
 )
 import logging
 import os
 import stat
 import shutil
-import copyreg
+import types
 import sys
 import zipfile
 from pathlib import Path
 from enum import Enum
-from types import TracebackType
 
 from srctools import Angle
 
@@ -116,6 +116,7 @@ else:
 BITNESS = '64' if sys.maxsize > (2 << 48) else '32'
 BEE_VERSION += f' {BITNESS}-bit'
 
+
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
     return _INSTALL_ROOT / path
@@ -213,8 +214,8 @@ LookupT = TypeVar('LookupT')
 EnumT = TypeVar('EnumT', bound=Enum)
 
 
-def freeze_enum_props(cls: type[EnumT]) -> type[EnumT]:
-    """Make a enum with property getters more efficent.
+def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
+    """Make an enum with property getters more efficent.
 
     Call the getter on each member, and then replace it with a dict lookup.
     """
@@ -223,11 +224,11 @@ def freeze_enum_props(cls: type[EnumT]) -> type[EnumT]:
         if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
             continue
         data = {}
-        data_exc: dict[EnumT, tuple[BaseException, TracebackType | None]] = {}
+        data_exc: dict[EnumT, tuple[BaseException, types.TracebackType | None]] = {}
 
         exc: Exception
         enum: EnumT
-        tb: TracebackType | None
+        tb: types.TracebackType | None
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
@@ -261,7 +262,7 @@ def freeze_enum_props(cls: type[EnumT]) -> type[EnumT]:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, tuple[BaseException, TracebackType | None]],
+    data_exc: Mapping[EnumT, tuple[BaseException, types.TracebackType | None]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -324,7 +325,8 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         def callback(func: LookupT) -> LookupT:
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
-            func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+            if isinstance(func, types.FunctionType):
+                func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
             for name, value in kwargs.items():
                 setattr(func, name, value)
             self.__setitem__(names, func)
@@ -341,9 +343,9 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
             return NotImplemented
         return self._registry == conv
 
-    def __iter__(self) -> Iterator[LookupT]:
-        """Yield all the functions."""
-        return iter(self.values())
+    def __iter__(self) -> Iterator[str]:
+        """Yield all the IDs."""
+        return iter(self._registry)
 
     def keys(self) -> KeysView[str]:
         """Yield all the valid IDs."""

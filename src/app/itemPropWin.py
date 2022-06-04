@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from functools import partial as func_partial
 from enum import Enum
-from typing import Callable, Any
+from typing import Callable, Iterator, Any
 import random
 
 import utils
@@ -315,7 +315,7 @@ def exit_win(_: tk.Event=None) -> None:
         contextWin.window.deiconify()
 
 
-def can_edit(prop_list: dict[str, str]) -> bool:
+def can_edit(prop_list: Iterator[str]) -> bool:
     """Determine if any of these properties are changeable."""
     for prop in prop_list:
         prop_type, prop_name = PROP_TYPES.get(prop, (PropTypes.NONE, ''))

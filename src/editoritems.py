@@ -4,7 +4,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Type, Callable, ClassVar, Protocol, Any
+from typing import Callable, ClassVar, Protocol, Any
 from pathlib import PurePosixPath as FSPath
 
 import attrs
@@ -13,7 +13,7 @@ from srctools import Vec, logger, conv_int, conv_bool, Property, Output
 from srctools.tokenizer import Tokenizer, Token
 
 from connections import Config as ConnConfig, InputType, OutNames
-from editoritems_props import ItemProp, UnknownProp, PROP_TYPES
+from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
 from collisions import CollideType, BBox, NonBBoxError
 
 
@@ -848,8 +848,8 @@ class Item:
     id: str  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
-    # Type if known, or string if unknown property.
-    subtype_prop: Type[ItemProp] | str | None = None
+    # Type if present.
+    subtype_prop: ItemPropKind | None = None
     subtypes: list[SubType] = attrs.Factory(list)  # Each subtype in order.
     # Movement handle
     handle: Handle = Handle.NONE
@@ -1056,10 +1056,7 @@ class Item:
 
         # If the user defined a subtype property, that prop's default value should not be changed.
         if item.subtype_prop is not None:
-            if isinstance(item.subtype_prop, str):
-                prop_name = item.subtype_prop
-            else:
-                prop_name = item.subtype_prop.id
+            prop_name = item.subtype_prop.id
             try:
                 item.properties[prop_name.casefold()].allow_user_default = False
             except KeyError:
@@ -1115,7 +1112,8 @@ class Item:
                     self.subtype_prop = PROP_TYPES[subtype_prop.casefold()]
                 except ValueError:
                     LOGGER.warning('Unknown subtype property "{}"!', subtype_prop)
-                    self.subtype_prop = subtype_prop
+                    # Construct a generic kind.
+                    self.subtype_prop = ItemPropKind.unknown(subtype_prop)
             elif folded_key == 'desiredfacing':
                 desired_facing = tok.expect(Token.STRING)
                 try:
@@ -1141,11 +1139,12 @@ class Item:
     def _parse_properties_block(self, tok: Tokenizer) -> None:
         """Parse the properties block of the item definitions."""
         for prop_str in tok.block('Properties'):
+            prop_type: ItemPropKind | None
             try:
                 prop_type = PROP_TYPES[prop_str.casefold()]
             except KeyError:
                 LOGGER.warning('Unknown property "{}"!', prop_str)
-                prop_type = UnknownProp
+                prop_type = ItemPropKind.unknown(prop_str)
 
             default = ''
             index = 0
@@ -1158,24 +1157,20 @@ class Item:
                     index = conv_int(tok.expect(Token.STRING))
                 elif prop_value == 'bee2_ignore':
                     user_default = conv_bool(tok.expect(Token.STRING), user_default)
-                    if prop_type is UnknownProp:
+                    if prop_type.is_unknown:
                         LOGGER.warning('Unknown properties cannot have defaults set!')
                 else:
                     raise tok.error('Unknown property option "{}"!', prop_value)
-            if prop_type is UnknownProp:
-                self.properties[prop_str.casefold()] = UnknownProp(
-                    prop_str, default, index,
+            try:
+                self.properties[prop_type.id.casefold()] = ItemProp(
+                    prop_type, default,
+                    index, user_default,
                 )
-            else:
-                try:
-                    self.properties[prop_type.id.casefold()] = prop_type(
-                        default, index, user_default,
-                    )
-                except ValueError:
-                    raise tok.error(
-                        'Default value {} is not valid for {} properties!',
-                        default, prop_type.id,
-                    )
+            except ValueError:
+                raise tok.error(
+                    'Default value {} is not valid for {} properties!',
+                    default, prop_type.id,
+                )
 
     def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
         """Parse the export block of the item definitions. This returns the parsed connection's info.
@@ -1705,7 +1700,7 @@ class Item:
         if self.properties:
             f.write('\t"Properties"\n\t\t{\n')
             for prop in self.properties.values():
-                f.write(f'\t\t"{prop.id}"\n\t\t\t{{\n')
+                f.write(f'\t\t"{prop.kind.id}"\n\t\t\t{{\n')
                 f.write(f'\t\t\t"DefaultValue" "{prop.export()}"\n')
                 f.write(f'\t\t\t"Index"        "{prop.index}"\n')
                 f.write('\t\t\t}\n')
@@ -1716,7 +1711,7 @@ class Item:
             for i, inst in enumerate(self.instances):
                 f.write(f'\t\t\t"{i}"\n\t\t\t\t{{\n')
                 if id_filenames:
-                    file = FSPath("instances", "id", self.id, f"sub_{i}.vmf")
+                    file = FSPath("instances", "BEE2_by_id", self.id, f"sub_{i}.vmf")
                 else:
                     file = inst.inst
                 if file == FSPath():  # Don't write just a ".".
@@ -1943,7 +1938,7 @@ class Item:
         ) = state
 
         self.properties = {
-            prop.id.casefold(): prop
+            prop.kind.id.casefold(): prop
             for prop in props
         }
         self.antline_points = dict(zip(ConnSide, antline_points))

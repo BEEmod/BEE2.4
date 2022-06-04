@@ -14,24 +14,25 @@ from zipfile import ZipFile
 from typing import List
 from pathlib import Path
 
+
 import srctools.run
 from srctools import FGD
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
-from srctools.bsp_transform import run_transformations
-from srctools.scripts.plugin import PluginFinder, Source as PluginSource
-from srctools.compiler import __version__ as version_haddons
+
+from hammeraddons.bsp_transform import run_transformations
+from hammeraddons.plugin import PluginFinder, Source as PluginSource
+from hammeraddons import __version__ as version_haddons
+
+import trio
 
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
 # Load our BSP transforms.
 # noinspection PyUnresolvedReferences
-from postcomp import (
-    coop_responses,
-    filter,
-)
+from postcomp import coop_responses, filter
 import utils
 
 
@@ -48,19 +49,15 @@ def load_transforms() -> None:
         LOGGER.debug('Loading transforms from frozen package: {}', transforms)
     else:
         # We can just delegate to the regular postcompiler finder.
-        try:
-            transform_loc = Path(os.environ['BSP_TRANSFORMS'])
-        except KeyError:
-            transform_loc = utils.install_path('../HammerAddons/transforms/').resolve()
+        transform_loc = utils.install_path('hammeraddons/transforms/').resolve()
         if not transform_loc.exists():
             raise ValueError(
-                f'Invalid BSP transforms location "{transform_loc.resolve()}"!\n'
-                'Clone TeamSpen210/HammerAddons next to BEE2.4, or set the '
-                'environment variable BSP_TRANSFORMS to the location.'
+                f'No BSP transforms location "{transform_loc.resolve()}"!\n'
+                'Initialise your submodules!'
             )
-        finder = PluginFinder('postcomp.transforms', [
-            PluginSource(transform_loc, recurse=True),
-        ])
+        finder = PluginFinder('postcomp.transforms', {
+            'builtin': PluginSource('builtin', transform_loc, recursive=True),
+        })
         sys.meta_path.append(finder)
         LOGGER.debug('Loading transforms from source: {}', transform_loc)
         finder.load_all()
@@ -76,7 +73,7 @@ def run_vrad(args: List[str]) -> None:
         sys.exit(code)
 
 
-def main(argv: List[str]) -> None:
+async def main(argv: List[str]) -> None:
     """Main VRAD script."""
     LOGGER.info(
         "BEE{} VRAD hook initiallised, srctools v{}, Hammer Addons v{}",
@@ -231,7 +228,7 @@ def main(argv: List[str]) -> None:
     music.generate(bsp_file.ents, packlist)
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
+    await run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
     LOGGER.info('Scanning map for files to pack:')
     packlist.pack_from_bsp(bsp_file)
@@ -299,4 +296,4 @@ def main(argv: List[str]) -> None:
     LOGGER.info("BEE2 VRAD hook finished!")
 
 if __name__ == '__main__':
-    main(sys.argv)
+    trio.run(main, sys.argv)

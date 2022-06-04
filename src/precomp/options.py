@@ -8,13 +8,11 @@ from srctools import Property, Vec, parse_vec_str
 from BEE2_config import ConfigFile
 import srctools.logger
 
-from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO
+from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, cast
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-SETTINGS = {}
-
+SETTINGS: Dict[str, Union[str, int, float, bool, Vec, None]] = {}
 ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
 
 
@@ -194,9 +192,9 @@ def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
 
     # Vec is mutable, don't allow modifying the original.
     if expected_type is Vec:
-        return val.copy()
+        return cast(Vec, val).copy()
     else:
-        return val
+        return cast(OptionT, val)
 
 
 def get_itemconf(

@@ -1,0 +1,3 @@
+[submodule "hammeraddons"]
+	path = hammeraddons
+	url = https://github.com/TeamSpen210/HammerAddons.git

@@ -25,7 +25,7 @@ from . import (
 import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass
-from editoritems_props import TimerDelay
+from editoritems_props import prop_timer_delay
 from localisation import gettext
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -310,7 +310,7 @@ def load_item_data() -> None:
     tooltip.set_tooltip(wid['moreinfo'], selected_item.data.url)
 
     editor = item_data.editor
-    has_timer = any(isinstance(prop, TimerDelay) for prop in editor.properties)
+    has_timer = any(prop.kind is prop_timer_delay for prop in editor.properties.values())
 
     if editor.has_prim_input():
         if editor.has_sec_input():

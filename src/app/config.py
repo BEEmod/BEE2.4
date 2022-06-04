@@ -6,7 +6,7 @@ They can then fetch the current state and store new state.
 from enum import Enum
 from typing import (
     Any, TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
-    Type, Dict, Awaitable, Iterator,
+    Type, Dict, Awaitable, Iterator, Tuple,
 )
 
 import attrs
@@ -41,7 +41,7 @@ def read_settings() -> None:
         except IOError:
             pass
 
-    conf = parse_conf(props)
+    conf, _ = parse_conf(props)
     _CUR_CONFIG.clear()
     for info, obj_map in conf.items():
         _CUR_CONFIG[info] = obj_map
@@ -234,19 +234,21 @@ def store_conf(data: DataT, data_id: str='') -> None:
         _CUR_CONFIG[info] = {data_id: data}
 
 
-def parse_conf(props: Property) -> Config:
+def parse_conf(props: Property) -> Tuple[Config, bool]:
     """Parse a configuration file into individual data.
 
-    The data is in the form {conf_type: {id: data}}.
+    The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
+    and so should be resaved.
     """
     if 'version' not in props:  # New conf format
-        return parse_conf_legacy(props)
+        return parse_conf_legacy(props), True
 
     version = props.int('version')
     if version != 1:
         raise ValueError(f'Unknown config version {version}!')
 
     conf = Config({})
+    upgraded = False
     for child in props:
         if child.name == 'version':
             continue
@@ -268,6 +270,8 @@ def parse_conf(props: Property) -> Config:
             )
             # Don't try to parse, it'll be invalid.
             continue
+        elif version != info.version:
+            upgraded = True
         data_map: Dict[str, Data] = {}
         conf[info] = data_map
         if info.uses_id:
@@ -289,7 +293,7 @@ def parse_conf(props: Property) -> Config:
                     info.name,
                     exc_info=True,
                 )
-    return conf
+    return conf, upgraded
 
 
 def parse_conf_legacy(props: Property) -> Config:

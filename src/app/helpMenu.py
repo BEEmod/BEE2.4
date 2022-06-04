@@ -94,11 +94,11 @@ Used software / libraries in the BEE2.4:
 * [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
 * [mistletoe][mistletoe] `{mstle_ver}` by Mi Yu and Contributors
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
-* [TKinter][tcl] `{tk_ver}`/[TTK][tcl] `{ttk_ver}`/[Tcl][tcl] `{tcl_ver}`
+* [TKinter][tcl] /[Tcl][tcl] `{tk_ver}`
 * [Python][python] `{py_ver}`
 * [FFmpeg][ffmpeg] licensed under the [LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html). Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
-[pyglet]: https://bitbucket.org/pyglet/pyglet/wiki/Home
+[pyglet]: https://pyglet.org/
 [avbin]: https://avbin.github.io/AVbin/Home/Home.html
 [pillow]: http://pillow.readthedocs.io
 [perlin_noise]: https://github.com/caseman/noise
@@ -427,9 +427,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '''.format(
     # Inject the running Python version.
     py_ver=platform.python_version(),
-    tk_ver=tk.TkVersion,
-    tcl_ver=tk.TclVersion,
-    ttk_ver=ttk.__version__,
+    tk_ver=TK_ROOT.tk.call('info', 'patchlevel'),
     pyglet_ver=sound.pyglet_version,
     mstle_ver=mistletoe.__version__,
     pygtrie_ver=pygtrie.__version__,

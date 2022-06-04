@@ -36,6 +36,7 @@ DROPPERLESS_OFFSET = 22 - 64
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
+# We also snap to nearest voxel, to allow cubes to use an offset handle.
 CUBE_POS: dict[tuple[float, float, float], CubePair] = {}
 
 # Prevents duplicating different filter entities. A number of different keys are used depending on
@@ -439,23 +440,23 @@ class CubeType:
 
         cube_item_id = conf['itemid']
 
-        packlist = conf.find_key('Pack', '')
-        if packlist.has_children():
+        packlist_prop = conf.find_key('Pack', '')
+        if packlist_prop.has_children():
             # Each file individually
             packlist = [
-                prop.value for prop in packlist
+                prop.value for prop in packlist_prop
             ]
         else:
             # One value - packlist ID
-            packlist = packlist.value
+            packlist = packlist_prop.value
 
-        packlist_color = conf.find_key('PackColor', '')
-        if packlist_color.has_children():
+        packlist_color_prop = conf.find_key('PackColor', '')
+        if packlist_color_prop.has_children():
             packlist_color = [
-                prop.value for prop in packlist_color
+                prop.value for prop in packlist_color_prop
             ]
         else:
-            packlist_color = packlist_color.value
+            packlist_color = packlist_color_prop.value
 
         try:
             cube_type = CubeEntType(conf['cubetype'].upper())
@@ -583,12 +584,15 @@ class CubePair:
             ]
 
         # Ensure we can look up the pair by origin and instance.
+        # Round to the nearest voxel to allow the cube to be offset.
         if dropper is not None:
+            pos = Vec.from_str(dropper['origin']) // 128
+            CUBE_POS[pos.as_tuple()] = self
             INST_TO_PAIR[dropper] = self
-            CUBE_POS[Vec.from_str(dropper['origin']).as_tuple()] = self
         if cube is not None:
+            pos = Vec.from_str(cube['origin']) // 128
+            CUBE_POS[pos.as_tuple()] = self
             INST_TO_PAIR[cube] = self
-            CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
         # Cache of comp_kv_setters adding outputs to dropper ents.
         self._kv_setters: dict[str, Entity] = {}
@@ -1046,7 +1050,7 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('VScriptCubePredicate')
-def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> None:
+def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> object:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
     This produces a script to include, which will define the specified function
@@ -1114,6 +1118,7 @@ def link_cubes(vmf: VMF) -> None:
     # cube or dropper -> cubetype or droppertype value.
     inst_to_type: dict[str, CubeType | DropperType] = {}
 
+    obj_type: CubeType | DropperType
     for obj_type in itertools.chain(CUBE_TYPES.values(), DROPPER_TYPES.values()):
         for inst in obj_type.instances:
             inst_to_type[inst] = obj_type
@@ -1276,7 +1281,7 @@ def link_cubes(vmf: VMF) -> None:
         orient = Matrix.from_angle(Angle.from_str(inst['angles']))
 
         with suppress(KeyError):
-            pairs.append(CUBE_POS[origin.as_tuple()])
+            pairs.append(CUBE_POS[(origin // 128).as_tuple()])
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
@@ -1285,7 +1290,7 @@ def link_cubes(vmf: VMF) -> None:
             pos = brushLoc.POS.raycast_world(
                 origin,
                 direction=(0, 0, 1),
-            )
+            ) // 128
             with suppress(KeyError):
                 pairs.append(CUBE_POS[pos.as_tuple()])
 

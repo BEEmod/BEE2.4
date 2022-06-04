@@ -21,17 +21,8 @@ elif utils.LINUX:
 else:
     suffix = ''
 
-# Find the BSP transforms from HammerAddons.
-try:
-    transform_loc = Path(os.environ['BSP_TRANSFORMS']).resolve()
-except KeyError:
-    transform_loc = Path('../../HammerAddons/transforms/').resolve()
-if not transform_loc.exists():
-    raise ValueError(
-        f'Invalid BSP transforms location "{transform_loc}"!\n'
-        'Clone TeamSpen210/HammerAddons next to BEE2.4, or set the '
-        'environment variable BSP_TRANSFORMS to the location.'
-    )
+hammeraddons = Path(SPECPATH, '../hammeraddons/')
+sys.path.append(str(hammeraddons / 'src'))
 
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
@@ -144,6 +135,7 @@ vbsp_vrad_an = Analysis(
 # Force the BSP transforms to be included in their own location.
 # Map package -> module.
 names: 'dict[str, list[str]]' = {}
+transform_loc = hammeraddons / 'transforms'
 for mod in transform_loc.rglob('*.py'):
     rel_path = mod.relative_to(transform_loc)
 
