@@ -1110,7 +1110,7 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> object:
 
 
 @conditions.meta_cond(priority=-750, only_once=True)
-def link_cubes(vmf: VMF) -> None:
+def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """Determine the cubes set based on instance settings.
 
     This sets data, but doesn't implement the changes.
@@ -1325,12 +1325,8 @@ def link_cubes(vmf: VMF) -> None:
 
     # After that's done, save what cubes are present for filter optimisation,
     # and set Voice 'Has' attrs.
-
-    from vbsp import settings
-    voice_attr: dict[str, bool] = settings['has_attr']
-
     if PAIRS:
-        voice_attr['cube'] = True
+        info.set_attr('cube')
 
     for pair in PAIRS:
         if pair.tint is not None:
@@ -1339,29 +1335,25 @@ def link_cubes(vmf: VMF) -> None:
             pair.cube_type.in_map = True
 
         if pair.paint_type is CubePaintType.BOUNCE:
-            voice_attr['bouncegel'] = voice_attr['BlueGel'] = True
-            voice_attr['gel'] = True
+            info.set_attr('gel', 'bouncegel', 'BlueGel')
         elif pair.paint_type is CubePaintType.SPEED:
-            voice_attr['speedgel'] = voice_attr['OrangeGel'] = True
-            voice_attr['gel'] = True
+            info.set_attr('gel', 'speedgel', 'OrangeGel')
 
         has_name = pair.cube_type.has_name
-        voice_attr['cube' + has_name] = True
+        info.set_attr('cube' + has_name)
         if pair.dropper:
-            voice_attr['cubedropper'] = True
-            voice_attr['cubedropper' + has_name] = True
-
+            info.set_attr('cubedropper', 'cubedropper' + has_name)
             # Remove this since it's not useful, with our changes.
             del pair.dropper.fixup['$cube_type']
         else:
-            voice_attr['cubedropperless' + has_name] = True
+            info.set_attr('cubedropperless' + has_name)
 
         if not pair.cube_type.is_companion:
-            voice_attr['cubenotcompanion'] = True
+            info.set_attr('cubenotcompanion')
 
         # Any spherical item, not specifically edgeless cubes.
         if pair.cube_type.type is CubeEntType.sphere:
-            voice_attr['cubesphereshaped'] = True
+            info.set_attr('cubesphereshaped')
 
 
 def setup_output(
@@ -1650,12 +1642,10 @@ def make_cube(
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def generate_cubes(vmf: VMF):
+def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """After other conditions are run, generate cubes."""
-    from vbsp import settings
-    voice_attr: dict[str, bool] = settings['has_attr']
-    bounce_in_map = voice_attr['bouncegel']
-    speed_in_map = voice_attr['speedgel']
+    bounce_in_map = info.has_attr('bouncegel')
+    speed_in_map = info.has_attr('speedgel')
 
     # point_template for spawning dropperless cubes.
     # We can fit 16 in each, start with the count = 16 so
