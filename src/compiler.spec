@@ -59,6 +59,7 @@ INCLUDES = [
     'statistics', 'string', 'struct',
 ]
 INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
+INCLUDES += collect_submodules('hammeraddons')
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
