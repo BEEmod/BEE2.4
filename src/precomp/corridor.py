@@ -55,9 +55,10 @@ class Info:
         """Check if this attribute is present in the map."""
         return self._attrs[name.casefold()]
 
-    def set_attr(self, name: str):
-        """Set this attribute to true."""
-        self._attrs[name.casefold()] = True
+    def set_attr(self, *names: str) -> None:
+        """Set these attributes to true."""
+        for name in names:
+            self._attrs[name.casefold()] = True
 
 
 def analyse_and_modify(
