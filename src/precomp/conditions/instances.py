@@ -377,7 +377,7 @@ def res_global_input(vmf: VMF, res: Property) -> conditions.ResultCallable:
     else:
         conf_output = Output.parse(res)
         conf_output.output = ''  # Don't need to store GlobalInput...
-        # relay_name = ''
+        relay_name = ''
 
     def add_global(inst: Entity) -> None:
         """Add the output."""

@@ -1,6 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Dict, Optional, Union, Callable,
+    Dict, Optional, Union, Callable, Set,
     AsyncIterator, Awaitable, Mapping, List, Tuple,
 )
 from tkinter import ttk
@@ -172,8 +172,8 @@ class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     multi_func: MultiCreateFunc  # Function to create and arrange the block of widgets.
     use_inf: bool  # For timer, is infinite valid?
-    values: list[tuple[str, tk.StringVar]]
-    ui_cbacks: dict[str, UpdateFunc] = attrs.Factory(dict)
+    values: List[Tuple[str, tk.StringVar]]
+    ui_cbacks: Dict[str, UpdateFunc] = attrs.Factory(dict)
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
@@ -220,8 +220,8 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         conf_id: str,
         group_name: str,
         desc,
-        widgets: list[SingleWidget],
-        multi_widgets: list[MultiWidget],
+        widgets: List[SingleWidget],
+        multi_widgets: List[MultiWidget],
     ) -> None:
         self.id = conf_id
         self.name = group_name
@@ -372,7 +372,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         # Don't display that as well.
         CONFIG_ORDER.remove(override)
 
-    def widget_ids(self) -> set[str]:
+    def widget_ids(self) -> Set[str]:
         """Return the set of widget IDs used."""
         return {
             wid.id for wid in

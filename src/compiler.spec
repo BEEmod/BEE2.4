@@ -21,7 +21,7 @@ elif utils.LINUX:
 else:
     suffix = ''
 
-hammeraddons = Path(SPECPATH, '../hammeraddons/')
+hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 sys.path.append(str(hammeraddons / 'src'))
 
 # Unneeded packages that cx_freeze detects:
@@ -59,6 +59,7 @@ INCLUDES = [
     'statistics', 'string', 'struct',
 ]
 INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
+INCLUDES += collect_submodules('hammeraddons')
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
