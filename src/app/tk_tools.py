@@ -6,9 +6,10 @@ import functools
 import sys
 from enum import Enum
 from typing import (
-    Awaitable, Generic, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
     Tuple, Literal,
 )
+from typing_extensions import Unpack, TypeVarTuple
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -37,6 +38,7 @@ import utils
 # Set icons for the application.
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
+PosArgsT = TypeVarTuple('PosArgsT')
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
@@ -202,51 +204,64 @@ else:
     raise AssertionError
 
 
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, Unpack[PosArgsT]], object],
+    args: Tuple[Unpack[PosArgsT]]=(),
+) -> None:
+    """Bind mousewheel events, which function differently on each platform.
+
+     The delta value is prepended to args, then the function is called.
+     - Windows needs the delta value to be divided by 120.
+     - OS X needs the delta value passed unmodified.
+      - Linux uses Button-4 and Button-5 events instead of
+        a MouseWheel event.
+    """
+    if isinstance(widgets, tk.Misc):
+        widgets = [widgets]
+
+    if utils.WIN:
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
+            func(int(event.delta / -120), *args)
+        for widget in widgets:
+            widget.bind('<MouseWheel>', mousewheel_handler, add=True)
+    elif utils.MAC:
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
+            func(-event.delta, *args)
+        for widget in widgets:
+            widget.bind('<MouseWheel>', mousewheel_handler, add=True)
+    elif utils.LINUX:
+        def scroll_up(_: tk.Event) -> None:
+            """Handle scrolling up."""
+            func(-1, *args)
+
+        def scroll_down(_: tk.Event) -> None:
+            """Handle scrolling down."""
+            func(1, *args)
+
+        for widget in widgets:
+            widget.bind('<Button-4>', scroll_up, add=True)
+            widget.bind('<Button-5>', scroll_down, add=True)
+    else:
+        raise AssertionError('Unknown platform ' + sys.platform)
+
+
 @overload
-def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: """..."""
+def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: ...
 @overload
-def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: """..."""
+def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: ...
 def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
     """Add events so scrolling anywhere in a frame will scroll a target.
 
     frames should be the TK objects to bind to - mainly Frame or
     Toplevel objects.
     Set orient to 'x' or 'y'.
-    This is needed since different platforms handle mousewheel events
-    differently:
-     - Windows needs the delta value to be divided by 120.
-     - OS X needs the delta value passed unmodified.
-      - Linux uses Button-4 and Button-5 events instead of
-        a MouseWheel event.
     """
     scroll_func = getattr(target, orient + 'view_scroll')
-
-    if utils.WIN:
-        def mousewheel_handler(event: tk.Event) -> None:
-            """Handle mousewheel events."""
-            scroll_func(int(event.delta / -120), "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
-    elif utils.MAC:
-        def mousewheel_handler(event: tk.Event) -> None:
-            """Handle mousewheel events."""
-            scroll_func(-event.delta, "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
-    elif utils.LINUX:
-        def scroll_up(event: tk.Event) -> None:
-            """Handle scrolling up."""
-            scroll_func(-1, "units")
-
-        def scroll_down(event: tk.Event) -> None:
-            """Handle scrolling down."""
-            scroll_func(1, "units")
-
-        for frame in frames:
-            frame.bind('<Button-4>', scroll_up, add=True)
-            frame.bind('<Button-5>', scroll_down, add=True)
-    else:
-        raise AssertionError('Unknown platform ' + sys.platform)
+    # Call view_scroll(delta, "units").
+    bind_mousewheel(frames, scroll_func, ('units', ))
 
 
 EventFunc = Callable[[tk.Event], Any]
