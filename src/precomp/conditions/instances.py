@@ -137,8 +137,14 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
         comp_func = INSTVAR_COMP.get(op, operator.eq)
     elif len(values) == 2:
         val_a, val_b = values
-        op = '=='
-        comp_func = operator.eq
+        if val_b in INSTVAR_COMP:
+            # User did "$var ==", treat as comparing against an empty string.
+            comp_func = INSTVAR_COMP[val_b]
+            val_b = ""
+        else:
+            # With just two vars, assume equality.
+            op = '=='
+            comp_func = operator.eq
     else:
         # For just a name.
         return conv_bool(inst.fixup.substitute(values[0]))
