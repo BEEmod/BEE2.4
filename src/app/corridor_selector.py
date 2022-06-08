@@ -101,6 +101,8 @@ class Selector:
         self.wid_image.grid(row=0, column=1, sticky='nsew')
         self.wid_image_right.grid(row=0, column=2, sticky='ns')
 
+        tk_tools.bind_mousewheel(self.wid_image, sel_img)
+
         img.apply(self.wid_image_left, IMG_ARROW_LEFT)
         img.apply(self.wid_image, IMG_CORR_BLANK)
         img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
