@@ -2341,12 +2341,15 @@ def generate_goo(vmf: VMF) -> None:
             bbox_max = Vec(max_x, max_y, z) * 128
             trig_hurt.solids.append(vmf.make_prism(
                 bbox_min,
-                bbox_max + (128, 128, 77),
+                # 19 units below the surface.
+                bbox_max + (128, 128, 96 - 19),
                 mat=consts.Tools.TRIGGER,
             ).solid)
             trig_phys.solids.append(vmf.make_prism(
                 bbox_min,
-                bbox_max + (128, 128, 26),
+                # 70 units below the surface - 1 unit more than the height of a turret with its
+                # antenna extended. Most likely this is why PeTI uses this particular height.
+                bbox_max + (128, 128, 96 - 70),
                 mat=consts.Tools.TRIGGER,
             ).solid)
 
