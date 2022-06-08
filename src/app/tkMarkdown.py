@@ -41,6 +41,13 @@ _HR = [
     TextSegment('\n', ('hrule', ), None),
     TextSegment('\n', (), None),
 ]
+# Unicode bullet characters, in order of use.
+BULLETS = [
+    '\N{bullet} ',  # Regular bullet
+    '\u25E6 ',  # White/hollow bullet
+    '- ',  # Dash
+    '\u2023 ',  # Triangular bullet
+]
 
 
 @attrs.define
@@ -178,7 +185,9 @@ class TKRenderer(mistletoe.BaseRenderer):
         """The individual items in a list."""
         count = self._list_stack[-1]
         if count is None:
-            prefix = '\N{bullet} '  # Bullet char.
+            # Bullet list, make nested ones use different characters.
+            nesting = self._list_stack.count(None) - 1
+            prefix = BULLETS[nesting % len(BULLETS)]
         else:
             prefix = f'{count}. '
             self._list_stack[-1] += 1
