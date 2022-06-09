@@ -290,7 +290,7 @@ class Selector:
                 self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
                 self.slots[next_slot].flexi_group = GRP_UNSELECTED
             except KeyError:
-                LOGGER.warning('Unknown corridor instance "{}" in config!')
+                LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
             else:
                 next_slot += 1
 
