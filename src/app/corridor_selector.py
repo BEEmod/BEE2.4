@@ -1,7 +1,7 @@
 """Implements UI for selecting corridors."""
 from tkinter import ttk
 import tkinter as tk
-from typing import Optional, List, Sequence, Literal
+from typing import Optional, List, Sequence
 from typing_extensions import TypeAlias, Final
 
 import srctools.logger
@@ -206,8 +206,8 @@ class Selector:
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
-        selected = []
-        unselected = []
+        selected: List[str] = []
+        unselected: List[str] = []
 
         for slot in self.slots:
             if slot.contents is not None:
@@ -393,8 +393,10 @@ class Selector:
             self.wid_image_left.state(('disabled', ))
             self.wid_image_right.state(('disabled', ))
 
-    def _sel_img(self, direction: Literal[-1, 0, 1]) -> None:
+    def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
+        direction = min(1, max(-1, direction))  # Clamp
+
         max_ind = len(self.cur_images) - 1
         self.img_ind += direction
         # Order this and the comparisons so size = 0 means index is forced to 0 with both
