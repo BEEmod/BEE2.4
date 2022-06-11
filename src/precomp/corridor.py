@@ -4,13 +4,14 @@ from collections import Counter
 from typing import Dict
 
 import attrs
-from srctools import Matrix, VMF, Vec, Angle
+from srctools import Vec, Angle, Matrix
+from srctools.vmf import VMF, Entity
 import srctools.logger
 
 import consts
 import utils
 from . import instanceLocs, rand
-from corridor import (
+from corridor import (  # noqa
     GameMode, Direction, Orient,
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
@@ -95,6 +96,9 @@ def analyse_and_modify(
     seen_no_player_start: set[bool] = set()
     seen_game_modes: set[GameMode] = set()
 
+    inst_elev_entry: Entity | None = None
+    inst_elev_exit: Entity | None = None
+
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
         # doors.
@@ -162,6 +166,10 @@ def analyse_and_modify(
             # Do after so it overwrites these automatic ones.
             item.fixup.update(chosen.fixups)
 
+            # The instance has a numeric suffix depending on the corridor index.
+            # That's no longer valid, just strip it.
+            item['targetname'] = item['targetname'].rstrip('0123456789')
+
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
                 item['origin'] = origin - (0, 0, 64)
@@ -182,19 +190,22 @@ def analyse_and_modify(
         elif file_coop_exit == file:
             seen_game_modes.add(GameMode.COOP)
             # Elevator instances don't get named - fix that...
-            item['targetname'] = 'coop_exit'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
-        elif file_sp_exit == file or file_sp_entry == file:
+            item['targetname'] = 'coop_exit'
+            inst_elev_exit = item
+        elif file_sp_entry == file:
             seen_game_modes.add(GameMode.SP)
             if elev_override:
                 item.fixup['no_player_start'] = '1'
-            # Elevator instances don't get named - fix that...
-            item['targetname'] = (
-                'elev_entry' if
-                file_sp_entry == file
-                else 'elev_exit'
-            )
+            item['targetname'] = 'elev_entry'
+            inst_elev_entry = item
+        elif file_sp_exit == file:
+            seen_game_modes.add(GameMode.SP)
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
+            item['targetname'] = 'elev_exit'
+            inst_elev_exit = item
         # Skip frames and include the chosen corridor
         filenames[file] += 1
 
@@ -223,6 +234,12 @@ def analyse_and_modify(
         raise Exception('Entry corridor is missing!')
     if chosen_exit is None:
         raise Exception('Exit corridor is missing!')
+
+    # Apply selected fixups to the elevator also.
+    if inst_elev_entry is not None:
+        inst_elev_entry.fixup.update(chosen_entry.fixups)
+    if inst_elev_exit is not None:
+        inst_elev_exit.fixup.update(chosen_exit.fixups)
 
     [is_publishing] = seen_no_player_start
     [game_mode] = seen_game_modes
