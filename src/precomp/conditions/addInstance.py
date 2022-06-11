@@ -14,7 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
 @conditions.make_result('addGlobal')
-def res_add_global_inst(vmf: VMF, res: Property):
+def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> None:
     """Add one instance in a specific location.
 
     Options:
@@ -33,24 +33,25 @@ def res_add_global_inst(vmf: VMF, res: Property):
     """
     if not res.has_children():
         res = Property('AddGlobal', [Property('File', res.value)])
-    file = instanceLocs.resolve_one(res['file'], error=True)
+    file = instanceLocs.resolve_one(inst.fixup.substitute(res['file']), error=True)
 
     if res.bool('allow_multiple') or file.casefold() not in conditions.GLOBAL_INSTANCES:
-        # By default we will skip adding the instance
+        # By default, we will skip adding the instance
         # if was already added - this is helpful for
         # items that add to original items, or to avoid
         # bugs.
         new_inst = vmf.create_ent(
             classname="func_instance",
-            targetname=res['name', ''],
+            targetname=inst.fixup.substitute(res['name', '']),
             file=file,
-            angles=res['angles', '0 0 0'],
+            angles=inst.fixup.substitute(res['angles', '0 0 0']),
             fixup_style=res['fixup_style', '0'],
         )
         try:
-            new_inst['origin'] = res['position']
+            new_inst['origin'] = inst.fixup.substitute(res['position'])
         except IndexError:
             new_inst['origin'] = options.get(Vec, 'global_ents_loc')
+
         conditions.GLOBAL_INSTANCES.add(file.casefold())
         conditions.ALL_INST.add(file.casefold())
         if new_inst['targetname'] == '':
