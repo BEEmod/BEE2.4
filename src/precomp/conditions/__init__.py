@@ -771,7 +771,7 @@ def check_flag(
         if can_skip:
             raise
         else:
-            return False
+            return not desired_result
     else:
         return res is desired_result
 
