@@ -1120,8 +1120,8 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
 
     obj_type: CubeType | DropperType
     for obj_type in itertools.chain(CUBE_TYPES.values(), DROPPER_TYPES.values()):
-        for inst in obj_type.instances:
-            inst_to_type[inst] = obj_type
+        for fname in obj_type.instances:
+            inst_to_type[fname] = obj_type
 
     # Origin -> instances
     dropper_pos: dict[tuple[float, float, float], tuple[Entity, DropperType]] = {}
@@ -1339,21 +1339,28 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         elif pair.paint_type is CubePaintType.SPEED:
             info.set_attr('gel', 'speedgel', 'OrangeGel')
 
-        has_name = pair.cube_type.has_name
-        info.set_attr('cube' + has_name)
         if pair.dropper:
-            info.set_attr('cubedropper', 'cubedropper' + has_name)
+            info.set_attr('cubedropper')
             # Remove this since it's not useful, with our changes.
             del pair.dropper.fixup['$cube_type']
-        else:
-            info.set_attr('cubedropperless' + has_name)
+
+        has_name = pair.cube_type.has_name
+        names = [has_name]
 
         if not pair.cube_type.is_companion:
-            info.set_attr('cubenotcompanion')
-
+            names.append('notcompanion')
         # Any spherical item, not specifically edgeless cubes.
         if pair.cube_type.type is CubeEntType.sphere:
-            info.set_attr('cubesphereshaped')
+            names.append('sphereshaped')
+        else:
+            names.append('notsphereshaped')
+
+        for name in names:
+            info.set_attr('cube' + name)
+            if pair.dropper:
+                info.set_attr('cubedropper', 'cubedropper' + name)
+            else:
+                info.set_attr('cubedropperless' + name)
 
 
 def setup_output(
