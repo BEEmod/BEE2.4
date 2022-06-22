@@ -4,7 +4,7 @@ from __future__ import annotations
 import itertools
 import os
 from collections import defaultdict
-from typing import Callable, Union, Optional, Tuple, Mapping, Iterable, Iterator
+from typing import AbstractSet, Callable, Union, Optional, Tuple, Mapping, Iterable, Iterator
 
 from decimal import Decimal
 from enum import Enum
@@ -295,9 +295,9 @@ class Template:
         )
 
     @property
-    def visgroups(self) -> Iterator[str]:
-        """Iterate over the template visgroups"""
-        return iter(self._data)
+    def visgroups(self) -> AbstractSet[str]:
+        """Return a view of the template visgroups."""
+        return self._data.keys()
 
     def visgrouped(
         self,
@@ -531,7 +531,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
             # Auto-visgroup puts func_detail ents in unique visgroups.
             if is_detail and not visgroup and conf_auto_visgroup:
-                visgroup = '__auto_group_{}__'.format(conf_auto_visgroup)
+                visgroup = f'__auto_group_{conf_auto_visgroup}__'
                 # Reuse as the unique index, >0 are True too..
                 conf_auto_visgroup += 1
 
