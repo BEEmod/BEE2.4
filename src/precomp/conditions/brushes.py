@@ -12,7 +12,7 @@ from precomp import (
     conditions, tiling, texturing, rand, corridor,
     instance_traits, brushLoc, faithplate, template_brush,
 )
-import vbsp
+import utils
 import consts
 from precomp.collisions import Collisions
 
@@ -592,6 +592,8 @@ def res_import_template(vmf: VMF, coll: Collisions, info: corridor.Info, res: Pr
         for vis_flag_block in visgroup_instvars:
             if all(conditions.check_flag(flag, coll, info, inst) for flag in vis_flag_block):
                 visgroups.add(vis_flag_block.real_name)
+            if utils.DEV_MODE and vis_flag_block.real_name not in template.visgroups:
+                LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_flag_block.real_name)
 
         force_colour = conf_force_colour
         if color_var == '<editor>':
