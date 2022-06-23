@@ -10,7 +10,12 @@ import trio
 import event
 import packages
 
-from app import TK_ROOT, background_run, config, dragdrop, img, sound, tk_tools
+from app import (
+    TK_ROOT, DEV_MODE, background_run,
+    config, dragdrop,
+    img, sound, tk_tools,
+    tkMarkdown,
+)
 from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
@@ -385,7 +390,19 @@ class Selector:
             self._sel_img(0)  # Updates the buttons.
 
             self.wid_title['text'] = corr.name
-            self.wid_desc.set_text(corr.desc)
+            if DEV_MODE.get():
+                # Show the instance in the description, plus fixups that are assigned.
+                self.wid_desc.set_text(tkMarkdown.join(
+                    tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
+                    corr.desc,
+                    tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
+                    tkMarkdown.convert('\n'.join([
+                        f'* `{var}`: `{value}`'
+                        for var, value in corr.fixups.items()
+                    ]), None)
+                ))
+            else:
+                self.wid_desc.set_text(corr.desc)
         else:  # Reset.
             self.wid_title['text'] = ''
             self.wid_desc.set_text(corridor.EMPTY_DESC)
