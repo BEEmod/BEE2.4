@@ -972,7 +972,7 @@ def flag_dropper_color(inst: Entity, res: Property) -> bool:
     except KeyError:
         return False
 
-    if res.value:
+    if res.value and data.tint is not None:
         inst.fixup[res.value] = data.tint
 
     return data.tint is not None
