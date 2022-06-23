@@ -3,9 +3,10 @@
 This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
-from collections.abc import Sequence
+from typing import Type, Sequence
 import urllib.parse
 import types
+import enum
 
 import attrs
 from mistletoe import block_token as btok, span_token as stok
@@ -18,6 +19,37 @@ import utils
 LOGGER = srctools.logger.get_logger(__name__)
 
 
+class TextTag(str, enum.Enum):
+    """Tags used in text segments."""
+    H1 = 'heading_1'
+    H2 = 'heading_2'
+    H3 = 'heading_3'
+    H4 = 'heading_4'
+    H5 = 'heading_5'
+    H6 = 'heading_6'
+
+    UNDERLINE = 'underline'
+    BOLD = 'bold'
+    ITALIC = 'italic'
+    CODE = 'code'
+    STRIKETHROUGH = 'strikethrough'
+    INVERT = 'invert'
+    INDENT = 'indent'
+    LIST_START = 'list_start'
+    LIST = 'list'
+    HRULE = 'hrule'
+    LINK = 'link'
+
+    HEADINGS: dict[int, TextTag]
+
+# Assign outside class, so it's not an enum member.
+TextTag.HEADINGS = {
+    int(tag.name[-1]): tag
+    for tag in TextTag
+    if tag.value.startswith('heading_')
+}
+
+
 class Block:
     """The kinds of data contained in MarkdownData."""
 
@@ -26,7 +58,7 @@ class Block:
 class TextSegment(Block):
     """Each section added in text blocks."""
     text: str  # The text to show
-    tags: tuple[str, ...]  # Tags
+    tags: tuple[TextTag, ...]  # Tags
     url: str | None  # If set, the text should be given this URL as a callback.
 
 
@@ -63,12 +95,12 @@ class MarkdownData:
         """Empty data is false."""
         return bool(self.blocks)
 
-    def copy(self) -> 'MarkdownData':
+    def copy(self) -> MarkdownData:
         """Create and return a duplicate of this object."""
         return MarkdownData(list(self.blocks))
 
     @classmethod
-    def text(cls, text: str, *tags: str, url: str | None = None) -> MarkdownData:
+    def text(cls, text: str, *tags: TextTag, url: str | None = None) -> MarkdownData:
         """Construct data with a single text segment."""
         return cls([TextSegment(text, tags, url)])
 
@@ -85,7 +117,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         self.package: str | None = None
         super().__init__()
 
-    def __exit__(self, exc_type: type[BaseException], exc_val: BaseException, exc_tb: types.TracebackType) -> None:
+    def __exit__(self, exc_type: Type[BaseException], exc_val: BaseException, exc_tb: types.TracebackType) -> None:
         self._list_stack.clear()
         self.package = None
 
@@ -120,7 +152,7 @@ class TKRenderer(mistletoe.BaseRenderer):
 
         return MarkdownData(blocks)
 
-    def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: str, url: str=None) -> MarkdownData:
+    def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: TextTag, url: str=None) -> MarkdownData:
         added_tags = set(tags)
         result = self.render_inner(token)
         for i, data in enumerate(result.blocks):
@@ -133,12 +165,14 @@ class TKRenderer(mistletoe.BaseRenderer):
         """An automatic link - the child is a single raw token."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return MarkdownData.text(child.content, 'link', url=token.target)
+        return MarkdownData.text(child.content, TextTag.LINK, url=token.target)
 
     def render_block_code(self, token: btok.BlockCode) -> MarkdownData:
+        """Render full code blocks."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return MarkdownData.text(child.content, 'codeblock')
+        # TODO: Code block.
+        return MarkdownData.text(child.content, TextTag.CODE)
 
     def render_document(self, token: btok.Document) -> MarkdownData:
         """Render the outermost document."""
@@ -150,6 +184,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         return result
 
     def render_escape_sequence(self, token: stok.EscapeSequence) -> MarkdownData:
+        """Render backslash escaped text."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
         return MarkdownData.text(child.content)
@@ -160,9 +195,10 @@ class TKRenderer(mistletoe.BaseRenderer):
         return MarkdownData([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
+        """Render inline code segments."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return MarkdownData.text(child.content, 'code')
+        return MarkdownData.text(child.content, TextTag.CODE)
 
     def render_line_break(self, token: stok.LineBreak) -> MarkdownData:
         if token.soft:
@@ -171,6 +207,7 @@ class TKRenderer(mistletoe.BaseRenderer):
             return MarkdownData.text('\n')
 
     def render_link(self, token: stok.Link) -> MarkdownData:
+        """Render links."""
         return self._with_tag(token, url=token.target)
 
     def render_list(self, token: btok.List) -> MarkdownData:
@@ -193,8 +230,8 @@ class TKRenderer(mistletoe.BaseRenderer):
             self._list_stack[-1] += 1
 
         result = join(
-            MarkdownData.text(prefix, 'list_start'),
-            self._with_tag(token, 'list'),
+            MarkdownData.text(prefix, TextTag.LIST_START),
+            self._with_tag(token, TextTag.LIST),
         )
 
         return result
@@ -214,9 +251,11 @@ class TKRenderer(mistletoe.BaseRenderer):
         return MarkdownData.text('<Tables not supported>')
 
     def render_table_cell(self, token: btok.TableCell) -> MarkdownData:
+        """Unimplemented table cells."""
         return MarkdownData.text('<Tables not supported>')
 
     def render_table_row(self, token: btok.TableRow) -> MarkdownData:
+        """Unimplemented table rows."""
         return MarkdownData.text('<Tables not supported>')
 
     def render_thematic_break(self, token: btok.ThematicBreak) -> MarkdownData:
@@ -224,25 +263,30 @@ class TKRenderer(mistletoe.BaseRenderer):
         return MarkdownData(_HR.copy())
 
     def render_heading(self, token: btok.Heading) -> MarkdownData:
-        return self._with_tag(token, f'heading_{token.level}')
+        """Render a level 1-6 heading."""
+        return self._with_tag(token, TextTag.HEADINGS[token.level])
 
     def render_quote(self, token: btok.Quote) -> MarkdownData:
-        return self._with_tag(token, 'indent')
+        """Render blockquotes."""
+        return self._with_tag(token, TextTag.INDENT)
 
     def render_strikethrough(self, token: stok.Strikethrough) -> MarkdownData:
-        return self._with_tag(token, 'strikethrough')
+        """Render strikethroughed text."""
+        return self._with_tag(token, TextTag.STRIKETHROUGH)
 
     def render_strong(self, token: stok.Strong) -> MarkdownData:
-        return self._with_tag(token, 'bold')
+        """Render <strong> tags, with bold fonts."""
+        return self._with_tag(token, TextTag.BOLD)
 
     def render_emphasis(self, token: stok.Emphasis) -> MarkdownData:
-        return self._with_tag(token, 'italic')
+        """Render <em> tags, with italic fonts."""
+        return self._with_tag(token, TextTag.ITALIC)
 
 _RENDERER = TKRenderer()
 
 
 def convert(text: str, package: str | None) -> MarkdownData:
-    """Convert markdown syntax into data ready to be passed to richTextBox.
+    """Convert Markdown syntax into data ready to be passed to richTextBox.
 
     The package must be passed to allow using images in the document.
     """
@@ -264,7 +308,7 @@ def join(*args: MarkdownData) -> MarkdownData:
 
     for child in args:
         for data in child.blocks:
-            # We also want to combine together text segments next to each other.
+            # We also want to combine text segments next to each other.
             if isinstance(data, TextSegment) and blocks:
                 last = blocks[-1]
                 if isinstance(last, TextSegment) and last.tags == data.tags and last.url == data.url:

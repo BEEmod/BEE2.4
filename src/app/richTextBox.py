@@ -7,6 +7,7 @@ from typing import Union, Tuple, Dict, Callable
 import webbrowser
 
 from app import tkMarkdown
+from app.tkMarkdown import TextTag
 from app.tk_tools import Cursors
 from localisation import gettext
 import srctools.logger
@@ -16,7 +17,13 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 class tkRichText(tkinter.Text):
     """A version of the TK Text widget which allows using special formatting."""
-    def __init__(self, parent, width=10, height=4, font="TkDefaultFont", **kargs):
+    def __init__(
+        self,
+        parent: tkinter.Misc,
+        width: int = 10, height: int = 4,
+        font: str = "TkDefaultFont",
+        **kargs,
+    ) -> None:
         # Setup all our configuration for inserting text.
         self.font = nametofont(font)
         self.bold_font = self.font.copy()
@@ -45,38 +52,20 @@ class tkRichText(tkinter.Text):
             self.heading_font[size] = font = self.font.copy()
             cur_size /= 0.8735
             font.configure(weight='bold', size=round(cur_size))
-            self.tag_config(
-                'heading_{}'.format(size),
-                font=font,
-            )
+            self.tag_config(TextTag.HEADINGS[size], font=font)
 
+        self.tag_config(TextTag.UNDERLINE, underline=True)
+        self.tag_config(TextTag.BOLD, font=self.bold_font)
+        self.tag_config(TextTag.ITALIC, font=self.italic_font)
+        self.tag_config(TextTag.STRIKETHROUGH, overstrike=True)
         self.tag_config(
-            "underline",
-            underline=True,
-        )
-        self.tag_config(
-            "bold",
-            font=self.bold_font,
-        )
-        self.tag_config(
-            "italic",
-            font=self.italic_font,
-        )
-        self.tag_config(
-            "strikethrough",
-            overstrike=True,
-        )
-        self.tag_config(
-            "invert",
+            TextTag.INVERT,
             background='black',
             foreground='white',
         )
+        self.tag_config(TextTag.CODE, font='TkFixedFont')
         self.tag_config(
-            "code",
-            font='TkFixedFont',
-        )
-        self.tag_config(
-            "indent",
+            TextTag.INDENT,
             # Indent the first line slightly, but indent the following
             # lines more to line up with the text.
             lmargin1="10",
@@ -85,24 +74,24 @@ class tkRichText(tkinter.Text):
         # Indent the first line slightly, but indent the following
         # lines more to line up with the text.
         self.tag_config(
-            "list_start",
+            TextTag.LIST_START,
             lmargin1="10",
             lmargin2="25",
         )
         self.tag_config(
-            "list",
+            TextTag.LIST,
             lmargin1="25",
             lmargin2="25",
         )
         self.tag_config(
-            "hrule",
+            TextTag.HRULE,
             relief="sunken",
             borderwidth=1,
             # This makes the line-height very short.
             font=tkFont(size=1),
         )
         self.tag_config(
-            "link",
+            TextTag.LINK,
             underline=True,
             foreground='blue',
         )
@@ -110,12 +99,12 @@ class tkRichText(tkinter.Text):
         # We can't change cursors locally for tags, so add a binding which
         # sets the widget property.
         self.tag_bind(
-            "link",
+            TextTag.LINK,
             "<Enter>",
             lambda e: self.__setitem__('cursor', Cursors.LINK),
         )
         self.tag_bind(
-            "link",
+            TextTag.LINK,
             "<Leave>",
             lambda e: self.__setitem__('cursor', Cursors.REGULAR),
         )
@@ -151,6 +140,7 @@ class tkRichText(tkinter.Text):
         segment: tkMarkdown.TextSegment
         for i, block in enumerate(text_data.blocks):
             if isinstance(block, tkMarkdown.TextSegment):
+                tags: tuple[str, ...]
                 if block.url:
                     try:
                         cmd_tag, _ = self._link_commands[block.url]
@@ -162,7 +152,7 @@ class tkRichText(tkinter.Text):
                             self.make_link_callback(block.url),
                         )
                         self._link_commands[block.url] = cmd_tag, cmd_id
-                    tags = block.tags + (cmd_tag, 'link')
+                    tags = block.tags + (cmd_tag, TextTag.LINK)
                 else:
                     tags = block.tags
                 # Strip newlines from the beginning and end of the textbox.
