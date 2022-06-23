@@ -1,6 +1,6 @@
 """Test the Plane class."""
 from collections import Counter
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, no_type_check
 
 from plane import Plane
 import pytest
@@ -147,6 +147,7 @@ def test_views() -> None:
 
 
 # noinspection PyTypeChecker
+@no_type_check
 def test_illegal_positions() -> None:
     """Test invalid positions produce a KeyError."""
     plane = Plane()

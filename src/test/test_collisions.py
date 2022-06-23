@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, no_type_check
 from pathlib import Path
 import pytest
 
@@ -94,6 +94,7 @@ def test_bbox_construction() -> None:
     ).tags == frozenset({'a', 'b', 'embed'})
 
 
+@no_type_check
 def test_illegal_bbox() -> None:
     """A line or point segement is not allowed."""
     with pytest.raises(ValueError):
@@ -123,6 +124,7 @@ def test_bbox_vecs() -> None:
     assert bb.center is not bb.center
 
 
+@no_type_check
 def test_bbox_is_frozen() -> None:
     """Test modification is not possible."""
     bb = BBox(40, 60, 80, 120, 450, 730, contents=CollideType.PHYSICS)
