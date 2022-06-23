@@ -20,17 +20,8 @@ import os.path
 import event
 from app import TK_ROOT, background_run, config
 
-try:
-    # Python 3.6+
-    # noinspection PyCompatibility
-    from idlelib.redirector import WidgetRedirector
-    from idlelib.query import Query
-except ImportError:
-    # Python 3.5 and below
-    # noinspection PyCompatibility, PyUnresolvedReferences
-    from idlelib.WidgetRedirector import WidgetRedirector
-    Query = None
-
+from idlelib.redirector import WidgetRedirector
+from idlelib.query import Query
 
 import utils
 
