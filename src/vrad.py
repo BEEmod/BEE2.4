@@ -158,9 +158,9 @@ async def main(argv: List[str]) -> None:
             # If shift is held, reverse.
             if utils.check_shift():
                 if light_args == 'FAST':
-                    light_args == 'FULL'
+                    light_args = 'FULL'
                 else:
-                    light_args == 'FAST'
+                    light_args = 'FAST'
                 LOGGER.info('Shift held, changing configured lighting option to {}!', light_args)
         else:
             # publishing - always force full lighting.
