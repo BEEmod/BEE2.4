@@ -55,6 +55,7 @@ class StraightPlate(FaithPlate):
     helper_trig: Entity
 
 
+@attrs.define
 class PaintDropper(FaithPlate):
     """A special case - bomb-type Paint Droppers use this to aim the bomb."""
     VISGROUP: ClassVar[str] = 'paintdrop'
