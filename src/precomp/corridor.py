@@ -166,10 +166,6 @@ def analyse_and_modify(
             # Do after so it overwrites these automatic ones.
             item.fixup.update(chosen.fixups)
 
-            # The instance has a numeric suffix depending on the corridor index.
-            # That's no longer valid, just strip it.
-            item['targetname'] = item['targetname'].rstrip('0123456789')
-
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
                 item['origin'] = origin - (0, 0, 64)

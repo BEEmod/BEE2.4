@@ -457,19 +457,23 @@ def calc_connections(
     It also applies frames to shape signage to distinguish repeats.
     """
     # First we want to match targetnames to item types.
-    toggles = {}  # type: Dict[str, Entity]
+    toggles: dict[str, Entity] = {}
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
-    sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
+    sign_shape_overlays: dict[tuple[str, str], list[Entity]] = defaultdict(list)
 
     # Indicator panels
-    panels = {}  # type: Dict[str, Entity]
+    panels: dict[str, Entity] = {}
 
     # We only need to pay attention for TBeams, other items we can
     # just detect any output.
     tbeam_polarity = {OutNames.IN_SEC_ACT, OutNames.IN_SEC_DEACT}
     # Also applies to other items, but not needed for this analysis.
     tbeam_io = {OutNames.IN_ACT, OutNames.IN_DEACT}
+
+    # Corridors have a numeric suffix depending on the corridor index.
+    # That's no longer valid, so we want to strip it.
+    corridors: list[Entity] = []
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
@@ -516,6 +520,9 @@ def calc_connections(
             if item_type.input_type is InputType.DUAL:
                 del inst.fixup[consts.FixupVars.CONN_COUNT]
                 del inst.fixup[consts.FixupVars.CONN_COUNT_TBEAM]
+
+            if 'corridor' in traits:
+                corridors.append(inst)
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
@@ -648,6 +655,10 @@ def calc_connections(
                     vmf.add_ent(frame)
                     frame['material'] = frame_mat
                     frame['renderorder'] = 1  # On top
+
+    # Now we've computed everything, strip numbers.
+    for inst in corridors:
+        inst['targetname'] = inst['targetname'].rstrip('0123456789')
 
 
 def do_item_optimisation(vmf: VMF) -> None:
