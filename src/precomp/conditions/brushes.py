@@ -9,12 +9,11 @@ from srctools.math import Vec, Angle, Matrix, to_matrix
 import srctools.logger
 
 from precomp import (
-    conditions, tiling, texturing, rand, corridor,
+    conditions, tiling, texturing, rand, corridor, collisions,
     instance_traits, brushLoc, faithplate, template_brush,
 )
 import utils
 import consts
-from precomp.collisions import Collisions
 
 
 COND_MOD_NAME = 'Brushes'
@@ -370,7 +369,12 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('TemplateBrush')
-def res_import_template(vmf: VMF, coll: Collisions, info: corridor.Info, res: Property):
+def res_import_template(
+    vmf: VMF,
+    coll: collisions.Collisions,
+    info: corridor.Info,
+    res: Property,
+) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only
@@ -1085,7 +1089,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             bbox_max += off
             for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
                 if pos.as_tuple() not in points:
-                    bevel_world.add((pos[uaxis], pos[vaxis]))
+                    bevel_world.add((int(pos[uaxis]), int(pos[vaxis])))
         # else: No bevels.
     panels: list[tiling.Panel] = []
 
@@ -1135,8 +1139,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.bevels.clear()
             for u, v in bevel_world:
                 # Convert from world points to UV positions.
-                u = (u - tile.pos[uaxis] + 48) // 32
-                v = (v - tile.pos[vaxis] + 48) // 32
+                u = round((u - tile.pos[uaxis] + 48) // 32)
+                v = round((v - tile.pos[vaxis] + 48) // 32)
                 # Cull outside here, we wont't use them.
                 if -1 <= u <= 4 and -1 <= v <= 4:
                     panel.bevels.add((u, v))
@@ -1178,7 +1182,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         if brush_ent is None:
             brush_ent = vmf.create_ent('')
 
-        old_pos = brush_ent.keys.pop('origin', None)
+        old_pos = brush_ent.pop('origin', None)
 
         conditions.set_ent_keys(brush_ent, inst, props)
         if not brush_ent['classname']:
@@ -1193,7 +1197,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         else:
             # We want to do some post-processing.
             # Localise any origin value.
-            if 'origin' in brush_ent.keys:
+            if 'origin' in brush_ent:
                 pos = Vec.from_str(brush_ent['origin'])
                 pos.localise(
                     Vec.from_str(inst['origin']),

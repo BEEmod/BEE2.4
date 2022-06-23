@@ -324,7 +324,7 @@ def refresh_counts(reload: bool = True) -> None:
             bar_var.should_flash = True
         else:
             bar_var.should_flash = False
-            bar_var.set(100 * value / max_value)
+            bar_var.set(round(100 * value / max_value))
 
         set_tooltip(UI['count_' + name], '{}/{} ({:.2%}):\n{}'.format(
             value,
