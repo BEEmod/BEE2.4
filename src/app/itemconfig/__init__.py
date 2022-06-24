@@ -1,11 +1,12 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Dict, Optional, Union, Callable, Set,
-    AsyncIterator, Awaitable, Mapping, List, Tuple,
+    Optional, Union, Callable,
+    List, Tuple, Dict, Set,
+    Iterator, AsyncIterator, Awaitable, Mapping,
 )
+from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
-import itertools
 
 from srctools import EmptyMapping, Property, Vec, logger
 from srctools.dmx import Element
@@ -14,7 +15,7 @@ import attrs
 
 import app.config
 from packages import PakObject, ExportData, ParseData, desc_parse
-from app import UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, BEE2
+from app import UI, background_run, signage_ui, tkMarkdown, sound, tk_tools
 from app.tooltip import add_tooltip
 import BEE2_config
 import utils
@@ -23,12 +24,12 @@ import utils
 LOGGER = logger.get_logger(__name__)
 
 # Called when the var is changed, to update UI if required.
-UpdateFunc = Callable[[str], Awaitable[None]]
+UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 
 # Functions for each widget.
 # The function is passed a parent frame, StringVar, and Property block.
 # The widget to be installed should be returned, and a callback to refresh the UI.
-SingleCreateFunc = Callable[
+SingleCreateFunc: TypeAlias = Callable[
     [ttk.Frame, tk.StringVar, Property],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
@@ -37,7 +38,7 @@ WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets')
 # Override for timer-type widgets to be more compact - passed a num:var dict of StringVars
 # instead. The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
-MultiCreateFunc = Callable[
+MultiCreateFunc: TypeAlias = Callable[
     [ttk.Frame, List[Tuple[str, tk.StringVar]], Property],
     AsyncIterator[Tuple[str, UpdateFunc]]
 ]
@@ -114,7 +115,21 @@ class WidgetConfig(app.config.Data):
                 for tim, value in self.values.items()
             ])
 
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'WidgetConfig':
+        """Parse DMX format configuration."""
+        assert version == 1
+        if 'value' in data:
+            return WidgetConfig(data['value'].val_string)
+        else:
+            return WidgetConfig({
+                attr.name[4:]: attr.val_string
+                for attr in data.values()
+                if attr.name.startswith('tim_')
+            })
+
     def export_dmx(self) -> Element:
+        """Generate DMX format configuration."""
         elem = Element('ItemVar', 'DMElement')
         if isinstance(self.values, str):
             elem['value'] = self.values
@@ -265,7 +280,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
             is_timer = wid.bool('UseTimer')
             use_inf = is_timer and wid.bool('HasInf')
             wid_id = wid['id'].casefold()
-            name = wid['Label']
+            name = wid['Label', wid_id]
             tooltip = wid['Tooltip', '']
             default_prop = wid.find_key('Default', '')
             values: list[tuple[str, tk.StringVar]]
@@ -375,8 +390,9 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
     def widget_ids(self) -> Set[str]:
         """Return the set of widget IDs used."""
         return {
-            wid.id for wid in
-            itertools.chain(self.widgets, self.multi_widgets)
+            wid.id
+            for wid_list in [self.widgets, self.multi_widgets]
+            for wid in wid_list
         }
 
     @staticmethod
@@ -505,7 +521,11 @@ async def make_pane(parent: ttk.Frame) -> None:
 
 def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     """For widgets without a multi version, do it generically."""
-    async def generic_func(parent: ttk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+    async def generic_func(
+        parent: ttk.Frame,
+        values: List[Tuple[str, tk.StringVar]],
+        conf: Property,
+    ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
         """Generically make a set of labels."""
         for row, (tim_val, var) in enumerate(values):
             if tim_val == 'inf':
@@ -528,7 +548,10 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     return generic_func
 
 
-def multi_grid(values: List[Tuple[str, tk.StringVar]], columns=10):
+def multi_grid(
+    values: List[Tuple[str, tk.StringVar]],
+    columns: int = 10,
+) -> Iterator[Tuple[int, int, str, str, tk.StringVar]]:
     """Generate the row and columns needed for a nice layout of widgets."""
     for tim, var in values:
         if tim == 'inf':

@@ -38,7 +38,7 @@ async def widget_checkmark_multi(
     conf: Property,
 ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
-    for row, column, tim_text, var in multi_grid(values):
+    for row, column, _, tim_text, var in multi_grid(values):
         checkbox, _ = await widget_checkmark(parent, var, conf)
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
