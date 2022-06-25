@@ -1170,12 +1170,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the various extra instances to the map."""
     loc = options.get(Vec, 'global_ents_loc')
 
-    music.add(
-        vmf,
-        loc,
-        cast(Property, settings['music_conf']),
-        info,
-    )
+    music.add(vmf, loc, settings['music_conf'], info)
 
     LOGGER.info('Adding global ents...')
 
@@ -1195,7 +1190,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
     # If none are present this doesn't happen...
     vmf.create_ent(
         classname='env_cubemap',
-        cubemapsize=1,  # Make as small as possible..
+        cubemapsize=1,  # Make as small as possible.
         origin=global_ents_pos,
     )
 
@@ -1208,7 +1203,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
         angles='0 0 0',
     )
 
-    if settings['has_attr']['bridge'] or settings['has_attr']['lightbridge']:
+    if info.has_attr('bridge') or info.has_attr('lightbridge'):
         # If we have light bridges, make sure we precache the particle.
         vmf.create_ent(
             classname='info_particle_system',
@@ -1587,8 +1582,8 @@ def main() -> None:
         )
         change_ents(vmf)
 
-        fizzler.parse_map(vmf, settings['has_attr'])
-        barriers.parse_map(vmf, settings['has_attr'])
+        fizzler.parse_map(vmf, info)
+        barriers.parse_map(vmf, info)
 
         conditions.init(vmf)
 

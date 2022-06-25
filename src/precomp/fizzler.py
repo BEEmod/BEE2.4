@@ -978,7 +978,7 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
-def parse_map(vmf: VMF, voice_attrs: dict[str, bool]) -> None:
+def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     """Analyse fizzler instances to assign fizzler types.
 
     Instance traits are required.
@@ -1070,8 +1070,7 @@ def parse_map(vmf: VMF, voice_attrs: dict[str, bool]) -> None:
                 f'("{base_inst["file"]}")!'
             ) from None
 
-        for attr_name in fizz_type.voice_attrs:
-            voice_attrs[attr_name] = True
+        info.set_attr(*fizz_type.voice_attrs)
 
         for model in models:
             pos = Vec.from_str(model['origin'])

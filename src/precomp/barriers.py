@@ -50,7 +50,7 @@ def get_pos_norm(origin: Vec) -> tuple[tuple[float, float, float], tuple[float, 
     return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
 
 
-def parse_map(vmf: VMF, has_attr: dict[str, bool]) -> None:
+def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     """Find all glass/grating in the map.
 
     This removes the per-tile instances, and all original brushwork.
@@ -59,30 +59,17 @@ def parse_map(vmf: VMF, has_attr: dict[str, bool]) -> None:
     frame_inst = resolve('[glass_frames]', silent=True)
     glass_inst = resolve_one('[glass_128]')
 
-    pos = None
-    for brush_ent in vmf.by_class['func_detail']:
-        is_glass = False
-        for face in brush_ent.sides():
-            if face.mat == consts.Special.GLASS:
-                has_attr['glass'] = True
-                pos = face.get_origin()
-                is_glass = True
-                break
-        if is_glass:
-            brush_ent.remove()
-            BARRIERS[get_pos_norm(pos)] = BarrierType.GLASS
-
-    for brush_ent in vmf.by_class['func_brush']:
-        is_grating = False
-        for face in brush_ent.sides():
-            if face.mat == consts.Special.GRATING:
-                has_attr['grating'] = True
-                pos = face.get_origin()
-                is_grating = True
-                break
-        if is_grating:
-            brush_ent.remove()
-            BARRIERS[get_pos_norm(pos)] = BarrierType.GRATING
+    for entities, voice_attr, material, barrier_type in [
+        (vmf.by_class['func_detail'], 'glass', consts.Special.GLASS, BarrierType.GLASS),
+        (vmf.by_class['func_brush'], 'grating', consts.Special.GRATING, BarrierType.GRATING),
+    ]:
+        for brush_ent in entities:
+            for face in brush_ent.sides():
+                if face.mat == material:
+                    info.set_attr(voice_attr)
+                    brush_ent.remove()
+                    BARRIERS[get_pos_norm(face.get_origin())] = barrier_type
+                    break
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
@@ -97,7 +84,7 @@ def parse_map(vmf: VMF, has_attr: dict[str, bool]) -> None:
             except KeyError:
                 LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
-    if options.get(str, 'glass_pack') and has_attr['glass']:
+    if options.get(str, 'glass_pack') and info.has_attr('glass'):
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
 
 
