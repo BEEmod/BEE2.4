@@ -677,10 +677,11 @@ class EnumButton(Generic[EnumT]):
         self,
         master: tk.Misc,
         event_man: event.EventManager,
+        current: EnumT,
         *values: Tuple[EnumT, str],
     ) -> None:
         self.frame = ttk.Frame(master)
-        self._current = values[0][0]
+        self._current = current
         self.buttons: dict[EnumT, ttk.Button] = {}
         self.events = event_man
 
@@ -692,11 +693,14 @@ class EnumButton(Generic[EnumT]):
             )
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
-            if x == 0:
+            if val is current:
                 btn.state(['pressed'])
 
+        if current not in self.buttons:
+            raise ValueError(f'Default value {current!r} not present in {list(values)}')
+
         if len(self.buttons) != len(values):
-            raise ValueError('No duplicates allowed, got: ' + repr(list(values)))
+            raise ValueError(f'No duplicates allowed, got: {list(values)}')
 
     def _select(self, value: EnumT) -> None:
         """Select a specific value."""

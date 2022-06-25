@@ -1,4 +1,7 @@
 """Implements UI for selecting corridors."""
+import attrs
+from srctools import Property
+from srctools.dmx import Element
 from tkinter import ttk
 import tkinter as tk
 from typing import Optional, List, Sequence
@@ -47,6 +50,95 @@ FALLBACK = corridor.CorridorGroup(
         for orient in Orient
     }
 )
+
+
+@config.register('CorridorUIState', version=1, palette_stores=False)
+@attrs.frozen
+class UIState(config.Data):
+    """The current window state for saving and restoring."""
+    last_mode: GameMode = GameMode.SP
+    last_direction: Direction = Direction.ENTRY
+    last_orient: Orient = Orient.HORIZONTAL
+    width: int = -1
+    height: int = -1
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> 'UIState':
+        """Parse Keyvalues 1 configuration."""
+        assert version == 1, version
+        try:
+            last_mode = GameMode(data['mode'])
+        except (LookupError, ValueError):
+            last_mode = GameMode.SP
+
+        try:
+            last_direction = Direction(data['direction'])
+        except (LookupError, ValueError):
+            last_direction = Direction.ENTRY
+
+        try:
+            last_orient = Orient(data['orient'])
+        except (LookupError, ValueError):
+            last_orient = Orient.HORIZONTAL
+
+        return UIState(
+            last_mode, last_direction, last_orient,
+            data.int('width', -1),
+            data.int('height', -1),
+        )
+
+    def export_kv1(self) -> Property:
+        """Export Keyvalues 1 configuration."""
+        return Property('', [
+            Property('mode', self.last_mode.value),
+            Property('direction', self.last_direction.value),
+            Property('orient', self.last_orient.value),
+            Property('width', str(self.width)),
+            Property('height', str(self.height)),
+        ])
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> 'UIState':
+        """Parse Keyvalues 2 configuration."""
+        assert version == 1, version
+        try:
+            last_mode = GameMode(data['mode'].val_string)
+        except (LookupError, ValueError):
+            last_mode = GameMode.SP
+
+        try:
+            last_direction = Direction(data['direction'].val_string)
+        except (LookupError, ValueError):
+            last_direction = Direction.ENTRY
+
+        try:
+            last_orient = Orient(data['orient'].val_string)
+        except (LookupError, ValueError):
+            last_orient = Orient.HORIZONTAL
+
+        try:
+            width = data['width'].val_int
+        except KeyError:
+            width = -1
+        try:
+            height = data['height'].val_int
+        except KeyError:
+            height = -1
+
+        return UIState(
+            last_mode, last_direction, last_orient,
+            width, height,
+        )
+
+    def export_dmx(self) -> Element:
+        """Export Keyvalues 2 configuration."""
+        element = Element('UIState', 'DMElement')
+        element['mode'] = self.last_mode.value
+        element['direction'] = self.last_direction.value
+        element['orient'] = self.last_orient.value
+        element['width'] = self.width
+        element['height'] = self.height
+        return element
 
 
 class Selector:
@@ -123,20 +215,23 @@ class Selector:
 
         self.events = event.EventManager()
 
+        conf = config.get_cur_conf(UIState, default=UIState())
+        self.win.geometry(f'{conf.width}x{conf.height}')
+
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
-            button_frm, self.events,
+            button_frm, self.events, conf.last_mode,
             (GameMode.SP, gettext('SP')),
             (GameMode.COOP, gettext('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
-            button_frm, self.events,
+            button_frm, self.events, conf.last_direction,
             (Direction.ENTRY, gettext('Entry')),
             (Direction.EXIT, gettext('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
-            button_frm, self.events,
+            button_frm, self.events, conf.last_orient,
             (Orient.FLAT, gettext('Flat')),
             (Orient.UP, gettext('Upward')),
             (Orient.DN, gettext('Downward')),
@@ -199,6 +294,7 @@ class Selector:
         """Display the window."""
         self.drag_man.load_icons()
         self.win.deiconify()
+        tk_tools.center_win(self.win, TK_ROOT)
 
     def hide(self) -> None:
         """Hide the window."""
@@ -250,6 +346,12 @@ class Selector:
         orient = self.btn_orient.current
         self.conf_id = corridor.Config.get_id(self.corr_group.id, mode, direction, orient)
         conf = config.get_cur_conf(corridor.Config, self.conf_id, corridor.Config())
+
+        config.store_conf(UIState(
+            mode, direction, orient,
+            self.win.winfo_width(),
+            self.win.winfo_height(),
+        ))
 
         try:
             corr_list = self.corr_group.corridors[mode, direction, orient]
@@ -349,6 +451,17 @@ class Selector:
             if slot.flexi_group != GRP_SELECTED
         ), 'slots')
         pos.resize_canvas()
+
+    def evt_resized(self, _: tk.Event) -> None:
+        """When the window is resized, save configuration."""
+        config.store_conf(UIState(
+            self.btn_mode.current,
+            self.btn_direction.current,
+            self.btn_orient.current,
+            self.win.winfo_width(),
+            self.win.winfo_height(),
+        ))
+        background_run(self.reflow)
 
     async def evt_hover_enter(self, slot: Slot) -> None:
         """Display the specified corridor temporarily on hover."""
