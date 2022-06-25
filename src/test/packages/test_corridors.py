@@ -1,23 +1,23 @@
 import pytest
 from packages.corridor import parse_specifier
-from consts import CorrOrient, CorrDir, GameMode
+from corridor import Orient, Direction, GameMode
 
 
 @pytest.mark.parametrize('text, mode, direction, orient', [
-    ('sp_entry', GameMode.SP, CorrDir.ENTRY, CorrOrient.HORIZ),
-    ('exit_sp', GameMode.SP, CorrDir.EXIT, CorrOrient.HORIZ),
-    ('sp_entry_horiz', GameMode.SP, CorrDir.ENTRY, CorrOrient.HORIZ),
-    ('exit_flat_coop', GameMode.COOP, CorrDir.EXIT, CorrOrient.HORIZ),
-    ('coop_entry_up', GameMode.COOP, CorrDir.ENTRY, CorrOrient.UP),
-    ('sp_down_exit', GameMode.SP, CorrDir.EXIT, CorrOrient.DOWN),
-    ('coop_exit', GameMode.COOP, CorrDir.EXIT, CorrOrient.HORIZ),
-    ('entry_sp_down', GameMode.SP, CorrDir.ENTRY, CorrOrient.DOWN),
+    ('sp_entry', GameMode.SP, Direction.ENTRY, Orient.HORIZ),
+    ('exit_sp', GameMode.SP, Direction.EXIT, Orient.HORIZ),
+    ('sp_entry_horiz', GameMode.SP, Direction.ENTRY, Orient.HORIZ),
+    ('exit_flat_coop', GameMode.COOP, Direction.EXIT, Orient.HORIZ),
+    ('coop_entry_up', GameMode.COOP, Direction.ENTRY, Orient.UP),
+    ('sp_down_exit', GameMode.SP, Direction.EXIT, Orient.DOWN),
+    ('coop_exit', GameMode.COOP, Direction.EXIT, Orient.HORIZ),
+    ('entry_sp_down', GameMode.SP, Direction.ENTRY, Orient.DOWN),
 ])
 def test_specifier_parse(
     text: str,
     mode: GameMode,
-    direction: CorrDir,
-    orient: CorrOrient,
+    direction: Direction,
+    orient: Orient,
 ) -> None:
     assert parse_specifier(text) == (mode, direction, orient)
     # Check case-insensitivity.
