@@ -14,14 +14,14 @@ COND_MOD_NAME = 'Randomisation'
 def flag_random(res: Property) -> Callable[[Entity], bool]:
     """Randomly is either true or false."""
     if res.has_children():
-        chance = res['chance', '100']
+        chance_str = res['chance', '100']
         seed = res['seed', '']
     else:
-        chance = res.value
+        chance_str = res.value
         seed = ''
 
     # Allow ending with '%' sign
-    chance = srctools.conv_int(chance.rstrip('%'), 100)
+    chance = srctools.conv_int(chance_str.rstrip('%'), 100)
 
     def rand_func(inst: Entity) -> bool:
         """Apply the random chance."""
@@ -153,7 +153,7 @@ def res_rand_num(res: Property) -> Callable[[Entity], None]:
         if is_float:
             inst.fixup[var] = rng.uniform(min_val, max_val)
         else:
-            inst.fixup[var] = rng.randint(min_val, max_val)
+            inst.fixup[var] = rng.randint(round(min_val), round(max_val))
     return randomise
 
 
