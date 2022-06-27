@@ -52,7 +52,7 @@ TIMER_NUM_INF = ['inf', *TIMER_NUM]
 INF = '∞'
 
 # For the item-variant widget, we need to refresh on style changes.
-ITEM_VARIANT_LOAD = []
+ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
 
 async def nop_update(__value: str) -> None:
@@ -590,8 +590,6 @@ async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Proper
         nonlocal version_lookup
         version_lookup = contextWin.set_version_combobox(combobox, item)
 
-    update_data.item_id = item.id
-
     def change_callback(e: tk.Event=None):
         """Change the item version."""
         item.change_version(version_lookup[combobox.current()])
@@ -604,7 +602,7 @@ async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Proper
     combobox.state(['readonly'])  # Prevent directly typing in values
     combobox.bind('<<ComboboxSelected>>', change_callback)
 
-    ITEM_VARIANT_LOAD.append(update_data)
+    ITEM_VARIANT_LOAD.append((item.id, update_data))
     update_data()
     return combobox, nop_update
 

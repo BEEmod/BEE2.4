@@ -208,8 +208,8 @@ def set_item_version(e=None):
     load_item_data()
 
     # Refresh itemconfig comboboxes to match us.
-    for func in itemconfig.ITEM_VARIANT_LOAD:
-        if func.item_id == selected_item.id:
+    for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
+        if selected_item.id == item_id:
             func()
 
 

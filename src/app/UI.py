@@ -1732,7 +1732,7 @@ async def init_windows() -> None:
             item.load_data()  # Refresh everything
 
         # Update variant selectors on the itemconfig pane
-        for func in itemconfig.ITEM_VARIANT_LOAD:
+        for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
             func()
 
         # Disable this if the style doesn't have elevators
