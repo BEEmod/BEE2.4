@@ -631,13 +631,12 @@ def current_style() -> packages.Style:
 def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
-    stylevar_win = StyleVarPane.window
     opt_win = windows['opt']
     pal_win = windows['pal']
     # The x-pos of the right side of the main window
     xpos = min(
         TK_ROOT.winfo_screenwidth()
-        - stylevar_win.winfo_reqwidth(),
+        - itemconfig.window.winfo_reqwidth(),
 
         TK_ROOT.winfo_rootx()
         + TK_ROOT.winfo_reqwidth()
@@ -663,8 +662,8 @@ def reposition_panes() -> None:
     opt_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty()-40,
-        width=stylevar_win.winfo_reqwidth())
-    stylevar_win.move(
+        width=itemconfig.window.winfo_reqwidth())
+    itemconfig.window.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
 
@@ -674,7 +673,7 @@ def reset_panes() -> None:
     reposition_panes()
     windows['pal'].save_conf()
     windows['opt'].save_conf()
-    StyleVarPane.window.save_conf()
+    itemconfig.window.save_conf()
     CompilerPane.window.save_conf()
 
 
@@ -1614,8 +1613,8 @@ async def init_windows() -> None:
     loader.step('UI', 'options')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(StyleVarPane.make_pane, frames['toolMenu'], view_menu, flow_picker)
-    loader.step('UI', 'stylevar')
+        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], view_menu, flow_picker)
+    loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:
         corridor = corridor_selector.Selector(packages.LOADED)
@@ -1644,7 +1643,7 @@ async def init_windows() -> None:
 
     # When clicking on any window hide the context window
     tk_tools.bind_leftclick(TK_ROOT, contextWin.hide_context)
-    tk_tools.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    tk_tools.bind_leftclick(itemconfig.window, contextWin.hide_context)
     tk_tools.bind_leftclick(CompilerPane.window, contextWin.hide_context)
     tk_tools.bind_leftclick(corridor.win, contextWin.hide_context)
     tk_tools.bind_leftclick(windows['opt'], contextWin.hide_context)
@@ -1675,7 +1674,7 @@ async def init_windows() -> None:
     TK_ROOT.deiconify()  # show it once we've loaded everything
     windows['pal'].deiconify()
     windows['opt'].deiconify()
-    StyleVarPane.window.deiconify()
+    itemconfig.window.deiconify()
     CompilerPane.window.deiconify()
 
     if utils.MAC:
@@ -1707,7 +1706,7 @@ async def init_windows() -> None:
     # If the config is valid, this will move them to user-defined
     # positions.
     reposition_panes()
-    StyleVarPane.window.load_conf()
+    itemconfig.window.load_conf()
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()
     windows['pal'].load_conf()

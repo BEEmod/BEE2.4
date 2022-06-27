@@ -1,6 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Optional, Union, Callable,
+    Iterable, Optional, Union, Callable,
     List, Tuple, Dict, Set,
     Iterator, AsyncIterator, Awaitable, Mapping,
 )
@@ -13,12 +13,14 @@ from srctools.dmx import Element
 import trio
 import attrs
 
-from app import UI, background_run, signage_ui, tkMarkdown, sound, tk_tools
+from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
+from localisation import gettext
 import BEE2_config
 import config
 import utils
 import packages
+from ..SubPane import SubPane
 
 
 LOGGER = logger.get_logger(__name__)
@@ -53,6 +55,8 @@ INF = '∞'
 
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
+
+window: Optional[SubPane] = None
 
 
 async def nop_update(__value: str) -> None:
@@ -243,6 +247,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.widgets = widgets
         self.multi_widgets = multi_widgets
 
+        self.ui_frame: Optional[ttk.LabelFrame] = None
+        self.creating = False
+
     @classmethod
     async def parse(cls, data: packages.ParseData) -> 'ConfigGroup':
         """Parse the config group from info.txt."""
@@ -381,11 +388,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
     def widget_ids(self) -> Set[str]:
         """Return the set of widget IDs used."""
-        return {
-            wid.id
-            for wid_list in [self.widgets, self.multi_widgets]
-            for wid in wid_list
-        }
+        widgets: List[Iterable[Widget]] = [self.widgets, self.multi_widgets]
+        return {wid.id for wid_list in widgets for wid in wid_list}
 
     @staticmethod
     def export(exp_data: packages.ExportData) -> None:
@@ -402,13 +406,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 del CONFIG[conf.id]
         CONFIG.save_check()
 
-    async def create_widgets(self, master: ttk.Frame) -> ttk.LabelFrame:
+    async def create_widgets(self, master: ttk.Frame, callback: Callable[['ConfigGroup'], object]) -> None:
         """Create the widgets for this config."""
         frame = ttk.LabelFrame(master, text=self.name)
         frame.columnconfigure(0, weight=1)
         row = 0
 
         widget_count = len(self.widgets) + len(self.multi_widgets)
+        wid_frame: Union[ttk.Frame, ttk.LabelFrame]
 
         # Now make the widgets.
         if self.widgets:
@@ -466,52 +471,122 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             await config.set_and_run_ui_callback(
                 WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
             )
+            await trio.sleep(0)
 
             if m_wid.tooltip:
                 add_tooltip(wid_frame, m_wid.tooltip)
+        self.ui_frame = frame
+        callback(self)
 
-        return frame
+
+# Special group injected for the stylevar display.
+STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', gettext('Style Properties'), '', [], [])
 
 
-async def make_pane(parent: ttk.Frame) -> None:
-    """Create all the widgets we use."""
-    ordered_conf = sorted(packages.LOADED.all_obj(ConfigGroup), key=lambda grp: grp.name)
+async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Callable[[], None]) -> None:
+    """Create the item properties pane, with the widgets it uses.
 
-    parent.columnconfigure(0, weight=1)
+    update_item_vis is passed through to the stylevar pane.
+    """
+    global window
+
+    window = SubPane(
+        TK_ROOT,
+        title=gettext('Style/Item Properties'),
+        name='style',
+        menu_bar=menu_bar,
+        resize_y=True,
+        tool_frame=tool_frame,
+        tool_img='icons/win_stylevar',
+        tool_col=3,
+    )
+
+    ordered_conf: List[ConfigGroup] = sorted(
+        packages.LOADED.all_obj(ConfigGroup),
+        key=lambda grp: grp.name,
+    )
+    ordered_conf.insert(0, STYLEVAR_GROUP)
+    selector = ttk.Combobox(
+        window,
+        exportselection=False,
+        state='readonly',
+        values=[grp.name for grp in ordered_conf],
+    )
+    selector.grid(row=0, column=0, columnspan=2, sticky='ew')
+    selector.set(STYLEVAR_GROUP.name)
 
     # Need to use a canvas to allow scrolling.
-    canvas = tk.Canvas(parent, highlightthickness=0)
-    canvas.grid(row=0, column=0, sticky='NSEW')
-    parent.rowconfigure(0, weight=1)
+    canvas = tk.Canvas(window, highlightthickness=0)
+    canvas.grid(row=1, column=0, sticky='NSEW')
+    window.columnconfigure(0, weight=1)
+    window.rowconfigure(1, weight=1)
 
     scrollbar = ttk.Scrollbar(
-        parent,
+        window,
         orient='vertical',
         command=canvas.yview,
     )
-    scrollbar.grid(column=1, row=0, sticky="ns")
+    scrollbar.grid(row=1, column=1, sticky="ns")
     canvas['yscrollcommand'] = scrollbar.set
 
-    tk_tools.add_mousewheel(canvas, canvas, parent)
+    tk_tools.add_mousewheel(canvas, canvas, window)
     canvas_frame = ttk.Frame(canvas)
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)
 
-    for conf_row, conf in enumerate(ordered_conf, start=1):
-        frame = await conf.create_widgets(canvas_frame)
-        frame.grid(column=0, row=conf_row, sticky='ew')
+    stylevar_frame = ttk.Frame(canvas_frame)
+    await StyleVarPane.make_stylevar_pane(stylevar_frame, update_item_vis)
+
+    loading_text = ttk.Label(canvas_frame, text=gettext('Loading...'))
+    loading_text.grid(row=1, column=0, sticky='ew')
+    loading_text.grid_forget()
+
+    STYLEVAR_GROUP.ui_frame = stylevar_frame
+    cur_group = STYLEVAR_GROUP
+    win_max_width = 0
+
+    def display_group(group: ConfigGroup) -> None:
+        """Callback to display the group in the UI, once constructed."""
+        nonlocal win_max_width
+        if cur_group is group:
+            if loading_text.winfo_ismapped():
+                loading_text.grid_forget()
+            group.ui_frame.grid(row=1, column=0, sticky='ew')
+            group.ui_frame.update_idletasks()
+            width = group.ui_frame.winfo_reqwidth()
+            if width > win_max_width:
+                canvas['width'] = width
+                win_max_width = width
+            canvas['scrollregion'] = canvas.bbox('all')
+
+    def select_group(_: tk.Event) -> None:
+        """Callback when the combobox is changed."""
+        nonlocal cur_group
+        new_group = ordered_conf[selector.current()]
+        if new_group is cur_group:  # Pointless to reselect.
+            return
+        if cur_group.ui_frame is not None and cur_group.ui_frame.winfo_ismapped():
+            cur_group.ui_frame.grid_forget()
+        cur_group = new_group
+        if new_group.ui_frame is not None:
+            # Ready, add.
+            display_group(new_group)
+        else:  # Begin creating, or loading.
+            loading_text.grid(row=1, column=1, sticky='ew')
+            if not new_group.creating:
+                background_run(new_group.create_widgets, canvas_frame, display_group)
+                new_group.creating = True
+
+    selector.bind('<<ComboboxSelected>>', select_group)
 
     canvas.update_idletasks()
-    canvas.config(
-        scrollregion=canvas.bbox('ALL'),
-        width=canvas_frame.winfo_reqwidth(),
-    )
 
     def canvas_reflow(_) -> None:
         """Update canvas when the window resizes."""
         canvas['scrollregion'] = canvas.bbox('all')
 
     canvas.bind('<Configure>', canvas_reflow)
+    display_group(cur_group)
 
 
 def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
