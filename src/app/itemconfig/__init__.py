@@ -13,12 +13,12 @@ from srctools.dmx import Element
 import trio
 import attrs
 
-from packages import PakObject, ExportData, ParseData, desc_parse
 from app import UI, background_run, signage_ui, tkMarkdown, sound, tk_tools
 from app.tooltip import add_tooltip
 import BEE2_config
 import config
 import utils
+import packages
 
 
 LOGGER = logger.get_logger(__name__)
@@ -45,7 +45,6 @@ MultiCreateFunc: TypeAlias = Callable[
 WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-Widgets')
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
-CONFIG_ORDER: List['ConfigGroup'] = []
 
 TIMER_NUM = list(map(str, range(3, 31)))
 TIMER_NUM_INF = ['inf', *TIMER_NUM]
@@ -228,7 +227,7 @@ class MultiWidget(Widget):
         return on_changed
 
 
-class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
+class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
     """A group of configs for an item."""
     def __init__(
         self,
@@ -245,7 +244,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    async def parse(cls, data: ParseData) -> 'ConfigGroup':
+    async def parse(cls, data: packages.ParseData) -> 'ConfigGroup':
         """Parse the config group from info.txt."""
         props = data.info
 
@@ -255,7 +254,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         else:
             group_name = props['Name']
 
-        desc = desc_parse(props, data.id, data.pak_id)
+        desc = packages.desc_parse(props, data.id, data.pak_id)
 
         widgets: list[SingleWidget] = []
         multi_widgets: list[MultiWidget] = []
@@ -358,20 +357,16 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
                         name=f'itemconf_{data.id}_{wid_id}',
                     ),
                 ))
+        # If we are new, write our defaults to config.
+        CONFIG.save_check()
 
-        group = cls(
+        return cls(
             data.id,
             group_name,
             desc,
             widgets,
             multi_widgets,
         )
-        CONFIG_ORDER.append(group)
-
-        # If we are new, write our defaults to config.
-        CONFIG.save_check()
-
-        return group
 
     def add_over(self, override: 'ConfigGroup') -> None:
         """Override a ConfigGroup to add additional widgets."""
@@ -384,9 +379,6 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets.extend(override.multi_widgets)
         self.desc = tkMarkdown.join(self.desc, override.desc)
 
-        # Don't display that as well.
-        CONFIG_ORDER.remove(override)
-
     def widget_ids(self) -> Set[str]:
         """Return the set of widget IDs used."""
         return {
@@ -396,9 +388,9 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
         }
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    def export(exp_data: packages.ExportData) -> None:
         """Write all our values to the config."""
-        for conf in CONFIG_ORDER:
+        for conf in exp_data.packset.all_obj(ConfigGroup):
             config_section = CONFIG[conf.id]
             for s_wid in conf.widgets:
                 if s_wid.has_values:
@@ -478,7 +470,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
 
 async def make_pane(parent: ttk.Frame) -> None:
     """Create all the widgets we use."""
-    CONFIG_ORDER.sort(key=lambda grp: grp.name)
+    ordered_conf = sorted(packages.LOADED.all_obj(ConfigGroup), key=lambda grp: grp.name)
 
     parent.columnconfigure(0, weight=1)
 
@@ -504,7 +496,7 @@ async def make_pane(parent: ttk.Frame) -> None:
     if sign_button is not None:
         sign_button.grid(row=0, column=0, sticky='ew')
 
-    for conf_row, conf in enumerate(CONFIG_ORDER, start=1):
+    for conf_row, conf in enumerate(ordered_conf, start=1):
         frame = await conf.create_widgets(canvas_frame)
         frame.grid(column=0, row=conf_row, sticky='ew')
 
