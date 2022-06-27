@@ -416,23 +416,28 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 wid_frame = ttk.Frame(frame)
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
-
+                await trio.sleep(0)
                 try:
                     widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
                 except Exception:
                     LOGGER.exception('Could not construct widget {}.{}', self.id, s_wid.id)
                     continue
 
-                label = ttk.Label(wid_frame, text=s_wid.name + ': ')
-                label.grid(row=0, column=0)
-                widget.grid(row=0, column=1, sticky='e')
+                if s_wid.name:
+                    label = ttk.Label(wid_frame, text=s_wid.name + ': ')
+                    label.grid(row=0, column=0)
+                    widget.grid(row=0, column=1, sticky='e')
+                else:
+                    label = None
+                    widget.grid(row=0, column=0, columnspan=2, sticky='ew')
                 if s_wid.has_values:
                     await config.set_and_run_ui_callback(
                         WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
                     )
                 if s_wid.tooltip:
                     add_tooltip(widget, s_wid.tooltip)
-                    add_tooltip(label, s_wid.tooltip)
+                    if label is not None:
+                        add_tooltip(label, s_wid.tooltip)
                     add_tooltip(wid_frame, s_wid.tooltip)
 
         if self.widgets and self.multi_widgets:
@@ -441,7 +446,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         # Continue from wherever we were.
         for row, m_wid in enumerate(self.multi_widgets, start=row + 1):
             # If we only have 1 widget, don't add a redundant title.
-            if widget_count == 1:
+            if widget_count == 1 or not m_wid.name:
                 wid_frame = ttk.Frame(frame)
             else:
                 wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
