@@ -25,7 +25,7 @@ import srctools.logger
 
 from app.richTextBox import tkRichText
 from app.tooltip import add_tooltip, set_tooltip
-from app import tkMarkdown, tk_tools, sound, config, img, TK_ROOT, DEV_MODE
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
 from packages import SelitemData
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
@@ -34,6 +34,7 @@ from consts import (
 )
 from localisation import gettext, ngettext
 import utils
+import config
 
 
 LOGGER = srctools.logger.get_logger(__name__)

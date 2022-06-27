@@ -105,7 +105,7 @@ def on_error(
         pass
 
     try:
-        from app import config
+        import config
         import attrs
         # Try to turn on the logging window for next time...
         conf = config.get_cur_conf(config.GenOptions)

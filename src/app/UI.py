@@ -24,6 +24,7 @@ from app import img
 from app import itemconfig
 import utils
 import consts
+import config
 from localisation import gettext
 from app import (
     tk_tools,
@@ -43,7 +44,6 @@ from app import (
     signage_ui,
     paletteUI,
     music_conf,
-    config,
 )
 
 

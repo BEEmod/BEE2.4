@@ -13,11 +13,11 @@ from srctools.dmx import Element
 import trio
 import attrs
 
-import app.config
 from packages import PakObject, ExportData, ParseData, desc_parse
 from app import UI, background_run, signage_ui, tkMarkdown, sound, tk_tools
 from app.tooltip import add_tooltip
 import BEE2_config
+import config
 import utils
 
 
@@ -75,9 +75,9 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     return r, g, b
 
 
-@app.config.register('ItemVar', uses_id=True)
+@config.register('ItemVar', uses_id=True)
 @attrs.frozen
-class WidgetConfig(app.config.Data):
+class WidgetConfig(config.Data):
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
     values: Union[str, Mapping[str, str]] = EmptyMapping
@@ -175,7 +175,7 @@ class SingleWidget(Widget):
         def on_changed(*_) -> None:
             """Recompute state and UI when changed."""
             val = self.value.get()
-            app.config.store_conf(WidgetConfig(val), save_id)
+            config.store_conf(WidgetConfig(val), save_id)
             if self.ui_cback is not None:
                 background_run(self.ui_cback, val)
 
@@ -221,7 +221,7 @@ class MultiWidget(Widget):
                 pass
             else:
                 background_run(cback, var.get())
-            app.config.store_conf(WidgetConfig({
+            config.store_conf(WidgetConfig({
                 num: sub_var.get()
                 for num, sub_var in self.values
             }), save_id)
@@ -285,7 +285,7 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
             default_prop = wid.find_key('Default', '')
             values: list[tuple[str, tk.StringVar]]
 
-            conf = app.config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
+            conf = config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:
@@ -439,18 +439,18 @@ async def make_pane(parent: ttk.Frame) -> None:
     if sign_button is not None:
         sign_button.grid(row=0, column=0, sticky='ew')
 
-    for conf_row, config in enumerate(CONFIG_ORDER, start=1):
-        frame = ttk.LabelFrame(canvas_frame, text=config.name)
+    for conf_row, conf in enumerate(CONFIG_ORDER, start=1):
+        frame = ttk.LabelFrame(canvas_frame, text=conf.name)
         frame.columnconfigure(0, weight=1)
         frame.grid(row=conf_row, column=0, sticky='nsew')
 
         row = 0
 
-        widget_count = len(config.widgets) + len(config.multi_widgets)
+        widget_count = len(conf.widgets) + len(conf.multi_widgets)
 
         # Now make the widgets.
-        if config.widgets:
-            for row, s_wid in enumerate(config.widgets):
+        if conf.widgets:
+            for row, s_wid in enumerate(conf.widgets):
                 wid_frame = ttk.Frame(frame)
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
@@ -458,31 +458,31 @@ async def make_pane(parent: ttk.Frame) -> None:
                 try:
                     widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
                 except Exception:
-                    LOGGER.exception('Could not construct widget {}.{}', config.id, s_wid.id)
+                    LOGGER.exception('Could not construct widget {}.{}', conf.id, s_wid.id)
                     continue
 
                 label = ttk.Label(wid_frame, text=s_wid.name + ': ')
                 label.grid(row=0, column=0)
                 widget.grid(row=0, column=1, sticky='e')
                 if s_wid.has_values:
-                    await app.config.set_and_run_ui_callback(WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}')
+                    await config.set_and_run_ui_callback(WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}')
 
                 if s_wid.tooltip:
                     add_tooltip(widget, s_wid.tooltip)
                     add_tooltip(label, s_wid.tooltip)
                     add_tooltip(wid_frame, s_wid.tooltip)
 
-        if config.widgets and config.multi_widgets:
+        if conf.widgets and conf.multi_widgets:
             ttk.Separator(orient='horizontal').grid(
                 row=1, column=0, sticky='ew',
             )
 
         # Skip if no timer widgets
-        if not config.multi_widgets:
+        if not conf.multi_widgets:
             continue
 
         # Continue from wherever we were.
-        for row, m_wid in enumerate(config.multi_widgets, start=row+1):
+        for row, m_wid in enumerate(conf.multi_widgets, start=row+1):
             # If we only have 1 widget, don't add a redundant title.
             if widget_count == 1:
                 wid_frame = ttk.Frame(frame)
@@ -499,9 +499,9 @@ async def make_pane(parent: ttk.Frame) -> None:
                 ):
                     m_wid.ui_cbacks[tim_val] = value
             except Exception:
-                LOGGER.exception('Could not construct widget {}.{}', config.id, m_wid.id)
+                LOGGER.exception('Could not construct widget {}.{}', conf.id, m_wid.id)
                 continue
-            await app.config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
+            await config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
 
             if m_wid.tooltip:
                 add_tooltip(wid_frame, m_wid.tooltip)

@@ -34,12 +34,13 @@ from srctools import (
 )
 import srctools.logger
 import srctools.fgd
-from app import backup, config, tk_tools, resource_gen, TK_ROOT, DEV_MODE
+from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE
 from localisation import gettext
 import loadScreen
 import packages.template_brush
 import editoritems
 import utils
+import config
 
 
 try:

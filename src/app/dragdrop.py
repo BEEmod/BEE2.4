@@ -804,7 +804,7 @@ class Slot(Generic[ItemT]):
 async def test() -> None:
     """Test the GUI."""
     import BEE2_config
-    from app import config
+    import config
     import packages
 
     BEE2_config.GEN_OPTS.load()

@@ -12,10 +12,11 @@ from pathlib import PurePosixPath as FSPath
 
 import attrs
 import trio
-from srctools import FileSystem, Property, VMF, Vec, logger
+from srctools import FileSystem, Property, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
 
-from app import tkMarkdown, img, lazy_conf, DEV_MODE, config
+from app import tkMarkdown, img, lazy_conf, DEV_MODE
+import config
 from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,

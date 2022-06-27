@@ -6,7 +6,7 @@ import functools
 import sys
 from enum import Enum
 from typing import (
-    Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
     Tuple, Literal,
 )
 from typing_extensions import Unpack, TypeVarTuple
@@ -17,12 +17,12 @@ from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
-import event
-from app import TK_ROOT, background_run, config
-
 from idlelib.redirector import WidgetRedirector
 from idlelib.query import Query
 
+from app import TK_ROOT, background_run
+import event
+import config
 import utils
 
 

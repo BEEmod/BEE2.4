@@ -13,7 +13,8 @@ from srctools import Property, Vec
 from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
 
 import utils
-from app import img, lazy_conf, tkMarkdown, config
+from app import img, lazy_conf, tkMarkdown
+import config
 import packages
 import editoritems
 from corridor import (

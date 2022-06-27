@@ -12,8 +12,9 @@ import srctools.logger
 import attrs
 
 from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
-from app import background_run, tk_tools, paletteLoader, config, TK_ROOT, img, BEE2
+from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
 from localisation import gettext
+import config
 
 
 LOGGER = srctools.logger.get_logger(__name__)

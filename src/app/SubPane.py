@@ -3,11 +3,11 @@ from typing import Callable, Any, Union
 import tkinter as tk
 from tkinter import ttk
 
-from app import tooltip, tk_tools, config
+from app import tooltip, tk_tools,  sound
 from app.img import Handle as ImgHandle, apply as apply_img
 from localisation import gettext
 import utils
-from app import sound
+import config
 
 
 # This is a bit of an ugly hack. On OSX the buttons are set to have

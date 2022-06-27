@@ -8,12 +8,11 @@ import random
 import io
 from uuid import UUID, uuid4, uuid5
 
-
 import srctools.logger
 from srctools import Property, NoKeyError, KeyValError
 
 from localisation import gettext
-from app import config
+import config
 import utils
 
 

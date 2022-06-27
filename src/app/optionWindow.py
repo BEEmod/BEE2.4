@@ -10,15 +10,15 @@ from typing import List, Tuple, Dict
 import attrs
 import srctools.logger
 
-from app.config import AfterExport
 from app.tooltip import add_tooltip
-
 from app import (
-    contextWin, gameMan, tk_tools, sound, logWindow, img, TK_ROOT, config,
-    LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run
+    TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
+    contextWin, gameMan, tk_tools, sound, logWindow, img,
 )
+from config import AfterExport
 from localisation import gettext
 import loadScreen
+import config
 
 
 LOGGER = srctools.logger.get_logger(__name__)

@@ -12,10 +12,11 @@ import functools
 import shutil
 
 import trio
-
-from app import TK_ROOT, config
 from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
 import srctools.logger
+
+from app import TK_ROOT
+import config
 import utils
 
 __all__ = [

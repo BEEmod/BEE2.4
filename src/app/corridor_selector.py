@@ -10,12 +10,10 @@ from typing_extensions import TypeAlias, Final
 import srctools.logger
 import trio
 
-import event
-import packages
 
 from app import (
     TK_ROOT, DEV_MODE, background_run,
-    config, dragdrop,
+    dragdrop,
     img, sound, tk_tools,
     tkMarkdown,
 )
@@ -23,6 +21,9 @@ from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
 from corridor import GameMode, Direction, Orient
+import event
+import config
+import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)

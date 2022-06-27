@@ -16,8 +16,9 @@ import attrs
 
 from packages import Style, StyleVar
 from app.SubPane import SubPane
-from app import tooltip, TK_ROOT, itemconfig, tk_tools, config
+from app import tooltip, TK_ROOT, itemconfig, tk_tools
 from localisation import ngettext, gettext
+import config
 
 
 LOGGER = get_logger(__name__)

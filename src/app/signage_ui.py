@@ -8,9 +8,10 @@ from srctools import Property
 import srctools.logger
 import attrs
 
-from app import dragdrop, img, tk_tools, config, TK_ROOT
+from app import dragdrop, img, tk_tools, TK_ROOT
 from packages import Signage, Style
 from localisation import gettext
+import config
 
 LOGGER = srctools.logger.get_logger(__name__)
 

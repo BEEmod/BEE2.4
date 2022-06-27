@@ -19,7 +19,8 @@ from srctools import Property, bool_as_int
 from srctools.logger import get_logger
 from srctools.dmx import Element
 
-from app import SubPane, tk_tools, config, TK_ROOT, corridor_selector
+from app import SubPane, tk_tools, TK_ROOT, corridor_selector
+import config
 from app.tooltip import add_tooltip, set_tooltip
 from localisation import gettext
 import BEE2_config

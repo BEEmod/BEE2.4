@@ -9,7 +9,8 @@ import attrs
 
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
-from app import TK_ROOT, config
+from app import TK_ROOT
+import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
 from localisation import gettext

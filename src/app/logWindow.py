@@ -10,7 +10,8 @@ import srctools.logger
 import trio
 import attrs
 
-from app import config
+import config
+
 
 _PIPE_MAIN_REC, PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)

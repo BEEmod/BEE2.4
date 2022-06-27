@@ -4,7 +4,7 @@ from typing import List
 from srctools import Property
 import srctools.logger
 
-from app import config
+import config
 from packages import PakObject, ParseData, ExportData
 
 

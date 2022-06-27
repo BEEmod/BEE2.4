@@ -11,8 +11,9 @@ import trio
 from BEE2_config import GEN_OPTS
 from app import (
     TK_ROOT, sound, img, gameMan, music_conf,
-    UI, logWindow, config,
+    UI, logWindow,
 )
+import config
 import app
 import loadScreen
 import packages

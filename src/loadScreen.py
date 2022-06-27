@@ -15,7 +15,8 @@ import time
 import attrs
 import srctools.logger
 
-from app import config, logWindow
+from app import logWindow
+import config
 from localisation import gettext
 import utils
 
