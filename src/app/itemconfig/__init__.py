@@ -497,10 +497,6 @@ async def make_pane(parent: ttk.Frame) -> None:
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)
 
-    sign_button = await signage_ui.init_widgets(canvas_frame)
-    if sign_button is not None:
-        sign_button.grid(row=0, column=0, sticky='ew')
-
     for conf_row, conf in enumerate(ordered_conf, start=1):
         frame = await conf.create_widgets(canvas_frame)
         frame.grid(column=0, row=conf_row, sticky='ew')
@@ -582,6 +578,10 @@ async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Proper
         item = UI.item_list[conf['ItemID']]
     except KeyError:
         raise ValueError('Unknown item "{}"!'.format(conf['ItemID']))
+
+    if item.id == 'ITEM_BEE2_SIGNAGE':
+        # Even more special case, display the "configure signage" button.
+        return await signage_ui.init_widgets(parent), nop_update
 
     version_lookup: Optional[List[str]] = None
 
