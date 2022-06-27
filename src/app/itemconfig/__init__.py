@@ -410,6 +410,71 @@ class ConfigGroup(PakObject, allow_mult=True, needs_foreground=True):
                 del CONFIG[conf.id]
         CONFIG.save_check()
 
+    async def create_widgets(self, master: ttk.Frame) -> ttk.LabelFrame:
+        """Create the widgets for this config."""
+        frame = ttk.LabelFrame(master, text=self.name)
+        frame.columnconfigure(0, weight=1)
+        row = 0
+
+        widget_count = len(self.widgets) + len(self.multi_widgets)
+
+        # Now make the widgets.
+        if self.widgets:
+            for row, s_wid in enumerate(self.widgets):
+                wid_frame = ttk.Frame(frame)
+                wid_frame.grid(row=row, column=0, sticky='ew')
+                wid_frame.columnconfigure(1, weight=1)
+
+                try:
+                    widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
+                except Exception:
+                    LOGGER.exception('Could not construct widget {}.{}', self.id, s_wid.id)
+                    continue
+
+                label = ttk.Label(wid_frame, text=s_wid.name + ': ')
+                label.grid(row=0, column=0)
+                widget.grid(row=0, column=1, sticky='e')
+                if s_wid.has_values:
+                    await config.set_and_run_ui_callback(
+                        WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
+                    )
+                if s_wid.tooltip:
+                    add_tooltip(widget, s_wid.tooltip)
+                    add_tooltip(label, s_wid.tooltip)
+                    add_tooltip(wid_frame, s_wid.tooltip)
+
+        if self.widgets and self.multi_widgets:
+            ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
+
+        # Continue from wherever we were.
+        for row, m_wid in enumerate(self.multi_widgets, start=row + 1):
+            # If we only have 1 widget, don't add a redundant title.
+            if widget_count == 1:
+                wid_frame = ttk.Frame(frame)
+            else:
+                wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
+
+            wid_frame.grid(row=row, column=0, sticky='ew')
+            assert isinstance(m_wid.values, list)
+            try:
+                async for tim_val, value in m_wid.multi_func(
+                    wid_frame,
+                    m_wid.values,
+                    m_wid.config,
+                ):
+                    m_wid.ui_cbacks[tim_val] = value
+            except Exception:
+                LOGGER.exception('Could not construct widget {}.{}', self.id, m_wid.id)
+                continue
+            await config.set_and_run_ui_callback(
+                WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
+            )
+
+            if m_wid.tooltip:
+                add_tooltip(wid_frame, m_wid.tooltip)
+
+        return frame
+
 
 async def make_pane(parent: ttk.Frame) -> None:
     """Create all the widgets we use."""
@@ -417,7 +482,7 @@ async def make_pane(parent: ttk.Frame) -> None:
 
     parent.columnconfigure(0, weight=1)
 
-    # Need to use a canvas to allow scrolling
+    # Need to use a canvas to allow scrolling.
     canvas = tk.Canvas(parent, highlightthickness=0)
     canvas.grid(row=0, column=0, sticky='NSEW')
     parent.rowconfigure(0, weight=1)
@@ -440,71 +505,8 @@ async def make_pane(parent: ttk.Frame) -> None:
         sign_button.grid(row=0, column=0, sticky='ew')
 
     for conf_row, conf in enumerate(CONFIG_ORDER, start=1):
-        frame = ttk.LabelFrame(canvas_frame, text=conf.name)
-        frame.columnconfigure(0, weight=1)
-        frame.grid(row=conf_row, column=0, sticky='nsew')
-
-        row = 0
-
-        widget_count = len(conf.widgets) + len(conf.multi_widgets)
-
-        # Now make the widgets.
-        if conf.widgets:
-            for row, s_wid in enumerate(conf.widgets):
-                wid_frame = ttk.Frame(frame)
-                wid_frame.grid(row=row, column=0, sticky='ew')
-                wid_frame.columnconfigure(1, weight=1)
-
-                try:
-                    widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
-                except Exception:
-                    LOGGER.exception('Could not construct widget {}.{}', conf.id, s_wid.id)
-                    continue
-
-                label = ttk.Label(wid_frame, text=s_wid.name + ': ')
-                label.grid(row=0, column=0)
-                widget.grid(row=0, column=1, sticky='e')
-                if s_wid.has_values:
-                    await config.set_and_run_ui_callback(WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}')
-
-                if s_wid.tooltip:
-                    add_tooltip(widget, s_wid.tooltip)
-                    add_tooltip(label, s_wid.tooltip)
-                    add_tooltip(wid_frame, s_wid.tooltip)
-
-        if conf.widgets and conf.multi_widgets:
-            ttk.Separator(orient='horizontal').grid(
-                row=1, column=0, sticky='ew',
-            )
-
-        # Skip if no timer widgets
-        if not conf.multi_widgets:
-            continue
-
-        # Continue from wherever we were.
-        for row, m_wid in enumerate(conf.multi_widgets, start=row+1):
-            # If we only have 1 widget, don't add a redundant title.
-            if widget_count == 1:
-                wid_frame = ttk.Frame(frame)
-            else:
-                wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
-
-            wid_frame.grid(row=row, column=0, sticky='ew')
-            assert isinstance(m_wid.values, list)
-            try:
-                async for tim_val, value in m_wid.multi_func(
-                    wid_frame,
-                    m_wid.values,
-                    m_wid.config,
-                ):
-                    m_wid.ui_cbacks[tim_val] = value
-            except Exception:
-                LOGGER.exception('Could not construct widget {}.{}', conf.id, m_wid.id)
-                continue
-            await config.set_and_run_ui_callback(WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}')
-
-            if m_wid.tooltip:
-                add_tooltip(wid_frame, m_wid.tooltip)
+        frame = await conf.create_widgets(canvas_frame)
+        frame.grid(column=0, row=conf_row, sticky='ew')
 
     canvas.update_idletasks()
     canvas.config(
