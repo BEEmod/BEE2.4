@@ -407,7 +407,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 del CONFIG[conf.id]
         CONFIG.save_check()
 
-    async def create_widgets(self, master: ttk.Frame, callback: Callable[['ConfigGroup'], object]) -> None:
+    async def create_widgets(self, master: ttk.Frame) -> None:
         """Create the widgets for this config."""
         frame = ttk.Frame(master)
         frame.columnconfigure(0, weight=1)
@@ -477,7 +477,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             if m_wid.tooltip:
                 add_tooltip(wid_frame, m_wid.tooltip)
         self.ui_frame = frame
-        callback(self)
 
 
 # Special group injected for the stylevar display.
@@ -547,22 +546,26 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     cur_group = STYLEVAR_GROUP
     win_max_width = 0
 
-    def display_group(group: ConfigGroup) -> None:
+    async def display_group(group: ConfigGroup) -> None:
         """Callback to display the group in the UI, once constructed."""
         nonlocal win_max_width
         if cur_group is group:
             if loading_text.winfo_ismapped():
                 loading_text.grid_forget()
             group.ui_frame.grid(row=1, column=0, sticky='ew')
-            group.ui_frame.update_idletasks()
-            canvas['scrollregion'] = x1, y1, width, y2 = canvas.bbox('all')
+            await tk_tools.wait_eventloop()
+            width = group.ui_frame.winfo_reqwidth()
+            canvas['scrollregion'] = (
+                0, 0,
+                width,
+                group.ui_frame.winfo_reqheight()
+            )
             if width > win_max_width:
                 canvas['width'] = width
                 win_max_width = width
                 scroll_width = scrollbar.winfo_width() + 10
                 window.geometry(f'{width + scroll_width}x{window.winfo_height()}')
-            else:
-                canvas.itemconfigure(frame_winid, width=win_max_width)
+            canvas.itemconfigure(frame_winid, width=win_max_width)
 
     def select_group(_: tk.Event) -> None:
         """Callback when the combobox is changed."""
@@ -575,11 +578,16 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         cur_group = new_group
         if new_group.ui_frame is not None:
             # Ready, add.
-            display_group(new_group)
+            background_run(display_group, new_group)
         else:  # Begin creating, or loading.
             loading_text.grid(row=0, column=0, sticky='ew')
             if not new_group.creating:
-                background_run(new_group.create_widgets, canvas_frame, display_group)
+                async def task() -> None:
+                    """Create the widgets, then display."""
+                    await new_group.create_widgets(canvas_frame)
+                    await display_group(new_group)
+
+                background_run(task)
                 new_group.creating = True
 
     selector.bind('<<ComboboxSelected>>', select_group)
@@ -591,7 +599,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         canvas['scrollregion'] = canvas.bbox('all')
 
     canvas.bind('<Configure>', canvas_reflow)
-    display_group(cur_group)
+    await display_group(cur_group)
 
 
 def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
