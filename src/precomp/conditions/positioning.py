@@ -121,6 +121,7 @@ def brush_at_loc(
             visgroup = inst.map.create_visgroup('TileAtLoc')
         first_trace = inst.map.create_ent('info_target', origin=pos, targetname=inst['targetname'])
         first_trace.vis_shown = False
+        first_trace.hidden = True
         first_trace.visgroup_ids.add(visgroup.id)
     else:
         visgroup = first_trace = None
@@ -134,6 +135,7 @@ def brush_at_loc(
             # Place a second for the bounding box, grouped with the first.
             second_trace = inst.map.create_ent('info_target', origin=pos2, targetname=inst['targetname'])
             second_trace.vis_shown = False
+            second_trace.hidden = True
             second_trace.visgroup_ids.add(visgroup.id)
             group = EntityGroup(inst.map)
             inst.map.groups[group.id] = group

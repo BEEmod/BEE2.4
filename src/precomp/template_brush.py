@@ -740,6 +740,7 @@ def import_template(
             ent.visgroup_ids.add(dbg_visgroup.id)
             ent.groups.add(dbg_group.id)
             ent.vis_shown = False
+            ent.hidden = True
 
         dbg_add(
             'bee2_template_conf',
