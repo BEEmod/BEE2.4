@@ -7,8 +7,7 @@ from typing import Collection, NoReturn
 from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
 
-from precomp import options
-from precomp.conditions import make_flag, make_result, RES_EXHAUSTED, Unsatisfiable, MapInfo
+from precomp import options, conditions
 import vbsp
 import utils
 
@@ -28,10 +27,10 @@ def global_bool(val: bool) -> bool:
     if val:
         return True
     else:
-        raise Unsatisfiable
+        raise conditions.Unsatisfiable
 
 
-@make_flag('styleVar')
+@conditions.make_flag('styleVar')
 def flag_stylevar(flag: Property) -> bool:
     """Checks if the given Style Var is true.
 
@@ -40,8 +39,8 @@ def flag_stylevar(flag: Property) -> bool:
     return global_bool(vbsp.settings['style_vars'][flag.value.casefold()])
 
 
-@make_flag('has')
-def flag_voice_has(info: MapInfo, flag: Property) -> bool:
+@conditions.make_flag('has')
+def flag_voice_has(info: conditions.MapInfo, flag: Property) -> bool:
     """Checks if the given Voice Attribute is present.
 
     Use the NOT flag to invert if needed.
@@ -49,17 +48,17 @@ def flag_voice_has(info: MapInfo, flag: Property) -> bool:
     return global_bool(info.has_attr(flag.value))
 
 
-@make_flag('has_music')
+@conditions.make_flag('has_music')
 def flag_music() -> NoReturn:
     """Checks the selected music ID.
 
     Use `<NONE>` for no music.
     """
     LOGGER.warning('Checking for selected music is no longer possible!')
-    raise Unsatisfiable
+    raise conditions.Unsatisfiable
 
 
-@make_flag('Game')
+@conditions.make_flag('Game')
 def flag_game(flag: Property) -> bool:
     """Checks which game is being modded.
 
@@ -81,7 +80,7 @@ def flag_game(flag: Property) -> bool:
     ))
 
 
-@make_flag('has_char')
+@conditions.make_flag('has_char')
 def flag_voice_char(flag: Property) -> bool:
     """Checks to see if the given charcter is present in the voice pack.
 
@@ -95,30 +94,30 @@ def flag_voice_char(flag: Property) -> bool:
     for char in options.get(str, 'voice_char').split(','):
         if targ_char in char.casefold():
             return True
-    raise Unsatisfiable
+    raise conditions.Unsatisfiable
 
 
-@make_flag('HasCavePortrait')
+@conditions.make_flag('HasCavePortrait')
 def res_cave_portrait() -> bool:
     """Checks to see if the Cave Portrait option is set for the given voice pack.
     """
     return global_bool(options.get(int, 'cave_port_skin') is not None)
 
 
-@make_flag('entryCorridor')
-def res_check_entry_corridor(info: MapInfo, flag: Property) -> bool:
+@conditions.make_flag('entryCorridor')
+def res_check_entry_corridor(info: conditions.MapInfo, flag: Property) -> bool:
     """Check the selected entry corridor matches this filename."""
     return global_bool(info.corr_entry.instance.casefold() == flag.value.casefold())
 
 
-@make_flag('entryCorridor')
-def res_check_exit_corridor(info: MapInfo, flag: Property) -> bool:
+@conditions.make_flag('entryCorridor')
+def res_check_exit_corridor(info: conditions.MapInfo, flag: Property) -> bool:
     """Check the selected exit corridor matches this filename."""
     return global_bool(info.corr_exit.instance.casefold() == flag.value.casefold())
 
 
-@make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(info: MapInfo, flag: Property) -> bool:
+@conditions.make_flag('ifMode', 'iscoop', 'gamemode')
+def flag_game_mode(info: conditions.MapInfo, flag: Property) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
     """
     mode = flag.value.casefold()
@@ -130,8 +129,8 @@ def flag_game_mode(info: MapInfo, flag: Property) -> bool:
         raise ValueError(f'Unknown gamemode "{flag.value}"!')
 
 
-@make_flag('ifPreview', 'preview')
-def flag_is_preview(info: MapInfo, flag: Property) -> bool:
+@conditions.make_flag('ifPreview', 'preview')
+def flag_is_preview(info: conditions.MapInfo, flag: Property) -> bool:
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -144,27 +143,27 @@ def flag_is_preview(info: MapInfo, flag: Property) -> bool:
     return global_bool(expect_preview == (not info.start_at_elevator))
 
 
-@make_flag('hasExitSignage')
+@conditions.make_flag('hasExitSignage')
 def flag_has_exit_signage(vmf: VMF) -> bool:
     """Check to see if either exit sign is present."""
     for over in vmf.by_class['info_overlay']:
         if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
             return True
-    raise Unsatisfiable
+    raise conditions.Unsatisfiable
 
 
-@make_result('setOption')
-def res_set_option(res: Property) -> bool:
+@conditions.make_result('setOption')
+def res_set_option(res: Property) -> object:
     """Set a value in the "options" part of VBSP_config.
 
     Each child property will be set.
     """
     for opt in res:
         options.set_opt(opt.name, opt.value)
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@make_result('styleVar')
+@conditions.make_result('styleVar')
 def res_set_style_var(res: Property) -> bool:
     """Set Style Vars.
 
@@ -175,11 +174,11 @@ def res_set_style_var(res: Property) -> bool:
             vbsp.settings['style_vars'][opt.value.casefold()] = True
         elif opt.name == 'setfalse':
             vbsp.settings['style_vars'][opt.value.casefold()] = False
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@make_result('has')
-def res_set_voice_attr(info: MapInfo, res: Property) -> object:
+@conditions.make_result('has')
+def res_set_voice_attr(info: conditions.MapInfo, res: Property) -> object:
     """Sets a number of Voice Attributes.
 
     Each child property will be set. The value is ignored, but must
@@ -190,14 +189,14 @@ def res_set_voice_attr(info: MapInfo, res: Property) -> object:
             info.set_attr(opt.name)
     else:
         info.set_attr(res.value)
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
 # The set is the set of skins to use. If empty, all are used.
 CACHED_MODELS: dict[str, tuple[set[int], Entity]] = {}
 
 
-@make_result('PreCacheModel')
+@conditions.make_result('PreCacheModel')
 def res_pre_cache_model(vmf: VMF, res: Property) -> None:
     """Precache the given model for switching.
 
@@ -271,7 +270,7 @@ def get_itemconf(inst: Entity, res: Property) -> str | None:
     return options.get_itemconf((group_id, wid_name), None, timer_delay)
 
 
-@make_flag('ItemConfig')
+@conditions.make_flag('ItemConfig')
 def res_match_item_config(inst: Entity, res: Property) -> bool:
     """Check if an Item Config Panel value matches another value.
 
@@ -289,7 +288,7 @@ def res_match_item_config(inst: Entity, res: Property) -> bool:
     return global_bool(conf == desired_value)
 
 
-@make_result('GetItemConfig')
+@conditions.make_result('GetItemConfig')
 def res_item_config_to_fixup(inst: Entity, res: Property) -> None:
     """Load a config from the item config panel onto a fixup.
 
