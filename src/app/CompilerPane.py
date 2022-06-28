@@ -19,6 +19,7 @@ from srctools import Property, bool_as_int
 from srctools.logger import get_logger
 from srctools.dmx import Element
 
+import app
 from app import SubPane, tk_tools, TK_ROOT, corridor_selector
 import config
 from app.tooltip import add_tooltip, set_tooltip
@@ -263,7 +264,7 @@ async def apply_state(state: CompilePaneState) -> None:
             f.write(state.sshot_cust)
 
     # Refresh these.
-    set_screen_type()
+    await set_screen_type()
     set_screenshot()
 
     start_in_elev.set(state.spawn_elev)
@@ -383,7 +384,7 @@ def find_screenshot(e=None) -> None:
         COMPILE_CFG.save_check()
 
 
-def set_screen_type() -> None:
+async def set_screen_type() -> None:
     """Set the type of screenshot used."""
     chosen = chosen_thumb.get()
     COMPILE_CFG['Screenshot']['type'] = chosen
@@ -391,12 +392,9 @@ def set_screen_type() -> None:
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     else:
         UI['thumb_label'].grid_forget()
-    UI['thumb_label'].update_idletasks()
+    await tk_tools.wait_eventloop()
     # Resize the pane to accommodate the shown/hidden image
-    window.geometry('{}x{}'.format(
-        window.winfo_width(),
-        window.winfo_reqheight(),
-    ))
+    window.geometry(f'{window.winfo_width()}x{window.winfo_reqheight()}')
     config.store_conf(attrs.evolve(
         config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         sshot_type=chosen,
@@ -485,12 +483,16 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
+    def set_screen() -> None:
+        """Event handler when radio buttons are clicked."""
+        app.background_run(set_screen_type)
+
     UI['thumb_auto'] = ttk.Radiobutton(
         thumb_frame,
         text=gettext('Auto'),
         value='AUTO',
         variable=chosen_thumb,
-        command=set_screen_type,
+        command=set_screen,
     )
 
     UI['thumb_peti'] = ttk.Radiobutton(
@@ -498,7 +500,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         text=gettext('PeTI'),
         value='PETI',
         variable=chosen_thumb,
-        command=set_screen_type,
+        command=set_screen,
     )
 
     UI['thumb_custom'] = ttk.Radiobutton(
@@ -506,7 +508,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         text=gettext('Custom:'),
         value='CUST',
         variable=chosen_thumb,
-        command=set_screen_type,
+        command=set_screen,
     )
 
     UI['thumb_label'] = ttk.Label(

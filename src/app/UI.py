@@ -1700,7 +1700,7 @@ async def init_windows() -> None:
             win=TK_ROOT,
         )
         TK_ROOT.geometry(f'+{start_x}+{start_y}')
-    TK_ROOT.update_idletasks()
+    await tk_tools.wait_eventloop()
 
     # First move to default positions, then load the config.
     # If the config is valid, this will move them to user-defined

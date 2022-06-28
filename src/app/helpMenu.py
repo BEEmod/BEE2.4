@@ -479,7 +479,9 @@ class Dialog(tk.Toplevel):
             row=1, column=0,
         )
 
-    def show(self, e=None):
+    @tk_tools.make_handler
+    async def show(self) -> None:
+        """Display the help dialog."""
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
         if self.text is not None:
@@ -488,7 +490,7 @@ class Dialog(tk.Toplevel):
             self.text = None
 
         self.deiconify()
-        self.update_idletasks()
+        await tk_tools.wait_eventloop()
         tk_tools.center_win(self, TK_ROOT)
 
 
