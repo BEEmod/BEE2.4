@@ -3,13 +3,14 @@ General code used for tkinter portions.
 
 """
 import functools
+import inspect
 import sys
 from enum import Enum
 from typing import (
-    Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
     Tuple, Literal,
 )
-from typing_extensions import Unpack, TypeVarTuple
+from typing_extensions import TypeAlias, Unpack, TypeVarTuple
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -19,6 +20,7 @@ import os.path
 
 from idlelib.redirector import WidgetRedirector
 from idlelib.query import Query
+import trio
 
 from app import TK_ROOT, background_run
 import event
@@ -193,6 +195,30 @@ elif utils.LINUX:
         INVALID_DRAG = 'circle'
 else:
     raise AssertionError
+
+
+_cur_update: Optional[trio.Event] = None
+
+
+@TK_ROOT.register
+def _update_complete() -> None:
+    """Set the event, after the event loop has run."""
+    global _cur_update
+    if _cur_update is not None:
+        _cur_update.set()
+        _cur_update = None
+
+
+async def wait_eventloop() -> None:
+    """Wait until the next iteration of the TK event loop.
+
+    This ensures widget dimensions are correct.
+    """
+    global _cur_update
+    if _cur_update is None:
+        _cur_update = trio.Event()
+        TK_ROOT.tk.call('after', 'idle', _update_complete)
+    await _cur_update.wait()
 
 
 def bind_mousewheel(
