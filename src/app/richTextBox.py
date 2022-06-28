@@ -21,11 +21,13 @@ class tkRichText(tkinter.Text):
         self,
         parent: tkinter.Misc,
         width: int = 10, height: int = 4,
-        font: str = "TkDefaultFont",
+        font: Union[str, tkFont] = "TkDefaultFont",
         **kargs,
     ) -> None:
         # Setup all our configuration for inserting text.
-        self.font = nametofont(font)
+        if isinstance(font, str):
+            font = nametofont(font)
+        self.font = font
         self.bold_font = self.font.copy()
         self.italic_font = self.font.copy()
 

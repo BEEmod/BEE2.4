@@ -105,7 +105,7 @@ tk_vars: dict[str, IntVar] = {}
 VAR_LIST: list[StyleVar] = []
 STYLES: dict[str, Style] = {}
 
-UI = {}
+UI: dict[str, ttk.Label] = {}
 
 
 def mandatory_unlocked() -> bool:

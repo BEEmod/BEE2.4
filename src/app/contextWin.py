@@ -37,7 +37,7 @@ wid_sprite: dict[SPR, ttk.Label] = {}
 selected_item: UI.Item
 selected_sub_item: UI.PalItem
 
-version_lookup = []
+version_lookup: list[str] = []
 
 window = tk.Toplevel(TK_ROOT)
 window.overrideredirect(True)
@@ -213,7 +213,7 @@ def set_item_version(e=None):
             func()
 
 
-def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list:
+def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list[str]:
     """Set values on the variant combobox.
 
     This is in a function so itemconfig can reuse it.

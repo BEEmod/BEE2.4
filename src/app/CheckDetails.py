@@ -6,7 +6,7 @@ be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
 from __future__ import annotations
-from typing import Generic, Optional, TypeVar, Iterable, Iterator
+from typing import Generic, Optional, TypeVar, Iterable, Iterator, overload
 from tkinter import ttk, font
 import tkinter as tk
 import functools
@@ -71,6 +71,23 @@ class Header:
 class Item(Generic[UserT]):
     """Represents one item in a CheckDetails list."""
     user: UserT
+    @overload
+    def __init__(
+        self: 'Item[None]',
+        *values: str,
+        hover_text: str='',
+        lock_check: bool=False,
+        state: bool=False,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: 'Item[UserT]',
+        *values: str,
+        hover_text: str='',
+        lock_check: bool=False,
+        state: bool=False,
+        user: UserT,
+    ) -> None: ...
     def __init__(
         self,
         *values: str,
@@ -494,7 +511,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
 
 if __name__ == '__main__':
     from app import TK_ROOT
-    test_inst = CheckDetails(
+    test_inst = CheckDetails[None](
         parent=TK_ROOT,
         headers=['Name', 'Author', 'Description'],
         items=[
