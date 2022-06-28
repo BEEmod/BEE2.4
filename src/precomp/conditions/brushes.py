@@ -666,8 +666,7 @@ def res_import_template(
 
             move_dir = temp_data.detail['movedir', '']
             if move_dir.startswith('<') and move_dir.endswith('>'):
-                move_dir = Vec.from_str(move_dir) @ orient
-                temp_data.detail['movedir'] = move_dir.to_angle()
+                temp_data.detail['movedir'] = (Vec.from_str(move_dir) @ orient).to_angle()
 
             for out in outputs:
                 out = out.copy()

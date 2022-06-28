@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Dict, Set, Callable
+from typing import Iterable, Tuple, Dict, Set, Callable
 
 from srctools.vmf import EntityGroup
 
@@ -395,6 +395,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
         types = flag.value.split()
         pos1 = Vec()
 
+    bbox: Iterable[Vec]
     if pos2 is not None:
         bbox = Vec.iter_grid(*Vec.bbox(pos1, pos2), stride=128)
     else:

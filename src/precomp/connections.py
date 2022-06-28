@@ -81,7 +81,7 @@ SIGN_ORDER = [
     consts.Signage.SHAPE_WAVY
 ]
 
-SIGN_ORDER_LOOKUP = {
+SIGN_ORDER_LOOKUP: Dict[Union[consts.Signage, str], int] = {
     sign: index
     for index, sign in
     enumerate(SIGN_ORDER)
@@ -900,7 +900,7 @@ def add_locking(item: Item) -> None:
             if cmd.target:
                 target = conditions.local_name(lock_button.inst, cmd.target)
             else:
-                target = lock_button.inst
+                target = lock_button.inst['targetname']
             item.add_io_command(
                 output,
                 target,
