@@ -58,8 +58,8 @@ class Block:
 class TextSegment(Block):
     """Each section added in text blocks."""
     text: str  # The text to show
-    tags: tuple[TextTag, ...]  # Tags
-    url: str | None  # If set, the text should be given this URL as a callback.
+    tags: tuple[TextTag, ...] = ()  # Tags
+    url: str | None = None  # If set, the text should be given this URL as a callback.
 
 
 @attrs.define

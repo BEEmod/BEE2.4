@@ -278,13 +278,13 @@ def load_item_data() -> None:
                 heading = '\n\nInstances:\n'
             else:
                 heading = f'\nInstances ({editor.id}):\n'
-            inst_desc.append(tkMarkdown.TextSegment(heading, (), None))
+            inst_desc.append(tkMarkdown.TextSegment(heading, (tkMarkdown.TextTag.BOLD, )))
             for ind, inst in enumerate(editor.instances):
-                inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', ('indent', ), None))
-                inst_desc.append(tkMarkdown.TextSegment(f'{inst.inst}\n', ('code', ), None))
+                inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', (tkMarkdown.TextTag.INDENT, )))
+                inst_desc.append(tkMarkdown.TextSegment(f'{inst.inst}\n', (tkMarkdown.TextTag.CODE, )))
             for name, inst in editor.cust_instances.items():
-                inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', ('indent', ), None))
-                inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', ('code', ), None))
+                inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', (tkMarkdown.TextTag.INDENT, )))
+                inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', (tkMarkdown.TextTag.CODE, )))
         desc = tkMarkdown.join(desc, tkMarkdown.MarkdownData(inst_desc))
 
     wid['desc'].set_text(desc)
