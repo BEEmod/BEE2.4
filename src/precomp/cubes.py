@@ -384,7 +384,6 @@ class CubeType:
         pack_color: str | list[str],
         base_offset: float,
         base_tint: Vec,
-        outputs: dict[CubeOutputs, list[Output]],
         overlay_addon: CubeAddon | None,
         overlay_think: str | None,
     ):
@@ -422,9 +421,6 @@ class CubeType:
 
         # Distance from model origin to the 'floor'.
         self.base_offset = base_offset
-
-        # Configurable outputs for the cube/dropper.
-        self.base_outputs = outputs
 
         # If set, an instance to attach onto the cube.
         self.overlay_addon = overlay_addon
@@ -485,13 +481,6 @@ class CubeType:
             cust_model = conf['model', None]
             cust_model_color = conf['modelColor', None]
 
-        outputs: dict[CubeOutputs, list[Output]] = {}
-
-        for out_type in CubeOutputs:
-            outputs[out_type] = out_list = []
-            for prop in conf.find_all(out_type.value):
-                out_list.append(Output.parse(prop))
-
         return cls(
             cube_id,
             cube_type,
@@ -506,7 +495,6 @@ class CubeType:
             packlist_color,
             conf.float('offset', 20),
             conf.vec('baseTint', 255, 255, 255),
-            outputs,
             CubeAddon.base_parse(cube_id, conf),
             conf['thinkFunc', None],
         )
@@ -579,13 +567,9 @@ class CubePair:
             self.addons.add(cube_type.overlay_addon)
 
         # Outputs to fire on the cubes.
-        self.outputs: dict[CubeOutputs, list[Output]] = {}
-        # Copy the initial outputs the base cube type needs.
-        for out_type in CubeOutputs:
-            self.outputs[out_type] = [
-                out.copy()
-                for out in cube_type.base_outputs[out_type]
-            ]
+        self.outputs: dict[CubeOutputs, list[Output]] = {
+            out_type: [] for out_type in CubeOutputs
+        }
 
         # Ensure we can look up the pair by origin and instance.
         # Round to the nearest voxel to allow the cube to be offset.
