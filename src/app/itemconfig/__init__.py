@@ -247,7 +247,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.widgets = widgets
         self.multi_widgets = multi_widgets
 
-        self.ui_frame: Optional[ttk.LabelFrame] = None
+        self.ui_frame: Optional[ttk.Frame] = None
+        # If true, the create_widgets method has been called.
         self.creating = False
 
     @classmethod
@@ -408,7 +409,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
     async def create_widgets(self, master: ttk.Frame, callback: Callable[['ConfigGroup'], object]) -> None:
         """Create the widgets for this config."""
-        frame = ttk.LabelFrame(master, text=self.name)
+        frame = ttk.Frame(master)
         frame.columnconfigure(0, weight=1)
         row = 0
 
@@ -517,7 +518,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
 
     # Need to use a canvas to allow scrolling.
     canvas = tk.Canvas(window, highlightthickness=0)
-    canvas.grid(row=1, column=0, sticky='NSEW')
+    canvas.grid(row=1, column=0, sticky='NSEW', padx=(5, 0))
     window.columnconfigure(0, weight=1)
     window.rowconfigure(1, weight=1)
 
@@ -531,14 +532,15 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
 
     tk_tools.add_mousewheel(canvas, canvas, window)
     canvas_frame = ttk.Frame(canvas)
-    canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
-    canvas_frame.rowconfigure(0, weight=1)
+    frame_winid = canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
+    canvas_frame.columnconfigure(0, weight=1)
+    canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
     await StyleVarPane.make_stylevar_pane(stylevar_frame, update_item_vis)
 
     loading_text = ttk.Label(canvas_frame, text=gettext('Loading...'))
-    loading_text.grid(row=1, column=0, sticky='ew')
+    loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
     STYLEVAR_GROUP.ui_frame = stylevar_frame
@@ -553,11 +555,14 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
                 loading_text.grid_forget()
             group.ui_frame.grid(row=1, column=0, sticky='ew')
             group.ui_frame.update_idletasks()
-            width = group.ui_frame.winfo_reqwidth()
+            canvas['scrollregion'] = x1, y1, width, y2 = canvas.bbox('all')
             if width > win_max_width:
                 canvas['width'] = width
                 win_max_width = width
-            canvas['scrollregion'] = canvas.bbox('all')
+                scroll_width = scrollbar.winfo_width() + 10
+                window.geometry(f'{width + scroll_width}x{window.winfo_height()}')
+            else:
+                canvas.itemconfigure(frame_winid, width=win_max_width)
 
     def select_group(_: tk.Event) -> None:
         """Callback when the combobox is changed."""
@@ -572,14 +577,14 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
             # Ready, add.
             display_group(new_group)
         else:  # Begin creating, or loading.
-            loading_text.grid(row=1, column=1, sticky='ew')
+            loading_text.grid(row=0, column=0, sticky='ew')
             if not new_group.creating:
                 background_run(new_group.create_widgets, canvas_frame, display_group)
                 new_group.creating = True
 
     selector.bind('<<ComboboxSelected>>', select_group)
 
-    canvas.update_idletasks()
+    await tk_tools.wait_eventloop()
 
     def canvas_reflow(_) -> None:
         """Update canvas when the window resizes."""
