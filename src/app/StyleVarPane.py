@@ -1,22 +1,19 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import Callable, Dict, Optional
-
-import trio
-from srctools.dmx import Element
+from typing import Callable, Dict
 from tkinter import *
 from tkinter import ttk
-
 import operator
 import itertools
 
 from srctools import Property, bool_as_int, conv_bool
 from srctools.logger import get_logger
+from srctools.dmx import Element
 import attrs
+import trio
 
-from packages import Style, StyleVar
-from app.SubPane import SubPane
-from app import tooltip, TK_ROOT, itemconfig, tk_tools
+from packages import Style, StyleVar, PackagesSet
+from app import tooltip
 from localisation import ngettext, gettext
 import config
 
@@ -103,7 +100,6 @@ checkbox_other: dict[str, ttk.Checkbutton] = {}
 tk_vars: dict[str, IntVar] = {}
 
 VAR_LIST: list[StyleVar] = []
-STYLES: dict[str, Style] = {}
 
 UI: dict[str, ttk.Label] = {}
 
@@ -157,7 +153,7 @@ def export_data(chosen_style: Style) -> dict[str, bool]:
     }
 
 
-def make_desc(var: StyleVar) -> str:
+def make_desc(packset: PackagesSet, var: StyleVar) -> str:
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.
@@ -175,13 +171,11 @@ def make_desc(var: StyleVar) -> str:
         desc.append(gettext('Styles: Unstyled'))
     else:
         app_styles = [
-            style
-            for style in
-            STYLES.values()
+            style for style in packset.all_obj(Style)
             if var.applies_to_style(style)
         ]
 
-        if len(app_styles) == len(STYLES):
+        if len(app_styles) == len(packset.all_obj(Style)):
             # i18n: StyleVar which matches all styles.
             desc.append(gettext('Styles: All'))
         else:
@@ -235,7 +229,11 @@ def refresh(selected_style: Style) -> None:
         UI['stylevar_other_none'].grid_remove()
 
 
-async def make_stylevar_pane(frame: ttk.Frame, update_item_vis: Callable[[], None]) -> None:
+async def make_stylevar_pane(
+    frame: ttk.Frame,
+    packset: PackagesSet,
+    update_item_vis: Callable[[], None],
+) -> None:
     """Construct the stylevar pane."""
     frame_all = ttk.Labelframe(frame, text=gettext("All:"))
     frame_all.grid(row=0, sticky='EW')
@@ -263,7 +261,7 @@ async def make_stylevar_pane(frame: ttk.Frame, update_item_vis: Callable[[], Non
         font='TkMenuFont',
         justify='center',
     )
-    VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
+    VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
     async def add_state_syncers(
         var_id: str,
@@ -293,7 +291,7 @@ async def make_stylevar_pane(frame: ttk.Frame, update_item_vis: Callable[[], Non
             text=var.name,
         )
         chk.grid(row=all_pos, column=0, sticky="W", padx=3)
-        tooltip.add_tooltip(chk, make_desc(var))
+        tooltip.add_tooltip(chk, make_desc(packset, var))
 
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
@@ -319,7 +317,7 @@ async def make_stylevar_pane(frame: ttk.Frame, update_item_vis: Callable[[], Non
     async with trio.open_nursery() as nursery:
         for var in VAR_LIST:
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
-            desc = make_desc(var)
+            desc = make_desc(packset, var)
             if var.applies_to_all():
                 # Available in all styles - put with the hardcoded variables.
                 all_pos += 1

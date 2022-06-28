@@ -536,7 +536,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
-    await StyleVarPane.make_stylevar_pane(stylevar_frame, update_item_vis)
+    await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.LOADED, update_item_vis)
 
     loading_text = ttk.Label(canvas_frame, text=gettext('Loading...'))
     loading_text.grid(row=0, column=0, sticky='ew')
