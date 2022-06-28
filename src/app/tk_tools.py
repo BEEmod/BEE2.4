@@ -83,7 +83,6 @@ else:  # Linux
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
 
-
 # Some events differ on different systems, so define them here.
 if utils.MAC:
     KEY_EXPORT = '<Command-e>'
@@ -196,7 +195,6 @@ elif utils.LINUX:
 else:
     raise AssertionError
 
-
 _cur_update: Optional[trio.Event] = None
 
 
@@ -224,7 +222,7 @@ async def wait_eventloop() -> None:
 def bind_mousewheel(
     widgets: Union[Iterable[tk.Misc], tk.Misc],
     func: Callable[[int, Unpack[PosArgsT]], object],
-    args: Tuple[Unpack[PosArgsT]]=(),
+    args: Tuple[Unpack[PosArgsT]] = (),
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
@@ -281,7 +279,28 @@ def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: 
     bind_mousewheel(frames, scroll_func, ('units', ))
 
 
-EventFunc = Callable[[tk.Event], Any]
+def make_handler(func: Union[
+    Callable[[], Awaitable[object]],
+    Callable[[tk.Event], Awaitable[object]],
+]) -> Callable[[tk.Event], object]:
+    """Given an asyncronous event handler, return a sync function which uses background_run().
+
+    This checks the signature of the function to decide whether to pass along the event object.
+    """
+    sig = inspect.signature(func)
+    if len(sig.parameters) == 0:
+        def wrapper(e: tk.Event) -> None:
+            """Discard the event."""
+            background_run(func)
+    else:
+        def wrapper(e: tk.Event) -> None:
+            """Pass along the event."""
+            background_run(func, e)
+    functools.update_wrapper(wrapper, func)
+    return wrapper
+
+
+EventFunc: TypeAlias = Callable[[tk.Event], object]
 EventFuncT = TypeVar('EventFuncT', bound=EventFunc)
 
 
@@ -316,10 +335,10 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
     return functools.update_wrapper(cast(_Binder, deco), bind_func)
 
 if utils.MAC:
-    # On OSX, make left-clicks switch to a rightclick when control is held.
+    # On OSX, make left-clicks switch to a right-click when control is held.
     @_bind_event_handler
-    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
-        """On OSX, left-clicks are converted to right-clicks when control is held."""
+    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+        """On OSX, left-clicks are converted to right-click when control is held."""
         def event_handler(e: tk.Event) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
@@ -329,8 +348,8 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
-        """On OSX, left-clicks are converted to right-clicks when control is held."""
+    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+        """On OSX, left-clicks are converted to right-click when control is held."""
         def event_handler(e: tk.Event) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
@@ -340,23 +359,23 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
+    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
         wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
     @_bind_event_handler
-    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
+    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
+    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool=False) -> None:
+    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
@@ -370,8 +389,8 @@ def adjust_inside_screen(
     x: int,
     y: int,
     win: Union[tk.Tk, tk.Toplevel],
-    horiz_bound: int=14,
-    vert_bound: int=45,
+    horiz_bound: int = 14,
+    vert_bound: int = 45,
 ) -> Tuple[int, int]:
     """Adjust a window position to ensure it fits inside the screen.
 
@@ -395,13 +414,13 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel]=None) -> None:
+def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel] = None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
 
-    x = parent.winfo_rootx() + (parent.winfo_width()-window.winfo_width())//2
-    y = parent.winfo_rooty() + (parent.winfo_height()-window.winfo_height())//2
+    x = parent.winfo_rootx() + (parent.winfo_width() - window.winfo_width()) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - window.winfo_height()) // 2
 
     x, y = adjust_inside_screen(x, y, window)
 
@@ -478,8 +497,8 @@ else:
 
 def prompt(
     title: str, message: str,
-    initialvalue: str='',
-    parent: tk.Misc= TK_ROOT,
+    initialvalue: str = '',
+    parent: tk.Misc = TK_ROOT,
     validator: Callable[[str], str] = _default_validator,
 ) -> Optional[str]:
     """Ask the user to enter a string."""
@@ -531,7 +550,7 @@ class ReadOnlyEntry(ttk.Entry):
 
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice]=None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -583,9 +602,9 @@ class FileField(ttk.Frame):
     def __init__(
         self,
         master: tk.Misc,
-        is_dir: bool=False,
-        loc: str='',
-        callback: Callable[[str], None]=None,
+        is_dir: bool = False,
+        loc: str = '',
+        callback: Callable[[str], None] = None,
     ) -> None:
         """Initialise the field.
 
@@ -645,7 +664,7 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: tk.Event=None) -> None:
+    def browse(self, event: tk.Event = None) -> None:
         """Browse for a file."""
         path = self.browser.show()
         if path:
@@ -697,7 +716,8 @@ EnumT = TypeVar('EnumT')
 class EnumButton(Generic[EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
-    The event manager recives an event with this as the context and the value as the arg when changed.
+    The event manager recives an event with this as the context and the value as the arg when
+    changed.
     """
     def __init__(
         self,
