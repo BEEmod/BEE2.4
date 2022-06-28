@@ -274,7 +274,9 @@ class CubeAddon:
 
     @staticmethod
     def _parse_outputs(props: Property) -> dict[CubeOutputs, list[Output]]:
-        outputs = {}
+        """Parse addon outputs."""
+        outputs: dict[CubeOutputs, list[Output]] = {}
+        out_list: list[Output]
 
         for out_type in CubeOutputs:
             outputs[out_type] = out_list = []
@@ -284,8 +286,9 @@ class CubeAddon:
         return outputs
 
     @staticmethod
-    def _parse_fixups(props: Property) -> list[tuple[str, str | AddonFixups]] | None:
-        fixups = []
+    def _parse_fixups(props: Property) -> list[tuple[str, AddonFixups | str]] | None:
+        src: AddonFixups | str
+        fixups: list[tuple[str, AddonFixups | str]] = []
         found = False
         for parent in props.find_all('Fixups'):
             found = True
@@ -342,11 +345,11 @@ class DropperType:
                 'use cube_angles instead.',
                 conf['id'],
             )
-            cube_dir = conf['cube_dir']
+            cube_dir_str = conf['cube_dir']
             try:
-                cube_dir = Vec(conditions.DIRECTIONS[cube_dir])
+                cube_dir = Vec(conditions.DIRECTIONS[cube_dir_str])
             except KeyError:
-                cube_dir = Vec.from_str(cube_dir, x=1)
+                cube_dir = Vec.from_str(cube_dir_str, x=1)
             # Set roll to counteract us being on the ceiling.
             cube_orient = cube_dir.to_angle(180)
         else:
@@ -441,6 +444,7 @@ class CubeType:
         cube_item_id = conf['itemid']
 
         packlist_prop = conf.find_key('Pack', '')
+        packlist: list[str] | str
         if packlist_prop.has_children():
             # Each file individually
             packlist = [
