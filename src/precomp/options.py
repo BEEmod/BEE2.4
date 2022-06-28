@@ -240,7 +240,7 @@ def get_itemconf(
     elif isinstance(default, bool):
         return srctools.conv_bool(value, default)
     elif isinstance(default, float):
-        return srctools.conv_int(value, default)
+        return srctools.conv_float(value, default)
     elif isinstance(default, int):
         return srctools.conv_int(value, default)
     else:
