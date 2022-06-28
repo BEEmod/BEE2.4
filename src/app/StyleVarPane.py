@@ -1,7 +1,7 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
 from typing import Callable, Dict
-from tkinter import *
+from tkinter import IntVar
 from tkinter import ttk
 import operator
 import itertools
@@ -136,6 +136,15 @@ class StyleVarState(config.Data):
         """Export the stylevars in KV1 format."""
         return Property('', bool_as_int(self.value))
 
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> StyleVarState:
+        try:
+            value = data['value'].val_bool
+        except KeyError:
+            return cls(False)
+        else:
+            return cls(value)
+
     def export_dmx(self) -> Element:
         """Export stylevars in DMX format."""
         elem = Element('StyleVar', 'DMElement')
@@ -241,10 +250,7 @@ async def make_stylevar_pane(
     frm_chosen = ttk.Labelframe(frame, text=gettext("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
-    ttk.Separator(
-        frame,
-        orient=HORIZONTAL,
-    ).grid(row=2, sticky='EW', pady=(10, 5))
+    ttk.Separator(frame, orient='horizontal').grid(row=2, sticky='EW', pady=(10, 5))
 
     frm_other = ttk.Labelframe(frame, text=gettext("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
