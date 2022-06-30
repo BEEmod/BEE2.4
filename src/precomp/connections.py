@@ -658,7 +658,12 @@ def calc_connections(
 
     # Now we've computed everything, strip numbers.
     for inst in corridors:
-        inst['targetname'] = inst['targetname'].rstrip('0123456789')
+        old_name = inst['targetname']
+        new_name = inst['targetname'] = old_name.rstrip('0123456789')
+        try:
+            ITEMS[new_name] = ITEMS.pop(old_name)
+        except KeyError:
+            pass
 
 
 def do_item_optimisation(vmf: VMF) -> None:

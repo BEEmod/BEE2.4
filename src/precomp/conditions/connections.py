@@ -92,7 +92,7 @@ def res_change_io_type(props: Property) -> Callable[[Entity], None]:
         try:
             item = connections.ITEMS[inst['targetname']]
         except KeyError:
-            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+            raise ValueError(f'No item with name "{inst["targetname"]}"!')
 
         item.config = conf
 
