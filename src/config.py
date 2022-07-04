@@ -205,19 +205,37 @@ async def apply_conf(info_or_type: Union[ConfType[DataT], Type[DataT]], /, data_
                     nursery.start_soon(cb, data)
 
 
-def get_cur_conf(cls: Type[DataT], data_id: str='', default: Union[DataT, None] = None) -> DataT:
-    """Fetch the currently active config for this ID."""
+def get_cur_conf(
+    cls: Type[DataT],
+    data_id: str='',
+    default: Union[DataT, None] = None,
+    legacy_id: str='',
+) -> DataT:
+    """Fetch the currently active config for this ID.
+
+    If legacy_id is defined, this will be checked if the original does not exist, and if so
+    moved to the actual ID.
+    """
     info: ConfType[DataT] = _TYPE_TO_TYPE[cls]
     if data_id and not info.uses_id:
         raise ValueError(f'Data type "{info.name}" does not support IDs!')
+    data: object = None
     try:
         data = _CUR_CONFIG[info][data_id]
     except KeyError:
+        if legacy_id:
+            try:
+                conf_map = _CUR_CONFIG[info]
+                data = conf_map[data_id] = conf_map.pop(legacy_id)
+            except KeyError:
+                pass
+    if data is None:
         # Return a default value.
         if default is not None:
             return default
         else:
-            raise
+            raise KeyError(data_id)
+
     assert isinstance(data, info.cls), info
     return data
 

@@ -493,11 +493,12 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     window = SubPane(
         TK_ROOT,
         title=gettext('Style/Item Properties'),
-        name='style',
+        name='item',
+        legacy_name='style',
         menu_bar=menu_bar,
         resize_y=True,
         tool_frame=tool_frame,
-        tool_img='icons/win_stylevar',
+        tool_img='icons/win_itemvar',
         tool_col=3,
     )
 

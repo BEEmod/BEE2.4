@@ -1,4 +1,4 @@
-from typing import Callable, Any, Union
+from typing import Callable, Any, Optional, Union
 
 import tkinter as tk
 from tkinter import ttk
@@ -47,9 +47,11 @@ class SubPane(tk.Toplevel):
         resize_x: bool=False,
         resize_y: bool=False,
         name: str='',
+        legacy_name: str='',
     ) -> None:
         self.visible = tk.BooleanVar(parent, True)
         self.win_name = name
+        self.legacy_name = legacy_name
         self.allow_snap = False
         self.can_save = False
         self.parent = parent
@@ -191,7 +193,7 @@ class SubPane(tk.Toplevel):
     def load_conf(self) -> None:
         """Load configuration from our config file."""
         try:
-            state = config.get_cur_conf(config.WindowState, self.win_name)
+            state = config.get_cur_conf(config.WindowState, self.win_name, legacy_id=self.legacy_name)
         except KeyError:
             pass  # No configured state.
         else:
