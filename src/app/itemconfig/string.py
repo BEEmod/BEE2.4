@@ -8,7 +8,7 @@ from app.itemconfig import UpdateFunc, WidgetLookup, nop_update
 
 
 @WidgetLookup('string', 'str')
-async def widget_string(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
+async def widget_string(parent: tk.Widget, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
     """Simple textbox for entering text."""
     return ttk.Entry(
         parent,

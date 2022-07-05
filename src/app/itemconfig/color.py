@@ -17,7 +17,7 @@ from localisation import gettext
 
 @WidgetLookup('color', 'colour', 'rgb')
 async def widget_color_single(
-    parent: ttk.Frame,
+    parent: tk.Widget,
     var: tk.StringVar,
     conf: Property,
 ) -> tuple[tk.Widget, UpdateFunc]:
@@ -33,7 +33,7 @@ async def widget_color_single(
 
 
 @WidgetLookupMulti('color', 'colour', 'rgb')
-async def widget_color_multi(parent: ttk.Frame, values: list[tuple[str, tk.StringVar]], conf: Property):
+async def widget_color_multi(parent: tk.Widget, values: list[tuple[str, tk.StringVar]], conf: Property):
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text, var in multi_grid(values):
         swatch, update = make_color_swatch(parent, var, 16)
@@ -42,7 +42,7 @@ async def widget_color_multi(parent: ttk.Frame, values: list[tuple[str, tk.Strin
         yield tim_val, update
 
 
-def make_color_swatch(parent: ttk.Frame, var: tk.StringVar, size: int) -> tuple[tk.Widget, UpdateFunc]:
+def make_color_swatch(parent: tk.Widget, var: tk.StringVar, size: int) -> tuple[tk.Widget, UpdateFunc]:
     """Make a single swatch."""
     # Note: tkinter requires RGB as ints, not float!
     def open_win(e) -> None:

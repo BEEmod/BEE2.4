@@ -291,11 +291,11 @@ def make_handler(func: Union[
     if len(sig.parameters) == 0:
         def wrapper(e: tk.Event) -> None:
             """Discard the event."""
-            background_run(func)
+            background_run(func)  # type: ignore
     else:
         def wrapper(e: tk.Event) -> None:
             """Pass along the event."""
-            background_run(func, e)
+            background_run(func, e)  # type: ignore
     functools.update_wrapper(wrapper, func)
     return wrapper
 

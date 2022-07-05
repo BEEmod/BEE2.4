@@ -1394,7 +1394,7 @@ class SelectorWin:
                 ))
             elif attr.type is AttrTypes.LIST:
                 # Join the values (in alphabetical order)
-                assert isinstance(val, Iterable), repr(val)
+                assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
                 attr.label['text'] = ', '.join(sorted(val))
             elif attr.type is AttrTypes.STRING:
                 # Just a string.

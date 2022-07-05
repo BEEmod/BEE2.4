@@ -12,7 +12,7 @@ import pytest
 ])
 def test_insertion(dx, dy) -> None:
     """Simple tests to ensure resizing works in each direction."""
-    plane = Plane()
+    plane = Plane[object]()
     for i in range(10):
         assert len(plane) == i, f'{dx*i}, {dy*i}'
         plane[dx*i, dy*i] = i
@@ -77,7 +77,7 @@ def _points(*pattern):
 ], ids=['order', 'patA', 'patB', 'patC'])
 def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int):
     """Insert in various patterns, to test the dynamic resizing."""
-    plane = Plane()
+    plane = Plane[object]()
     backup = {}
     # First iteration will update.
     min_x = min_y = +99999
@@ -188,7 +188,7 @@ def test_illegal_positions() -> None:
 
 def test_deletion() -> None:
     """Test deleting positions."""
-    plane = Plane()
+    plane = Plane[int]()
     plane[5, 5] = 4
     plane[4, 5] = 3
     plane[5, 4] = 3
@@ -210,8 +210,8 @@ def test_deletion() -> None:
 
 def test_defaults() -> None:
     """Test the ability to set a default value for all keys."""
-    plane_req = Plane()
-    plane_opt = Plane(default=45)
+    plane_req = Plane[int]()
+    plane_opt = Plane[int](default=45)
 
     plane_req[2, 5] = plane_opt[2, 5] = 3
     assert plane_req[2, 5] == 3

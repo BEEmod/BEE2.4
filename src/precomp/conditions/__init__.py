@@ -505,7 +505,7 @@ class CondCall(Generic[CallResultT]):
     def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Property) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
-            return self._cback(ent.map, coll, info, ent, conf)
+            return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
         else:
             # Execute setup functions if required.
             try:
@@ -1024,7 +1024,7 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=Non
 
 
 def set_ent_keys(
-    ent: Entity,
+    ent: typing.MutableMapping[str, str],
     inst: Entity,
     prop_block: Property,
     block_name: str='Keys',

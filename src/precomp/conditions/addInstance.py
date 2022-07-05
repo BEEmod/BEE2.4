@@ -1,7 +1,7 @@
 """Results for generating additional instances.
 
 """
-from typing import Optional, Callable
+from typing import Iterable, Optional, Callable
 from srctools import Vec, Entity, Property, VMF, Angle
 import srctools.logger
 
@@ -14,7 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
 @conditions.make_result('addGlobal')
-def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
     """Add one instance in a specific location.
 
     Options:
@@ -169,6 +169,7 @@ def res_add_shuffle_group(
     for prop in res.find_all('selector'):
         conf_value = prop['value', '']
         conf_flags = list(prop.find_children('conditions'))
+        picked_pools: Iterable[str]
         try:
             picked_pools = prop['pools'].casefold().split()
         except LookupError:

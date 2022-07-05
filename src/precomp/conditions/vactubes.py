@@ -82,7 +82,7 @@ VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
 @conditions.make_result('CustVactube')
-def res_vactubes(vmf: VMF, res: Property):
+def res_vactubes(vmf: VMF, res: Property) -> conditions.ResultCallable:
     """Specialised result to parse vactubes from markers.
 
     Only runs once, and then quits the condition list. After priority 400,
@@ -157,7 +157,7 @@ def res_vactubes(vmf: VMF, res: Property):
             for inst_filename in instanceLocs.resolve(file):
                 inst_config[inst_filename] = conf, size
 
-    def result(_: Entity) -> None:
+    def result(_: Entity) -> object:
         """Create the vactubes."""
         if group not in VAC_CONFIGS:
             # We've already executed this config group

@@ -20,7 +20,7 @@ def decimal_points(num: float) -> int:
 
 
 @WidgetLookup('range', 'slider', wide=True)
-async def widget_slider(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
+async def widget_slider(parent: tk.Widget, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a slider for setting a number in a range."""
     limit_min = conf.float('min', 0)
     limit_max = conf.float('max', 100)

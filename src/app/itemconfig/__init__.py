@@ -33,7 +33,7 @@ UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 # The widget to be installed should be returned, and a callback to refresh the UI.
 # If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
-    [ttk.Frame, tk.StringVar, Property],
+    [tk.Widget, tk.StringVar, Property],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
 WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets', attrs=['wide'])
@@ -42,7 +42,7 @@ WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets', a
 # instead. The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc: TypeAlias = Callable[
-    [ttk.Frame, List[Tuple[str, tk.StringVar]], Property],
+    [tk.Widget, List[Tuple[str, tk.StringVar]], Property],
     AsyncIterator[Tuple[str, UpdateFunc]]
 ]
 WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-Widgets')
@@ -415,7 +415,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         row = 0
 
         widget_count = len(self.widgets) + len(self.multi_widgets)
-        wid_frame: Union[ttk.Frame, ttk.LabelFrame]
+        wid_frame: tk.Widget
+        widget: tk.Widget
 
         # Now make the widgets.
         if self.widgets:
@@ -614,7 +615,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
 def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     """For widgets without a multi version, do it generically."""
     async def generic_func(
-        parent: ttk.Frame,
+        parent: tk.Widget,
         values: List[Tuple[str, tk.StringVar]],
         conf: Property,
     ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
@@ -662,7 +663,7 @@ def widget_sfx(*args) -> None:
 
 
 @WidgetLookup('itemvariant', 'variant')
-async def widget_item_variant(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_item_variant(parent: tk.Widget, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.

@@ -107,7 +107,7 @@ SPRITE_TOOL = {
     'surf_wall_floor': gettext('This item can be placed on floors and walls.'),
     'surf_wall_floor_ceil': gettext('This item can be placed in any orientation.'),
 }
-IMG_ALPHA = img.Handle.blank(64, 64)
+IMG_ALPHA: img.Handle = img.Handle.blank(64, 64)
 
 
 def set_sprite(pos: SPR, sprite: str) -> None:

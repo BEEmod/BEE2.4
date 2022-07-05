@@ -1,4 +1,5 @@
 """Test the events manager and collections."""
+from typing import no_type_check
 import pytest
 from unittest.mock import AsyncMock, create_autospec, call
 
@@ -170,6 +171,7 @@ async def test_register_priming() -> None:
     func2.assert_awaited_once_with(10)
 
 
+@no_type_check
 def test_valuechange() -> None:
     """Check ValueChange() produces the right values."""
     with pytest.raises(TypeError):
@@ -189,9 +191,9 @@ def test_valuechange_attrs() -> None:
     assert examp.new == 1
     # Readonly.
     with pytest.raises(AttributeError):
-        examp.old = ()
+        examp.old = ()  # type: ignore
     with pytest.raises(AttributeError):
-        examp.new = ()
+        examp.new = ()  # type: ignore
 
 
 def test_valuechange_hash() -> None:

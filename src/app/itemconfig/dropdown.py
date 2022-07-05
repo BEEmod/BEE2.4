@@ -13,7 +13,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 
 @WidgetLookup('dropdown')
-async def dropdown(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+async def dropdown(parent: tk.Widget, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """Dropdowns allow selecting from a few options."""
     options: List[str] = []
     display: List[str] = []

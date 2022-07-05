@@ -13,7 +13,7 @@ from app.tooltip import add_tooltip
 
 
 @WidgetLookup('boolean', 'bool', 'checkbox')
-async def widget_checkmark(parent: ttk.Frame, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
     """Allows ticking a box."""
     # Ensure it's a bool value.
     if conv_bool(var.get()):
@@ -33,7 +33,7 @@ async def widget_checkmark(parent: ttk.Frame, var: tk.StringVar, conf: Property)
 
 @WidgetLookupMulti('boolean', 'bool', 'checkbox')
 async def widget_checkmark_multi(
-    parent: ttk.Frame,
+    parent: tk.Widget,
     values: List[Tuple[str, tk.StringVar]],
     conf: Property,
 ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
