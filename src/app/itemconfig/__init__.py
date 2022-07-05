@@ -31,11 +31,12 @@ UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 # Functions for each widget.
 # The function is passed a parent frame, StringVar, and Property block.
 # The widget to be installed should be returned, and a callback to refresh the UI.
+# If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
     [ttk.Frame, tk.StringVar, Property],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
-WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets')
+WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets', attrs=['wide'])
 
 # Override for timer-type widgets to be more compact - passed a num:var dict of StringVars
 # instead. The widgets should insert themselves into the parent frame.
@@ -423,18 +424,25 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 wid_frame.grid(row=row, column=0, sticky='ew')
                 wid_frame.columnconfigure(1, weight=1)
                 await trio.sleep(0)
+
+                label: Optional[ttk.Label] = None
+                if s_wid.name:
+                    if getattr(s_wid.create_func, 'wide', False):
+                        wid_frame = ttk.LabelFrame(wid_frame, text=s_wid.name + ': ')
+                        wid_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=5)
+                        wid_frame.columnconfigure(0, weight=1)
+                    else:
+                        label = ttk.Label(wid_frame, text=s_wid.name + ': ')
+                        label.grid(row=0, column=0)
                 try:
                     widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
                 except Exception:
                     LOGGER.exception('Could not construct widget {}.{}', self.id, s_wid.id)
                     continue
 
-                if s_wid.name:
-                    label = ttk.Label(wid_frame, text=s_wid.name + ': ')
-                    label.grid(row=0, column=0)
+                if label is not None:
                     widget.grid(row=0, column=1, sticky='e')
                 else:
-                    label = None
                     widget.grid(row=0, column=0, columnspan=2, sticky='ew')
                 if s_wid.has_values:
                     await config.set_and_run_ui_callback(
@@ -457,7 +465,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             else:
                 wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
 
-            wid_frame.grid(row=row, column=0, sticky='ew')
+            wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
             assert isinstance(m_wid.values, list)
             try:
                 async for tim_val, value in m_wid.multi_func(
