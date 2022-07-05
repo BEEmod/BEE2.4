@@ -3,12 +3,14 @@
 These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
+
 from typing import Union
 from tkinter import filedialog, ttk
 import tkinter as tk
 import base64
 import functools
 import io
+import random
 
 from PIL import Image, ImageTk
 from atomicwrites import atomic_write
@@ -95,50 +97,6 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
 
 packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
-
-count_brush = tk.IntVar(value=0)
-count_entity = tk.IntVar(value=0)
-count_overlay = tk.IntVar(value=0)
-
-# Controls flash_count()
-count_brush.should_flash = False
-count_entity.should_flash = False
-count_overlay.should_flash = False
-
-# The data for the 3 progress bars -
-# (variable, config_name, default_max, description)
-COUNT_CATEGORIES = [
-    (
-        count_brush, 'brush', 8192,
-        # i18n: Progress bar description
-        gettext(
-            "Brushes form the walls or other parts of the test chamber. If this "
-            "is high, it may help to reduce the size of the map or remove "
-            "intricate shapes."
-        )
-    ),
-    (
-        count_entity, 'entity', 2048,
-        # i18n: Progress bar description
-        gettext(
-            "Entities are the things in the map that have functionality. "
-            "Removing complex moving items will help reduce this. Items have "
-            "their entity count listed in the item description window.\n\nThis "
-            "isn't completely accurate, some entity types are counted here but "
-            "don't affect the ingame limit, while others may generate "
-            "additional entities at runtime."
-        ),
-    ),
-    (
-        count_overlay, 'overlay', 512,
-        # i18n: Progress bar description
-        gettext(
-            "Overlays are smaller images affixed to surfaces, like signs or "
-            "indicator lights. Hiding complex antlines or setting them to "
-            "signage will reduce this."
-        )
-    ),
-]
 
 # vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
 # Checks if vrad_force_full is defined, if it is, sets vrad_compile_type to true and
@@ -278,65 +236,81 @@ async def apply_state(state: CompilePaneState) -> None:
     COMPILE_CFG.save_check()
 
 
-def flash_count() -> None:
-    """Flash the counter between 0 and 100 when on."""
-    should_cont = False
+class LimitCounter:
+    """Displays the current status of various compiler limits."""
+    def __init__(
+        self,
+        master: ttk.LabelFrame,
+        *,
+        maximum: int,
+        length: int,
+        blurb: str,
+        name: str,
+    ) -> None:
+        self._flasher: Union[trio.CancelScope, None] = None
+        self.var = tk.IntVar()
+        self.max = maximum
+        self.name = name
+        self.blurb = blurb
+        self.cur_count = 0
 
-    for var in (count_brush, count_entity, count_overlay):
-        if not getattr(var, 'should_flash', False):
-            continue  # Abort when it shouldn't be flashing
+        self.bar = ttk.Progressbar(
+            master,
+            maximum=100,
+            variable=self.var,
+            length=length,
+        )
+        # Add tooltip logic.
+        add_tooltip(self.bar)
 
-        if var.get() == 0:
-            var.set(100)
-        else:
-            var.set(0)
-
-        should_cont = True
-
-    if should_cont:
-        TK_ROOT.after(750, flash_count)
-
-
-def refresh_counts(reload: bool = True) -> None:
-    """Set the last-compile limit display."""
-    if reload:
-        COMPILE_CFG.load()
-
-    # Don't re-run the flash function if it's already on.
-    run_flash = not (
-        count_entity.should_flash or
-        count_overlay.should_flash or
-        count_brush.should_flash
-    )
-
-    for bar_var, name, default, tip_blurb in COUNT_CATEGORIES:
-        value = COMPILE_CFG.get_int('Counts', name)
-
-        if name == 'entity':
-            # The in-engine entity limit is different to VBSP's limit
-            # (that one might include prop_static, lights etc).
-            max_value = default
-        else:
-            # Use or to ensure no divide-by-zero occurs..
-            max_value = COMPILE_CFG.get_int('Counts', 'max_' + name) or default
-
+    def update(self, value: int) -> None:
+        """Apply the value to the counter."""
         # If it's hit the limit, make it continuously scroll to draw
         # attention to the bar.
-        if value >= max_value:
-            bar_var.should_flash = True
+        if value >= self.max:
+            if self._flasher is None:
+                app.background_run(self._flash)
         else:
-            bar_var.should_flash = False
-            bar_var.set(round(100 * value / max_value))
+            if self._flasher is not None:
+                self._flasher.cancel()
+            self._flasher = None
+            self.cur_count = round(100 * value / self.max)
+            self.var.set(self.cur_count)
 
-        set_tooltip(UI['count_' + name], '{}/{} ({:.2%}):\n{}'.format(
+        set_tooltip(self.bar, '{}/{} ({:.2%}):\n{}'.format(
             value,
-            max_value,
-            value / max_value,
-            tip_blurb,
+            self.max,
+            value / self.max,
+            self.blurb,
         ))
 
-    if run_flash:
-        flash_count()
+    async def _flash(self) -> None:
+        """Flash the display."""
+        if self._flasher is not None:
+            self._flasher.cancel()
+        with trio.CancelScope() as self._flasher:
+            while True:
+                self.var.set(100)
+                await trio.sleep(random.uniform(0.5, 0.75))
+                self.var.set(0)
+                await trio.sleep(random.uniform(0.5, 0.75))
+        # noinspection PyUnreachableCode
+        self.var.set(self.cur_count)
+
+
+def refresh_counts(*counters: LimitCounter) -> None:
+    """Set the last-compile limit display."""
+    COMPILE_CFG.load()
+    for limit_counter in counters:
+        value = COMPILE_CFG.get_int('Counts', limit_counter.name)
+
+        # The in-engine entity limit is different to VBSP's limit
+        # (that one might include prop_static, lights etc).
+        max_value = COMPILE_CFG.get_int('Counts', 'max_' + limit_counter.name)
+        if limit_counter.name != 'entity' and max_value != 0:
+            limit_counter.max = max_value
+
+        limit_counter.update(value)
 
 
 def set_pack_dump_dir(path: str) -> None:
@@ -659,13 +633,22 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         anchor='n',
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
 
-    UI['count_entity'] = ttk.Progressbar(
+    count_entity = LimitCounter(
         count_frame,
-        maximum=100,
-        variable=count_entity,
+        maximum=2048,
         length=120,
+        name='entity',
+        # i18n: Progress bar description
+        blurb=gettext(
+            "Entities are the things in the map that have functionality. "
+            "Removing complex moving items will help reduce this. Items have "
+            "their entity count listed in the item description window.\n\nThis "
+            "isn't completely accurate, some entity types are counted here but "
+            "don't affect the ingame limit, while others may generate "
+            "additional entities at runtime."
+        )
     )
-    UI['count_entity'].grid(
+    count_entity.bar.grid(
         row=1,
         column=0,
         columnspan=3,
@@ -678,21 +661,27 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         text=gettext('Overlay'),
         anchor='center',
     ).grid(row=2, column=0, sticky='ew')
-    UI['count_overlay'] = ttk.Progressbar(
+    count_overlay = LimitCounter(
         count_frame,
-        maximum=100,
-        variable=count_overlay,
+        maximum=512,
         length=50,
+        name='overlay',
+        # i18n: Progress bar description
+        blurb=gettext(
+            "Overlays are smaller images affixed to surfaces, like signs or "
+            "indicator lights. Hiding complex antlines or setting them to "
+            "signage will reduce this."
+        )
     )
-    UI['count_overlay'].grid(row=3, column=0, sticky='ew', padx=5)
+    count_overlay.bar.grid(row=3, column=0, sticky='ew', padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
         'icons/tool_sub',
-        refresh_counts,
+        lambda: refresh_counts(count_brush, count_entity, count_overlay),
     )
     UI['refresh_counts'].grid(row=3, column=1)
-    add_tooltip(UI['refresh_counts'],gettext(
+    add_tooltip(UI['refresh_counts'], gettext(
         "Refresh the compile progress bars. Press after a compile has been "
         "performed to show the new values."
     ))
@@ -702,19 +691,20 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         text=gettext('Brush'),
         anchor='center',
     ).grid(row=2, column=2, sticky=tk.EW)
-    UI['count_brush'] = ttk.Progressbar(
+    count_brush = LimitCounter(
         count_frame,
-        maximum=100,
-        variable=count_brush,
+        maximum=8192,
         length=50,
+        name='brush',
+        blurb=gettext(
+            "Brushes form the walls or other parts of the test chamber. If this "
+            "is high, it may help to reduce the size of the map or remove "
+            "intricate shapes."
+        )
     )
-    UI['count_brush'].grid(row=3, column=2, sticky='ew', padx=5)
+    count_brush.bar.grid(row=3, column=2, sticky='ew', padx=5)
 
-    for wid_name in ('count_overlay', 'count_entity', 'count_brush'):
-        # Add in tooltip logic to the widgets.
-        add_tooltip(UI[wid_name])
-
-    refresh_counts(reload=False)
+    refresh_counts(count_brush, count_entity, count_overlay)
 
 
 async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -> None:
