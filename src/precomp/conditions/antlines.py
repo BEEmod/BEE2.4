@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Callable, Union
 import attrs
 
-from precomp import instanceLocs, connections, conditions, antlines, tiling
+from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
 from precomp.conditions import make_result
 from srctools import VMF, Property, Output, Vec, Entity, Angle, Matrix
@@ -33,6 +33,7 @@ NAME_BEAM_CONN: Callable[[str, int], str] = '{}-fx_b_conn_{}'.format
 NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
 
 
+# The corner offset in the model for each timer delay value. This starts at delay=3.
 CORNER_POS = [
     Vec(8.0, 56.0, -64.0),
     Vec(8.0, 40.0, -64.0),
@@ -43,6 +44,7 @@ CORNER_POS = [
     Vec(-8.0, 24.0, -64.0),
     Vec(-8.0, 8.0, -64.0),
 ]
+
 
 class NodeType(Enum):
     """Handle our two types of item."""
@@ -188,7 +190,7 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
     cable_conf = res.find_key('CableKeys', or_blank=True)
 
     if beam_conf:
-        # Grab a copy of the beam spawnflags so we can set our own options.
+        # Grab a copy of the beam spawnflags, so we can set our own options.
         conf_beam_flags = beam_conf.int('spawnflags')
         # Mask out certain flags.
         conf_beam_flags &= (
@@ -281,7 +283,7 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                 group.links.add(frozenset({node, neigh_node}))
 
             # If we have a real output, we need to transfer it.
-            # Otherwise we can just destroy it.
+            # Otherwise, we can just destroy it.
             if has_output:
                 node.item.transfer_antlines(group.item)
             else:
@@ -418,7 +420,7 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                 node.inst.remove()
                 # Figure out whether we want a corner at this point, or
                 # just a regular dot. If a non-node input was provided it's
-                # always a corner. Otherwise it's one if there's an L, T or X
+                # always a corner. Otherwise, it's one if there's an L, T or X
                 # junction.
                 use_corner = True
                 norm = node.orient.up().as_tuple()
@@ -527,7 +529,7 @@ def build_cables(
     """Place Old-Aperture style cabling."""
     # We have a couple different situations to deal with here.
     # Either end could Not exist, be Unlinked, or be Linked = 8 combos.
-    # Always flip so we do A to B.
+    # We may want to flip to ensure we always are connecting A to B.
     # AB |
     # NN | Make 2 new ones, one is an endpoint.
     # NU | Flip, do UN.
@@ -562,7 +564,7 @@ def build_cables(
         if state_a is not RopeState.UNLINKED:
             rope_a = vmf.create_ent('move_rope')
             for prop in beam_conf:
-                rope_a[prop.name] = node_a.inst.fixup.substitute(node_a.inst, prop.value)
+                rope_a[prop.name] = node_a.inst.fixup.substitute(prop.value)
             rope_a['origin'] = pos_a
             rope_ind += 1
             rope_a['targetname'] = NAME_CABLE(base_name, rope_ind)
@@ -586,7 +588,7 @@ def build_cables(
             assert isinstance(ent_b, Entity)
             name_b = ent_b['targetname']
         else:  # Linked, we just have the name.
-            name_b = ent_b
+            name_b = ent_b['targetname'] if isinstance(ent_b, Entity) else ent_b
 
         # By here, rope_a should be an unlinked rope,
         # and name_b should be a name to link to.
