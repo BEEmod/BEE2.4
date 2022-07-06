@@ -294,6 +294,8 @@ class Game:
     root: str
     # The last modified date of packages, so we know whether to copy it over.
     mod_times: dict[str, int] = attrs.Factory(dict)
+    # The style last exported to the game.
+    exported_style: Optional[str] = None
 
     @classmethod
     def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
@@ -309,13 +311,15 @@ class Game:
         if not os.path.exists(folder):
             raise ValueError(f'Folder {folder} does not exist for game {gm_id}!')
 
+        exp_style = config.get_val(gm_id, 'exported_style', '') or None
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
             if name.startswith('pack_mod_'):
                 mod_times[name[9:].casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_times)
+        return cls(gm_id, steam_id, folder, mod_times, exp_style)
 
     def save(self) -> None:
         """Write a game into the config page."""
@@ -323,6 +327,8 @@ class Game:
         CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
+        if self.exported_style is not None:
+            CONFIG[self.name]['exported_style'] = self.exported_style
         for pack, mod_time in self.mod_times.items():
             CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
@@ -904,6 +910,9 @@ class Game:
                 with loc.open('wb') as f1:
                     f1.write(data)
 
+            self.exported_style = style.id
+            save()
+
             if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
                 os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
                 with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f2:
@@ -1260,26 +1269,24 @@ def make_tag_coop_inst(tag_loc: str):
     )
 
 
-def save():
+def save() -> None:
     for gm in all_games:
         gm.save()
     CONFIG.save_check()
 
 
-def load():
+def load() -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
         if gm != 'DEFAULT':
             try:
-                new_game = Game.parse(
-                    gm,
-                    CONFIG,
-                )
+                new_game = Game.parse(gm, CONFIG)
             except ValueError:
                 LOGGER.warning("Can't parse game: ", exc_info=True)
                 continue
             all_games.append(new_game)
+            LOGGER.info('Load game: {}', new_game)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen.main_loader.suppress()
@@ -1355,7 +1362,7 @@ def add_game(e=None, refresh_menu=True):
             else:
                 break
 
-        new_game = Game(name, gm_id, folder, {})
+        new_game = Game(name, gm_id, folder)
         all_games.append(new_game)
         if refresh_menu:
             add_menu_opts(game_menu)
