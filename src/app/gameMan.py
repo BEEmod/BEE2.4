@@ -6,10 +6,10 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
-from typing import Optional, Union, Any, Type, IO
+from typing import Optional, Union, Any, Type, IO, Iterable, Iterator
 from pathlib import Path
-from collections.abc import Iterable, Iterator
 
+import attrs
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -287,19 +287,13 @@ def should_backup_app(file: str) -> bool:
         return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
 
 
+@attrs.define(eq=False)
 class Game:
-    def __init__(
-        self,
-        name: str,
-        steam_id: str,
-        folder: str,
-        mod_times: dict[str, int],
-    ) -> None:
-        self.name = name
-        self.steamID = steam_id
-        self.root = folder
-        # The last modified date of packages, so we know whether to copy it over.
-        self.mod_times = mod_times
+    name: str
+    steamID: str
+    root: str
+    # The last modified date of packages, so we know whether to copy it over.
+    mod_times: dict[str, int] = attrs.Factory(dict)
 
     @classmethod
     def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
