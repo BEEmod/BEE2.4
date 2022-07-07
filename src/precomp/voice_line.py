@@ -1,7 +1,7 @@
 """Adds voicelines dynamically into the map."""
 import itertools
 from decimal import Decimal
-from typing import List, Set, NamedTuple, Iterator
+from typing import List, Optional, Set, NamedTuple, Iterator
 
 import srctools.logger
 import vbsp
@@ -176,7 +176,7 @@ def find_group_quotes(
 
         if poss_quotes:
             yield PossibleQuote(
-                quote['priority', '0'],
+                quote.int('priority'),
                 poss_quotes,
             )
 
@@ -261,10 +261,10 @@ def add_quote(
     LOGGER.info('Adding quote: {}', quote)
 
     only_once = atomic = False
-    cc_emit_name = None
-    start_ents = []  # type: List[Entity]
-    end_commands = []
-    start_names = []
+    cc_emit_name: Optional[str] = None
+    start_ents: List[Entity] = []
+    end_commands: List[Output] = []
+    start_names: List[str] = []
 
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
@@ -454,7 +454,7 @@ def add_voice(
     norm_config = ConfigFile('bee2/voice.cfg', in_conf_folder=False)
     mid_config = ConfigFile('bee2/mid_voice.cfg', in_conf_folder=False)
 
-    quote_base = QUOTE_DATA['base', False]
+    quote_base = QUOTE_DATA['base', '']
     quote_loc = get_studio_loc()
     if quote_base:
         LOGGER.info('Adding Base instance!')

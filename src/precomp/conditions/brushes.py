@@ -1056,9 +1056,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         })
 
     tiles_to_uv: dict[tiling.TileDef, set[tuple[int, int]]] = defaultdict(set)
-    for pos in points:
+    for pos in map(Vec, points):
         try:
-            tile, u, v = tiling.find_tile(Vec(pos), normal, force=create)
+            tile, u, v = tiling.find_tile(pos, normal, force=create)
         except KeyError:
             continue
         tiles_to_uv[tile].add((u, v))
@@ -1289,5 +1289,5 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         start_tile.bullseye_count = 0
         # Then transfer the targets across.
         for plate in faithplate.PLATES.values():
-            if getattr(plate, 'target', None) is start_tile:
+            if not isinstance(plate, faithplate.StraightPlate) and plate.target is start_tile:
                 plate.target = end_tile
