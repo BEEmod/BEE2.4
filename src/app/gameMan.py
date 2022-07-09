@@ -44,13 +44,6 @@ import utils
 import config
 
 
-try:
-    from importlib.resources import read_binary as imp_res_read_binary
-except ImportError:
-    # Backport module for before Python 3.7
-    from importlib_resources import read_binary as imp_res_read_binary
-
-
 LOGGER = srctools.logger.get_logger(__name__)
 
 all_games: list[Game] = []
@@ -84,7 +77,7 @@ _UNLOCK_ITEMS = [
 # Material file used for fizzler sides.
 # We use $decal because that ensures it's displayed over brushes,
 # if there's base slabs or the like.
-# We have to use SolidEnergy so it fades out with fizzlers.
+# We have to use SolidEnergy, so it fades out with fizzlers.
 FIZZLER_EDGE_MAT = '''\
 SolidEnergy
 {{

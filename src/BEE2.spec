@@ -139,7 +139,6 @@ EXCLUDES = [
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
-    'importlib_resources',  # 3.6 backport.
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
