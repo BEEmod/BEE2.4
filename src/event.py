@@ -23,7 +23,6 @@ import srctools.logger
 __all__ = ['EventManager', 'APP_EVENTS', 'ValueChange', 'ObsValue']
 LOGGER = srctools.logger.get_logger(__name__)
 ArgT = TypeVar('ArgT')
-CtxT = TypeVar('CtxT')
 ValueT = TypeVar('ValueT')
 Value2T = TypeVar('Value2T')
 NoneType: Type[None] = type(None)
@@ -36,18 +35,18 @@ class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
     args.
     """
     __slots__ = ['ctx', 'last_result', 'cur_calls']
-    ctx: Any
+    ctx: object
     last_result: ArgT
     cur_calls: int
 
-    def __init__(self, ctx: Any) -> None:
+    def __init__(self, ctx: object) -> None:
         super().__init__()
         self.ctx = ctx
         self.cur_calls = 0
         # Leave last_result unset as a sentinel.
 
 
-def _get_arg_type(arg_type: object) -> Type:
+def _get_arg_type(arg_type: object) -> type:
     """Given the arg type, pull out the actual type to key with."""
     if arg_type is None:  # Special case.
         return NoneType
@@ -71,19 +70,19 @@ class EventManager:
 
     @overload
     def register(
-        self, ctx: CtxT,
+        self, ctx: object,
         arg_type: None,
         func: Callable[[None], Awaitable[Any]],
     ) -> None: ...
     @overload
     def register(
-        self, ctx: CtxT,
+        self, ctx: object,
         arg_type: Type[ArgT],
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None: ...
     def register(
         self,
-        ctx: CtxT,
+        ctx: object,
         arg_type: Optional[Type[ArgT]],
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None:
@@ -104,19 +103,19 @@ class EventManager:
 
     @overload
     async def register_and_prime(
-        self, ctx: CtxT,
+        self, ctx: object,
         arg_type: None,
         func: Callable[[None], Awaitable[Any]],
     ) -> None: ...
     @overload
     async def register_and_prime(
-        self, ctx: CtxT,
+        self, ctx: object,
         arg_type: Type[ArgT],
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None: ...
     async def register_and_prime(
         self,
-        ctx: CtxT,
+        ctx: object,
         arg_type: Optional[Type[ArgT]],
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None:
@@ -134,7 +133,7 @@ class EventManager:
         else:
             await func(last_val)
 
-    async def __call__(self, ctx: CtxT, arg: ArgT=None) -> None:
+    async def __call__(self, ctx: object, arg: ArgT=None) -> None:
         """Run the specified event.
 
         This is re-entrant - if called whilst the same event is already being
@@ -168,19 +167,19 @@ class EventManager:
 
     @overload
     def unregister(
-        self, ctx: CtxT,
+        self, ctx: object,
         arg_type: None,
         func: Callable[[None], Awaitable[Any]],
     ) -> None: ...
     @overload
     def unregister(
-        self, ctx: CtxT,
+        self, ctx: object,
         arg_type: Type[ArgT],
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None: ...
     def unregister(
         self,
-        ctx: CtxT,
+        ctx: object,
         arg_type: Optional[Type[ArgT]],
         func: Callable[[ArgT], Awaitable[Any]],
     ) -> None:
