@@ -1,5 +1,4 @@
 import tkinter
-from tkinter.constants import *
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
 
@@ -132,7 +131,7 @@ class tkRichText(tkinter.Text):
         self._link_commands.clear()
 
         self['state'] = "normal"
-        self.delete(1.0, END)
+        self.delete(1.0, 'end')
 
         # Basic mode, insert just blocks of text.
         if isinstance(text_data, str):

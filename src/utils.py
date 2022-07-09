@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 import copyreg
 from typing import (
-    TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING,
+    TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
     SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
     KeysView, ValuesView, ItemsView,
 )
@@ -182,7 +182,7 @@ S = Angle(yaw=270)
 E = Angle(yaw=0)
 W = Angle(yaw=180)
 # Lookup values for joining things together.
-CONN_LOOKUP = {
+CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
     #N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),

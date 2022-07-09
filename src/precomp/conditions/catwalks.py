@@ -5,14 +5,15 @@ from typing import Optional, Dict, Tuple, Mapping
 
 import attrs
 from srctools import Angle, Vec, Property, VMF
-import srctools.logger
+from srctools.logger import get_logger
+import srctools
 
 from precomp import brushLoc, instanceLocs, conditions
 from precomp.connections import ITEMS
 import utils
 
 COND_MOD_NAME = None
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.catwalks')
+LOGGER = get_logger(__name__, alias='cond.catwalks')
 
 
 class Instances(Enum):

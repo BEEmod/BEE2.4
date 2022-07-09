@@ -8,7 +8,7 @@ import logging
 from typing import Callable, Optional, Dict, Tuple, List
 
 from tkinter import ttk
-from tkinter.font import Font
+from tkinter.font import Font, families as tk_font_families
 from app import img, TK_ROOT, tk_tools
 import tkinter as tk
 import multiprocessing.connection
@@ -89,7 +89,7 @@ class BaseLoadScreen:
         self.win.bind('<B1-Motion>', self.move_motion)
         self.win.bind('<Escape>', self.cancel)
 
-    def cancel(self, event: tk.Event=None) -> None:
+    def cancel(self, event: Optional[tk.Event]=None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
         PIPE_SEND.send(('cancel', self.scr_id))
@@ -265,7 +265,7 @@ class SplashScreen(BaseLoadScreen):
 
         self.is_compact = True
 
-        all_fonts = set(tk.font.families())
+        all_fonts = set(tk_font_families())
 
         for font_family in all_fonts:
             # DIN is the font used by Portal 2's logo,
@@ -665,9 +665,10 @@ class LogWindow:
             name='level_selector',
             values=translations['level_text'],
             exportselection=False,
-            # On Mac this defaults to being way too wide!
-            width=15 if utils.MAC else None,
         )
+        # On Mac this defaults to being way too wide!
+        if utils.MAC:
+            self.level_selector['width'] = 15
         self.level_selector.state(['readonly'])  # Prevent directly typing in values
         self.level_selector.bind('<<ComboboxSelected>>', self.evt_set_level)
         self.level_selector.current(1)

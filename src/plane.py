@@ -77,16 +77,16 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         cpy._data = copy.deepcopy(self._data, memodict)
         return cpy
 
-    def __getitem__(self, pos: tuple[int, int]) -> ValT:
+    def __getitem__(self, pos: tuple[float, float]) -> ValT:
         """Return the value at a given position."""
         return self.get(pos, self.default)
 
     @overload
-    def get(self, __key: tuple[int, int]) -> Optional[ValT]: ...
+    def get(self, __key: tuple[float, float]) -> Optional[ValT]: ...
     @overload
-    def get(self, __key: tuple[int, int], __default: ValT | DefaultT) -> ValT | DefaultT: ...
+    def get(self, __key: tuple[float, float], __default: ValT | DefaultT) -> ValT | DefaultT: ...
 
-    def get(self, pos: tuple[int, int], default: DefaultT = None) -> DefaultT | ValT | None:
+    def get(self, pos: tuple[float, float], default: DefaultT = None) -> DefaultT | ValT | None:
         """Return the value at a given position, or a default if not present."""
         try:
             x, y = map(int, pos)
@@ -113,7 +113,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                 return default
         return out
 
-    def __setitem__(self, pos: tuple[int, int], val: ValT) -> None:
+    def __setitem__(self, pos: tuple[float, float], val: ValT) -> None:
         """Set the value at the given position, resizing if required."""
         try:
             x, y = map(int, pos)
@@ -191,7 +191,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                 if data is not _UNSET:
                     yield (x, y)
 
-    def __delitem__(self, pos: Tuple[int, int]) -> None:
+    def __delitem__(self, pos: Tuple[float, float]) -> None:
         """Remove the value at a given position, doing nothing if not set."""
         try:
             x, y = map(int, pos)

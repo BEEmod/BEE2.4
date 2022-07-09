@@ -90,4 +90,5 @@ def rebuild_database() -> None:
                     word_set.add((item.id, subtype_ind))
 
     LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
-    _type_cback()
+    if _type_cback is not None:
+        _type_cback()

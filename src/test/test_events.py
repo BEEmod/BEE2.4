@@ -213,7 +213,7 @@ def test_valuechange_hash() -> None:
 async def test_obsval_getset() -> None:
     """Check getting/setting functions normally, unrelated to events."""
     man = EventManager()
-    holder: ObsValue = ObsValue(man, 45)
+    holder: ObsValue[object] = ObsValue(man, 45)
     assert holder.value == 45
 
     await holder.set(32)
@@ -230,7 +230,7 @@ async def test_obsval_getset() -> None:
 async def test_obsval_fires() -> None:
     """Check an event fires whenever the value changes."""
     man = EventManager()
-    holder: ObsValue = ObsValue(man, 0)
+    holder: ObsValue[object] = ObsValue(man, 0)
     func1 = create_autospec(event_func)
     man.register(holder, ValueChange, func1)
     func1.assert_not_awaited()
@@ -282,7 +282,7 @@ async def test_obsvalue_set_during_event() -> None:
 async def test_obsval_repr() -> None:
     """Test the repr() of ObsValue."""
     man = EventManager()
-    holder: ObsValue = ObsValue(man, 0)
+    holder: ObsValue[object] = ObsValue(man, 0)
     assert repr(holder) == f'ObsValue({man!r}, 0)'
 
     await holder.set([1, 2, 3])

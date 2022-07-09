@@ -4,7 +4,7 @@ from srctools import Property
 from srctools.dmx import Element
 from tkinter import ttk
 import tkinter as tk
-from typing import Optional, List, Sequence
+from typing import Awaitable, Optional, List, Sequence, Callable
 from typing_extensions import TypeAlias, Final
 
 import srctools.logger
@@ -263,7 +263,7 @@ class Selector:
             fill='black',
         )
 
-        reflow = self.reflow  # Avoid making self a cell var.
+        reflow: Callable[[], Awaitable[object]] = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
         self.header_sel = tk_tools.LineHeader(self.canvas, gettext('Selected:'))

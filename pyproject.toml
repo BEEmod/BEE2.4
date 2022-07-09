@@ -1,0 +1,13 @@
+[tool.pyright]
+include = [
+	"src/",
+    "hammeraddons/src/",
+	]
+exclude = [
+	"**/__pycache__"
+	]
+stubPath = "src/"   # Use our module for stubs.
+# We want to do conversions when setting.
+reportPropertyTypeMismatch = false
+pythonVersion = "3.8"
+strictParameterNoneValue = false

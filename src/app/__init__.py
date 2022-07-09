@@ -33,14 +33,14 @@ del _run_main_loop
 def tk_error(
     exc_type: Type[BaseException],
     exc_value: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: Optional[TracebackType],
 ) -> None:
     """Log TK errors."""
     # The exception is caught inside the TK code.
     # We don't care about that, so try and move the traceback up
     # one level.
     import logging
-    if exc_tb.tb_next:
+    if exc_tb is not None and exc_tb.tb_next:
         exc_tb = exc_tb.tb_next
 
     logger = logging.getLogger('BEE2')

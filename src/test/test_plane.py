@@ -34,7 +34,7 @@ def test_insertion(dx, dy) -> None:
         for y in range(min_y-1, max_y+2):
             if (x, y) not in expected:
                 with pytest.raises(KeyError):
-                    _ = plane[x, y]
+                    _ = plane[x, y]  # type: ignore
                 assert plane.get((x, y), 'hi') == 'hi'
 
 
@@ -154,36 +154,36 @@ def test_illegal_positions() -> None:
     plane[1, 2] = 5
     assert plane[1.0, 2.0] == 5
     with pytest.raises(KeyError):
-        _ = plane[45, 9, 2]
+        _ = plane[45, 9, 2]  # type: ignore
     with pytest.raises(KeyError):
-        _ = plane[45]
+        _ = plane[45]  # type: ignore
     with pytest.raises(KeyError):
-        _ = plane["blah", 9]
+        _ = plane["blah", 9]  # type: ignore
     with pytest.raises(KeyError):
-        _ = plane[9, "blah"]
+        _ = plane[9, "blah"]  # type: ignore
     with pytest.raises(KeyError):
-        _ = plane[2, 8]
+        _ = plane[2, 8]  # type: ignore
 
     assert plane.get((2, 8)) is None
     assert plane.get((2, 8), 45) == 45
 
     with pytest.raises(KeyError):
-        plane[45, 9, 2] = object
+        plane[45, 9, 2] = object  # type: ignore
     with pytest.raises(KeyError):
-        plane[45] = object
+        plane[45] = object  # type: ignore
     with pytest.raises(KeyError):
-        plane["blah", 9] = object
+        plane["blah", 9] = object  # type: ignore
     with pytest.raises(KeyError):
-        plane[9, "blah"] = object
+        plane[9, "blah"] = object  # type: ignore
 
     with pytest.raises(KeyError):
-        del plane[45, 9, 2]
+        del plane[45, 9, 2]  # type: ignore
     with pytest.raises(KeyError):
-        del plane[45]
+        del plane[45]  # type: ignore
     with pytest.raises(KeyError):
-        del plane["blah", 9]
+        del plane["blah", 9]  # type: ignore
     with pytest.raises(KeyError):
-        del plane[9, "blah"]
+        del plane[9, "blah"]  # type: ignore
 
 
 def test_deletion() -> None:
@@ -222,5 +222,5 @@ def test_defaults() -> None:
             if x == 2 and y == 5:
                 continue
             with pytest.raises(KeyError):
-                _ = plane_req[x, y]
+                _ = plane_req[x, y]  # type: ignore
             assert plane_opt[x, y] == 45

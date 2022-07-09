@@ -153,7 +153,7 @@ def _load_file(
     fsys: FileSystem,
     uri: utils.PackagePath,
     width: int, height: int,
-    resize_algo: int,
+    resize_algo: Literal[0, 1, 2, 3, 4, 5],
     check_other_packages: bool=False,
 ) -> Image.Image:
     """Load an image from a filesystem."""
@@ -873,7 +873,7 @@ def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
     return widget
 
 
-def get_app_icon(path: str):
+def get_app_icon(path: str) -> ImageTk.PhotoImage:
     """On non-Windows, retrieve the application icon."""
     with open(path, 'rb') as f:
         return ImageTk.PhotoImage(Image.open(f))
@@ -885,7 +885,7 @@ def make_splash_screen(
     base_height: int,
     text1_bbox: tuple[int, int, int, int],
     text2_bbox: tuple[int, int, int, int],
-) -> tuple[tk.PhotoImage, int, int]:
+) -> tuple[ImageTk.PhotoImage, int, int]:
     """Create the splash screen image.
 
     This uses a random screenshot from the splash_screens directory.

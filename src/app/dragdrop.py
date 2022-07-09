@@ -175,7 +175,7 @@ class Manager(Generic[ItemT]):
         *,
         size: Tuple[int, int]=(64, 64),
         config_icon: bool=False,
-        pick_flexi_group: Callable[[int, int], Optional[str]]=None,
+        pick_flexi_group: Optional[Callable[[int, int], Optional[str]]]=None,
     ):
         """Create a group of drag-drop slots.
 
@@ -267,7 +267,7 @@ class Manager(Generic[ItemT]):
             - label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        if not self._pick_flexi_group:
+        if self._pick_flexi_group is None:
             raise ValueError('Flexi callback missing!')
         slot: Slot[ItemT] = Slot(self, parent, SlotType.FLEXI, label)
         self._slots.append(slot)
@@ -479,6 +479,7 @@ class Manager(Generic[ItemT]):
         dest = self._pos_slot(evt.x_root, evt.y_root)
 
         if dest is self._cur_slot:
+            assert dest is not None
             # Dropped on itself, fire special event, put the item back.
             dest.contents = self._cur_drag
             background_run(self.event, Event.REDROPPED, dest)
@@ -490,9 +491,11 @@ class Manager(Generic[ItemT]):
 
         if self._cur_slot.is_flexi:
             # It's a flexi slot, lookup the group and drop.
+            if self._pick_flexi_group is None:
+                raise ValueError('No pick_flexi_group function!')
             group = self._pick_flexi_group(evt.x_root, evt.y_root)
             for slot in self._slots:
-                if slot.is_flexi and slot.contents is None:
+                if slot.is_flexi and slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
                     background_run(self.event, Event.MODIFIED)

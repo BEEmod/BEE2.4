@@ -18,6 +18,7 @@ from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 from BEE2_config import ConfigFile
 import utils
+import srctools
 import srctools.run
 import srctools.logger
 from precomp.collisions import Collisions
@@ -354,6 +355,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         return
 
     loc = options.get(Vec, 'global_ents_loc')
+    assert loc is not None
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -468,6 +470,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
         has['spawn_nogun'] = True
 
     ent_pos = options.get(Vec, 'global_pti_ents_loc')
+    assert ent_pos is not None
 
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
 
