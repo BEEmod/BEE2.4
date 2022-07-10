@@ -461,6 +461,13 @@ class Handle:
         else:
             return ImgColor._deduplicate(width, height, *color)
 
+    def overlay_text(self, text: str, size: int) -> ImgComposite:
+        """Add a text overlay to the corner."""
+        return ImgComposite.composite(
+            [self, ImgTextOverlay._deduplicate(self.width, self.height, text, size)],
+            self.width, self.height
+        )
+
     def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
         if self.allow_raw:
@@ -756,6 +763,39 @@ class ImgIcon(Handle):
     def resize(self, width: int, height: int) -> ImgIcon:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.icon_name)
+
+
+@attrs.define(eq=False)
+class ImgTextOverlay(Handle):
+    """A transparent image containing text in a corner, for overlaying."""
+    text: str
+    size: int
+    # TODO: If exposed, we might want to specify the quadrant to apply to
+
+    def _make_image(self) -> Image.Image:
+        """Construct an image with text in the lower-left."""
+        img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        font = get_pil_font(self.size)
+        bbox = draw.textbbox(
+            (0, self.height),
+            self.text,
+            font=font,
+            anchor='ld',
+        )
+        draw.rectangle(bbox, fill=PETI_ITEM_BG)
+        draw.text(
+            (0, self.height),
+            self.text,
+            font=font,
+            anchor='ld',
+            fill=(0, 0, 0, 255),
+        )
+        return img
+
+    def resize(self, width: int, height: int) -> ImgTextOverlay:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.text, self.size)
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
