@@ -1263,6 +1263,20 @@ def make_tag_coop_inst(tag_loc: str):
     )
 
 
+def app_in_game_error() -> None:
+    """Display a message warning about the issues with placing the BEE folder directly in P2."""
+    messagebox.showerror(
+        message=gettext(
+            "It appears that the BEE2 application was installed directly in a game directory. "
+            "The bee2/ folder name is used for exported resources, so this will cause issues.\n\n"
+            "Move the application folder elsewhere, then re-run."
+        ),
+        parent=TK_ROOT,
+        title='BEE2',
+    )
+    return None
+
+
 def save() -> None:
     for gm in all_games:
         gm.save()
