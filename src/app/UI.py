@@ -535,6 +535,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
             pass
         suggested_refresh()
 
+    # Defaults match Clean Style, if not found it uses the first item.
     skybox_win = SelectorWin(
         TK_ROOT,
         sky_list,
@@ -545,6 +546,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
             'of sky (seen in some items), the style of bottomless pit (if present), as well as '
             'color of "fog" (seen in larger chambers).'
         ),
+        default_id='BEE2_CLEAN',
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
@@ -565,6 +567,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
         ),
         has_none=True,
+        default_id='BEE2_GLADOS_CLEAN',
         none_desc=gettext('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
             'CHAR': [gettext('<Multiverse Cave only>')],
