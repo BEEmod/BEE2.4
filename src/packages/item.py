@@ -7,6 +7,7 @@ from __future__ import annotations
 import operator
 import re
 import copy
+from enum import Enum
 from typing import Iterable, Match, cast
 from pathlib import PurePosixPath as FSPath
 
@@ -32,6 +33,15 @@ LOGGER = logger.get_logger(__name__)
 
 # Finds names surrounded by %s
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
+
+
+class InheritKind(Enum):
+    """Defines how an item variant was specified for this item."""
+    DEFINED = 'defined'    # Specified directly
+    MODIFIED = 'modified'  # Modifies another definition
+    INHERIT = 'inherit'    # Inherited from a base style
+    UNSTYLED = 'unstyled'  # Fallback from elsewhere.
+    REUSED = 'reused'      # Reuses another style.
 
 
 @attrs.frozen
@@ -389,6 +399,7 @@ class Version:
     isolate: bool
     styles: dict[str, ItemVariant]
     def_style: ItemVariant
+    inherit_kind: dict[str, InheritKind]
 
     def __repr__(self) -> str:
         return f'<Version "{self.id}">'
@@ -451,6 +462,7 @@ class Item(PakObject, needs_foreground=True):
             ver_name = ver['name', 'Regular']
             ver_id = ver['ID', 'VER_DEFAULT']
             styles: dict[str, ItemVariant] = {}
+            inherit_kind: dict[str, InheritKind] = {}
             ver_isolate = ver.bool('isolated')
             def_style = None
 
@@ -463,6 +475,7 @@ class Item(PakObject, needs_foreground=True):
                         style=style['Base', ''],
                         config=style,
                     )
+                    inherit_kind[style.real_name] = InheritKind.MODIFIED
 
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
@@ -473,6 +486,7 @@ class Item(PakObject, needs_foreground=True):
                         folder=None,
                         config=None,
                     )
+                    inherit_kind[style.real_name] = InheritKind.REUSED
                 else:
                     # Reference to the actual folder...
                     folder = UnParsedItemVariant(
@@ -482,6 +496,7 @@ class Item(PakObject, needs_foreground=True):
                         style=None,
                         config=None,
                     )
+                    inherit_kind[style.real_name] = InheritKind.DEFINED
                 # We need to parse the folder now if set.
                 if folder.folder:
                     folders_to_parse.add(folder.folder)
@@ -504,6 +519,7 @@ class Item(PakObject, needs_foreground=True):
                 name=ver_name,
                 isolate=ver_isolate,
                 styles=styles,
+                inherit_kind=inherit_kind,
                 def_style=cast(ItemVariant, def_style),  # Temporary, will be fixed in setup_style_tree()
             )
 
@@ -582,11 +598,12 @@ class Item(PakObject, needs_foreground=True):
                 # We don't have that version!
                 self.versions[ver_id] = version
             else:
-                our_ver = self.versions[ver_id].styles
+                our_ver = self.versions[ver_id]
                 for sty_id, style in version.styles.items():
-                    if sty_id not in our_ver:
+                    if sty_id not in our_ver.styles:
                         # We don't have that style!
-                        our_ver[sty_id] = style
+                        our_ver.styles[sty_id] = style
+                        our_ver.inherit_kind[sty_id] = version.inherit_kind[sty_id]
                     else:
                         raise ValueError(
                             'Two definitions for item folder {}.{}.{}',
@@ -959,7 +976,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
     """
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
-    all_ver = list(item.versions.values())
+    all_ver: list[Version] = list(item.versions.values())
 
     # Move default version to the beginning, so it's read first.
     # that ensures it's got all styles set if we need to fallback.
@@ -1074,6 +1091,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                 if base_style.id in styles:
                     # Copy the values for the parent to the child style
                     styles[style.id] = styles[base_style.id]
+                    vers.inherit_kind[style.id] = InheritKind.INHERIT
                     # If requested, log this.
                     if not item.unstyled and config.get_cur_conf(config.GenOptions).log_item_fallbacks:
                         LOGGER.warning(
@@ -1088,7 +1106,8 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                         'Item "{}"{} using inappropriate style for "{}"!',
                         item.id, vers_desc, style.id,
                     )
-
+                # Unstyled elements allow inheriting anyway.
+                vers.inherit_kind[style.id] = InheritKind.INHERIT if item.unstyled else InheritKind.UNSTYLED
                 # If 'isolate versions' is set on the item,
                 # we never consult other versions for matching styles.
                 # There we just use our first style (Clean usually).
