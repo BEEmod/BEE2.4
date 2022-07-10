@@ -14,8 +14,9 @@ from tkinter import ttk
 import tkinter as tk
 import itertools
 import logging
+import functools
 
-from PIL import ImageTk, Image, ImageDraw
+from PIL import ImageFont, ImageTk, Image, ImageDraw
 import attrs
 import trio
 
@@ -871,6 +872,26 @@ def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
     else:  # Need to load.
         widget['image'] = img._request_load()
     return widget
+
+
+@functools.cache
+def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Find a nice font for drawing into images."""
+    for filename in [
+        'san fransisco.ttf',
+        'segoeui.ttf',
+        'lucida sans.ttf',
+        'helvetica neue.ttf',
+        'tahoma.ttf',
+        'ubuntu.ttf',
+    ]:
+        try:
+            return ImageFont.truetype(filename, size)
+        except IOError:
+            pass
+    else:
+        LOGGER.warning('Failed to find font, add more OS fonts!')
+        return ImageFont.load_default()
 
 
 def get_app_icon(path: str) -> ImageTk.PhotoImage:
