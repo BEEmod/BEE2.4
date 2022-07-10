@@ -48,6 +48,7 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
         'voiceline_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
+        'packfile_auto_enable': '1',
     },
     'Counts': {
         'brush': '0',
@@ -97,6 +98,7 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
 
 packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
+packfile_auto_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_auto_enable', True))
 
 # vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
 # Checks if vrad_force_full is defined, if it is, sets vrad_compile_type to true and
@@ -398,7 +400,7 @@ def set_screenshot(image: Image=None) -> None:
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def make_setter(section: str, config: str, variable: tk.Variable, state_var: str='') -> None:
+def make_setter(section: str, config: str, variable: tk.Variable) -> None:
     """Create a callback which sets the given config from a variable."""
     def callback(var_name: str, var_ind: str, cback_name: str) -> None:
         """Automatically called when the variable is written to."""
@@ -447,6 +449,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     These are generally things that are aesthetic, and to do with the file and
     compilation process.
     """
+    make_setter("General", "packfile_auto_enable", packfile_auto_enable)
     frame.columnconfigure(0, weight=1)
 
     thumb_frame = ttk.LabelFrame(
@@ -589,6 +592,18 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
 
     packfile_enable = ttk.Checkbutton(
         frame,
+        text=gettext('Enable packing'),
+        variable=packfile_auto_enable,
+    )
+    packfile_enable.grid(row=2, column=0, sticky='ew')
+    add_tooltip(packfile_enable, gettext(
+        "Disable automatically packing resources in the map. This can speed up building and allows "
+        "editing files and running reload commands, but can cause some resources to not work "
+        "correctly. Regardless of this setting, packing is enabled when publishing. "
+    ))
+
+    packfile_dump_enable_chk = ttk.Checkbutton(
+        frame,
         text=gettext('Dump packed files to:'),
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
@@ -596,9 +611,9 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
 
     packfile_frame = ttk.LabelFrame(
         frame,
-        labelwidget=packfile_enable,
+        labelwidget=packfile_dump_enable_chk,
     )
-    packfile_frame.grid(row=2, column=0, sticky='ew')
+    packfile_frame.grid(row=3, column=0, sticky='ew')
 
     UI['packfile_filefield'] = packfile_filefield = tk_tools.FileField(
         packfile_frame,
@@ -612,7 +627,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
 
     set_pack_dump_enabled()
 
-    add_tooltip(packfile_enable, gettext(
+    add_tooltip(packfile_dump_enable_chk, gettext(
         "When compiling, dump all files which were packed into the map. "
         "Useful if you're intending to edit maps in Hammer."
     ))

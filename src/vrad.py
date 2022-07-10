@@ -243,14 +243,18 @@ async def main(argv: List[str]) -> None:
     LOGGER.info('Run transformations...')
     await run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
-    LOGGER.info('Scanning map for files to pack:')
-    packlist.pack_from_bsp(bsp_file)
-    packlist.pack_fgd(bsp_file.ents, fgd)
-    packlist.eval_dependencies()
-    LOGGER.info('Done!')
+    enable_packing = not is_preview or config.getboolean("General", "packfile_auto_enable", True)
+    if enable_packing:
+        LOGGER.info('Scanning map for files to pack:')
+        packlist.pack_from_bsp(bsp_file)
+        packlist.pack_fgd(bsp_file.ents, fgd)
+        packlist.eval_dependencies()
+        LOGGER.info('Done!')
 
-    packlist.write_soundscript_manifest()
-    packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
+        packlist.write_soundscript_manifest()
+        packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
+    else:
+        LOGGER.warning('Packing disabled!')
 
     # We need to disallow Valve folders.
     pack_whitelist: set[FileSystem] = set()
@@ -276,7 +280,7 @@ async def main(argv: List[str]) -> None:
     else:
         dump_loc = None
 
-    if '-no_pack' not in args:
+    if '-no_pack' not in args and enable_packing:
         # Cubemap files packed into the map already.
         existing = set(bsp_file.pakfile.namelist())
 
