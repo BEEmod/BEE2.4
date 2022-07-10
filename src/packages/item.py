@@ -518,21 +518,22 @@ class Item(PakObject, needs_foreground=True):
             raise ValueError(f'Item "{data.id}" has no versions!')
 
         # Parse all the folders for an item.
-        parsed_folders: dict[str, ItemVariant] = {}
         async with trio.open_nursery() as nursery:
-            for folder in folders_to_parse:
-                nursery.start_soon(
-                    parse_item_folder,
-                    parsed_folders, folder, data.fsys, data.id, data.pak_id,
+            parsed_folders: dict[str, utils.Result[ItemVariant]] = {
+                folder: utils.Result(
+                    nursery, parse_item_folder,
+                    folder, data.fsys, data.id, data.pak_id,
                 )
+                for folder in folders_to_parse
+            }
 
         # We want to ensure the number of visible subtypes doesn't change.
         subtype_counts = {
             tuple([
-                i for i, subtype in enumerate(folder.editor.subtypes, 1)
+                i for i, subtype in enumerate(item_variant_result().editor.subtypes, 1)
                 if subtype.pal_pos or subtype.pal_name
             ])
-            for folder in parsed_folders.values()
+            for item_variant_result in parsed_folders.values()
         }
         if len(subtype_counts) > 1:
             raise ValueError(
@@ -544,12 +545,12 @@ class Item(PakObject, needs_foreground=True):
         for ver in versions.values():
             if isinstance(ver.def_style, str):
                 try:
-                    ver.def_style = parsed_folders[ver.def_style]
+                    ver.def_style = parsed_folders[ver.def_style]()
                 except KeyError:
                     pass
             for sty, fold in ver.styles.items():
                 if isinstance(fold, str):
-                    ver.styles[sty] = parsed_folders[fold]
+                    ver.styles[sty] = parsed_folders[fold]()
 
         return cls(
             data.id,
@@ -563,8 +564,8 @@ class Item(PakObject, needs_foreground=True):
             desc_last=desc_last,
             # Add filesystem to individualise this to the package.
             folders={
-                (data.fsys, folder): item_variant
-                for folder, item_variant in
+                (data.fsys, folder): item_variant_result()
+                for folder, item_variant_result in
                 parsed_folders.items()
             }
         )
@@ -781,16 +782,12 @@ class ItemConfig(PakObject, allow_mult=True):
 
 
 async def parse_item_folder(
-    folders: dict[str, ItemVariant],
     fold: str,
     filesystem: FileSystem,
     item_id: str,
     pak_id: str,
-) -> dict[str, ItemVariant]:
-    """Parse through the data in item/ folders.
-
-    folders is a dict, which we fill in ItemVariants as required.
-    """
+) -> ItemVariant:
+    """Parse through data in item/ folders, and return the result."""
     prop_path = f'items/{fold}/properties.txt'
     editor_path = f'items/{fold}/editoritems.txt'
     config_path = f'items/{fold}/vbsp_config.cfg'
@@ -858,16 +855,16 @@ async def parse_item_folder(
     except LookupError:
         all_icon = None
 
-    folders[fold] = ItemVariant(
+    # Add the folder the item definition comes from,
+    # so we can trace it later for debug messages.
+    source = f'<{pak_id}>/items/{fold}'
+
+    variant = ItemVariant(
         editoritems=first_item,
         editor_extra=extra_items,
 
-        # Add the folder the item definition comes from,
-        # so we can trace it later for debug messages.
-        source=f'<{pak_id}>/items/{fold}',
         pak_id=pak_id,
-        vbsp_config=lazy_conf.BLANK,
-
+        source=source,
         authors=sep_values(props['authors', '']),
         tags=sep_values(props['tags', '']),
         desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
@@ -884,9 +881,14 @@ async def parse_item_folder(
         },
         all_name=props['all_name', None],
         all_icon=all_icon,
+        vbsp_config=lazy_conf.from_file(
+            utils.PackagePath(pak_id, config_path),
+            missing_ok=True,
+            source=source,
+        ),
     )
 
-    if not folders[fold].ent_count and config.get_cur_conf(config.GenOptions).log_missing_ent_count:
+    if not variant.ent_count and config.get_cur_conf(config.GenOptions).log_missing_ent_count:
         LOGGER.warning(
             '"{}:{}" has missing entity count!',
             pak_id,
@@ -895,21 +897,16 @@ async def parse_item_folder(
 
     # If we have one of the grouping icon definitions but not both required
     # ones then notify the author.
-    has_name = folders[fold].all_name is not None
-    has_icon = folders[fold].all_icon is not None
-    if (has_name or has_icon or 'all' in folders[fold].icons) and (not has_name or not has_icon):
+    has_name = variant.all_name is not None
+    has_icon = variant.all_icon is not None
+    if (has_name or has_icon or 'all' in variant.icons) and (not has_name or not has_icon):
         LOGGER.warning(
             'Warning: "{}:{}" has incomplete grouping icon '
             'definition!',
             pak_id,
             prop_path,
         )
-    folders[fold].vbsp_config = lazy_conf.from_file(
-        utils.PackagePath(pak_id, config_path),
-        missing_ok=True,
-        source=folders[fold].source,
-    )
-    return folders
+    return variant
 
 
 def apply_replacements(conf: Property, item_id: str) -> Property:
