@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections import deque
 import copyreg
 from typing import (
-    TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
+    Awaitable, TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
     SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
     KeysView, ValuesView, ItemsView,
 )
+from typing_extensions import TypeVarTuple, Unpack
 import logging
 import os
 import stat
@@ -17,6 +18,7 @@ import zipfile
 from pathlib import Path
 from enum import Enum
 
+import trio
 from srctools import Angle
 
 
@@ -459,6 +461,60 @@ class PackagePath:
     def child(self, child: str) -> PackagePath:
         """Return a child file of this package."""
         return PackagePath(self.package, f'{self.path}/{child}')
+
+
+ResultT = TypeVar('ResultT')
+ArgsT = TypeVarTuple('ArgsT')
+_NO_RESULT: Any = object()
+
+
+class Result(Generic[ResultT]):
+    """Encasulates an async computation submitted to a nursery.
+
+    Once the nursery has closed, the result is accessible.
+    """
+    _checked_nursery = False
+    def __init__(
+        self,
+        nursery: trio.Nursery,
+        func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]],
+        /, *args: Unpack[ArgsT],
+        name: object = None,
+    ) -> None:
+        self._nursery: Optional[trio.Nursery] = nursery
+        self._result: ResultT = _NO_RESULT
+        nursery.start_soon(self._task, func, args, name=name or func)
+        if not self._checked_nursery:
+            # Double-check this exists.
+            assert hasattr(nursery, '_closed')
+            Result._checked_nursery = True
+
+    @classmethod
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        func: Callable[[Unpack[ArgsT]], ResultT],
+        /, *args: Unpack[ArgsT],
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[ResultT]':
+        """Wrap a sync task, using to_thread.run_sync()."""
+        async def task() -> ResultT:
+            """Run in a thread."""
+            return await trio.to_thread.run_sync(func, *args, cancellable=cancellable, limiter=limiter)
+
+        return Result(nursery, task, name=func)
+
+    async def _task(self, func: Callable[[Unpack[ArgsT]], ResultT], args: Tuple[Unpack[ArgsT]]) -> None:
+        """The task that is run."""
+        self._result = await func(*args)
+
+    def __call__(self) -> ResultT:
+        """Fetch the result. The nursery must be closed."""
+        if self._nursery is not None and not self._nursery._closed:
+            raise ValueError(f'Result cannot be fetched before nursery has closed!')
+        self._nursery = None  # The check passed, no need to keep this alive.
+        return self._result
 
 
 def get_indent(line: str) -> str:
