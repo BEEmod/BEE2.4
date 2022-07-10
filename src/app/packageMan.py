@@ -66,7 +66,7 @@ def apply_changes() -> None:
         window.withdraw()
         window.grab_release()
         for pack, item in pack_items:
-            if pack.id != packages.CLEAN_PACKAGE:
+            if pack.id.casefold() != packages.CLEAN_PACKAGE:
                 pack.enabled = item.state
         PACK_CONFIG.save_check()
         utils.restart_app()
