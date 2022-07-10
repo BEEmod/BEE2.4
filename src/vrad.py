@@ -147,12 +147,12 @@ async def main(argv: List[str]) -> None:
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
 
-    # If VBSP marked it as Hammer, trust that.
+    # Hard to determine if the map is PeTI or not, so use VBSP's stashed info.
     if srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_peti']):
         is_peti = True
-        # Detect preview via knowing the bsp name. If we are in preview,
-        # check the config file to see what was specified there.
-        if os.path.basename(path) == "preview.bsp":
+        # VBSP passed this along.
+        is_preview = srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_preview'])
+        if is_preview:
             # Checks what the light config was set to.
             light_args = config.get_val('General', 'vrad_compile_type', 'FAST')
             # If shift is held, reverse.
@@ -167,6 +167,7 @@ async def main(argv: List[str]) -> None:
             light_args = 'FULL'
     else:
         is_peti = False
+        is_preview = False
         light_args = 'FULL'
 
     if '-force_peti' in args or '-force_hammer' in args or '-skip_vrad' in args:
@@ -184,7 +185,7 @@ async def main(argv: List[str]) -> None:
             LOGGER.warning('OVERRIDE: VRAD will not run!')
             light_args = 'NONE'
 
-    LOGGER.info('Final status: is_peti={}, light_args={}', is_peti, light_args)
+    LOGGER.info('Map status: is_peti={}, is_preview={} light_args={}', is_peti, is_preview, light_args)
     if not is_peti:
         # Skip everything, if the user wants these features install the Hammer Addons postcompiler.
         LOGGER.info("Hammer map detected! Skipping all transforms.")
