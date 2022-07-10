@@ -5,7 +5,7 @@ from pathlib import Path
 import tkinter as tk
 import trio
 from tkinter import ttk, messagebox
-from typing import List, Tuple, Dict
+from typing import Callable, List, Optional, Tuple, Dict
 
 import attrs
 import srctools.logger
@@ -13,7 +13,7 @@ import srctools.logger
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
-    contextWin, gameMan, tk_tools, sound, logWindow, img,
+    contextWin, gameMan, tk_tools, sound, logWindow, img, UI,
 )
 from config import AfterExport
 from localisation import gettext
@@ -87,6 +87,7 @@ async def apply_config(conf: config.GenOptions) -> None:
     logWindow.HANDLER.set_visible(conf.show_log_win)
     loadScreen.set_force_ontop(conf.force_load_ontop)
     # We don't propagate compact splash, that isn't important after the UI loads.
+    UI.refresh_palette_icons()
 
 
 def clear_caches() -> None:
@@ -122,9 +123,11 @@ def clear_caches() -> None:
 def make_checkbox(
     frame: tk.Misc,
     name: str,
+    *,
     desc: str,
-    var: tk.BooleanVar=None,
+    var: tk.BooleanVar = None,
     tooltip='',
+    callback: Optional[Callable[[], object]] = None,
 ) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
 
@@ -136,10 +139,13 @@ def make_checkbox(
     if var is None:
         var = tk.BooleanVar(name=f'gen_opt_{name}')
     # Ensure it's a valid attribute.
-    assert name in config.GenOptions.__annotations__, config.GenOptions.__annotations__
+    assert name in config.GenOptions.__annotations__, list(config.GenOptions.__annotations__)
 
     VARS.append((name, var))
     widget = ttk.Checkbutton(frame, variable=var, text=desc)
+
+    if callback is not None:
+        widget['command'] = callback
 
     if tooltip:
         add_tooltip(widget, tooltip)
@@ -187,7 +193,6 @@ async def init_widgets() -> None:
         """Close the window, then reload from configs to rollback changes."""
         win.withdraw()
         load()
-
 
     ok_btn = ttk.Button(ok_cancel, text=gettext('OK'), command=ok)
     cancel_btn = ttk.Button(ok_cancel, text=gettext('Cancel'), command=cancel)
@@ -338,6 +343,15 @@ async def init_dev_tab(f: ttk.Frame) -> None:
             'for example). This is usually fine, but may need to be fixed.'
         ),
     ).grid(row=2, column=0, columnspan=2, sticky='W')
+
+    make_checkbox(
+        f, 'visualise_inheritance',
+        desc=gettext("Display item inheritance"),
+        tooltip=gettext(
+            'Add overlays to item icons to display which inherit from parent styles or '
+            'have no applicable style.'
+        ),
+    ).grid(row=3, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
         f, 'dev_mode',

@@ -506,6 +506,7 @@ class GenOptions(Data):
     log_missing_ent_count: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_missing_styles: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    visualise_inheritance: bool = False
     force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
 
     @classmethod
@@ -522,7 +523,12 @@ class GenOptions(Data):
 
         res = {}
         for field in gen_opts_bool:
-            section: str = field.metadata['legacy']
+            try:
+                section: str = field.metadata['legacy']
+            except KeyError:
+                # New field.
+                res[field.name] = field.default
+                continue
             try:
                 section, name = section.split(':')
             except ValueError:

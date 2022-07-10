@@ -18,15 +18,16 @@ from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
-from app import sound as snd
 import packages
-from app import img
-from app import itemconfig
+from packages.item import ItemVariant, InheritKind
 import utils
 import consts
 import config
 from localisation import gettext
 from app import (
+    img,
+    itemconfig,
+    sound as snd,
     tk_tools,
     SubPane,
     voiceEditor,
@@ -104,6 +105,7 @@ class Item:
         'item',
         'def_data',
         'data',
+        'inherit_kind',
         'visual_subtypes',
         'authors',
         'id',
@@ -111,6 +113,8 @@ class Item:
         'pak_name',
         'names',
         ]
+    data: ItemVariant
+    inherit_kind: InheritKind
 
     def __init__(self, item: packages.Item) -> None:
         self.ver_list = sorted(item.versions.keys())
@@ -139,11 +143,13 @@ class Item:
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
 
-        self.data = item.versions[self.selected_ver].styles.get(selected_style, self.def_data)
+        self.load_data()
 
     def load_data(self) -> None:
         """Reload data from the item."""
-        self.data = self.item.versions[self.selected_ver].styles.get(selected_style, self.def_data)
+        vers = self.item.versions[self.selected_ver]
+        self.data = vers.styles.get(selected_style, self.def_data)
+        self.inherit_kind = vers.inherit_kind.get(selected_style, InheritKind.UNSTYLED)
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
@@ -166,12 +172,20 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
+        icon = self._get_raw_icon(subKey, allow_single, single_num)
+        if self.item.unstyled or not config.get_cur_conf(config.GenOptions).visualise_inheritance:
+            return icon
+        if self.inherit_kind is not InheritKind.DEFINED:
+            icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
+        return icon
+
+    def _get_raw_icon(self, subKey, allow_single: bool, single_num: int) -> img.Handle:
+        """Get the raw icon, which may be overlaid if required."""
         icons = self.data.icons
         num_picked = sum(
-            1 for item in
-            pal_picked if
             item.id == self.id
-            )
+            for item in pal_picked
+        )
         if allow_single and self.data.can_group() and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
@@ -1387,6 +1401,12 @@ def set_game(game: 'gameMan.Game') -> None:
     EXPORT_CMD_VAR.set(text)
 
 
+def refresh_palette_icons() -> None:
+    """Refresh all displayed palette icons."""
+    for pal_item in itertools.chain(pal_picked, pal_items):
+        pal_item.load_data()
+
+
 def init_menu_bar(win: Union[tk.Tk, tk.Toplevel], export: Callable[[], None]) -> Tuple[tk.Menu, tk.Menu]:
     """Create the top menu bar.
 
@@ -1729,9 +1749,9 @@ async def init_windows() -> None:
         selected_style = style_id
 
         style_obj = current_style()
-
-        for item in itertools.chain(item_list.values(), pal_picked, pal_items):
-            item.load_data()  # Refresh everything
+        for item in item_list.values():
+            item.load_data()
+        refresh_palette_icons()
 
         # Update variant selectors on the itemconfig pane
         for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
