@@ -506,7 +506,6 @@ class GenOptions(Data):
     log_missing_ent_count: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_missing_styles: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
-    log_incorrect_packfile: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
 
     @classmethod

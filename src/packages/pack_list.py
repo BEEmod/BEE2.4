@@ -25,10 +25,8 @@ class PackList(PakObject, allow_mult=True):
 
         if 'AddIfMat' in data.info:
             LOGGER.warning(
-                '{}:{}: AddIfMat is no '
-                'longer used.',
-                data.pak_id,
-                data.id,
+                '{}:{}: AddIfMat is no longer used.',
+                data.pak_id, data.id,
             )
 
         files = []
@@ -40,7 +38,7 @@ class PackList(PakObject, allow_mult=True):
                 for prop in conf
             ]
         elif conf.value:
-            path = 'pack/' + conf.value + '.cfg'
+            path = f'pack/{conf.value}.cfg'
             with filesystem.open_str(path) as f:
                 # Each line is a file to pack.
                 # Skip blank lines, strip whitespace, and
@@ -52,31 +50,10 @@ class PackList(PakObject, allow_mult=True):
 
         # Deprecated old option.
         for prop in data.info.find_all('AddIfMat'):
-            files.append('materials/' + prop.value + '.vmt')
+            files.append(f'materials/{prop.value}.vmt')
 
         if not files:
-            raise ValueError('"{}" has no files to pack!'.format(data.id))
-
-        # Check to see if the zip contains the resources referred to by the packfile.
-        if config.get_cur_conf(config.GenOptions).log_incorrect_packfile:
-            # Use normpath so sep differences are ignored, plus case.
-            resources = {
-                os.path.normpath(file.path).casefold()
-                for file in
-                filesystem.walk_folder('resources/')
-            }
-            for file in files:
-                if file.startswith(('-#', 'precache_sound:')):
-                    # Used to disable stock soundscripts, and precache sounds
-                    # Not to pack - ignore.
-                    continue
-
-                file = file.lstrip('#')  # This means to put in soundscript too...
-
-                #  Check to make sure the files exist...
-                file = os.path.join('resources', os.path.normpath(file)).casefold()
-                if file not in resources:
-                    LOGGER.warning('Warning: "{}" not in zip! ({})', file, data.pak_id)
+            raise ValueError(f'"{data.id}" has no files to pack!')
 
         return cls(data.id, files)
 

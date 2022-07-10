@@ -340,16 +340,6 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=2, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
-        f, 'log_incorrect_packfile',
-        desc=gettext("Log missing packfile resources"),
-        tooltip=gettext(
-            'Log when the resources a "PackList" refers to are not '
-            'present in the zip. This may be fine (in a prerequisite zip), '
-            'but it often indicates an error.'
-        ),
-    ).grid(row=3, column=0, columnspan=2, sticky='W')
-
-    make_checkbox(
         f, 'dev_mode',
         var=DEV_MODE,
         desc=gettext("Development Mode"),
