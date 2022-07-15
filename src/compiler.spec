@@ -10,10 +10,17 @@ import sys
 workpath: str
 SPECPATH: str
 
-# Allow importing utils.
-sys.path.append(SPECPATH)
-import utils
+py_path = os.environ.get('PYTHONPATH').split(os.pathsep)
 
+# Allow finding/importing hammeraddons and utils.
+hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
+py_path.append(SPECPATH)
+py_path.append(str(hammeraddons / 'src'))
+
+sys.path.extend(py_path)
+os.environ['PYTHONPATH'] = os.pathsep.join(py_path)
+
+import utils
 if utils.MAC:
     suffix = '_osx'
 elif utils.LINUX:
@@ -21,18 +28,12 @@ elif utils.LINUX:
 else:
     suffix = ''
 
-hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
-sys.path.append(str(hammeraddons / 'src'))
-
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
     # This isn't ever used in the compiler.
     'tkinter',
-
-    # 3.6 backport
-    'importlib_resources',
 
     'win32api',
     'win32com',
@@ -56,7 +57,7 @@ INCLUDES = [
     'bisect', 'colorsys', 'collections', 'csv', 'datetime',
     'decimal', 'difflib', 'enum', 'fractions', 'functools',
     'io', 'itertools', 'json', 'math', 'random', 're',
-    'statistics', 'string', 'struct',
+    'statistics', 'string', 'struct', 'attrs', 'attr',
 ]
 INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 INCLUDES += collect_submodules('hammeraddons')
@@ -79,10 +80,6 @@ if utils.MAC or utils.LINUX:
 
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
-
-if sys.version_info >= (3, 7):
-    # Only needed on 3.6, it's in the stdlib thereafter.
-    EXCLUDES += ['importlib_resources']
 
 # Include the condition sub-modules that are dynamically imported.
 INCLUDES += [
