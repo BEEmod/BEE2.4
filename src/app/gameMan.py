@@ -1129,6 +1129,15 @@ class Game:
             for key in TRANS_DATA:
                 TRANS_DATA[key] = gettext(key)
 
+    def get_export_text(self) -> str:
+        """Return the text to use on export button labels."""
+        text = gettext('Export to "{}"...').format(self.name)
+
+        if self.cache_invalid():
+            # Mark that it needs extractions
+            text += ' *'
+        return text
+
 
 def find_steam_info(game_dir):
     """Determine the steam ID and game name of this folder, if it has one.

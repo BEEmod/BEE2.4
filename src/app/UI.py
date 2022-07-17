@@ -1391,12 +1391,7 @@ def set_game(game: 'gameMan.Game') -> None:
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     config.store_conf(config.LastSelected(game.name), 'game')
-    text = gettext('Export to "{}"...').format(game.name)
-
-    if game.cache_invalid():
-        # Mark that it needs extractions
-        text += ' *'
-
+    text = game.get_export_text()
     menus['file'].entryconfigure(EXPORT_BTN_POS, label=text)
     EXPORT_CMD_VAR.set(text)
 
