@@ -3,7 +3,6 @@ import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
 from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
-from typing_extensions import Final
 import itertools
 import operator
 import random
@@ -17,7 +16,6 @@ import loadScreen
 from app import TK_ROOT, background_run
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
 import packages
 from packages.item import ItemVariant, InheritKind
@@ -40,13 +38,14 @@ from app import (
     item_search,
     corridor_selector,
     optionWindow,
-    helpMenu,
     backup as backup_win,
     tooltip,
     signage_ui,
     paletteUI,
     music_conf,
 )
+from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
+from app.menu_bar import MenuBar
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -55,8 +54,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 windows: Dict[str, Any] = {}  # Toplevel | SubPane
 frames: Dict[str, Union[tk.Frame, ttk.Frame]] = {}
 UI: Dict[str, Any] = {}  # Various widgets.
-menus: Dict[str, tk.Menu] = {}
-EXPORT_BTN_POS: Final = 0  # Position of the export button.
 
 # These panes.
 skybox_win: 'SelectorWin[[]]'
@@ -710,13 +707,12 @@ def suggested_refresh() -> None:
             UI['suggested_style'].state(['!disabled'])
 
 
-def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
+def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
-    menus['file'].entryconfigure(EXPORT_BTN_POS, state='disabled')
+    bar.set_export_allowed(False)
     TK_ROOT.update_idletasks()
-    conf = config.get_cur_conf(config.GenOptions)
     try:
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
@@ -740,6 +736,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
             for it_id, section in
             item_opts.items()
         }
+        conf = config.get_cur_conf(config.GenOptions)
 
         success, vpk_success = gameMan.selected_game.export(
             style=chosen_style,
@@ -819,11 +816,11 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         pal_ui.select_palette(paletteUI.UUID_EXPORT)
         pal_ui.update_state()
 
-        # Re-set this, so we clear the '*' on buttons if extracting cache.
-        set_game(gameMan.selected_game)
+        # Re-fire this, so we clear the '*' on buttons if extracting cache.
+        background_run(gameMan.EVENT_BUS, None, gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
-        menus['file'].entryconfigure(EXPORT_BTN_POS, state='normal')
+        bar.set_export_allowed(True)
 
 
 def set_disp_name(item: PalItem, e=None) -> None:
@@ -1064,11 +1061,11 @@ def pal_shuffle() -> None:
     flow_preview()
 
 
-# UI functions, each accepts the parent frame to place everything in.
-# initMainWind generates the main frames that hold all the panes to
-# make it easy to move them around if needed
-
-async def init_option(pane: SubPane.SubPane, pal_ui: paletteUI.PaletteUI) -> None:
+async def init_option(
+    pane: SubPane.SubPane,
+    pal_ui: paletteUI.PaletteUI,
+    export: Callable[[], object],
+) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1094,11 +1091,7 @@ async def init_option(pane: SubPane.SubPane, pal_ui: paletteUI.PaletteUI) -> Non
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
-    UI['pal_export'] = ttk.Button(
-        frame,
-        textvariable=EXPORT_CMD_VAR,
-        command=functools.partial(export_editoritems, pal_ui),
-    )
+    UI['pal_export'] = ttk.Button(frame, textvariable=EXPORT_CMD_VAR, command=export)
     UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
@@ -1391,9 +1384,7 @@ def set_game(game: 'gameMan.Game') -> None:
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     config.store_conf(config.LastSelected(game.name), 'game')
-    text = game.get_export_text()
-    menus['file'].entryconfigure(EXPORT_BTN_POS, label=text)
-    EXPORT_CMD_VAR.set(text)
+    EXPORT_CMD_VAR.set(game.get_export_text())
 
 
 def refresh_palette_icons() -> None:
@@ -1402,93 +1393,25 @@ def refresh_palette_icons() -> None:
         pal_item.load_data()
 
 
-def init_menu_bar(win: Union[tk.Tk, tk.Toplevel], export: Callable[[], None]) -> Tuple[tk.Menu, tk.Menu]:
-    """Create the top menu bar.
-
-    This returns the View and palette menus, for later population.
-    """
-    bar = tk.Menu(win)
-    # Suppress ability to make each menu a separate window - weird old
-    # TK behaviour
-    win.option_add('*tearOff', '0')
-    if utils.MAC:
-        # Name is used to make this the special 'BEE2' menu item
-        file_menu = menus['file'] = tk.Menu(bar, name='apple')
-    else:
-        file_menu = menus['file'] = tk.Menu(bar)
-
-    bar.add_cascade(menu=file_menu, label=gettext('File'))
-
-    # Assign the bar as the main window's menu.
-    # Must be done after creating the apple menu.
-    win['menu'] = bar
-
-    file_menu.add_command(
-        label=gettext("Export"),
-        command=export,
-        accelerator=tk_tools.ACCEL_EXPORT,
-    )
-    # EXPORT_BTN_POS should be this button's position.
-    assert EXPORT_BTN_POS == file_menu.index('end'), file_menu.index('end')
-    file_menu.entryconfigure(EXPORT_BTN_POS, state='disabled')
-
-    file_menu.add_command(
-        label=gettext("Add Game"),
-        command=gameMan.add_game,
-    )
-    file_menu.add_command(
-        label=gettext("Uninstall from Selected Game"),
-        command=gameMan.remove_game,
-        )
-    file_menu.add_command(
-        label=gettext("Backup/Restore Puzzles..."),
-        command=backup_win.show_window,
-    )
-    file_menu.add_command(
-        label=gettext("Manage Packages..."),
-        command=packageMan.show,
-    )
-    file_menu.add_separator()
-    file_menu.add_command(
-        label=gettext("Options"),
-        command=optionWindow.show,
-    )
-    if not utils.MAC:
-        file_menu.add_command(
-            label=gettext("Quit"),
-            command=quit_application,
-            )
-    file_menu.add_separator()
-    # Add a set of options to pick the game into the menu system
-    gameMan.add_menu_opts(menus['file'], callback=set_game)
-    gameMan.game_menu = menus['file']
-
-    pal_menu = menus['pal'] = tk.Menu(bar)
-    # Menu name
-    bar.add_cascade(menu=pal_menu, label=gettext('Palette'))
-
-    view_menu = tk.Menu(bar)
-    bar.add_cascade(menu=view_menu, label=gettext('View'))
-
-    helpMenu.make_help_menu(bar)
-
-    return view_menu, pal_menu
-
-
 async def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    view_menu, pal_menu = init_menu_bar(TK_ROOT, export=lambda: export_editoritems(pal_ui))
+    def export() -> None:
+        """Export the palette, passing the required UI objects."""
+        export_editoritems(pal_ui, menu_bar)
+
+    menu_bar = MenuBar(
+        TK_ROOT,
+        quit_app=quit_application,
+        export=export,
+        set_game=set_game,
+    )
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
-        )
+    )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-
-    if utils.MAC:
-        # OS X has a special quit menu item.
-        TK_ROOT.createcommand('tk::mac::Quit', quit_application)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')
@@ -1583,7 +1506,7 @@ async def init_windows() -> None:
         TK_ROOT,
         title=gettext('Palettes'),
         name='pal',
-        menu_bar=view_menu,
+        menu_bar=menu_bar.view_menu,
         resize_x=True,
         resize_y=True,
         tool_frame=frames['toolMenu'],
@@ -1597,7 +1520,7 @@ async def init_windows() -> None:
     windows['pal'].rowconfigure(0, weight=1)
 
     pal_ui = paletteUI.PaletteUI(
-        pal_frame, pal_menu,
+        pal_frame, menu_bar.pal_menu,
         cmd_clear=pal_clear,
         cmd_shuffle=pal_shuffle,
         get_items=lambda: [(it.id, it.subKey) for it in pal_picked],
@@ -1606,7 +1529,7 @@ async def init_windows() -> None:
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save)
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as)
-    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui))
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui, menu_bar))
 
     await trio.sleep(0)
     loader.step('UI', 'palette')
@@ -1620,7 +1543,7 @@ async def init_windows() -> None:
         TK_ROOT,
         title=gettext('Export Options'),
         name='opt',
-        menu_bar=view_menu,
+        menu_bar=menu_bar.view_menu,
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img='icons/win_options',
@@ -1628,16 +1551,16 @@ async def init_windows() -> None:
     )
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(init_option, windows['opt'], pal_ui)
+        nurs.start_soon(init_option, windows['opt'], pal_ui, export)
     loader.step('UI', 'options')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], view_menu, flow_picker)
+        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, flow_picker)
     loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:
         corridor = corridor_selector.Selector(packages.LOADED)
-        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], view_menu, corridor)
+        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], menu_bar.view_menu, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)
     loader.step('UI', 'compiler')
@@ -1735,7 +1658,7 @@ async def init_windows() -> None:
         for cls in packages.OBJ_TYPES.values():
             await packages.LOADED.ready(cls).wait()
         UI['pal_export'].state(('!disabled',))
-        menus['file'].entryconfigure(EXPORT_BTN_POS, state='normal')
+        menu_bar.set_export_allowed(True)
 
     background_run(enable_export)
 
