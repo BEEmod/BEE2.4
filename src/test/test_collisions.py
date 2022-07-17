@@ -183,7 +183,7 @@ def test_reorder_helper() -> None:
     assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
-def get_intersect_testcases() -> list:
+def get_intersect_testcases() -> Iterable:
     """Use a VMF to make it easier to generate the bounding boxes."""
     with Path(__file__, '../bbox_samples.vmf').open() as f:
         vmf = VMF.parse(Property.parse(f))

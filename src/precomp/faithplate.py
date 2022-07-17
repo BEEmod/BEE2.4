@@ -118,20 +118,21 @@ def associate_faith_plates(vmf: VMF) -> None:
 
         # If the plate isn't on a tile (placed on goo for example),
         # use the direct position.
-        tile = Vec.from_str(targ['origin'])
+        tile_pos = Vec.from_str(targ['origin'])
 
         grid_pos: Vec = origin // 128 * 128 + 64
         norm = (origin - grid_pos).norm()
 
         # If we're on the floor above the top of goo, move down to the surface.
-        block_type = brushLoc.POS['world': tile - (0, 0, 64)]
+        block_type = brushLoc.POS['world': tile_pos - (0, 0, 64)]
         if block_type.is_goo and block_type.is_top:
-            tile.z -= 32
+            tile_pos.z -= 32
 
+        tile_or_pos: Union[Vec, tiling.TileDef] = tile_pos
         for norm in [norm, -norm]:
             # Try both directions.
             try:
-                tile = tiling.TILES[
+                tile_or_pos = tiling.TILES[
                     (origin - 64 * norm).as_tuple(),
                     norm.as_tuple(),
                 ]
@@ -139,9 +140,9 @@ def associate_faith_plates(vmf: VMF) -> None:
             except KeyError:
                 pass
 
-        # We don't need the entity anymore, we'll regenerate them later.
+        # We don't need the entity any more, we'll regenerate them later.
         targ.remove()
-        target_to_pos[name] = tile
+        target_to_pos[name] = tile_or_pos
 
     # Loop over instances, recording plates and moving targets into the tiledefs.
     instances: Dict[str, Entity] = {}

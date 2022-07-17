@@ -152,7 +152,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         elif y_ind >= y_bound:
             change = y_ind - y_bound + 1
             self._xoffs += [0] * change
-            self._data += [None] * change  # type: ignore # Mypy assumes list[None]
+            self._data += [None] * change
             y_ind = -1  # y_bound - 1, but list can compute that.
 
         # Now x.

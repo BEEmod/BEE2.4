@@ -45,7 +45,7 @@ def load_transforms() -> None:
     if utils.FROZEN:
         # We embedded a copy of all the transforms in this package, which auto-imports the others.
         # noinspection PyUnresolvedReferences
-        from postcomp import transforms
+        from postcomp import transforms  # type: ignore
         LOGGER.debug('Loading transforms from frozen package: {}', transforms)
     else:
         # We can just delegate to the regular postcompiler finder.

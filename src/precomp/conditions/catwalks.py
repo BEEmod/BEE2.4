@@ -84,14 +84,14 @@ class Link:
 
 class EmptyLink(Link):
     """Special case link, which is never placed. This ensures straight ends aren't placed on stairs."""
-    @property
-    def N(self) -> bool:
+    @property  # type: ignore
+    def N(self) -> bool:  # type: ignore
         """Always unset."""
         return False
-    @N.setter
-    def N(self, value: bool) -> None:
+    @N.setter  # type: ignore
+    def N(self, value: bool) -> None:  # type: ignore
         """Setting does nothing."""
-    S = E = W = N
+    S = E = W = N  # type: ignore
 
 
 EMPTY = EmptyLink()

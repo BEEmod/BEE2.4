@@ -389,15 +389,24 @@ def add_quote(
         elif name == 'atomic':
             atomic = srctools.conv_bool(prop.value)
         elif name == 'endcommand':
-            end_commands.append(Output(
-                'OnCompletion',
-                prop['target'],
-                prop['input'],
-                prop['parm', ''],
-                prop.float('delay'),
-                only_once=prop.bool('only_once'),
-                times=prop.int('times', -1),
-            ))
+            if prop.bool('only_once'):
+                end_commands.append(Output(
+                    'OnCompletion',
+                    prop['target'],
+                    prop['input'],
+                    prop['parm', ''],
+                    prop.float('delay'),
+                    only_once=True,
+                ))
+            else:
+                end_commands.append(Output(
+                    'OnCompletion',
+                    prop['target'],
+                    prop['input'],
+                    prop['parm', ''],
+                    prop.float('delay'),
+                    times=prop.int('times', -1),
+                ))
 
     if cc_emit_name:
         for ent in start_ents:

@@ -3,7 +3,7 @@
 This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
-from typing import Type, Sequence
+from typing import Mapping, Type, Sequence
 import urllib.parse
 import types
 import enum
@@ -40,10 +40,8 @@ class TextTag(str, enum.Enum):
     HRULE = 'hrule'
     LINK = 'link'
 
-    HEADINGS: dict[int, TextTag]
 
-# Assign outside class, so it's not an enum member.
-TextTag.HEADINGS = {
+TAG_HEADINGS: Mapping[int, TextTag] = {
     int(tag.name[-1]): tag
     for tag in TextTag
     if tag.value.startswith('heading_')
@@ -70,7 +68,7 @@ class Image(Block):
 
 _HR = [
     TextSegment('\n', (), None),
-    TextSegment('\n', ('hrule', ), None),
+    TextSegment('\n', (TextTag.HRULE, ), None),
     TextSegment('\n', (), None),
 ]
 # Unicode bullet characters, in order of use.
@@ -264,7 +262,7 @@ class TKRenderer(mistletoe.BaseRenderer):
 
     def render_heading(self, token: btok.Heading) -> MarkdownData:
         """Render a level 1-6 heading."""
-        return self._with_tag(token, TextTag.HEADINGS[token.level])
+        return self._with_tag(token, TAG_HEADINGS[token.level])
 
     def render_quote(self, token: btok.Quote) -> MarkdownData:
         """Render blockquotes."""

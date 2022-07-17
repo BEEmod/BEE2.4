@@ -48,6 +48,8 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
     # First, calculate the centers of all the cells.
     timer = 3
     cells = []
+    x: float
+    y: float
     for y, row_count in enumerate(COLORIZER_ROWS):
         y -= len(COLORIZER_ROWS) // 2
         for x, tim_val in enumerate(range(timer, timer + row_count)):

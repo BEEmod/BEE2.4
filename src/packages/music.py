@@ -49,6 +49,7 @@ class Music(PakObject, needs_foreground=True):
         sound = data.info.find_key('soundscript', or_blank=True)
 
         sounds: dict[MusicChannel, list[str]]
+        channel_snd: list[str]
         if sound.has_children():
             sounds = {}
             for channel in MusicChannel:

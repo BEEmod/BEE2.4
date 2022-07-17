@@ -629,9 +629,9 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     coll: list[CollisionDef] = []
     for ent in vmf.by_class['bee2_collision_bbox']:
-        visgroups = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
+        visgroup_set = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
         for bbox in collisions.BBox.from_ent(ent):
-            coll.append(CollisionDef(bbox, visgroups))
+            coll.append(CollisionDef(bbox, visgroup_set))
 
     return Template(
         temp_id=loc.id,
@@ -732,7 +732,7 @@ def import_template(
                 break
         else:
             dbg_visgroup = vmf.create_visgroup('Templates', (113, 113, 0))
-        dbg_group = EntityGroup(vmf, color=(113, 113, 0))
+        dbg_group = EntityGroup(vmf, color=Vec(113, 113, 0))
 
         def dbg_add(classname, **kwargs) -> None:
             """Add a marker to the map."""
@@ -906,7 +906,7 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
     except KeyError:
         pass
     temp = get_template(temp_name)
-    uvs = {}
+    uvs: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]] = {}
 
     for brush in temp.visgrouped_solids(over_names):
         for side in brush.sides:
@@ -998,7 +998,7 @@ def retexture_template(
 
     # For each face, if it needs to be forced to a colour, or None if not.
     # If a string it's forced to that string specifically.
-    force_colour_face: dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
+    force_colour_faces: dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
     # Picker names to their results.
     picker_results = template_data.picker_results
     picker_type_results: dict[str, Optional[TileType]] = {}
@@ -1080,17 +1080,17 @@ def retexture_template(
                     face_output=pattern,
                 )
 
-            for side in color_picker.sides:
-                if picker_patterned[side] is None and (u, v) in pattern:
-                    picker_patterned[side] = pattern[u, v]
+            for side_id in color_picker.sides:
+                if picker_patterned[side_id] is None and (u, v) in pattern:
+                    picker_patterned[side_id] = pattern[u, v]
         else:
             # Only do the highest priority successful one.
-            for side in color_picker.sides:
-                if force_colour_face[side] is None:
+            for side_id in color_picker.sides:
+                if force_colour_faces[side_id] is None:
                     if tile_color is tile_color.WHITE:
-                        force_colour_face[side] = color_picker.force_tex_white or tile_color
+                        force_colour_faces[side_id] = color_picker.force_tex_white or tile_color
                     else:
-                        force_colour_face[side] = color_picker.force_tex_black or tile_color
+                        force_colour_faces[side_id] = color_picker.force_tex_black or tile_color
 
         if color_picker.after is AfterPickMode.VOID:
             tiledef[u, v] = TileType.VOID
@@ -1339,11 +1339,12 @@ def retexture_template(
                     gen_type = generator
             # Otherwise, it's a panel wall or the like
 
-            if force_colour_face[orig_id] is not None:
-                tex_colour = force_colour_face[orig_id]
-                if isinstance(tex_colour, str):
-                    face.mat = tex_colour
+            force_colour_face = force_colour_faces[orig_id]
+            if force_colour_face is not None:
+                if isinstance(force_colour_face, str):
+                    face.mat = force_colour_face
                     continue
+                tex_colour = force_colour_face
             elif force_colour == 'INVERT':
                 # Invert the texture
                 tex_colour = ~tex_colour

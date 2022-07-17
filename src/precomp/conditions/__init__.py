@@ -846,6 +846,7 @@ def dump_conditions(file: TextIO) -> None:
         dump_func_docs(file, func)
         file.write('\n')
 
+    lookup: list[tuple[str, tuple[str, ...], CondCall]]
     for lookup, name in [
         (ALL_FLAGS, 'Flags'),
         (ALL_RESULTS, 'Results'),

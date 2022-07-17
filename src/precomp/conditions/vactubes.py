@@ -28,7 +28,7 @@ class Config:
     """Configuration for a vactube item set."""
     inst_corner: list[str]
     temp_corner: list[tuple[template_brush.Template | None, Iterable[str]]]
-    trig_radius: int
+    trig_radius: float
     inst_support: str  # Placed on each side with an adjacent wall.
     inst_support_ring: str  # If any support is placed, this is placed.
     inst_exit: str

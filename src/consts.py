@@ -52,12 +52,12 @@ class MaterialGroupMeta(EnumMeta):
     _value2member_map_: dict[str, Any]  # Enum defines.
 
     @classmethod
-    def __prepare__(mcs, cls: str, bases: tuple[type, ...], /, **kwargs: Any) -> Mapping[str, Any]:
+    def __prepare__(mcs, cls: str, bases: tuple[type, ...], /, **kwd: Any) -> Any:
         """Override Enum class-dict type.
 
         This makes string-values lowercase when set.
         """
-        namespace = super().__prepare__(cls, bases, **kwargs)
+        namespace = super().__prepare__(cls, bases, **kwd)
         return _MaterialGroupNS(cast(MutableMapping[str, Any], namespace))
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwds: Any) -> MaterialGroupMeta:

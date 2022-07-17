@@ -6,7 +6,7 @@ from random import Random
 
 def test_duplicate_insertion() -> None:
     """Test inserting values with the same bbox."""
-    tree = RTree()
+    tree: RTree[str] = RTree()
     tree.insert(Vec(10, 20, 30), Vec(40, 50, 60), 'value1')
     tree.insert(Vec(50, 20, 30), Vec(80, 65, 60), 'another')
     tree.insert(Vec(10, 20, 30), Vec(40, 50, 60), 'value2')
@@ -50,7 +50,7 @@ def test_bbox() -> None:
         )
         for _ in range(200)
     ]
-    tree = RTree()
+    tree: RTree[bytes] = RTree()
     for a, b, data in points:
         tree.insert(a, b, data)
 

@@ -59,10 +59,10 @@ menus: Dict[str, tk.Menu] = {}
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
 
 # These panes.
-skybox_win: SelectorWin[[]]
-voice_win: SelectorWin[[]]
-style_win: SelectorWin[[]]
-elev_win: SelectorWin[[]]
+skybox_win: 'SelectorWin[[]]'
+voice_win: 'SelectorWin[[]]'
+style_win: 'SelectorWin[[]]'
+elev_win: 'SelectorWin[[]]'
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []

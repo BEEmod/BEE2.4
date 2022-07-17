@@ -6,7 +6,7 @@ from typing import Union, Tuple, Dict, Callable
 import webbrowser
 
 from app import tkMarkdown
-from app.tkMarkdown import TextTag
+from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
 from localisation import gettext
 import srctools.logger
@@ -53,7 +53,7 @@ class tkRichText(tkinter.Text):
             self.heading_font[size] = font = self.font.copy()
             cur_size /= 0.8735
             font.configure(weight='bold', size=round(cur_size))
-            self.tag_config(TextTag.HEADINGS[size], font=font)
+            self.tag_config(TAG_HEADINGS[size], font=font)
 
         self.tag_config(TextTag.UNDERLINE, underline=True)
         self.tag_config(TextTag.BOLD, font=self.bold_font)

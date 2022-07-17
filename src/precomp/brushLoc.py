@@ -134,9 +134,9 @@ def _conv_key(pos: _grid_keys) -> tuple[float, float, float]:
     if isinstance(pos, slice):
         system, slice_pos = pos.start, pos.stop
         if system == 'world':
-            return tuple(world_to_grid(Vec(slice_pos)))
+            return world_to_grid(Vec(slice_pos)).as_tuple()
         else:
-            return tuple(slice_pos)
+            return slice_pos.as_tuple()
     x, y, z = pos
     return x, y, z
 
@@ -146,7 +146,8 @@ class _GridItemsView(ItemsView[Vec, Block]):
     # Initialised by superclass.
     _mapping: dict[tuple[float, float, float], Block]
     def __init__(self, grid: dict[tuple[float, float, float], Block]):
-        super().__init__(grid)
+        # Superclass typehints as expecting Mapping[Vec, Block], but we override everything.
+        super().__init__(grid)  # type: ignore
 
     def __contains__(self, item: Any) -> bool:
         pos, block = item
@@ -222,6 +223,10 @@ class Grid(MutableMapping[_grid_keys, Block]):
     ) -> Vec:
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
+
+    def lookup_world(self, pos: Iterable[float]) -> Block:
+        """Lookup a world position."""
+        return self._grid.get(tuple(world_to_grid(Vec(pos))), Block.VOID)
 
     def __getitem__(self, pos: _grid_keys) -> Block:
         return self._grid.get(_conv_key(pos), Block.VOID)

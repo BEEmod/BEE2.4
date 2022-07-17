@@ -461,7 +461,7 @@ class Handle:
         else:
             return ImgColor._deduplicate(width, height, *color)
 
-    def overlay_text(self, text: str, size: int) -> ImgComposite:
+    def overlay_text(self, text: str, size: int) -> Handle:
         """Add a text overlay to the corner."""
         return ImgComposite.composite(
             [self, ImgTextOverlay._deduplicate(self.width, self.height, text, size)],
