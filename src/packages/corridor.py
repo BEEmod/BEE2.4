@@ -123,9 +123,9 @@ class Config(config.Data):
         """Serialise to DMX configs."""
         elem = Element('Corridor', 'DMEConfig')
         elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
-        selected.extend(self.slots)
+        selected.extend(self.selected)
         elem['unselected'] = unselected = DMAttr.array('unselected', DMXValue.STR)
-        unselected.extend(self.slots)
+        unselected.extend(self.unselected)
 
         return elem
 
