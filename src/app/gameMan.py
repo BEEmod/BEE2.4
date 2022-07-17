@@ -1311,14 +1311,14 @@ def load() -> None:
         loadScreen.main_loader.suppress()
 
         # Ask the user for Portal 2's location...
-        if not add_game(refresh_menu=False):
+        if not add_game():
             # they cancelled, quit
             quit_application()
         loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
 
-def add_game(e=None, refresh_menu=True):
+def add_game(e=None):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
@@ -1383,7 +1383,7 @@ def add_game(e=None, refresh_menu=True):
 
         new_game = Game(name, gm_id, folder)
         all_games.append(new_game)
-        if refresh_menu:
+        if game_menu is not None:
             add_menu_opts(game_menu)
         save()
         return True
@@ -1419,12 +1419,8 @@ def remove_game(e=None):
         add_menu_opts(game_menu)
 
 
-def add_menu_opts(menu: Menu, callback=None):
+def add_menu_opts(menu: Menu) -> None:
     """Add the various games to the menu."""
-    global selectedGame_radio, setgame_callback
-    if callback is not None:
-        setgame_callback = callback
-
     for ind in range(menu.index(END), 0, -1):
         # Delete all the old radiobutton
         # Iterate backward to ensure indexes stay the same.
@@ -1444,7 +1440,6 @@ def add_menu_opts(menu: Menu, callback=None):
 def setGame() -> None:
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
-    setgame_callback(selected_game)
     # TODO: make this function async to eliminate.
     background_run(EVENT_BUS, None, selected_game)
 
@@ -1457,7 +1452,6 @@ def set_game_by_name(name: str) -> None:
             selectedGame_radio.set(all_games.index(game))
             # TODO: make this function async too to eliminate.
             background_run(EVENT_BUS, None, selected_game)
-            setgame_callback(selected_game)
             break
 
 if __name__ == '__main__':
@@ -1470,4 +1464,4 @@ if __name__ == '__main__':
     TK_ROOT['menu'] = test_menu
 
     load()
-    add_menu_opts(dropdown, setgame_callback)
+    add_menu_opts(dropdown)

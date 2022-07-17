@@ -18,7 +18,6 @@ class MenuBar:
         parent: tk.Tk,
         quit_app: Callable[[], object],
         export: Callable[[], object],
-        set_game: Callable[['gameMan.Game'], object],
     ) -> None:
         """Create the top menu bar.
 
@@ -82,7 +81,7 @@ class MenuBar:
             )
         self.file_menu.add_separator()
         # Add a set of options to pick the game into the menu system
-        gameMan.add_menu_opts(self.file_menu, callback=set_game)
+        gameMan.add_menu_opts(self.file_menu)
         gameMan.game_menu = self.file_menu
 
         self.pal_menu = tk.Menu(bar)

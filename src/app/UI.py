@@ -1377,12 +1377,12 @@ def init_drag_icon() -> None:
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game: 'gameMan.Game') -> None:
+async def set_game(game: 'gameMan.Game') -> None:
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
     """
-    TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
+    TK_ROOT.title(f'BEEMOD {utils.BEE_VERSION} - {game.name}')
     config.store_conf(config.LastSelected(game.name), 'game')
     EXPORT_CMD_VAR.set(game.get_export_text())
 
@@ -1405,13 +1405,13 @@ async def init_windows() -> None:
         TK_ROOT,
         quit_app=quit_application,
         export=export,
-        set_game=set_game,
     )
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
     )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
+    await gameMan.EVENT_BUS.register_and_prime(None, gameMan.Game, set_game)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')

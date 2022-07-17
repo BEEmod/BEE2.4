@@ -891,7 +891,9 @@ def init_application() -> None:
     ui_new_backup()
 
     # UI.py isn't present, so we use this callback
-    gameMan.setgame_callback = load_game
+    async def cback(game):
+        load_game(game)
+    gameMan.EVENT_BUS.register(None, gameMan.Game, cback)
 
     gameMan.add_menu_opts(game_menu)
 
