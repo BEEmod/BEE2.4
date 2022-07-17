@@ -244,8 +244,8 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         img.apply(preview_left, IMG_BLANK)
         img.apply(preview_right, IMG_BLANK)
 
-    drag_man.event.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
-    drag_man.event.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
+    drag_man.event_bus.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
+    drag_man.event_bus.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
 
     for i in SIGN_IND:
         SLOTS_SELECTED[i] = slot = drag_man.slot_target(

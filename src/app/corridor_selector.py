@@ -214,7 +214,7 @@ class Selector:
 
         ttk.Button(frm_right, text=gettext('Close'), command=self.hide).grid(row=3, column=0)
 
-        self.events = event.EventManager()
+        self.event_bus = event.EventBus()
 
         conf = config.get_cur_conf(UIState, default=UIState())
         self.win.geometry(f'{conf.width}x{conf.height}')
@@ -222,17 +222,17 @@ class Selector:
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
-            button_frm, self.events, conf.last_mode,
+            button_frm, self.event_bus, conf.last_mode,
             (GameMode.SP, gettext('SP')),
             (GameMode.COOP, gettext('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
-            button_frm, self.events, conf.last_direction,
+            button_frm, self.event_bus, conf.last_direction,
             (Direction.ENTRY, gettext('Entry')),
             (Direction.EXIT, gettext('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
-            button_frm, self.events, conf.last_orient,
+            button_frm, self.event_bus, conf.last_orient,
             (Orient.FLAT, gettext('Flat')),
             (Orient.UP, gettext('Upward')),
             (Orient.DN, gettext('Downward')),
@@ -241,9 +241,9 @@ class Selector:
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
         refresh = self.refresh
-        self.events.register(self.btn_mode, GameMode, refresh)
-        self.events.register(self.btn_direction, Direction, refresh)
-        self.events.register(self.btn_orient, Orient, refresh)
+        self.event_bus.register(self.btn_mode, GameMode, refresh)
+        self.event_bus.register(self.btn_direction, Direction, refresh)
+        self.event_bus.register(self.btn_orient, Orient, refresh)
 
         canv_frame = ttk.Frame(frm_left, relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -284,11 +284,11 @@ class Selector:
             size=(WIDTH, HEIGHT),
             pick_flexi_group=self._get_flexi_group,
         )
-        drop.event.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
-        drop.event.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
-        drop.event.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
-        drop.event.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
-        drop.event.register(dragdrop.Event.MODIFIED, None, self._on_changed)
+        drop.event_bus.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
+        drop.event_bus.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
+        drop.event_bus.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
+        drop.event_bus.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
+        drop.event_bus.register(dragdrop.Event.MODIFIED, None, self._on_changed)
         self.load_corridors(packset)
 
     def show(self) -> None:

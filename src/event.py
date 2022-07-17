@@ -20,7 +20,7 @@ import attrs
 import trio
 import srctools.logger
 
-__all__ = ['EventManager', 'APP_EVENTS', 'ValueChange', 'ObsValue']
+__all__ = ['EventBus', 'APP_BUS', 'ValueChange', 'ObsValue']
 LOGGER = srctools.logger.get_logger(__name__)
 ArgT = TypeVar('ArgT')
 ValueT = TypeVar('ValueT')
@@ -59,8 +59,8 @@ def _get_arg_type(arg_type: object) -> type:
     raise ValueError(f'{arg_type!r} is not an argument type!')
 
 
-class EventManager:
-    """Manages a set of events, and the associated callbacks."""
+class EventBus:
+    """Stores functions to be called for a set of events."""
     # Type[ArgT] -> EventSpec[ArgT], but can't specify that.
     _events: dict[tuple[int, Type[Any]], EventSpec[Any]]
 
@@ -193,7 +193,7 @@ class EventManager:
             raise LookupError(ctx, arg_type, func) from None
 
 # Global manager for general events.
-APP_EVENTS = EventManager()
+APP_BUS = EventBus()
 
 
 @attrs.frozen
@@ -205,8 +205,8 @@ class ValueChange(Generic[ValueT]):
 
 class ObsValue(Generic[ValueT]):
     """Holds a single value of any type, firing an event whenever it is altered."""
-    def __init__(self, man: EventManager, initial: ValueT) -> None:
-        self.man = man
+    def __init__(self, bus: EventBus, initial: ValueT) -> None:
+        self.bus = bus
         self._value = initial
 
     @property
@@ -219,7 +219,7 @@ class ObsValue(Generic[ValueT]):
         # Note: fire the event AFTER we change the contents.
         old = self._value
         self._value = new
-        await self.man(self, ValueChange(old, new))
+        await self.bus(self, ValueChange(old, new))
 
     def __repr__(self) -> str:
-        return f'ObsValue({self.man!r}, {self._value!r})'
+        return f'ObsValue({self.bus!r}, {self._value!r})'

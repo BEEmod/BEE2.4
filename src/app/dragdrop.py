@@ -200,7 +200,7 @@ class Manager(Generic[ItemT]):
         # While dragging, the place we started at.
         self._cur_slot: Optional[Slot[ItemT]] = None
 
-        self.event = event.EventManager()
+        self.event_bus = event.EventBus()
 
         self._drag_win = drag_win = tkinter.Toplevel(master)
         drag_win.withdraw()
@@ -482,7 +482,7 @@ class Manager(Generic[ItemT]):
             assert dest is not None
             # Dropped on itself, fire special event, put the item back.
             dest.contents = self._cur_drag
-            background_run(self.event, Event.REDROPPED, dest)
+            background_run(self.event_bus, Event.REDROPPED, dest)
             self._cur_drag = None
             self._cur_slot = None
             return
@@ -498,18 +498,18 @@ class Manager(Generic[ItemT]):
                 if slot.is_flexi and slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
-                    background_run(self.event, Event.MODIFIED)
+                    background_run(self.event_bus, Event.MODIFIED)
                     break
             else:
                 LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
                 self._cur_slot.contents = self._cur_drag
-                background_run(self.event, Event.REDROPPED, self._cur_slot)
+                background_run(self.event_bus, Event.REDROPPED, self._cur_slot)
         elif dest:  # We have a target.
             dest.contents = self._cur_drag
-            background_run(self.event, Event.MODIFIED)
+            background_run(self.event_bus, Event.MODIFIED)
         # No target, and we dragged off an existing target, delete.
         elif not self._cur_slot.is_source:
-            background_run(self.event, Event.MODIFIED)
+            background_run(self.event_bus, Event.MODIFIED)
             sound.fx('delete')
 
         self._cur_drag = None
@@ -661,7 +661,7 @@ class Slot(Generic[ItemT]):
 
         if self.is_flexi and (old_cont is None) != (value is None):
             # We're showing/hiding, we need to redraw.
-            background_run(self.man.event, Event.FLEXI_FLOW, self)
+            background_run(self.man.event_bus, Event.FLEXI_FLOW, self)
 
         if new_group is not None:
             # Update myself and the entire group to get the group
@@ -750,7 +750,7 @@ class Slot(Generic[ItemT]):
                     sound.fx('config')
                     if self.is_flexi:
                         self.contents = None
-                    background_run(self.man.event, Event.MODIFIED)
+                    background_run(self.man.event_bus, Event.MODIFIED)
                     return
                 elif slot.contents is item:
                     # It's already on the board, don't change anything.
@@ -762,7 +762,7 @@ class Slot(Generic[ItemT]):
         else:
             # Fast-delete this.
             self.contents = None
-            background_run(self.man.event, Event.MODIFIED)
+            background_run(self.man.event_bus, Event.MODIFIED)
             sound.fx('delete')
 
     def _evt_hover_enter(self, event: tkinter.Event) -> None:
@@ -779,7 +779,7 @@ class Slot(Generic[ItemT]):
                 y=self._lbl.winfo_height() - padding,
                 anchor='se',
             )
-        background_run(self.man.event, Event.HOVER_ENTER, self)
+        background_run(self.man.event_bus, Event.HOVER_ENTER, self)
 
         if self._text_lbl:
             self._text_lbl.place(
@@ -796,12 +796,12 @@ class Slot(Generic[ItemT]):
             self._info_btn.place_forget()
         if self._text_lbl:
             self._text_lbl.place_forget()
-        background_run(self.man.event, Event.HOVER_EXIT, self)
+        background_run(self.man.event_bus, Event.HOVER_EXIT, self)
 
     def _evt_configure(self, _: tkinter.Event) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
         if self.contents:
-            background_run(self.man.event, Event.CONFIG, self)
+            background_run(self.man.event_bus, Event.CONFIG, self)
 
 
 async def test() -> None:
@@ -864,7 +864,7 @@ async def test() -> None:
         return call
 
     for evt in Event:
-        manager.event.register(evt, Slot[TestItem], func(evt))
+        manager.event_bus.register(evt, Slot[TestItem], func(evt))
 
     PAK_CLEAN = 'BEE2_CLEAN_STYLE'
     PAK_ELEM = 'VALVE_TEST_ELEM'
@@ -931,9 +931,9 @@ async def test() -> None:
     async def evt_config(evt_slot: Slot[TestItem]) -> None:
         messagebox.showinfo('Hello World', str(evt_slot.contents))
 
-    manager.event.register(Event.HOVER_ENTER, Slot[TestItem], evt_enter)
-    manager.event.register(Event.HOVER_EXIT, Slot[TestItem], evt_exit)
-    manager.event.register(Event.CONFIG, Slot[TestItem], evt_config)
+    manager.event_bus.register(Event.HOVER_ENTER, Slot[TestItem], evt_enter)
+    manager.event_bus.register(Event.HOVER_EXIT, Slot[TestItem], evt_exit)
+    manager.event_bus.register(Event.CONFIG, Slot[TestItem], evt_config)
 
     TK_ROOT.deiconify()
     with trio.CancelScope() as scope:

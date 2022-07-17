@@ -3,7 +3,7 @@ from typing import no_type_check
 import pytest
 from unittest.mock import AsyncMock, create_autospec, call
 
-from event import EventManager, ValueChange, ObsValue
+from event import EventBus, ValueChange, ObsValue
 
 
 async def event_func(arg):
@@ -12,51 +12,51 @@ async def event_func(arg):
 
 
 async def test_simple_register() -> None:
-    """Test registering events in the manager."""
-    man = EventManager()
+    """Test registering events in the bus."""
+    bus = EventBus()
     func1 = create_autospec(event_func)
     func2 = create_autospec(event_func)
     ctx1 = object()
     ctx2 = object()
 
-    man.register(ctx1, int, func1)
+    bus.register(ctx1, int, func1)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await man(ctx1, 5)
+    await bus(ctx1, 5)
 
     func1.assert_awaited_once_with(5)
     func2.assert_not_awaited()
     func1.reset_mock()
 
     # Different context, not fired.
-    await man(ctx2, 12)
+    await bus(ctx2, 12)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    man.register(ctx2, int, func2)
+    bus.register(ctx2, int, func2)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await man(ctx2, 34)
+    await bus(ctx2, 34)
     func1.assert_not_awaited()
     func2.assert_awaited_once_with(34)
     func2.reset_mock()
 
 
 async def test_unregister() -> None:
-    """Test unregistering events in the manager."""
-    man = EventManager()
+    """Test unregistering events in the bus."""
+    bus = EventBus()
     func1 = create_autospec(event_func)
     func2 = create_autospec(event_func)
     ctx = object()
 
-    man.register(ctx, bool, func1)
-    man.register(ctx, bool, func2)
-    await man(ctx, True)
+    bus.register(ctx, bool, func1)
+    bus.register(ctx, bool, func2)
+    await bus(ctx, True)
 
     func1.assert_awaited_once_with(True)
     func2.assert_awaited_once_with(True)
@@ -64,66 +64,66 @@ async def test_unregister() -> None:
     func2.reset_mock()
 
     with pytest.raises(LookupError):
-        man.unregister(ctx, int, func1)
+        bus.unregister(ctx, int, func1)
     with pytest.raises(LookupError):
-        man.unregister(45, bool, func1)
-    man.unregister(ctx, bool, func1)
+        bus.unregister(45, bool, func1)
+    bus.unregister(ctx, bool, func1)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await man(ctx, False)
+    await bus(ctx, False)
 
     func1.assert_not_awaited()
     func2.assert_awaited_once_with(False)
 
 
 async def test_register_nonearg() -> None:
-    """Test registering events with no arg in the manager."""
-    man = EventManager()
+    """Test registering events with no arg in the bus."""
+    bus = EventBus()
     func1 = create_autospec(event_func, name='func1')
     func2 = create_autospec(event_func, name='func2')
     ctx1 = object()
     ctx2 = object()
 
-    man.register(ctx1, None, func1)
+    bus.register(ctx1, None, func1)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await man(ctx1)
+    await bus(ctx1)
 
     func1.assert_awaited_once_with(None)
     func2.assert_not_awaited()
     func1.reset_mock()
 
     # Different context, not fired.
-    await man(ctx2)
+    await bus(ctx2)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    man.register(ctx2, None, func2)
+    bus.register(ctx2, None, func2)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await man(ctx2, None)
+    await bus(ctx2, None)
     func1.assert_not_awaited()
     func2.assert_awaited_once_with(None)
     func2.reset_mock()
 
 
 async def test_unregister_nonearg() -> None:
-    """Test unregistering events in the manager."""
-    man = EventManager()
+    """Test unregistering events in the bus."""
+    bus = EventBus()
     func1 = create_autospec(event_func, name='func1')
     func2 = create_autospec(event_func, name='func2')
     ctx = object()
 
-    man.register(ctx, None, func1)
-    man.register(ctx, None, func2)
-    await man(ctx)
+    bus.register(ctx, None, func1)
+    bus.register(ctx, None, func2)
+    await bus(ctx)
 
     func1.assert_awaited_once_with(None)
     func2.assert_awaited_once_with(None)
@@ -131,15 +131,15 @@ async def test_unregister_nonearg() -> None:
     func2.reset_mock()
 
     with pytest.raises(LookupError):
-        man.unregister(ctx, int, func1)
+        bus.unregister(ctx, int, func1)
     with pytest.raises(LookupError):
-        man.unregister(45, None, func1)
-    man.unregister(ctx, None, func1)
+        bus.unregister(45, None, func1)
+    bus.unregister(ctx, None, func1)
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await man(ctx)
+    await bus(ctx)
 
     func1.assert_not_awaited()
     func2.assert_awaited_once_with(None)
@@ -147,26 +147,26 @@ async def test_unregister_nonearg() -> None:
 
 async def test_register_priming() -> None:
     """Test the priming version of registering."""
-    man = EventManager()
+    bus = EventBus()
     func1 = create_autospec(event_func, name='func1')
     func2 = create_autospec(event_func, name='func2')
 
     # If not fired, does nothing.
-    await man.register_and_prime(None, int, func1)
+    await bus.register_and_prime(None, int, func1)
     func1.assert_not_awaited()
-    await man(None, 5)
+    await bus(None, 5)
     func1.assert_awaited_once_with(5)
 
     func1.reset_mock()
     # Now it's been fired already, the late registry can be sent it.
-    await man.register_and_prime(None, int, func2)
+    await bus.register_and_prime(None, int, func2)
     func1.assert_not_awaited()  # This is unaffected.
     func2.assert_awaited_once_with(5)
 
     func1.reset_mock()
     func2.reset_mock()
 
-    await man(None, 10)
+    await bus(None, 10)
     func1.assert_awaited_once_with(10)
     func2.assert_awaited_once_with(10)
 
@@ -212,8 +212,8 @@ def test_valuechange_hash() -> None:
 
 async def test_obsval_getset() -> None:
     """Check getting/setting functions normally, unrelated to events."""
-    man = EventManager()
-    holder: ObsValue[object] = ObsValue(man, 45)
+    bus = EventBus()
+    holder: ObsValue[object] = ObsValue(bus, 45)
     assert holder.value == 45
 
     await holder.set(32)
@@ -229,10 +229,10 @@ async def test_obsval_getset() -> None:
 
 async def test_obsval_fires() -> None:
     """Check an event fires whenever the value changes."""
-    man = EventManager()
-    holder: ObsValue[object] = ObsValue(man, 0)
+    bus = EventBus()
+    holder: ObsValue[object] = ObsValue(bus, 0)
     func1 = create_autospec(event_func)
-    man.register(holder, ValueChange, func1)
+    bus.register(holder, ValueChange, func1)
     func1.assert_not_awaited()
 
     assert holder.value == 0
@@ -257,8 +257,8 @@ async def test_obsvalue_set_during_event() -> None:
     # The third will cause it to set it to 3.
     # A new event will then fire, setting it to 3 again.
     # No event will fire.
-    man = EventManager()
-    holder = ObsValue(man, 0)
+    bus = EventBus()
+    holder = ObsValue(bus, 0)
 
     async def event(arg: ValueChange):
         """Event fired when registered."""
@@ -267,7 +267,7 @@ async def test_obsvalue_set_during_event() -> None:
 
     mock = AsyncMock(side_effect=event)
     mock.assert_not_awaited()
-    man.register(holder, ValueChange, mock)
+    bus.register(holder, ValueChange, mock)
     await holder.set(1)
     assert holder.value == 3
     assert mock.call_count == 4
@@ -281,12 +281,12 @@ async def test_obsvalue_set_during_event() -> None:
 
 async def test_obsval_repr() -> None:
     """Test the repr() of ObsValue."""
-    man = EventManager()
-    holder: ObsValue[object] = ObsValue(man, 0)
-    assert repr(holder) == f'ObsValue({man!r}, 0)'
+    bus = EventBus()
+    holder: ObsValue[object] = ObsValue(bus, 0)
+    assert repr(holder) == f'ObsValue({bus!r}, 0)'
 
     await holder.set([1, 2, 3])
-    assert repr(holder) == f'ObsValue({man!r}, [1, 2, 3])'
+    assert repr(holder) == f'ObsValue({bus!r}, [1, 2, 3])'
 
     await holder.set(None)
-    assert repr(holder) == f'ObsValue({man!r}, None)'
+    assert repr(holder) == f'ObsValue({bus!r}, None)'

@@ -722,14 +722,14 @@ class EnumButton(Generic[EnumT]):
     def __init__(
         self,
         master: tk.Misc,
-        event_man: event.EventManager,
+        event_bus: event.EventBus,
         current: EnumT,
         *values: Tuple[EnumT, str],
     ) -> None:
         self.frame = ttk.Frame(master)
         self._current = current
         self.buttons: dict[EnumT, ttk.Button] = {}
-        self.events = event_man
+        self.event_bus = event_bus
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
@@ -754,7 +754,7 @@ class EnumButton(Generic[EnumT]):
             self.buttons[self._current].state(['!pressed'])
             self._current = value
             self.buttons[self._current].state(['pressed'])
-            background_run(self.events, self, value)
+            background_run(self.event_bus, self, value)
 
     @property
     def current(self) -> EnumT:
