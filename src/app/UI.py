@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
 from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
+from typing_extensions import Final
 import itertools
 import operator
 import random
@@ -55,6 +56,7 @@ windows: Dict[str, Any] = {}  # Toplevel | SubPane
 frames: Dict[str, Union[tk.Frame, ttk.Frame]] = {}
 UI: Dict[str, Any] = {}  # Various widgets.
 menus: Dict[str, tk.Menu] = {}
+EXPORT_BTN_POS: Final = 0  # Position of the export button.
 
 # These panes.
 skybox_win: SelectorWin[[]]
@@ -712,7 +714,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
-    menus['file'].entryconfigure(menus['file'].export_btn_index, state='disabled')
+    menus['file'].entryconfigure(EXPORT_BTN_POS, state='disabled')
     TK_ROOT.update_idletasks()
     conf = config.get_cur_conf(config.GenOptions)
     try:
@@ -821,7 +823,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         set_game(gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
-        menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+        menus['file'].entryconfigure(EXPORT_BTN_POS, state='normal')
 
 
 def set_disp_name(item: PalItem, e=None) -> None:
@@ -1142,7 +1144,7 @@ async def init_option(pane: SubPane.SubPane, pal_ui: paletteUI.PaletteUI) -> Non
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packages.QuotePack.by_id(voice_win.chosen_id)
+            chosen_voice = packages.LOADED.obj_by_id(packages.QuotePack, voice_win.chosen_id)
         except KeyError:
             pass
         else:
@@ -1165,7 +1167,7 @@ async def init_option(pane: SubPane.SubPane, pal_ui: paletteUI.PaletteUI) -> Non
         voice_frame,
         command=configure_voice,
         width=8,
-        )
+    )
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
     img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
@@ -1395,10 +1397,7 @@ def set_game(game: 'gameMan.Game') -> None:
         # Mark that it needs extractions
         text += ' *'
 
-    menus['file'].entryconfigure(
-        menus['file'].export_btn_index,
-        label=text,
-    )
+    menus['file'].entryconfigure(EXPORT_BTN_POS, label=text)
     EXPORT_CMD_VAR.set(text)
 
 
@@ -1434,8 +1433,9 @@ def init_menu_bar(win: Union[tk.Tk, tk.Toplevel], export: Callable[[], None]) ->
         command=export,
         accelerator=tk_tools.ACCEL_EXPORT,
     )
-    file_menu.export_btn_index = 0  # Change this if the menu is reordered
-    file_menu.entryconfigure(file_menu.export_btn_index, state='disabled')
+    # EXPORT_BTN_POS should be this button's position.
+    assert EXPORT_BTN_POS == file_menu.index('end'), file_menu.index('end')
+    file_menu.entryconfigure(EXPORT_BTN_POS, state='disabled')
 
     file_menu.add_command(
         label=gettext("Add Game"),
@@ -1740,7 +1740,7 @@ async def init_windows() -> None:
         for cls in packages.OBJ_TYPES.values():
             await packages.LOADED.ready(cls).wait()
         UI['pal_export'].state(('!disabled',))
-        menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+        menus['file'].entryconfigure(EXPORT_BTN_POS, state='normal')
 
     background_run(enable_export)
 
