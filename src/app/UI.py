@@ -57,10 +57,10 @@ UI: Dict[str, Any] = {}  # Various widgets.
 menus: Dict[str, tk.Menu] = {}
 
 # These panes.
-skybox_win: SelectorWin
-voice_win: SelectorWin
-style_win: SelectorWin
-elev_win: SelectorWin
+skybox_win: SelectorWin[[]]
+voice_win: SelectorWin[[]]
+style_win: SelectorWin[[]]
+elev_win: SelectorWin[[]]
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -257,22 +257,23 @@ class Item:
 
     def refresh_subitems(self) -> None:
         """Call load_data() on all our subitems, so they reload icons and names."""
-        for refresh_cmd, subitem_list in [
-                (flow_preview, pal_picked),
-                (flow_picker, pal_items),
-                ]:
-            for item in subitem_list:
-                if item.id == self.id:
-                    item.load_data()
-            refresh_cmd()
+        for item in pal_picked:
+            if item.id == self.id:
+                item.load_data()
+        flow_preview()
+        for item in pal_items:
+            if item.id == self.id:
+                item.load_data()
+        flow_picker()
 
     def change_version(self, version: str) -> None:
+        """Set the version of this item."""
         item_opts[self.id]['sel_version'] = version
         self.selected_ver = version
         self.load_data()
         self.refresh_subitems()
 
-    def get_version_names(self):
+    def get_version_names(self) -> Tuple[List[str], List[str]]:
         """Get a list of the names and corresponding IDs for the item."""
         # item folders are reused, so we can find duplicates.
         style_obj_ids = {
@@ -523,14 +524,14 @@ async def load_packages(packset: packages.PackagesSet) -> None:
                 }
             ))
 
-    def win_callback(style_id, win_name):
+    def win_callback(sel_id: Optional[str]) -> None:
         """Callback for the selector windows.
 
         This just refreshes if the 'apply selection' option is enabled.
         """
         suggested_refresh()
 
-    def voice_callback(voice_id):
+    def voice_callback(voice_id: Optional[str]) -> None:
         """Special callback for the voice selector window.
 
         The configuration button is disabled when no music is selected.
@@ -563,7 +564,6 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         default_id='BEE2_CLEAN',
         has_none=False,
         callback=win_callback,
-        callback_params=['Skybox'],
         attributes=[
             SelAttr.bool('3D', gettext('3D Skybox'), False),
             SelAttr.color('COLOR', gettext('Fog Color')),
@@ -633,7 +633,6 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         none_name=gettext('Random'),
         none_desc=gettext('Choose a random video.'),
         callback=win_callback,
-        callback_params=['Elevator'],
         attributes=[
             SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
         ]
@@ -825,11 +824,13 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
 
 
-def set_disp_name(item, e=None) -> None:
+def set_disp_name(item: PalItem, e=None) -> None:
+    """Callback to display the name of the item."""
     UI['pre_disp_name'].configure(text=item.name)
 
 
 def clear_disp_name(e=None) -> None:
+    """Callback to reset the item name."""
     UI['pre_disp_name'].configure(text='')
 
 
@@ -1743,9 +1744,10 @@ async def init_windows() -> None:
 
     background_run(enable_export)
 
-    def style_select_callback(style_id: str) -> None:
+    def style_select_callback(style_id: Optional[str]) -> None:
         """Callback whenever a new style is chosen."""
         global selected_style
+        assert style_id is not None, "Style ID must be provided"
         selected_style = style_id
 
         style_obj = current_style()

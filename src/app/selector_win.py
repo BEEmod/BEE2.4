@@ -5,7 +5,8 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
-from typing import Union, Iterable, Mapping, Callable, Any, AbstractSet
+from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
+from typing_extensions import Concatenate, ParamSpec, TypeAlias
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -97,7 +98,8 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list')
 
 
-AttrValues = Union[str, Iterable[str], bool, Vec]
+AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
+CallbackT = ParamSpec('CallbackT')
 
 
 @config.register('SelectorWindow', palette_stores=False, uses_id=True)
@@ -515,7 +517,7 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
-class SelectorWin:
+class SelectorWin(Generic[CallbackT]):
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates
@@ -553,8 +555,9 @@ class SelectorWin:
         title: str = 'BEE2',
         desc: str = '',
         readonly_desc: str = '',
-        callback: Callable[..., None]=None,
-        callback_params: Iterable[Any]=(),
+        callback: Optional[Callable[Concatenate[Optional[str], CallbackT], None]]=None,
+        callback_params: CallbackT.args=(),
+        callback_keywords: CallbackT.kwargs = EmptyMapping,
         attributes: Iterable[AttrDef]=(),
     ):
         """Create a window object.
@@ -582,7 +585,7 @@ class SelectorWin:
         - title is the title of the selector window.
         - callback is a function to be called whenever the selected item
          changes.
-        - callback_params is a list of additional values which will be
+        - callback_params and callback_keywords is a list of additional values which will be
           passed to the callback function.
           The first argument to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the
@@ -618,12 +621,9 @@ class SelectorWin:
         self.chosen_id: str | None = None
 
         # Callback function, and positional arguments to pass
-        if callback is not None:
-            self.callback = callback
-            self.callback_params = list(callback_params)
-        else:
-            self.callback = None
-            self.callback_params = []
+        self.callback = callback
+        self.callback_params = list(callback_params)
+        self.callback_kwargs = dict(callback_keywords)
 
         # Currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested: list[Item] = []
@@ -1292,7 +1292,7 @@ class SelectorWin:
         if self.store_last_selected:
             config.store_conf(config.LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
-            self.callback(self.chosen_id, *self.callback_params)
+            self.callback(self.chosen_id, *self.callback_params, **self.callback_kwargs)
 
     def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""
