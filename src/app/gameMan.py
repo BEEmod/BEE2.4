@@ -34,7 +34,7 @@ from srctools import (
 )
 import srctools.logger
 import srctools.fgd
-from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE
+from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
 from localisation import gettext
 import loadScreen
 import packages
@@ -42,6 +42,7 @@ import packages.template_brush
 import editoritems
 import utils
 import config
+import event
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -50,6 +51,7 @@ all_games: list[Game] = []
 selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
+EVENT_BUS = event.EventBus()
 
 # Translated text from basemodui.txt.
 TRANS_DATA: dict[str, str] = {}
@@ -1439,18 +1441,22 @@ def add_menu_opts(menu: Menu, callback=None):
     setGame()
 
 
-def setGame():
+def setGame() -> None:
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
     setgame_callback(selected_game)
+    # TODO: make this function async to eliminate.
+    background_run(EVENT_BUS, None, selected_game)
 
 
-def set_game_by_name(name):
-    global selected_game, selectedGame_radio
+def set_game_by_name(name: str) -> None:
+    global selected_game
     for game in all_games:
         if game.name == name:
             selected_game = game
             selectedGame_radio.set(all_games.index(game))
+            # TODO: make this function async too to eliminate.
+            background_run(EVENT_BUS, None, selected_game)
             setgame_callback(selected_game)
             break
 
