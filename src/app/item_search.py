@@ -15,7 +15,7 @@ word_to_ids: 'CharTrie[Set[Tuple[str, int]]]' = CharTrie()
 _type_cback: Optional[Callable[[], None]] = None
 
 
-def init(frm: tk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]], None]) -> None:
+def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]], None]) -> None:
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along

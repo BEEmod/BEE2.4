@@ -39,7 +39,7 @@ class SubPane(tk.Toplevel):
         self,
         parent: Union[tk.Toplevel, tk.Tk],
         *,
-        tool_frame: tk.Frame,
+        tool_frame: Union[tk.Frame, ttk.Frame],
         tool_img: str,
         menu_bar: tk.Menu,
         tool_col: int=0,

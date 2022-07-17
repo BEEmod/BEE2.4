@@ -92,7 +92,7 @@ class PaletteState(config.Data):
 class PaletteUI:
     """UI for selecting palettes."""
     def __init__(
-        self, f: tk.Frame, menu: tk.Menu,
+        self, f: ttk.Frame, menu: tk.Menu,
         *,
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],

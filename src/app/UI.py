@@ -52,7 +52,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows: Dict[str, Any] = {}  # Toplevel | SubPane
-frames: Dict[str, tk.Frame] = {}
+frames: Dict[str, Union[tk.Frame, ttk.Frame]] = {}
 UI: Dict[str, Any] = {}  # Various widgets.
 menus: Dict[str, tk.Menu] = {}
 
@@ -1218,7 +1218,7 @@ def flow_preview() -> None:
     UI['pre_sel_line'].lift()
 
 
-def init_preview(f: tk.Frame) -> None:
+def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Generate the preview pane.
 
      This shows the items that will export to the palette.
@@ -1252,7 +1252,7 @@ def init_preview(f: tk.Frame) -> None:
     flow_preview()
 
 
-def init_picker(f: tk.Frame) -> None:
+def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
     ttk.Label(
