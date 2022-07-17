@@ -8,14 +8,12 @@ from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from localisation import gettext
-from BEE2_config import ConfigFile
 import packages
 import utils
 
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 
-PACK_CONFIG = ConfigFile('packages.cfg')
 list_widget: CheckDetails
 pack_items: list[tuple[packages.Package, CheckItem]] = []
 
@@ -68,7 +66,7 @@ def apply_changes() -> None:
         for pack, item in pack_items:
             if pack.id.casefold() != packages.CLEAN_PACKAGE:
                 pack.enabled = item.state
-        PACK_CONFIG.save_check()
+        packages.PACK_CONFIG.save_check()
         utils.restart_app()
 
 

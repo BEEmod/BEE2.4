@@ -11,10 +11,11 @@ import attrs
 import trio
 
 import srctools
+
+from BEE2_config import ConfigFile
 from app import tkMarkdown, img, lazy_conf, background_run
 import utils
 import consts
-from app.packageMan import PACK_CONFIG
 from srctools import Property, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
@@ -35,6 +36,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='packages')
 OBJ_TYPES: dict[str, Type[PakObject]] = {}
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS: dict[str, FileSystem] = {}
+PACK_CONFIG = ConfigFile('packages.cfg')
 
 
 @attrs.define
