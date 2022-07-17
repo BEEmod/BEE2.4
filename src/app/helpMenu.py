@@ -10,7 +10,7 @@ import attrs
 import srctools
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
 from localisation import gettext
 import utils
 
@@ -479,7 +479,6 @@ class Dialog(tk.Toplevel):
             row=1, column=0,
         )
 
-    @tk_tools.make_handler
     async def show(self) -> None:
         """Display the help dialog."""
         # The first time we're shown, decode the text.
@@ -527,5 +526,5 @@ def make_help_menu(parent: tk.Menu):
     help.add_separator()
     help.add_command(
         label=gettext('Credits...'),
-        command=credits.show,
+        command=lambda: background_run(credits.show),
     )
