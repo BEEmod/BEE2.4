@@ -19,8 +19,8 @@ if __name__ == '__main__':
         # Disable here, can't get this to work.
         sys.modules['pyglet'] = None  # type: ignore
 
-        # Fork breaks on Mac, so override.
-        set_start_method('spawn')
+    # Forking doesn't really work right, stick to spawning a fresh process.
+    set_start_method('spawn')
 
     import srctools.logger
     from app import on_error, TK_ROOT
