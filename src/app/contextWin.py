@@ -43,7 +43,6 @@ window = tk.Toplevel(TK_ROOT)
 window.overrideredirect(True)
 window.resizable(False, False)
 window.transient(master=TK_ROOT)
-window.attributes('-topmost', 1)
 window.withdraw()  # starts hidden
 
 SUBITEM_POS = {
