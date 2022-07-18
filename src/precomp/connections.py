@@ -889,10 +889,10 @@ def add_locking(item: Item) -> None:
     instance_traits.get(item.inst).add('locking_targ')
     instance_traits.get(lock_button.inst).add('locking_btn')
 
-    # Force the item to not have a timer.
-    for pan in item.ind_panels:
+    # Force the button to not have a timer.
+    for pan in lock_button.ind_panels:
         pan.remove()
-    item.ind_panels.clear()
+    lock_button.ind_panels.clear()
 
     for output, input_cmds in [
         (item.config.output_lock, lock_button.config.lock_cmd),
