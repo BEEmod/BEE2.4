@@ -1,13 +1,13 @@
 """Results relating to item connections."""
 from typing import Callable
 
-import srctools.logger
 
 from precomp import connections, conditions
-from srctools import Property, Entity, Output
+from srctools import Property, Entity, Output, logger
+import srctools
 
 COND_MOD_NAME = 'I/O'
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.connections')
+LOGGER = logger.get_logger(__name__, alias='cond.connections')
 
 
 @conditions.make_result('AddOutput')

@@ -100,7 +100,7 @@ EMPTY = EmptyLink()
 def place_catwalk_connections(
     catwalks: Dict[Tuple[float, float, float], Link],
     vmf: VMF,
-    instances: Dict[Instances, str],
+    instances: Mapping[Instances, str],
     point_a: Vec, point_b: Vec,
 ) -> None:
     """Place catwalk sections to connect two straight points."""

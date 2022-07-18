@@ -6,6 +6,7 @@ include = [
 exclude = [
 	"**/__pycache__"
 	]
+venv = "BEE2_39"
 stubPath = "src/"   # Use our module for stubs.
 # We want to do conversions when setting.
 reportPropertyTypeMismatch = false
