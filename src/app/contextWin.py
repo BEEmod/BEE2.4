@@ -375,7 +375,7 @@ def load_item_data() -> None:
         )
 
     if editor.cls is ItemClass.GEL:
-        # Reflection or normal gel..
+        # Reflection or normal gel...
         set_sprite(SPR.FACING, 'surf_wall_ceil')
         set_sprite(SPR.INPUT, 'in_norm')
         set_sprite(SPR.COLLISION, 'space_none')
@@ -384,6 +384,28 @@ def load_item_data() -> None:
     elif editor.cls is ItemClass.TRACK_PLATFORM:
         # Track platform - always embeds into the floor.
         set_sprite(SPR.COLLISION, 'space_embed')
+
+    real_conn_item = editor
+    if selected_item.id in ["ITEM_CUBE", "ITEM_PAINT_SPLAT"]:
+        # The connections are on the dropper.
+        try:
+            [real_conn_item] = selected_item.data.editor_extra
+        except ValueError:
+            # Moved elsewhere?
+            pass
+
+    if DEV_MODE.get() and real_conn_item.conn_config is not None:
+        # Override tooltips with the raw information.
+        blurb = real_conn_item.conn_config.get_input_blurb()
+        if real_conn_item.force_input:
+            # Strip to remove \n if blurb is empty.
+            blurb = ('Input force-enabled!\n' + blurb).strip()
+        tooltip.set_tooltip(wid_sprite[SPR.INPUT], blurb)
+
+        blurb = real_conn_item.conn_config.get_output_blurb()
+        if real_conn_item.force_output:
+            blurb = ('Output force-enabled!\n' + blurb).strip()
+        tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], blurb)
 
 
 def adjust_position(e=None) -> None:

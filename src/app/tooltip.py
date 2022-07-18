@@ -38,7 +38,7 @@ context_label = tk.Label(
     # Put image above text if both are provided.
     compound='top',
     justify='left',
-    wraplength=260,  # Stop it getting too long.
+    wraplength=360,  # Stop it getting too long.
 )
 context_label.grid(row=0, column=0)
 
