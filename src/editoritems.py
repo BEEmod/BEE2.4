@@ -1313,9 +1313,9 @@ class Item:
         if ConnTypes.NORMAL in self.conn_inputs:
             conn = self.conn_inputs.pop(ConnTypes.NORMAL)
             if conn.activate is not None:
-                conf.enable_cmd += (Output('', '', conn.activate, inst_in=conn.act_name), )
+                conf.enable_cmd += (Output('', conn.act_name, conn.activate), )
             if conn.deactivate is not None:
-                conf.disable_cmd += (Output('', '', conn.deactivate, inst_in=conn.deact_name), )
+                conf.disable_cmd += (Output('', conn.deact_name, conn.deactivate), )
 
         if ConnTypes.POLARITY in self.conn_inputs:
             if self.id.upper() != 'ITEM_TBEAM':
