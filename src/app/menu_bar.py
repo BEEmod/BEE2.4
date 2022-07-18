@@ -1,14 +1,23 @@
 """The widgets for the main menu bar."""
+import os
 import tkinter as tk
-from typing import Callable
+from typing import Awaitable, Callable, Iterable, List, Tuple
 from typing_extensions import Final
+from pathlib import Path
 
+import BEE2_config
 import utils
 from localisation import gettext
 from app import gameMan, helpMenu, optionWindow, packageMan, tk_tools, backup as backup_win
 
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
+FOLDER_OPTIONS: List[Tuple[str, Callable[['gameMan.Game'], Iterable[Path]]]] = [
+    (gettext('{game} Puzzle Folder'), lambda game: [game.abs_path('portal2/puzzles/')]),
+    (gettext('{game} Folder'), lambda game: [game.abs_path('.')]),
+    (gettext('Palettes Folder'), lambda game: [utils.conf_location('palettes')]),
+    (gettext('Packages Folder'), lambda game: BEE2_config.get_package_locs()),
+]
 
 
 class MenuBar:
@@ -65,11 +74,21 @@ class MenuBar:
             label=gettext("Backup/Restore Puzzles..."),
             command=backup_win.show_window,
         )
+
+        self.folder_menu = tk.Menu(bar)
+        self.file_menu.add_cascade(menu=self.folder_menu, label=gettext('Open Folder...'))
+        for label, path_getter in FOLDER_OPTIONS:
+            self.folder_menu.add_command(
+                label=label.format(game=''),
+                command=self._evt_open_dir(path_getter)
+            )
+
+        self.file_menu.add_separator()
+
         self.file_menu.add_command(
             label=gettext("Manage Packages..."),
             command=packageMan.show,
         )
-        self.file_menu.add_separator()
         self.file_menu.add_command(
             label=gettext("Options"),
             command=optionWindow.show,
@@ -79,7 +98,9 @@ class MenuBar:
                 label=gettext("Quit"),
                 command=quit_app,
             )
+
         self.file_menu.add_separator()
+
         # Add a set of options to pick the game into the menu system
         gameMan.add_menu_opts(self.file_menu)
         gameMan.game_menu = self.file_menu
@@ -99,6 +120,19 @@ class MenuBar:
         self._can_export = allowed
         self.file_menu.entryconfigure(self.export_btn_pos, state='normal' if allowed else 'disabled')
 
+    def _evt_open_dir(self, path_getter: Callable[['gameMan.Game'], Iterable[Path]]) -> Callable[[], None]:
+        """Get an event function which opens the specified folder."""
+        def handler() -> None:
+            """When called opens the path."""
+            paths = path_getter(gameMan.selected_game)
+            if utils.WIN:
+                for path in paths:
+                    os.startfile(path)
+            # TODO: Other OSes.
+        return handler
+
     async def _game_changed(self, game: 'gameMan.Game') -> None:
         """Callback for when games are changed."""
         self.file_menu.entryconfigure(self.export_btn_pos, label=game.get_export_text())
+        for i, (label, path_getter) in enumerate(FOLDER_OPTIONS):
+            self.folder_menu.entryconfigure(i, label=label.format(game=game.name))

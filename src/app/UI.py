@@ -1411,7 +1411,9 @@ async def init_windows() -> None:
         height=TK_ROOT.winfo_screenheight(),
     )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-    await gameMan.EVENT_BUS.register_and_prime(None, gameMan.Game, set_game)
+    gameMan.EVENT_BUS.register(None, gameMan.Game, set_game)
+    # Initialise the above and the menu bar.
+    await gameMan.EVENT_BUS(None, gameMan.Game)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')
