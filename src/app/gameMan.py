@@ -240,11 +240,6 @@ def translate(string: str) -> str:
     return TRANS_DATA.get(string, string)
 
 
-def setgame_callback(selected_game):
-    """Callback function run when games are selected."""
-    pass
-
-
 def quit_application():
     """Command run to quit the application.
 
