@@ -14,17 +14,18 @@ if sys.stdin is None:
 
 freeze_support()
 
-if __name__ == '__main__':
-    if sys.platform == "darwin":
-        # Disable here, can't get this to work.
-        sys.modules['pyglet'] = None  # type: ignore
+if sys.platform == "darwin":
+    # Disable here, can't get this to work.
+    sys.modules['pyglet'] = None  # type: ignore
 
+
+import srctools.logger
+from app import on_error, TK_ROOT
+import utils
+
+if __name__ == '__main__':
     # Forking doesn't really work right, stick to spawning a fresh process.
     set_start_method('spawn')
-
-    import srctools.logger
-    from app import on_error, TK_ROOT
-    import utils
 
     if len(sys.argv) > 1:
         log_name = app_name = sys.argv[1].lower()
