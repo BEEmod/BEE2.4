@@ -9,14 +9,14 @@
             "content": null,
             "embeds": [
               {
-                "title": "Why is BTS being removed?",
-                "description": "The BTS style was made back before BEE2.4, and our direction has long since changed. The style doesn't work in the Puzzlemaker and it has become increasingly difficult to maintain and develop. As such, we've decided that it's best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it, but it would likely take on a different form, and nothing regarding this is being worked on right now.",
+                "title": "What happened to BTS style?",
+                "description": "The BTS style was made in the early days of the BEE2, before we had really figured out our scope. We made the decision to remove BTS because it's fundamentally incompatible with the way normal test chambers (and by extension Puzzlemaker maps) are built. Test chambers are made up of modular, reusable test elements; BTS on the other hand has much more specialized machines, such as the turret production line from the campaign. In some ways, BTS maps are more similar to Half-Life's environmental puzzles than Portal's test chambers.\n\nBuilding a BTS map following the structure of a test chamber results in something which doesn't feel like a BTS map, it just feels like a test chamber with a skin on top of it - which is really all BEEmod styles are. That works fine when the skin is also a test chamber (or an equivalent), but if it's not, then the fact that it's just a skin becomes extremely obvious.",
                 "color": 16761704
               }
             ],
             "username": "BLoBDOS"
           },
-          "reference": ""
+          "reference": "https://discord.com/channels/293435914598744064/804814306897690715/882513917824335924"
         }
       ],
       "targets": [

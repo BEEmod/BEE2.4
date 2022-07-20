@@ -16,7 +16,7 @@ msgstr ""
 
 #: loadScreen.py:224
 msgid "Skipped!"
-msgstr "Sauté !"
+msgstr "Fait !"
 
 #: loadScreen.py:225
 msgid "Version: "
@@ -57,7 +57,7 @@ msgstr "Avertissements seulement"
 
 #: loadScreen.py:244
 msgid "Packages"
-msgstr "Paquets"
+msgstr "Packages"
 
 #: loadScreen.py:245
 msgid "Loading Objects"
@@ -103,7 +103,7 @@ msgid ""
 "shapes."
 msgstr ""
 "Les brushes forment les murs ou les autres parties de la salle de test. "
-"Si cette valeur est élevée, essayer de réduire la taille de la carte ou "
+"Si cette valeur est élevée, essayer de réduire la taille de la carte ou de "
 "simplifier sa forme."
 
 #. i18n: Progress bar description
@@ -139,14 +139,14 @@ msgstr ""
 
 #: app/CompilerPane.py:277
 msgid "Corridor"
-msgstr "Couloir"
+msgstr "Corridor"
 
 #: app/CompilerPane.py:316
 msgid ""
 "Randomly choose a corridor. This is saved in the puzzle data and will not"
 " change."
 msgstr ""
-"Choisit un couloir aléatoire. Ceci est sauvegardé dans le data du puzzle "
+"Choisit un corridor aléatoire. Ceci est sauvegardé dans le data dde la salle "
 "et ne va pas changer."
 
 #: app/CompilerPane.py:322 app/UI.py:663
@@ -155,7 +155,7 @@ msgstr "Aléatoire"
 
 #: app/CompilerPane.py:425
 msgid "Image Files"
-msgstr "Fichiers image"
+msgstr "Fichiers d'image"
 
 #: app/CompilerPane.py:497
 msgid ""
@@ -224,7 +224,7 @@ msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
 msgstr ""
-"Supprimer automatiquement les screenshots Autos non utilisés. Décochez si"
+"Supprimer automatiquement les screenshots automatiques non utilisés. Décochez si"
 " vous souhaitez garder des images dans \"portal2/screenshots\"."
 
 #: app/CompilerPane.py:615
@@ -244,7 +244,8 @@ msgid ""
 "You can hold down Shift during the start of the Lighting stage to invert "
 "this configuration on the fly."
 msgstr ""
-
+"Vous pouvez maintenir Shift appuyé pendant le démarrage du calcul de la lumière"
+" pour inverser cette configuration."
 #: app/CompilerPane.py:639
 msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
@@ -269,7 +270,7 @@ msgstr ""
 
 #: app/CompilerPane.py:652
 msgid "Dump packed files to:"
-msgstr "Vider les fichiers enpaquetés vers :"
+msgstr "Vider les fichiers packés vers :"
 
 #: app/CompilerPane.py:675
 msgid ""
@@ -339,7 +340,8 @@ msgid ""
 "You can hold down Shift during the start of the Geometry stage to quickly"
 " swap whichlocation you spawn at on the fly."
 msgstr ""
-
+"Vous pouvez maintenir Shift appuyé pendant le démarrage du calcul géométrique pour "
+"changer le point d'apparition."
 #: app/CompilerPane.py:811
 #, fuzzy
 msgid ""
@@ -348,7 +350,7 @@ msgid ""
 msgstr ""
 "Lors d'une prévisualisation en solo, cela fait apparaître dans "
 "l'ascenseur. Cela empêche aussi le redémarrage de la carte quand vous "
-"atteignez la sortie. Utilisez ceci pour vérifier les couloirs d'entrée et"
+"atteignez la sortie. Utilisez ceci pour vérifier les corridors d'entrée et"
 " de sortie."
 
 #: app/CompilerPane.py:815
@@ -360,21 +362,21 @@ msgstr ""
 
 #: app/CompilerPane.py:822
 msgid "Corridor:"
-msgstr "Couloir:"
+msgstr "Corridor:"
 
 #: app/CompilerPane.py:828
 msgid "Singleplayer Entry Corridor"
-msgstr ""
+msgstr "Corridor d'entrée solo"
 
 #. i18n: corridor selector window title.
 #: app/CompilerPane.py:829
 msgid "Singleplayer Exit Corridor"
-msgstr ""
+msgstr "Corridor de sortie solo"
 
 #. i18n: corridor selector window title.
 #: app/CompilerPane.py:830
 msgid "Coop Exit Corridor"
-msgstr ""
+msgstr "Corridor de sortie Coop"
 
 #: app/CompilerPane.py:840
 msgid "SP Entry:"
@@ -386,7 +388,7 @@ msgstr "Sortie solo:"
 
 #: app/CompilerPane.py:850
 msgid "Coop Exit:"
-msgstr ""
+msgstr "Sortie Coop"
 
 #: app/CompilerPane.py:856
 msgid "Player Model (SP):"
@@ -533,7 +535,7 @@ msgstr "Autres styles:"
 
 #: app/StyleVarPane.py:292
 msgid "No Options!"
-msgstr "Pas d'options!"
+msgstr "Pas d'options !"
 
 #: app/StyleVarPane.py:298
 msgid "None!"
@@ -549,7 +551,7 @@ msgstr "Cacher/Montrer la fenêtre \"{}\""
 
 #: app/UI.py:85
 msgid "Export..."
-msgstr "Export..."
+msgstr "Exportation..."
 
 #: app/UI.py:590
 msgid "Select Skyboxes"
@@ -686,7 +688,7 @@ msgstr "Enregistrer la palette sous..."
 
 #: app/UI.py:1138 app/paletteUI.py:134
 msgid "Save Settings in Palettes"
-msgstr ""
+msgstr "Enregistrer les paramètres (style, musique) dans la palette"
 
 #: app/UI.py:1156 app/music_conf.py:222
 msgid "Music: "
@@ -738,7 +740,7 @@ msgstr "Exporter"
 
 #: app/UI.py:1481 app/backup.py:877
 msgid "Add Game"
-msgstr "Ajouter le jeu"
+msgstr "Ajouter un jeu"
 
 #: app/UI.py:1485
 msgid "Uninstall from Selected Game"
@@ -750,7 +752,7 @@ msgstr "Sauvegarder/Restaurer les puzzles..."
 
 #: app/UI.py:1493
 msgid "Manage Packages..."
-msgstr "Gérer les paquets..."
+msgstr "Gérer les packages..."
 
 #: app/UI.py:1498
 msgid "Options"
@@ -766,7 +768,7 @@ msgstr "Palette"
 
 #: app/UI.py:1516
 msgid "View"
-msgstr ""
+msgstr "Voir"
 
 #: app/UI.py:1629
 msgid "Palettes"
@@ -774,7 +776,7 @@ msgstr "Palettes"
 
 #: app/UI.py:1666
 msgid "Export Options"
-msgstr "Options d'export"
+msgstr "Options d'exportation"
 
 #: app/UI.py:1698
 msgid "Fill empty spots in the palette with random items."
@@ -782,7 +784,7 @@ msgstr "Remplir les emplacements vides de la palette avec des objets aléatoires
 
 #: app/__init__.py:95
 msgid "BEEMOD {} Error!"
-msgstr ""
+msgstr "BEEMOD {} Erreur !"
 
 #: app/__init__.py:96
 msgid ""
@@ -791,6 +793,10 @@ msgid ""
 "\n"
 "This has been copied to the clipboard."
 msgstr ""
+"Une erreur s'est produite : \n"
+"{}\n"
+"\n"
+"Ceci a été copié dans le presse-papiers."
 
 #: app/backup.py:78
 msgid "Copying maps"
@@ -1045,7 +1051,7 @@ msgstr "Cet objet peut être tourné sur le sol à 360°."
 #: app/contextWin.py:440
 #, fuzzy
 msgid "Properties:"
-msgstr "Propriétés"
+msgstr "Propriétés :"
 
 #: app/contextWin.py:466
 msgid ""
@@ -1083,13 +1089,15 @@ msgstr "Changer les réglages par défaut pour cet objet lorsqu'il est placé."
 
 #: app/gameMan.py:788 app/gameMan.py:880
 msgid "BEE2 - Export Failed!"
-msgstr "BEE2 - Export échoué !"
+msgstr "BEE2 - Exportation échouée !"
 
 #: app/gameMan.py:789
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr ""
+"Le fichier du compileur {file} est manquant. Quittez les applications Steam, "
+"et appuyez sur OK pour vérifier le cache du jeu. vous pourrez ensuite réexporter."
 
 #: app/gameMan.py:881
 #, fuzzy
@@ -1103,10 +1111,12 @@ msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
 msgstr ""
+"L'instance de générateur Coop pour Ap-Tag n'a pas été trouvée !\n"
+"Les générateurs Coop ne fonctionneront pas - vérifiez le cache pour réparer."
 
 #: app/gameMan.py:1191
 msgid "BEE2 - Aperture Tag Files Missing"
-msgstr ""
+msgstr "BEE2 - Fichiers de Aperture Tag manquants"
 
 #: app/gameMan.py:1304
 msgid "Select the folder where the game executable is located ({appname})..."
@@ -1206,7 +1216,7 @@ msgstr "Portal Stories: Mel"
 
 #: app/helpMenu.py:79
 msgid "Thinking With Time Machine"
-msgstr "Thinking with Time Machine"
+msgstr "Thinking With Time Machine"
 
 #: app/helpMenu.py:474 app/itemPropWin.py:355
 msgid "Close"
@@ -1238,7 +1248,7 @@ msgid ""
 "(0=infinite)"
 msgstr ""
 "Délai\n"
-"(0=infini)"
+"(0=infinite)"
 
 #: app/itemPropWin.py:354
 msgid "No Properties available!"
@@ -1246,15 +1256,15 @@ msgstr "Aucune propriété disponible !"
 
 #: app/itemPropWin.py:604
 msgid "Settings for \"{}\""
-msgstr ""
+msgstr "Paramètres pour \"{}\""
 
 #: app/itemPropWin.py:605
 msgid "BEE2 - {}"
-msgstr ""
+msgstr "BEE2 - {}"
 
 #: app/item_search.py:67
 msgid "Search:"
-msgstr ""
+msgstr "Rechercher:"
 
 #: app/itemconfig.py:622
 msgid "Choose a Color"
@@ -1273,7 +1283,7 @@ msgid ""
 msgstr ""
 "Cela contrôle la musique de fond utilisée dans la carte. Certaines pistes"
 " ont des variations jouées lors d’interactions avec certains éléments de "
-"test."
+"test, comme les gels."
 
 #: app/music_conf.py:152
 msgid ""
@@ -1332,7 +1342,7 @@ msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
 msgstr ""
-"Sélectionne la musique quand les joueurs sont très véloces "
+"Sélectionne la musique quand les joueurs vont très vite "
 "horizontalement."
 
 #: app/music_conf.py:201
@@ -1341,7 +1351,7 @@ msgstr "N'ajoute pas de musique en temps de course rapide."
 
 #: app/music_conf.py:236
 msgid "Base: "
-msgstr "Base"
+msgstr "Base: "
 
 #: app/music_conf.py:269
 msgid "Funnel:"
@@ -1360,32 +1370,42 @@ msgstr "Vitesse"
 msgid ""
 "\n"
 "Launch Game?"
-msgstr "Lancer le jeu"
+msgstr ""
+"\n"
+"Lancer le jeu ?"
 
 #: app/optionWindow.py:46
 #, fuzzy
 msgid ""
 "\n"
 "Minimise BEE2?"
-msgstr "Minimiser le BEE2"
+msgstr ""
+"\n"
+"Minimiser BEE2 ?"
 
 #: app/optionWindow.py:47
 msgid ""
 "\n"
 "Launch Game and minimise BEE2?"
 msgstr ""
+"\n"
+"Lancer le jeu et minimiser BEE2 ?"
 
 #: app/optionWindow.py:49
 msgid ""
 "\n"
 "Quit BEE2?"
 msgstr ""
+"\n"
+"Quitter BEE2 ?"
 
 #: app/optionWindow.py:50
 msgid ""
 "\n"
 "Launch Game and quit BEE2?"
 msgstr ""
+"\n"
+"Lancer le jeu et quitter BEE2 ?"
 
 #: app/optionWindow.py:69
 msgid "BEE2 Options"
@@ -1396,8 +1416,8 @@ msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
 msgstr ""
-"Les caches temporelles des Packages ont été réinitialisées.Elles vont "
-"être extraites durant le prochain export."
+"Les caches temporelles des packages ont été réinitialisées. Elles vont "
+"être extraites durant la prochaine exportation."
 
 #: app/optionWindow.py:124
 msgid "\"Preserve Game Resources\" has been disabled."
@@ -1406,7 +1426,7 @@ msgstr "\"Preserve Game Resources\" a été désactivé."
 #: app/optionWindow.py:136
 #, fuzzy
 msgid "Packages Reset"
-msgstr "réinitialisation des packages"
+msgstr "Réinitialisation des packages"
 
 #: app/optionWindow.py:217
 msgid "General"
@@ -1426,7 +1446,7 @@ msgstr "OK"
 
 #: app/optionWindow.py:284
 msgid "After Export:"
-msgstr "Après l'export:"
+msgstr "Après l'exportation:"
 
 #: app/optionWindow.py:301
 msgid "Do Nothing"
@@ -1442,15 +1462,15 @@ msgstr "Quitter BEE2"
 
 #: app/optionWindow.py:321
 msgid "After exports, do nothing and keep the BEE2 in focus."
-msgstr "Après l'export, ne rien faire et garder BEE2 au premier plan."
+msgstr "Après l'exportation, ne rien faire et garder BEE2 au premier plan."
 
 #: app/optionWindow.py:323
 msgid "After exports, minimise to the taskbar/dock."
-msgstr "Après l'export, minimiser BEE2 dans la barre des tâches."
+msgstr "Après l'exportation, minimiser BEE2 dans la barre des tâches."
 
 #: app/optionWindow.py:324
 msgid "After exports, quit the BEE2."
-msgstr "Après l'export, quitter le BEE2."
+msgstr "Après l'exportation, quitter le BEE2."
 
 #: app/optionWindow.py:331
 msgid "Launch Game"
@@ -1458,7 +1478,7 @@ msgstr "Lancer le jeu"
 
 #: app/optionWindow.py:332
 msgid "After exporting, launch the selected game automatically."
-msgstr "Après l'export, lancer le jeu sélectionné automatiquement."
+msgstr "Après l'exportation, lancer le jeu sélectionné automatiquement."
 
 #: app/optionWindow.py:340 app/optionWindow.py:346
 msgid "Play Sounds"
@@ -1493,7 +1513,7 @@ msgid ""
 "multiple monitors, disable this."
 msgstr ""
 "Empêcher les sous-fenêtres de sortir des limites de l'écran. Si vous "
-"avezplusieurs écrans, désactivez cela."
+"avez plusieurs écrans, désactivez cela."
 
 #: app/optionWindow.py:384
 #, fuzzy
@@ -1507,8 +1527,8 @@ msgid ""
 "again."
 msgstr ""
 "Forcer les écrans de téléchargement à être au-dessus des autres "
-"fenêtres.Si elles n'apparaissent pas dans la barre des tâches/dock, elles"
-" ne peuvent pas aller au-dessusfacilement."
+"fenêtres. Si elles n'apparaissent pas dans la barre des tâches/dock, elles"
+" ne peuvent pas aller au-dessus facilement."
 
 #: app/optionWindow.py:395
 msgid "Reset All Window Positions"
@@ -1523,7 +1543,7 @@ msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
 msgstr ""
-"Lors du chargement des objets, enregistrer les objets ayant unnombre "
+"Lors du chargement des objets, enregistrer les objets ayant un nombre "
 "d'entités manquantes dans leur fichier properties.txt."
 
 #: app/optionWindow.py:418
@@ -1576,6 +1596,8 @@ msgid ""
 "Enables displaying additional UI specific for development purposes. "
 "Requires restart to have an effect."
 msgstr ""
+"Active l'affichage d'autres éléments de l'interface pour le développement. "
+"Requiert un redémarrage pour fonctionner."
 
 #: app/optionWindow.py:457
 msgid "Preserve Game Directories"
@@ -1589,7 +1611,7 @@ msgid ""
 "Only enable if you're developing new content, to ensure it is not "
 "overwritten."
 msgstr ""
-"Lors de l'export, ne pas remplacer\n"
+"Lors de l'exportation, ne pas remplacer\n"
 "\"bee2/\" et\n"
 "\"sdk_content/maps/bee2/\".\n"
 "Activez cela si vous développez du contenu nouveau afin qu'il ne soit pas"
@@ -1627,11 +1649,11 @@ msgstr "Supprimer la liste d'objets"
 
 #: app/optionWindow.py:502
 msgid "Reload Images"
-msgstr ""
+msgstr "Reloader les images"
 
 #: app/optionWindow.py:505
 msgid "Reload all images in the app. Expect the app to freeze momentarily."
-msgstr ""
+msgstr "Reloader toutes les images dans l'application. Attendez-vous à un lag de l'application."
 
 #: app/packageMan.py:64
 msgid "BEE2 - Restart Required!"
@@ -1652,7 +1674,7 @@ msgstr "BEE2 - Gérer les packages"
 #. i18n: Last exported items
 #: app/paletteLoader.py:26
 msgid "<Last Export>"
-msgstr "<Dernier export>"
+msgstr "<Dernière exportation>"
 
 #. i18n: Empty palette name
 #: app/paletteLoader.py:28
@@ -1713,11 +1735,11 @@ msgstr "Entrer un nom:"
 
 #: app/paletteUI.py:334
 msgid "BEE2 - Change Palette Group"
-msgstr ""
+msgstr "BEE2 - Changer le groupe de palettes"
 
 #: app/paletteUI.py:335
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
-msgstr ""
+msgstr "Entrez le nom du groupe pour cette palette, ou \"\" pour dissocier."
 
 #: app/richTextBox.py:197
 msgid "Open \"{}\" in the default browser?"
@@ -1801,7 +1823,7 @@ msgstr "Personnages humains (Bendy et Chell)"
 
 #: app/voiceEditor.py:44
 msgid "AI characters (ATLAS, P-Body, or Coop)"
-msgstr "Personnages IA (ATLAS, P-Body, ou Coop"
+msgstr "Personnages IA (ATLAS, P-Body, ou Coop)"
 
 #: app/voiceEditor.py:51
 msgid "Death - Toxic Goo"
@@ -1888,7 +1910,7 @@ msgstr "Sans nom ?"
 #~ msgstr "Chargement des images"
 
 #~ msgid "Enables displaying additional UI specific for development purposes."
-#~ msgstr ""
+#~ msgstr "Montre des éléments supplémentaires au UI pour le développement."
 
 #~ msgid "This palette already exists. Overwrite?"
 #~ msgstr "Cette palette existe déjà. Remplacer ?"

@@ -65,7 +65,8 @@ As an example, Portal 1 is a style that fits this criteria, as most of Portal 2'
 If your suggested style is a simple variant of an existing style (e.g. Original Clean, which just changes wall textures), it may be added. Custom packages can also add their own styles, so feel free to implement a new style yourself.
 
 ### Can you add style mixing / changing of items to different styles?
-No.
+
+We can, but we won't. You need the flexibility of Hammer to properly explain style mixing, and lots of combinations wouldn't make sense anyway.
 
 ### Why doesn't Portal 1 GLaDOS have any lines?
 
@@ -113,10 +114,20 @@ The Source engine has very strict limits on toggleable lights. Only two dynamic 
 
 If this is still what you want to do, first go into the BEE2 app and set Spawn Point to Elevator and disable Restart When Reaching Exit. Compile your map in Puzzlemaker, then open `maps/styled/preview.vmf` in Hammer and resave it to a different location so it doesn't get overwritten. Additionally, check your Build Programs settings to make sure that you're using the BEE2 version of VRAD (simply called `vrad.exe`), as this is needed for some features such as music to work.
 
-### Why is BTS being removed?
+### How do I use bottomless pits/what happened to 3D Factory?
 
-The BTS style was made back before BEE2.4, and our direction has long since changed. The style doesn't work in the Puzzlemaker and it has become increasingly difficult to maintain and develop. As such, we've decided that it's best to remove it, at least for now. The style might make a return if we have time to develop it or if someone else in the community steps in to work on it, but it would likely take on a different form, and nothing regarding this is being worked on right now.
+The bottomless pits originally featured in BEEmod had significant problems, so they've been removed for the time being. The plan is to implement a "chamber exterior" system which would allow generating areas surrounding the map, including improved bottomless pits. However, this feature is not yet being worked on.
+
+### What happened to BTS style?
+
+The BTS style was made in the early days of the BEE2, before we had really figured out our scope. We made the decision to remove BTS because it's fundamentally incompatible with the way normal test chambers (and by extension Puzzlemaker maps) are built. Test chambers are made up of modular, reusable test elements; BTS on the other hand has much more specialized machines, such as the turret production line from the campaign. In some ways, BTS maps are more similar to Half-Life's environmental puzzles than Portal's test chambers.
+
+Building a BTS map following the structure of a test chamber results in something which doesn't feel like a BTS map, it just feels like a test chamber with a skin on top of it - which is really all BEEmod styles are. That works fine when the skin is also a test chamber (or an equivalent), but if it's not, then the fact that it's just a skin becomes extremely obvious.
 
 ### Will you add Desolation's Industrial style to BEE2.4?
 
-No. The Industrial style is fairly complex and would be difficult to implement in the Puzzlemaker, requiring lots of compiler modifications. It also relies on many custom assets which would need to be packed into the map, increasing its file size substantially. Even if ways around both of these things were found, the style also makes use of custom features of Desolation's engine, which can't be replicated in standard Portal 2.\n\nImplementing the style within Desolation itself would solve the latter two issues, but Desolation won't be able to use Valve's puzzlemaker for technical reasons, and the developers currently have no plans to write their own. It also wouldn't solve the first problem, which is actually generating Industrial maps.\n\nAdditionally, see the question above about new styles in general.
+No. The Industrial style is fairly complex and would be difficult to implement in the Puzzlemaker, requiring lots of compiler modifications. It also relies on many custom assets which would need to be packed into the map, increasing its file size substantially. Even if ways around both of these things were found, the style also makes use of custom features of Desolation's engine, which can't be replicated in standard Portal 2.
+
+Implementing the style within Desolation itself would solve the latter two issues, but Desolation won't be able to use Valve's puzzlemaker for technical reasons, and the developers currently have no plans to write their own. It also wouldn't solve the first problem, which is actually generating Industrial maps.
+
+Additionally, see the question above about new styles in general.

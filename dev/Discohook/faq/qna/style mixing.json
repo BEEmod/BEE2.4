@@ -1,0 +1,29 @@
+{
+  "version": 7,
+  "backups": [
+    {
+      "name": "BEE FAQ - Style Mixing",
+      "messages": [
+        {
+          "data": {
+            "content": null,
+            "embeds": [
+              {
+                "title": "Can you add style mixing / changing of items to different styles?",
+                "description": "We can, but we won't. You need the flexibility of Hammer to properly explain style mixing, and lots of combinations wouldn't make sense anyway.",
+                "color": 16761704
+              }
+            ],
+            "username": "BLoBDOS"
+          },
+          "reference": ""
+        }
+      ],
+      "targets": [
+        {
+          "url": ""
+        }
+      ]
+    }
+  ]
+}
