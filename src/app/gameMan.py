@@ -114,7 +114,7 @@ MaterialModify
 '''
 
 # The location of all the instances in the game directory
-INST_PATH = 'sdk_content/maps/instances/bee2'
+INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
