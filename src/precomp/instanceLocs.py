@@ -357,10 +357,7 @@ def _resolve(path: str) -> List[str]:
                 try:
                     item_inst = INSTANCE_FILES[item_id]
                 except KeyError:
-                    LOGGER.warning(
-                        '"{}" not a valid item!',
-                        item_id,
-                    )
+                    LOGGER.warning('"{}" is not a valid item!', item_id)
                     return []
                 if subitems:
                     out.extend(get_subitems(subitems, item_inst, item_id))
@@ -373,7 +370,7 @@ def _resolve(path: str) -> List[str]:
                 try:
                     out.extend(INST_SPECIAL[special_name])
                 except KeyError:
-                    LOGGER.warning('"{}" not a valid instance category!', special_name)
+                    LOGGER.warning('"{}" is not a valid instance category!', special_name)
                     continue
             else:
                 raise Exception(group)
