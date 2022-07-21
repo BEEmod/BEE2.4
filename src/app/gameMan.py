@@ -1322,12 +1322,11 @@ def add_game(e=None):
         ).format(appname='portal2' + EXE_SUFFIX),
         parent=TK_ROOT,
         title=gettext('BEE2 - Add Game'),
-        )
+    )
     exe_loc = filedialog.askopenfilename(
         title=gettext('Find Game Exe'),
-        filetypes=[(gettext('Executable'), '.exe')],
-        initialdir='C:',
-        )
+        filetypes=[(gettext('Executable'), '.exe')] if utils.WIN else None,
+    )
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
@@ -1337,7 +1336,7 @@ def add_game(e=None):
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
                 title=gettext('BEE2 - Add Game'),
-                )
+            )
             return False
 
         # Mel doesn't use PeTI, so that won't make much sense...
