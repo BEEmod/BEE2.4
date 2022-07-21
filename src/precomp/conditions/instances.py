@@ -2,11 +2,11 @@
 
 """
 from __future__ import annotations
-from typing import Any, Union, Callable, Tuple, Dict
+from typing import Any, Union, Callable
 import operator
 
 import srctools.logger
-from precomp.conditions import make_flag, make_result, make_result_setup
+from precomp.conditions import make_flag, make_result
 from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Property, Angle, Vec, Entity, Output, VMF, conv_bool
 
