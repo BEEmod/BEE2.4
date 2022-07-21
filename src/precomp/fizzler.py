@@ -6,10 +6,9 @@ from enum import Enum
 import itertools
 
 import attrs
-import srctools.logger
 import srctools.vmf
 from srctools.vmf import VMF, Solid, Entity, Side, Output
-from srctools import Property, NoKeyError, Vec, Matrix, Angle
+from srctools import Property, NoKeyError, Vec, Matrix, Angle, logger
 
 import utils
 from precomp import (
@@ -105,7 +104,8 @@ class FizzBeam:
 def read_configs(conf: Property) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
-        fizz = FizzlerType.parse(fizz_conf)
+        with logger.context(fizz_conf['id', '??']):
+            fizz = FizzlerType.parse(fizz_conf)
 
         if fizz.id in FIZZ_TYPES:
             raise ValueError('Duplicate fizzler ID "{}"'.format(fizz.id))
