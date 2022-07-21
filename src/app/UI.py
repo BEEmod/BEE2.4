@@ -1602,13 +1602,13 @@ async def init_windows() -> None:
     loader.step('UI', 'voiceline')
     contextWin.init_widgets()
     loader.step('UI', 'contextwin')
-    await optionWindow.init_widgets()
+    await optionWindow.init_widgets(
+        reset_all_win=reset_panes,
+    )
     loader.step('UI', 'optionwindow')
     init_drag_icon()
     loader.step('UI', 'drag_icon')
     await trio.sleep(0)
-
-    optionWindow.reset_all_win = reset_panes
 
     # Load to properly apply config settings, then save to ensure
     # the file has any defaults applied.

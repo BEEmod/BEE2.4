@@ -40,13 +40,6 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], str] = {
 VARS: List[Tuple[str, tk.Variable]] = []
 
 
-def reset_all_win() -> None:
-    """Return all windows to their default positions.
-
-    This is replaced by `UI.reset_panes`.
-    """
-    pass
-
 win = tk.Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
 tk_tools.set_window_icon(win)
@@ -153,7 +146,10 @@ def make_checkbox(
     return widget
 
 
-async def init_widgets() -> None:
+async def init_widgets(
+    *,
+    reset_all_win: Callable[[], object],
+) -> None:
     """Create all the widgets."""
     nbook = ttk.Notebook(win)
     nbook.grid(
@@ -177,7 +173,7 @@ async def init_widgets() -> None:
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(init_gen_tab, fr_general)
-        nursery.start_soon(init_win_tab, fr_win)
+        nursery.start_soon(init_win_tab, fr_win, reset_all_win)
         nursery.start_soon(init_dev_tab, fr_dev)
 
     ok_cancel = ttk.Frame(win)
@@ -276,7 +272,10 @@ async def init_gen_tab(f: ttk.Frame) -> None:
     )
 
 
-async def init_win_tab(f: ttk.Frame) -> None:
+async def init_win_tab(
+    f: ttk.Frame,
+    reset_all_win: Callable[[], object],
+) -> None:
     """Optionsl relevant to specific windows."""
 
     make_checkbox(
@@ -309,7 +308,7 @@ async def init_win_tab(f: ttk.Frame) -> None:
         f,
         text=gettext('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
-        command=lambda: reset_all_win(),
+        command=reset_all_win,
     ).grid(row=1, column=1, sticky='E')
 
 
