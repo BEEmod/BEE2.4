@@ -813,8 +813,10 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 raise ValueError(f'Unknown action "{conf.after_export}"')
 
         # Select the last_export palette, so reloading loads this item selection.
-        pal_ui.select_palette(paletteUI.UUID_EXPORT)
-        pal_ui.update_state()
+        # But leave it at the current palette, if it's unmodified.
+        if pal_ui.selected.pos != pal_data:
+            pal_ui.select_palette(paletteUI.UUID_EXPORT)
+            pal_ui.update_state()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
         background_run(gameMan.EVENT_BUS, None, gameMan.selected_game)
