@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Awaitable, Callable
 from uuid import UUID
 
-from srctools.dmx import Element
+from srctools.dmx import Element, Attribute as DMAttribute, ValueType
 from tkinter import ttk, messagebox
 import tkinter as tk
 
@@ -21,6 +21,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 TREE_TAG_GROUPS = 'pal_group'
 TREE_TAG_PALETTES = 'palette'
 ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
+# These may not be hidden.
+FORCE_SHOWN: frozenset[UUID] = frozenset({UUID_PORTAL2})
 
 # Re-export paletteLoader values for convenience.
 __all__ = [
@@ -37,6 +39,7 @@ class PaletteState(config.Data):
     """
     selected: UUID = UUID_PORTAL2
     save_settings: bool = False
+    hidden_defaults: frozenset[UUID] = attrs.Factory(frozenset)
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> dict[str, PaletteState]:
@@ -50,24 +53,34 @@ class PaletteState(config.Data):
         return {'': cls(
             selected_uuid,
             config.LEGACY_CONF.get_bool('General', 'palette_save_settings'),
+            frozenset(),
         )}
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> PaletteState:
         """Parse Keyvalues data."""
         assert version == 1
+        hidden = {
+            UUID(hex=prop.value)
+            for prop in data.find_all('hidden')
+        }
         try:
             uuid = UUID(hex=data['selected'])
         except (LookupError, ValueError):
             uuid = UUID_PORTAL2
-        return PaletteState(uuid, data.bool('save_settings', False))
+        hidden.discard(uuid)
+        hidden -= FORCE_SHOWN
+        return PaletteState(uuid, data.bool('save_settings', False), frozenset(hidden))
 
     def export_kv1(self) -> Property:
         """Export to a property block."""
-        return Property('', [
+        prop = Property('', [
             Property('selected', self.selected.hex),
             Property('save_settings', srctools.bool_as_int(self.save_settings)),
         ])
+        for hidden in self.hidden_defaults:
+            prop.append(Property('hidden', hidden.hex))
+        return prop
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> PaletteState:
@@ -76,9 +89,20 @@ class PaletteState(config.Data):
             uuid = UUID(bytes=data['selected'].val_bytes)
         except (LookupError, ValueError):
             uuid = UUID_PORTAL2
+        hidden: set[UUID]
+        try:
+            hidden_arr = data['hidden'].iter_bytes()
+        except KeyError:
+            hidden = set()
+        else:
+            hidden = {UUID(bytes=byt) for byt in hidden_arr}
+            hidden.discard(uuid)
+            hidden -= FORCE_SHOWN
+
         return PaletteState(
             uuid,
             data['save_settings'].val_bool,
+            frozenset(hidden),
         )
 
     def export_dmx(self) -> Element:
@@ -86,6 +110,9 @@ class PaletteState(config.Data):
         elem = Element('Palette', 'DMElement')
         elem['selected'] = self.selected.bytes
         elem['save_settings'] = self.save_settings
+        elem['hidden'] = hidden = DMAttribute.array('hidden', ValueType.BINARY)
+        for uuid in self.hidden_defaults:
+            hidden.append(uuid.bytes)
         return elem
 
 
@@ -113,6 +140,7 @@ class PaletteUI:
         }
         prev_state = config.get_cur_conf(PaletteState, default=PaletteState())
         self.selected_uuid = prev_state.selected
+        self.hidden_defaults = set(prev_state.hidden_defaults)
         self.var_save_settings = tk.BooleanVar(value=prev_state.save_settings)
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
         self.get_items = get_items
@@ -175,19 +203,18 @@ class PaletteUI:
             command=self.event_remove,
         )
         self.ui_menu_delete_index = menu.index('end')
-        self.ui_menu_indexes = [self.ui_menu_delete_index]
 
         menu.add_command(
             label=gettext('Change Palette Group...'),
             command=self.event_change_group,
         )
-        self.ui_menu_indexes.append(menu.index('end'))
+        self.ui_readonly_indexes = [menu.index('end')]
 
         menu.add_command(
             label=gettext('Rename Palette...'),
             command=self.event_rename,
         )
-        self.ui_menu_indexes.append(menu.index('end'))
+        self.ui_readonly_indexes.append(menu.index('end'))
 
         menu.add_command(
             label=gettext('Fill Palette'),
@@ -208,7 +235,7 @@ class PaletteUI:
             command=self.event_save,
             accelerator=tk_tools.ACCEL_SAVE,
         )
-        self.ui_menu_indexes.append(menu.index('end'))
+        self.ui_readonly_indexes.append(menu.index('end'))
         menu.add_command(
             label=gettext('Save Palette As...'),
             command=self.event_save_as,
@@ -246,7 +273,8 @@ class PaletteUI:
 
         groups: dict[str, list[Palette]] = {}
         for pal in self.palettes.values():
-            groups.setdefault(pal.group, []).append(pal)
+            if pal is self.selected or pal.uuid not in self.hidden_defaults:
+                groups.setdefault(pal.group, []).append(pal)
 
         for group, palettes in sorted(groups.items(), key=lambda t: (t[0] != paletteLoader.GROUP_BUILTIN, t[0])):
             if group == paletteLoader.GROUP_BUILTIN:
@@ -310,20 +338,33 @@ class PaletteUI:
         self.ui_treeview.selection_set('pal_' + self.selected.uuid.hex)
         self.ui_treeview.see('pal_' + self.selected.uuid.hex)
 
-        self.ui_menu.entryconfigure(
-            self.ui_menu_delete_index,
-            label=gettext('Delete Palette "{}"').format(self.selected.name),
-        )
         if self.selected.readonly:
-            self.ui_remove.state(('disabled',))
+            self.ui_menu.entryconfigure(
+                self.ui_menu_delete_index,
+                label=gettext('Hide Palette "{}"').format(self.selected.name),
+            )
+            self.ui_remove['text'] = gettext('Hide Palette')
+
             self.save_btn_state(('disabled',))
-            for ind in self.ui_menu_indexes:
+            for ind in self.ui_readonly_indexes:
                 self.ui_menu.entryconfigure(ind, state='disabled')
         else:
-            self.ui_remove.state(('!disabled',))
+            self.ui_menu.entryconfigure(
+                self.ui_menu_delete_index,
+                label=gettext('Delete Palette "{}"').format(self.selected.name),
+            )
+            self.ui_remove['text'] = gettext('Delete Palette')
+
             self.save_btn_state(('!disabled',))
-            for ind in self.ui_menu_indexes:
+            for ind in self.ui_readonly_indexes:
                 self.ui_menu.entryconfigure(ind, state='normal')
+
+        if self.selected.uuid in FORCE_SHOWN:
+            self.ui_remove.state(('disabled',))
+            self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='disabled')
+        else:
+            self.ui_remove.state(('!disabled',))
+            self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='normal')
 
     def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
         """Create a checkbutton configured to control the save palette in settings option."""
@@ -336,12 +377,26 @@ class PaletteUI:
 
     def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""
-        config.store_conf(PaletteState(self.selected_uuid, self.var_save_settings.get()))
+        config.store_conf(PaletteState(
+            self.selected_uuid,
+            self.var_save_settings.get(),
+            frozenset(self.hidden_defaults),
+        ))
+
+    def reset_hidden_palettes(self) -> None:
+        """Clear all hidden palettes, and save."""
+        self.hidden_defaults.clear()
+        self._store_configuration()
+        self.update_state()
 
     def event_remove(self) -> None:
         """Remove the currently selected palette."""
         pal = self.selected
-        if not pal.readonly and messagebox.askyesno(
+        if pal.readonly:
+            if pal.uuid in FORCE_SHOWN:
+                return  # Disallowed.
+            self.hidden_defaults.add(pal.uuid)
+        elif messagebox.askyesno(
             title='BEE2',
             message=gettext('Are you sure you want to delete "{}"?').format(pal.name),
             parent=TK_ROOT,
@@ -349,6 +404,7 @@ class PaletteUI:
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
         self.select_palette(paletteLoader.UUID_PORTAL2)
+        self.update_state()
         background_run(self.set_items, self.selected)
 
     def event_save(self) -> None:

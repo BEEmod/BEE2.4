@@ -1603,6 +1603,7 @@ async def init_windows() -> None:
     contextWin.init_widgets()
     loader.step('UI', 'contextwin')
     await optionWindow.init_widgets(
+        unhide_palettes=pal_ui.reset_hidden_palettes,
         reset_all_win=reset_panes,
     )
     loader.step('UI', 'optionwindow')

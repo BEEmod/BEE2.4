@@ -148,6 +148,7 @@ def make_checkbox(
 
 async def init_widgets(
     *,
+    unhide_palettes: Callable[[], object],
     reset_all_win: Callable[[], object],
 ) -> None:
     """Create all the widgets."""
@@ -172,7 +173,7 @@ async def init_widgets(
     nbook.add(fr_dev, text=gettext('Development'))
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(init_gen_tab, fr_general)
+        nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
         nursery.start_soon(init_win_tab, fr_win, reset_all_win)
         nursery.start_soon(init_dev_tab, fr_dev)
 
@@ -201,16 +202,20 @@ async def init_widgets(
     await config.set_and_run_ui_callback(config.GenOptions, apply_config)
 
 
-async def init_gen_tab(f: ttk.Frame) -> None:
+async def init_gen_tab(
+    f: ttk.Frame,
+    unhide_palettes: Callable[[], object],
+) -> None:
     """Make widgets in the 'General' tab."""
     after_export_frame = ttk.LabelFrame(f, text=gettext('After Export:'))
     after_export_frame.grid(
         row=0,
-        rowspan=2,
+        rowspan=4,
         column=0,
         sticky='NS',
         padx=(0, 10),
     )
+    f.rowconfigure(3, weight=1) # Stretch underneath the right column, so it's all aligned to top.
 
     exp_nothing = ttk.Radiobutton(
         after_export_frame,
@@ -258,14 +263,25 @@ async def init_gen_tab(f: ttk.Frame) -> None:
             mute,
             gettext('Pyglet is either not installed or broken.\nSound effects have been disabled.')
         )
-    mute.grid(row=0, column=1, sticky='E')
+    mute.grid(row=0, column=1, sticky='W')
+
+    reset_palette = ttk.Button(
+        f,
+        text=gettext('Show Hidden Palettes'),
+        command=unhide_palettes,
+    )
+    reset_palette.grid(row=1, column=1, sticky='W')
+    add_tooltip(
+        reset_palette,
+        gettext('Show all builtin palettes that you may have hidden.'),
+    )
 
     reset_cache = ttk.Button(
         f,
         text=gettext('Reset Package Caches'),
         command=clear_caches,
     )
-    reset_cache.grid(row=1, column=1, sticky='EW')
+    reset_cache.grid(row=2, column=1, sticky='W')
     add_tooltip(
         reset_cache,
         gettext('Force re-extracting all package resources.'),
