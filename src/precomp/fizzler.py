@@ -23,7 +23,7 @@ from precomp import (
 import consts
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = logger.get_logger(__name__)
 
 FIZZ_TYPES: dict[str, FizzlerType] = {}
 FIZZLERS: dict[str, Fizzler] = {}
@@ -245,11 +245,13 @@ class FizzlerType:
         inst: dict[tuple[FizzInst, bool], list[str]] = {}
         for inst_type, is_static in itertools.product(FizzInst, (False, True)):
             inst_type_name = inst_type.value + ('_static' if is_static else '')
-            inst[inst_type, is_static] = instances = [
-                file
-                for prop in conf.find_all(inst_type_name)
-                for file in instanceLocs.resolve(prop.value)
-            ]
+            inst[inst_type, is_static] = instances = []
+            for prop in conf.find_all(inst_type_name):
+                resolved = instanceLocs.resolve(prop.value)
+                if prop.value and not resolved:
+                    LOGGER.warning('No instances found using specifier "{}"!', prop.value)
+                instances.extend(resolved)
+
             # Allow specifying weights to bias model locations
             weights = conf[inst_type_name + '_weight', '']
             if weights:
@@ -260,7 +262,7 @@ class FizzlerType:
                     rand.parse_weights(len(instances), weights)
                 ))
             # If static versions aren't given, reuse non-static ones.
-            # We do False, True so it's already been calculated.
+            # We did False before True above, so we know it's already been calculated.
             if not instances and is_static:
                 inst[inst_type, True] = inst[inst_type, False]
 
@@ -282,6 +284,8 @@ class FizzlerType:
             for prop in
             conf.find_all('PackStatic')
         }
+        if pack_lists or pack_lists_static:
+            LOGGER.warning('Packlist definitions are deprecated, use auto packing or comp_pack!')
 
         brushes = [
             FizzlerBrush.parse(prop)
