@@ -43,7 +43,11 @@ async def init_app() -> None:
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
     config.read_settings()
-    conf = config.get_cur_conf(config.GenOptions)
+    try:
+        conf = config.get_cur_conf(config.GenOptions)
+    except KeyError:
+        conf = config.GenOptions()
+        config.store_conf(conf)
 
     # Special case, load in this early, so it applies.
     utils.DEV_MODE = conf.dev_mode
