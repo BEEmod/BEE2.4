@@ -10,7 +10,6 @@ import sys
 workpath: str
 SPECPATH: str
 
-# Allow finding/importing hammeraddons and utils.
 hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 sys.path.append(SPECPATH)
 
@@ -56,9 +55,12 @@ INCLUDES = [
 
     # Might not be found?
     'rtree',
+    # Ensure all of Hammeraddons is loaded.
+    'hammeraddons', 'hammeraddons.acache', 'hammeraddons.config', 'hammeraddons.mdl_compiler',
+    'hammeraddons.postcompiler', 'hammeraddons.plugin', 'hammeraddons.propcombine',
+    'hammeraddons.plugin',
 ]
 INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
-INCLUDES += collect_submodules('hammeraddons')
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
