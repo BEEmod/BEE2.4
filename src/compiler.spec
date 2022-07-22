@@ -10,7 +10,7 @@ import sys
 workpath: str
 SPECPATH: str
 
-py_path = os.environ.get('PYTHONPATH').split(os.pathsep)
+py_path = os.environ.get('PYTHONPATH', '').split(os.pathsep)
 
 # Allow finding/importing hammeraddons and utils.
 hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
