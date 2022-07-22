@@ -190,7 +190,7 @@ elif utils.LINUX:
         STRETCH_VERT = 'bottom_side'
         STRETCH_HORIZ = 'right_side'
         MOVE_ITEM = 'fleur'
-        DESTROY_ITEM = 'x_cursor'
+        DESTROY_ITEM = 'X_cursor'
         INVALID_DRAG = 'circle'
 else:
     raise AssertionError
