@@ -1323,10 +1323,13 @@ def add_game(e=None):
         parent=TK_ROOT,
         title=gettext('BEE2 - Add Game'),
     )
-    exe_loc = filedialog.askopenfilename(
-        title=gettext('Find Game Exe'),
-        filetypes=[(gettext('Executable'), '.exe')] if utils.WIN else None,
-    )
+    if utils.WIN:
+        exe_loc = filedialog.askopenfilename(
+            title=gettext('Find Game Exe'),
+            filetypes=[(gettext('Executable'), '.exe')]
+        )
+    else:
+        exe_loc = filedialog.askopenfilename(title=gettext('Find Game Binaries'))
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
