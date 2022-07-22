@@ -64,8 +64,8 @@ FILES_TO_BACKUP = [
     ('Windows VRAD', 'bin/vrad',       '.exe'),
     ('OSX VBSP',     'bin/vbsp_osx',   ''),
     ('OSX VRAD',     'bin/vrad_osx',   ''),
-    ('Linux VBSP',   'bin/vbsp_linux', ''),
-    ('Linux VRAD',   'bin/vrad_linux', ''),
+    ('Linux VBSP',   'bin/linux32/vbsp_linux', ''),
+    ('Linux VRAD',   'bin/linux32/vrad_linux', ''),
 ]
 
 _UNLOCK_ITEMS = [
@@ -550,7 +550,7 @@ class Game:
                 start_folder = start_folder.casefold()
 
                 if start_folder == 'instances':
-                    dest = self.abs_path(INST_PATH + '/' + path)
+                    dest = self.abs_path(INST_PATH + '/' + path.casefold())
                 elif start_folder in ('bee2', 'music_samp'):
                     screen_func('RES', start_folder)
                     continue  # Skip app icons and music samples.
@@ -844,12 +844,13 @@ class Game:
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
                 compiler_src = utils.install_path('compiler')
+                comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
                 for comp_file in compiler_src.rglob('*'):
                     # Ignore folders.
                     if comp_file.is_dir():
                         continue
 
-                    dest = self.abs_path('bin' / comp_file.relative_to(compiler_src))
+                    dest = self.abs_path(comp_dest / comp_file.relative_to(compiler_src))
 
                     LOGGER.info('\t* {} -> {}', comp_file, dest)
 
@@ -869,11 +870,13 @@ class Game:
                         export_screen.reset()
                         messagebox.showerror(
                             title=gettext('BEE2 - Export Failed!'),
-                            message=gettext('Copying compiler file {file} failed. '
-                                      'Ensure {game} is not running.').format(
-                                        file=comp_file,
-                                        game=self.name,
-                                    ),
+                            message=gettext(
+                                'Copying compiler file {file} failed. '
+                                'Ensure {game} is not running.'
+                            ).format(
+                                file=comp_file,
+                                game=self.name,
+                            ),
                             master=TK_ROOT,
                         )
                         return False, vpk_success

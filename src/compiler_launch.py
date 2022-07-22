@@ -4,6 +4,11 @@ import sys
 
 if hasattr(sys, 'frozen'):
     app_name = os.path.basename(sys.executable).casefold()
+    # On Linux, we're in bin/linux32/, not bin/. So everything else works as expected,
+    # move back.
+    folder = os.path.basename(os.getcwd())
+    if folder.casefold() == 'linux32':
+        os.chdir(os.path.dirname(os.getcwd()))
 else:
     # Sourcecode-launch - check first sys arg.
     app_name = sys.argv.pop(1).casefold()
