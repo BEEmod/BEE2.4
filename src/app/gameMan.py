@@ -559,10 +559,10 @@ class Game:
                     dest = self.abs_path(os.path.join('bee2', file.path))
 
                 # Already copied from another package.
-                if dest in already_copied:
+                if dest.casefold() in already_copied:
                     screen_func('RES', dest)
                     continue
-                already_copied.add(dest)
+                already_copied.add(dest.casefold())
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
@@ -1040,7 +1040,7 @@ class Game:
                 dest_loc = os.path.join(tag_dest, filename)
                 if os.path.isfile(src_loc) and not os.path.exists(dest_loc):
                     shutil.copy(src_loc, dest_loc)
-                copied_files.add(dest_loc)
+                copied_files.add(dest_loc.casefold())
                 export_screen.step('MUS')
 
         if MUSIC_MEL_VPK is not None:
@@ -1050,7 +1050,7 @@ class Game:
                 if not os.path.exists(dest_loc):
                     with open(dest_loc, 'wb') as dest:
                         dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
-                copied_files.add(dest_loc)
+                copied_files.add(dest_loc.casefold())
                 export_screen.step('MUS')
 
         return copied_files
