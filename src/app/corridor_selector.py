@@ -217,7 +217,8 @@ class Selector:
         self.event_bus = event.EventBus()
 
         conf = config.get_cur_conf(UIState, default=UIState())
-        self.win.geometry(f'{conf.width}x{conf.height}')
+        if conf.width > 0 and conf.height > 0:
+            self.win.geometry(f'{conf.width}x{conf.height}')
 
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
