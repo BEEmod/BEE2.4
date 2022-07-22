@@ -65,7 +65,10 @@ def load_transforms() -> None:
 
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
-    code = srctools.run.run_compiler(os.path.join(os.getcwd(), "vrad"), args)
+    code = srctools.run.run_compiler(
+        os.path.join(os.getcwd(), 'linux32/vrad' if utils.LINUX else 'vrad'),
+        args,
+    )
     if code == 0:
         LOGGER.info("Done!")
     else:

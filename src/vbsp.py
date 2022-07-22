@@ -1333,7 +1333,10 @@ def run_vbsp(vbsp_args, path, new_path=None) -> None:
     buff = StringIO()
     vbsp_logger.addHandler(logging.StreamHandler(buff))
 
-    code = srctools.run.run_compiler('vbsp', vbsp_args, vbsp_logger)
+    code = srctools.run.run_compiler(
+        'linux32/vbsp' if utils.LINUX else 'vbsp',
+        vbsp_args, vbsp_logger,
+    )
     if code != 0:
         # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
