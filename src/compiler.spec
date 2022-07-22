@@ -10,15 +10,10 @@ import sys
 workpath: str
 SPECPATH: str
 
-py_path = os.environ.get('PYTHONPATH', '').split(os.pathsep)
-
 # Allow finding/importing hammeraddons and utils.
 hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
-py_path.append(SPECPATH)
-py_path.append(str(hammeraddons / 'src'))
+sys.path.append(SPECPATH)
 
-sys.path.extend(py_path)
-os.environ['PYTHONPATH'] = os.pathsep.join(py_path)
 
 import utils
 if utils.MAC:
@@ -58,6 +53,9 @@ INCLUDES = [
     'decimal', 'difflib', 'enum', 'fractions', 'functools',
     'io', 'itertools', 'json', 'math', 'random', 're',
     'statistics', 'string', 'struct', 'attrs', 'attr',
+
+    # Might not be found?
+    'rtree',
 ]
 INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 INCLUDES += collect_submodules('hammeraddons')
@@ -123,7 +121,7 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 
 vbsp_vrad_an = Analysis(
     ['compiler_launch.py'],
-    pathex=[workpath],
+    pathex=[workpath, str(hammeraddons / 'src')],
     binaries=binaries,
     hiddenimports=INCLUDES,
     excludes=EXCLUDES,
