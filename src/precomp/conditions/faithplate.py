@@ -75,7 +75,7 @@ def res_set_faith(res: Property) -> conditions.ResultCallable:
 
 
 @conditions.make_result('faithMods')
-def res_faith_mods() -> None:
+def res_faith_mods() -> object:
     """This result is deprecated.
 
     The functions provided by this have been replaced by other features:

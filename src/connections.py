@@ -101,7 +101,7 @@ def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | 
     return out_name, output
 
 
-def format_output_name(out_tup: [str | None, str]) -> str:
+def format_output_name(out_tup: tuple[str | None, str]) -> str:
     """Convert the output tuple into a nice string."""
     inst, out = out_tup
     if inst is not None:

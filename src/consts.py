@@ -52,7 +52,7 @@ class MaterialGroupMeta(EnumMeta):
     _value2member_map_: dict[str, Any]  # Enum defines.
 
     @classmethod
-    def __prepare__(mcs, cls: str, bases: tuple[type, ...], /, **kwd: Any) -> Any:
+    def __prepare__(mcs, cls: str, bases: tuple[type, ...], /, **kwd: Any) -> Any:  # type: ignore
         """Override Enum class-dict type.
 
         This makes string-values lowercase when set.

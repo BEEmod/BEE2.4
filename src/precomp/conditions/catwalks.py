@@ -88,8 +88,8 @@ class EmptyLink(Link):
     def N(self) -> bool:  # type: ignore
         """Always unset."""
         return False
-    @N.setter  # type: ignore
-    def N(self, value: bool) -> None:  # type: ignore
+    @N.setter
+    def N(self, value: bool) -> None:
         """Setting does nothing."""
     S = E = W = N  # type: ignore
 

@@ -48,11 +48,11 @@ def flag_angles(flag: Property) -> Callable[[Entity], bool]:
 
     if flag.has_children():
         targ_angle = flag['direction', '0 0 0']
-        from_dir = flag['from_dir', '0 0 1']
-        if from_dir.casefold() in DIRECTIONS:
-            from_dir = Vec(DIRECTIONS[from_dir.casefold()])
+        from_dir_str = flag['from_dir', '0 0 1']
+        if from_dir_str.casefold() in DIRECTIONS:
+            from_dir = Vec(DIRECTIONS[from_dir_str.casefold()])
         else:
-            from_dir = Vec.from_str(from_dir, 0, 0, 1)
+            from_dir = Vec.from_str(from_dir_str, 0, 0, 1)
         allow_inverse = flag.bool('allow_inverse')
     else:
         targ_angle = flag.value
