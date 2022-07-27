@@ -226,7 +226,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
             continue
         data = {}
-        data_exc: dict[EnumT, tuple[BaseException, types.TracebackType | None]] = {}
+        data_exc: dict[EnumT, tuple[Type[BaseException], tuple]] = {}
 
         exc: Exception
         enum: EnumT
@@ -239,24 +239,18 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
                 pass
             try:
                 res = value.fget(enum)
+            except (ValueError, TypeError) as exc:
+                # These exceptions can be recreated later by passing *args. That's not possible
+                # for arbitrary exceptions, ensure we only do it for known ones.
+                data_exc[enum] = type(exc), exc.args
             except Exception as exc:
-                # The getter raised an exception, so we want to replicate
-                # that. So grab the traceback, and go back one frame to exclude
-                # ourselves from that. Then we can re-raise making it look like
-                # it came from the original getter.
-                if exc.__traceback__ is not None:
-                    tb = exc.__traceback__
-                    if tb.tb_next is not None:
-                        tb = tb.tb_next
-                else:
-                    tb = None
-                data_exc[enum] = (exc, tb)
-                exc.__traceback__ = None
+                # Something else, need to validate it can be recreated.
+                raise ValueError(f'{cls}.{name} raised exception! Add this to the above clause!') from exc
             else:
                 data[enum] = res
         if data_exc:
             func = _exc_freeze(data, data_exc)
-        else:  # If we don't raise, we can use the C-func
+        else:  # If we don't raise, we can use this C function directly.
             func = data.get
         setattr(cls, name, property(fget=func, doc=value.__doc__))
     return cls
@@ -264,7 +258,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, tuple[BaseException, types.TracebackType | None]],
+    data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -272,8 +266,8 @@ def _exc_freeze(
         try:
             return data[value]
         except KeyError:
-            exc, tb = data_exc[value]
-            raise exc.with_traceback(tb) from None
+            exc_type, args = data_exc[value]
+            raise exc_type(*args) from None
     return getter
 
 
@@ -505,7 +499,7 @@ class Result(Generic[ResultT]):
 
         return Result(nursery, task, name=func)
 
-    async def _task(self, func: Callable[[Unpack[ArgsT]], ResultT], args: Tuple[Unpack[ArgsT]]) -> None:
+    async def _task(self, func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]], args: Tuple[Unpack[ArgsT]]) -> None:
         """The task that is run."""
         self._result = await func(*args)
 
