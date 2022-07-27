@@ -1,11 +1,12 @@
 """Results relating to brushwork."""
 from __future__ import annotations
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Union
+from typing_extensions import Literal
 from collections import defaultdict
 from random import Random
 
 from srctools import Property, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, to_matrix
+from srctools.math import Vec, Angle, Matrix, Vec_tuple, to_matrix
 import srctools.logger
 
 from precomp import (
@@ -442,6 +443,7 @@ def res_import_template(
         res = Property('TemplateBrush', [])
 
     force = res['force', ''].casefold().split()
+    conf_force_colour: template_brush.ForceColour
     if 'white' in force:
         conf_force_colour = texturing.Portalable.white
     elif 'black' in force:
@@ -1215,12 +1217,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.brush_ent = brush_ent
 
 
-def _fill_norm_rotations() -> dict[
-    tuple[tuple[float, float, float], tuple[float, float, float]],
-    Matrix,
-]:
+def _fill_norm_rotations() -> dict[tuple[Vec_tuple, Vec_tuple], Matrix]:
     """Given a norm->norm rotation, return the angles producing that."""
-    rotations = {}
+    rotations: dict[tuple[Vec_tuple, Vec_tuple], Matrix] = {}
     for norm_ax in 'xyz':
         for norm_mag in [-1, +1]:
             norm = Vec.with_axes(norm_ax, norm_mag)

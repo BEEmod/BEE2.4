@@ -4,7 +4,8 @@ from __future__ import annotations
 import itertools
 import os
 from collections import defaultdict
-from typing import AbstractSet, Callable, Union, Optional, Tuple, Mapping, Iterable, Iterator
+from typing import AbstractSet, Callable, Union, Optional, Dict, Tuple, Mapping, Iterable, Iterator
+from typing_extensions import Literal, TypeAlias
 
 from decimal import Decimal
 from enum import Enum
@@ -195,7 +196,8 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-TEMP_COLOUR_INVERT = {
+ForceColour: TypeAlias = Union[texturing.Portalable, Literal['INVERT'], None]
+TEMP_COLOUR_INVERT: Dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,
     None: 'INVERT',
@@ -926,7 +928,7 @@ def retexture_template(
     origin: Vec,
     fixup: EntityFixup=None,
     replace_tex: Mapping[str, Union[list[str], str]]=srctools.EmptyMapping,
-    force_colour: Portalable=None,
+    force_colour: ForceColour=None,
     force_grid: TileSize=None,
     generator: GenCat=GenCat.NORMAL,
     sense_offset: Optional[Vec]=None,
