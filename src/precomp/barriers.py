@@ -249,9 +249,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
         normal = Vec.with_axes(norm_axis, 1 if is_pos else -1)
 
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-        is_present: Plane[object] = pos_slice.copy()
-        for pos in is_present:
-            is_present[pos] = True
+        is_present = Plane.fromkeys(pos_slice, True)
         for min_u, min_v, max_u, max_v, _ in grid_optimise(is_present):
             # These are two points in the origin plane, at the borders.
             pos_min = Vec.with_axes(

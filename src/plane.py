@@ -3,8 +3,8 @@
 """
 from __future__ import annotations
 from typing import (
-    TypeVar, Generic, Optional, Tuple, Any, overload,
-    Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView
+    Type, TypeVar, Generic, Optional, Tuple, Any, Union, overload,
+    Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView,
 )
 import copy
 
@@ -55,6 +55,28 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __repr__(self) -> str:
         return f'Plane({dict(self.items())!r})'
+
+    @classmethod
+    def fromkeys(
+        cls: Type['Plane[ValT]'],
+        source: Union[Plane, Iterable[Tuple[int, int]]],
+        value: ValT,
+    ) -> 'Plane[ValT]':
+        """Create a plane from an existing set of keys, setting all values to a specific value."""
+        if isinstance(source, Plane):
+            res: Plane[ValT] = cls.__new__(cls)
+            res.__dict__.update(source.__dict__)  # Immutables
+            res._xoffs = source._xoffs.copy()
+            res._data = [
+                None if row is None else [value] * len(row)
+                for row in source._data
+            ]
+            return res
+        else:
+            res = Plane()
+            for xy in source:
+                res[xy] = value
+            return res
 
     def copy(self) -> 'Plane[ValT]':
         """Shallow-copy the plane."""
