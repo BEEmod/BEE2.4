@@ -1,7 +1,7 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Container
 from enum import Enum
 import math
 
@@ -50,7 +50,7 @@ class AntTex:
             static = prop.bool('static')
         else:
             vals = prop.value.split('|')
-            opts = ()
+            opts: Container[str] = ()
             scale_str = '0.25'
 
             if len(vals) == 2:
