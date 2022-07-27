@@ -181,17 +181,17 @@ class TileType(Enum):
     @property
     def as_white(self) -> TileType:
         """Force to the white version."""
-        if self is self.GOO_SIDE:
-            return self.WHITE_4x4
+        if self is TileType.GOO_SIDE:
+            return TileType.WHITE_4x4
         if self.name.startswith('BLACK'):
-            return getattr(self, f'WHITE{self.name[5:]}')
+            return getattr(TileType, f'WHITE{self.name[5:]}')
         return self
 
     @property
     def as_black(self) -> TileType:
         """Force to the black version."""
         if self.is_white:
-            return getattr(self, f'BLACK{self.name[5:]}')
+            return getattr(TileType, f'BLACK{self.name[5:]}')
         return self
 
     @property
@@ -1758,9 +1758,9 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 break  # Skip to next entity
 
     # Tell the antlines which tiledefs they attach to.
-    for side, segments in side_to_ant_seg.items():
+    for side_id, segments in side_to_ant_seg.items():
         try:
-            tile = face_to_tile[side]
+            tile = face_to_tile[side_id]
         except KeyError:
             continue
         for seg in segments:
@@ -1780,8 +1780,8 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 faces.remove(face)
         over['sides'] = ' '.join(faces)
 
-    # Strip out all the original goo triggers. Ignore ones with names
-    # so we don't touch laserfield trigger here.
+    # Strip out all the original goo triggers. Ignore ones with names, so we don't touch
+    # laserfield triggers here.
     for trig in vmf_file.by_class['trigger_multiple']:
         if trig['wait'] == '0.1' and trig['targetname', ''] == '':
             trig.remove()
