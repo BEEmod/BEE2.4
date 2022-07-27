@@ -1,13 +1,13 @@
-"""The result used to generate unstationary scaffolds."""
-from typing import Tuple, Optional, Any
+"""Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
+from decimal import Decimal
+from typing import Dict, Tuple, Optional, Any, Union
 from enum import Enum
 import math
 
 from srctools import Vec, Property, VMF
 import srctools.logger
 
-from precomp import instanceLocs, item_chain
-from precomp.conditions import make_result, RES_EXHAUSTED, ResultCallable
+from precomp import instanceLocs, item_chain, conditions
 
 
 class LinkType(Enum):
@@ -66,11 +66,14 @@ def resolve_optional(prop: Property, key: str) -> Optional[str]:
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
 # Store the configs for scaffold items, so we can join them up later
-SCAFFOLD_CONFIGS = {}
+SCAFFOLD_CONFIGS: Dict[str, Tuple[
+    Dict[str, Dict[str, Union[bool, str, Vec, None]]],
+    Dict[str, Dict[str, Optional[str]]],
+]] = {}
 
 
-@make_result('UnstScaffold')
-def res_old_unst_scaffold(res: Property) -> ResultCallable:
+@conditions.make_result('UnstScaffold')
+def res_old_unst_scaffold(res: Property) -> object:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
     This has since been swapped to use the LinkedItems result, but this is kept for package
@@ -86,7 +89,7 @@ def res_old_unst_scaffold(res: Property) -> ResultCallable:
         targ_inst, links = SCAFFOLD_CONFIGS[group]
 
     for block in res.find_all("Instance"):
-        conf = {
+        conf: Dict[str, Union[bool, str, Vec, None]] = {
             # If set, adjusts the offset appropriately
             'is_piston': srctools.conv_bool(block['isPiston', '0']),
             'rotate_logic': srctools.conv_bool(block['AlterAng', '1'], True),
@@ -130,22 +133,20 @@ def res_old_unst_scaffold(res: Property) -> ResultCallable:
             # A '*' name to reference all the ents (set on the start logic)
             'all': block['allVar', None],
         }
+    LOGGER.warning(
+        'Running legacy scaffold generator for "{}"!'
+        'Items should now use the generic LinkedItem config, update your packages!',
+        res.value,
+    )
 
-    def scaffold_result(vmf: VMF) -> object:
-        """Construct the scaffolds."""
-        # The instance types we're modifying
-        if group not in SCAFFOLD_CONFIGS:
-            # We've already executed this config group
-            return RES_EXHAUSTED
 
-        LOGGER.warning(
-            'Running legacy scaffold generator for "{}"!'
-            'Items should now use the generic LinkedItem config, update your packages!',
-            res.value,
-        )
-        inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
-        del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
+@conditions.meta_cond(priority=Decimal('-250.0001'))
+def legacy_scaffold_link(vmf: VMF) -> None:
+    """Apply the legacy scaffold logic."""
+    if not SCAFFOLD_CONFIGS:
+        return
 
+    for inst_to_config, LINKS in SCAFFOLD_CONFIGS.values():
         # Don't bother typechecking this dict, legacy code.
         nodes: list[item_chain.Node[dict[str, Any]]] = []
         for inst in vmf.by_class['func_instance']:
@@ -292,6 +293,4 @@ def res_old_unst_scaffold(res: Property) -> ResultCallable:
                     # Copy over fixup values
                     logic_inst.fixup[key] = val
 
-        LOGGER.info('Finished Scaffold generation!')
-        return RES_EXHAUSTED
-    return scaffold_result
+        LOGGER.info('Finished legacy Scaffold generation!')

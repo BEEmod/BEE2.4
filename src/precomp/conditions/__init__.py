@@ -574,7 +574,7 @@ def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=Tru
     ALL_META.append((name, dec_priority, wrapper))
 
 
-def meta_cond(priority: int=0, only_once: bool=True) -> Callable[[CallableT], CallableT]:
+def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[CallableT], CallableT]:
     """Decorator version of add_meta."""
     def x(func: CallableT) -> CallableT:
         add_meta(func, priority, only_once)
