@@ -232,7 +232,7 @@ class BBox:
     def from_ent(cls, ent: Entity) -> Iterator[BBox]:
         """Parse keyvalues on a VMF entity. One bounding box is produced for each brush."""
         coll = CollideType.NOTHING
-        for key, value in ent.keys.items():
+        for key, value in ent.items():
             if key.casefold().startswith('coll_') and conv_bool(value):
                 coll_name = key[5:].upper()
                 try:
