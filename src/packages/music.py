@@ -153,7 +153,7 @@ class Music(PakObject, needs_foreground=True):
             return True
         return False
 
-    def has_channel(self, channel: MusicChannel) -> bool:
+    def has_channel(self, packset: PackagesSet, channel: MusicChannel) -> bool:
         """Check if this track or its children has a channel."""
         if self.sound[channel]:
             return True
@@ -161,15 +161,15 @@ class Music(PakObject, needs_foreground=True):
             # The instance provides the base track.
             return True
         try:
-            children = Music.by_id(self.children[channel])
+            children = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             return False
         return bool(children.sound[channel])
 
-    def get_attrs(self) -> dict[str, bool]:
+    def get_attrs(self, packset: PackagesSet) -> dict[str, bool]:
         """Generate attributes for SelectorWin."""
         attrs = {
-            channel.name: self.has_channel(channel)
+            channel.name: self.has_channel(packset, channel)
             for channel in MusicChannel
             if channel is not MusicChannel.BASE
         }
@@ -264,7 +264,7 @@ class Music(PakObject, needs_foreground=True):
                 child_id = music.children.get(channel, '')
                 if child_id:
                     try:
-                        cls.by_id(child_id)
+                        packset.obj_by_id(cls, child_id)
                     except KeyError:
                         LOGGER.warning(
                             'Music "{}" refers to nonexistent'

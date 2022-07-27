@@ -119,7 +119,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
                 selitem = SelItem.from_data(
                     music.id,
                     music.selitem_data,
-                    music.get_attrs(),
+                    music.get_attrs(packset),
                 )
                 selitem.snd_sample = music.get_sample(channel)
                 music_list.append(selitem)
