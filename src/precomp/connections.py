@@ -1023,9 +1023,8 @@ def add_item_inputs(
         # fire it off.
         if spawn_fire is FeatureMode.ALWAYS:
             if item.is_logic:
-                # Logic gates need to trigger their outputs.
-                # Make this item a logic_auto temporarily, then we'll fix them
-                # them up into an OnMapSpawn output properly at the end.
+                # Logic gates need to trigger their outputs. Make this item a logic_auto
+                # temporarily, then we'll fix them up into an OnMapSpawn output properly at the end.
                 item.inst.clear_keys()
                 item.inst['classname'] = 'logic_auto'
                 dummy_logic_ents.append(item.inst)
@@ -1067,7 +1066,10 @@ def add_item_inputs(
                 for cmd in input_cmds:
                     inp_item.add_io_command(
                         output,
-                        item.inst,
+                        conditions.local_name(
+                            item.inst,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or item.inst,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
                         inst_in=cmd.inst_in,
@@ -1126,41 +1128,19 @@ def add_item_inputs(
         invert_var,
     ))
 
+    invert_lag = 0.0
     if is_inverted:
         enable_cmd, disable_cmd = disable_cmd, enable_cmd
 
-        # Inverted logic items get a short amount of lag, so loops will propagate
-        # over several frames so we don't lock up.
+        # Inverted logic items get a short amount of lag, so loops will just oscillate indefinitely
+        # as time passes instead of infinitely looping.
         if item.inputs and item.outputs:
-            enable_cmd = [
-                Output(
-                    '',
-                    out.target,
-                    out.input,
-                    out.params,
-                    out.delay + 0.01,
-                    times=out.times,
-                    inst_in=out.inst_in,
-                )
-                for out in enable_cmd
-            ]
-            disable_cmd = [
-                Output(
-                    '',
-                    out.target,
-                    out.input,
-                    out.params,
-                    out.delay + 0.01,
-                    times=out.times,
-                    inst_in=out.inst_in,
-                )
-                for out in disable_cmd
-            ]
+            invert_lag = 0.1
 
     needs_counter = len(inputs) > 1
 
-    # If this option is enabled, generate additional logic to fire the disable
-    # output after spawn (but only if it's not triggered normally.)
+    # If this option is enabled, generate additional logic to fire the disabling output after spawn
+    # (but only if it's not triggered normally.)
 
     # We just use a relay to do this.
     # User2 is the real enable input, User1 is the real disable input.
@@ -1290,7 +1270,7 @@ def add_item_inputs(
                         ) or item.inst,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay,
+                        delay=cmd.delay + invert_lag,
                         times=cmd.times,
                     )
                 )
@@ -1311,7 +1291,7 @@ def add_item_inputs(
                         ) or item.inst,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay,
+                        delay=cmd.delay + invert_lag,
                         times=cmd.times,
                     )
 
