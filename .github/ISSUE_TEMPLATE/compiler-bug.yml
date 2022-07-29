@@ -35,6 +35,7 @@ body:
       label: What operating system are you running on?
       multiple: true
       options:
+        - Windows 11
         - Windows 10 (64bit)
         - Windows 10 (32bit)
         - Windows 8 (64bit)
