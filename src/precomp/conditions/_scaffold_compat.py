@@ -73,7 +73,7 @@ SCAFFOLD_CONFIGS: Dict[str, Tuple[
 
 
 @conditions.make_result('UnstScaffold')
-def res_old_unst_scaffold(res: Property) -> object:
+def res_old_unst_scaffold(res: Property) -> None:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
     This has since been swapped to use the LinkedItems result, but this is kept for package
