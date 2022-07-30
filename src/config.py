@@ -184,43 +184,47 @@ class ConfigSpec:
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
 
+    async def apply_conf(
+        self,
+        info_or_type: Union[ConfType[DataT], Type[DataT]],
+        *,
+        data_id: str= '',
+    ) -> None:
+        """Apply the current settings for this config type and ID.
 
-async def apply_conf(info_or_type: Union[ConfType[DataT], Type[DataT]], /, data_id: str= '') -> None:
-    """Apply the current settings for this config type and ID.
-
-    If the data_id is not passed, all settings will be applied.
-    """
-    info: ConfType[DataT]
-    if isinstance(info_or_type, ConfType):
-        info = info_or_type
-    else:
-        info = _TYPE_TO_TYPE[info_or_type]
-
-    if data_id:
-        if not info.uses_id:
-            raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        try:
-            data = _CUR_CONFIG[info][data_id]
-            cb = info.callback[data_id]
-        except KeyError:
-            LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
+        If the data_id is not passed, all settings will be applied.
+        """
+        info: ConfType[DataT]
+        if isinstance(info_or_type, ConfType):
+            info = info_or_type
         else:
-            assert isinstance(data, info.cls), info
-            await cb(data)
-    else:
-        try:
-            data_map = _CUR_CONFIG[info]
-        except KeyError:
-            LOGGER.warning('{}[:] has no UI callback!', info.name)
-            return
-        async with trio.open_nursery() as nursery:
-            for dat_id, data in data_map.items():
-                try:
-                    cb = info.callback[dat_id]
-                except KeyError:
-                    LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
-                else:
-                    nursery.start_soon(cb, data)
+            info = self._class_to_type[info_or_type]
+
+        if data_id:
+            if not info.uses_id:
+                raise ValueError(f'Data type "{info.name}" does not support IDs!')
+            try:
+                data = self._current[info][data_id]
+                cb = info.callback[data_id]
+            except KeyError:
+                LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
+            else:
+                assert isinstance(data, info.cls), info
+                await cb(data)
+        else:
+            try:
+                data_map = self._current[info]
+            except KeyError:
+                LOGGER.warning('{}[:] has no UI callback!', info.name)
+                return
+            async with trio.open_nursery() as nursery:
+                for dat_id, data in data_map.items():
+                    try:
+                        cb = info.callback[dat_id]
+                    except KeyError:
+                        LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
+                    else:
+                        nursery.start_soon(cb, data)
 
 
 def get_cur_conf(
@@ -425,7 +429,7 @@ async def apply_pal_conf(conf: Config) -> None:
     async with trio.open_nursery() as nursery:
         for info in conf:
             if info.palette_stores:
-                nursery.start_soon(apply_conf, info)
+                nursery.start_soon(APP.apply_conf, info)
 
 
 # Main application configs.

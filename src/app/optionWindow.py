@@ -183,7 +183,7 @@ async def init_widgets(
     def ok() -> None:
         """Close and apply changes."""
         save()
-        background_run(config.apply_conf, config.GenOptions)
+        background_run(config.APP.apply_conf, config.GenOptions)
         win.withdraw()
 
     def cancel() -> None:
