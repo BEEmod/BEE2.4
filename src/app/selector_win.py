@@ -1026,7 +1026,7 @@ class SelectorWin(Generic[CallbackT]):
         self.readonly = self._readonly
 
         if self.store_last_selected:
-            await config.set_and_run_ui_callback(
+            await config.APP.set_and_run_ui_callback(
                 config.LastSelected, self._load_selected,
                 self.save_id,
             )

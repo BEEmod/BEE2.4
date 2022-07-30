@@ -863,7 +863,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_sele
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     await make_widgets(corr)
-    await config.set_and_run_ui_callback(CompilePaneState, apply_state)
+    await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
 def init_application() -> None:

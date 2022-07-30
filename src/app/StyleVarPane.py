@@ -278,7 +278,7 @@ async def make_stylevar_pane(
         async def apply_state(state: StyleVarState) -> None:
             """Applies the given state."""
             tk_var.set(state.value)
-        await config.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
+        await config.APP.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
 
         def cmd_func() -> None:
             """When clicked, store configuration."""
@@ -314,7 +314,7 @@ async def make_stylevar_pane(
 
             unlock_def_var = int_var
             chk['command'] = on_unlock_default_set
-            await config.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
+            await config.APP.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
         else:
             await add_state_syncers(var.id, int_var, chk)
 

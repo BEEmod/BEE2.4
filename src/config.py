@@ -163,22 +163,26 @@ class ConfigSpec:
 
         return deco
 
+    async def set_and_run_ui_callback(
+        self,
+        typ: Type[DataT],
+        func: Callable[[DataT], Awaitable],
+        data_id: str='',
+    ) -> None:
+        """Set the callback used to apply this config type to the UI.
 
-async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable], data_id: str='') -> None:
-    """Set the callback used to apply this config type to the UI.
-
-    If the configs have been loaded, it will immediately be called. Whenever new configs
-    are loaded, it will be re-applied regardless.
-    """
-    info: ConfType[DataT] = _TYPE_TO_TYPE[typ]
-    if data_id and not info.uses_id:
-        raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    if data_id in info.callback:
-        raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
-    info.callback[data_id] = func
-    data_map = _CUR_CONFIG.setdefault(info, {})
-    if data_id in data_map:
-        await func(cast(DataT, data_map[data_id]))
+        If the configs have been loaded, it will immediately be called. Whenever new configs
+        are loaded, it will be re-applied regardless.
+        """
+        info: ConfType[DataT] = self._class_to_type[typ]
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        if data_id in info.callback:
+            raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
+        info.callback[data_id] = func
+        data_map = self._current.setdefault(info, {})
+        if data_id in data_map:
+            await func(cast(DataT, data_map[data_id]))
 
 
 async def apply_conf(info_or_type: Union[ConfType[DataT], Type[DataT]], /, data_id: str= '') -> None:

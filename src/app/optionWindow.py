@@ -199,7 +199,7 @@ async def init_widgets(
 
     load()  # Load the existing config.
     # Then apply to other windows.
-    await config.set_and_run_ui_callback(config.GenOptions, apply_config)
+    await config.APP.set_and_run_ui_callback(config.GenOptions, apply_config)
 
 
 async def init_gen_tab(

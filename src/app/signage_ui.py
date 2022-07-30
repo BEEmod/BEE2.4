@@ -289,7 +289,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         tk_tools.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
-    await config.set_and_run_ui_callback(Layout, apply_config)
+    await config.APP.set_and_run_ui_callback(Layout, apply_config)
     return ttk.Button(
         master,
         text=gettext('Configure Signage'),

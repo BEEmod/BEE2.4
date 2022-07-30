@@ -446,7 +446,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 else:
                     widget.grid(row=0, column=0, columnspan=2, sticky='ew')
                 if s_wid.has_values:
-                    await config.set_and_run_ui_callback(
+                    await config.APP.set_and_run_ui_callback(
                         WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
                     )
                 if s_wid.tooltip:
@@ -478,7 +478,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', self.id, m_wid.id)
                 continue
-            await config.set_and_run_ui_callback(
+            await config.APP.set_and_run_ui_callback(
                 WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
             )
             await trio.sleep(0)
