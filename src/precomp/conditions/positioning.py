@@ -1,3 +1,4 @@
+"""Various conditions related to the position/orientation of items."""
 import math
 from typing import Iterable, Tuple, Dict, Set, Callable
 
@@ -9,10 +10,7 @@ from precomp.conditions import (
     DIRECTIONS,
 )
 from precomp import tiling, brushLoc
-from srctools import (
-    Vec, Angle, Matrix, conv_float,
-    NoKeyError, Property, Entity,
-)
+from srctools import Vec, Angle, Matrix, conv_float, Property, Entity
 from srctools.logger import get_logger
 
 
@@ -22,6 +20,7 @@ LOGGER = get_logger(__name__, alias='cond.positioning')
 # Predicates for tiles.
 # We optimise to a lookup table.
 TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
+
 
 @make_flag(
     'rotation',
@@ -66,7 +65,7 @@ def flag_angles(flag: Property) -> Callable[[Entity], bool]:
 
     def check_orient(inst: Entity) -> bool:
         """Check the orientation against the instance."""
-        inst_normal = from_dir @ Angle.from_str(inst['angles'])
+        inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
 
         if normal == 'WALL':
             # Special case - it's not on the floor or ceiling
@@ -88,15 +87,15 @@ def brush_at_loc(
     and a set of all types found.
     """
     origin = Vec.from_str(inst['origin'])
-    angles = Angle.from_str(inst['angles'])
+    orient = Matrix.from_angstr(inst['angles'])
 
     # Allow using pos1 instead, to match pos2.
     pos = props.vec('pos1' if 'pos1' in props else 'pos')
     pos.z -= 64  # Subtract so origin is the floor-position
 
-    pos.localise(origin, angles)
+    pos.localise(origin, orient)
 
-    norm: Vec = round(props.vec('dir', 0, 0, 1) @ angles, 6)
+    norm: Vec = round(props.vec('dir', 0, 0, 1) @ orient, 6)
 
     if props.bool('gridpos') and norm is not None:
         for axis in 'xyz':
@@ -129,7 +128,7 @@ def brush_at_loc(
     if 'pos2' in props:
         pos2 = props.vec('pos2')
         pos2.z -= 64  # Subtract so origin is the floor-position
-        pos2.localise(origin, angles)
+        pos2.localise(origin, orient)
 
         if visgroup is not None and first_trace is not None:
             # Place a second for the bounding box, grouped with the first.
@@ -226,7 +225,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
           `Type` is ignored.
     - `SetVar` defines an instvar which will be given a value of `black`,
       `white` or `none` depending on the average colour of tiles.
-    - If `gridPos` is true, the position will be snapped so it aligns with
+    - If `gridPos` is true, the position will be snapped, so it aligns with
       the 128 grid (Useful with fizzler/light strip items).
     - `RemoveTile`: If set to `1`, the tile will be removed if found.
     """
@@ -238,7 +237,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
         mode = flag['mode', 'avg'].casefold()
 
     if mode in ('same', 'diff', 'different'):
-        # These don't need 'type', force the value so it can't error out.
+        # These don't need 'type', force the value to ensure it can't error out.
         des_type = 'any'
     else:
         des_type = flag['type', 'any'].casefold()
@@ -335,7 +334,7 @@ def res_brush_at_loc(inst: Entity, res: Property):
     - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
     - `Pos2`: If set, causes the check to average the tiles in a bounding box.
       If no tiles are present they're treated as a lack of them.
-      Otherwise the dominant colour wins, with ties treated as black.
+      Otherwise, the dominant colour wins, with ties treated as black.
     - `ResultVar` is the variable which is set. This will be set to
       `black`, `white` or `none` depending on the average colour of tiles.
     - If `gridPos` is true, the position will be snapped so it aligns with
@@ -495,7 +494,7 @@ def res_alt_orientation(res: Property) -> Callable[[Entity], None]:
 
     def swap_orient(inst: Entity) -> None:
         """Apply the new orientation."""
-        inst['angles'] = pose @ Angle.from_str(inst['angles'])
+        inst['angles'] = pose @ Matrix.from_angstr(inst['angles'])
     return swap_orient
 
 
@@ -524,7 +523,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
     Alternately it is set by `ResultVar`, and `offset` adds or subtracts to the value.
     `GooCollide` means that it will stop when goo is found, otherwise it is
     ignored.
-    `GooAdjust` means additionally if the space is goo, the distance will
+    `GooAdjust` means additionally if the space is GOO, the distance will
     be modified so that it specifies the surface of the goo.
     """
     if res.has_children():
@@ -538,7 +537,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
         collide_goo = adjust_goo = False
 
     origin = Vec.from_str(inst['origin'])
-    normal = Vec(z=1).rotate_by_str(inst['angles'])
+    normal = Matrix.from_angstr(inst['angles']).up()
 
     mask = [
         brushLoc.Block.SOLID,
@@ -548,7 +547,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
     ]
 
     # Only if actually downward.
-    if normal == (0, 0, -1) and collide_goo:
+    if normal.z < -0.9 and collide_goo:
         mask.append(brushLoc.Block.GOO_TOP)
         mask.append(brushLoc.Block.GOO_SINGLE)
 
@@ -577,14 +576,14 @@ def res_rotate_inst(inst: Entity, res: Property) -> None:
     Tip: If you want to match angled panels, rotate with an axis of `0 -1 0`
     and an around value of `0 -64 -64`.
     """
-    angles = Angle.from_str(inst['angles'])
+    angles = Matrix.from_angstr(inst['angles'])
     if 'axis' in res:
         orient = Matrix.axis_angle(
             Vec.from_str(inst.fixup.substitute(res['axis'])),
             conv_float(inst.fixup.substitute(res['angle'])),
         )
     else:
-        orient = Matrix.from_angle(Angle.from_str(inst.fixup.substitute(res['angle'])))
+        orient = Matrix.from_angstr(inst.fixup.substitute(res['angle']))
 
     try:
         offset = Vec.from_str(inst.fixup.substitute(res['around']))

@@ -5,7 +5,7 @@ This includes Unstationary Scaffolds and Vactubes.
 from __future__ import annotations
 from typing import Optional, Iterator, TypeVar, Generic, Iterable
 
-from srctools import Entity, Matrix, Angle, Vec
+from srctools import Entity, Matrix, Vec
 import attrs
 
 from precomp import connections
@@ -26,7 +26,7 @@ class Node(Generic[ConfT]):
         lambda self: Vec.from_str(self.item.inst['origin']), takes_self=True,
     ))
     orient = attrs.field(init=False, default=attrs.Factory(
-        lambda self: Matrix.from_angle(Angle.from_str(self.item.inst['angles'])),
+        lambda self: Matrix.from_angstr(self.item.inst['angles']),
         takes_self=True,
     ))
 

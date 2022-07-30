@@ -70,7 +70,7 @@ TILES: dict[tuple[tuple[float, float, float], tuple[float, float, float]], TileD
 
 # Special key for TileDef.subtile - this is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
-# This isn't a U,V tuple, but pretend it is so we can use it as a key.
+# This isn't a U,V tuple, but pretend it is, so we can use it as a key.
 SUBTILE_FIZZ_KEY: tuple[int, int] = cast(Tuple[int, int], object())
 
 # For each overlay, stores any tiledefs that they're affixed to. We then
@@ -90,7 +90,7 @@ BEVEL_BACK_SCALE = {
 }
 
 # U, V offset -> points on that side.
-# This allows computing the set of bevel orientations from the tiles around it.
+# This allows computing the set of bevel orientations from the surrounding tiles.
 BEVEL_SIDES: list[tuple[int, int, set[tuple[int, int]]]] = [
     (-1, 0, {(-1, y) for y in range(4)}),
     (+1, 0, {(+4, y) for y in range(4)}),
@@ -317,7 +317,7 @@ class Pattern:
         self.wall_only = wall_only
         self.tiles = list(tiles)
         tile_u, tile_v = tex.size
-        # Do some sanity checks on values..
+        # Do some sanity checks on values...
         for umin, vmin, umax, vmax in tiles:
             tile_tex = '{} -> {} {} {} {}'.format(tex, umin, vmin, umax, vmax)
             assert 0 <= umin < umax <= 4, tile_tex
@@ -505,14 +505,13 @@ class Panel:
         )
         use_bullseye = tile.use_bullseye()
 
-        angles = Angle.from_str(self.inst['angles'])
-        inst_orient = orient = Matrix.from_angle(angles)
+        inst_orient = orient = Matrix.from_angstr(self.inst['angles'])
         if orient.up() != tile.normal:
             # It's not aligned to ourselves, so dump the rotation for our
             # logic.
-            angles = Angle.from_str(
-                conditions.PETI_INST_ANGLE[tile.normal.as_tuple()])
-            orient = Matrix.from_angle(angles)
+            orient = Matrix.from_angstr(
+                conditions.PETI_INST_ANGLE[tile.normal.as_tuple()]
+            )
         front_pos = Vec(0, 0, 64) @ orient + tile.pos
 
         offset = self.offset.copy()
@@ -610,7 +609,7 @@ class Panel:
                 vmf,
                 self.template,
                 # Don't offset these at all. Assume the user knows
-                # where it should go. Similarly always use the instance orient.
+                # where it should go. Similarly, always use the instance orient.
                 Vec.from_str(self.inst['origin']),
                 inst_orient,
                 self.inst['targetname'],
@@ -625,19 +624,15 @@ class Panel:
             all_brushes += template.world
 
         if self.pan_type.is_angled:
-            # Rotate the panel to match the panel shape, by rotating around
-            # its Y axis.
+            # Rotate the panel to match the panel shape, by rotating around its Y axis.
             rotation = Matrix.axis_angle(-orient.left(), self.pan_type.angle)
 
-            # Shift so the rotation axis is 0 0 0, then shift back
-            # to rotate correctly.
+            # Shift so the rotation axis is 0 0 0, then shift back to rotate correctly.
             panel_offset = front_pos - Vec(64, 0, 0) @ orient
 
-            # Rotating like this though will make the brush clip into the
-            # surface it's attached on. We need to clip the hinge edge
-            # so it doesn't do that.
-            # We can just produce any plane that is the correct
-            # orientation and let VBSP sort out the geometry.
+            # Rotating like this though will make the brush clip into the surface it's attached on.
+            # We need to clip the hinge edge, so it doesn't do that. We can just produce any
+            # plane that is the correct orientation and let VBSP sort out the geometry.
 
             front_normal = orient.forward()
             for brush in all_brushes:
@@ -727,8 +722,7 @@ class Panel:
                     snap_to_helper_angles=int(force_helper),
                     radius=64,
                 )
-                # On a flip panel, we don't want to parent so it is
-                # always on the front side.
+                # On a flip panel don't parent. The helper can just stay on the front side.
                 if not is_static:
                     if self.pan_type.is_flip:
                         helper['attach_target_name'] = self.brush_ent[
@@ -776,7 +770,7 @@ class TileDef:
         pos: Vec for the center of the block.
         normal: The direction out of the block, towards the face.
         brush_faces: A list of brush faces which this tiledef has exported.
-          Empty before-hand, but after these are faces to attach antlines to.
+          Empty beforehand, but after these are faces to attach antlines to.
         base_type: TileSize this tile started with.
         override: If set, a specific texture to use and orientation.
           This only applies to .is_tile tiles.
@@ -956,7 +950,7 @@ class TileDef:
         self._get_subtiles()[SUBTILE_FIZZ_KEY] = cast(TileType, axis)
 
     def uv_offset(self, u: float, v: float, norm: float) -> Vec:
-        """Return a u/v offset from our position.
+        """Return an u/v offset from our position.
 
         This is used for subtile orientations:
             norm is in the direction of the normal.
@@ -1002,7 +996,7 @@ class TileDef:
                 # Output the split patterns for centered fizzlers.
                 # We need to remove it also so our iteration doesn't choke on it.
                 # 'u' or 'v'
-                split_type: str = tiles.pop(SUBTILE_FIZZ_KEY)
+                split_type = cast(str, tiles.pop(SUBTILE_FIZZ_KEY))
                 patterns = self.calc_patterns(
                     tiles,
                     is_wall,

@@ -1,6 +1,6 @@
 """Conditions which query or modify item collisions."""
 from __future__ import annotations
-from srctools import Angle, Matrix, Vec, Property, VMF, Entity, conv_float, logger
+from srctools import Matrix, Vec, Property, VMF, Entity, conv_float, logger
 
 from precomp import conditions, instance_traits
 from precomp.collisions import CollideType, Collisions, BBox
@@ -33,7 +33,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
     name = inst['targetname']
     LOGGER.info('"{}":{} -> coll {}', name, inst['file'], coll.collisions_for_item(inst['targetname']))
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     # Offset from platform of the track start and end.
     track_start = origin.copy()
@@ -48,7 +48,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
             if 'track' not in instance_traits.get(track_inst):
                 # Not a track.
                 continue
-            track_orient = Matrix.from_angle(Angle.from_str(track_inst['angles']))
+            track_orient = Matrix.from_angstr(track_inst['angles'])
             if Vec.dot(orient.up(), track_orient.up()) > 0.99:
                 # Found pointing the same way, it's ours.
                 break
@@ -58,7 +58,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) 
             track_orient = orient.copy()
         # Now, get the track direction relative to the track instances.
         # The angle is currently local to the platform, so go to world and back.
-        plat_track_dir = track_dir @ Angle.from_str(inst.fixup['travel_direction'])
+        plat_track_dir = track_dir @ Matrix.from_angstr(inst.fixup['travel_direction'])
         world_track_dir = plat_track_dir @ orient
         track_dir = world_track_dir @  track_orient.transpose()
         track_dist = conv_float(inst.fixup.float('travel_distance'))

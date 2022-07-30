@@ -2,7 +2,7 @@
 from typing import Set, Dict, Tuple
 
 from precomp import instanceLocs, conditions
-from srctools import Angle, Matrix, Vec, Property, Entity, VMF, logger
+from srctools import Matrix, Vec, Property, Entity, VMF, logger
 
 
 COND_MOD_NAME = 'Track Platforms'
@@ -78,12 +78,12 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
-        normal = Vec(0, 0, 1) @ Angle.from_str(plat_inst['angles'])
+        normal = Matrix.from_angstr(plat_inst['angles']).up()
 
         for tr_origin, first_track in track_instances.items():
             if plat_loc == tr_origin:
                 # Check direction
-                if normal == Vec(0, 0, 1) @ Angle.from_str(first_track['angles']):
+                if Vec.dot(normal, Matrix.from_angstr(first_track['angles']).up()) > 0.9:
                     break
         else:
             raise Exception(f'Platform "{plat_inst["targetname"]}" has no track!')
@@ -127,10 +127,10 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
         # Now figure out which way the track faces:
 
         # The direction of the platform surface
-        facing = Vec(-1, 0, 0) @ Angle.from_str(plat_inst['angles'])
+        facing = Matrix.from_angstr(plat_inst['angles']).forward(-1)
 
         # The direction horizontal track is offset
-        orient = Matrix.from_angle(Angle.from_str(first_track['angles']))
+        orient = Matrix.from_angstr(first_track['angles'])
         local_facing = round(facing @ orient.transpose(), 3)
         if local_facing.z != 0:
             raise ValueError(
@@ -171,7 +171,7 @@ def track_scan(
     :param x_dir: The direction to look (-1 or 1)
     """
     track = start_track
-    move_dir = Vec(x_dir*128, 0, 0) @ Angle.from_str(track['angles'])
+    move_dir = Vec(x_dir*128, 0, 0) @ Matrix.from_angstr(track['angles'])
     while track:
         tr_set.add(track)
 

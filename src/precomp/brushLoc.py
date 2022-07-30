@@ -294,7 +294,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
                 except KeyError:
                     pass
                 else:
-                    orient = Matrix.from_angle(Angle.from_str(ent['angles']))
+                    orient = Matrix.from_angstr(ent['angles'])
                     for local_pos in item.embed_voxels:
                         # Offset down because 0 0 0 is the floor voxel.
                         world_pos = (Vec(local_pos) - (0, 0, 1)) @ orient + pos

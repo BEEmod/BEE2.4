@@ -47,7 +47,7 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
 
     # Some styles might want to ignore the instance we're running on.
     if not srctools.conv_bool(inst.fixup.substitute(res['global', '0'])):
-        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        orient = Matrix.from_angstr(inst['angles'])
         origin @= orient
         angles @= orient
         origin += Vec.from_str(inst['origin'])
@@ -206,7 +206,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> c
             fizzler_item.sec_enable_cmd = fizz_conn_conf.sec_enable_cmd
             fizzler_item.sec_disable_cmd = fizz_conn_conf.sec_disable_cmd
 
-        inst_orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        inst_orient = Matrix.from_angstr(inst['angles'])
 
         # The actual location of the sign - on the wall
         sign_loc = Vec.from_str(inst['origin']) + Vec(0, 0, -64) @ inst_orient

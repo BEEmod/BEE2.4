@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from precomp import connections, conditions
 import srctools.logger
-from srctools import Property, Entity, VMF, Vec, Output, Angle, Matrix
+from srctools import Property, Entity, VMF, Vec, Output, Matrix
 
 
 COND_MOD_NAME = None
@@ -52,7 +52,7 @@ def res_sendificator(vmf: VMF, inst: Entity):
             LOGGER.warning('"{}" is not a Sendificator target!', las_item.name)
             continue
 
-        orient = Matrix.from_angle(Angle.from_str(las_item.inst['angles']))
+        orient = Matrix.from_angstr(las_item.inst['angles'])
 
         targ_offset =  Vec.from_str(las_item.inst['origin']) + targ_offset @ orient
         targ_normal = targ_normal @ orient

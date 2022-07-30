@@ -1266,7 +1266,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         pairs: list[CubePair] = []
 
         origin = Vec.from_str(inst['origin'])
-        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        orient = Matrix.from_angstr(inst['angles'])
 
         with suppress(KeyError):
             pairs.append(CUBE_POS[(origin // 128).as_tuple()])

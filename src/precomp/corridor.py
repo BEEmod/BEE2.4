@@ -4,7 +4,7 @@ from collections import Counter
 from typing import Dict
 
 import attrs
-from srctools import Vec, Angle, Matrix
+from srctools import Vec, Matrix
 from srctools.vmf import VMF, Entity
 import srctools.logger
 
@@ -117,7 +117,7 @@ def analyse_and_modify(
             seen_game_modes.add(corr_mode)
             if 'no_player_start' in item.fixup:
                 seen_no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
-            orient = Matrix.from_angle(Angle.from_str(item['angles']))
+            orient = Matrix.from_angstr(item['angles'])
             origin = Vec.from_str(item['origin'])
             norm = orient.up()
             if norm.z > 0.5:

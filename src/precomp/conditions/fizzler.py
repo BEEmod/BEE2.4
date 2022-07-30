@@ -1,5 +1,5 @@
 """Results for custom fizzlers."""
-from srctools import Property, Entity, Vec, VMF, Matrix, Angle
+from srctools import Property, Entity, Vec, VMF, Matrix
 import srctools.logger
 
 from precomp.instanceLocs import resolve_one
@@ -23,7 +23,7 @@ def flag_fizz_type(inst: Entity, flag: Property):
 
 @conditions.make_result('ChangeFizzlerType')
 def res_change_fizzler_type(inst: Entity, res: Property):
-    """Change the type of a fizzler. Only valid when run on the base instance."""
+    """Change the type of the fizzler. Only valid when run on the base instance."""
     fizz_name = inst['targetname']
     try:
         fizz = fizzler.FIZZLERS[fizz_name]
@@ -56,7 +56,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     shape_name = shape_inst['targetname']
     shape_item = connections.ITEMS.pop(shape_name)
 
-    shape_orient = Matrix.from_angle(Angle.from_str(shape_inst['angles']))
+    shape_orient = Matrix.from_angstr(shape_inst['angles'])
     up_axis: Vec = round(res.vec('up_axis') @ shape_orient, 6)
 
     for conn in shape_item.outputs:
@@ -121,7 +121,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     # Since the fizzler is moved elsewhere, it's the responsibility of
     # the new item to have holes.
     fizz.embedded = False
-    # So tell it whether or not it needs to do so.
+    # Tell the instance whether it needs to do so.
     shape_inst.fixup['$uses_nodraw'] = fizz.fizz_type.nodraw_behind
 
     for seg_prop in res.find_all('Segment'):

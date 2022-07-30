@@ -7,7 +7,7 @@ import attrs
 from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
 from precomp.conditions import make_result
-from srctools import VMF, Property, Output, Vec, Entity, Angle, Matrix
+from srctools import VMF, Property, Output, Vec, Entity, Matrix
 
 
 COND_MOD_NAME = None
@@ -235,7 +235,7 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
         except KeyError:
             raise ValueError('No item for "{}"?'.format(name)) from None
         pos = Vec.from_str(inst['origin'])
-        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        orient = Matrix.from_angstr(inst['angles'])
         if node_type is NodeType.CORNER:
             timer_delay = item.inst.fixup.int('$timer_delay')
             # We treat inf, 1, 2 and 3 as the same, to get around the 1 and 2 not

@@ -1041,7 +1041,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     for name, base_inst in fizz_bases.items():
         models = fizz_models[name]
-        orient = Matrix.from_angle(Angle.from_str(base_inst['angles']))
+        orient = Matrix.from_angstr(base_inst['angles'])
         up_axis = orient.left()
 
         # If upside-down, make it face upright.
@@ -1147,7 +1147,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         fizz_item.shape_signs += relay_item.shape_signs
         fizz_item.ind_panels |= relay_item.ind_panels
 
-        # Remove the relay item so it doesn't get added to the map.
+        # Remove the relay item, so it doesn't get added to the map.
         del connections.ITEMS[relay_item.name]
 
         for conn in list(relay_item.outputs):

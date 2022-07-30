@@ -5,7 +5,7 @@ from enum import Enum
 import srctools.logger
 from precomp import tiling, texturing, template_brush, conditions
 import consts
-from srctools import Property, Entity, VMF, Vec, NoKeyError, Matrix, Angle
+from srctools import Property, Entity, VMF, Vec, NoKeyError, Matrix
 from srctools.vmf import make_overlay, Side
 import vbsp
 
@@ -124,7 +124,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         return
 
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     normal = -orient.up()
     forward = -orient.forward()

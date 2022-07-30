@@ -1,7 +1,6 @@
 """Results relating to brushwork."""
 from __future__ import annotations
-from typing import Callable, Iterable, Union
-from typing_extensions import Literal
+from typing import Callable, Iterable
 from collections import defaultdict
 from random import Random
 
@@ -78,7 +77,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
 
     - `Pos` and `name` are local to the
       instance, and will set the `origin` and `targetname` respectively.
-    - `Keys` are any other keyvalues to be be set.
+    - `Keys` are any other keyvalues to be set.
     - `Flags` sets additional spawnflags. Multiple values may be
        separated by `+`, and will be added together.
     - `Classname` specifies which entity will be created, as well as
@@ -100,7 +99,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
     des_axis = res['axis', 'z'].casefold()
     reverse = res.bool('reversed')
     door_type = res['classname', 'func_door_rotating']
-    orient = Matrix.from_angle(Angle.from_str(ent['angles']))
+    orient = Matrix.from_angstr(ent['angles'])
 
     axis = round(Vec.with_axes(des_axis, 1) @ orient, 6)
 
@@ -206,7 +205,7 @@ def res_set_texture(inst: Entity, res: Property):
 
     `pos` is the position, relative to the instance (0 0 0 is the floor-surface).
     `dir` is the normal of the texture (pointing out)
-    If `gridPos` is true, the position will be snapped so it aligns with
+    If `gridPos` is true, the position will be snapped, so it aligns with
      the 128 brushes (Useful with fizzler/light strip items).
 
     `tex` is the texture to use.
@@ -327,17 +326,18 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
             tile_grids[axis] = tiling.TileSize.TILE_4x4
 
     solids = vmf.make_prism(point1, point2)
+    center = (point1 + point2) / 2
 
     solids.north.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.N),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['y'])
+    ).get(center, tile_grids['y'])
     solids.south.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.S),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['y'])
+    ).get(center, tile_grids['y'])
     solids.east.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.E),
@@ -347,17 +347,17 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
         texturing.GenCat.NORMAL,
         Vec(Vec.W),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['x'])
+    ).get(center, tile_grids['x'])
     solids.top.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.T),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['z'])
+    ).get(center, tile_grids['z'])
     solids.bottom.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.B),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['z'])
+    ).get(center, tile_grids['z'])
 
     if res.bool('detail'):
         # Add the brush to a func_detail entity
@@ -700,7 +700,7 @@ def res_antigel(inst: Entity) -> None:
     """Implement the Antigel marker."""
     inst.remove()
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     pos = round(origin - 128 * orient.up(), 6)
     norm = round(orient.up(), 6)
@@ -822,7 +822,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
     - `o`: Cutout Tile (Partial)
     """
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     offset = (res.vec('offset', -48, 48) - (0, 0, 64)) @ orient + origin
 
@@ -907,7 +907,7 @@ def res_add_placement_helper(inst: Entity, res: Property):
     the helper should be added to. If `upDir` is specified, this is the
     direction of the top of the portal.
     """
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     pos = conditions.resolve_offset(inst, res['offset', '0 0 0'], zoff=-64)
     normal = res.vec('normal', 0, 0, 1) @ orient
@@ -1033,7 +1033,7 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
 
 def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     """Implements SetPanelOptions and CreatePanel."""
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
     normal: Vec = round(props.vec('normal', 0, 0, 1) @ orient, 6)
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
@@ -1142,7 +1142,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
                 # Convert from world points to UV positions.
                 u = round((u - tile.pos[uaxis] + 48) // 32)
                 v = round((v - tile.pos[vaxis] + 48) // 32)
-                # Cull outside here, we wont't use them.
+                # Cull outside here, we won't use them.
                 if -1 <= u <= 4 and -1 <= v <= 4:
                     panel.bevels.add((u, v))
 

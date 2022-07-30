@@ -6,7 +6,7 @@ import srctools.logger
 from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
-from srctools import Entity, Matrix, VMF, Property, Output, Vec, Angle
+from srctools import Entity, Matrix, VMF, Property, Output, Vec
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -20,8 +20,7 @@ INST_NAMES = [
     'static_1',
     'static_2',
     'static_3',
-    # 4 can't happen, if it's not moving the whole thing isn't.
-    # Fullstatic is used.
+    # 4 can't happen, if it's not moving the whole thing isn't - fullstatic would be used.
 
     # Moving pistons.
     'dynamic_1',
@@ -136,7 +135,7 @@ def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
         )
 
         origin = Vec.from_str(inst['origin'])
-        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        orient = Matrix.from_angstr(inst['angles'])
         off = orient.up(128)
         move_ang = off.to_angle()
 

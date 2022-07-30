@@ -2,7 +2,7 @@
 from typing import Dict, List
 
 import attrs
-from srctools import Angle, Entity, Matrix, VMF, Vec
+from srctools import Entity, Matrix, VMF, Vec
 from srctools.vmf import EntityGroup
 
 from collisions import CollideType as CollideType, BBox as BBox  # re-export.
@@ -51,7 +51,7 @@ class Collisions:
     def add_item_coll(self, item: Item, inst: Entity) -> None:
         """Add the default collisions from an item definition for this instance."""
         origin = Vec.from_str(inst['origin'])
-        orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+        orient = Matrix.from_angstr(inst['angles'])
         for coll in item.collisions:
             self.add((coll @ orient + origin).with_attrs(name=inst['targetname']))
 

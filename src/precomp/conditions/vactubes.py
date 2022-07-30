@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Iterable
 
 import attrs
-from srctools import Vec, Property, Entity, VMF, Solid, Matrix, Angle
+from srctools import Vec, Property, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
@@ -60,7 +60,7 @@ class Marker:
     @orient.default
     def _init_orient(self) -> Matrix:
         """We need to rotate the orient, because items have forward as negative X."""
-        rot = Matrix.from_angle(Angle.from_str(self.ent['angles']))
+        rot = Matrix.from_angstr(self.ent['angles'])
         return Matrix.from_yaw(180) @ rot
 
     def follow_path(self, vac_list: dict[str, Marker]) -> Iterator[tuple[Marker, Marker]]:
@@ -75,9 +75,8 @@ class Marker:
             vac_node = next_ent
 
 
-# Store the configs for vactube items so we can
-# join them together - multiple item types can participate in the same
-# vactube track.
+# Store the configs for vactube items to allow us to join them together.
+# Multiple item types can participate in the same vactube track.
 VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
@@ -111,7 +110,7 @@ def res_vactubes(vmf: VMF, res: Property) -> conditions.ResultCallable:
             return None, ()
 
     for block in res.find_all("Instance"):
-        # Configuration info for each instance set..
+        # Configuration info for each instance set...
         straight_block = block.find_key('straight_inst', '')
         if straight_block.has_children():
             straight = {
@@ -204,8 +203,7 @@ def res_vactubes(vmf: VMF, res: Property) -> conditions.ResultCallable:
                 next_marker.no_prev = False
 
             if next_marker is None:
-                # No next-instances were found..
-                # Mark as no-connections
+                # No next-instances were found - mark as no-connections.
                 marker.next = None
 
         # We do generation only from the start of chains.
@@ -226,12 +224,12 @@ def vactube_gen(vmf: VMF) -> None:
     for start, all_markers in VAC_TRACKS:
         start_normal = start.orient.forward()
 
-        # First create the start section..
+        # First create the start section
         start_logic = start.ent.copy()
         vmf.add_ent(start_logic)
 
         if start_normal.z > 0:
-            start_logic['file'] = fname=start.conf.inst_entry_ceil
+            start_logic['file'] = fname = start.conf.inst_entry_ceil
         elif start_normal.z < 0:
             start_logic['file'] = fname = start.conf.inst_entry_floor
         else:
@@ -246,8 +244,8 @@ def vactube_gen(vmf: VMF) -> None:
         end_loc = Vec.from_str(end.ent['origin'])
         end_norm = end.orient.forward()
 
-        # join_markers creates straight parts up-to the marker, but not at it's
-        # location - create the last one.
+        # join_markers creates straight parts up-to the marker, but not at its location.
+        # Create the last one.
         make_straight(
             vmf,
             end_loc,
@@ -288,7 +286,7 @@ def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
 
 
 def motion_trigger(vmf: VMF, *solids: Solid) -> None:
-    """Create the anti-gravity trigger, and force crouching."""
+    """Create the antigravity trigger, and force crouching."""
     motion_trig = vmf.create_ent(
         classname='trigger_vphysics_motion',
         SetGravityScale='0.0',
@@ -474,7 +472,7 @@ def make_ubend(
     max_size: int,
     is_start=False,
 ):
-    """Create u-shaped bends."""
+    """Create U-shaped bends."""
     offset = origin_b - origin_a
 
     out_axis = normal.axis()
@@ -482,8 +480,8 @@ def make_ubend(
     offset[out_axis] = 0
 
     if len(offset) == 2:
-        # Len counts the non-zero values..
-        # If 2, the u-bend is diagonal so it's ambiguous where to put the bends.
+        # Len counts the non-zero values.
+        # If 2, the U-bend is diagonal, and it's ambiguous where to put the bends.
         return []
 
     side_norm = offset.norm()
@@ -635,7 +633,7 @@ def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False)
                 config,
                 is_start,
             )
-        # else: S-bend, we don't do the geometry for this..
+        # else: S-bend, we don't do the geometry for this.
         return
 
     if norm_a == -norm_b:

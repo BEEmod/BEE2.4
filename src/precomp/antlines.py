@@ -6,7 +6,7 @@ from enum import Enum
 import math
 
 import attrs
-from srctools import Vec, Angle, Matrix, Property, conv_float, logger
+from srctools import Vec, Matrix, Property, conv_float, logger
 from srctools.vmf import VMF, overlay_bounds, make_overlay
 
 from precomp import tiling, rand
@@ -236,7 +236,7 @@ class Antline:
         for seg in self.line:
             conf = floor_conf if seg.on_floor else wall_conf
             # Check tiledefs in the voxels, and assign just in case.
-            # antline corner items don't have them defined, and some embedfaces don't work
+            # antline corner items don't have them defined, and some embed-faces don't work
             # properly. But we keep any segments actually defined also.
             mins, maxs = Vec.bbox(seg.start, seg.end)
             norm_axis = seg.normal.axis()
@@ -360,9 +360,8 @@ def parse_antlines(vmf: VMF) -> tuple[
 
     segment_to_name: dict[Segment, str] = {}
 
-    # Points on antlines where two can connect. For corners that's each side,
-    # for straight it's each end. Combine that with the targetname
-    # so we only join related antlines.
+    # Points on antlines where two can connect. For corners that's each side, for straight it's
+    # each end. Combine that with the targetname, so we only join related antlines.
     join_points: dict[tuple[str, float, float, float], Segment] = {}
 
     mat_straight = consts.Antlines.STRAIGHT
@@ -375,7 +374,7 @@ def parse_antlines(vmf: VMF) -> tuple[
         mat = over['material']
         origin = Vec.from_str(over['basisorigin'])
         normal = Vec.from_str(over['basisnormal'])
-        orient = Matrix.from_angle(Angle.from_str(over['angles']))
+        orient = Matrix.from_angstr(over['angles'])
 
         if mat == mat_corner:
             seg_type = SegType.CORNER

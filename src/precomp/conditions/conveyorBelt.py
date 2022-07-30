@@ -1,6 +1,6 @@
 """Continuously moving belts, like in BTS.
 """
-from srctools import Property, Vec, Entity, Output, VMF, Angle, Matrix
+from srctools import Property, Vec, Entity, Output, VMF, Matrix
 
 import srctools.logger
 from precomp import instanceLocs, template_brush, conditions
@@ -43,8 +43,8 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
         inst.remove()
         return
 
-    orig_orient = Matrix.from_angle(Angle.from_str(inst['angles']))
-    move_dir = Vec(1, 0, 0) @ Angle.from_str(inst.fixup['$travel_direction'])
+    orig_orient = Matrix.from_angstr(inst['angles'])
+    move_dir = Matrix.from_angstr(inst.fixup['$travel_direction']).forward()
     move_dir = move_dir @ orig_orient
     start_offset = inst.fixup.float('$starting_position')
     teleport_to_start = res.bool('TrackTeleport', True)
