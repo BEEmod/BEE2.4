@@ -324,7 +324,7 @@ class Palette:
 
         if self.settings is not None:
             settings_prop = Property('settings', [])
-            settings_prop.extend(config.build_conf(self.settings))
+            settings_prop.extend(config.APP.build_kv1(self.settings))
             props.append(settings_prop)
 
         # We need to write a new file, determine a valid path.

@@ -350,34 +350,34 @@ class ConfigSpec:
                 conf[info] = {}
         return conf
 
+    def build_kv1(self, conf: Config) -> Iterator[Property]:
+        """Build out a configuration file from some data.
 
-def build_conf(conf: Config) -> Iterator[Property]:
-    """Build out a configuration file from some data.
-
-    The data is in the form {conf_type: {id: data}}.
-    """
-    yield Property('version', '1')
-    for info, data_map in conf.items():
-        if not data_map:
-            # Blank, don't save.
-            continue
-        prop = Property(info.name, [
-            Property('_version', str(info.version)),
-        ])
-        if info.uses_id:
-            for data_id, data in data_map.items():
-                sub_prop = data.export_kv1()
-                sub_prop.name = data_id
-                prop.append(sub_prop)
-        else:
-            # Must be a single '' key.
-            if list(data_map.keys()) != ['']:
-                raise ValueError(
-                    f'Must have a single \'\' key for non-id type "{info.name}", got:\n{data_map}'
-                )
-            [data] = data_map.values()
-            prop.extend(data.export_kv1())
-        yield prop
+        The data is in the form {conf_type: {id: data}}.
+        """
+        yield Property('version', '1')
+        info: ConfType
+        for info, data_map in conf.items():
+            if not data_map or info.cls not in self._class_to_type:
+                # Blank or not in our definition, don't save.
+                continue
+            prop = Property(info.name, [
+                Property('_version', str(info.version)),
+            ])
+            if info.uses_id:
+                for data_id, data in data_map.items():
+                    sub_prop = data.export_kv1()
+                    sub_prop.name = data_id
+                    prop.append(sub_prop)
+            else:
+                # Must be a single '' key.
+                if list(data_map.keys()) != ['']:
+                    raise ValueError(
+                        f'Must have a single \'\' key for non-id type "{info.name}", got:\n{data_map}'
+                    )
+                [data] = data_map.values()
+                prop.extend(data.export_kv1())
+            yield prop
 
 
 def build_conf_dmx(conf: Config) -> Element:
