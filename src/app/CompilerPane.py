@@ -116,7 +116,7 @@ else:
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
 
-@config.register('CompilerPane')
+@config.APP.register('CompilerPane')
 @attrs.frozen
 class CompilePaneState(config.Data):
     """State saved in palettes.

@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 
-@config.register('Palette', palette_stores=False)
+@config.APP.register('Palette', palette_stores=False)
 @attrs.frozen
 class PaletteState(config.Data):
     """Data related to palettes which is restored next run.

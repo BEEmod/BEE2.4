@@ -53,7 +53,7 @@ FALLBACK = corridor.CorridorGroup(
 )
 
 
-@config.register('CorridorUIState', version=1, palette_stores=False)
+@config.APP.register('CorridorUIState', version=1, palette_stores=False)
 @attrs.frozen
 class UIState(config.Data):
     """The current window state for saving and restoring."""

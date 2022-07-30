@@ -79,7 +79,7 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     return r, g, b
 
 
-@config.register('ItemVar', uses_id=True)
+@config.APP.register('ItemVar', uses_id=True)
 @attrs.frozen
 class WidgetConfig(config.Data):
     """The configuation persisted to disk and stored in palettes."""

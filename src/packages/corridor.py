@@ -63,7 +63,7 @@ class CorridorUI(Corridor):
         )
 
 
-@config.register('Corridor', uses_id=True, version=1)
+@config.APP.register('Corridor', uses_id=True, version=1)
 @attrs.frozen
 class Config(config.Data):
     """The current configuration for a corridor."""

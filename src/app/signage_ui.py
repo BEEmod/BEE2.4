@@ -59,7 +59,7 @@ def export_data() -> List[Tuple[str, str]]:
     ]
 
 
-@config.register('Signage')
+@config.APP.register('Signage')
 @attrs.frozen
 class Layout(config.Data):
     """A layout of selected signs."""

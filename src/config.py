@@ -132,37 +132,36 @@ class ConfigSpec:
         global _CUR_CONFIG
         _CUR_CONFIG = value
 
+    def info_by_name(self, name: str) -> ConfType:
+        """Lookup the data type for a specific name."""
+        return self._name_to_type[name.casefold()]
+    def info_by_class(self, data: Type[DataT]) -> ConfType[DataT]:
+        """Lookup the data type for this class."""
+        return self._class_to_type[data]
 
-def get_info_by_name(name: str) -> ConfType:
-    """Lookup the data type for this class."""
-    return _NAME_TO_TYPE[name.casefold()]
+    def register(
+        self,
+        name: str, *,
+        version: int = 1,
+        palette_stores: bool = True,
+        uses_id: bool = False,
+    ) -> Callable[[Type[DataT]], Type[DataT]]:
+        """Register a config data type. The name must be unique.
 
+        The version is the latest version of this config, and should increment each time it changes
+        in a backwards-incompatible way.
+        """
 
-def get_info_by_type(data: Type[DataT]) -> ConfType[DataT]:
-    """Lookup the data type for this class."""
-    return _TYPE_TO_TYPE[data]
+        def deco(cls: Type[DataT]) -> Type[DataT]:
+            """Register the class."""
+            info = ConfType(cls, name, version, palette_stores, uses_id)
+            assert name.casefold() not in {'version', 'name'}, info  # Reserved names
+            assert name.casefold() not in self._name_to_type, info
+            assert cls not in self._class_to_type, info
+            self._name_to_type[name.casefold()] = self._class_to_type[cls] = info
+            return cls
 
-
-def register(
-    name: str, *,
-    version: int = 1,
-    palette_stores: bool = True,
-    uses_id: bool = False,
-) -> Callable[[Type[DataT]], Type[DataT]]:
-    """Register a config data type. The name must be unique.
-
-    The version is the latest version of this config, and should increment each time it changes
-    in a backwards-incompatible way.
-    """
-    def deco(cls: Type[DataT]) -> Type[DataT]:
-        """Register the class."""
-        info = ConfType(cls, name, version, palette_stores, uses_id)
-        assert name.casefold() not in {'version', 'name'}, info  # Reserved names
-        assert name.casefold() not in _NAME_TO_TYPE, info
-        assert cls not in _TYPE_TO_TYPE, info
-        _NAME_TO_TYPE[name.casefold()] = _TYPE_TO_TYPE[cls] = info
-        return cls
-    return deco
+        return deco
 
 
 async def set_and_run_ui_callback(typ: Type[DataT], func: Callable[[DataT], Awaitable], data_id: str='') -> None:
@@ -432,8 +431,7 @@ _NAME_TO_TYPE = APP._name_to_type
 _TYPE_TO_TYPE = APP._class_to_type
 
 
-
-@register('LastSelected', uses_id=True)
+@APP.register('LastSelected', uses_id=True)
 @attrs.frozen
 class LastSelected(Data):
     """Used for several general items, specifies the last selected one for restoration."""
@@ -502,7 +500,7 @@ class AfterExport(Enum):
     QUIT = 2  # Quit the app.
 
 
-@register('Options', palette_stores=False)
+@APP.register('Options', palette_stores=False)
 @attrs.frozen
 class GenOptions(Data):
     """General app config options, mainly booleans. These are all changed in the options window."""
@@ -624,7 +622,7 @@ gen_opts_bool = [
 ]
 
 
-@register('PaneState', uses_id=True, palette_stores=False)
+@APP.register('PaneState', uses_id=True, palette_stores=False)
 @attrs.frozen
 class WindowState(Data):
     """Holds the position and size of windows."""

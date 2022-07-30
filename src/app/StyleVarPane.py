@@ -112,7 +112,7 @@ def mandatory_unlocked() -> bool:
         return False
 
 
-@config.register('StyleVar', uses_id=True)
+@config.APP.register('StyleVar', uses_id=True)
 @attrs.frozen
 class StyleVarState(config.Data):
     """Holds style var state stored in configs."""
