@@ -224,9 +224,7 @@ async def main(argv: List[str]) -> None:
 
     packlist = PackList(fsys)
     LOGGER.info('Reading soundscripts...')
-    packlist.load_soundscript_manifest(
-        str(root_folder / 'bin/bee2/sndscript_cache.vdf')
-    )
+    packlist.load_soundscript_manifest(root_folder / 'bin/bee2/sndscript_cache.dmx')
 
     # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
@@ -235,7 +233,7 @@ async def main(argv: List[str]) -> None:
             packlist.load_soundscript(soundscript, always_include=False)
 
     LOGGER.info('Reading particles....')
-    packlist.load_particle_manifest()
+    packlist.load_particle_manifest(root_folder / 'bin/bee2/particle_cache.dmx')
 
     LOGGER.info('Loading transforms...')
     load_transforms()
