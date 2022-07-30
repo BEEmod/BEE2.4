@@ -905,7 +905,7 @@ async def parse_item_folder(
         ),
     )
 
-    if not variant.ent_count and config.get_cur_conf(config.GenOptions).log_missing_ent_count:
+    if not variant.ent_count and config.APP.get_cur_conf(config.GenOptions).log_missing_ent_count:
         LOGGER.warning(
             '"{}:{}" has missing entity count!',
             pak_id,
@@ -1093,7 +1093,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                     styles[style.id] = styles[base_style.id]
                     vers.inherit_kind[style.id] = InheritKind.INHERIT
                     # If requested, log this.
-                    if not item.unstyled and config.get_cur_conf(config.GenOptions).log_item_fallbacks:
+                    if not item.unstyled and config.APP.get_cur_conf(config.GenOptions).log_item_fallbacks:
                         LOGGER.warning(
                             'Item "{}" using parent "{}" for "{}"!',
                             item.id, base_style.id, style.id,
@@ -1101,7 +1101,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                     break
             else:
                 # No parent matches!
-                if not item.unstyled and config.get_cur_conf(config.GenOptions).log_missing_styles:
+                if not item.unstyled and config.APP.get_cur_conf(config.GenOptions).log_missing_styles:
                     LOGGER.warning(
                         'Item "{}"{} using inappropriate style for "{}"!',
                         item.id, vers_desc, style.id,

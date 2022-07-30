@@ -201,7 +201,7 @@ def has_sound() -> bool:
 
 def play_fx() -> bool:
     """Return if sounds should play."""
-    return config.get_cur_conf(config.GenOptions).play_sounds
+    return config.APP.get_cur_conf(config.GenOptions).play_sounds
 
 if utils.WIN and not utils.FROZEN:
     # Add a libs folder for FFmpeg dlls.

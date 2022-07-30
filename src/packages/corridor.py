@@ -369,7 +369,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         export: ExportedConf = {}
         blank = Config()
         for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
-            conf = config.get_cur_conf(
+            conf = config.APP.get_cur_conf(
                 Config,
                 Config.get_id(style_id, mode, direction, orient),
                 blank,

@@ -216,7 +216,7 @@ class Selector:
 
         self.event_bus = event.EventBus()
 
-        conf = config.get_cur_conf(UIState, default=UIState())
+        conf = config.APP.get_cur_conf(UIState, default=UIState())
         if conf.width > 0 and conf.height > 0:
             self.win.geometry(f'{conf.width}x{conf.height}')
 
@@ -317,7 +317,7 @@ class Selector:
                 (selected if slot.flexi_group == GRP_SELECTED
                  else unselected).append(slot.contents.instance.casefold())
 
-        config.store_conf(corridor.Config(selected=selected, unselected=unselected), self.conf_id)
+        config.APP.store_conf(corridor.Config(selected=selected, unselected=unselected), self.conf_id)
 
         # Fix up the highlight, if it was moved.
         for slot in self.drag_man.all_slots():
@@ -325,7 +325,7 @@ class Selector:
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
-        style_id = config.get_cur_conf(
+        style_id = config.APP.get_cur_conf(
             config.LastSelected, 'styles',
             config.LastSelected('BEE2_CLEAN'),
         ).id or 'BEE2_CLEAN'
@@ -347,9 +347,9 @@ class Selector:
         direction = self.btn_direction.current
         orient = self.btn_orient.current
         self.conf_id = corridor.Config.get_id(self.corr_group.id, mode, direction, orient)
-        conf = config.get_cur_conf(corridor.Config, self.conf_id, corridor.Config())
+        conf = config.APP.get_cur_conf(corridor.Config, self.conf_id, corridor.Config())
 
-        config.store_conf(UIState(
+        config.APP.store_conf(UIState(
             mode, direction, orient,
             self.win.winfo_width(),
             self.win.winfo_height(),
@@ -456,7 +456,7 @@ class Selector:
 
     def evt_resized(self, _: tk.Event) -> None:
         """When the window is resized, save configuration."""
-        config.store_conf(UIState(
+        config.APP.store_conf(UIState(
             self.btn_mode.current,
             self.btn_direction.current,
             self.btn_orient.current,

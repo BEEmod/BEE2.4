@@ -273,7 +273,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     def hide_window() -> None:
         """Hide the window."""
         # Store off the configured signage.
-        config.store_conf(Layout({
+        config.APP.store_conf(Layout({
             timer: slt.contents.id if slt.contents is not None else ''
             for timer, slt in SLOTS_SELECTED.items()
         }))

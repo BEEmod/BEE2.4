@@ -182,7 +182,7 @@ class SubPane(tk.Toplevel):
     def save_conf(self) -> None:
         """Write configuration to the config file."""
         if self.can_save:
-            config.store_conf(config.WindowState(
+            config.APP.store_conf(config.WindowState(
                 visible=self.visible.get(),
                 x=self.relX,
                 y=self.relY,
@@ -193,7 +193,7 @@ class SubPane(tk.Toplevel):
     def load_conf(self) -> None:
         """Load configuration from our config file."""
         try:
-            state = config.get_cur_conf(config.WindowState, self.win_name, legacy_id=self.legacy_name)
+            state = config.APP.get_cur_conf(config.WindowState, self.win_name, legacy_id=self.legacy_name)
         except KeyError:
             pass  # No configured state.
         else:

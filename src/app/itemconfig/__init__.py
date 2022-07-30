@@ -179,7 +179,7 @@ class SingleWidget(Widget):
         def on_changed(*_) -> None:
             """Recompute state and UI when changed."""
             val = self.value.get()
-            config.store_conf(WidgetConfig(val), save_id)
+            config.APP.store_conf(WidgetConfig(val), save_id)
             if self.ui_cback is not None:
                 background_run(self.ui_cback, val)
 
@@ -225,7 +225,7 @@ class MultiWidget(Widget):
                 pass
             else:
                 background_run(cback, var.get())
-            config.store_conf(WidgetConfig({
+            config.APP.store_conf(WidgetConfig({
                 num: sub_var.get()
                 for num, sub_var in self.values
             }), save_id)
@@ -293,7 +293,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             default_prop = wid.find_key('Default', '')
             values: list[tuple[str, tk.StringVar]]
 
-            conf = config.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
+            conf = config.APP.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
             # Special case - can't be timer, and no values.
             if create_func is widget_item_variant:

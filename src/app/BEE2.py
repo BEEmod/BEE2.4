@@ -44,10 +44,10 @@ async def init_app() -> None:
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
     config.read_settings()
     try:
-        conf = config.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(config.GenOptions)
     except KeyError:
         conf = config.GenOptions()
-        config.store_conf(conf)
+        config.APP.store_conf(conf)
 
     # Special case, load in this early, so it applies.
     utils.DEV_MODE = conf.dev_mode
@@ -70,7 +70,7 @@ async def init_app() -> None:
 
     gameMan.load()
     try:
-        last_game = config.get_cur_conf(config.LastSelected, 'game')
+        last_game = config.APP.get_cur_conf(config.LastSelected, 'game')
     except KeyError:
         pass
     else:

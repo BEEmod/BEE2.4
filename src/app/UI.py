@@ -172,7 +172,7 @@ class Item:
         they use the single_num parameter to control the output.
         """
         icon = self._get_raw_icon(subKey, allow_single, single_num)
-        if self.item.unstyled or not config.get_cur_conf(config.GenOptions).visualise_inheritance:
+        if self.item.unstyled or not config.APP.get_cur_conf(config.GenOptions).visualise_inheritance:
             return icon
         if self.inherit_kind is not InheritKind.DEFINED:
             icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
@@ -443,7 +443,7 @@ def quit_application() -> None:
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
     if TK_ROOT.winfo_viewable():
-        config.store_conf(config.WindowState(
+        config.APP.store_conf(config.WindowState(
             x=TK_ROOT.winfo_rootx(),
             y=TK_ROOT.winfo_rooty(),
         ), 'main_window')
@@ -736,7 +736,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             for it_id, section in
             item_opts.items()
         }
-        conf = config.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(config.GenOptions)
 
         success, vpk_success = gameMan.selected_game.export(
             style=chosen_style,
@@ -1385,7 +1385,7 @@ async def set_game(game: 'gameMan.Game') -> None:
     This updates the title bar to match, and saves it into the config.
     """
     TK_ROOT.title(f'BEEMOD {utils.BEE_VERSION} - {game.name}')
-    config.store_conf(config.LastSelected(game.name), 'game')
+    config.APP.store_conf(config.LastSelected(game.name), 'game')
     EXPORT_CMD_VAR.set(game.get_export_text())
 
 
@@ -1631,7 +1631,7 @@ async def init_windows() -> None:
 
     # Position windows according to remembered settings:
     try:
-        main_win_state = config.get_cur_conf(config.WindowState, 'main_window')
+        main_win_state = config.APP.get_cur_conf(config.WindowState, 'main_window')
     except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette

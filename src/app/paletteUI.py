@@ -138,7 +138,7 @@ class PaletteUI:
             pal.uuid: pal
             for pal in paletteLoader.load_palettes()
         }
-        prev_state = config.get_cur_conf(PaletteState, default=PaletteState())
+        prev_state = config.APP.get_cur_conf(PaletteState, default=PaletteState())
         self.selected_uuid = prev_state.selected
         self.hidden_defaults = set(prev_state.hidden_defaults)
         self.var_save_settings = tk.BooleanVar(value=prev_state.save_settings)
@@ -377,7 +377,7 @@ class PaletteUI:
 
     def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""
-        config.store_conf(PaletteState(
+        config.APP.store_conf(PaletteState(
             self.selected_uuid,
             self.var_save_settings.get(),
             frozenset(self.hidden_defaults),

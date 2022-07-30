@@ -282,7 +282,7 @@ async def make_stylevar_pane(
 
         def cmd_func() -> None:
             """When clicked, store configuration."""
-            config.store_conf(StyleVarState(tk_var.get() != 0), var_id)
+            config.APP.store_conf(StyleVarState(tk_var.get() != 0), var_id)
 
         for check in checks:
             check['command'] = cmd_func
@@ -304,7 +304,7 @@ async def make_stylevar_pane(
         if var.id == 'UnlockDefault':
             def on_unlock_default_set() -> None:
                 """Update item filters when this is changed by the user."""
-                config.store_conf(StyleVarState(unlock_def_var.get() != 0), 'UnlockDefault')
+                config.APP.store_conf(StyleVarState(unlock_def_var.get() != 0), 'UnlockDefault')
                 update_item_vis()
 
             async def apply_unlock_default(state: StyleVarState) -> None:

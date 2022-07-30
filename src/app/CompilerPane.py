@@ -352,8 +352,8 @@ def find_screenshot(e=None) -> None:
             f.write(buf.getvalue())
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-        config.store_conf(attrs.evolve(
-            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             sshot_cust=buf.getvalue(),
         ))
         set_screenshot(image)
@@ -371,8 +371,8 @@ async def set_screen_type() -> None:
     await tk_tools.wait_eventloop()
     # Resize the pane to accommodate the shown/hidden image
     window.geometry(f'{window.winfo_width()}x{window.winfo_reqheight()}')
-    config.store_conf(attrs.evolve(
-        config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+    config.APP.store_conf(attrs.evolve(
+        config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
         sshot_type=chosen,
     ))
     COMPILE_CFG.save_check()
@@ -739,8 +739,8 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
 
     def set_voice_priority() -> None:
         """Called when the voiceline priority is changed."""
-        config.store_conf(attrs.evolve(
-            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
         ))
         COMPILE_CFG['General']['voiceline_priority'] = str(VOICE_PRIORITY_VAR.get())
@@ -771,8 +771,8 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
 
     def elev_changed(state: bool) -> None:
         """Called when an elevator is selected."""
-        config.store_conf(attrs.evolve(
-            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             spawn_elev=state,
         ))
         COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state)
@@ -834,8 +834,8 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     def set_model(_: tk.Event) -> None:
         """Save the selected player model."""
         model = PLAYER_MODELS_REV[player_model_var.get()]
-        config.store_conf(attrs.evolve(
-            config.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             player_mdl=model,
         ))
         COMPILE_CFG['General']['player_model'] = model

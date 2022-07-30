@@ -42,8 +42,8 @@ class TextHandler(logging.Handler):
 
     def set_visible(self, is_visible: bool) -> None:
         """Show or hide the window."""
-        conf = config.get_cur_conf(config.GenOptions)
-        config.store_conf(attrs.evolve(conf, show_log_win=is_visible))
+        conf = config.APP.get_cur_conf(config.GenOptions)
+        config.APP.store_conf(attrs.evolve(conf, show_log_win=is_visible))
         _PIPE_MAIN_SEND.send(('visible', is_visible, None))
 
     def setLevel(self, level: Union[int, str]) -> None:
@@ -71,11 +71,11 @@ async def setting_apply() -> None:
             return
         if cmd == 'level':
             TextHandler.setLevel(HANDLER, param)
-            conf = config.get_cur_conf(config.GenOptions)
-            config.store_conf(attrs.evolve(conf, log_win_level=param))
+            conf = config.APP.get_cur_conf(config.GenOptions)
+            config.APP.store_conf(attrs.evolve(conf, log_win_level=param))
         elif cmd == 'visible':
-            conf = config.get_cur_conf(config.GenOptions)
-            config.store_conf(attrs.evolve(conf, show_log_win=param))
+            conf = config.APP.get_cur_conf(config.GenOptions)
+            config.APP.store_conf(attrs.evolve(conf, show_log_win=param))
         elif cmd == 'quit':
             return
         else:

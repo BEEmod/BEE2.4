@@ -108,8 +108,8 @@ def on_error(
         import config
         import attrs
         # Try to turn on the logging window for next time...
-        conf = config.get_cur_conf(config.GenOptions)
-        config.store_conf(attrs.evolve(
+        conf = config.APP.get_cur_conf(config.GenOptions)
+        config.APP.store_conf(attrs.evolve(
             conf,
             show_log_win=True,
             log_win_level='DEBUG',

@@ -138,8 +138,8 @@ class LoadScreen:
             command, arg = _PIPE_MAIN_REC.recv()
             if command == 'main_set_compact':
                 # Save the compact state to the config.
-                conf = config.get_cur_conf(config.GenOptions)
-                config.store_conf(attrs.evolve(conf, compact_splash=arg))
+                conf = config.APP.get_cur_conf(config.GenOptions)
+                config.APP.store_conf(attrs.evolve(conf, compact_splash=arg))
             elif command == 'cancel':
                 # Mark this loadscreen as cancelled.
                 _SCREEN_CANCEL_FLAG.add(arg)

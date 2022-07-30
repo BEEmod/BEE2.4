@@ -58,7 +58,7 @@ def show() -> None:
 
 def load() -> None:
     """Load the current settings from config."""
-    conf = config.get_cur_conf(config.GenOptions)
+    conf = config.APP.get_cur_conf(config.GenOptions)
     AFTER_EXPORT_ACTION.set(conf.after_export.value)
     for name, var in VARS:
         var.set(getattr(conf, name))
@@ -67,12 +67,12 @@ def load() -> None:
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     # Preserve options set elsewhere.
-    res = attrs.asdict(config.get_cur_conf(config.GenOptions), recurse=False)
+    res = attrs.asdict(config.APP.get_cur_conf(config.GenOptions), recurse=False)
 
     res['after_export'] = AfterExport(AFTER_EXPORT_ACTION.get())
     for name, var in VARS:
         res[name] = var.get()
-    config.store_conf(config.GenOptions(**res))
+    config.APP.store_conf(config.GenOptions(**res))
 
 
 async def apply_config(conf: config.GenOptions) -> None:
@@ -99,9 +99,9 @@ def clear_caches() -> None:
 
     # This needs to be disabled, since otherwise we won't actually export
     # anything...
-    conf = config.get_cur_conf(config.GenOptions)
+    conf = config.APP.get_cur_conf(config.GenOptions)
     if conf.preserve_resources:
-        config.store_conf(attrs.evolve(conf, preserve_resources=False))
+        config.APP.store_conf(attrs.evolve(conf, preserve_resources=False))
         message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
 
     gameMan.CONFIG.save_check()

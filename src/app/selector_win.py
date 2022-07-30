@@ -642,13 +642,13 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.item_list = lst
 
-        prev_state = config.get_cur_conf(
+        prev_state = config.APP.get_cur_conf(
             config.LastSelected,
             save_id,
             config.LastSelected(default_id),
         )
         if store_last_selected:
-            config.store_conf(prev_state, save_id)
+            config.APP.store_conf(prev_state, save_id)
         if not self.item_list:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
@@ -1165,7 +1165,7 @@ class SelectorWin(Generic[CallbackT]):
                 width=self.win.winfo_width(),
                 height=self.win.winfo_height(),
             )
-            config.store_conf(state, self.save_id)
+            config.APP.store_conf(state, self.save_id)
 
         if self.modal:
             self.win.grab_release()
@@ -1229,7 +1229,7 @@ class SelectorWin(Generic[CallbackT]):
         if self.first_open:
             self.first_open = False
             try:
-                state = config.get_cur_conf(WindowState, self.save_id)
+                state = config.APP.get_cur_conf(WindowState, self.save_id)
             except KeyError:
                 pass
             else:
@@ -1290,7 +1290,7 @@ class SelectorWin(Generic[CallbackT]):
     def do_callback(self) -> None:
         """Call the callback function."""
         if self.store_last_selected:
-            config.store_conf(config.LastSelected(self.chosen_id), self.save_id)
+            config.APP.store_conf(config.LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
             self.callback(self.chosen_id, *self.callback_params, **self.callback_kwargs)
 

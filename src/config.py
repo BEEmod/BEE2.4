@@ -228,52 +228,51 @@ class ConfigSpec:
                     else:
                         nursery.start_soon(cb, data)
 
+    def get_cur_conf(
+        self,
+        cls: Type[DataT],
+        data_id: str='',
+        default: Union[DataT, None] = None,
+        legacy_id: str='',
+    ) -> DataT:
+        """Fetch the currently active config for this ID.
 
-def get_cur_conf(
-    cls: Type[DataT],
-    data_id: str='',
-    default: Union[DataT, None] = None,
-    legacy_id: str='',
-) -> DataT:
-    """Fetch the currently active config for this ID.
+        If legacy_id is defined, this will be checked if the original does not exist, and if so
+        moved to the actual ID.
+        """
+        info: ConfType[DataT] = self._class_to_type[cls]
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        data: object = None
+        try:
+            data = self._current[info][data_id]
+        except KeyError:
+            if legacy_id:
+                try:
+                    conf_map = self._current[info]
+                    data = conf_map[data_id] = conf_map.pop(legacy_id)
+                except KeyError:
+                    pass
+        if data is None:
+            # Return a default value.
+            if default is not None:
+                return default
+            else:
+                raise KeyError(data_id)
 
-    If legacy_id is defined, this will be checked if the original does not exist, and if so
-    moved to the actual ID.
-    """
-    info: ConfType[DataT] = _TYPE_TO_TYPE[cls]
-    if data_id and not info.uses_id:
-        raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    data: object = None
-    try:
-        data = _CUR_CONFIG[info][data_id]
-    except KeyError:
-        if legacy_id:
-            try:
-                conf_map = _CUR_CONFIG[info]
-                data = conf_map[data_id] = conf_map.pop(legacy_id)
-            except KeyError:
-                pass
-    if data is None:
-        # Return a default value.
-        if default is not None:
-            return default
-        else:
-            raise KeyError(data_id)
+        assert isinstance(data, info.cls), info
+        return data
 
-    assert isinstance(data, info.cls), info
-    return data
-
-
-def store_conf(data: DataT, data_id: str='') -> None:
-    """Update the current data for this ID. """
-    info: ConfType[DataT] = _TYPE_TO_TYPE[type(data)]
-    if data_id and not info.uses_id:
-        raise ValueError(f'Data type "{info.name}" does not support IDs!')
-    LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-    try:
-        _CUR_CONFIG[info][data_id] = data
-    except KeyError:
-        _CUR_CONFIG[info] = {data_id: data}
+    def store_conf(self, data: DataT, data_id: str='') -> None:
+        """Update the current data for this ID. """
+        info: ConfType[DataT] = self._class_to_type[type(data)]
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
+        try:
+            self._current[info][data_id] = data
+        except KeyError:
+            self._current[info] = {data_id: data}
 
 
 def parse_conf(props: Property) -> Tuple[Config, bool]:
