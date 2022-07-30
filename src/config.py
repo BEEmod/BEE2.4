@@ -110,12 +110,27 @@ class ConfType(Generic[DataT]):
     callback: Dict[str, Callable[[DataT], Awaitable]] = attrs.field(factory=dict, repr=False)
 
 
-_NAME_TO_TYPE: Dict[str, ConfType] = {}
-_TYPE_TO_TYPE: Dict[Type[Data], ConfType] = {}
 # The current data loaded from the config file. This maps an ID to each value, or
 # is {'': data} if no key is used.
 Config = NewType('Config', Dict[ConfType, Dict[str, Data]])
 _CUR_CONFIG: Config = Config({})
+
+
+@attrs.define(eq=False)
+class ConfigSpec:
+    """ConfTypes are registered with a spec, to define what sections are present."""
+    _name_to_type: Dict[str, ConfType] = attrs.Factory(dict)
+    _class_to_type: Dict[Type[Data], ConfType] = attrs.Factory(dict)
+    # _current: Config = attrs.Factory(lambda: Config({}))
+    @property
+    def _current(self) -> Config:
+        """TODO: Redirect all _CUR_CONFIG uses to here."""
+        return _CUR_CONFIG
+
+    @_current.setter
+    def _current(self, value: Config) -> None:
+        global _CUR_CONFIG
+        _CUR_CONFIG = value
 
 
 def get_info_by_name(name: str) -> ConfType:
@@ -408,6 +423,14 @@ async def apply_pal_conf(conf: Config) -> None:
         for info in conf:
             if info.palette_stores:
                 nursery.start_soon(apply_conf, info)
+
+
+# Main application configs.
+APP = ConfigSpec()
+# TODO Remove these globals.
+_NAME_TO_TYPE = APP._name_to_type
+_TYPE_TO_TYPE = APP._class_to_type
+
 
 
 @register('LastSelected', uses_id=True)
