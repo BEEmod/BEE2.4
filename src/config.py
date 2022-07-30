@@ -4,8 +4,9 @@ Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
 from enum import Enum
+from pathlib import Path
 from typing import (
-    Any, TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
+    Any, Optional, TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
 )
 import os
@@ -121,6 +122,7 @@ _CUR_CONFIG: Config = Config({})
 @attrs.define(eq=False)
 class ConfigSpec:
     """ConfTypes are registered with a spec, to define what sections are present."""
+    filename: Optional[Path]
     _name_to_type: Dict[str, ConfType] = attrs.Factory(dict)
     _class_to_type: Dict[Type[Data], ConfType] = attrs.Factory(dict)
     # _current: Config = attrs.Factory(lambda: Config({}))
@@ -434,7 +436,7 @@ async def apply_pal_conf(conf: Config) -> None:
 
 
 # Main application configs.
-APP = ConfigSpec()
+APP = ConfigSpec(utils.conf_location('config/config.vdf'))
 # TODO Remove these globals.
 _NAME_TO_TYPE = APP._name_to_type
 _TYPE_TO_TYPE = APP._class_to_type
