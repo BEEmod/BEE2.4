@@ -8,6 +8,7 @@ from typing import (
     Any, TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
 )
+import os
 
 import attrs
 import trio
@@ -20,7 +21,8 @@ from BEE2_config import GEN_OPTS as LEGACY_CONF
 
 
 LOGGER = logger.get_logger(__name__)
-LOGGER.setLevel('INFO')  # Debug messages are spammy.
+if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
+    LOGGER.setLevel('INFO')
 
 
 def read_settings() -> None:
