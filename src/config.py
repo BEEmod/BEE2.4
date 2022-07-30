@@ -44,7 +44,7 @@ def read_settings() -> None:
         except IOError:
             pass
 
-    conf, _ = parse_conf(props)
+    conf, _ = APP.parse_kv1(props)
     _CUR_CONFIG.clear()
     for info, obj_map in conf.items():
         _CUR_CONFIG[info] = obj_map
@@ -58,7 +58,7 @@ def write_settings() -> None:
         return
 
     props = Property.root()
-    props.extend(build_conf(_CUR_CONFIG))
+    props.extend(APP.build_kv1(_CUR_CONFIG))
     with atomic_write(
         utils.conf_location('config/config.vdf'),
         encoding='utf8',
@@ -276,81 +276,79 @@ class ConfigSpec:
         except KeyError:
             self._current[info] = {data_id: data}
 
+    def parse_kv1(self, props: Property) -> Tuple[Config, bool]:
+        """Parse a configuration file into individual data.
 
-def parse_conf(props: Property) -> Tuple[Config, bool]:
-    """Parse a configuration file into individual data.
+        The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
+        and so should be resaved.
+        """
+        if 'version' not in props:  # New conf format
+            return self._parse_legacy(props), True
 
-    The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
-    and so should be resaved.
-    """
-    if 'version' not in props:  # New conf format
-        return parse_conf_legacy(props), True
+        version = props.int('version')
+        if version != 1:
+            raise ValueError(f'Unknown config version {version}!')
 
-    version = props.int('version')
-    if version != 1:
-        raise ValueError(f'Unknown config version {version}!')
-
-    conf = Config({})
-    upgraded = False
-    for child in props:
-        if child.name == 'version':
-            continue
-        try:
-            info = _NAME_TO_TYPE[child.name]
-        except KeyError:
-            LOGGER.warning('Unknown config option "{}"!', child.real_name)
-            continue
-        version = child.int('_version', 1)
-        try:
-            del child['_version']
-        except LookupError:
-            pass
-        if version > info.version:
-            LOGGER.warning(
-                'Config option "{}" has version {}, '
-                'which is higher than the supported version ({})!',
-                info.name, version, info.version
-            )
-            # Don't try to parse, it'll be invalid.
-            continue
-        elif version != info.version:
-            upgraded = True
-        data_map: Dict[str, Data] = {}
-        conf[info] = data_map
-        if info.uses_id:
-            for data_prop in child:
+        conf = Config({})
+        upgraded = False
+        for child in props:
+            if child.name == 'version':
+                continue
+            try:
+                info = self._name_to_type[child.name]
+            except KeyError:
+                LOGGER.warning('Unknown config option "{}"!', child.real_name)
+                continue
+            version = child.int('_version', 1)
+            try:
+                del child['_version']
+            except LookupError:
+                pass
+            if version > info.version:
+                LOGGER.warning(
+                    'Config option "{}" has version {}, '
+                    'which is higher than the supported version ({})!',
+                    info.name, version, info.version
+                )
+                # Don't try to parse, it'll be invalid.
+                continue
+            elif version != info.version:
+                upgraded = True
+            data_map: Dict[str, Data] = {}
+            conf[info] = data_map
+            if info.uses_id:
+                for data_prop in child:
+                    try:
+                        data_map[data_prop.real_name] = info.cls.parse_kv1(data_prop, version)
+                    except Exception:
+                        LOGGER.warning(
+                            'Failed to parse config {}[{}]:',
+                            info.name, data_prop.real_name,
+                            exc_info=True,
+                        )
+            else:
                 try:
-                    data_map[data_prop.real_name] = info.cls.parse_kv1(data_prop, version)
+                    data_map[''] = info.cls.parse_kv1(child, version)
                 except Exception:
                     LOGGER.warning(
-                        'Failed to parse config {}[{}]:',
-                        info.name, data_prop.real_name,
+                        'Failed to parse config {}:',
+                        info.name,
                         exc_info=True,
                     )
-        else:
-            try:
-                data_map[''] = info.cls.parse_kv1(child, version)
-            except Exception:
-                LOGGER.warning(
-                    'Failed to parse config {}:',
-                    info.name,
-                    exc_info=True,
-                )
-    return conf, upgraded
+        return conf, upgraded
 
-
-def parse_conf_legacy(props: Property) -> Config:
-    """Parse the old config format."""
-    conf = Config({})
-    # Convert legacy configs.
-    for info in _NAME_TO_TYPE.values():
-        if hasattr(info.cls, 'parse_legacy'):
-            conf[info] = new = info.cls.parse_legacy(props)
-            LOGGER.info('Converted legacy {} to {}', info.name, new)
-        else:
-            LOGGER.warning('No legacy conf for "{}"!', info.name)
-            conf[info] = {}
-    return conf
+    def _parse_legacy(self, props: Property) -> Config:
+        """Parse the old config format."""
+        conf = Config({})
+        # Convert legacy configs.
+        for info in self._name_to_type.values():
+            if hasattr(info.cls, 'parse_legacy'):
+                conf[info] = new = info.cls.parse_legacy(props)
+                LOGGER.info('Converted legacy {} to {}', info.name, new)
+            else:
+                LOGGER.warning('No legacy conf for "{}"!', info.name)
+                conf[info] = {}
+        return conf
 
 
 def build_conf(conf: Config) -> Iterator[Property]:

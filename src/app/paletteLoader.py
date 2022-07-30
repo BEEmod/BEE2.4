@@ -276,7 +276,7 @@ class Palette:
         except NoKeyError:
             settings = None
         else:
-            settings, upgraded_settings = config.parse_conf(settings_conf)
+            settings, upgraded_settings = config.APP.parse_kv1(settings_conf)
             if upgraded_settings:
                 needs_save = True
 
