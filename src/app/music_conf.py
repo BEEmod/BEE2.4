@@ -57,11 +57,11 @@ def set_suggested(music_id: str) -> None:
             WINDOWS[channel].set_suggested({sugg} if sugg else set())
 
 
-def export_data() -> Dict[MusicChannel, Optional[Music]]:
+def export_data(packset: PackagesSet) -> Dict[MusicChannel, Optional[Music]]:
     """Return the data used to export this."""
     base_id = WINDOWS[MusicChannel.BASE].chosen_id
     if base_id is not None:
-        base_track = Music.by_id(base_id)
+        base_track = packset.obj_by_id(Music, base_id)
     else:
         base_track = None
     data: dict[MusicChannel, Optional[Music]] = {
@@ -70,7 +70,7 @@ def export_data() -> Dict[MusicChannel, Optional[Music]]:
     for channel, win in WINDOWS.items():
         if channel is MusicChannel.BASE:
             continue
-        # If collapsed, use the suggested track. Otherwise use the chosen one.
+        # If collapsed, use the suggested track. Otherwise, use the chosen one.
         if is_collapsed:
             if base_track is not None:
                 mus_id = base_track.get_suggestion(channel)
@@ -79,7 +79,7 @@ def export_data() -> Dict[MusicChannel, Optional[Music]]:
         else:
             mus_id = win.chosen_id
         if mus_id is not None:
-            data[channel] = Music.by_id(mus_id)
+            data[channel] = packset.obj_by_id(Music, mus_id)
         else:
             data[channel] = None
     return data

@@ -742,7 +742,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             style=chosen_style,
             selected_objects={
                 # Specify the 'chosen item' for each object type
-                packages.Music: music_conf.export_data(),
+                packages.Music: music_conf.export_data(packages.LOADED),
                 packages.Skybox: skybox_win.chosen_id,
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
