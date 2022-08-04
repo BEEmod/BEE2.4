@@ -569,26 +569,27 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     )
     UI['light_full'].grid(row=0, column=2)
 
-    def light_conf_swap(switch_to: str): 
-        return gettext(
-            "You can hold down Shift during the start of the Lighting stage to switch to "
-            ) + switch_to + gettext(" lighting on the fly.")
+    light_conf_swap =  gettext(  # gettext: Info for toggling lighting via a key.
+        "You can hold down Shift during the start of the Lighting stage to "
+        "switch to {} lighting on the fly."
+    )
+
     add_tooltip(UI['light_none'], gettext(
         "Compile with no lighting whatsoever. This significantly speeds up "
         "compile times, but there will be no lights, gel will be invisible, "
         "and the map will run in fullbright. \nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap(gettext("Fast")))
+    ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
 
     add_tooltip(UI['light_fast'], gettext(
         "Compile with lower-quality, fast lighting. This speeds up compile "
         "times, but does not appear as good. Some shadows may appear "
         "wrong.\nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap(gettext("Full")))
+    ) + "\n\n" + light_conf_swap.format(gettext("Full")))
     add_tooltip(UI['light_full'], gettext(
         "Compile with high-quality lighting. This looks correct, but takes "
         "longer to compute. Use if you're arranging lights.\nWhen "
         "publishing, this is always used."
-    ) + "\n\n" + light_conf_swap(gettext("Fast")))
+    ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
 
     packfile_enable = ttk.Checkbutton(
         frame,

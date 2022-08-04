@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-01-08 12:57+1000\n"
+"POT-Creation-Date: 2022-08-04 10:53+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -93,48 +93,6 @@ msgstr ""
 msgid "Bendy"
 msgstr ""
 
-#. i18n: Progress bar description
-#: app/CompilerPane.py
-msgid ""
-"Brushes form the walls or other parts of the test chamber. If this is "
-"high, it may help to reduce the size of the map or remove intricate "
-"shapes."
-msgstr ""
-
-#. i18n: Progress bar description
-#: app/CompilerPane.py
-msgid ""
-"Entities are the things in the map that have functionality. Removing "
-"complex moving items will help reduce this. Items have their entity count"
-" listed in the item description window.\n"
-"\n"
-"This isn't completely accurate, some entity types are counted here but "
-"don't affect the ingame limit, while others may generate additional "
-"entities at runtime."
-msgstr ""
-
-#. i18n: Progress bar description
-#: app/CompilerPane.py
-msgid ""
-"Overlays are smaller images affixed to surfaces, like signs or indicator "
-"lights. Hiding complex antlines or setting them to signage will reduce "
-"this."
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "Corridor"
-msgstr ""
-
-#: app/CompilerPane.py
-msgid ""
-"Randomly choose a corridor. This is saved in the puzzle data and will not"
-" change."
-msgstr ""
-
-#: app/CompilerPane.py app/UI.py
-msgid "Random"
-msgstr ""
-
 #: app/CompilerPane.py
 msgid "Image Files"
 msgstr ""
@@ -203,17 +161,29 @@ msgid "Lighting:"
 msgstr ""
 
 #: app/CompilerPane.py
+msgid "None"
+msgstr ""
+
+#: app/CompilerPane.py app/CompilerPane.py app/CompilerPane.py
 msgid "Fast"
 msgstr ""
 
-#: app/CompilerPane.py
+#: app/CompilerPane.py app/CompilerPane.py
 msgid "Full"
 msgstr ""
 
 #: app/CompilerPane.py
 msgid ""
-"You can hold down Shift during the start of the Lighting stage to invert "
-"this configuration on the fly."
+"You can hold down Shift during the start of the Lighting stage to switch "
+"to {} lighting on the fly."
+msgstr ""
+
+#: app/CompilerPane.py
+msgid ""
+"Compile with no lighting whatsoever. This significantly speeds up compile"
+" times, but there will be no lights, gel will be invisible, and the map "
+"will run in fullbright. \n"
+"When publishing, this is ignored."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -228,6 +198,18 @@ msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
 "to compute. Use if you're arranging lights.\n"
 "When publishing, this is always used."
+msgstr ""
+
+#: app/CompilerPane.py
+msgid "Enable packing"
+msgstr ""
+
+#: app/CompilerPane.py
+msgid ""
+"Disable automatically packing resources in the map. This can speed up "
+"building and allows editing files and running reload commands, but can "
+"cause some resources to not work correctly. Regardless of this setting, "
+"packing is enabled when publishing. "
 msgstr ""
 
 #: app/CompilerPane.py
@@ -248,8 +230,28 @@ msgstr ""
 msgid "Entity"
 msgstr ""
 
+#. i18n: Progress bar description
+#: app/CompilerPane.py
+msgid ""
+"Entities are the things in the map that have functionality. Removing "
+"complex moving items will help reduce this. Items have their entity count"
+" listed in the item description window.\n"
+"\n"
+"This isn't completely accurate, some entity types are counted here but "
+"don't affect the ingame limit, while others may generate additional "
+"entities at runtime."
+msgstr ""
+
 #: app/CompilerPane.py
 msgid "Overlay"
+msgstr ""
+
+#. i18n: Progress bar description
+#: app/CompilerPane.py
+msgid ""
+"Overlays are smaller images affixed to surfaces, like signs or indicator "
+"lights. Hiding complex antlines or setting them to signage will reduce "
+"this."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -260,6 +262,13 @@ msgstr ""
 
 #: app/CompilerPane.py
 msgid "Brush"
+msgstr ""
+
+#: app/CompilerPane.py
+msgid ""
+"Brushes form the walls or other parts of the test chamber. If this is "
+"high, it may help to reduce the size of the map or remove intricate "
+"shapes."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -306,33 +315,7 @@ msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Corridor:"
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "Singleplayer Entry Corridor"
-msgstr ""
-
-#. i18n: corridor selector window title.
-#: app/CompilerPane.py
-msgid "Singleplayer Exit Corridor"
-msgstr ""
-
-#. i18n: corridor selector window title.
-#: app/CompilerPane.py
-msgid "Coop Exit Corridor"
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "SP Entry:"
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "SP Exit:"
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "Coop Exit:"
+msgid "Select Corridors"
 msgstr ""
 
 #: app/CompilerPane.py
@@ -443,14 +426,6 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: app/StyleVarPane.py
-msgid "Style/Item Properties"
-msgstr ""
-
-#: app/StyleVarPane.py
-msgid "Styles"
-msgstr ""
-
-#: app/StyleVarPane.py
 msgid "All:"
 msgstr ""
 
@@ -468,10 +443,6 @@ msgstr ""
 
 #: app/StyleVarPane.py
 msgid "None!"
-msgstr ""
-
-#: app/StyleVarPane.py
-msgid "Items"
 msgstr ""
 
 #: app/SubPane.py
@@ -566,6 +537,10 @@ msgid "This style does not have a elevator video screen."
 msgstr ""
 
 #: app/UI.py
+msgid "Random"
+msgstr ""
+
+#: app/UI.py
 msgid "Choose a random video."
 msgstr ""
 
@@ -591,10 +566,6 @@ msgstr ""
 
 #: app/UI.py app/paletteUI.py
 msgid "Save Palette As..."
-msgstr ""
-
-#: app/UI.py app/paletteUI.py
-msgid "Save Settings in Palettes"
 msgstr ""
 
 #: app/UI.py app/music_conf.py
@@ -629,50 +600,6 @@ msgstr ""
 
 #: app/UI.py
 msgid "All Items: "
-msgstr ""
-
-#: app/UI.py
-msgid "Export to \"{}\"..."
-msgstr ""
-
-#: app/UI.py app/backup.py
-msgid "File"
-msgstr ""
-
-#: app/UI.py
-msgid "Export"
-msgstr ""
-
-#: app/UI.py app/backup.py
-msgid "Add Game"
-msgstr ""
-
-#: app/UI.py
-msgid "Uninstall from Selected Game"
-msgstr ""
-
-#: app/UI.py
-msgid "Backup/Restore Puzzles..."
-msgstr ""
-
-#: app/UI.py
-msgid "Manage Packages..."
-msgstr ""
-
-#: app/UI.py
-msgid "Options"
-msgstr ""
-
-#: app/UI.py app/gameMan.py
-msgid "Quit"
-msgstr ""
-
-#: app/UI.py
-msgid "Palette"
-msgstr ""
-
-#: app/UI.py
-msgid "View"
 msgstr ""
 
 #: app/UI.py
@@ -719,11 +646,11 @@ msgstr ""
 msgid "No description found."
 msgstr ""
 
-#: app/backup.py
+#: app/backup.py app/corridor_selector.py
 msgid "Coop"
 msgstr ""
 
-#: app/backup.py
+#: app/backup.py app/corridor_selector.py
 msgid "SP"
 msgstr ""
 
@@ -801,6 +728,14 @@ msgstr ""
 
 #: app/backup.py app/backup.py
 msgid "Save Backup"
+msgstr ""
+
+#: app/backup.py app/menu_bar.py
+msgid "File"
+msgstr ""
+
+#: app/backup.py app/menu_bar.py
+msgid "Add Game"
 msgstr ""
 
 #: app/backup.py
@@ -966,6 +901,38 @@ msgstr ""
 msgid "Change the default settings for this item when placed."
 msgstr ""
 
+#: app/corridor_selector.py app/helpMenu.py app/itemPropWin.py
+msgid "Close"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Entry"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Exit"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Flat"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Upward"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Downward"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Selected:"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Unused:"
+msgstr ""
+
 #: app/gameMan.py app/gameMan.py
 msgid "BEE2 - Export Failed!"
 msgstr ""
@@ -980,6 +947,14 @@ msgstr ""
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
 
+#: app/gameMan.py app/menu_bar.py
+msgid "Quit"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Export to \"{}\"..."
+msgstr ""
+
 #: app/gameMan.py
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
@@ -988,6 +963,15 @@ msgstr ""
 
 #: app/gameMan.py
 msgid "BEE2 - Aperture Tag Files Missing"
+msgstr ""
+
+#: app/gameMan.py
+msgid ""
+"It appears that the BEE2 application was installed directly in a game "
+"directory. The bee2/ folder name is used for exported resources, so this "
+"will cause issues.\n"
+"\n"
+"Move the application folder elsewhere, then re-run."
 msgstr ""
 
 #: app/gameMan.py
@@ -1005,6 +989,10 @@ msgstr ""
 
 #: app/gameMan.py
 msgid "Executable"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Find Game Binaries"
 msgstr ""
 
 #: app/gameMan.py
@@ -1088,10 +1076,6 @@ msgstr ""
 msgid "Thinking With Time Machine"
 msgstr ""
 
-#: app/helpMenu.py app/itemPropWin.py
-msgid "Close"
-msgstr ""
-
 #: app/helpMenu.py
 msgid "Help"
 msgstr ""
@@ -1134,8 +1118,52 @@ msgstr ""
 msgid "Search:"
 msgstr ""
 
-#: app/itemconfig.py
-msgid "Choose a Color"
+#: app/menu_bar.py
+msgid "{game} Puzzle Folder"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "{game} Folder"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Palettes Folder"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Packages Folder"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Export"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Uninstall from Selected Game"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Backup/Restore Puzzles..."
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Open Folder..."
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Manage Packages..."
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Options"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "Palette"
+msgstr ""
+
+#: app/menu_bar.py
+msgid "View"
 msgstr ""
 
 #: app/music_conf.py
@@ -1335,21 +1363,19 @@ msgid ""
 msgstr ""
 
 #: app/optionWindow.py
+msgid "Show Hidden Palettes"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Show all builtin palettes that you may have hidden."
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Reset Package Caches"
 msgstr ""
 
 #: app/optionWindow.py
 msgid "Force re-extracting all package resources."
-msgstr ""
-
-#: app/optionWindow.py
-msgid "Keep windows inside screen"
-msgstr ""
-
-#: app/optionWindow.py
-msgid ""
-"Prevent sub-windows from moving outside the screen borders. If you have "
-"multiple monitors, disable this."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1361,6 +1387,24 @@ msgid ""
 "Force loading screens to be on top of other windows. Since they don't "
 "appear on the taskbar/dock, they can't be brought to the top easily "
 "again."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Use compact splash screen"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Use an alternate smaller splash screen, which takes up less screen space."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Keep windows inside screen"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Prevent sub-windows from moving outside the screen borders. If you have "
+"multiple monitors, disable this."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1383,8 +1427,8 @@ msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"Log items have no applicable version for a particular style.This usually "
-"means it will look very bad."
+"Log items have no applicable version for a particular style. This usually"
+" means it will look very bad."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1398,14 +1442,13 @@ msgid ""
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Log missing packfile resources"
+msgid "Display item inheritance"
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"Log when the resources a \"PackList\" refers to are not present in the "
-"zip. This may be fine (in a prerequisite zip), but it often indicates an "
-"error."
+"Add overlays to item icons to display which inherit from parent styles or"
+" have no applicable style."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1503,7 +1546,7 @@ msgstr ""
 msgid "Clear Palette"
 msgstr ""
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py app/paletteUI.py app/paletteUI.py
 msgid "Delete Palette"
 msgstr ""
 
@@ -1519,12 +1562,24 @@ msgstr ""
 msgid "Fill Palette"
 msgstr ""
 
+#: app/paletteUI.py app/paletteUI.py
+msgid "Save Settings in Palettes"
+msgstr ""
+
 #: app/paletteUI.py
 msgid "Save Palette"
 msgstr ""
 
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Hide Palette \"{}\""
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Hide Palette"
 msgstr ""
 
 #: app/paletteUI.py
@@ -1684,5 +1739,21 @@ msgstr ""
 
 #: app/voiceEditor.py
 msgid "No Name?"
+msgstr ""
+
+#: app/itemconfig/__init__.py
+msgid "Style Properties"
+msgstr ""
+
+#: app/itemconfig/__init__.py
+msgid "Style/Item Properties"
+msgstr ""
+
+#: app/itemconfig/__init__.py
+msgid "Loading..."
+msgstr ""
+
+#: app/itemconfig/color.py
+msgid "Choose a Color"
 msgstr ""
 
