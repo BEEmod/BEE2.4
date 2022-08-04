@@ -807,34 +807,48 @@ async def parse_item_folder(
     """Parse through data in item/ folders, and return the result."""
     prop_path = f'items/{fold}/properties.txt'
     editor_path = f'items/{fold}/editoritems.txt'
+    vmf_path = f'items/{fold}/editoritems.vmf'
     config_path = f'items/{fold}/vbsp_config.cfg'
 
-    first_item: EditorItem | None = None
-    extra_items: list[EditorItem] = []
+    def _parse_items(path: str) -> list[EditorItem]:
+        """Parse the editoritems in order in a file."""
+        items: list[EditorItem] = []
+        with filesystem[path].open_str() as f:
+            tok = Tokenizer(f, path)
+            for tok_type, tok_value in tok:
+                if tok_type is Token.STRING:
+                    if tok_value.casefold() != 'item':
+                        raise tok.error('Unknown item option "{}"!', tok_value)
+                    items.append(EditorItem.parse_one(tok))
+                elif tok_type is not Token.NEWLINE:
+                    raise tok.error(tok_type)
+        return items
+
+    def _parse_vmf(path: str) -> VMF | None:
+        """Parse the VMF portion."""
+        try:
+            vmf_keyvalues = filesystem.read_prop(path)
+        except FileNotFoundError:
+            return None
+        else:
+            return VMF.parse(vmf_keyvalues)
+
     try:
-        props = await trio.to_thread.run_sync(filesystem.read_prop, prop_path)
-        props = props.find_key('Properties')
-        f = filesystem[editor_path].open_str()
+        async with trio.open_nursery() as nursery:
+            props_res = utils.Result.sync(nursery, filesystem.read_prop, prop_path, cancellable=True)
+            all_items = utils.Result.sync(nursery, _parse_items, editor_path, cancellable=True)
+            editor_vmf = utils.Result.sync(nursery, _parse_vmf, vmf_path, cancellable=True)
+        props = props_res().find_key('Properties')
     except FileNotFoundError as err:
         raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
-    with f:
-        tok = Tokenizer(f, editor_path)
-        for tok_type, tok_value in tok:
-            if tok_type is Token.STRING:
-                if tok_value.casefold() != 'item':
-                    raise tok.error('Unknown item option "{}"!', tok_value)
-                if first_item is None:
-                    first_item = await trio.to_thread.run_sync(EditorItem.parse_one, tok)
-                else:
-                    extra_items.append(await trio.to_thread.run_sync(EditorItem.parse_one, tok))
-            elif tok_type is not Token.NEWLINE:
-                raise tok.error(tok_type)
 
-    if first_item is None:
+    try:
+        first_item, *extra_items = all_items()
+    except ValueError:
         raise ValueError(
             f'"{pak_id}:items/{fold}/editoritems.txt has no '
             '"Item" block!'
-        )
+        ) from None
 
     if first_item.id.casefold() != item_id.casefold():
         LOGGER.warning(
@@ -843,14 +857,9 @@ async def parse_item_folder(
             item_id, first_item.id, pak_id, fold,
         )
 
-    try:
-        editor_props = await trio.to_thread.run_sync(filesystem.read_prop, f'{editor_path[:-3]}vmf')
-        editor_vmf = await trio.to_thread.run_sync(VMF.parse, editor_props)
-    except FileNotFoundError:
-        pass
-    else:
-        editoritems_vmf.load(first_item, editor_vmf)
-        del editor_props, editor_vmf
+    if editor_vmf() is not None:
+        editoritems_vmf.load(first_item, editor_vmf())
+        del editor_vmf
     first_item.generate_collisions()
 
     # extra_items is any extra blocks (offset catchers, extent items).
