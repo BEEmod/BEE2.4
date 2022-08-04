@@ -1531,8 +1531,8 @@ async def init_windows() -> None:
         set_items=set_palette,
     )
 
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save)
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as)
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save())
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as())
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui, menu_bar))
 
     await trio.sleep(0)
