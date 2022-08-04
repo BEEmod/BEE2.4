@@ -113,7 +113,7 @@ async def init_app() -> None:
     if Tracer.slow:
         LOGGER.info('Slow tasks\n{}', '\n'.join([
             msg for _, msg in
-            sorted(Tracer.slow, key=lambda t: t[1])
+            sorted(Tracer.slow, key=lambda t: t[1], reverse=True)
         ]))
 
     loadScreen.main_loader.destroy()
