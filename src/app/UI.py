@@ -1417,7 +1417,7 @@ async def init_windows() -> None:
     # Initialise the above and the menu bar.
     await gameMan.EVENT_BUS(None, gameMan.Game)
 
-    ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG)
+    ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
@@ -1429,7 +1429,7 @@ async def init_windows() -> None:
     style.configure('BG.TButton', background=ItemsBG)
     style.configure('Preview.TLabel', background='#F4F5F5')
 
-    frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG)
+    frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
     frames['preview'].grid(
         row=0,
         column=3,
@@ -1458,7 +1458,7 @@ async def init_windows() -> None:
         pady=10,
     )
 
-    picker_split_frame = tk.Frame(ui_bg, bg=ItemsBG)
+    picker_split_frame = tk.Frame(ui_bg, bg=ItemsBG, name='picker_split')
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
     ui_bg.columnconfigure(5, weight=1)
 
@@ -1466,6 +1466,7 @@ async def init_windows() -> None:
     # to right
     search_frame = ttk.Frame(
         picker_split_frame,
+        name='searchbar',
         padding=5,
         borderwidth=0,
         relief="raised",
@@ -1485,6 +1486,7 @@ async def init_windows() -> None:
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
+        name='picker',
         padding=5,
         borderwidth=4,
         relief="raised",
@@ -1499,6 +1501,7 @@ async def init_windows() -> None:
 
     frames['toolMenu'] = tk.Frame(
         frames['preview'],
+        name='toolbar',
         bg=ItemsBG,
         width=192,
         height=26,
@@ -1518,7 +1521,7 @@ async def init_windows() -> None:
         tool_col=1,
     )
 
-    pal_frame = ttk.Frame(windows['pal'])
+    pal_frame = ttk.Frame(windows['pal'], name='pal_frame')
     pal_frame.grid(row=0, column=0, sticky='NSEW')
     windows['pal'].columnconfigure(0, weight=1)
     windows['pal'].rowconfigure(0, weight=1)
