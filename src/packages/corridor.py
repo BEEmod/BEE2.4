@@ -200,7 +200,15 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            corridors[parse_specifier(prop.name)].append(CorridorUI(
+            spec = parse_specifier(prop.name)
+
+            if is_legacy := prop.bool('legacy'):
+                LOGGER.warning(
+                    '{.value}_{.value}_{.value} has legacy corridor "{}"',
+                    *spec, prop['Name', prop['instance']],
+                )
+
+            corridors[spec].append(CorridorUI(
                 instance=prop['instance'],
                 name=prop['Name', 'Corridor'],
                 authors=packages.sep_values(prop['authors', '']),
@@ -209,7 +217,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 config=packages.get_config(prop, 'items', data.pak_id, source='Corridor ' + prop.name),
                 images=images,
                 dnd_icon=icon,
-                legacy=prop.bool('legacy'),
+                legacy=is_legacy,
                 fixups={
                     subprop.name: subprop.value
                     for subprop in prop.find_children('fixups')
