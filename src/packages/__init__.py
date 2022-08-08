@@ -550,10 +550,10 @@ async def load_packages(
         if obj_type.needs_foreground
     ))
 
-    LOGGER.info('Object counts:\n{}\n', '\n'.join(
+    LOGGER.info('Object counts:\n{}', '\n'.join(
         '{:<15}: {}'.format(obj_type.__name__, len(objs))
         for obj_type, objs in
-        packset.unparsed.items()
+        sorted(packset.unparsed.items(), key=lambda t: len(t[1]), reverse=True)
     ))
 
     # Load either now, or in background.
