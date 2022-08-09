@@ -105,7 +105,7 @@ def clear_caches() -> None:
         message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
 
     gameMan.CONFIG.save_check()
-    config.write_settings()
+    config.APP.write_file()
 
     # Since we've saved, dismiss this window.
     win.withdraw()

@@ -42,7 +42,7 @@ async def init_app() -> None:
     """Initialise the application."""
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
-    config.read_settings()
+    config.APP.read_file()
     try:
         conf = config.APP.get_cur_conf(config.GenOptions)
     except KeyError:

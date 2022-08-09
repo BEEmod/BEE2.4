@@ -26,49 +26,6 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
     LOGGER.setLevel('INFO')
 
 
-def read_settings() -> None:
-    """Read and apply the settings from disk."""
-    path = utils.conf_location('config/config.vdf')
-    try:
-        file = path.open(encoding='utf8')
-    except FileNotFoundError:
-        return
-    try:
-        with file:
-            props = Property.parse(file)
-    except KeyValError:
-        LOGGER.warning('Cannot parse config.vdf!', exc_info=True)
-        # Try and move to a backup name, if not don't worry about it.
-        try:
-            path.replace(path.with_suffix('.err.vdf'))
-        except IOError:
-            pass
-
-    conf, _ = APP.parse_kv1(props)
-    _CUR_CONFIG.clear()
-    for info, obj_map in conf.items():
-        _CUR_CONFIG[info] = obj_map
-
-
-def write_settings() -> None:
-    """Write the settings to disk."""
-    if not any(_CUR_CONFIG.values()):
-        # We don't have any data saved, abort!
-        # This could happen while parsing, for example.
-        return
-
-    props = Property.root()
-    props.extend(APP.build_kv1(_CUR_CONFIG))
-    with atomic_write(
-        utils.conf_location('config/config.vdf'),
-        encoding='utf8',
-        overwrite=True,
-    ) as file:
-        for prop in props:
-            for line in prop.export():
-                file.write(line)
-
-
 DataT = TypeVar('DataT', bound='Data')
 
 
@@ -411,6 +368,48 @@ class ConfigSpec:
                 elem.type = f'Conf_v{info.version}'
             root[info.name] = elem
         return root
+
+    def read_file(self) -> None:
+        """Read and apply the settings from disk."""
+        if self.filename is None:
+            raise ValueError('No filename specified for this ConfigSpec!')
+
+        try:
+            file = self.filename.open(encoding='utf8')
+        except FileNotFoundError:
+            return
+        try:
+            with file:
+                props = Property.parse(file)
+        except KeyValError:
+            LOGGER.warning('Cannot parse {}!', self.filename.name, exc_info=True)
+            # Try and move to a backup name, if not don't worry about it.
+            try:
+                self.filename.replace(self.filename.with_suffix('.err.vdf'))
+            except IOError:
+                pass
+
+        conf, _ = self.parse_kv1(props)
+        self._current.clear()
+        for info, obj_map in conf.items():
+            self._current[info] = obj_map
+
+    def write_file(self) -> None:
+        """Write the settings to disk."""
+        if self.filename is None:
+            raise ValueError('No filename specified for this ConfigSpec!')
+
+        if not any(self._current.values()):
+            # We don't have any data saved, abort!
+            # This could happen while parsing, for example.
+            return
+
+        props = Property.root()
+        props.extend(self.build_kv1(self._current))
+        with atomic_write(self.filename, encoding='utf8', overwrite=True) as file:
+            for prop in props:
+                for line in prop.export():
+                    file.write(line)
 
 
 def get_pal_conf() -> Config:

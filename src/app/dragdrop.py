@@ -811,7 +811,7 @@ async def test() -> None:
     import packages
 
     BEE2_config.GEN_OPTS.load()
-    config.read_settings()
+    config.APP.read_file()
 
     # Setup images to read from packages.
     print('Loading packages for images.')

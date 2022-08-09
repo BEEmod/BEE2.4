@@ -552,7 +552,7 @@ async def test() -> None:
     background_run(sound.sound_task)
 
     test_sel = Selector(packages.LOADED)
-    config.read_settings()
+    config.APP.read_file()
     test_sel.show()
     with trio.CancelScope() as scope:
         test_sel.win.wm_protocol('WM_DELETE_WINDOW', scope.cancel)

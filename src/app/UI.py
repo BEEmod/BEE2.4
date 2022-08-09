@@ -449,7 +449,7 @@ def quit_application() -> None:
         ), 'main_window')
 
     try:
-        config.write_settings()
+        config.APP.write_file()
     except Exception:
         LOGGER.exception('Saving main conf:')
     try:
@@ -777,7 +777,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # Save the configs since we're writing to disk lots anyway.
         GEN_OPTS.save_check()
         item_opts.save_check()
-        config.write_settings()
+        config.APP.write_file()
 
         message = gettext('Selected Items and Style successfully exported!')
         if not vpk_success:
