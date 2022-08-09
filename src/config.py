@@ -70,11 +70,11 @@ class Data:
     @classmethod
     def parse_dmx(cls: Type[DataT], data: Element, version: int) -> DataT:
         """Parse DMX config values."""
-        raise NotImplementedError
+        return cls.parse_kv1(data.to_kv1(), version)
 
     def export_dmx(self) -> Element:
         """Generate DMX for saving the configuration."""
-        raise NotImplementedError
+        return Element.from_kv1(self.export_kv1())
 
 
 @attrs.define(eq=False)
