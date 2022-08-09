@@ -6,7 +6,7 @@ They can then fetch the current state and store new state.
 from enum import Enum
 from pathlib import Path
 from typing import (
-    Any, ClassVar, Optional, TypeVar, Callable, Generic, NewType, Union, cast,
+    Any, ClassVar, Optional, Set, TypeVar, Callable, Generic, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
 )
 import os
@@ -104,6 +104,7 @@ class ConfigSpec:
     filename: Optional[Path]
     _name_to_type: Dict[str, ConfType] = attrs.Factory(dict)
     _class_to_type: Dict[Type[Data], ConfType] = attrs.Factory(dict)
+    _registered: Set[Type[Data]] = attrs.Factory(set)
     # _current: Config = attrs.Factory(lambda: Config({}))
     @property
     def _current(self) -> Config:
@@ -128,6 +129,7 @@ class ConfigSpec:
         info = cls.get_conf_info()
         self._name_to_type[info.name.casefold()] = info
         self._class_to_type[cls] = info
+        self._registered.add(cls)
         return cls
 
     async def set_and_run_ui_callback(
