@@ -6,7 +6,7 @@ They can then fetch the current state and store new state.
 from enum import Enum
 from pathlib import Path
 from typing import (
-    Any, Optional, TypeVar, Callable, Generic, Protocol, NewType, Union, cast,
+    Any, ClassVar, Optional, TypeVar, Callable, Generic, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
 )
 import os
@@ -29,8 +29,30 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
 DataT = TypeVar('DataT', bound='Data')
 
 
-class Data(Protocol):
+class Data:
     """Data which can be saved to the config. These should be immutable."""
+    __info: ClassVar['ConfType']
+
+    def __init_subclass__(
+        cls, *,
+        name: str = '',
+        version: int = 1,
+        palette_stores: bool = True,  # TODO remove
+        uses_id: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init_subclass__(**kwargs)
+        if not name:
+            raise ValueError('Config name must be specified!')
+        if name.casefold() in {'version', 'name'}:
+            raise ValueError(f'Illegal name: "{name}"')
+        cls.__info = ConfType(cls, name, version, palette_stores, uses_id)
+
+    @classmethod
+    def get_conf_info(cls: Type[DataT]) -> 'ConfType[DataT]':
+        """Return the ConfType for this class."""
+        return cls.__info
+
     @classmethod
     def parse_legacy(cls: Type[DataT], conf: Property) -> Dict[str, DataT]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
@@ -96,33 +118,17 @@ class ConfigSpec:
     def info_by_name(self, name: str) -> ConfType:
         """Lookup the data type for a specific name."""
         return self._name_to_type[name.casefold()]
+
     def info_by_class(self, data: Type[DataT]) -> ConfType[DataT]:
         """Lookup the data type for this class."""
         return self._class_to_type[data]
 
-    def register(
-        self,
-        name: str, *,
-        version: int = 1,
-        palette_stores: bool = True,
-        uses_id: bool = False,
-    ) -> Callable[[Type[DataT]], Type[DataT]]:
-        """Register a config data type. The name must be unique.
-
-        The version is the latest version of this config, and should increment each time it changes
-        in a backwards-incompatible way.
-        """
-
-        def deco(cls: Type[DataT]) -> Type[DataT]:
-            """Register the class."""
-            info = ConfType(cls, name, version, palette_stores, uses_id)
-            assert name.casefold() not in {'version', 'name'}, info  # Reserved names
-            assert name.casefold() not in self._name_to_type, info
-            assert cls not in self._class_to_type, info
-            self._name_to_type[name.casefold()] = self._class_to_type[cls] = info
-            return cls
-
-        return deco
+    def register(self, cls: Type[DataT]) -> Type[DataT]:
+        """Register a config data type. The name must be unique."""
+        info = cls.get_conf_info()
+        self._name_to_type[info.name.casefold()] = info
+        self._class_to_type[cls] = info
+        return cls
 
     async def set_and_run_ui_callback(
         self,
@@ -437,9 +443,9 @@ async def apply_pal_conf(conf: Config) -> None:
 APP = ConfigSpec(utils.conf_location('config/config.vdf'))
 
 
-@APP.register('LastSelected', uses_id=True)
-@attrs.frozen
-class LastSelected(Data):
+@APP.register
+@attrs.frozen(slots=False)
+class LastSelected(Data, name='LastSelected', uses_id=True):
     """Used for several general items, specifies the last selected one for restoration."""
     id: Union[str, None] = None
 
@@ -506,9 +512,9 @@ class AfterExport(Enum):
     QUIT = 2  # Quit the app.
 
 
-@APP.register('Options', palette_stores=False)
-@attrs.frozen
-class GenOptions(Data):
+@APP.register
+@attrs.frozen(slots=False)
+class GenOptions(Data, name='Options', palette_stores=False):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
     # If the name has a :, the first is the section and the second is the name.
@@ -628,9 +634,9 @@ gen_opts_bool = [
 ]
 
 
-@APP.register('PaneState', uses_id=True, palette_stores=False)
-@attrs.frozen
-class WindowState(Data):
+@APP.register
+@attrs.frozen(slots=False)
+class WindowState(Data, name='PaneState', uses_id=True, palette_stores=False):
     """Holds the position and size of windows."""
     x: int
     y: int

@@ -30,9 +30,9 @@ __all__ = [
 ]
 
 
-@config.APP.register('Palette', palette_stores=False)
-@attrs.frozen
-class PaletteState(config.Data):
+@config.APP.register
+@attrs.frozen(slots=False)
+class PaletteState(config.Data, name='Palette', palette_stores=False):
     """Data related to palettes which is restored next run.
 
     Since we don't store in the palette, we don't need to register the UI callback.

@@ -102,9 +102,9 @@ AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
 
 
-@config.APP.register('SelectorWindow', palette_stores=False, uses_id=True)
-@attrs.frozen
-class WindowState(config.Data):
+@config.APP.register
+@attrs.frozen(slots=False)
+class WindowState(config.Data, name='SelectorWindow', palette_stores=False, uses_id=True):
     """The immutable window state stored in config files for restoration next launch."""
     open_groups: Mapping[str, bool] = attrs.Factory(dict)
     width: int = 0
