@@ -135,12 +135,12 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
             origin=pos.join(' '),
         )
         # Extra stuff to apply to the flags (USE, toggle, etc)
-        spawnflags = sum(map(
+        spawnflags = sum(
             # Add together multiple values
-            srctools.conv_int,
-            res['flags', '0'].split('+')
+            srctools.conv_int(num)
+            for num in res['flags', '0'].split('+')
             # Make the door always non-solid!
-        )) | flag_values.get('solid_flags', 0)
+        ) | flag_values.get('solid_flags', 0)
 
         conditions.set_ent_keys(door_ent, ent, res)
 
