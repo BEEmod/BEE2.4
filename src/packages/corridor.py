@@ -200,15 +200,22 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            spec = parse_specifier(prop.name)
+            mode, direction, orient = parse_specifier(prop.name)
 
             if is_legacy := prop.bool('legacy'):
-                LOGGER.warning(
-                    '{.value}_{.value}_{.value} has legacy corridor "{}"',
-                    *spec, prop['Name', prop['instance']],
-                )
 
-            corridors[spec].append(CorridorUI(
+                if orient is Orient.HORIZONTAL:
+                    LOGGER.warning(
+                        '{.value}_{.value}_{.value} has legacy corridor "{}"',
+                        mode, direction, orient, prop['Name', prop['instance']],
+                    )
+                else:
+                    raise ValueError(
+                        f'Non-horizontal {mode.value}_{direction.value}_{orient.value} corridor '
+                        f'"{prop["Name", prop["instance"]]}" cannot be defined as a legacy corridor!'
+                    )
+
+            corridors[mode, direction, orient].append(CorridorUI(
                 instance=prop['instance'],
                 name=prop['Name', 'Corridor'],
                 authors=packages.sep_values(prop['authors', '']),
