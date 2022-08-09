@@ -102,7 +102,7 @@ _CUR_CONFIG: Config = Config({})
 class ConfigSpec:
     """ConfTypes are registered with a spec, to define what sections are present."""
     filename: Optional[Path]
-    _name_to_type: Dict[str, ConfType] = attrs.Factory(dict)
+    _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
     _class_to_type: Dict[Type[Data], ConfType] = attrs.Factory(dict)
     _registered: Set[Type[Data]] = attrs.Factory(set)
     # _current: Config = attrs.Factory(lambda: Config({}))
@@ -116,7 +116,7 @@ class ConfigSpec:
         global _CUR_CONFIG
         _CUR_CONFIG = value
 
-    def info_by_name(self, name: str) -> ConfType:
+    def datatype_for_name(self, name: str) -> Type[Data]:
         """Lookup the data type for a specific name."""
         return self._name_to_type[name.casefold()]
 
@@ -127,7 +127,7 @@ class ConfigSpec:
     def register(self, cls: Type[DataT]) -> Type[DataT]:
         """Register a config data type. The name must be unique."""
         info = cls.get_conf_info()
-        self._name_to_type[info.name.casefold()] = info
+        self._name_to_type[info.name.casefold()] = cls
         self._class_to_type[cls] = info
         self._registered.add(cls)
         return cls
@@ -260,10 +260,11 @@ class ConfigSpec:
             if child.name == 'version':
                 continue
             try:
-                info = self._name_to_type[child.name]
+                cls = self._name_to_type[child.name]
             except KeyError:
                 LOGGER.warning('Unknown config option "{}"!', child.real_name)
                 continue
+            info = cls.get_conf_info()
             version = child.int('_version', 1)
             try:
                 del child['_version']
@@ -284,7 +285,7 @@ class ConfigSpec:
             if info.uses_id:
                 for data_prop in child:
                     try:
-                        data_map[data_prop.real_name] = info.cls.parse_kv1(data_prop, version)
+                        data_map[data_prop.real_name] = cls.parse_kv1(data_prop, version)
                     except Exception:
                         LOGGER.warning(
                             'Failed to parse config {}[{}]:',
@@ -293,7 +294,7 @@ class ConfigSpec:
                         )
             else:
                 try:
-                    data_map[''] = info.cls.parse_kv1(child, version)
+                    data_map[''] = cls.parse_kv1(child, version)
                 except Exception:
                     LOGGER.warning(
                         'Failed to parse config {}:',
@@ -306,9 +307,10 @@ class ConfigSpec:
         """Parse the old config format."""
         conf = Config({})
         # Convert legacy configs.
-        for info in self._name_to_type.values():
-            if hasattr(info.cls, 'parse_legacy'):
-                conf[info] = new = info.cls.parse_legacy(props)
+        for cls in self._name_to_type.values():
+            info = cls.get_conf_info()
+            if hasattr(cls, 'parse_legacy'):
+                conf[info] = new = cls.parse_legacy(props)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
