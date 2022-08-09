@@ -436,9 +436,6 @@ async def apply_pal_conf(conf: Config) -> None:
 
 # Main application configs.
 APP = ConfigSpec(utils.conf_location('config/config.vdf'))
-# TODO Remove these globals.
-_NAME_TO_TYPE = APP._name_to_type
-_TYPE_TO_TYPE = APP._class_to_type
 
 
 @APP.register('LastSelected', uses_id=True)
