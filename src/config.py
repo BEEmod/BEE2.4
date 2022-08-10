@@ -144,21 +144,14 @@ class ConfigSpec:
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
 
-    async def apply_conf(
-        self,
-        info_or_type: Union[ConfType[DataT], Type[DataT]],
-        *,
-        data_id: str= '',
-    ) -> None:
+    async def apply_conf(self, typ: Type[Data], *, data_id: str= '') -> None:
         """Apply the current settings for this config type and ID.
 
         If the data_id is not passed, all settings will be applied.
         """
-        info: ConfType[DataT]
-        if isinstance(info_or_type, ConfType):
-            info = info_or_type
-        else:
-            info = info_or_type.get_conf_info()
+        if typ not in self._registered:
+            raise ValueError(f'Unregistered data type {typ!r}')
+        info = typ.get_conf_info()
 
         if data_id:
             if not info.uses_id:
@@ -436,7 +429,7 @@ async def apply_pal_conf(conf: Config) -> None:
     async with trio.open_nursery() as nursery:
         for info in conf:
             if info.palette_stores:
-                nursery.start_soon(APP.apply_conf, info)
+                nursery.start_soon(APP.apply_conf, info.cls)
 
 
 # Main application configs.
