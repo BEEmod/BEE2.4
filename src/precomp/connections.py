@@ -69,15 +69,15 @@ CONN_NAMES = {
 
 # The order signs are used in maps.
 SIGN_ORDER = [
+    consts.Signage.SHAPE_SQUARE,
+    consts.Signage.SHAPE_CROSS,
     consts.Signage.SHAPE_DOT,
     consts.Signage.SHAPE_MOON,
-    consts.Signage.SHAPE_TRIANGLE,
-    consts.Signage.SHAPE_CROSS,
-    consts.Signage.SHAPE_SQUARE,
-    consts.Signage.SHAPE_CIRCLE,
-    consts.Signage.SHAPE_SINE,
     consts.Signage.SHAPE_SLASH,
+    consts.Signage.SHAPE_TRIANGLE,
+    consts.Signage.SHAPE_SINE,
     consts.Signage.SHAPE_STAR,
+    consts.Signage.SHAPE_CIRCLE,
     consts.Signage.SHAPE_WAVY
 ]
 
