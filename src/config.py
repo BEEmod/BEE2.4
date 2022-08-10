@@ -164,7 +164,7 @@ class ConfigSpec:
                 data = self._current[typ][data_id]
                 cb = self.callback[typ, data_id]
             except KeyError:
-                LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
+                LOGGER.warning('{}[{!r}] has no UI callback!', info.name, data_id)
             else:
                 assert isinstance(data, typ), info
                 await cb(data)
@@ -179,7 +179,7 @@ class ConfigSpec:
                     try:
                         cb = self.callback[typ, dat_id]
                     except KeyError:
-                        LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
+                        LOGGER.warning('{}[{!r}] has no UI callback!', info.name, dat_id)
                     else:
                         nursery.start_soon(cb, data)
 
