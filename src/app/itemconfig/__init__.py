@@ -81,7 +81,7 @@ def parse_color(color: str) -> Tuple[int, int, int]:
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class WidgetConfig(config.Data, name='ItemVar', uses_id=True):
+class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     """The configuation persisted to disk and stored in palettes."""
     # A single non-timer value, or timer name -> value.
     values: Union[str, Mapping[str, str]] = EmptyMapping

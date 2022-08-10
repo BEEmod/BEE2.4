@@ -3,6 +3,7 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
+import abc
 from enum import Enum
 from pathlib import Path
 from typing import (
@@ -29,24 +30,25 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
 DataT = TypeVar('DataT', bound='Data')
 
 
-class Data:
+class Data(abc.ABC):
     """Data which can be saved to the config. These should be immutable."""
     __info: ClassVar['ConfType']
+    __slots__ = ()  # No members itself.
 
     def __init_subclass__(
         cls, *,
-        name: str = '',
+        conf_name: str = '',
         version: int = 1,
         palette_stores: bool = True,  # TODO remove
         uses_id: bool = False,
         **kwargs,
     ) -> None:
         super().__init_subclass__(**kwargs)
-        if not name:
+        if not conf_name:
             raise ValueError('Config name must be specified!')
-        if name.casefold() in {'version', 'name'}:
-            raise ValueError(f'Illegal name: "{name}"')
-        cls.__info = ConfType(cls, name, version, palette_stores, uses_id)
+        if conf_name.casefold() in {'version', 'name'}:
+            raise ValueError(f'Illegal name: "{conf_name}"')
+        cls.__info = ConfType(cls, conf_name, version, palette_stores, uses_id)
 
     @classmethod
     def get_conf_info(cls: Type[DataT]) -> 'ConfType[DataT]':
@@ -59,10 +61,12 @@ class Data:
         return {}
 
     @classmethod
+    @abc.abstractmethod
     def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def export_kv1(self) -> Property:
         """Generate keyvalues for saving configuration."""
         raise NotImplementedError
@@ -458,7 +462,7 @@ PALETTE = ConfigSpec(None)
 
 @APP.register
 @attrs.frozen(slots=False)
-class LastSelected(Data, name='LastSelected', uses_id=True):
+class LastSelected(Data, conf_name='LastSelected', uses_id=True):
     """Used for several general items, specifies the last selected one for restoration."""
     id: Union[str, None] = None
 
@@ -527,7 +531,7 @@ class AfterExport(Enum):
 
 @APP.register
 @attrs.frozen(slots=False)
-class GenOptions(Data, name='Options', palette_stores=False):
+class GenOptions(Data, conf_name='Options', palette_stores=False):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
     # If the name has a :, the first is the section and the second is the name.
@@ -649,7 +653,7 @@ gen_opts_bool = [
 
 @APP.register
 @attrs.frozen(slots=False)
-class WindowState(Data, name='PaneState', uses_id=True, palette_stores=False):
+class WindowState(Data, conf_name='PaneState', uses_id=True, palette_stores=False):
     """Holds the position and size of windows."""
     x: int
     y: int

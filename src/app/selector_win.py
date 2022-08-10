@@ -104,7 +104,7 @@ CallbackT = ParamSpec('CallbackT')
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class WindowState(config.Data, name='SelectorWindow', palette_stores=False, uses_id=True):
+class WindowState(config.Data, conf_name='SelectorWindow', palette_stores=False, uses_id=True):
     """The immutable window state stored in config files for restoration next launch."""
     open_groups: Mapping[str, bool] = attrs.Factory(dict)
     width: int = 0

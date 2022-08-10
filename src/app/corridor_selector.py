@@ -55,7 +55,7 @@ FALLBACK = corridor.CorridorGroup(
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class UIState(config.Data, name='CorridorUIState', palette_stores=False):
+class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
     """The current window state for saving and restoring."""
     last_mode: GameMode = GameMode.SP
     last_direction: Direction = Direction.ENTRY

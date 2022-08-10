@@ -61,7 +61,7 @@ def export_data() -> List[Tuple[str, str]]:
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class Layout(config.Data, name='Signage'):
+class Layout(config.Data, conf_name='Signage'):
     """A layout of selected signs."""
     signs: Mapping[int, str] = attrs.Factory(DEFAULT_IDS.copy)
 

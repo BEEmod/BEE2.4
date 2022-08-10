@@ -65,7 +65,7 @@ class CorridorUI(Corridor):
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class Config(config.Data, name='Corridor', uses_id=True, version=1):
+class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
     """The current configuration for a corridor."""
     selected: List[str] = attrs.field(factory=list, kw_only=True)
     unselected: List[str] = attrs.field(factory=list, kw_only=True)

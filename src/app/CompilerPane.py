@@ -118,7 +118,7 @@ cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class CompilePaneState(config.Data, name='CompilerPane'):
+class CompilePaneState(config.Data, conf_name='CompilerPane'):
     """State saved in palettes.
 
     Note: We specifically do not save/load the following:
