@@ -89,7 +89,7 @@ class ConfType(Generic[DataT]):
 
 # The current data loaded from the config file. This maps an ID to each value, or
 # is {'': data} if no key is used.
-Config = NewType('Config', Dict[ConfType, Dict[str, Data]])
+Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
 
 
 @attrs.define(eq=False)
@@ -140,7 +140,7 @@ class ConfigSpec:
         if (typ, data_id) in self.callback:
             raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
         self.callback[typ, data_id] = func
-        data_map = self._current.setdefault(info, {})
+        data_map = self._current.setdefault(typ, {})
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
 
@@ -157,7 +157,7 @@ class ConfigSpec:
             if not info.uses_id:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
-                data = self._current[info][data_id]
+                data = self._current[typ][data_id]
                 cb = self.callback[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
@@ -166,7 +166,7 @@ class ConfigSpec:
                 await cb(data)
         else:
             try:
-                data_map = self._current[info]
+                data_map = self._current[typ]
             except KeyError:
                 LOGGER.warning('{}[:] has no UI callback!', info.name)
                 return
@@ -178,6 +178,23 @@ class ConfigSpec:
                         LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
                     else:
                         nursery.start_soon(cb, data)
+
+    async def apply_multi(self, config: Config) -> None:
+        """Apply all the config values to us.
+
+        Application is done concurrently, but all are stored atomically.
+        Config types not registered with us are ignored.
+        """
+        to_apply: list[Type[Data]] = []
+        for cls, opt_map in config.items():
+            if cls not in self._registered:
+                continue
+            self._current[cls] = opt_map.copy()
+            to_apply.append(cls)
+
+        async with trio.open_nursery() as nursery:
+            for cls in to_apply:
+                nursery.start_soon(self.apply_conf, cls)
 
     def get_cur_conf(
         self,
@@ -198,11 +215,11 @@ class ConfigSpec:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         data: object = None
         try:
-            data = self._current[info][data_id]
+            data = self._current[cls][data_id]
         except KeyError:
             if legacy_id:
                 try:
-                    conf_map = self._current[info]
+                    conf_map = self._current[cls]
                     data = conf_map[data_id] = conf_map.pop(legacy_id)
                 except KeyError:
                     pass
@@ -220,15 +237,16 @@ class ConfigSpec:
         """Update the current data for this ID. """
         if type(data) not in self._registered:
             raise ValueError(f'Unregistered data type {type(data)!r}')
-        info = data.get_conf_info()
+        cls = type(data)
+        info = cls.get_conf_info()
 
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
         try:
-            self._current[info][data_id] = data
+            self._current[cls][data_id] = data
         except KeyError:
-            self._current[info] = {data_id: data}
+            self._current[cls] = {data_id: data}
 
     def parse_kv1(self, props: Property) -> Tuple[Config, bool]:
         """Parse a configuration file into individual data.
@@ -270,7 +288,7 @@ class ConfigSpec:
             elif version != info.version:
                 upgraded = True
             data_map: Dict[str, Data] = {}
-            conf[info] = data_map
+            conf[cls] = data_map
             if info.uses_id:
                 for data_prop in child:
                     try:
@@ -299,11 +317,11 @@ class ConfigSpec:
         for cls in self._name_to_type.values():
             info = cls.get_conf_info()
             if hasattr(cls, 'parse_legacy'):
-                conf[info] = new = cls.parse_legacy(props)
+                conf[cls] = new = cls.parse_legacy(props)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
-                conf[info] = {}
+                conf[cls] = {}
         return conf
 
     def build_kv1(self, conf: Config) -> Iterator[Property]:
@@ -312,11 +330,11 @@ class ConfigSpec:
         The data is in the form {conf_type: {id: data}}.
         """
         yield Property('version', '1')
-        info: ConfType
-        for info, data_map in conf.items():
-            if not data_map or info.cls not in self._registered:
+        for cls, data_map in conf.items():
+            if not data_map or cls not in self._registered:
                 # Blank or not in our definition, don't save.
                 continue
+            info = cls.get_conf_info()
             prop = Property(info.name, [
                 Property('_version', str(info.version)),
             ])
@@ -329,7 +347,8 @@ class ConfigSpec:
                 # Must be a single '' key.
                 if list(data_map.keys()) != ['']:
                     raise ValueError(
-                        f'Must have a single \'\' key for non-id type "{info.name}", got:\n{data_map}'
+                        f'Must have a single "" key for non-id type '
+                        f'"{info.name}", got:\n{data_map}'
                     )
                 [data] = data_map.values()
                 prop.extend(data.export_kv1())
@@ -340,11 +359,12 @@ class ConfigSpec:
 
         The data is in the form {conf_type: {id: data}}.
         """
-        info: ConfType
         root = Element('BEE2Config', 'DMElement')
-        for info, data_map in conf.items():
-            if info.cls not in self._registered:
+        cls: Type[Data]
+        for cls, data_map in conf.items():
+            if cls not in self._registered:
                 continue
+            info = cls.get_conf_info()
             if not hasattr(info.cls, 'export_dmx'):
                 LOGGER.warning('No DMX export for {}!', info.name)
                 continue
@@ -390,8 +410,7 @@ class ConfigSpec:
 
         conf, _ = self.parse_kv1(props)
         self._current.clear()
-        for info, obj_map in conf.items():
-            self._current[info] = obj_map
+        self._current.update(conf)
 
     def write_file(self) -> None:
         """Write the settings to disk."""
@@ -414,26 +433,27 @@ class ConfigSpec:
 def get_pal_conf() -> Config:
     """Return a copy of the current settings for the palette."""
     return Config({
-        info: opt_map.copy()
-        for info, opt_map in APP._current.items()
-        if info.palette_stores
+        cls: opt_map.copy()
+        for cls, opt_map in APP._current.items()
+        if cls.get_conf_info().palette_stores
     })
 
 
 async def apply_pal_conf(conf: Config) -> None:
     """Apply a config provided from the palette."""
     # First replace all the configs to be atomic, then apply.
-    for info, opt_map in conf.items():
-        if info.palette_stores:  # Double-check, in case it's added to the file.
-            APP._current[info] = opt_map.copy()
+    for cls, opt_map in conf.items():
+        if cls.get_conf_info().palette_stores:  # Double-check, in case it's added to the file.
+            APP._current[cls] = opt_map.copy()
     async with trio.open_nursery() as nursery:
-        for info in conf:
-            if info.palette_stores:
-                nursery.start_soon(APP.apply_conf, info.cls)
+        for cls in conf:
+            if cls.get_conf_info().palette_stores:
+                nursery.start_soon(APP.apply_conf, cls)
 
 
 # Main application configs.
 APP = ConfigSpec(utils.conf_location('config/config.vdf'))
+PALETTE = ConfigSpec(None)
 
 
 @APP.register
