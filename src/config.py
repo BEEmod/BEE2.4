@@ -97,7 +97,6 @@ class ConfigSpec:
     """ConfTypes are registered with a spec, to define what sections are present."""
     filename: Optional[Path]
     _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
-    _class_to_type: Dict[Type[Data], ConfType] = attrs.Factory(dict)
     _registered: Set[Type[Data]] = attrs.Factory(set)
 
     # After the relevant UI is initialised, this is set to an async func which
@@ -112,15 +111,13 @@ class ConfigSpec:
         """Lookup the data type for a specific name."""
         return self._name_to_type[name.casefold()]
 
-    def info_by_class(self, data: Type[DataT]) -> ConfType[DataT]:
-        """Lookup the data type for this class."""
-        return self._class_to_type[data]
-
     def register(self, cls: Type[DataT]) -> Type[DataT]:
         """Register a config data type. The name must be unique."""
         info = cls.get_conf_info()
+        folded_name = info.name.casefold()
+        if folded_name in self._name_to_type:
+            raise ValueError(f'"{info.name}" is already registered!')
         self._name_to_type[info.name.casefold()] = cls
-        self._class_to_type[cls] = info
         self._registered.add(cls)
         return cls
 
@@ -135,7 +132,9 @@ class ConfigSpec:
         If the configs have been loaded, it will immediately be called. Whenever new configs
         are loaded, it will be re-applied regardless.
         """
-        info: ConfType[DataT] = self._class_to_type[typ]
+        if typ not in self._registered:
+            raise ValueError(f'Unregistered data type {typ!r}')
+        info = typ.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         if (typ, data_id) in self.callback:
@@ -159,7 +158,7 @@ class ConfigSpec:
         if isinstance(info_or_type, ConfType):
             info = info_or_type
         else:
-            info = self._class_to_type[info_or_type]
+            info = info_or_type.get_conf_info()
 
         if data_id:
             if not info.uses_id:
@@ -199,7 +198,9 @@ class ConfigSpec:
         If legacy_id is defined, this will be checked if the original does not exist, and if so
         moved to the actual ID.
         """
-        info: ConfType[DataT] = self._class_to_type[cls]
+        if cls not in self._registered:
+            raise ValueError(f'Unregistered data type {cls!r}')
+        info = cls.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         data: object = None
@@ -224,7 +225,10 @@ class ConfigSpec:
 
     def store_conf(self, data: DataT, data_id: str='') -> None:
         """Update the current data for this ID. """
-        info: ConfType[DataT] = self._class_to_type[type(data)]
+        if type(data) not in self._registered:
+            raise ValueError(f'Unregistered data type {type(data)!r}')
+        info = data.get_conf_info()
+
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
@@ -317,7 +321,7 @@ class ConfigSpec:
         yield Property('version', '1')
         info: ConfType
         for info, data_map in conf.items():
-            if not data_map or info.cls not in self._class_to_type:
+            if not data_map or info.cls not in self._registered:
                 # Blank or not in our definition, don't save.
                 continue
             prop = Property(info.name, [
@@ -346,7 +350,7 @@ class ConfigSpec:
         info: ConfType
         root = Element('BEE2Config', 'DMElement')
         for info, data_map in conf.items():
-            if info.cls not in self._class_to_type:
+            if info.cls not in self._registered:
                 continue
             if not hasattr(info.cls, 'export_dmx'):
                 LOGGER.warning('No DMX export for {}!', info.name)
