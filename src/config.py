@@ -90,7 +90,6 @@ class ConfType(Generic[DataT]):
 # The current data loaded from the config file. This maps an ID to each value, or
 # is {'': data} if no key is used.
 Config = NewType('Config', Dict[ConfType, Dict[str, Data]])
-_CUR_CONFIG: Config = Config({})
 
 
 @attrs.define(eq=False)
@@ -107,16 +106,7 @@ class ConfigSpec:
     # One is provided independently for each ID, so it can be sent to the right object.
     callback: Dict[Tuple[Type[Data], str], Callable[[Data], Awaitable]] = attrs.field(factory=dict, repr=False)
 
-    # _current: Config = attrs.Factory(lambda: Config({}))
-    @property
-    def _current(self) -> Config:
-        """TODO: Redirect all _CUR_CONFIG uses to here."""
-        return _CUR_CONFIG
-
-    @_current.setter
-    def _current(self, value: Config) -> None:
-        global _CUR_CONFIG
-        _CUR_CONFIG = value
+    _current: Config = attrs.Factory(lambda: Config({}))
 
     def datatype_for_name(self, name: str) -> Type[Data]:
         """Lookup the data type for a specific name."""
@@ -428,7 +418,7 @@ def get_pal_conf() -> Config:
     """Return a copy of the current settings for the palette."""
     return Config({
         info: opt_map.copy()
-        for info, opt_map in _CUR_CONFIG.items()
+        for info, opt_map in APP._current.items()
         if info.palette_stores
     })
 
@@ -438,7 +428,7 @@ async def apply_pal_conf(conf: Config) -> None:
     # First replace all the configs to be atomic, then apply.
     for info, opt_map in conf.items():
         if info.palette_stores:  # Double-check, in case it's added to the file.
-            _CUR_CONFIG[info] = opt_map.copy()
+            APP._current[info] = opt_map.copy()
     async with trio.open_nursery() as nursery:
         for info in conf:
             if info.palette_stores:
