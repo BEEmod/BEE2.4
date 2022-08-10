@@ -1460,7 +1460,6 @@ if __name__ == '__main__':
     test_menu = Menu(TK_ROOT)
     dropdown = Menu(test_menu)
     test_menu.add_cascade(menu=dropdown, label='Game')
-    dropdown.game_pos = 0
     TK_ROOT['menu'] = test_menu
 
     load()

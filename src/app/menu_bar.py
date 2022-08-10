@@ -13,8 +13,8 @@ from app import gameMan, helpMenu, optionWindow, packageMan, tk_tools, backup as
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
 FOLDER_OPTIONS: List[Tuple[str, Callable[['gameMan.Game'], Iterable[Path]]]] = [
-    (gettext('{game} Puzzle Folder'), lambda game: [game.abs_path('portal2/puzzles/')]),
-    (gettext('{game} Folder'), lambda game: [game.abs_path('.')]),
+    (gettext('{game} Puzzle Folder'), lambda game: [Path(game.abs_path('portal2/puzzles/'))]),
+    (gettext('{game} Folder'), lambda game: [Path(game.abs_path('.'))]),
     (gettext('Palettes Folder'), lambda game: [utils.conf_location('palettes')]),
     (gettext('Packages Folder'), lambda game: BEE2_config.get_package_locs()),
 ]

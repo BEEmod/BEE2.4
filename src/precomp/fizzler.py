@@ -245,7 +245,8 @@ class FizzlerType:
         inst: dict[tuple[FizzInst, bool], list[str]] = {}
         for inst_type, is_static in itertools.product(FizzInst, (False, True)):
             inst_type_name = inst_type.value + ('_static' if is_static else '')
-            inst[inst_type, is_static] = instances = []
+            instances: list[str] = []
+            inst[inst_type, is_static] = instances
             for prop in conf.find_all(inst_type_name):
                 resolved = instanceLocs.resolve(prop.value)
                 if prop.value and not resolved:
