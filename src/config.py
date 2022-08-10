@@ -158,11 +158,11 @@ class ConfigSpec:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
                 data = self._current[info][data_id]
-                cb = self.callback[info.cls, data_id]
+                cb = self.callback[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
             else:
-                assert isinstance(data, info.cls), info
+                assert isinstance(data, typ), info
                 await cb(data)
         else:
             try:
@@ -173,7 +173,7 @@ class ConfigSpec:
             async with trio.open_nursery() as nursery:
                 for dat_id, data in data_map.items():
                     try:
-                        cb = self.callback[info.cls, dat_id]
+                        cb = self.callback[typ, dat_id]
                     except KeyError:
                         LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
                     else:
@@ -213,7 +213,7 @@ class ConfigSpec:
             else:
                 raise KeyError(data_id)
 
-        assert isinstance(data, info.cls), info
+        assert isinstance(data, cls), info
         return data
 
     def store_conf(self, data: DataT, data_id: str='') -> None:
