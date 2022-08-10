@@ -85,11 +85,6 @@ class ConfType(Generic[DataT]):
     version: int
     palette_stores: bool  # If this is save/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
-    # After the relevant UI is initialised, this is set to an async func which
-    # applies the data to the UI. This way we know it can be done safely now.
-    # If data was loaded from the config, the callback is immediately awaited.
-    # One is provided independently for each ID, so it can be sent to the right object.
-    callback: Dict[str, Callable[[DataT], Awaitable]] = attrs.field(factory=dict, repr=False)
 
 
 # The current data loaded from the config file. This maps an ID to each value, or
@@ -105,6 +100,13 @@ class ConfigSpec:
     _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
     _class_to_type: Dict[Type[Data], ConfType] = attrs.Factory(dict)
     _registered: Set[Type[Data]] = attrs.Factory(set)
+
+    # After the relevant UI is initialised, this is set to an async func which
+    # applies the data to the UI. This way we know it can be done safely now.
+    # If data was loaded from the config, the callback is immediately awaited.
+    # One is provided independently for each ID, so it can be sent to the right object.
+    callback: Dict[Tuple[Type[Data], str], Callable[[Data], Awaitable]] = attrs.field(factory=dict, repr=False)
+
     # _current: Config = attrs.Factory(lambda: Config({}))
     @property
     def _current(self) -> Config:
@@ -146,9 +148,9 @@ class ConfigSpec:
         info: ConfType[DataT] = self._class_to_type[typ]
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        if data_id in info.callback:
+        if (typ, data_id) in self.callback:
             raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
-        info.callback[data_id] = func
+        self.callback[typ, data_id] = func
         data_map = self._current.setdefault(info, {})
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
@@ -174,7 +176,7 @@ class ConfigSpec:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
                 data = self._current[info][data_id]
-                cb = info.callback[data_id]
+                cb = self.callback[info.cls, data_id]
             except KeyError:
                 LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
             else:
@@ -189,7 +191,7 @@ class ConfigSpec:
             async with trio.open_nursery() as nursery:
                 for dat_id, data in data_map.items():
                     try:
-                        cb = info.callback[dat_id]
+                        cb = self.callback[info.cls, dat_id]
                     except KeyError:
                         LOGGER.warning('{}[{}] has no UI callback!', info.name, data_id)
                     else:
