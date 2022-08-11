@@ -99,7 +99,7 @@ if utils.WIN and utils.BITNESS == '32':
     for dll in lib_path.iterdir():
         if dll.suffix == '.dll' and 'spatialindex' in dll.stem:
             dest = rtree_dir / dll.name
-            print('Writing {} -> {}', dll, dest)
+            print(f'Writing {dll} -> {dest}')
             dest.write_bytes(dll.read_bytes())
 # Now we can collect the appropriate path.
 binaries = collect_dynamic_libs('rtree')
