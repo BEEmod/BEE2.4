@@ -52,15 +52,15 @@ Icon
 *.filelist.txt
 
 # Compiled application output
-build_BEE2/
-compiler/
-dist/
+/build_BEE2/
+/compiler/
+/dist/
 
 # Ignore palettes
 palettes/*.bee2_palette
 
 # The config files automatically regenerate with the defaults.
-config/
+/config/
 
 # Reports and logs we produce:
 logs/
