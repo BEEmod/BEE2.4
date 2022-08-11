@@ -1,7 +1,10 @@
 """Test the main config logic."""
-import pytest
-from srctools import Property, bool_as_int
 from typing_extensions import Literal, TypeAlias
+import io
+import uuid
+
+from srctools import Property, bool_as_int
+import pytest
 
 import config
 
@@ -98,3 +101,46 @@ def test_parse_kv1_upgrades(value: str, triple: Triple) -> None:
     conf, upgraded = spec.parse_kv1(props)
     assert not upgraded
     assert conf == {DataSingle: {'': DataSingle(value, triple)}}
+
+
+@pytest.mark.parametrize('triple', ['a', 'b', 'c'])
+@pytest.mark.parametrize('value', ['val1', 'val2'])
+def test_export_kv1_regress(value: str, triple: Triple, file_regression) -> None:
+    """Test exporting KV1 produces the same result."""
+    spec = config.ConfigSpec(None)
+    spec.register(DataSingle)
+
+    conf = config.Config({
+        DataSingle: {'': DataSingle(value, triple)}
+    })
+    props = Property.root(*spec.build_kv1(conf))
+
+    buf = io.StringIO()
+    buf.writelines(props.export())
+
+    file_regression.check(
+        buf.getvalue(),
+        basename=f'export_noid_{triple}_{value}', extension='.vdf',
+    )
+
+
+@pytest.mark.parametrize('triple', ['a', 'b', 'c'])
+@pytest.mark.parametrize('value', ['val1', 'val2'])
+def test_export_dmx_regress(value: str, triple: Triple, file_regression) -> None:
+    """Test exporting DMX produces the same result."""
+    spec = config.ConfigSpec(None)
+    spec.register(DataSingle)
+
+    conf = config.Config({
+        DataSingle: {'': DataSingle(value, triple)}
+    })
+    elem = spec.build_dmx(conf)
+    # The root UUID is always present, override to some fixed value so we can compare.
+    elem.uuid = uuid.UUID(hex='5f6c487e-1365-49e6-80d4-effe1abe1701')
+
+    buf = io.BytesIO()
+    elem.export_kv2(buf, 'BEEConfig', 1, unicode='format', cull_uuid=True)
+    file_regression.check(
+        buf.getvalue().decode().replace('\r\n', '\n'),
+        basename=f'export_noid_{triple}_{value}', extension='.dmx',
+    )

@@ -1,0 +1,12 @@
+<!-- dmx encoding unicode_keyvalues2 1 format BEEConfig 1 -->
+"DMElement"
+{
+	"id" "elementid" "5f6c487e-1365-49e6-80d4-effe1abe1701"
+	"name" "string" "BEE2Config"
+	"TestName" "Conf_v2"
+	{
+		"name" "string" "TestName"
+		"value" "string" "val1"
+		"triple" "string" "c"
+	}
+}
