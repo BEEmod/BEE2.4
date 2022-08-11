@@ -7,7 +7,7 @@ import abc
 from enum import Enum
 from pathlib import Path
 from typing import (
-    Any, ClassVar, Optional, Set, TypeVar, Callable, Generic, NewType, Union, cast,
+    Any, ClassVar, Optional, Set, TypeVar, Callable, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
 )
 import os
@@ -30,9 +30,18 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
 DataT = TypeVar('DataT', bound='Data')
 
 
+@attrs.define(eq=False)
+class ConfInfo:
+    """Holds information about a type of configuration data."""
+    name: str
+    version: int
+    palette_stores: bool  # If this is save/loaded by palettes.
+    uses_id: bool  # If we manage individual configs for each of these IDs.
+
+
 class Data(abc.ABC):
     """Data which can be saved to the config. These should be immutable."""
-    __info: ClassVar['ConfType']
+    __info: ClassVar[ConfInfo]
     __slots__ = ()  # No members itself.
 
     def __init_subclass__(
@@ -48,11 +57,11 @@ class Data(abc.ABC):
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfType(cls, conf_name, version, palette_stores, uses_id)
+        cls.__info = ConfInfo(cls, conf_name, version, palette_stores, uses_id)
 
     @classmethod
-    def get_conf_info(cls: Type[DataT]) -> 'ConfType[DataT]':
-        """Return the ConfType for this class."""
+    def get_conf_info(cls) -> ConfInfo:
+        """Return the ConfInfo for this class."""
         return cls.__info
 
     @classmethod
@@ -81,16 +90,6 @@ class Data(abc.ABC):
         return Element.from_kv1(self.export_kv1())
 
 
-@attrs.define(eq=False)
-class ConfType(Generic[DataT]):
-    """Holds information about a type of configuration data."""
-    cls: Type[DataT]
-    name: str
-    version: int
-    palette_stores: bool  # If this is save/loaded by palettes.
-    uses_id: bool  # If we manage individual configs for each of these IDs.
-
-
 # The current data loaded from the config file. This maps an ID to each value, or
 # is {'': data} if no key is used.
 Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
@@ -98,7 +97,7 @@ Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
 
 @attrs.define(eq=False)
 class ConfigSpec:
-    """ConfTypes are registered with a spec, to define what sections are present."""
+    """A config spec represents the set of data types in a particlar config file."""
     filename: Optional[Path]
     _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
     _registered: Set[Type[Data]] = attrs.Factory(set)
