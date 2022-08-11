@@ -369,9 +369,6 @@ class ConfigSpec:
             if cls not in self._registered:
                 continue
             info = cls.get_conf_info()
-            if not hasattr(info.cls, 'export_dmx'):
-                LOGGER.warning('No DMX export for {}!', info.name)
-                continue
             if info.uses_id:
                 elem = Element(info.name, f'Conf_v{info.version}')
                 for data_id, data in data_map.items():
