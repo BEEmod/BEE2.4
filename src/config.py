@@ -57,7 +57,7 @@ class Data(abc.ABC):
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfInfo(cls, conf_name, version, palette_stores, uses_id)
+        cls.__info = ConfInfo(conf_name, version, palette_stores, uses_id)
 
     @classmethod
     def get_conf_info(cls) -> ConfInfo:
