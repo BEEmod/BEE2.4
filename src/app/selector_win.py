@@ -210,8 +210,10 @@ class AttrDef:
 
 class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
-    def __init__(self, win: SelectorWin, title: str) -> None:
+    def __init__(self, win: SelectorWin, title: str, menu: tk.Menu) -> None:
         self.parent = win
+        self._menu = menu  # The rightclick cascade widget.
+        self._menu_pos = -1
         super().__init__(win.pal_frame, title)
 
         self.arrow = ttk.Label(
@@ -1100,15 +1102,18 @@ class SelectorWin(Generic[CallbackT]):
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = item.group
-            if group_key not in self.group_widgets:
-                self.group_widgets[group_key] = GroupHeader(self, self.group_names[group_key])
-
-            try:
-                menu = self.context_menus[group_key]
-            except KeyError:
-                self.context_menus[group_key] = menu = tk.Menu(
-                    self.context_menu,
-                )
+            if group_key:
+                try:
+                    group = self.group_widgets[group_key]
+                except KeyError:
+                    self.group_widgets[group_key] = group = GroupHeader(
+                        self,
+                        self.group_names[group_key],
+                        tk.Menu(self.context_menu),
+                    )
+                menu = group._menu
+            else:
+                menu = self.context_menu
 
             menu.add_radiobutton(
                 label=item.context_lbl,
@@ -1125,17 +1130,17 @@ class SelectorWin(Generic[CallbackT]):
         # Note - empty string should sort to the beginning!
         self.group_order[:] = sorted(self.grouped_items.keys())
 
-        for (key, menu) in sorted(self.context_menus.items(), key=operator.itemgetter(0)):
-            if key == '':
+        for group_key in self.group_order:
+            if group_key == '':
                 # Don't add the ungrouped menu to itself!
                 continue
+            group = self.group_widgets[group_key]
             self.context_menu.add_cascade(
-                menu=menu,
-                label=self.group_names[key],
+                menu=group._menu,
+                label=self.group_names[group_key],
             )
-            # Set a custom attribute to keep track of the menu's index.
-            # The one at the end is the one we just added.
-            menu._context_index = self.context_menu.index('end')
+            # Track the menu's index. The one at the end is the one we just added.
+            group._menu_pos = self.context_menu.index('end')
         if self.win.winfo_ismapped():
             self.flow_items()
 
@@ -1692,16 +1697,17 @@ class SelectorWin(Generic[CallbackT]):
         new_font = self.sugg_font if suggested else self.norm_font
         if item.group:
             group_key = item.group.casefold()
-            menu = self.context_menus[group_key]
+            group = self.group_widgets[group_key]
+            menu = group._menu
 
             # Apply the font to the group header as well, if suggested.
             if suggested:
-                self.group_widgets[group_key].title['font'] = new_font
+                group.title['font'] = new_font
 
                 # Also highlight the menu
                 # noinspection PyUnresolvedReferences
                 self.context_menu.entryconfig(
-                    menu._context_index,  # Use a custom attr to keep track of this...
+                    group._menu_pos,
                     font=new_font,
                 )
         else:
@@ -1719,13 +1725,8 @@ class SelectorWin(Generic[CallbackT]):
         # re-bold it.
         for group_key, header in self.group_widgets.items():
             header.title['font'] = self.norm_font
-            try:
-                # noinspection PyProtectedMember, PyUnresolvedReferences
-                ind = self.context_menus[group_key]._context_index
-            except AttributeError:
-                pass
-            else:
-                self.context_menu.entryconfig(ind, font=self.norm_font)
+            if header._menu_pos >= 0:
+                self.context_menu.entryconfig(header._menu_pos, font=self.norm_font)
 
         self._set_context_font(self.noneItem, '<NONE>' in suggested)
 
