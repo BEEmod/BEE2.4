@@ -414,8 +414,17 @@ def annotation_caller(
     # Add some introspection attributes to this generated function.
     try:
         reorder_func.__name__ = func.__name__
+    except AttributeError:
+        pass
+    try:
         reorder_func.__qualname__ = func.__qualname__
-        reorder_func.__wrapped__ = func
+    except AttributeError:
+        pass
+    try:
+        reorder_func.__wrapped__ = func  # type: ignore
+    except AttributeError:
+        pass
+    try:
         reorder_func.__doc__ = f'{func.__name__}({comma_inp}) -> {func.__name__}({comma_out})'
     except AttributeError:
         pass
