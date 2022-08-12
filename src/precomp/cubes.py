@@ -451,6 +451,7 @@ class CubeType:
             packlist = packlist_prop.value
 
         packlist_color_prop = conf.find_key('PackColor', '')
+        packlist_color: list[str] | str
         if packlist_color_prop.has_children():
             packlist_color = [
                 prop.value for prop in packlist_color_prop

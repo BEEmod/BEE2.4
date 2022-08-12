@@ -76,7 +76,7 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 # Used to dump a list of the flags, results, meta-conditions
 ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
-ALL_META: list[tuple[str, Decimal, CondCall[None]]] = []
+ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
 
 
 CallableT = TypeVar('CallableT', bound=Callable)
@@ -508,7 +508,7 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:
+    def __doc__(self) -> str:  # type: ignore  # object.__doc__ is not a property.
         return self.func.__doc__
 
     def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Property) -> CallResultT:

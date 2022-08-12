@@ -1016,7 +1016,7 @@ class SelectorWin(Generic[CallbackT]):
         self.disp_btn = ttk.Button(
             self.display,
             text="...",
-            width=1.5,
+            width=1.5,  # type: ignore
             command=self.open_win,
         )
         self.disp_btn.pack(side='right')

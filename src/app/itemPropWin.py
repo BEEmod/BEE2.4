@@ -621,8 +621,8 @@ def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: str)
 if __name__ == '__main__':
     TK_ROOT.geometry('+250+250')
 
-    def callback(vals):
-        for key, value in sorted(vals.items()):
+    def callback(props: dict[str, str]) -> None:
+        for key, value in sorted(props.items()):
             print(key + ' = ' + repr(value))
 
     init(callback)
