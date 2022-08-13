@@ -79,6 +79,10 @@ else:
 if _SETTINGS_ROOT is not None:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
+# If testing, redirect to a subdirectory so the real configs aren't touched.
+if 'pytest' in sys.modules:
+    _SETTINGS_ROOT /= 'testing'
+
 
 def get_git_version(inst_path: Path | str) -> str:
     """Load the version from Git history."""
