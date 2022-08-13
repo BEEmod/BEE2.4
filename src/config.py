@@ -182,22 +182,28 @@ class ConfigSpec:
                     else:
                         nursery.start_soon(cb, data)
 
-    async def apply_multi(self, config: Config) -> None:
-        """Apply all the config values to us.
+    def merge_conf(self, config: Config) -> None:
+        """Re-store values in the specified config.
 
-        Application is done concurrently, but all are stored atomically.
         Config types not registered with us are ignored.
+        For per-ID types all values are replaced.
         """
-        to_apply: list[Type[Data]] = []
         for cls, opt_map in config.items():
             if cls not in self._registered:
                 continue
             self._current[cls] = opt_map.copy()
-            to_apply.append(cls)
 
+    async def apply_multi(self, config: Config) -> None:
+        """Merge the values into our config, then apply the changed types.
+
+        Application is done concurrently, but all are stored atomically.
+        Config types not registered with us are ignored.
+        """
+        self.merge_conf(config)
         async with trio.open_nursery() as nursery:
-            for cls in to_apply:
-                nursery.start_soon(self.apply_conf, cls)
+            for cls in config:
+                if cls in self._registered:
+                    nursery.start_soon(self.apply_conf, cls)
 
     def get_cur_conf(
         self,
