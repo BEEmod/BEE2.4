@@ -661,8 +661,10 @@ def add(prop_block: Property) -> None:
 
 def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
     """Check all conditions."""
-    for inst in vmf.by_class['func_instance']:
-        ALL_INST.add(inst['file'].casefold())
+    ALL_INST.update({
+        inst['file'].casefold()
+        for inst in vmf.by_class['func_instance']
+    })
 
     # Sort by priority, where higher = done later
     zero = Decimal(0)
