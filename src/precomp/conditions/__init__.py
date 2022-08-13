@@ -659,8 +659,8 @@ def add(prop_block: Property) -> None:
         conditions.append(con)
 
 
-def init(vmf: VMF) -> None:
-    """Initialise the Conditions system."""
+def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
+    """Check all conditions."""
     for inst in vmf.by_class['func_instance']:
         ALL_INST.add(inst['file'].casefold())
 
@@ -674,9 +674,6 @@ def init(vmf: VMF) -> None:
             for name, func in RESULT_SETUP.items()
         ]))
 
-
-def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
-    """Check all conditions."""
     LOGGER.info('Checking Conditions...')
     LOGGER.info('-----------------------')
     skipped_cond = 0

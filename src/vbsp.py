@@ -1591,8 +1591,6 @@ def main() -> None:
         fizzler.parse_map(vmf, info)
         barriers.parse_map(vmf, info)
 
-        conditions.init(vmf)
-
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
 
