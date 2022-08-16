@@ -914,7 +914,7 @@ def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
     return widget
 
 
-@functools.cache
+@functools.lru_cache
 def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """Find a nice font for drawing into images."""
     for filename in [
