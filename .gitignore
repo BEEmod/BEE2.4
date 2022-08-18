@@ -44,17 +44,17 @@ Icon
 # MyPy
 .mypy_cache
 
-
 # Portal 2 stuff
 *.vmx
 *.log
 *.prt
 *.filelist.txt
 
-# Compiled application output
+# Compiled application output, temp files
 /build_BEE2/
 /compiler/
 /dist/
+/build_tmp/
 
 # Ignore palettes
 palettes/*.bee2_palette
@@ -71,13 +71,12 @@ reports/
 
 # Specifies the version for compilation.
 src/bee_version.txt
+# Assembled copy of Hammer Addons, for adding to the frozen EXE.
+/hammeraddons.fgd
 
 # Testing:
 .hypothesis/
 .pytest_cache/
-
-# PyInstaller temporary file directory
-/build_tmp/
 
 # Ignore copies of FFMPEG, but include libspatialindex.
 # rtree doesn't have 32-bit windows wheels, so incldue the files ourselves.

@@ -218,12 +218,6 @@ sp_a5_finale02_stage_end.wav\
 # still_alive_gutair_cover.wav
 # want_you_gone_guitar_cover.wav
 
-# HammerAddons tags relevant to P2.
-FGD_TAGS = frozenset({
-    'SINCE_HL2', 'SINCE_HLS', 'SINCE_EP1', 'SINCE_EP2', 'SINCE_TF2',
-    'SINCE_P1', 'SINCE_L4D', 'SINCE_L4D2', 'SINCE_ASW', 'SINCE_P2',
-    'P2', 'UNTIL_CSGO', 'VSCRIPT', 'INST_IO'
-})
 
 
 def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
@@ -489,15 +483,6 @@ class Game:
                 del data[i:]
                 break
 
-        engine_fgd = srctools.FGD.engine_dbase()
-        engine_fgd.collapse_bases()
-        fgd = srctools.FGD()
-
-        for ent in engine_fgd:
-            if ent.classname.startswith('comp_') or ent.classname == "hammer_notes":
-                fgd.entities[ent.classname] = ent
-                ent.strip_tags(FGD_TAGS)
-
         with atomic_write(fgd_path, overwrite=True, mode='wb') as file:
             for line in data:
                 file.write(line)
@@ -506,13 +491,20 @@ class Game:
                     b'// BEE 2 EDIT FLAG = 1 \n'
                     b'// Added automatically by BEE2. Set above to "0" to '
                     b'allow editing below text without being overwritten.\n'
+                    b'// You\'ll want to do that if installing Hammer Addons.'
                     b'\n\n'
                 )
                 with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
-                file_str = io.TextIOWrapper(file, encoding='iso-8859-1')
-                fgd.export(file_str)
-                file_str.detach()  # Ensure it doesn't close it itself.
+                file.write(b'\n')
+                try:
+                    with utils.install_path('hammeraddons.fgd').open('rb') as ha_fgd:
+                        shutil.copyfileobj(ha_fgd, file)
+                except FileNotFoundError:
+                    if utils.FROZEN:
+                        raise  # Should be here!
+                    else:
+                        LOGGER.warning('Missing hammeraddons.fgd, build the app at least once!')
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
