@@ -110,7 +110,7 @@ def res_check_entry_corridor(info: conditions.MapInfo, flag: Property) -> bool:
     return global_bool(info.corr_entry.instance.casefold() == flag.value.casefold())
 
 
-@conditions.make_flag('entryCorridor')
+@conditions.make_flag('exitCorridor')
 def res_check_exit_corridor(info: conditions.MapInfo, flag: Property) -> bool:
     """Check the selected exit corridor matches this filename."""
     return global_bool(info.corr_exit.instance.casefold() == flag.value.casefold())

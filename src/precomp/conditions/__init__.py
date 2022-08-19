@@ -596,8 +596,13 @@ def make_flag(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]
     def x(func: CallableT) -> CallableT:
         wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
         ALL_FLAGS.append((orig_name, aliases, wrapper))
+        name = orig_name.casefold()
+        if name in FLAG_LOOKUP:
+            raise ValueError(f'Flag {orig_name} is a duplicate!')
         FLAG_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
+            if name.casefold() in FLAG_LOOKUP:
+                raise ValueError(f'Flag {orig_name} is a duplicate!')
             FLAG_LOOKUP[name.casefold()] = wrapper
         return func
     return x
@@ -625,8 +630,12 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             func = conv_setup_pair(setup_func, result_func)
 
         wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
+        if orig_name.casefold() in RESULT_LOOKUP:
+            raise ValueError(f'Result {orig_name} is a duplicate!')
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
+            if name.casefold() in RESULT_LOOKUP:
+                raise ValueError(f'Result {orig_name} is a duplicate!')
             RESULT_LOOKUP[name.casefold()] = wrapper
         if setup_func is not None:
             for name in aliases:
