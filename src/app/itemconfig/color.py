@@ -50,13 +50,14 @@ def make_color_swatch(parent: tk.Widget, var: tk.StringVar, size: int) -> tuple[
         widget_sfx()
         r, g, b = parse_color(var.get())
         new_color, tk_color = askcolor(
-            color=(r, g, b),
+            color=f"#{r:02x}{g:02x}{b:02x}",
             parent=parent.winfo_toplevel(),
             title=gettext('Choose a Color'),
         )
         if new_color is not None:
-            r, g, b = map(int, new_color)  # Returned as floats, which is wrong.
-            var.set(f'{int(r)} {int(g)} {int(b)}')
+            # On 3.8, these are floats.
+            rf, gf, bf = new_color
+            var.set(f'{int(rf)} {int(gf)} {int(bf)}')
 
     swatch = ttk.Label(parent)
     img.apply(swatch, img.Handle.color(parse_color(var.get()), size, size))
