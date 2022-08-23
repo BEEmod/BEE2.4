@@ -1105,12 +1105,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     This sets data, but doesn't implement the changes.
     """
     # cube or dropper -> cubetype or droppertype value.
-    inst_to_type: dict[str, CubeType | DropperType] = {}
-
-    obj_type: CubeType | DropperType
-    for obj_type in itertools.chain(CUBE_TYPES.values(), DROPPER_TYPES.values()):
-        for fname in obj_type.instances:
-            inst_to_type[fname] = obj_type
+    inst_to_cube: dict[str, CubeType] = {
+        fname: cube_type
+        for cube_type in CUBE_TYPES.values()
+        for fname in cube_type.instances
+    }
+    inst_to_drop: dict[str, DropperType] = {
+        fname: drop_type
+        for drop_type in DROPPER_TYPES.values()
+        for fname in drop_type.instances
+    }
 
     # Origin -> instances
     dropper_pos: dict[tuple[float, float, float], tuple[Entity, DropperType]] = {}
@@ -1123,36 +1127,37 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     cubes: list[tuple[Entity, CubeType]] = []
 
     for inst in vmf.by_class['func_instance']:
+        fname = inst['file'].casefold()
         try:
-            inst_type = inst_to_type[inst['file'].casefold()]
+            cube_type = inst_to_cube[fname]
         except KeyError:
-            # Not a cube or dropper!
-            continue
-
-        # A dropper.
-        if isinstance(inst_type, DropperType):
-            timer = inst.fixup.int('$timer_delay', 0)
-            # Don't allow others access to this value.
-            del inst.fixup['$timer_delay']
-            # Infinite and 3 (default) are treated as off.
-            if 3 < timer <= 30:
-                if timer in dropper_timer:
-                    LOGGER.warning(
-                        'Two droppers with the same timer value: {}',
-                        timer,
-                    )
-                    # Disable this.
-                    dropper_timer[timer] = None, None
-                else:
-                    dropper_timer[timer] = inst, inst_type
-            # For setup later.
-            dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst, inst_type
-            used_droppers[inst] = False
-
-        # A cube.
-        elif isinstance(inst_type, CubeType):
+            pass  # Non cube.
+        else:
             # A dropperless cube.
-            cubes.append((inst, inst_type))
+            cubes.append((inst, cube_type))
+            continue
+        try:
+            drop_type = inst_to_drop[fname]
+        except KeyError:
+            continue  # Not cube or dropper, we don't care.
+
+        timer = inst.fixup.int('$timer_delay', 0)
+        # Don't allow others access to this value.
+        del inst.fixup['$timer_delay']
+        # Infinite and 3 (default) are treated as off.
+        if 3 < timer <= 30:
+            if timer in dropper_timer:
+                LOGGER.warning(
+                    'Two droppers with the same timer value: {}',
+                    timer,
+                )
+                # Disable this.
+                dropper_timer[timer] = None, None
+            else:
+                dropper_timer[timer] = inst, drop_type
+        # For setup later.
+        dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst, drop_type
+        used_droppers[inst] = False
 
     # Now link and match up all the cubes.
     for cube, cube_type in cubes:
@@ -1241,25 +1246,20 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 'No Valve cube type "{}" available!'.format(cube_type_id)
             ) from None
 
-        PAIRS.append(CubePair(
-            cube_type,
-            inst_to_type[dropper['file'].casefold()],
-            dropper=dropper,
-        ))
+        drop_type = inst_to_drop[dropper['file'].casefold()]
+        PAIRS.append(CubePair(cube_type, drop_type, dropper=dropper))
 
     # Check for colorisers and gel splats in the map, and apply those.
     coloriser_inst = resolve_inst('<ITEM_BEE2_CUBE_COLORISER>', silent=True)
     splat_inst = resolve_inst('<ITEM_PAINT_SPLAT>', silent=True)
 
-    LOGGER.info('SPLAT File: {}', splat_inst)
-
     for inst in vmf.by_class['func_instance']:
         file = inst['file'].casefold()
 
         if file in coloriser_inst:
-            file = coloriser_inst
+            kind = coloriser_inst
         elif file in splat_inst:
-            file = splat_inst
+            kind = splat_inst
         else:
             # Not one we care about.
             continue
@@ -1283,7 +1283,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             with suppress(KeyError):
                 pairs.append(CUBE_POS[pos.as_tuple()])
 
-        if file is coloriser_inst:
+        if kind is coloriser_inst:
             # The instance is useless now we know about it.
             inst.remove()
 
@@ -1294,7 +1294,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             ))
             for pair in pairs:
                 pair.tint = color.copy()
-        elif file is splat_inst:
+        elif kind is splat_inst:
             try:
                 paint_type = CubePaintType(inst.fixup.int('$paint_type'))
             except ValueError:
