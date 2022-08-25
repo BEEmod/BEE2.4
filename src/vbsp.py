@@ -443,12 +443,10 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
 
     LOGGER.info('Setting Portalgun:')
 
-    has = settings['has_attr']
-
-    blue_portal = not has['blueportal']
-    oran_portal = not has['orangeportal']
-    has_btn_onoff = has['portalgunonoff']
-    force_portal_man = has_btn_onoff or has['needsportalman']
+    blue_portal = not info.has_attr('blueportal')
+    oran_portal = not info.has_attr('orangeportal')
+    has_btn_onoff = info.has_attr('portalgunonoff')
+    force_portal_man = has_btn_onoff or info.has_attr('needsportalman')
 
     LOGGER.info(
         'Blue: {}, Orange: {!s}',
@@ -457,17 +455,11 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     )
 
     if blue_portal and oran_portal:
-        has['spawn_dual'] = True
-        has['spawn_single'] = False
-        has['spawn_nogun'] = False
+        info.set_attr('spawn_dual')
     elif blue_portal or oran_portal:
-        has['spawn_dual'] = False
-        has['spawn_single'] = True
-        has['spawn_nogun'] = False
+        info.set_attr('spawn_single')
     else:
-        has['spawn_dual'] = False
-        has['spawn_single'] = False
-        has['spawn_nogun'] = True
+        info.set_attr('spawn_nogun')
 
     ent_pos = options.get(Vec, 'global_pti_ents_loc')
     assert ent_pos is not None
