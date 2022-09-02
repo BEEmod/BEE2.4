@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-08-04 10:53+1000\n"
+"POT-Creation-Date: 2022-09-02 12:08+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -22,7 +22,7 @@ msgstr "跳过！"
 msgid "Version: "
 msgstr "版本："
 
-#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:884
+#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:886
 #: loadScreen.py:228
 msgid "Cancel"
 msgstr "取消"
@@ -961,7 +961,7 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: app/corridor_selector.py:215 app/helpMenu.py:476 app/itemPropWin.py:355
+#: app/corridor_selector.py:215 app/helpMenu.py:466 app/itemPropWin.py:355
 msgid "Close"
 msgstr "关闭"
 
@@ -995,30 +995,30 @@ msgstr "所选风格"
 msgid "Unused:"
 msgstr ""
 
-#: app/gameMan.py:779 app/gameMan.py:872
+#: app/gameMan.py:771 app/gameMan.py:864
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
-#: app/gameMan.py:780
+#: app/gameMan.py:772
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
 
-#: app/gameMan.py:873
+#: app/gameMan.py:865
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
-#: app/gameMan.py:1127 app/menu_bar.py:98
+#: app/gameMan.py:1119 app/menu_bar.py:98
 msgid "Quit"
 msgstr "退出"
 
-#: app/gameMan.py:1134
+#: app/gameMan.py:1126
 msgid "Export to \"{}\"..."
 msgstr "导出到 \"{}\"..."
 
-#: app/gameMan.py:1193
+#: app/gameMan.py:1185
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1026,11 +1026,11 @@ msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
 
-#: app/gameMan.py:1197
+#: app/gameMan.py:1189
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: app/gameMan.py:1278
+#: app/gameMan.py:1270
 msgid ""
 "It appears that the BEE2 application was installed directly in a game "
 "directory. The bee2/ folder name is used for exported resources, so this "
@@ -1039,48 +1039,48 @@ msgid ""
 "Move the application folder elsewhere, then re-run."
 msgstr ""
 
-#: app/gameMan.py:1323
+#: app/gameMan.py:1315
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "选择游戏可执行文件的路径 {appname}"
 
-#: app/gameMan.py:1327 app/gameMan.py:1344 app/gameMan.py:1354
-#: app/gameMan.py:1361 app/gameMan.py:1370 app/gameMan.py:1379
+#: app/gameMan.py:1319 app/gameMan.py:1336 app/gameMan.py:1346
+#: app/gameMan.py:1353 app/gameMan.py:1362 app/gameMan.py:1371
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: app/gameMan.py:1331
+#: app/gameMan.py:1323
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: app/gameMan.py:1332
+#: app/gameMan.py:1324
 msgid "Executable"
 msgstr "可执行文件"
 
-#: app/gameMan.py:1335
+#: app/gameMan.py:1327
 msgid "Find Game Binaries"
 msgstr ""
 
-#: app/gameMan.py:1341
+#: app/gameMan.py:1333
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: app/gameMan.py:1351
+#: app/gameMan.py:1343
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: app/gameMan.py:1362
+#: app/gameMan.py:1354
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: app/gameMan.py:1369
+#: app/gameMan.py:1361
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: app/gameMan.py:1378
+#: app/gameMan.py:1370
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: app/gameMan.py:1396
+#: app/gameMan.py:1388
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1088,70 +1088,88 @@ msgstr ""
 "\n"
 "（BEE2即将退出，这是最后一次修改游戏的配置！）"
 
-#: app/gameMan.py:1402 app/paletteUI.py:401
+#: app/gameMan.py:1394 app/paletteUI.py:401
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
-#: app/helpMenu.py:64
+#: app/helpMenu.py:60
 msgid "Wiki..."
 msgstr "维基百科..."
 
-#: app/helpMenu.py:66
+#: app/helpMenu.py:61
 msgid "Original Items..."
 msgstr "默认物品..."
 
 #. i18n: The chat program.
-#: app/helpMenu.py:71
+#: app/helpMenu.py:63
 msgid "Discord Server..."
 msgstr "Discord服务器..."
 
-#: app/helpMenu.py:72
+#: app/helpMenu.py:64
 msgid "aerond's Music Changer..."
 msgstr "BEEMod音乐转换器..."
 
-#: app/helpMenu.py:74
+#: app/helpMenu.py:65
+msgid "Purchase Portal 2"
+msgstr ""
+
+#: app/helpMenu.py:67
 msgid "Application Repository..."
 msgstr "软件开源代码库..."
 
-#: app/helpMenu.py:75
+#: app/helpMenu.py:68
 msgid "Items Repository..."
 msgstr "物品开源代码库..."
 
-#: app/helpMenu.py:77
+#: app/helpMenu.py:69
+#, fuzzy
+msgid "Music Repository..."
+msgstr "物品开源代码库..."
+
+#: app/helpMenu.py:71
 msgid "Submit Application Bugs..."
 msgstr "反馈程序Bug..."
 
-#: app/helpMenu.py:78
+#: app/helpMenu.py:72
 msgid "Submit Item Bugs..."
 msgstr "反馈物品Bug..."
 
-#. i18n: Original Palette
-#: app/helpMenu.py:80 app/paletteLoader.py:37
-msgid "Portal 2"
-msgstr "传送门2"
+#: app/helpMenu.py:73
+#, fuzzy
+msgid "Submit Music Bugs..."
+msgstr "反馈物品Bug..."
 
-#. i18n: Aperture Tag's palette
-#: app/helpMenu.py:81 app/paletteLoader.py:39
-msgid "Aperture Tag"
-msgstr "Aperture Tag"
+#: app/helpMenu.py:507 app/helpMenu.py:515
+msgid "BEEMOD2 - Failed to open URL"
+msgstr ""
 
-#: app/helpMenu.py:82
-msgid "Portal Stories: Mel"
-msgstr "传送门：梅尔的故事"
+#: app/helpMenu.py:508
+msgid ""
+"Failed to download list of URLs. Help menu links will not function. Check"
+" your Internet?"
+msgstr ""
 
-#: app/helpMenu.py:83
-msgid "Thinking With Time Machine"
-msgstr "传送门：时间机器"
+#: app/helpMenu.py:516
+msgid "Failed to parse help menu URLs file. Help menu links will not function."
+msgstr ""
 
-#: app/helpMenu.py:501
+#: app/helpMenu.py:531
+msgid "BEEMOD 2 - Open URL"
+msgstr ""
+
+#: app/helpMenu.py:532
+msgid "Do you wish to open the following URL?\n"
+msgstr ""
+
+#: app/helpMenu.py:543
 msgid "Help"
 msgstr "帮助"
 
-#: app/helpMenu.py:511
+#: app/helpMenu.py:552
 msgid "BEE2 Credits"
 msgstr "BEE2 声明"
 
-#: app/helpMenu.py:528
+#: app/helpMenu.py:567
 msgid "Credits..."
 msgstr "声明..."
 
@@ -1387,7 +1405,7 @@ msgstr "窗口"
 msgid "Development"
 msgstr "开发者选项"
 
-#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:860
+#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:862
 msgid "OK"
 msgstr "确定"
 
@@ -1630,6 +1648,16 @@ msgstr "BEE模组物品"
 msgid "Portal 2 Collapsed"
 msgstr "传送门2(已折叠)"
 
+#. i18n: Original Palette
+#: app/paletteLoader.py:37
+msgid "Portal 2"
+msgstr "传送门2"
+
+#. i18n: Aperture Tag's palette
+#: app/paletteLoader.py:39
+msgid "Aperture Tag"
+msgstr "Aperture Tag"
+
 #: app/paletteUI.py:155
 msgid "Clear Palette"
 msgstr "清空模板内容"
@@ -1698,44 +1726,44 @@ msgstr ""
 msgid "Open \"{}\" in the default browser?"
 msgstr "在默认浏览器中打开 \"{}\" ？"
 
-#: app/selector_win.py:483
+#: app/selector_win.py:485
 msgid "{} Preview"
 msgstr ""
 
 #. i18n: 'None' item description
-#: app/selector_win.py:550
+#: app/selector_win.py:552
 msgid "Do not add anything."
 msgstr "不要添加任何东西。"
 
 #. i18n: 'None' item name.
-#: app/selector_win.py:554
+#: app/selector_win.py:556
 msgid "<None>"
 msgstr "<无>"
 
-#: app/selector_win.py:804
+#: app/selector_win.py:806
 msgid "Play a sample of this item."
 msgstr "播放该物品的示例"
 
-#: app/selector_win.py:872
+#: app/selector_win.py:874
 #, fuzzy
 msgid "Select Suggested"
 msgstr "建议"
 
-#: app/selector_win.py:1070
+#: app/selector_win.py:1072
 msgid "Other"
 msgstr "其它"
 
-#: app/selector_win.py:1326
+#: app/selector_win.py:1331
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "作者: {}"
 
 #. i18n: Tooltip for colour swatch.
-#: app/selector_win.py:1392
+#: app/selector_win.py:1397
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "颜色: R={r}, G={g}, B={b}"
 
-#: app/selector_win.py:1604 app/selector_win.py:1610
+#: app/selector_win.py:1609 app/selector_win.py:1615
 msgid "Suggested"
 msgstr "建议"
 
@@ -1963,4 +1991,10 @@ msgstr "选择一种颜色"
 
 #~ msgid " lighting on the fly."
 #~ msgstr ""
+
+#~ msgid "Portal Stories: Mel"
+#~ msgstr "传送门：梅尔的故事"
+
+#~ msgid "Thinking With Time Machine"
+#~ msgstr "传送门：时间机器"
 

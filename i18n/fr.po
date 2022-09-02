@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-08-04 10:53+1000\n"
+"POT-Creation-Date: 2022-09-02 12:08+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -22,7 +22,7 @@ msgstr "Fait !"
 msgid "Version: "
 msgstr "Version: "
 
-#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:884
+#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:886
 #: loadScreen.py:228
 msgid "Cancel"
 msgstr "Annuler"
@@ -1025,7 +1025,7 @@ msgstr "Changer les valeurs par défaut..."
 msgid "Change the default settings for this item when placed."
 msgstr "Changer les réglages par défaut pour cet objet lorsqu'il est placé."
 
-#: app/corridor_selector.py:215 app/helpMenu.py:476 app/itemPropWin.py:355
+#: app/corridor_selector.py:215 app/helpMenu.py:466 app/itemPropWin.py:355
 msgid "Close"
 msgstr "Fermer"
 
@@ -1059,11 +1059,11 @@ msgstr "Style choisi:"
 msgid "Unused:"
 msgstr ""
 
-#: app/gameMan.py:779 app/gameMan.py:872
+#: app/gameMan.py:771 app/gameMan.py:864
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - Exportation échouée !"
 
-#: app/gameMan.py:780
+#: app/gameMan.py:772
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
@@ -1072,22 +1072,22 @@ msgstr ""
 "Steam, et appuyez sur OK pour vérifier le cache du jeu. vous pourrez "
 "ensuite réexporter."
 
-#: app/gameMan.py:873
+#: app/gameMan.py:865
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
 "Copie du fichier {file} échouée. Veuillez vous assurer que {game} n'est "
 "pas en cours d'exécution."
 
-#: app/gameMan.py:1127 app/menu_bar.py:98
+#: app/gameMan.py:1119 app/menu_bar.py:98
 msgid "Quit"
 msgstr "Quitter"
 
-#: app/gameMan.py:1134
+#: app/gameMan.py:1126
 msgid "Export to \"{}\"..."
 msgstr "Exporter vers \"{}\"..."
 
-#: app/gameMan.py:1193
+#: app/gameMan.py:1185
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1096,11 +1096,11 @@ msgstr ""
 "Les générateurs Coop ne fonctionneront pas - vérifiez le cache pour "
 "réparer."
 
-#: app/gameMan.py:1197
+#: app/gameMan.py:1189
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - Fichiers de Aperture Tag manquants"
 
-#: app/gameMan.py:1278
+#: app/gameMan.py:1270
 msgid ""
 "It appears that the BEE2 application was installed directly in a game "
 "directory. The bee2/ folder name is used for exported resources, so this "
@@ -1109,48 +1109,48 @@ msgid ""
 "Move the application folder elsewhere, then re-run."
 msgstr ""
 
-#: app/gameMan.py:1323
+#: app/gameMan.py:1315
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr "Sélectionnez le dossier où l'exécutable du jeu est localisé ({appname})..."
 
-#: app/gameMan.py:1327 app/gameMan.py:1344 app/gameMan.py:1354
-#: app/gameMan.py:1361 app/gameMan.py:1370 app/gameMan.py:1379
+#: app/gameMan.py:1319 app/gameMan.py:1336 app/gameMan.py:1346
+#: app/gameMan.py:1353 app/gameMan.py:1362 app/gameMan.py:1371
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - Ajouter un jeu"
 
-#: app/gameMan.py:1331
+#: app/gameMan.py:1323
 msgid "Find Game Exe"
 msgstr "Trouvez l'exécutable du jeu"
 
-#: app/gameMan.py:1332
+#: app/gameMan.py:1324
 msgid "Executable"
 msgstr "Exécutable"
 
-#: app/gameMan.py:1335
+#: app/gameMan.py:1327
 msgid "Find Game Binaries"
 msgstr ""
 
-#: app/gameMan.py:1341
+#: app/gameMan.py:1333
 msgid "This does not appear to be a valid game folder!"
 msgstr "Cela ne semble pas être un dossier de jeu valide."
 
-#: app/gameMan.py:1351
+#: app/gameMan.py:1343
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "Portal Stories: Mel n'a pas d'éditeur."
 
-#: app/gameMan.py:1362
+#: app/gameMan.py:1354
 msgid "Enter the name of this game:"
 msgstr "Entrez le nom de ce jeu:"
 
-#: app/gameMan.py:1369
+#: app/gameMan.py:1361
 msgid "This name is already taken!"
 msgstr "Ce nom est déjà pris !"
 
-#: app/gameMan.py:1378
+#: app/gameMan.py:1370
 msgid "Please enter a name for this game!"
 msgstr "Veuillez entrer un nom pour ce jeu."
 
-#: app/gameMan.py:1396
+#: app/gameMan.py:1388
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1158,70 +1158,88 @@ msgstr ""
 "\n"
 "(BEE2 va se fermer.)"
 
-#: app/gameMan.py:1402 app/paletteUI.py:401
+#: app/gameMan.py:1394 app/paletteUI.py:401
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
 
-#: app/helpMenu.py:64
+#: app/helpMenu.py:60
 msgid "Wiki..."
 msgstr "Wiki..."
 
-#: app/helpMenu.py:66
+#: app/helpMenu.py:61
 msgid "Original Items..."
 msgstr "Items originaux..."
 
 #. i18n: The chat program.
-#: app/helpMenu.py:71
+#: app/helpMenu.py:63
 msgid "Discord Server..."
 msgstr "Serveur Discord..."
 
-#: app/helpMenu.py:72
+#: app/helpMenu.py:64
 msgid "aerond's Music Changer..."
 msgstr "Le changeur de musique d'aerond..."
 
-#: app/helpMenu.py:74
+#: app/helpMenu.py:65
+msgid "Purchase Portal 2"
+msgstr ""
+
+#: app/helpMenu.py:67
 msgid "Application Repository..."
 msgstr "Emplacement web de l'application..."
 
-#: app/helpMenu.py:75
+#: app/helpMenu.py:68
 msgid "Items Repository..."
 msgstr "Emplacement web des objets..."
 
-#: app/helpMenu.py:77
+#: app/helpMenu.py:69
+#, fuzzy
+msgid "Music Repository..."
+msgstr "Emplacement web des objets..."
+
+#: app/helpMenu.py:71
 msgid "Submit Application Bugs..."
 msgstr "Soumettre un bug de l'application..."
 
-#: app/helpMenu.py:78
+#: app/helpMenu.py:72
 msgid "Submit Item Bugs..."
 msgstr "Soumettre un bug des objets..."
 
-#. i18n: Original Palette
-#: app/helpMenu.py:80 app/paletteLoader.py:37
-msgid "Portal 2"
-msgstr "Portal 2"
+#: app/helpMenu.py:73
+#, fuzzy
+msgid "Submit Music Bugs..."
+msgstr "Soumettre un bug des objets..."
 
-#. i18n: Aperture Tag's palette
-#: app/helpMenu.py:81 app/paletteLoader.py:39
-msgid "Aperture Tag"
-msgstr "Aperture Tag"
+#: app/helpMenu.py:507 app/helpMenu.py:515
+msgid "BEEMOD2 - Failed to open URL"
+msgstr ""
 
-#: app/helpMenu.py:82
-msgid "Portal Stories: Mel"
-msgstr "Portal Stories: Mel"
+#: app/helpMenu.py:508
+msgid ""
+"Failed to download list of URLs. Help menu links will not function. Check"
+" your Internet?"
+msgstr ""
 
-#: app/helpMenu.py:83
-msgid "Thinking With Time Machine"
-msgstr "Thinking With Time Machine"
+#: app/helpMenu.py:516
+msgid "Failed to parse help menu URLs file. Help menu links will not function."
+msgstr ""
 
-#: app/helpMenu.py:501
+#: app/helpMenu.py:531
+msgid "BEEMOD 2 - Open URL"
+msgstr ""
+
+#: app/helpMenu.py:532
+msgid "Do you wish to open the following URL?\n"
+msgstr ""
+
+#: app/helpMenu.py:543
 msgid "Help"
 msgstr "Aide"
 
-#: app/helpMenu.py:511
+#: app/helpMenu.py:552
 msgid "BEE2 Credits"
 msgstr "Crédits de BEE2"
 
-#: app/helpMenu.py:528
+#: app/helpMenu.py:567
 msgid "Credits..."
 msgstr "Crédits..."
 
@@ -1475,7 +1493,7 @@ msgstr "Windows"
 msgid "Development"
 msgstr "Développement"
 
-#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:860
+#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:862
 msgid "OK"
 msgstr "OK"
 
@@ -1741,6 +1759,16 @@ msgstr "BEEMod"
 msgid "Portal 2 Collapsed"
 msgstr "Portal 2 Compressé"
 
+#. i18n: Original Palette
+#: app/paletteLoader.py:37
+msgid "Portal 2"
+msgstr "Portal 2"
+
+#. i18n: Aperture Tag's palette
+#: app/paletteLoader.py:39
+msgid "Aperture Tag"
+msgstr "Aperture Tag"
+
 #: app/paletteUI.py:155
 msgid "Clear Palette"
 msgstr "Vider la palette"
@@ -1809,45 +1837,45 @@ msgstr "Entrez le nom du groupe pour cette palette, ou \"\" pour dissocier."
 msgid "Open \"{}\" in the default browser?"
 msgstr "Ouvrir \"{}\" dans le navigateur par défaut ?"
 
-#: app/selector_win.py:483
+#: app/selector_win.py:485
 msgid "{} Preview"
 msgstr ""
 
 #. i18n: 'None' item description
-#: app/selector_win.py:550
+#: app/selector_win.py:552
 msgid "Do not add anything."
 msgstr "Ne rien ajouter."
 
 #. i18n: 'None' item name.
-#: app/selector_win.py:554
+#: app/selector_win.py:556
 msgid "<None>"
 msgstr "<Rien>"
 
-#: app/selector_win.py:804
+#: app/selector_win.py:806
 msgid "Play a sample of this item."
 msgstr "Jouer un échantillon de cet objet"
 
-#: app/selector_win.py:872
+#: app/selector_win.py:874
 #, fuzzy
 msgid "Select Suggested"
 msgstr "Suggéré"
 
-#: app/selector_win.py:1070
+#: app/selector_win.py:1072
 msgid "Other"
 msgstr "Autre"
 
-#: app/selector_win.py:1326
+#: app/selector_win.py:1331
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "Auteur: {}"
 msgstr[1] "Auteurs: {}"
 
 #. i18n: Tooltip for colour swatch.
-#: app/selector_win.py:1392
+#: app/selector_win.py:1397
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "Couleur: R={r}, V={g}, B={b}"
 
-#: app/selector_win.py:1604 app/selector_win.py:1610
+#: app/selector_win.py:1609 app/selector_win.py:1615
 msgid "Suggested"
 msgstr "Suggéré"
 
@@ -2057,4 +2085,10 @@ msgstr "Choisissez une couleur"
 
 #~ msgid " lighting on the fly."
 #~ msgstr ""
+
+#~ msgid "Portal Stories: Mel"
+#~ msgstr "Portal Stories: Mel"
+
+#~ msgid "Thinking With Time Machine"
+#~ msgstr "Thinking With Time Machine"
 

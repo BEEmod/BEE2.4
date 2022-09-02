@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-08-04 10:53+1000\n"
+"POT-Creation-Date: 2022-09-02 12:08+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1043,11 +1043,19 @@ msgid "aerond's Music Changer..."
 msgstr ""
 
 #: app/helpMenu.py
+msgid "Purchase Portal 2"
+msgstr ""
+
+#: app/helpMenu.py
 msgid "Application Repository..."
 msgstr ""
 
 #: app/helpMenu.py
 msgid "Items Repository..."
+msgstr ""
+
+#: app/helpMenu.py
+msgid "Music Repository..."
 msgstr ""
 
 #: app/helpMenu.py
@@ -1058,22 +1066,30 @@ msgstr ""
 msgid "Submit Item Bugs..."
 msgstr ""
 
-#. i18n: Original Palette
-#: app/helpMenu.py app/paletteLoader.py
-msgid "Portal 2"
+#: app/helpMenu.py
+msgid "Submit Music Bugs..."
 msgstr ""
 
-#. i18n: Aperture Tag's palette
-#: app/helpMenu.py app/paletteLoader.py
-msgid "Aperture Tag"
+#: app/helpMenu.py app/helpMenu.py
+msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
 
 #: app/helpMenu.py
-msgid "Portal Stories: Mel"
+msgid ""
+"Failed to download list of URLs. Help menu links will not function. Check"
+" your Internet?"
 msgstr ""
 
 #: app/helpMenu.py
-msgid "Thinking With Time Machine"
+msgid "Failed to parse help menu URLs file. Help menu links will not function."
+msgstr ""
+
+#: app/helpMenu.py
+msgid "BEEMOD 2 - Open URL"
+msgstr ""
+
+#: app/helpMenu.py
+msgid "Do you wish to open the following URL?\n"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1540,6 +1556,16 @@ msgstr ""
 #. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
+msgstr ""
+
+#. i18n: Original Palette
+#: app/paletteLoader.py
+msgid "Portal 2"
+msgstr ""
+
+#. i18n: Aperture Tag's palette
+#: app/paletteLoader.py
+msgid "Aperture Tag"
 msgstr ""
 
 #: app/paletteUI.py
