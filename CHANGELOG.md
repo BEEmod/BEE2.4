@@ -7,8 +7,6 @@
 	* Each corridor can now be individually enabled/disabled, you can have any number active.
 	* UCPs can easily add new corridors to the mix
 	* Corridor designs can be added for the floor/ceiling.
-	* Added `entryCorridor` and `exitCorridor` flags, for checking 
-* Rebuilt config logic to provide a better config file system, improve internal code layout.
 
 ### Enhancements
 * The Item Properties pane has been rearranged a bit, so it better handles heaps of widgets, and makes the old style properties window less prominent.
@@ -21,11 +19,14 @@
 * #1443: Allow hiding builtin palettes.
 * #1774: If the current palette is unchanged, don't switch to `<Last Export>`.
 * VRAD can be configured to not compile lighting at all, for faster (but awful looking) testing (via @SP2G50000).
+* Rebuilt config logic to provide a better config file system, improve internal code layout.
 
 ### UCP-Relevant Enhancements
 * A new collision system has been added, but it is currently not being used for anything.
 	* Items can define collisions for BEE2 specifically, using new psuedo-entities.
 	* Editoritem collisions and connectionpoints can also be specified with the new system.
+* New [`CorridorGroup`](https://github.com/BEEmod/BEE2-items/wiki/Corridors) object type, for corridors.
+* Added `entryCorridor` and `exitCorridor` flags, for checking which corridors were chosen.
 * Added `AppendConnInputs` result, for adding additional outputs to an item.
 * With 'developer mode' enabled, the `PosIsSolid` condition will annotate the map to show measurement points.
 * With 'developer mode' enabled, items will list their full I/O configuration in the tooltips.
@@ -35,6 +36,7 @@
 * `ConfigGroup` widgets may now have a blank label, causing it to be hidden. This is useful if there's only one widget in the group.
 
 ### Bugfixes
+* Fixed help menu Discord invite being temporary, added system to allow updating these retroactively in future.
 * #1776: Fix funnel light code didn't use the right fixup values.
 * Fix P1 style not compiling, by ensuring `hammer_notes` is present in the FGD.
 * Fix BEEmod/BEE2-items#3998: Signage appearing sideways on walls, instead of locking upright.
