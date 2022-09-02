@@ -51,6 +51,7 @@
 * Fix BEEmod/BEE2-items#4044: Antlaser outputs not functioning.
 * Fix locking buttons removing their target's timer signs, instead of their own.
 * Fix Sendificators behaving incorrectly when multiple are connected to the same laser.
+* Fix Conveyors potentially leaking in "oscillating" mode.
 
 ------------------------------------------
 

@@ -38,7 +38,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
     """
     move_dist = inst.fixup.int('$travel_distance')
 
-    if move_dist <= 2:
+    if move_dist <= 256:
         # There isn't room for a conveyor, so don't bother.
         inst.remove()
         return
@@ -58,7 +58,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
 
     if start_offset > 0:
         # If an oscillating platform, move to the closest side..
-        offset = start_offset * move_dir
+        offset = start_offset * move_dist * move_dir
         # The instance is placed this far along, so move back to the end.
         start_pos -= offset
         end_pos -= offset
