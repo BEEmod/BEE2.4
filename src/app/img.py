@@ -1,7 +1,9 @@
 """The image system manages all the images packages request.
 
-It handles loading them from disk and converting them to TK versions, and
-caching images so repeated requests are cheap.
+
+Handles are automatically deduplicated, and intiaially only contain the 
+filename/options, so are cheap to create. Once applied to a UI widget, 
+they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 
