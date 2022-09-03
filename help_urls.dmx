@@ -5,7 +5,7 @@
 	// This indirection allows us to change them retroactively if the old ones are invalid.
 	"name" "string" "AppURLs"
 
-	"discord_bee2" "string" "https://discord.gg/aTZZcveU9p"
+	"discord_bee2" "string" "https://discord.gg/hnGFJrz"
 	"store_portal2" "string" "https://store.steampowered.com/app/620/Portal_2/"
 
 	"addon_music_changer" "string" "https://beemmc.boards.net/"
