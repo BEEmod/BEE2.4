@@ -504,9 +504,11 @@ class Handle:
         if self._cached_tk is None:
             # LOGGER.debug('Loading {}', self)
             res = self._load_pil()
-            # Except for builtin types (icons), strip alpha.
-            if not self.alpha_result:
-                res = res.convert('RGB')
+            # Except for builtin types (icons), composite onto the PeTI BG.
+            if not self.alpha_result and res.mode == 'RGBA':
+                bg = Image.new('RGBA', res.size, PETI_ITEM_BG)
+                bg.alpha_composite(res)
+                res = bg.convert('RGB')
             self._cached_tk = _get_tk_img(res.width, res.height)
             self._cached_tk.paste(res)
         return self._cached_tk
