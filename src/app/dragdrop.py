@@ -207,9 +207,8 @@ class Manager(Generic[ItemT]):
         drag_win.transient(master=master)
         drag_win.wm_overrideredirect(True)
 
-        self._drag_lbl = drag_lbl = tkinter.Label(drag_win)
-        img.apply(drag_lbl, self._img_blank)
-        drag_lbl.grid(row=0, column=0)
+        self._drag_lbl = tkinter.Label(drag_win)
+        self._drag_lbl.grid(row=0, column=0)
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
     @property

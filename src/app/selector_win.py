@@ -774,7 +774,6 @@ class SelectorWin(Generic[CallbackT]):
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
-        img.apply(self.prop_icon, img.Handle.color(img.PETI_ITEM_BG, *ICON_SIZE_LRG)),
         self.prop_icon.grid(row=0, column=0)
         self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
         tk_tools.bind_leftclick(self.prop_icon, self._icon_clicked)
@@ -942,13 +941,7 @@ class SelectorWin(Generic[CallbackT]):
                 desc_label = ttk.Label(attr_frame, text=attr.desc)
                 attr.label = ttk.Label(attr_frame)
 
-                if attr.type is AttrTypes.BOOL:
-                    # It's a tick/cross label
-                    if attr.default:
-                        img.apply(attr.label, ICON_CHECK)
-                    else:
-                        img.apply(attr.label, ICON_CROSS)
-                elif attr.type is AttrTypes.COLOR:
+                if attr.type is AttrTypes.COLOR:
                     # A small colour swatch.
                     attr.label.configure(relief='raised')
                     # Show the color value when hovered.
@@ -1380,10 +1373,7 @@ class SelectorWin(Generic[CallbackT]):
             val = item.attrs.get(attr.id, attr.default)
 
             if attr.type is AttrTypes.BOOL:
-                if val:
-                    img.apply(attr.label, ICON_CHECK)
-                else:
-                    img.apply(attr.label, ICON_CROSS)
+                img.apply(attr.label, ICON_CHECK if val else ICON_CROSS)
             elif attr.type is AttrTypes.COLOR:
                 assert isinstance(val, Vec)
                 img.apply(attr.label, img.Handle.color(val, 16, 16))
