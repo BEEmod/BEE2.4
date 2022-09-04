@@ -1102,20 +1102,15 @@ class SelectorWin(Generic[CallbackT]):
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = item.group
-            if group_key:
-                try:
-                    group = self.group_widgets[group_key]
-                except KeyError:
-                    self.group_widgets[group_key] = group = GroupHeader(
-                        self,
-                        self.group_names[group_key],
-                        tk.Menu(self.context_menu),
-                    )
-                menu = group._menu
-            else:
-                menu = self.context_menu
-
-            menu.add_radiobutton(
+            try:
+                group = self.group_widgets[group_key]
+            except KeyError:
+                self.group_widgets[group_key] = group = GroupHeader(
+                    self,
+                    self.group_names[group_key],
+                    tk.Menu(self.context_menu) if group_key else self.context_menu,
+                )
+            group._menu.add_radiobutton(
                 label=item.context_lbl,
                 command=functools.partial(self.sel_item_id, item.name),
                 variable=self.context_var,
