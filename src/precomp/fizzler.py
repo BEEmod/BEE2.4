@@ -845,13 +845,13 @@ class FizzlerBrush:
             # Generate the three brushes for fizzlers.
             if round(field_length) <= 128:
                 side_len = field_length / 2
-                center_len = 0
+                center_len = 0.0
             else:
                 # Bugfix - the boundary texture wrapping causes
                 # artifacts to appear at the join, we need to avoid a small
                 # amount of that texture.
                 side_len = 63
-                center_len = field_length - 126
+                center_len = field_length - 126.0
 
             brush_left = vmf.make_prism((
                 origin
@@ -877,6 +877,7 @@ class FizzlerBrush:
             )).solid
             yield brush_right
 
+            brushes: list[tuple[Solid, Vec | None, float]]
             if center_len:
                 brush_center = vmf.make_prism((
                     origin
@@ -891,9 +892,9 @@ class FizzlerBrush:
                 yield brush_center
 
                 brushes = [
-                    (brush_left, field_axis, 64),
+                    (brush_left, field_axis, 64.0),
                     (brush_center, None, center_len),
-                    (brush_right, -field_axis, 64),
+                    (brush_right, -field_axis, 64.0),
                 ]
                 used_tex_func(self.textures[TexGroup.CENTER])
             else:
@@ -1178,7 +1179,7 @@ def generate_fizzlers(vmf: VMF) -> None:
         # TODO: This needs to use connections to correctly check this.
         is_static = bool(
             fizz.base_inst.fixup.int('$connectioncount', 0) == 0
-            and fizz.base_inst.fixup.bool('$start_enabled', 1)
+            and fizz.base_inst.fixup.bool('$start_enabled', True)
         )
         tile_blacken = conf_tile_blacken and fizz.fizz_type.blocks_portals
 
