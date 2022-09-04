@@ -33,6 +33,7 @@
 * A "debug" option is now available on `bee2_template_conf`, which will cause the map to contain additional info about how it was placed.
 * `ATLAS_SpawnPoint` and `addGlobal` now can use fixup values.
 * A new "dropdown" `ConfigGroup` widget type is now available, which allows picking from a list of options.
+* Icons may now be transparent - they will automatically be blended with the PeTI palette icon background.
 * `ConfigGroup` widgets may now have a blank label, causing it to be hidden. This is useful if there's only one widget in the group.
 
 ### Bugfixes
