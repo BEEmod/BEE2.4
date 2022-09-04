@@ -65,7 +65,7 @@ PACK_SYSTEMS: dict[str, FileSystem] = {}
 logging.getLogger('PIL').setLevel(logging.INFO)
 
 # Colour of the palette item background
-PETI_ITEM_BG: Final = (229, 232, 233)
+PETI_ITEM_BG: Final = (229, 233, 233)
 PETI_ITEM_BG_HEX: Final = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 
 FLIP_LEFT_RIGHT: Final = Image.FLIP_LEFT_RIGHT
