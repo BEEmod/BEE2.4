@@ -291,7 +291,7 @@ class Handle:
         """Parse a property into an image handle.
 
         If a package isn't specified, the given package will be used.
-        Optionally, 'subkey' can be used to specifiy that the property is a subkey.
+        Optionally, 'subkey' can be used to specify that the property is a subkey.
         An error icon will then be produced automatically.
         If subfolder is specified, files will be relative to this folder.
         The width/height may be zero to indicate it should not be resized.
@@ -304,13 +304,20 @@ class Handle:
         if prop.has_children():
             children = []
             for child in prop:
-                if child.name not in ('image', 'img', 'layer'):
-                    raise ValueError(f'Unknown compound type "{child}"!')
-                children.append(cls.parse(
-                    child, pack,
-                    width, height,
-                    subfolder=subfolder
-                ))
+                if child.name in ('noalpha', 'stripalpha'):
+                    children.append(cls.parse(
+                        child, pack,
+                        width, height,
+                        subfolder=subfolder,
+                    ).with_alpha_stripped())
+                elif child.name in ('image', 'img', 'layer'):
+                    children.append(cls.parse(
+                        child, pack,
+                        width, height,
+                        subfolder=subfolder,
+                    ))
+                else:
+                    raise ValueError(f'Unknown compound type "{child.real_name}"!')
             return cls.composite(children, width, height)
 
         return cls.parse_uri(utils.PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
@@ -424,6 +431,10 @@ class Handle:
     ) -> ImgCrop:
         """Wrap a handle to crop it into a smaller size."""
         return ImgCrop._deduplicate(width, height, self, bounds, transpose)
+
+    def with_alpha_stripped(self) -> ImgStripAlpha:
+        """Wrap a handle to strip alpha."""
+        return ImgStripAlpha._deduplicate(self.width, self.height, self)
 
     @classmethod
     def file(cls, path: utils.PackagePath, width: int, height: int) -> ImgFile:
@@ -610,6 +621,35 @@ class ImgAlpha(Handle):
     def resize(self, width: int, height: int) -> ImgAlpha:
         """Return a copy with a different size."""
         return self._deduplicate(width, height)
+
+
+@attrs.define(eq=False)
+class ImgStripAlpha(Handle):
+    """A wrapper around another image, which converts the alpha to 255."""
+    alpha_result: ClassVar[bool] = False
+    original: Handle
+
+    def _make_image(self) -> Image.Image:
+        """Strip the alpha from our child image."""
+        img = self.original._load_pil().convert('RGB')
+        if self.width and self.height and img.size != (self.width, self.height):
+            img = img.resize((self.width, self.height))
+        return img.convert('RGBA')
+
+    def resize(self, width: int, height: int) -> ImgStripAlpha:
+        """Return a copy with a different size."""
+        return self._deduplicate(width, height, self.original.resize(width, height))
+
+    # Subclass methods
+    def _children(self) -> Iterator[Handle]:
+        """Yield all the handles this depends on."""
+        yield self.original
+
+    @classmethod
+    def _to_key(cls, args: tuple) -> tuple:
+        """Handles aren't hashable, so we need to use identity."""
+        [original] = args
+        return (id(original), )
 
 
 @attrs.define(eq=False)
