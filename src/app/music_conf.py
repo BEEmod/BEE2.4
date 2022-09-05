@@ -10,6 +10,7 @@ import attrs
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
 from app import TK_ROOT
+from config.gen_opts import GenOptions
 import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
@@ -204,7 +205,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         """Configure for the collapsed state."""
         global is_collapsed
         is_collapsed = True
-        conf = config.APP.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
         base_lbl['text'] = gettext('Music: ')
         toggle_btn_exit()
@@ -219,7 +220,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         """Configure for the expanded state."""
         global is_collapsed
         is_collapsed = False
-        conf = config.APP.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
         base_lbl['text'] = gettext('Base: ')
         toggle_btn_exit()
@@ -262,7 +263,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 
-    if config.APP.get_cur_conf(config.GenOptions).music_collapsed:
+    if config.APP.get_cur_conf(GenOptions).music_collapsed:
         set_collapsed()
     else:
         set_expanded()

@@ -4,6 +4,7 @@ from types import TracebackType
 from typing import Any, Awaitable, Callable, Optional, Type
 from typing_extensions import TypeVarTuple, Unpack
 
+import config.gen_opts
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
 
@@ -108,7 +109,7 @@ def on_error(
         import config
         import attrs
         # Try to turn on the logging window for next time...
-        conf = config.APP.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         config.APP.store_conf(attrs.evolve(
             conf,
             show_log_win=True,

@@ -16,6 +16,7 @@ from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
 import srctools.logger
 
 from app import TK_ROOT
+from config.gen_opts import GenOptions
 import config
 import utils
 
@@ -199,9 +200,10 @@ def has_sound() -> bool:
     """Return if the sound system is functional."""
     return isinstance(sounds, PygletSound)
 
+
 def play_fx() -> bool:
     """Return if sounds should play."""
-    return config.APP.get_cur_conf(config.GenOptions).play_sounds
+    return config.APP.get_cur_conf(GenOptions).play_sounds
 
 if utils.WIN and not utils.FROZEN:
     # Add a libs folder for FFmpeg dlls.

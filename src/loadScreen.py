@@ -15,6 +15,7 @@ import time
 import attrs
 import srctools.logger
 
+import config.gen_opts
 from app import logWindow
 import config
 from localisation import gettext
@@ -138,7 +139,7 @@ class LoadScreen:
             command, arg = _PIPE_MAIN_REC.recv()
             if command == 'main_set_compact':
                 # Save the compact state to the config.
-                conf = config.APP.get_cur_conf(config.GenOptions)
+                conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
                 config.APP.store_conf(attrs.evolve(conf, compact_splash=arg))
             elif command == 'cancel':
                 # Mark this loadscreen as cancelled.

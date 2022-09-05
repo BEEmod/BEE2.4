@@ -10,7 +10,6 @@ from typing_extensions import TypeAlias, Final
 import srctools.logger
 import trio
 
-
 from app import (
     TK_ROOT, DEV_MODE, background_run,
     dragdrop,
@@ -21,6 +20,7 @@ from app.richTextBox import tkRichText
 from localisation import gettext
 from packages import corridor
 from corridor import GameMode, Direction, Orient
+from config.last_sel import LastSelected
 import event
 import config
 import packages
@@ -326,8 +326,8 @@ class Selector:
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
         style_id = config.APP.get_cur_conf(
-            config.LastSelected, 'styles',
-            config.LastSelected('BEE2_CLEAN'),
+            LastSelected, 'styles',
+            LastSelected('BEE2_CLEAN'),
         ).id or 'BEE2_CLEAN'
         try:
             self.corr_group = packset.obj_by_id(corridor.CorridorGroup, style_id)

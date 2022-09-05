@@ -13,6 +13,8 @@ from app import (
     TK_ROOT, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from config.gen_opts import GenOptions
+from config.last_sel import LastSelected
 import config
 import app
 import loadScreen
@@ -44,9 +46,9 @@ async def init_app() -> None:
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
     config.APP.read_file()
     try:
-        conf = config.APP.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(GenOptions)
     except KeyError:
-        conf = config.GenOptions()
+        conf = GenOptions()
         config.APP.store_conf(conf)
 
     # Special case, load in this early, so it applies.
@@ -70,7 +72,7 @@ async def init_app() -> None:
 
     gameMan.load()
     try:
-        last_game = config.APP.get_cur_conf(config.LastSelected, 'game')
+        last_game = config.APP.get_cur_conf(LastSelected, 'game')
     except KeyError:
         pass
     else:

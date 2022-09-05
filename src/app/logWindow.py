@@ -10,6 +10,7 @@ import srctools.logger
 import trio
 import attrs
 
+from config.gen_opts import GenOptions
 import config
 
 
@@ -42,7 +43,7 @@ class TextHandler(logging.Handler):
 
     def set_visible(self, is_visible: bool) -> None:
         """Show or hide the window."""
-        conf = config.APP.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, show_log_win=is_visible))
         _PIPE_MAIN_SEND.send(('visible', is_visible, None))
 
@@ -71,10 +72,10 @@ async def setting_apply() -> None:
             return
         if cmd == 'level':
             TextHandler.setLevel(HANDLER, param)
-            conf = config.APP.get_cur_conf(config.GenOptions)
+            conf = config.APP.get_cur_conf(GenOptions)
             config.APP.store_conf(attrs.evolve(conf, log_win_level=param))
         elif cmd == 'visible':
-            conf = config.APP.get_cur_conf(config.GenOptions)
+            conf = config.APP.get_cur_conf(GenOptions)
             config.APP.store_conf(attrs.evolve(conf, show_log_win=param))
         elif cmd == 'quit':
             return

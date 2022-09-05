@@ -23,6 +23,7 @@ from idlelib.query import Query
 import trio
 
 from app import TK_ROOT, background_run
+from config.gen_opts import GenOptions
 import event
 import config
 import utils
@@ -397,7 +398,7 @@ def adjust_inside_screen(
     The new value is returned.
     """
     # Allow disabling this adjustment for multi-window setups
-    if not config.APP.get_cur_conf(config.GenOptions).keep_win_inside:
+    if not config.APP.get_cur_conf(GenOptions).keep_win_inside:
         return x, y
     max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
     max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound

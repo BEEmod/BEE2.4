@@ -15,7 +15,7 @@ from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
     contextWin, gameMan, tk_tools, sound, logWindow, img, UI,
 )
-from config import AfterExport
+from config.gen_opts import GenOptions, AfterExport
 from localisation import gettext
 import loadScreen
 import config
@@ -58,7 +58,7 @@ def show() -> None:
 
 def load() -> None:
     """Load the current settings from config."""
-    conf = config.APP.get_cur_conf(config.GenOptions)
+    conf = config.APP.get_cur_conf(GenOptions)
     AFTER_EXPORT_ACTION.set(conf.after_export.value)
     for name, var in VARS:
         var.set(getattr(conf, name))
@@ -67,15 +67,15 @@ def load() -> None:
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     # Preserve options set elsewhere.
-    res = attrs.asdict(config.APP.get_cur_conf(config.GenOptions), recurse=False)
+    res = attrs.asdict(config.APP.get_cur_conf(GenOptions), recurse=False)
 
     res['after_export'] = AfterExport(AFTER_EXPORT_ACTION.get())
     for name, var in VARS:
         res[name] = var.get()
-    config.APP.store_conf(config.GenOptions(**res))
+    config.APP.store_conf(GenOptions(**res))
 
 
-async def apply_config(conf: config.GenOptions) -> None:
+async def apply_config(conf: GenOptions) -> None:
     """Used to apply the configuration to all windows."""
     logWindow.HANDLER.set_visible(conf.show_log_win)
     loadScreen.set_force_ontop(conf.force_load_ontop)
@@ -99,7 +99,7 @@ def clear_caches() -> None:
 
     # This needs to be disabled, since otherwise we won't actually export
     # anything...
-    conf = config.APP.get_cur_conf(config.GenOptions)
+    conf = config.APP.get_cur_conf(GenOptions)
     if conf.preserve_resources:
         config.APP.store_conf(attrs.evolve(conf, preserve_resources=False))
         message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
@@ -132,7 +132,7 @@ def make_checkbox(
     if var is None:
         var = tk.BooleanVar(name=f'gen_opt_{name}')
     # Ensure it's a valid attribute.
-    assert name in config.GenOptions.__annotations__, list(config.GenOptions.__annotations__)
+    assert name in GenOptions.__annotations__, list(GenOptions.__annotations__)
 
     VARS.append((name, var))
     widget = ttk.Checkbutton(frame, variable=var, text=desc)
@@ -183,7 +183,7 @@ async def init_widgets(
     def ok() -> None:
         """Close and apply changes."""
         save()
-        background_run(config.APP.apply_conf, config.GenOptions)
+        background_run(config.APP.apply_conf, GenOptions)
         win.withdraw()
 
     def cancel() -> None:
@@ -199,7 +199,7 @@ async def init_widgets(
 
     load()  # Load the existing config.
     # Then apply to other windows.
-    await config.APP.set_and_run_ui_callback(config.GenOptions, apply_config)
+    await config.APP.set_and_run_ui_callback(GenOptions, apply_config)
 
 
 async def init_gen_tab(

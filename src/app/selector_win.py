@@ -34,6 +34,7 @@ from consts import (
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
 from localisation import gettext, ngettext
+from config.last_sel import LastSelected
 import utils
 import config
 
@@ -645,9 +646,9 @@ class SelectorWin(Generic[CallbackT]):
             self.item_list = lst
 
         prev_state = config.APP.get_cur_conf(
-            config.LastSelected,
+            LastSelected,
             save_id,
-            config.LastSelected(default_id),
+            LastSelected(default_id),
         )
         if store_last_selected:
             config.APP.store_conf(prev_state, save_id)
@@ -979,7 +980,7 @@ class SelectorWin(Generic[CallbackT]):
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-    async def _load_selected(self, selected: config.LastSelected) -> None:
+    async def _load_selected(self, selected: LastSelected) -> None:
         """Load a new selected item."""
         self.sel_item_id('<NONE>' if selected.id is None else selected.id)
         self.save()
@@ -1021,10 +1022,7 @@ class SelectorWin(Generic[CallbackT]):
         self.readonly = self._readonly
 
         if self.store_last_selected:
-            await config.APP.set_and_run_ui_callback(
-                config.LastSelected, self._load_selected,
-                self.save_id,
-            )
+            await config.APP.set_and_run_ui_callback(LastSelected, self._load_selected, self.save_id)
         else:
             self.save()
 
@@ -1283,7 +1281,7 @@ class SelectorWin(Generic[CallbackT]):
     def do_callback(self) -> None:
         """Call the callback function."""
         if self.store_last_selected:
-            config.APP.store_conf(config.LastSelected(self.chosen_id), self.save_id)
+            config.APP.store_conf(LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
             self.callback(self.chosen_id, *self.callback_params, **self.callback_kwargs)
 

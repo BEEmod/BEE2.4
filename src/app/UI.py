@@ -21,6 +21,9 @@ import packages
 from packages.item import ItemVariant, InheritKind
 import utils
 import consts
+from config.gen_opts import GenOptions, AfterExport
+from config.last_sel import LastSelected
+from config.win_state import WindowState
 import config
 from localisation import gettext
 from app import (
@@ -172,7 +175,7 @@ class Item:
         they use the single_num parameter to control the output.
         """
         icon = self._get_raw_icon(subKey, allow_single, single_num)
-        if self.item.unstyled or not config.APP.get_cur_conf(config.GenOptions).visualise_inheritance:
+        if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
         if self.inherit_kind is not InheritKind.DEFINED:
             icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
@@ -443,7 +446,7 @@ def quit_application() -> None:
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
     if TK_ROOT.winfo_viewable():
-        config.APP.store_conf(config.WindowState(
+        config.APP.store_conf(WindowState(
             x=TK_ROOT.winfo_rootx(),
             y=TK_ROOT.winfo_rooty(),
         ), 'main_window')
@@ -736,7 +739,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             for it_id, section in
             item_opts.items()
         }
-        conf = config.APP.get_cur_conf(config.GenOptions)
+        conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
         success, vpk_success = gameMan.selected_game.export(
             style=chosen_style,
@@ -786,7 +789,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 'Hammer to ensure editor wall previews are changed.'
             )
 
-        if conf.launch_after_export or conf.after_export is not config.AfterExport.NORMAL:
+        if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
             do_action = messagebox.askyesno(
                 'BEEMOD2',
                 message + optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export],
@@ -802,11 +805,11 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             if conf.launch_after_export:
                 gameMan.selected_game.launch()
 
-            if conf.after_export is config.AfterExport.NORMAL:
+            if conf.after_export is AfterExport.NORMAL:
                 pass
-            elif conf.after_export is config.AfterExport.MINIMISE:
+            elif conf.after_export is AfterExport.MINIMISE:
                 TK_ROOT.iconify()
-            elif conf.after_export is config.AfterExport.QUIT:
+            elif conf.after_export is AfterExport.QUIT:
                 quit_application()
                 # We never return from this.
             else:
@@ -1385,7 +1388,7 @@ async def set_game(game: 'gameMan.Game') -> None:
     This updates the title bar to match, and saves it into the config.
     """
     TK_ROOT.title(f'BEEMOD {utils.BEE_VERSION} - {game.name}')
-    config.APP.store_conf(config.LastSelected(game.name), 'game')
+    config.APP.store_conf(LastSelected(game.name), 'game')
     EXPORT_CMD_VAR.set(game.get_export_text())
 
 
@@ -1634,7 +1637,7 @@ async def init_windows() -> None:
 
     # Position windows according to remembered settings:
     try:
-        main_win_state = config.APP.get_cur_conf(config.WindowState, 'main_window')
+        main_win_state = config.APP.get_cur_conf(WindowState, 'main_window')
     except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
