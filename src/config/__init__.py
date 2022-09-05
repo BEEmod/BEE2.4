@@ -142,7 +142,7 @@ class ConfigSpec:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         if (typ, data_id) in self.callback:
             raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
-        self.callback[typ, data_id] = func
+        self.callback[typ, data_id] = func  # type: ignore
         data_map = self._current.setdefault(typ, {})
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
