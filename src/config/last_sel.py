@@ -31,15 +31,20 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
             ('Music_Speed', 'music_speed'),
         ]:
             try:
-                result[new] = cls(last_sel[old])
+                value = last_sel[old]
             except LookupError:
-                pass
+                continue
+
+            if value.casefold() == '<none>':
+                result[new] = cls(None)
+            else:
+                result[new] = cls(value)
         return result
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'LastSelected':
         """Parse Keyvalues data."""
-        assert version == 1
+        assert version == 1, version
         if data.has_children():
             raise ValueError(f'LastSelected cannot be a block: {data!r}')
         if data.value.casefold() == '<none>':
@@ -53,7 +58,7 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'LastSelected':
         """Parse DMX elements."""
-        assert version == 1
+        assert version == 1, version
         if 'selected_none' in data and data['selected_none'].val_bool:
             return cls(None)
         else:
