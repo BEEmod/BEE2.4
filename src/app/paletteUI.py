@@ -3,17 +3,16 @@ from __future__ import annotations
 from typing import Awaitable, Callable
 from uuid import UUID
 
-from srctools.dmx import Element, Attribute as DMAttribute, ValueType
 from tkinter import ttk, messagebox
 import tkinter as tk
 
-from srctools import Property
 import srctools.logger
-import attrs
 
-from app.paletteLoader import Palette, UUID_PORTAL2, UUID_EXPORT, UUID_BLANK
+from app.paletteLoader import Palette
 from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
 from localisation import gettext
+from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
+from config.palette import PaletteState
 import config
 
 
@@ -21,99 +20,11 @@ LOGGER = srctools.logger.get_logger(__name__)
 TREE_TAG_GROUPS = 'pal_group'
 TREE_TAG_PALETTES = 'palette'
 ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
-# These may not be hidden.
-FORCE_SHOWN: frozenset[UUID] = frozenset({UUID_PORTAL2})
 
 # Re-export paletteLoader values for convenience.
 __all__ = [
     'PaletteUI', 'Palette', 'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
 ]
-
-
-@config.APP.register
-@attrs.frozen(slots=False)
-class PaletteState(config.Data, conf_name='Palette', palette_stores=False):
-    """Data related to palettes which is restored next run.
-
-    Since we don't store in the palette, we don't need to register the UI callback.
-    """
-    selected: UUID = UUID_PORTAL2
-    save_settings: bool = False
-    hidden_defaults: frozenset[UUID] = attrs.Factory(frozenset)
-
-    @classmethod
-    def parse_legacy(cls, conf: Property) -> dict[str, PaletteState]:
-        """Convert the legacy config options to the new format."""
-        # These are all in the GEN_OPTS config.
-        try:
-            selected_uuid = UUID(hex=config.LEGACY_CONF.get_val('Last_Selected', 'palette_uuid', ''))
-        except ValueError:
-            selected_uuid = UUID_PORTAL2
-
-        return {'': cls(
-            selected_uuid,
-            config.LEGACY_CONF.get_bool('General', 'palette_save_settings'),
-            frozenset(),
-        )}
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> PaletteState:
-        """Parse Keyvalues data."""
-        assert version == 1
-        hidden = {
-            UUID(hex=prop.value)
-            for prop in data.find_all('hidden')
-        }
-        try:
-            uuid = UUID(hex=data['selected'])
-        except (LookupError, ValueError):
-            uuid = UUID_PORTAL2
-        hidden.discard(uuid)
-        hidden -= FORCE_SHOWN
-        return PaletteState(uuid, data.bool('save_settings', False), frozenset(hidden))
-
-    def export_kv1(self) -> Property:
-        """Export to a property block."""
-        prop = Property('', [
-            Property('selected', self.selected.hex),
-            Property('save_settings', srctools.bool_as_int(self.save_settings)),
-        ])
-        for hidden in self.hidden_defaults:
-            prop.append(Property('hidden', hidden.hex))
-        return prop
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> PaletteState:
-        """Parse DMX data."""
-        try:
-            uuid = UUID(bytes=data['selected'].val_bytes)
-        except (LookupError, ValueError):
-            uuid = UUID_PORTAL2
-        hidden: set[UUID]
-        try:
-            hidden_arr = data['hidden'].iter_bytes()
-        except KeyError:
-            hidden = set()
-        else:
-            hidden = {UUID(bytes=byt) for byt in hidden_arr}
-            hidden.discard(uuid)
-            hidden -= FORCE_SHOWN
-
-        return PaletteState(
-            uuid,
-            data['save_settings'].val_bool,
-            frozenset(hidden),
-        )
-
-    def export_dmx(self) -> Element:
-        """Export to a DMX."""
-        elem = Element('Palette', 'DMElement')
-        elem['selected'] = self.selected.bytes
-        elem['save_settings'] = self.save_settings
-        elem['hidden'] = hidden = DMAttribute.array('hidden', ValueType.BINARY)
-        for uuid in self.hidden_defaults:
-            hidden.append(uuid.bytes)
-        return elem
 
 
 class PaletteUI:
@@ -359,7 +270,7 @@ class PaletteUI:
             for ind in self.ui_readonly_indexes:
                 self.ui_menu.entryconfigure(ind, state='normal')
 
-        if self.selected.uuid in FORCE_SHOWN:
+        if self.selected.uuid in PALETTE_FORCE_SHOWN:
             self.ui_remove.state(('disabled',))
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='disabled')
         else:
@@ -393,7 +304,7 @@ class PaletteUI:
         """Remove the currently selected palette."""
         pal = self.selected
         if pal.readonly:
-            if pal.uuid in FORCE_SHOWN:
+            if pal.uuid in PALETTE_FORCE_SHOWN:
                 return  # Disallowed.
             self.hidden_defaults.add(pal.uuid)
         elif messagebox.askyesno(
@@ -403,7 +314,7 @@ class PaletteUI:
         ):
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
-        self.select_palette(paletteLoader.UUID_PORTAL2)
+        self.select_palette(UUID_PORTAL2)
         self.update_state()
         background_run(self.set_items, self.selected)
 

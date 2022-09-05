@@ -13,6 +13,7 @@ from srctools import Property, NoKeyError, KeyValError
 
 from localisation import gettext
 import config
+import consts
 import utils
 
 
@@ -38,10 +39,6 @@ TRANS_NAMES: dict[str, str] = {
     # i18n: Aperture Tag's palette
     'APTAG': gettext('Aperture Tag'),
 }
-DEFAULT_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')
-UUID_PORTAL2 = uuid5(DEFAULT_NS, 'PORTAL2')
-UUID_EXPORT = uuid5(DEFAULT_NS, 'LAST_EXPORT')
-UUID_BLANK = uuid5(DEFAULT_NS, 'EMPTY')
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
 DEFAULT_PALETTES: dict[str, list[tuple[str, int]]] = {
@@ -262,7 +259,7 @@ class Palette:
         trans_name = props['TransName', '']
         if trans_name:
             # Builtin, force a fixed uuid. This is mainly for LAST_EXPORT.
-            uuid = uuid5(DEFAULT_NS, trans_name)
+            uuid = uuid5(consts.PALETTE_NS, trans_name)
         else:
             try:
                 uuid = UUID(hex=props['UUID'])
@@ -356,7 +353,7 @@ class Palette:
 
 def load_palettes() -> Iterator[Palette]:
     """Scan and read in all palettes. Legacy files will be converted in the process."""
-
+    name: str
     # Load our builtin palettes.
     for name, items in DEFAULT_PALETTES.items():
         LOGGER.info('Loading builtin "{}"', name)
@@ -366,7 +363,7 @@ def load_palettes() -> Iterator[Palette]:
             name,
             readonly=True,
             group=GROUP_BUILTIN,
-            uuid=uuid5(DEFAULT_NS, name),
+            uuid=uuid5(consts.PALETTE_NS, name),
         )
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs

@@ -6,7 +6,7 @@ from tkinter import ttk
 from app import tooltip, tk_tools, sound
 from app.img import Handle as ImgHandle, apply as apply_img
 from localisation import gettext
-from config.win_state import WindowState
+from config.windows import WindowState
 import utils
 import config
 

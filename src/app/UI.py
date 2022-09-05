@@ -23,7 +23,7 @@ import utils
 import consts
 from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
-from config.win_state import WindowState
+from config.windows import WindowState
 import config
 from localisation import gettext
 from app import (

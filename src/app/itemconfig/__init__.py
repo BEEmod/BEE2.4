@@ -1,20 +1,16 @@
 """Customizable configuration for specific items or groups of them."""
-from typing import (
-    Iterable, Optional, Union, Callable,
-    List, Tuple, Dict, Set,
-    Iterator, AsyncIterator, Awaitable, Mapping,
-)
+from typing import Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterator, AsyncIterator, Awaitable
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
 
 from srctools import EmptyMapping, Property, Vec, logger
-from srctools.dmx import Element
 import trio
 import attrs
 
 from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
+from config.widgets import WidgetConfig
 from localisation import gettext
 import BEE2_config
 import config
@@ -77,70 +73,6 @@ def parse_color(color: str) -> Tuple[int, int, int]:
     else:
         r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
     return r, g, b
-
-
-@config.APP.register
-@attrs.frozen(slots=False)
-class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
-    """The configuation persisted to disk and stored in palettes."""
-    # A single non-timer value, or timer name -> value.
-    values: Union[str, Mapping[str, str]] = EmptyMapping
-
-    @classmethod
-    def parse_legacy(cls, props: Property) -> Dict[str, 'WidgetConfig']:
-        """Parse from the old legacy config."""
-        data = {}
-        for group in props.find_children('ItemVar'):
-            if not group.has_children():
-                LOGGER.warning('Illegal leaf property "{}" in ItemVar conf', group.name)
-            for widget in group:
-                data[f'{group.real_name}:{widget.real_name}'] = WidgetConfig.parse_kv1(widget, 1)
-        return data
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'WidgetConfig':
-        """Parse Keyvalues config values."""
-        assert version == 1
-        if data.has_children():
-            return WidgetConfig({
-                prop.name: prop.value
-                for prop in data
-            })
-        else:
-            return WidgetConfig(data.value)
-
-    def export_kv1(self) -> Property:
-        """Generate keyvalues for saving configuration."""
-        if isinstance(self.values, str):
-            return Property('', self.values)
-        else:
-            return Property('', [
-                Property(tim, value)
-                for tim, value in self.values.items()
-            ])
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'WidgetConfig':
-        """Parse DMX format configuration."""
-        assert version == 1
-        if 'value' in data:
-            return WidgetConfig(data['value'].val_string)
-        else:
-            return WidgetConfig({
-                attr.name[4:]: attr.val_string
-                for attr in data.values()
-                if attr.name.startswith('tim_')
-            })
-
-    def export_dmx(self) -> Element:
-        """Generate DMX format configuration."""
-        elem = Element('ItemVar', 'DMElement')
-        if isinstance(self.values, str):
-            elem['value'] = self.values
-        else:
-            for tim, value in self.values.items():
-                elem[f'tim_{tim}'] = value
-        return elem
 
 
 @attrs.define

@@ -1,20 +1,18 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import Callable, Dict
+from typing import Callable
 from tkinter import IntVar
 from tkinter import ttk
 import operator
 import itertools
 
-from srctools import Property, bool_as_int, conv_bool
 from srctools.logger import get_logger
-from srctools.dmx import Element
-import attrs
 import trio
 
 from packages import Style, StyleVar, PackagesSet
 from app import tooltip
 from localisation import ngettext, gettext
+from config.stylevar import State
 import config
 
 
@@ -110,46 +108,6 @@ def mandatory_unlocked() -> bool:
         return tk_vars['UnlockDefault'].get() != 0
     except KeyError:  # Not loaded yet
         return False
-
-
-@config.APP.register
-@attrs.frozen(slots=False)
-class StyleVarState(config.Data, conf_name='StyleVar', uses_id=True):
-    """Holds style var state stored in configs."""
-    value: bool = False
-
-    @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, StyleVarState]:
-        """Parse the old StyleVar config."""
-        return {
-            prop.real_name: cls(conv_bool(prop.value))
-            for prop in conf.find_children('StyleVar')
-        }
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> StyleVarState:
-        """Parse KV1-formatted stylevar states."""
-        assert version == 1, version
-        return cls(conv_bool(data.value))
-
-    def export_kv1(self) -> Property:
-        """Export the stylevars in KV1 format."""
-        return Property('', bool_as_int(self.value))
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> StyleVarState:
-        try:
-            value = data['value'].val_bool
-        except KeyError:
-            return cls(False)
-        else:
-            return cls(value)
-
-    def export_dmx(self) -> Element:
-        """Export stylevars in DMX format."""
-        elem = Element('StyleVar', 'DMElement')
-        elem['value'] = self.value
-        return elem
 
 
 def export_data(chosen_style: Style) -> dict[str, bool]:
@@ -275,14 +233,14 @@ async def make_stylevar_pane(
         *checks: ttk.Checkbutton,
     ) -> None:
         """Makes functions for syncing stylevar state. """
-        async def apply_state(state: StyleVarState) -> None:
+        async def apply_state(state: State) -> None:
             """Applies the given state."""
             tk_var.set(state.value)
-        await config.APP.set_and_run_ui_callback(StyleVarState, apply_state, var_id)
+        await config.APP.set_and_run_ui_callback(State, apply_state, var_id)
 
         def cmd_func() -> None:
             """When clicked, store configuration."""
-            config.APP.store_conf(StyleVarState(tk_var.get() != 0), var_id)
+            config.APP.store_conf(State(tk_var.get() != 0), var_id)
 
         for check in checks:
             check['command'] = cmd_func
@@ -304,17 +262,17 @@ async def make_stylevar_pane(
         if var.id == 'UnlockDefault':
             def on_unlock_default_set() -> None:
                 """Update item filters when this is changed by the user."""
-                config.APP.store_conf(StyleVarState(unlock_def_var.get() != 0), 'UnlockDefault')
+                config.APP.store_conf(State(unlock_def_var.get() != 0), 'UnlockDefault')
                 update_item_vis()
 
-            async def apply_unlock_default(state: StyleVarState) -> None:
+            async def apply_unlock_default(state: State) -> None:
                 """Update item filters when this is changed by config."""
                 unlock_def_var.set(state.value)
                 update_item_vis()
 
             unlock_def_var = int_var
             chk['command'] = on_unlock_default_set
-            await config.APP.set_and_run_ui_callback(StyleVarState, apply_unlock_default, var.id)
+            await config.APP.set_and_run_ui_callback(State, apply_unlock_default, var.id)
         else:
             await add_state_syncers(var.id, int_var, chk)
 

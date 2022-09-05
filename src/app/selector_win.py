@@ -19,8 +19,7 @@ import math
 import random
 
 import attrs
-from srctools import Vec, Property, EmptyMapping
-from srctools.dmx import Attribute, Element, ValueType
+from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
 import srctools.logger
 
@@ -35,6 +34,7 @@ from consts import (
 )
 from localisation import gettext, ngettext
 from config.last_sel import LastSelected
+from config.windows import SelectorState
 import utils
 import config
 
@@ -101,69 +101,6 @@ class AttrTypes(Enum):
 
 AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
-
-
-@config.APP.register
-@attrs.frozen(slots=False)
-class WindowState(config.Data, conf_name='SelectorWindow', palette_stores=False, uses_id=True):
-    """The immutable window state stored in config files for restoration next launch."""
-    open_groups: Mapping[str, bool] = attrs.Factory(dict)
-    width: int = 0
-    height: int = 0
-
-    @classmethod
-    def parse_legacy(cls, conf: Property) -> dict[str, WindowState]:
-        """Convert the old legacy configuration."""
-        result: dict[str, WindowState] = {}
-        for prop in conf.find_children('Selectorwindow'):
-            result[prop.name] = cls.parse_kv1(prop, 1)
-        return result
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> WindowState:
-        """Parse from keyvalues."""
-        assert version == 1
-        open_groups = {
-            prop.name: srctools.conv_bool(prop.value)
-            for prop in data.find_children('Groups')
-        }
-        return cls(
-            open_groups,
-            data.int('width', -1), data.int('height', -1),
-        )
-
-    def export_kv1(self) -> Property:
-        """Generate keyvalues."""
-        props = Property('', [])
-        with props.build() as builder:
-            builder.width(str(self.width))
-            builder.height(str(self.height))
-            with builder.Groups:
-                for name, is_open in self.open_groups.items():
-                    builder[name](srctools.bool_as_int(is_open))
-        return props
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> WindowState:
-        """Parse DMX elements."""
-        assert version == 1
-        closed = dict.fromkeys(data['closed'].iter_str(), False)
-        opened = dict.fromkeys(data['opened'].iter_str(), True)
-        if closed.keys() & opened.keys():
-            LOGGER.warning('Overlap between:\nopened={}\nclosed={}', opened, closed)
-        closed.update(opened)
-        return cls(closed, data['width'].val_int, data['height'].val_int)
-
-    def export_dmx(self) -> Element:
-        """Serialise the state as a DMX element."""
-        elem = Element('WindowState', 'DMElement')
-        elem['width'] = self.width
-        elem['height'] = self.height
-        elem['opened'] = opened = Attribute.array('opened', ValueType.STRING)
-        elem['closed'] = closed = Attribute.array('closed', ValueType.STRING)
-        for name, val in self.open_groups.items():
-            (opened if val else closed).append(name)
-        return elem
 
 
 @attrs.define
@@ -1148,7 +1085,7 @@ class SelectorWin(Generic[CallbackT]):
                 img.apply(item.button, None)
 
         if not self.first_open:  # We've got state to store.
-            state = WindowState(
+            state = SelectorState(
                 open_groups={
                     grp_id: grp.visible
                     for grp_id, grp in self.group_widgets.items()
@@ -1220,7 +1157,7 @@ class SelectorWin(Generic[CallbackT]):
         if self.first_open:
             self.first_open = False
             try:
-                state = config.APP.get_cur_conf(WindowState, self.save_id)
+                state = config.APP.get_cur_conf(SelectorState, self.save_id)
             except KeyError:
                 pass
             else:

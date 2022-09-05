@@ -1,7 +1,4 @@
 """Implements UI for selecting corridors."""
-import attrs
-from srctools import Property
-from srctools.dmx import Element
 from tkinter import ttk
 import tkinter as tk
 from typing import Awaitable, Optional, List, Sequence, Callable
@@ -21,6 +18,7 @@ from localisation import gettext
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
+from config.corridors import UIState, Config
 import event
 import config
 import packages
@@ -51,95 +49,6 @@ FALLBACK = corridor.CorridorGroup(
         for orient in Orient
     }
 )
-
-
-@config.APP.register
-@attrs.frozen(slots=False)
-class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
-    """The current window state for saving and restoring."""
-    last_mode: GameMode = GameMode.SP
-    last_direction: Direction = Direction.ENTRY
-    last_orient: Orient = Orient.HORIZONTAL
-    width: int = -1
-    height: int = -1
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'UIState':
-        """Parse Keyvalues 1 configuration."""
-        assert version == 1, version
-        try:
-            last_mode = GameMode(data['mode'])
-        except (LookupError, ValueError):
-            last_mode = GameMode.SP
-
-        try:
-            last_direction = Direction(data['direction'])
-        except (LookupError, ValueError):
-            last_direction = Direction.ENTRY
-
-        try:
-            last_orient = Orient(data['orient'])
-        except (LookupError, ValueError):
-            last_orient = Orient.HORIZONTAL
-
-        return UIState(
-            last_mode, last_direction, last_orient,
-            data.int('width', -1),
-            data.int('height', -1),
-        )
-
-    def export_kv1(self) -> Property:
-        """Export Keyvalues 1 configuration."""
-        return Property('', [
-            Property('mode', self.last_mode.value),
-            Property('direction', self.last_direction.value),
-            Property('orient', self.last_orient.value),
-            Property('width', str(self.width)),
-            Property('height', str(self.height)),
-        ])
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'UIState':
-        """Parse Keyvalues 2 configuration."""
-        assert version == 1, version
-        try:
-            last_mode = GameMode(data['mode'].val_string)
-        except (LookupError, ValueError):
-            last_mode = GameMode.SP
-
-        try:
-            last_direction = Direction(data['direction'].val_string)
-        except (LookupError, ValueError):
-            last_direction = Direction.ENTRY
-
-        try:
-            last_orient = Orient(data['orient'].val_string)
-        except (LookupError, ValueError):
-            last_orient = Orient.HORIZONTAL
-
-        try:
-            width = data['width'].val_int
-        except KeyError:
-            width = -1
-        try:
-            height = data['height'].val_int
-        except KeyError:
-            height = -1
-
-        return UIState(
-            last_mode, last_direction, last_orient,
-            width, height,
-        )
-
-    def export_dmx(self) -> Element:
-        """Export Keyvalues 2 configuration."""
-        element = Element('UIState', 'DMElement')
-        element['mode'] = self.last_mode.value
-        element['direction'] = self.last_direction.value
-        element['orient'] = self.last_orient.value
-        element['width'] = self.width
-        element['height'] = self.height
-        return element
 
 
 class Selector:
@@ -317,7 +226,7 @@ class Selector:
                 (selected if slot.flexi_group == GRP_SELECTED
                  else unselected).append(slot.contents.instance.casefold())
 
-        config.APP.store_conf(corridor.Config(selected=selected, unselected=unselected), self.conf_id)
+        config.APP.store_conf(Config(selected=selected, unselected=unselected), self.conf_id)
 
         # Fix up the highlight, if it was moved.
         for slot in self.drag_man.all_slots():
@@ -334,7 +243,7 @@ class Selector:
         except KeyError:
             LOGGER.warning('No corridors defined for style "{}"', style_id)
             self.corr_group = FALLBACK
-        self.conf_id = corridor.Config.get_id(
+        self.conf_id = Config.get_id(
             style_id,
             self.btn_mode.current,
             self.btn_direction.current,
@@ -346,8 +255,8 @@ class Selector:
         mode = self.btn_mode.current
         direction = self.btn_direction.current
         orient = self.btn_orient.current
-        self.conf_id = corridor.Config.get_id(self.corr_group.id, mode, direction, orient)
-        conf = config.APP.get_cur_conf(corridor.Config, self.conf_id, corridor.Config())
+        self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
+        conf = config.APP.get_cur_conf(Config, self.conf_id, Config())
 
         config.APP.store_conf(UIState(
             mode, direction, orient,

@@ -9,14 +9,14 @@ import itertools
 
 import attrs
 import srctools.logger
-from srctools import Property, Vec
-from srctools.dmx import Element, Attribute as DMAttr, ValueType as DMXValue
+from srctools import Vec
 
 import utils
 from app import img, lazy_conf, tkMarkdown
 import config
 import packages
 import editoritems
+from config.corridors import Config
 from corridor import (
     CorrKind, Orient, Direction, GameMode,
     CORRIDOR_COUNTS, ID_TO_CORR,
@@ -61,73 +61,6 @@ class CorridorUI(Corridor):
             legacy=self.legacy,
             fixups=self.fixups,
         )
-
-
-@config.APP.register
-@attrs.frozen(slots=False)
-class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
-    """The current configuration for a corridor."""
-    selected: List[str] = attrs.field(factory=list, kw_only=True)
-    unselected: List[str] = attrs.field(factory=list, kw_only=True)
-
-    @staticmethod
-    def get_id(
-        style: str,
-        mode: GameMode,
-        direction: Direction,
-        orient: Orient,
-    ) -> str:
-        """Given the style and kind of corridor, return the ID for config lookup."""
-        return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
-
-    @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'Config':
-        """Parse from KeyValues1 configs."""
-        assert version == 1, version
-        selected = []
-        unselected = []
-        for child in data.find_children('Corridors'):
-            if child.name == 'selected' and not child.has_children():
-                selected.append(child.value)
-            elif child.name == 'unselected' and not child.has_children():
-                unselected.append(child.value)
-
-        return Config(selected=selected, unselected=unselected)
-
-    def export_kv1(self) -> Property:
-        """Serialise to a Keyvalues1 config."""
-        prop = Property('Corridors', [])
-        for corr in self.selected:
-            prop.append(Property('selected', corr))
-        for corr in self.unselected:
-            prop.append(Property('unselected', corr))
-
-        return Property('Corridor', [prop])
-
-    @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'Config':
-        """Parse from DMX configs."""
-        assert version == 1, version
-        try:
-            selected = list(data['selected'].iter_str())
-        except KeyError:
-            selected = []
-        try:
-            unselected = list(data['unselected'].iter_str())
-        except KeyError:
-            unselected = []
-
-        return Config(selected=selected, unselected=unselected)
-
-    def export_dmx(self) -> Element:
-        """Serialise to DMX configs."""
-        elem = Element('Corridor', 'DMEConfig')
-        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
-        selected.extend(self.selected)
-        elem['unselected'] = unselected = DMAttr.array('unselected', DMXValue.STR)
-        unselected.extend(self.unselected)
-
-        return elem
 
 
 def parse_specifier(specifier: str) -> CorrKind:

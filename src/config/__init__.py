@@ -33,7 +33,7 @@ class ConfInfo:
     """Holds information about a type of configuration data."""
     name: str
     version: int
-    palette_stores: bool  # If this is save/loaded by palettes.
+    palette_stores: bool  # If this is saved/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
 
 

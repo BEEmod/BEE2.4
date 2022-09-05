@@ -1,11 +1,14 @@
-from typing import Dict
+from __future__ import annotations
 
+from typing import Dict, Mapping
 import attrs
-from srctools import Property
-from srctools.dmx import Element
+from srctools import Property, conv_bool, bool_as_int, logger
+from srctools.dmx import Attribute, Element, ValueType
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
 import config
+
+LOGGER = logger.get_logger(__name__, 'conf.win')
 
 
 @config.APP.register
@@ -87,4 +90,67 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
             elem['width'] = self.width
         if self.height >= 0:
             elem['height'] = self.height
+        return elem
+
+
+@config.APP.register
+@attrs.frozen(slots=False)
+class SelectorState(config.Data, conf_name='SelectorWindow', palette_stores=False, uses_id=True):
+    """The state for selector windows for restoration next launch."""
+    open_groups: Mapping[str, bool] = attrs.Factory(dict)
+    width: int = 0
+    height: int = 0
+
+    @classmethod
+    def parse_legacy(cls, conf: Property) -> dict[str, SelectorState]:
+        """Convert the old legacy configuration."""
+        result: dict[str, SelectorState] = {}
+        for prop in conf.find_children('Selectorwindow'):
+            result[prop.name] = cls.parse_kv1(prop, 1)
+        return result
+
+    @classmethod
+    def parse_kv1(cls, data: Property, version: int) -> SelectorState:
+        """Parse from keyvalues."""
+        assert version == 1
+        open_groups = {
+            prop.name: conv_bool(prop.value)
+            for prop in data.find_children('Groups')
+        }
+        return cls(
+            open_groups,
+            data.int('width', -1), data.int('height', -1),
+        )
+
+    def export_kv1(self) -> Property:
+        """Generate keyvalues."""
+        props = Property('', [])
+        with props.build() as builder:
+            builder.width(str(self.width))
+            builder.height(str(self.height))
+            with builder.Groups:
+                for name, is_open in self.open_groups.items():
+                    builder[name](bool_as_int(is_open))
+        return props
+
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> SelectorState:
+        """Parse DMX elements."""
+        assert version == 1
+        closed = dict.fromkeys(data['closed'].iter_str(), False)
+        opened = dict.fromkeys(data['opened'].iter_str(), True)
+        if closed.keys() & opened.keys():
+            LOGGER.warning('Overlap between:\nopened={}\nclosed={}', opened, closed)
+        closed.update(opened)
+        return cls(closed, data['width'].val_int, data['height'].val_int)
+
+    def export_dmx(self) -> Element:
+        """Serialise the state as a DMX element."""
+        elem = Element('WindowState', 'DMElement')
+        elem['width'] = self.width
+        elem['height'] = self.height
+        elem['opened'] = opened = Attribute.array('opened', ValueType.STRING)
+        elem['closed'] = closed = Attribute.array('closed', ValueType.STRING)
+        for name, val in self.open_groups.items():
+            (opened if val else closed).append(name)
         return elem
