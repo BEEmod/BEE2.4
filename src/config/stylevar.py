@@ -36,6 +36,7 @@ class State(config.Data, conf_name='StyleVar', uses_id=True):
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> State:
         """Parse DMX config files."""
+        assert version == 1, version
         try:
             value = data['value'].val_bool
         except KeyError:
