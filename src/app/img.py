@@ -302,7 +302,7 @@ class Handle:
             except LookupError:
                 return cls.error(width, height)
         if prop.has_children():
-            children = []
+            children: list[Handle] = []
             for child in prop:
                 if child.name in ('noalpha', 'stripalpha'):
                     children.append(cls.parse(
