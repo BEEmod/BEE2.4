@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Mapping
 import attrs
 from srctools import Property, conv_bool, bool_as_int, logger
-from srctools.dmx import Attribute, Element, ValueType
+from srctools.dmx import Attribute, Element, ValueType, Vec2
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
 import config
@@ -46,6 +46,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'WindowState':
         """Parse keyvalues1 data."""
+        assert version == 1, version
         return WindowState(
             data.int('x', -1),
             data.int('y', -1),
@@ -70,22 +71,21 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'WindowState':
         """Parse DMX configuation."""
-        pos = data['pos'].val_vec2
-        width = data['width'].val_int if 'width' in data else -1
-        height = data['height'].val_int if 'height' in data else -1
+        assert version == 1, version
+        pos = data['pos'].val_vec2 if 'pos' in data else Vec2(-1, -1)
         return WindowState(
             x=int(pos.x),
             y=int(pos.y),
-            width=width,
-            height=height,
-            visible=data['visible'].val_bool,
+            width=data['width'].val_int if 'width' in data else -1,
+            height=data['height'].val_int if 'height' in data else -1,
+            visible=data['visible'].val_bool if 'visible' in data else True,
         )
 
     def export_dmx(self) -> Element:
         """Create DMX configuation."""
         elem = Element('', '')
         elem['visible'] = self.visible
-        elem['pos'] = (self.x, self.y)
+        elem['pos'] = Attribute.vec2('pos', (self.x, self.y))
         if self.width >= 0:
             elem['width'] = self.width
         if self.height >= 0:
