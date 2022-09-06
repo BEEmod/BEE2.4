@@ -65,3 +65,77 @@ def test_conf_export_dmx() -> None:
     assert len(elem) == 2
     assert list(elem['selected'].iter_string()) == CORR_SEL
     assert list(elem['unselected'].iter_string()) == CORR_UNSEL
+
+
+@pytest.mark.parametrize('mode', GameMode)
+@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('direction', Direction)
+def test_ui_parse_kv1(mode: GameMode, orient: Orient, direction: Direction) -> None:
+    """Test parsing keyvalues1 UI state."""
+    kv = Keyvalues('Corridor', [
+        Keyvalues('mode', mode.value),
+        Keyvalues('orient', orient.value),
+        Keyvalues('direction', direction.value),
+        Keyvalues('width', '272'),
+        Keyvalues('height', '849'),
+    ])
+    assert UIState.parse_kv1(kv, 1) == UIState(
+        last_mode=mode, last_orient=orient, last_direction=direction,
+        width=272, height=849,
+    )
+
+    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
+        UIState.parse_kv1(kv, 2)
+
+
+@pytest.mark.parametrize('mode', GameMode)
+@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('direction', Direction)
+def test_ui_export_kv1(mode: GameMode, orient: Orient, direction: Direction) -> None:
+    """Test exporting keyvalues1 UI state."""
+    kv = UIState(
+        last_mode=mode, last_orient=orient, last_direction=direction,
+        width=272, height=849,
+    ).export_kv1()
+    assert len(kv) == 5
+    assert kv['mode'] == mode.value
+    assert kv['orient'] == orient.value
+    assert kv['width'] == '272'
+    assert kv['height'] == '849'
+
+
+@pytest.mark.parametrize('mode', GameMode)
+@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('direction', Direction)
+def test_ui_parse_dmx(mode: GameMode, orient: Orient, direction: Direction) -> None:
+    """Test parsing dmx UI state."""
+    elem = Element('UIState', 'DMEElement')
+    elem['mode'] = mode.value
+    elem['orient'] = orient.value
+    elem['direction'] = direction.value
+    elem['width'] = 272
+    elem['height'] = 849
+
+    assert UIState.parse_dmx(elem, 1) == UIState(
+        last_mode=mode, last_orient=orient, last_direction=direction,
+        width=272, height=849,
+    )
+
+    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
+        UIState.parse_dmx(elem, 2)
+
+
+@pytest.mark.parametrize('mode', GameMode)
+@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('direction', Direction)
+def test_ui_export_dmx(mode: GameMode, orient: Orient, direction: Direction) -> None:
+    """Test exporting dmx UI state."""
+    elem = UIState(
+        last_mode=mode, last_orient=orient, last_direction=direction,
+        width=272, height=849,
+    ).export_dmx()
+    assert len(elem) == 5
+    assert elem['mode'].val_string == mode.value
+    assert elem['orient'].val_string == orient.value
+    assert elem['width'].val_int == 272
+    assert elem['height'].val_int == 849
