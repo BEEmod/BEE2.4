@@ -471,7 +471,6 @@ class Result(Generic[ResultT]):
 
     Once the nursery has closed, the result is accessible.
     """
-    _checked_nursery = False
     def __init__(
         self,
         nursery: trio.Nursery,
@@ -482,10 +481,6 @@ class Result(Generic[ResultT]):
         self._nursery: Optional[trio.Nursery] = nursery
         self._result: ResultT = _NO_RESULT
         nursery.start_soon(self._task, func, args, name=name or func)
-        if not self._checked_nursery:
-            # Double-check this exists.
-            assert hasattr(nursery, '_closed')
-            Result._checked_nursery = True
 
     @classmethod
     def sync(
@@ -509,8 +504,8 @@ class Result(Generic[ResultT]):
 
     def __call__(self) -> ResultT:
         """Fetch the result. The nursery must be closed."""
-        if self._nursery is not None and not self._nursery._closed:
-            raise ValueError(f'Result cannot be fetched before nursery has closed!')
+        if self._nursery is not None and 'exited' not in repr(self._nursery.cancel_scope):
+            raise ValueError(f'Result cannot be fetched before nursery has closed! ({self._nursery.cancel_scope!r})')
         self._nursery = None  # The check passed, no need to keep this alive.
         return self._result
 
