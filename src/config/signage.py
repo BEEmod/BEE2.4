@@ -30,13 +30,22 @@ DEFAULT_IDS = {
     # Remaining are blank.
     **dict.fromkeys(range(19, 31), ''),
 }
+VALID_TIME = set(range(3, 31))
+
+
+def _sign_converter(value: Mapping[int, str]) -> Mapping[int, str]:
+    """Ensure existing dicts are copied, and that all keys are present."""
+    return {
+        i: value.get(i, '')
+        for i in VALID_TIME
+    }
 
 
 @config.APP.register
 @attrs.frozen(slots=False)
 class Layout(config.Data, conf_name='Signage'):
     """A layout of selected signs."""
-    signs: Mapping[int, str] = attrs.Factory(DEFAULT_IDS.copy)
+    signs: Mapping[int, str] = attrs.field(default=DEFAULT_IDS, converter=_sign_converter)
 
     @classmethod
     def parse_legacy(cls, props: Property) -> Dict[str, 'Layout']:
@@ -48,7 +57,10 @@ class Layout(config.Data, conf_name='Signage'):
     @classmethod
     def parse_kv1(cls, data: Union[Property, Iterable[Property]], version: int) -> 'Layout':
         """Parse Keyvalues1 config values."""
-        sign = DEFAULT_IDS.copy()
+        if not data:  # No config, use defaults.
+            return cls(DEFAULT_IDS)
+
+        sign = dict.fromkeys(VALID_TIME, '')
         for child in data:
             try:
                 timer = int(child.name)
