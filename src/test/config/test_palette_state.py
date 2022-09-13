@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 from srctools import Property as Keyvalues
+from srctools.dmx import Element
 
 from config.palette import PaletteState
 from consts import UUID_PORTAL2, UUID_EXPORT
@@ -71,5 +72,49 @@ def test_export_kv1(save: int) -> None:
     hiddens = {
         prop.value for prop in kv.find_all('hidden')
     }
-    print(kv)
     assert hiddens == {another_uuid.hex, UUID_EXPORT.hex}
+
+
+@pytest.mark.parametrize('save', [False, True])
+def test_parse_dmx(save: bool) -> None:
+    """Test parsing DMX state."""
+    some_uuid = uuid.uuid4()
+    another_uuid = uuid.uuid4()
+
+    elem = Element('PaletteState', 'DMConfig')
+    elem['selected'] = some_uuid.bytes
+    elem['save_settings'] = save
+    elem['hidden'] = [
+        another_uuid.bytes,
+        UUID_EXPORT.bytes,
+        UUID_PORTAL2.bytes,
+    ]
+    state = PaletteState.parse_dmx(elem, 1)
+
+    assert state.selected == some_uuid
+    assert state.save_settings is bool(save)
+    # The "Portal 2" is not allowed here, so it should be stripped.
+    assert another_uuid in state.hidden_defaults
+    assert UUID_EXPORT in state.hidden_defaults
+    assert UUID_PORTAL2 not in state.hidden_defaults
+
+
+@pytest.mark.parametrize('save', [False, True])
+def test_export_dmx(save: bool) -> None:
+    """Test exporting DMX state."""
+    some_uuid = uuid.uuid4()
+    another_uuid = uuid.uuid4()
+
+    state = PaletteState(
+        selected=some_uuid,
+        hidden_defaults=frozenset({
+            another_uuid, UUID_EXPORT,
+        }),
+        save_settings=bool(save),
+    )
+    elem = state.export_dmx()
+    assert len(elem) == 3
+    assert elem['selected'].val_bytes == some_uuid.bytes
+    assert elem['save_settings'].val_bool is save
+    hiddens = set(elem['hidden'].iter_binary())
+    assert hiddens == {another_uuid.bytes, UUID_EXPORT.bytes}
