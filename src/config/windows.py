@@ -137,12 +137,13 @@ class SelectorState(config.Data, conf_name='SelectorWindow', palette_stores=Fals
     def parse_dmx(cls, data: Element, version: int) -> SelectorState:
         """Parse DMX elements."""
         assert version == 1
-        closed = dict.fromkeys(data['closed'].iter_str(), False)
-        opened = dict.fromkeys(data['opened'].iter_str(), True)
-        if closed.keys() & opened.keys():
-            LOGGER.warning('Overlap between:\nopened={}\nclosed={}', opened, closed)
-        closed.update(opened)
-        return cls(closed, data['width'].val_int, data['height'].val_int)
+        open_groups: Dict[str, bool] = {}
+        for name in data['closed'].iter_str():
+            open_groups[name.casefold()] = False
+        for name in data['opened'].iter_str():
+            open_groups[name.casefold()] = True
+
+        return cls(open_groups, data['width'].val_int, data['height'].val_int)
 
     def export_dmx(self) -> Element:
         """Serialise the state as a DMX element."""
