@@ -74,9 +74,9 @@ def chain(
                 continue
             conn.remove()
             if node.next is not None:
-                raise ValueError('Item "{}" links to multiple output items!')
+                raise ValueError(f'Item "{node.item.name}" links to multiple output items!')
             if next_node.prev is not None:
-                raise ValueError('Item "{}" links to multiple input items!')
+                raise ValueError(f'Item "{next_node.item.name}" links to multiple input items!')
             node.next = next_node
             next_node.prev = node
 
