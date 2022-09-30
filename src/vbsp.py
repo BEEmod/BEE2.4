@@ -47,7 +47,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, cast
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
 from typing_extensions import TypedDict
 
 
@@ -80,7 +80,7 @@ BEE2_config = ConfigFile('compile.cfg')
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
-IGNORED_OVERLAYS = set()
+IGNORED_OVERLAYS: Set[Entity] = set()
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 

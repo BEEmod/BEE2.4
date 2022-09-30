@@ -1,14 +1,13 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import Mapping, cast, Any, TypeVar, Type, MutableMapping, Iterator
+from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
 from uuid import UUID, uuid5
 
-from typing_extensions import Final
+from typing_extensions import Final, Self
 from enum import Enum, EnumMeta
 from srctools import Side
 
 
-T = TypeVar('T')
 __all__ = [
     'MaterialGroup',
 
@@ -81,12 +80,11 @@ class MaterialGroupMeta(EnumMeta):
             return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
 
-    # Need to ignore types here, EnumMeta does not match type's signature.
-    def __call__(cls: Type[T], value: str, *args, **kwargs) -> T:  # type: ignore
+    def __call__(cls, value: str, *args, **kwargs) -> Self:
         """Find the existing member with this name."""
-        if args or kwargs:
+        if args or kwargs:  # Constructing the enum itself, keep unchanged.
             return super().__call__(value, *args, **kwargs)  # type: ignore
-        return cls.__new__(cls, value.casefold())  # type: ignore
+        return cls.__new__(cls, value.casefold(), *args, **kwargs)  # type: ignore
 
 
 class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
