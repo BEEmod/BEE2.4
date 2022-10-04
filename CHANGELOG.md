@@ -6,7 +6,7 @@
 * New corridor selection system
 	* Each corridor can now be individually enabled/disabled, you can have any number active.
 	* UCPs can easily add new corridors to the mix
-	* Corridor designs can be added for the floor/ceiling.
+	* Corridor designs can be added for the floor/ceiling. Some have been added to Clean, but not other styles yet.
 
 ### Enhancements
 * The Item Properties pane has been rearranged a bit, so it better handles heaps of widgets, and makes the old style properties window less prominent.
