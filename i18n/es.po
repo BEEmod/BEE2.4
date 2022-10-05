@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-09-02 12:08+1000\n"
+"POT-Creation-Date: 2022-10-04 13:31+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -14,60 +14,60 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.1\n"
 
-#: loadScreen.py:226
+#: loadScreen.py:227
 msgid "Skipped!"
 msgstr "¡Saltado!"
 
-#: loadScreen.py:227
+#: loadScreen.py:228
 msgid "Version: "
 msgstr "Versión: "
 
-#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:886
-#: loadScreen.py:228
+#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:823
+#: loadScreen.py:229
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: app/paletteUI.py:197 loadScreen.py:229
+#: app/paletteUI.py:108 loadScreen.py:230
 msgid "Clear"
 msgstr "Limpiar"
 
-#: loadScreen.py:230
+#: loadScreen.py:231
 msgid "Copy"
 msgstr "Copiar"
 
-#: loadScreen.py:231
+#: loadScreen.py:232
 msgid "Show:"
 msgstr "Mostrar:"
 
-#: loadScreen.py:232
+#: loadScreen.py:233
 msgid "Logs - {}"
 msgstr "Registros - {}"
 
-#: loadScreen.py:234
+#: loadScreen.py:235
 msgid "Debug messages"
 msgstr "Mensajes de Depuración"
 
-#: loadScreen.py:235
+#: loadScreen.py:236
 msgid "Default"
 msgstr "Predeterminado"
 
-#: loadScreen.py:236
+#: loadScreen.py:237
 msgid "Warnings Only"
 msgstr "Sólo advertencias"
 
-#: loadScreen.py:246
+#: loadScreen.py:247
 msgid "Packages"
 msgstr "Paquetes"
 
-#: loadScreen.py:247
+#: loadScreen.py:248
 msgid "Loading Objects"
 msgstr "Cargando Objetos"
 
-#: loadScreen.py:248
+#: loadScreen.py:249
 msgid "Initialising UI"
 msgstr "Iniciando Interfaz"
 
-#: loadScreen.py:249
+#: loadScreen.py:250
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
@@ -79,27 +79,27 @@ msgstr ""
 msgid "Toggle all checkboxes."
 msgstr "Alternar todas las casillas."
 
-#: app/CompilerPane.py:67
+#: app/CompilerPane.py:66
 msgid "ATLAS"
 msgstr "ATLAS"
 
-#: app/CompilerPane.py:68
+#: app/CompilerPane.py:67
 msgid "P-Body"
 msgstr "P-Body"
 
-#: app/CompilerPane.py:69 app/voiceEditor.py:40
+#: app/CompilerPane.py:68 app/voiceEditor.py:40
 msgid "Chell"
 msgstr "Chell"
 
-#: app/CompilerPane.py:70 app/voiceEditor.py:39
+#: app/CompilerPane.py:69 app/voiceEditor.py:39
 msgid "Bendy"
 msgstr "Bendy"
 
-#: app/CompilerPane.py:342
+#: app/CompilerPane.py:244
 msgid "Image Files"
 msgstr "Archivos de Imagenes"
 
-#: app/CompilerPane.py:420
+#: app/CompilerPane.py:322
 msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
@@ -107,35 +107,35 @@ msgstr ""
 "Las opciones en este panel se pueden cambiar sin hacer falta exportar o "
 "reiniciar el juego."
 
-#: app/CompilerPane.py:435
+#: app/CompilerPane.py:337
 msgid "Map Settings"
 msgstr "Configuración del Mapa"
 
-#: app/CompilerPane.py:439
+#: app/CompilerPane.py:341
 msgid "Compile Settings"
 msgstr "Configuración de la Compilación"
 
-#: app/CompilerPane.py:457
+#: app/CompilerPane.py:359
 msgid "Thumbnail"
 msgstr "Miniatura"
 
-#: app/CompilerPane.py:469
+#: app/CompilerPane.py:371
 msgid "Auto"
 msgstr "Automático"
 
-#: app/CompilerPane.py:477
+#: app/CompilerPane.py:379
 msgid "PeTI"
 msgstr "PeTI"
 
-#: app/CompilerPane.py:485
+#: app/CompilerPane.py:387
 msgid "Custom:"
 msgstr "Personalizado:"
 
-#: app/CompilerPane.py:500
+#: app/CompilerPane.py:402
 msgid "Cleanup old screenshots"
 msgstr "Eliminar capturas de pantalla antiguas"
 
-#: app/CompilerPane.py:508
+#: app/CompilerPane.py:410
 msgid ""
 "Override the map image to use a screenshot automatically taken from the "
 "beginning of a chamber. Press F5 to take a new screenshot. If the map has"
@@ -148,11 +148,11 @@ msgstr ""
 "recientemente (en las últimas horas), se utilizará una captura por "
 "defecto de la visión del editor del juego."
 
-#: app/CompilerPane.py:516
+#: app/CompilerPane.py:418
 msgid "Use the normal editor view for the map preview image."
 msgstr "Utiliza la imagen por defecto del editor del juego."
 
-#: app/CompilerPane.py:518
+#: app/CompilerPane.py:420
 msgid ""
 "Use a custom image for the map preview image. Click the screenshot to "
 "select.\n"
@@ -162,7 +162,7 @@ msgstr ""
 "tu mapa. Haz clic en el rectángulo negro de abajo para seleccionarla. \n"
 "Las imágenes serán convertidas a formato JPEG de ser necesario."
 
-#: app/CompilerPane.py:533
+#: app/CompilerPane.py:435
 msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
@@ -171,30 +171,30 @@ msgstr ""
 "utilizadas. Deshabilita esta casilla si deseas mantener esas capturas. "
 "Las mismas se encuentran en: \"portal2/screenshots\"."
 
-#: app/CompilerPane.py:545
+#: app/CompilerPane.py:447
 msgid "Lighting:"
 msgstr "Iluminación:"
 
-#: app/CompilerPane.py:552
+#: app/CompilerPane.py:454
 #, fuzzy
 msgid "None"
 msgstr "¡Ninguno!"
 
-#: app/CompilerPane.py:559 app/CompilerPane.py:581 app/CompilerPane.py:592
+#: app/CompilerPane.py:461 app/CompilerPane.py:483 app/CompilerPane.py:494
 msgid "Fast"
 msgstr "Rápida"
 
-#: app/CompilerPane.py:566 app/CompilerPane.py:587
+#: app/CompilerPane.py:468 app/CompilerPane.py:489
 msgid "Full"
 msgstr "Completa"
 
-#: app/CompilerPane.py:572
+#: app/CompilerPane.py:474
 msgid ""
 "You can hold down Shift during the start of the Lighting stage to switch "
 "to {} lighting on the fly."
 msgstr ""
 
-#: app/CompilerPane.py:577
+#: app/CompilerPane.py:479
 msgid ""
 "Compile with no lighting whatsoever. This significantly speeds up compile"
 " times, but there will be no lights, gel will be invisible, and the map "
@@ -202,7 +202,7 @@ msgid ""
 "When publishing, this is ignored."
 msgstr ""
 
-#: app/CompilerPane.py:583
+#: app/CompilerPane.py:485
 msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
@@ -213,7 +213,7 @@ msgstr ""
 "incorrectas. En el momento que se publica el mapa, esta opción no se "
 "tendrá en cuenta."
 
-#: app/CompilerPane.py:588
+#: app/CompilerPane.py:490
 #, fuzzy
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
@@ -225,11 +225,11 @@ msgstr ""
 "efectos lumínicos. En el momento que se publica el mapa, esto siempre se "
 "activará de forma automática."
 
-#: app/CompilerPane.py:596
+#: app/CompilerPane.py:498
 msgid "Enable packing"
 msgstr ""
 
-#: app/CompilerPane.py:600
+#: app/CompilerPane.py:502
 msgid ""
 "Disable automatically packing resources in the map. This can speed up "
 "building and allows editing files and running reload commands, but can "
@@ -237,11 +237,11 @@ msgid ""
 "packing is enabled when publishing. "
 msgstr ""
 
-#: app/CompilerPane.py:608
+#: app/CompilerPane.py:510
 msgid "Dump packed files to:"
 msgstr "Volcar archivos empacados a:"
 
-#: app/CompilerPane.py:631
+#: app/CompilerPane.py:533
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -250,16 +250,16 @@ msgstr ""
 "fueron empacados dentro del mapa. Útil si tienes la intención de editar "
 "los mapas en Hammer."
 
-#: app/CompilerPane.py:638
+#: app/CompilerPane.py:540
 msgid "Last Compile:"
 msgstr "Última Compilación:"
 
-#: app/CompilerPane.py:648
+#: app/CompilerPane.py:550
 msgid "Entity"
 msgstr "Entidad"
 
 #. i18n: Progress bar description
-#: app/CompilerPane.py:658
+#: app/CompilerPane.py:560
 #, fuzzy
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
@@ -276,12 +276,12 @@ msgstr ""
 "enlistado en la parte superior derecha de la ventana de descripción de "
 "los mismos."
 
-#: app/CompilerPane.py:677
+#: app/CompilerPane.py:579
 msgid "Overlay"
 msgstr "Overlays"
 
 #. i18n: Progress bar description
-#: app/CompilerPane.py:686
+#: app/CompilerPane.py:588
 #, fuzzy
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
@@ -292,7 +292,7 @@ msgstr ""
 "pueden ser los símbolos, indicadores o las lineas de conexión. Ocultando "
 "largas lineas de conexión o cambiándolas a indicadores reducirá esto."
 
-#: app/CompilerPane.py:700
+#: app/CompilerPane.py:602
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
@@ -301,11 +301,11 @@ msgstr ""
 "Pulse después de que se haya realizado una compilación para mostrar los "
 "nuevos valores."
 
-#: app/CompilerPane.py:707
+#: app/CompilerPane.py:609
 msgid "Brush"
 msgstr "Bloque"
 
-#: app/CompilerPane.py:715
+#: app/CompilerPane.py:617
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
 "high, it may help to reduce the size of the map or remove intricate "
@@ -315,15 +315,15 @@ msgstr ""
 " esto es alto, te puede servir como guía para que puedas reducir el "
 "tamaño del mapa o eliminar formas complejas del mismo."
 
-#: app/CompilerPane.py:736
+#: app/CompilerPane.py:638
 msgid "Voicelines:"
 msgstr "Líneas de voz:"
 
-#: app/CompilerPane.py:752
+#: app/CompilerPane.py:654
 msgid "Use voiceline priorities"
 msgstr "Usar líneas de voces prioritarias"
 
-#: app/CompilerPane.py:757
+#: app/CompilerPane.py:659
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will can only be chosen if few test elements are in the map. If "
@@ -334,25 +334,25 @@ msgstr ""
 " prueba en el mapa. Si se deshabilita, cualquier línea aplicable será "
 "utilizada."
 
-#: app/CompilerPane.py:765
+#: app/CompilerPane.py:667
 msgid "Spawn at:"
 msgstr "Aparecer en:"
 
-#: app/CompilerPane.py:784
+#: app/CompilerPane.py:686
 msgid "Entry Door"
 msgstr "Puerta de entrada"
 
-#: app/CompilerPane.py:791
+#: app/CompilerPane.py:693
 msgid "Elevator"
 msgstr "Elevador"
 
-#: app/CompilerPane.py:800
+#: app/CompilerPane.py:702
 msgid ""
 "You can hold down Shift during the start of the Geometry stage to quickly"
 " swap whichlocation you spawn at on the fly."
 msgstr ""
 
-#: app/CompilerPane.py:804
+#: app/CompilerPane.py:706
 #, fuzzy
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
@@ -363,7 +363,7 @@ msgstr ""
 "si se llega atravesar la puerta de salida. Utilizar esta opción si deseas"
 " examinar los pasillos de entrada y salida del mapa."
 
-#: app/CompilerPane.py:808
+#: app/CompilerPane.py:710
 #, fuzzy
 msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
@@ -371,37 +371,37 @@ msgstr ""
 "antes de la puerta de entrada. Cuando atravieses la puerta de salida, el "
 "mapa se reiniciará."
 
-#: app/CompilerPane.py:814
+#: app/CompilerPane.py:716
 msgid "Select Corridors"
 msgstr ""
 
-#: app/CompilerPane.py:820
+#: app/CompilerPane.py:722
 msgid "Player Model (SP):"
 msgstr "Modelo del jugador (SP):"
 
-#: app/CompilerPane.py:855
+#: app/CompilerPane.py:757
 msgid "Compile Options"
 msgstr "Opciones de Compilación"
 
-#: app/CompilerPane.py:874
+#: app/CompilerPane.py:776
 msgid "Compiler Options - {}"
 msgstr "Opciones de Compilación - {}"
 
-#: app/StyleVarPane.py:29
+#: app/StyleVarPane.py:27
 msgid "Multiverse Cave"
 msgstr "Voz de Cave Johnson (Workshop)"
 
-#: app/StyleVarPane.py:31
+#: app/StyleVarPane.py:29
 msgid "Play the Workshop Cave Johnson lines on map start."
 msgstr ""
 "Reproduce la voz de Cave Johnson que fue programada para el Workshop en "
 "el comienzo del mapa."
 
-#: app/StyleVarPane.py:36
+#: app/StyleVarPane.py:34
 msgid "Prevent Portal Bump (fizzler)"
 msgstr "Prevenir trucos con los portales (En desintegrador)"
 
-#: app/StyleVarPane.py:38
+#: app/StyleVarPane.py:36
 msgid ""
 "Add portal bumpers to make it more difficult to portal across fizzler "
 "edges. This can prevent placing portals in tight spaces near fizzlers, or"
@@ -410,19 +410,19 @@ msgstr ""
 "Añade un volumen anti-portal que hace más difícil el colocar portales a "
 "través de los bordes del desintegrador."
 
-#: app/StyleVarPane.py:47
+#: app/StyleVarPane.py:45
 msgid "Suppress Mid-Chamber Dialogue"
 msgstr "Suprimir el diálogo de mitad de cámara"
 
-#: app/StyleVarPane.py:49
+#: app/StyleVarPane.py:47
 msgid "Disable all voicelines other than entry and exit lines."
 msgstr "Deshabilita todas las líneas de voz exceptuando las de entrada y salida."
 
-#: app/StyleVarPane.py:54
+#: app/StyleVarPane.py:52
 msgid "Unlock Default Items"
 msgstr "Desbloquear elementos obligatorios"
 
-#: app/StyleVarPane.py:56
+#: app/StyleVarPane.py:54
 msgid ""
 "Allow placing and deleting the mandatory Entry/Exit Doors and Large "
 "Observation Room. Use with caution, this can have weird results!"
@@ -431,13 +431,13 @@ msgstr ""
 " como la gran sala de observación. Solo recomendable con la gran sala de "
 "observación. Usar con precaución, ¡esto puede dar resultados extraños!"
 
-#: app/StyleVarPane.py:65
+#: app/StyleVarPane.py:63
 msgid "Allow Adding Goo Mist"
 msgstr ""
 "Permitir agregar vapor sobre la \n"
 "superficie del pringue mortal"
 
-#: app/StyleVarPane.py:67
+#: app/StyleVarPane.py:65
 msgid ""
 "Add mist particles above Toxic Goo in certain styles. This can increase "
 "the entity count significantly with large, complex goo pits, so disable "
@@ -448,12 +448,12 @@ msgstr ""
 "creado grandes y complejos pozos de ácido, así que deshabilítalo si es "
 "necesario."
 
-#: app/StyleVarPane.py:76
+#: app/StyleVarPane.py:74
 #, fuzzy
 msgid "Light Reversible Excursion Funnels"
 msgstr "Iluminar Embudos de Translación Reversibles"
 
-#: app/StyleVarPane.py:78
+#: app/StyleVarPane.py:76
 msgid ""
 "Funnels emit a small amount of light. However, if multiple funnels are "
 "near each other and can reverse polarity, this can cause lighting issues."
@@ -466,11 +466,11 @@ msgstr ""
 "prevenir esto desabilitando las luces. Los Embudos de translación no "
 "reversibles no tienen este problema."
 
-#: app/StyleVarPane.py:88
+#: app/StyleVarPane.py:86
 msgid "Enable Shape Framing"
 msgstr "Habilitar el encuadre de formas"
 
-#: app/StyleVarPane.py:90
+#: app/StyleVarPane.py:88
 msgid ""
 "After 10 shape-type antlines are used, the signs repeat. With this "
 "enabled, colored frames will be added to distinguish them."
@@ -479,63 +479,63 @@ msgstr ""
 "activado, se añadirán marcos coloreados para poder distingirlos."
 
 #. i18n: StyleVar default value.
-#: app/StyleVarPane.py:176
+#: app/StyleVarPane.py:134
 msgid "Default: On"
 msgstr "Predeterminado: Activado"
 
-#: app/StyleVarPane.py:176
+#: app/StyleVarPane.py:134
 msgid "Default: Off"
 msgstr "Predeterminado: Desactivado"
 
 #. i18n: StyleVar which is totally unstyled.
-#: app/StyleVarPane.py:180
+#: app/StyleVarPane.py:138
 msgid "Styles: Unstyled"
 msgstr "Estilos: Sin estilo"
 
 #. i18n: StyleVar which matches all styles.
-#: app/StyleVarPane.py:189
+#: app/StyleVarPane.py:147
 msgid "Styles: All"
 msgstr "Estilos: Todos"
 
-#: app/StyleVarPane.py:198
+#: app/StyleVarPane.py:156
 msgid "Style: {}"
 msgid_plural "Styles: {}"
 msgstr[0] "Estilo: {}"
 msgstr[1] "Estilos: {}"
 
-#: app/StyleVarPane.py:247
+#: app/StyleVarPane.py:205
 msgid "All:"
 msgstr "Todos:"
 
-#: app/StyleVarPane.py:250
+#: app/StyleVarPane.py:208
 msgid "Selected Style:"
 msgstr "Estilo seleccionado:"
 
-#: app/StyleVarPane.py:255
+#: app/StyleVarPane.py:213
 msgid "Other Styles:"
 msgstr "Otros Estilos:"
 
-#: app/StyleVarPane.py:260
+#: app/StyleVarPane.py:218
 msgid "No Options!"
 msgstr "¡Sin Opciones!"
 
-#: app/StyleVarPane.py:266
+#: app/StyleVarPane.py:224
 msgid "None!"
 msgstr "¡Ninguno!"
 
-#: app/SubPane.py:79
+#: app/SubPane.py:80
 msgid "Hide/Show the \"{}\" window."
 msgstr "Oculta/Muestra las \"{}\" ventanas."
 
-#: app/UI.py:85
+#: app/UI.py:88
 msgid "Export..."
 msgstr "Exportar..."
 
-#: app/UI.py:557
+#: app/UI.py:560
 msgid "Select Skyboxes"
 msgstr "Seleccionar Cielos"
 
-#: app/UI.py:558
+#: app/UI.py:561
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
@@ -547,19 +547,19 @@ msgstr ""
 "precipicios, así como el color de la \"niebla\" vistos en las cámaras "
 "largas."
 
-#: app/UI.py:567
+#: app/UI.py:570
 msgid "3D Skybox"
 msgstr "Skybox 3D"
 
-#: app/UI.py:568
+#: app/UI.py:571
 msgid "Fog Color"
 msgstr "Color de Niebla"
 
-#: app/UI.py:576
+#: app/UI.py:579
 msgid "Select Additional Voice Lines"
 msgstr "Selecciona línea de voces adicionales"
 
-#: app/UI.py:577
+#: app/UI.py:580
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -571,31 +571,31 @@ msgstr ""
 "elementos presentes en el mapa. Las líneas de voz adicionales de Cave "
 "Johnson se controlan por separado en las propiedades del estilo."
 
-#: app/UI.py:584
+#: app/UI.py:587
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "No añadir voces de línea adicionales, sólo Cave (Workshop)."
 
-#: app/UI.py:586
+#: app/UI.py:589
 msgid "<Multiverse Cave only>"
 msgstr "<Cave Johnson del Workshop solamente>"
 
-#: app/UI.py:590
+#: app/UI.py:593
 msgid "Characters"
 msgstr "Personajes"
 
-#: app/UI.py:591
+#: app/UI.py:594
 msgid "Turret Shoot Monitor"
 msgstr "Monitor de Disparos de Torreta"
 
-#: app/UI.py:592
+#: app/UI.py:595
 msgid "Monitor Visuals"
 msgstr "Visuales de Monitor"
 
-#: app/UI.py:601
+#: app/UI.py:604
 msgid "Select Style"
 msgstr "Selecciona Estilo"
 
-#: app/UI.py:602
+#: app/UI.py:605
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -611,15 +611,15 @@ msgstr ""
 "El Estilo define ampliamente el período de tiempo en el que se establece "
 "una cámara de pruebas."
 
-#: app/UI.py:614
+#: app/UI.py:617
 msgid "Elevator Videos"
 msgstr "Videos del Elevador"
 
-#: app/UI.py:622
+#: app/UI.py:625
 msgid "Select Elevator Video"
 msgstr "Selecciona el video del Elevador"
 
-#: app/UI.py:623
+#: app/UI.py:626
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -630,27 +630,27 @@ msgstr ""
 "seleccionado \"Ninguno\", se elegirá un vídeo aleatorio cada vez que se "
 "juegue el mapa, como en el editor de niveles del juego predeterminado."
 
-#: app/UI.py:628
+#: app/UI.py:631
 msgid "This style does not have a elevator video screen."
 msgstr "Este estilo no cuenta con una pantalla en el elevador."
 
-#: app/UI.py:632
+#: app/UI.py:635
 msgid "Random"
 msgstr "Aleatorio"
 
-#: app/UI.py:633
+#: app/UI.py:636
 msgid "Choose a random video."
 msgstr "Elegir un video aleatorio."
 
-#: app/UI.py:636
+#: app/UI.py:639
 msgid "Multiple Orientations"
 msgstr "Orientación Multiple"
 
-#: app/UI.py:782
+#: app/UI.py:785
 msgid "Selected Items and Style successfully exported!"
 msgstr "¡Estilo y elementos exportados correctamente!"
 
-#: app/UI.py:784
+#: app/UI.py:787
 msgid ""
 "\n"
 "\n"
@@ -663,39 +663,39 @@ msgstr ""
 "Hammer para asegurarse de que las vistas previas de las paredes del "
 "editor han cambiado."
 
-#: app/UI.py:1081
+#: app/UI.py:1084
 msgid "Save Palette..."
 msgstr "Guardar Paleta..."
 
-#: app/UI.py:1088 app/paletteUI.py:240
+#: app/UI.py:1091 app/paletteUI.py:151
 msgid "Save Palette As..."
 msgstr "Guardar Paleta Como..."
 
-#: app/UI.py:1104 app/music_conf.py:209
+#: app/UI.py:1107 app/music_conf.py:210
 msgid "Music: "
 msgstr "Música:"
 
-#: app/UI.py:1132
+#: app/UI.py:1135
 msgid "{arr} Use Suggested {arr}"
 msgstr "{arr} Usar Recomendado {arr}"
 
-#: app/UI.py:1148
+#: app/UI.py:1151
 msgid "Style: "
 msgstr "Estilo: "
 
-#: app/UI.py:1150
+#: app/UI.py:1153
 msgid "Voice: "
 msgstr "Voz: "
 
-#: app/UI.py:1151
+#: app/UI.py:1154
 msgid "Skybox: "
 msgstr "Skybox: "
 
-#: app/UI.py:1152
+#: app/UI.py:1155
 msgid "Elev Vid: "
 msgstr "Vid Elev: "
 
-#: app/UI.py:1170
+#: app/UI.py:1173
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
@@ -703,27 +703,27 @@ msgstr ""
 "Habilita o deshabilita ciertas lineas de voces, para prevenir que sean "
 "añadidas."
 
-#: app/UI.py:1258
+#: app/UI.py:1261
 msgid "All Items: "
 msgstr "Todos los Elementos: "
 
-#: app/UI.py:1514
+#: app/UI.py:1517
 msgid "Palettes"
 msgstr "Paletas"
 
-#: app/UI.py:1551
+#: app/UI.py:1554
 msgid "Export Options"
 msgstr "Opciones de Exportación"
 
-#: app/UI.py:1587
+#: app/UI.py:1590
 msgid "Fill empty spots in the palette with random items."
 msgstr "Rellenar espacios vacíos de la paleta con elementos aleatorios."
 
-#: app/__init__.py:97
+#: app/__init__.py:98
 msgid "BEEMOD {} Error!"
 msgstr ""
 
-#: app/__init__.py:98
+#: app/__init__.py:99
 msgid ""
 "An error occurred: \n"
 "{}\n"
@@ -753,11 +753,11 @@ msgstr ""
 msgid "No description found."
 msgstr "No se ha encontrado una descripción."
 
-#: app/backup.py:174 app/corridor_selector.py:228
+#: app/backup.py:174 app/corridor_selector.py:137
 msgid "Coop"
 msgstr "Cooperativo"
 
-#: app/backup.py:174 app/corridor_selector.py:227
+#: app/backup.py:174 app/corridor_selector.py:136
 msgid "SP"
 msgstr "Un solo jugador"
 
@@ -1028,45 +1028,45 @@ msgstr ""
 "Cambia la configuración predeterminada de este elemento cuando es "
 "colocado en el mapa."
 
-#: app/corridor_selector.py:215 app/helpMenu.py:466 app/itemPropWin.py:355
+#: app/corridor_selector.py:124 app/helpMenu.py:466 app/itemPropWin.py:355
 msgid "Close"
 msgstr "Cerrar"
 
-#: app/corridor_selector.py:232
+#: app/corridor_selector.py:141
 #, fuzzy
 msgid "Entry"
 msgstr "Bendy"
 
-#: app/corridor_selector.py:233
+#: app/corridor_selector.py:142
 msgid "Exit"
 msgstr ""
 
-#: app/corridor_selector.py:237
+#: app/corridor_selector.py:146
 msgid "Flat"
 msgstr ""
 
-#: app/corridor_selector.py:238
+#: app/corridor_selector.py:147
 msgid "Upward"
 msgstr ""
 
-#: app/corridor_selector.py:239
+#: app/corridor_selector.py:148
 msgid "Downward"
 msgstr ""
 
-#: app/corridor_selector.py:270
+#: app/corridor_selector.py:179
 #, fuzzy
 msgid "Selected:"
 msgstr "Seleccionado:"
 
-#: app/corridor_selector.py:271
+#: app/corridor_selector.py:180
 msgid "Unused:"
 msgstr ""
 
-#: app/gameMan.py:771 app/gameMan.py:864
+#: app/gameMan.py:773 app/gameMan.py:866
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - ¡Exportación Fallida!"
 
-#: app/gameMan.py:772
+#: app/gameMan.py:774
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
@@ -1075,22 +1075,22 @@ msgstr ""
 " pulse OK para verificar la integridad de los archivos. Después, podrás "
 "exportar de nuevo."
 
-#: app/gameMan.py:865
+#: app/gameMan.py:867
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
 "Fallo a la hora de copiar el archivo de compilador {file}. Asegurese de "
 "que {game} no esta abierto.\n"
 
-#: app/gameMan.py:1119 app/menu_bar.py:98
+#: app/gameMan.py:1121 app/menu_bar.py:98
 msgid "Quit"
 msgstr "Salir"
 
-#: app/gameMan.py:1126
+#: app/gameMan.py:1128
 msgid "Export to \"{}\"..."
 msgstr "Exportar a \"{}\"..."
 
-#: app/gameMan.py:1185
+#: app/gameMan.py:1187
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1099,11 +1099,11 @@ msgstr ""
 "Las pistolas del Coop no funcionarán. Verifique la integridad de los "
 "archivos para reparar el error."
 
-#: app/gameMan.py:1189
+#: app/gameMan.py:1191
 msgid "BEE2 - Aperture Tag Files Missing"
 msgstr "BEE2 - Falta de archivos de Aperture Tag"
 
-#: app/gameMan.py:1270
+#: app/gameMan.py:1272
 msgid ""
 "It appears that the BEE2 application was installed directly in a game "
 "directory. The bee2/ folder name is used for exported resources, so this "
@@ -1112,50 +1112,50 @@ msgid ""
 "Move the application folder elsewhere, then re-run."
 msgstr ""
 
-#: app/gameMan.py:1315
+#: app/gameMan.py:1317
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 "Selecciona el directorio donde se encuentre el ejecutable del juego "
 "({appname})..."
 
-#: app/gameMan.py:1319 app/gameMan.py:1336 app/gameMan.py:1346
-#: app/gameMan.py:1353 app/gameMan.py:1362 app/gameMan.py:1371
+#: app/gameMan.py:1321 app/gameMan.py:1338 app/gameMan.py:1348
+#: app/gameMan.py:1355 app/gameMan.py:1364 app/gameMan.py:1373
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - Añadir juego"
 
-#: app/gameMan.py:1323
+#: app/gameMan.py:1325
 msgid "Find Game Exe"
 msgstr "Encontrar Ejecutable del Juego"
 
-#: app/gameMan.py:1324
+#: app/gameMan.py:1326
 msgid "Executable"
 msgstr "Ejecutable"
 
-#: app/gameMan.py:1327
+#: app/gameMan.py:1329
 msgid "Find Game Binaries"
 msgstr ""
 
-#: app/gameMan.py:1333
+#: app/gameMan.py:1335
 msgid "This does not appear to be a valid game folder!"
 msgstr "¡Eso no parece ser un directorio de juego valido!"
 
-#: app/gameMan.py:1343
+#: app/gameMan.py:1345
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "¡Portal Stories: Mel no tiene un editor!"
 
-#: app/gameMan.py:1354
+#: app/gameMan.py:1356
 msgid "Enter the name of this game:"
 msgstr "Inserte el nombre de este juego:"
 
-#: app/gameMan.py:1361
+#: app/gameMan.py:1363
 msgid "This name is already taken!"
 msgstr "¡Este nombre ya está en uso!"
 
-#: app/gameMan.py:1370
+#: app/gameMan.py:1372
 msgid "Please enter a name for this game!"
 msgstr "¡Por favor introduzca un nombre a este juego!"
 
-#: app/gameMan.py:1388
+#: app/gameMan.py:1390
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
@@ -1163,7 +1163,7 @@ msgstr ""
 "\n"
 " (BEE2 se cerrará, este es el último juego seleccionado!)"
 
-#: app/gameMan.py:1394 app/paletteUI.py:401
+#: app/gameMan.py:1396 app/paletteUI.py:312
 msgid "Are you sure you want to delete \"{}\"?"
 msgstr "¿Estas seguro que deseas borrar \"{}\"?"
 
@@ -1331,12 +1331,12 @@ msgstr "Paleta"
 msgid "View"
 msgstr "Ver"
 
-#: app/music_conf.py:132
+#: app/music_conf.py:133
 #, fuzzy
 msgid "Select Background Music - Base"
 msgstr "Selecciona la música de fondo - Base"
 
-#: app/music_conf.py:133
+#: app/music_conf.py:134
 #, fuzzy
 msgid ""
 "This controls the background music used for a map. Expand the dropdown to"
@@ -1346,7 +1346,7 @@ msgstr ""
 " tienen variaciones que se oyen al interactuar con ciertos elementos de "
 "prueba."
 
-#: app/music_conf.py:138
+#: app/music_conf.py:139
 msgid ""
 "Add no music to the map at all. Testing Element-specific music may still "
 "be added."
@@ -1354,53 +1354,53 @@ msgstr ""
 "No añadir ninguna música de fondo al mapa. La música de ciertos elementos"
 " de prueba específicos puede que sea añadida."
 
-#: app/music_conf.py:143
+#: app/music_conf.py:144
 msgid "Propulsion Gel SFX"
 msgstr "SFX del Gel de Propulsión"
 
-#: app/music_conf.py:144
+#: app/music_conf.py:145
 msgid "Repulsion Gel SFX"
 msgstr "SFX del Gel de Repulsion"
 
-#: app/music_conf.py:145
+#: app/music_conf.py:146
 msgid "Excursion Funnel Music"
 msgstr "Música del embudo de translación"
 
-#: app/music_conf.py:146 app/music_conf.py:162
+#: app/music_conf.py:147 app/music_conf.py:163
 msgid "Synced Funnel Music"
 msgstr "Música del Embudo de Translación sincronizada"
 
-#: app/music_conf.py:154
+#: app/music_conf.py:155
 #, fuzzy
 msgid "Select Excursion Funnel Music"
 msgstr "Selecciona la música del Embudo de Translación"
 
-#: app/music_conf.py:155
+#: app/music_conf.py:156
 msgid "Set the music used while inside Excursion Funnels."
 msgstr "Selecciona la música usada al estar dentro de los Embudos de Translación."
 
-#: app/music_conf.py:158
+#: app/music_conf.py:159
 msgid "Have no music playing when inside funnels."
 msgstr "No hay música al estar dentro de los Embudos de translación."
 
-#: app/music_conf.py:170
+#: app/music_conf.py:171
 msgid "Select Repulsion Gel Music"
 msgstr "Seleccionar Música del Gel de Repulsión."
 
-#: app/music_conf.py:171
+#: app/music_conf.py:172
 msgid "Select the music played when players jump on Repulsion Gel."
 msgstr "Selecciona la música que se reproduce al saltar en el Gel de Repulsión."
 
-#: app/music_conf.py:174
+#: app/music_conf.py:175
 msgid "Add no music when jumping on Repulsion Gel."
 msgstr "No añadir música al saltar en el Gel de Repulsión."
 
-#: app/music_conf.py:183
+#: app/music_conf.py:184
 #, fuzzy
 msgid "Select Propulsion Gel Music"
 msgstr "Seleccionar la música del Gel de Repulsión"
 
-#: app/music_conf.py:184
+#: app/music_conf.py:185
 msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
@@ -1408,23 +1408,23 @@ msgstr ""
 "Selecciona la música que se reproduce cuando los jugadores  tienen una "
 "alta velocidad horizontal."
 
-#: app/music_conf.py:187
+#: app/music_conf.py:188
 msgid "Add no music while running fast."
 msgstr "No añadir música al moverse rápido."
 
-#: app/music_conf.py:224
+#: app/music_conf.py:225
 msgid "Base: "
 msgstr ""
 
-#: app/music_conf.py:257
+#: app/music_conf.py:258
 msgid "Funnel:"
 msgstr "Embudo de Translación:"
 
-#: app/music_conf.py:258
+#: app/music_conf.py:259
 msgid "Bounce:"
 msgstr "Rebotar:"
 
-#: app/music_conf.py:259
+#: app/music_conf.py:260
 msgid "Speed:"
 msgstr "Velocidad:"
 
@@ -1491,7 +1491,7 @@ msgstr "Ventanas"
 msgid "Development"
 msgstr "Desarollo"
 
-#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:862
+#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:799
 msgid "OK"
 msgstr "Vale"
 
@@ -1728,96 +1728,96 @@ msgid "BEE2 - Manage Packages"
 msgstr "BEE2 - Administrar Paquetes"
 
 #. i18n: Last exported items
-#: app/paletteLoader.py:27
+#: app/paletteLoader.py:28
 msgid "<Last Export>"
 msgstr "<Ultima Exportación>"
 
 #. i18n: Empty palette name
-#: app/paletteLoader.py:29
+#: app/paletteLoader.py:30
 msgid "Blank"
 msgstr "Vacío"
 
 #. i18n: BEEmod 1 palette.
-#: app/paletteLoader.py:32
+#: app/paletteLoader.py:33
 msgid "BEEMod"
 msgstr ""
 
 #. i18n: Default items merged together
-#: app/paletteLoader.py:34
+#: app/paletteLoader.py:35
 msgid "Portal 2 Collapsed"
 msgstr "Portal 2 Colapsado"
 
 #. i18n: Original Palette
-#: app/paletteLoader.py:37
+#: app/paletteLoader.py:38
 msgid "Portal 2"
 msgstr ""
 
 #. i18n: Aperture Tag's palette
-#: app/paletteLoader.py:39
+#: app/paletteLoader.py:40
 msgid "Aperture Tag"
 msgstr ""
 
-#: app/paletteUI.py:155
+#: app/paletteUI.py:66
 msgid "Clear Palette"
 msgstr "Vaciar la Paleta"
 
-#: app/paletteUI.py:185 app/paletteUI.py:202 app/paletteUI.py:356
+#: app/paletteUI.py:96 app/paletteUI.py:113 app/paletteUI.py:267
 msgid "Delete Palette"
 msgstr "Borrar Paleta"
 
-#: app/paletteUI.py:208
+#: app/paletteUI.py:119
 #, fuzzy
 msgid "Change Palette Group..."
 msgstr "Guardar Paleta Como..."
 
-#: app/paletteUI.py:214
+#: app/paletteUI.py:125
 #, fuzzy
 msgid "Rename Palette..."
 msgstr "Guardar Paleta..."
 
-#: app/paletteUI.py:220
+#: app/paletteUI.py:131
 msgid "Fill Palette"
 msgstr "Rellenar Paleta"
 
-#: app/paletteUI.py:227 app/paletteUI.py:373
+#: app/paletteUI.py:138 app/paletteUI.py:284
 msgid "Save Settings in Palettes"
 msgstr "Guardar Ajustes en las Paletas"
 
-#: app/paletteUI.py:234
+#: app/paletteUI.py:145
 msgid "Save Palette"
 msgstr "Guardar Paleta"
 
-#: app/paletteUI.py:281
+#: app/paletteUI.py:192
 msgid "Builtin / Readonly"
 msgstr ""
 
-#: app/paletteUI.py:344
+#: app/paletteUI.py:255
 #, fuzzy
 msgid "Hide Palette \"{}\""
 msgstr "Borrar Paleta \"{}\""
 
-#: app/paletteUI.py:346
+#: app/paletteUI.py:257
 #, fuzzy
 msgid "Hide Palette"
 msgstr "Guardar Paleta"
 
-#: app/paletteUI.py:354
+#: app/paletteUI.py:265
 msgid "Delete Palette \"{}\""
 msgstr "Borrar Paleta \"{}\""
 
-#: app/paletteUI.py:426 app/paletteUI.py:446
+#: app/paletteUI.py:337 app/paletteUI.py:357
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Guardar Paleta"
 
-#: app/paletteUI.py:426 app/paletteUI.py:446
+#: app/paletteUI.py:337 app/paletteUI.py:357
 msgid "Enter a name:"
 msgstr "Introduzca un nombre:"
 
-#: app/paletteUI.py:466
+#: app/paletteUI.py:377
 msgid "BEE2 - Change Palette Group"
 msgstr ""
 
-#: app/paletteUI.py:467
+#: app/paletteUI.py:378
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
@@ -1825,58 +1825,58 @@ msgstr ""
 msgid "Open \"{}\" in the default browser?"
 msgstr "Abrir \"{}\" en el navegador predeterminado?"
 
-#: app/selector_win.py:485
+#: app/selector_win.py:423
 msgid "{} Preview"
 msgstr ""
 
 #. i18n: 'None' item description
-#: app/selector_win.py:552
+#: app/selector_win.py:490
 msgid "Do not add anything."
 msgstr "No añadir nada."
 
 #. i18n: 'None' item name.
-#: app/selector_win.py:556
+#: app/selector_win.py:494
 msgid "<None>"
 msgstr "<Ninguno>"
 
-#: app/selector_win.py:806
+#: app/selector_win.py:743
 msgid "Play a sample of this item."
 msgstr "Ver una demostración de este elemento."
 
-#: app/selector_win.py:874
+#: app/selector_win.py:811
 #, fuzzy
 msgid "Select Suggested"
 msgstr "Recomendado"
 
-#: app/selector_win.py:1072
+#: app/selector_win.py:1000
 msgid "Other"
 msgstr "Otro"
 
-#: app/selector_win.py:1331
+#: app/selector_win.py:1254
 msgid "Author: {}"
 msgid_plural "Authors: {}"
 msgstr[0] "Autor: {}"
 msgstr[1] "Autores: {}"
 
 #. i18n: Tooltip for colour swatch.
-#: app/selector_win.py:1397
+#: app/selector_win.py:1317
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "Color: R={r}, G={g}, B={b} "
 
-#: app/selector_win.py:1609 app/selector_win.py:1615
+#: app/selector_win.py:1529 app/selector_win.py:1535
 msgid "Suggested"
 msgstr "Recomendado"
 
-#: app/signage_ui.py:162 app/signage_ui.py:295
+#: app/signage_ui.py:99 app/signage_ui.py:232
 msgid "Configure Signage"
 msgstr "Configurar Cartel"
 
-#: app/signage_ui.py:166
+#: app/signage_ui.py:103
 #, fuzzy
 msgid "Selected"
 msgstr "Seleccionado:"
 
-#: app/signage_ui.py:215
+#: app/signage_ui.py:152
 msgid "Signage: {}"
 msgstr "Cartel: {}"
 
@@ -1967,17 +1967,17 @@ msgstr "¡Sin nombre!"
 msgid "No Name?"
 msgstr "¿Sin nombre?"
 
-#: app/itemconfig/__init__.py:492
+#: app/itemconfig/__init__.py:424
 #, fuzzy
 msgid "Style Properties"
 msgstr "Propiedades de Estilo/ítem"
 
-#: app/itemconfig/__init__.py:504
+#: app/itemconfig/__init__.py:436
 #, fuzzy
 msgid "Style/Item Properties"
 msgstr "Propiedades de Estilo/ítem"
 
-#: app/itemconfig/__init__.py:551
+#: app/itemconfig/__init__.py:483
 msgid "Loading..."
 msgstr ""
 
