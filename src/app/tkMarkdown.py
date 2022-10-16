@@ -3,9 +3,9 @@
 This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
-from typing import Mapping, Type, Sequence
+from typing import Mapping, Sequence
+from contextvars import ContextVar
 import urllib.parse
-import types
 import enum
 
 import attrs
@@ -105,22 +105,28 @@ class MarkdownData:
     __copy__ = copy
 
 
+@attrs.define
+class RenderState:
+    """The data needed to convert tokens.
+
+    This is used so we don't store it on the TKRenderer, since it's shared.
+    """
+    package: str
+    # The lists we're currently generating.
+    # If none it's bulleted, otherwise it's the current count.
+    list_stack: list[int | None] = attrs.Factory(list)
+
+
+no_state = RenderState('')
+state = ContextVar('tk_markdown_state', default=no_state)
+
+
 class TKRenderer(mistletoe.BaseRenderer):
     """Extension needed to extract our list from the tree.
     """
-    def __init__(self) -> None:
-        # The lists we're currently generating.
-        # If none it's bulleted, otherwise it's the current count.
-        self._list_stack: list[int | None] = []
-        self.package: str | None = None
-        super().__init__()
-
-    def __exit__(self, exc_type: Type[BaseException], exc_val: BaseException, exc_tb: types.TracebackType) -> None:
-        self._list_stack.clear()
-        self.package = None
-
     def render(self, token: btok.BlockToken) -> MarkdownData:
         """Indicate the correct types for this."""
+        assert state.get() is not no_state
         return super().render(token)
 
     def render_inner(self, token: stok.SpanToken | btok.BlockToken) -> MarkdownData:
@@ -189,7 +195,7 @@ class TKRenderer(mistletoe.BaseRenderer):
 
     def render_image(self, token: stok.Image) -> MarkdownData:
         """Embed an image into a file."""
-        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), self.package)
+        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), state.get().package)
         return MarkdownData([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
@@ -210,22 +216,24 @@ class TKRenderer(mistletoe.BaseRenderer):
 
     def render_list(self, token: btok.List) -> MarkdownData:
         """The wrapping around a list, specifying the type and start number."""
-        self._list_stack.append(token.start)
+        stack = state.get().list_stack
+        stack.append(token.start)
         try:
             return self.render_inner(token)
         finally:
-            self._list_stack.pop()
+            stack.pop()
 
     def render_list_item(self, token: btok.ListItem) -> MarkdownData:
         """The individual items in a list."""
-        count = self._list_stack[-1]
+        stack = state.get().list_stack
+        count = stack[-1]
         if count is None:
             # Bullet list, make nested ones use different characters.
-            nesting = self._list_stack.count(None) - 1
+            nesting = stack.count(None) - 1
             prefix = BULLETS[nesting % len(BULLETS)]
         else:
             prefix = f'{count}. '
-            self._list_stack[-1] += 1
+            stack[-1] += 1
 
         result = join(
             MarkdownData.text(prefix, TextTag.LIST_START),
@@ -235,7 +243,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         return result
 
     def render_paragraph(self, token: btok.Paragraph) -> MarkdownData:
-        if self._list_stack:  # Collapse together.
+        if state.get().list_stack:  # Collapse together.
             return join(self.render_inner(token), MarkdownData.text('\n'))
         else:
             return join(MarkdownData.text('\n'), self.render_inner(token), MarkdownData.text('\n'))
@@ -288,9 +296,11 @@ def convert(text: str, package: str | None) -> MarkdownData:
 
     The package must be passed to allow using images in the document.
     """
-    with _RENDERER:
-        _RENDERER.package = package
+    tok = state.set(RenderState(package))
+    try:
         return _RENDERER.render(mistletoe.Document(text))
+    finally:
+        state.reset(tok)
 
 
 def join(*args: MarkdownData) -> MarkdownData:
