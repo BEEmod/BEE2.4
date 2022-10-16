@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import Enum
-from typing import Callable
+from typing import Callable, List, Tuple
 
 from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 import srctools.logger
 
 from plane import Plane
 from precomp import (
-    texturing, options, packing,
+    instanceLocs, texturing, options, packing,
     template_brush, conditions, collisions,
 )
 import consts
@@ -42,6 +42,16 @@ HOLES: dict[
     tuple[tuple[float, float, float], tuple[float, float, float]],
     HoleType,
 ] = {}
+
+
+ORIENTS = {
+    Vec.T: Matrix.from_angle(180, 0, 0),
+    Vec.B: Matrix.from_angle(0, 0, 0),
+    Vec.N: Matrix.from_angle(90, 270, 0),
+    Vec.S: Matrix.from_angle(90, 90, 0),
+    Vec.E: Matrix.from_angle(90, 180, 0),
+    Vec.W: Matrix.from_angle(90, 0, 0),
+}
 
 
 def get_pos_norm(origin: Vec) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
@@ -92,7 +102,7 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
-    all the parts are the same. Otherwise it'd collide with the borders.
+    all the parts are the same. Otherwise, it'd collide with the borders.
     """
 
     try:
@@ -195,6 +205,20 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
     floorbeam_temp = options.get(str, 'glass_floorbeam_temp')
 
+    # Valve doesn't implement convex corners, we'll do it ourselves.
+    convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]')
+    convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]')
+    convex_corners: List[Tuple[Matrix, str, int]] = [
+        (orient, filename, side)
+        # We don't include 90 and 270, the other filename covers those.
+        for orient in map(Matrix.from_yaw, [0.0, 180.0])
+        for (filename, side) in [
+            (convex_corner_left, -128.0),
+            (convex_corner_right, +128.0),
+        ]
+        if filename
+    ]
+
     if options.get_itemconf('BEE_PELLET:PelletGrating', False):
         # Merge together these existing filters in global_pti_ents
         vmf.create_ent(
@@ -240,6 +264,26 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     int((u + u_off) // 32),
                     int((v + v_off) // 32),
                 ] = barr_type
+        for orient, filename, corner_side in convex_corners:
+            # Not @=, we want to keep the original orient unaltered.
+            orient = orient @ ORIENTS[normal_tup]
+            # The convex corner is on the +X side, then +/-Y depending on the filename.
+            # The diagonal corner needs to not match to be a corner.
+            side_1 = orient.forward(128)
+            side_2 = orient.left(corner_side)
+            if (
+                BARRIERS.get(((origin + side_1).as_tuple(), normal_tup)) is barr_type and
+                BARRIERS.get(((origin + side_2).as_tuple(), normal_tup)) is barr_type and
+                BARRIERS.get(((origin + side_1 + side_2).as_tuple(), normal_tup)) is not barr_type
+            ):
+                vmf.create_ent(
+                    'func_instance',
+                    targetname='barrier',
+                    file=filename,
+                    origin=origin,
+                    angles=orient,
+                    fixup_style='0',
+                ).make_unique()
 
     # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
     # is done correctly.
