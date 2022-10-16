@@ -161,20 +161,26 @@ def _load_file(
 ) -> Image.Image:
     """Load an image from a filesystem."""
     path = uri.path.casefold()
-    if path[-4:-3] != '.':
-        path += ".png"
+    if path[-4:-3] == '.':
+        path, ext = path[:-4], path[-3:]
+    else:
+        ext = "png"
 
     image: Image.Image
     try:
-        img_file = fsys[path]
+        # TODO: Just for now, always light styled.
+        img_file = fsys[f'{path}.light.{ext}']
     except (KeyError, FileNotFoundError):
-        img_file = None
+        try:
+            img_file = fsys[f'{path}.{ext}']
+        except (KeyError, FileNotFoundError):
+            img_file = None
 
     # Deprecated behaviour, check the other packages.
     if img_file is None and check_other_packages:
         for pak_id, other_fsys in PACK_SYSTEMS.items():
             try:
-                img_file = other_fsys[path]
+                img_file = other_fsys[f'{path}.{ext}']
                 LOGGER.warning(
                     'Image "{}" was found in package "{}", '
                     'fix the reference.',
@@ -190,7 +196,7 @@ def _load_file(
 
     try:
         with img_file.open_bin() as file:
-            if path.casefold().endswith('.vtf'):
+            if ext.casefold() == 'vtf':
                 vtf = VTF.read(file)
                 mipmap = 0
                 # If resizing, pick the mipmap equal to or slightly larger than
