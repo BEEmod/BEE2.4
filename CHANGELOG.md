@@ -1,6 +1,10 @@
 # Changelog
 
-# Version <dev>
+# Version `<dev>`
+
+------------------------------------------
+
+# Version 4.42.0
 
 ### New features:
 * New corridor selection system
