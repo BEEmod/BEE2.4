@@ -545,7 +545,7 @@ def _get_cond_group(func: Any) -> str:
         return func.__globals__['COND_MOD_NAME']
     except KeyError:
         group = func.__globals__['__name__']
-        LOGGER.info('No name for module "{}"!', group)
+        LOGGER.warning('No name for module "{}"!', group)
         return group
 
 

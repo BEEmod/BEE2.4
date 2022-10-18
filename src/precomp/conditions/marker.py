@@ -7,6 +7,7 @@ import srctools.logger
 
 from precomp.conditions import make_flag, make_result
 
+COND_MOD_NAME = 'Markers'
 # TODO: switch to R-tree etc.
 MARKERS: list[Marker] = []
 LOGGER = srctools.logger.get_logger(__name__)

@@ -23,6 +23,7 @@ from precomp import (
 import consts
 
 
+COND_MOD_NAME = None
 LOGGER = logger.get_logger(__name__)
 
 FIZZ_TYPES: dict[str, FizzlerType] = {}
