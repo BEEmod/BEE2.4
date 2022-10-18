@@ -1,6 +1,7 @@
 """Launches the correct compiler."""
 import os
 import sys
+import trio  # Install its import hook
 
 if hasattr(sys, 'frozen'):
     app_name = os.path.basename(sys.executable).casefold()
