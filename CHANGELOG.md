@@ -9,35 +9,48 @@
 	* Corridor designs can be added for the floor/ceiling. Some have been added to Clean, but not other styles yet.
 
 ### Enhancements
-* The Item Properties pane has been rearranged a bit, so it better handles heaps of widgets, and makes the old style properties window less prominent.
-* Conditions will now exit early if the flags cannot be satisfied (for instance if the instance is not present at all). This reduces the amount of conditions which run.
-* Add some menu options to allow opening folders - the game directory, puzzles folder, palettes, packages, etc.
+* The Item Properties pane has been rearranged a bit, so it better handles heaps of widgets, and 
+  makes the old style properties window less prominent.
+* Conditions will now exit early if the flags cannot be satisfied (for instance if the instance is 
+  not present at all). This reduces the amount of conditions which run.
+* Add some menu options to allow opening folders - the game directory, puzzles folder, palettes, 
+  packages, etc.
 * #3238: Multiple catwalk items which intersect will now produce junctions as appropriate.
 * #1799: Add a special warning if BEE is installed directly into the Portal 2 folder.
 * #1366: Add option to disable auto-packing.
 * #452: Allow displaying which items inherit and are unstyled.
 * #1443: Allow hiding builtin palettes.
 * #1774: If the current palette is unchanged, don't switch to `<Last Export>`.
-* VRAD can be configured to not compile lighting at all, for faster (but awful looking) testing (via @SP2G50000).
+* VRAD can be configured to not compile lighting at all, for faster (but awful looking) 
+  testing (via @SP2G50000).
 * Rebuilt config logic to provide a better config file system, improve internal code layout.
+* BEEmod/BEE2-items#558: Concave frame corners will now be generated for glass/grating items, fixing
+  holes in the framework. 
 
 ### UCP-Relevant Enhancements
 * A new collision system has been added, but it is currently not being used for anything.
 	* Items can define collisions for BEE2 specifically, using new psuedo-entities.
 	* Editoritem collisions and connectionpoints can also be specified with the new system.
-* New [`CorridorGroup`](https://github.com/BEEmod/BEE2-items/wiki/Corridors) object type, for corridors.
+* New [`CorridorGroup`](https://github.com/BEEmod/BEE2-items/wiki/Corridors) object type, for 
+  corridors.
 * Added `entryCorridor` and `exitCorridor` flags, for checking which corridors were chosen.
 * Added `AppendConnInputs` result, for adding additional outputs to an item.
-* With 'developer mode' enabled, the `PosIsSolid` condition will annotate the map to show measurement points.
+* With 'developer mode' enabled, the `PosIsSolid` condition will annotate the map to show 
+  measurement points.
 * With 'developer mode' enabled, items will list their full I/O configuration in the tooltips.
-* A "debug" option is now available on `bee2_template_conf`, which will cause the map to contain additional info about how it was placed.
+* A "debug" option is now available on `bee2_template_conf`, which will cause the map to contain 
+  additional info about how it was placed.
 * `ATLAS_SpawnPoint` and `addGlobal` now can use fixup values.
-* A new "dropdown" `ConfigGroup` widget type is now available, which allows picking from a list of options.
-* Icons may now be transparent - they will automatically be blended with the PeTI palette icon background.
-* `ConfigGroup` widgets may now have a blank label, causing it to be hidden. This is useful if there's only one widget in the group.
+* A new "dropdown" `ConfigGroup` widget type is now available, which allows picking from a list of 
+  options.
+* Icons may now be transparent - they will automatically be blended with the PeTI palette icon 
+  background.
+* `ConfigGroup` widgets may now have a blank label, causing it to be hidden. This is useful if 
+  there's only one widget in the group.
 
 ### Bugfixes
-* Fixed help menu Discord invite being temporary, added system to allow updating these retroactively in future.
+* Fixed help menu Discord invite being temporary, added system to allow updating these retroactively
+  in future.
 * #1776: Fix funnel light code didn't use the right fixup values.
 * Fix P1 style not compiling, by ensuring `hammer_notes` is present in the FGD.
 * Fix BEEmod/BEE2-items#3998: Signage appearing sideways on walls, instead of locking upright.
@@ -59,16 +72,22 @@
 # Version 4.41.0
 
 ### New features:
-* The BTS style has been removed, due to it being rather substandard and not really possible to function in the puzzlemaker.
-* New Item: Antline Corner item, which allows for manually placing antlines anywhere. Place two down with a straight line between them, then link with antlines. A contiguous section is treated as one item, which acts like an OR gate.
-* New Item: Half Obs Room, a half-voxel wide Observation Room. The P1 room has switched to be a full voxel like other styles.
-* P1 style light strips now are a rectangular lamp like other styles, with the square hole split into a new item.
+* The BTS style has been removed, due to it being rather substandard and not really possible to 
+  function in the puzzlemaker.
+* New Item: Antline Corner item, which allows for manually placing antlines anywhere. Place two 
+  down with a straight line between them, then link with antlines. A contiguous section is treated 
+  as one item, which acts like an OR gate.
+* New Item: Half Obs Room, a half-voxel wide Observation Room. The P1 room has switched to be a 
+  full voxel like other styles.
+* P1 style light strips now are a rectangular lamp like other styles, with the square hole split 
+  into a new item.
 * Add brand new versions of Old Aperture SP spheres, and 50s+60s entry corridors all by @Critfish.
 * Old Aperture and P1 Gel Droppers now have new custom models.
 * P1 and Old Aperture exit signs will now reposition themselves like other styles.
 * Vactubes now have P1 and Old Aperture styles.
 * Remake some P1 entry corridors.
-* Add new option for making fizzlers force black tiles on adjacient tiles to discourage portal bumping.
+* Add new option for making fizzlers force black tiles on adjacient tiles to discourage portal 
+  bumping.
 * Implement ability to hold shift to force load in elevator or compile with full lighting.
 * Multiple suggestions can now be set.
 * Redo randomisation logic, so now it properly reproduces the same result when recompiled.
@@ -104,9 +123,12 @@
 * Add addShuffleGroup result, for picking from a pool of instances to randomise decoration.
 * Replace Unstationary Scaffold-specific condition with a more general version (LinkedItem).
 * Fix Switch ``<default>`` not working.
-* Multiple locations may now be specified in the config for package locations - add package1, package2 etc. This allows your user stuff to be elsewhere from the default packages.
-* All configuration files except for info.txt and editoritems.txt are now lazily loaded, meaning that you can modify them and re-export to apply the changes without needing to restart BEE2. This also should speed up startup.
-* Selector windows may now have the small thumbnail definition omitted, to make it automatically crop down the larger icon.
+* Multiple locations may now be specified in the config for package locations - add package1, 
+  package2 etc. This allows your user stuff to be elsewhere from the default packages.
+* All configuration files except for info.txt and editoritems.txt are now lazily loaded, meaning 
+  that you can modify them and re-export to apply the changes without needing to restart BEE2. This 
+  also should speed up startup.
+* Selector windows may now have the small thumbnail definition omitted, to make it automatically 
+  crop down the larger icon.
 
 ------------------------------------------
-
