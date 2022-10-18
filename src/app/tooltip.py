@@ -3,8 +3,16 @@
 
 Call add_tooltip with a widget to add all the events automatically.
 """
+from __future__ import annotations
+import weakref
+from typing import Callable
 import tkinter as tk
+
+import attr
+
 from app import TK_ROOT, img
+
+__all__ = ['set_tooltip', 'add_tooltip']
 
 
 PADDING = 0  # Space around the target widget
@@ -14,7 +22,7 @@ CENT_DIST = 50  # Distance around center where we align centered.
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 window.transient(master=TK_ROOT)
-window.overrideredirect(1)
+window.overrideredirect(True)
 window.resizable(False, False)
 
 context_label = tk.Label(
@@ -30,17 +38,29 @@ context_label = tk.Label(
     # Put image above text if both are provided.
     compound='top',
     justify='left',
-    wraplength=260,  # Stop it getting too long.
+    wraplength=360,  # Stop it getting too long.
 )
 context_label.grid(row=0, column=0)
 
 
-def _show(widget: tk.Misc, mouse_x, mouse_y) -> None:
+@attr.frozen
+class TooltipData:
+    """The current text for a widget."""
+    text: str
+    img: 'img.Handle | None'
+
+DATA: weakref.WeakKeyDictionary[tk.Misc, TooltipData] = weakref.WeakKeyDictionary()
+
+
+def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     """Show the context window."""
-    # noinspection PyUnresolvedReferences, PyProtectedMember
-    context_label['text'] = widget._bee2_tooltip_text
-    # noinspection PyUnresolvedReferences, PyProtectedMember
-    img.apply(context_label, widget._bee2_tooltip_img)
+    try:
+        data = DATA[widget]
+    except KeyError:
+        return
+
+    context_label['text'] = data.text
+    img.apply(context_label, data.img)
 
     window.deiconify()
     window.update_idletasks()
@@ -97,13 +117,12 @@ def _show(widget: tk.Misc, mouse_x, mouse_y) -> None:
             else:
                 y = widget.winfo_rooty() - window.winfo_height() - PADDING
 
-    window.geometry('+{}+{}'.format(int(x), int(y)))
+    window.geometry(f'+{round(x)}+{round(y)}')
 
 
-def set_tooltip(widget: tk.Misc, text: str='', image: img.Handle=None):
+def set_tooltip(widget: tk.Misc, text: str='', image: img.Handle=None) -> None:
     """Change the tooltip for a widget."""
-    widget._bee2_tooltip_text = text
-    widget._bee2_tooltip_img = image
+    DATA[widget] = TooltipData(text, image)
 
 
 def add_tooltip(
@@ -122,31 +141,33 @@ def add_tooltip(
     If show_when_disabled is false, no context menu will be shown if the
     target widget is disabled.
     """
-    targ_widget._bee2_tooltip_text = text
-    targ_widget._bee2_tooltip_img = image
+    set_tooltip(targ_widget, text, image)
 
     event_id = None  # The id of the enter event, so we can cancel it.
 
     # Only check for disabled widgets if the widget actually has a state,
     # and the user hasn't disabled the functionality
-    check_disabled = hasattr(targ_widget, 'instate') and not show_when_disabled
+    disabled_check: Callable[[tuple[str, ...]], bool] | None = None
+    if not show_when_disabled:
+        try:
+            disabled_check = getattr(targ_widget, 'instate', None)
+        except KeyError:
+            pass
 
-    def after_complete(x, y):
+    def after_complete(x: int, y: int) -> None:
         """Remove the id and show the tooltip after the delay."""
         nonlocal event_id
         event_id = None  # Invalidate event id
-        # noinspection PyUnresolvedReferences, PyProtectedMember
-        if targ_widget._bee2_tooltip_text or targ_widget._bee2_tooltip_img is not None:
+        data = DATA[targ_widget]
+        if data.text or data.img is not None:
             _show(targ_widget, x, y)
 
-    def enter_handler(event):
+    def enter_handler(event: tk.Event) -> None:
         """Schedule showing the tooltip."""
         nonlocal event_id
-        # noinspection PyUnresolvedReferences, PyProtectedMember
-        if targ_widget._bee2_tooltip_text or targ_widget._bee2_tooltip_img is not None:
-            # We know it has this method from above!
-            # noinspection PyUnresolvedReferences
-            if check_disabled and not targ_widget.instate(('!disabled',)):
+        data = DATA[targ_widget]
+        if data.text or data.img is not None:
+            if disabled_check is not None and not disabled_check(('!disabled',)):
                 return
             event_id = TK_ROOT.after(
                 delay,
@@ -154,15 +175,13 @@ def add_tooltip(
                 event.x_root, event.y_root,
             )
 
-    def exit_handler(e):
+    def exit_handler(_: tk.Event) -> None:
         """When the user leaves, cancel the event."""
         # We only want to cancel if the event hasn't expired already
         nonlocal event_id
         window.withdraw()
         if event_id is not None:
-            TK_ROOT.after_cancel(
-                event_id
-            )
+            TK_ROOT.after_cancel(event_id)
 
     targ_widget.bind('<Enter>', enter_handler)
     targ_widget.bind('<Leave>', exit_handler)

@@ -1,13 +1,12 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Container
 from enum import Enum
 import math
 
-import attr
-
-from srctools import Vec, Angle, Matrix, Property, conv_float, logger
+import attrs
+from srctools import Vec, Matrix, Property, conv_float, logger
 from srctools.vmf import VMF, overlay_bounds, make_overlay
 
 from precomp import tiling, rand
@@ -23,7 +22,7 @@ class SegType(Enum):
     CORNER = 1
 
 
-@attr.define
+@attrs.define
 class AntTex:
     """Represents a single texture, and the parameters it has."""
     texture: str
@@ -51,7 +50,7 @@ class AntTex:
             static = prop.bool('static')
         else:
             vals = prop.value.split('|')
-            opts = ()
+            opts: Container[str] = ()
             scale_str = '0.25'
 
             if len(vals) == 2:
@@ -67,7 +66,7 @@ class AntTex:
         return AntTex(tex, scale, static)
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class AntType:
     """Defines the style of antline to use.
 
@@ -76,11 +75,11 @@ class AntType:
 
     Corners can be omitted, if corner/straight antlines are the same.
     """
-    tex_straight: list[AntTex] = attr.ib()
-    tex_corner: list[AntTex] = attr.ib()
+    tex_straight: list[AntTex]
+    tex_corner: list[AntTex]
 
-    broken_straight: list[AntTex] = attr.ib()
-    broken_corner: list[AntTex] = attr.ib()
+    broken_straight: list[AntTex]
+    broken_corner: list[AntTex]
     broken_chance: float
 
     @classmethod
@@ -131,7 +130,7 @@ class AntType:
         )
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Segment:
     """A single section of an antline - a straight section or corner.
 
@@ -142,7 +141,7 @@ class Segment:
     start: Vec
     end: Vec
     # The brushes this segment is attached to.
-    tiles: set[tiling.TileDef] = attr.ib(factory=set)
+    tiles: set[tiling.TileDef] = attrs.Factory(set)
 
     @property
     def on_floor(self) -> bool:
@@ -179,7 +178,7 @@ class Segment:
             yield run_start, self.end, last_type
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Antline:
     """A complete antline."""
     name: str
@@ -237,7 +236,7 @@ class Antline:
         for seg in self.line:
             conf = floor_conf if seg.on_floor else wall_conf
             # Check tiledefs in the voxels, and assign just in case.
-            # antline corner items don't have them defined, and some embedfaces don't work
+            # antline corner items don't have them defined, and some embed-faces don't work
             # properly. But we keep any segments actually defined also.
             mins, maxs = Vec.bbox(seg.start, seg.end)
             norm_axis = seg.normal.axis()
@@ -361,9 +360,8 @@ def parse_antlines(vmf: VMF) -> tuple[
 
     segment_to_name: dict[Segment, str] = {}
 
-    # Points on antlines where two can connect. For corners that's each side,
-    # for straight it's each end. Combine that with the targetname
-    # so we only join related antlines.
+    # Points on antlines where two can connect. For corners that's each side, for straight it's
+    # each end. Combine that with the targetname, so we only join related antlines.
     join_points: dict[tuple[str, float, float, float], Segment] = {}
 
     mat_straight = consts.Antlines.STRAIGHT
@@ -376,7 +374,7 @@ def parse_antlines(vmf: VMF) -> tuple[
         mat = over['material']
         origin = Vec.from_str(over['basisorigin'])
         normal = Vec.from_str(over['basisnormal'])
-        orient = Matrix.from_angle(Angle.from_str(over['angles']))
+        orient = Matrix.from_angstr(over['angles'])
 
         if mat == mat_corner:
             seg_type = SegType.CORNER

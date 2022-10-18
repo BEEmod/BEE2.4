@@ -7,6 +7,7 @@
 	"Defines configuration options for a template."
 	[
 	template_id(string): "Template ID" : "" : "The ID given to this template. If set this will be loaded automatically."
+	debug(boolean): "Debug Mode" : 0 : "If true, when this template is added to the map additional ents will be placed to assist visualising its effects."
 	
 	realign_faces(sidelist): "Realign Faces" : : "Rotate and realign these faces to world." +
 	"This should be used on axis-aligned tile surfaces, to make texturing match in different templates. " +
@@ -130,12 +131,6 @@
 	group_id(string) : "Group ID" : "" : "?"
 	]
 
-@PointClass wirebox(min, max) = bee2_editor_embeddedvoxel: "Defines an EmbeddedVoxel section of an item. The shape is aligned to the 128-grid."
-	[
-	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the hollowed area."
-	min(vecline) : "Maximum Position" : "64 64 0" : "The maximum position of the hollowed area."
-	]
-
 @PointClass wirebox(min, max) = bee2_editor_embedface: "Defines a EmbedFace section for an item."
 	[
 	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the brush section. Vertical position is ignored."
@@ -151,6 +146,10 @@
 		]
 	]
 
+@SolidClass = bee2_editor_embeddedvoxel: "Defines an EmbeddedVoxel section of an item. The bounding box must be aligned to the voxel grid."
+	[
+	]
+
 @SolidClass = bee2_editor_occupiedvoxel: "Defines a region the item takes up. Depending on the resultant option, this can be positioned in a variety of ways: \n" +
 	"- Align to the 128x128 grid, to specify full voxels.\n" +
 	"- Make it thinner than 8 units, aligned to the side of a voxel to indicate a side.\n" +
@@ -158,6 +157,20 @@
 	[
 	coll_type(string) : "Collide Type" : "SOLID" : "Types of collision for this item." 
 	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
+	]
+
+@SolidClass = bee2_collision_bbox: "Defines a region of item collision for the compiler."
+	[
+	tags(string): "Tags" : : "Space-seperated list of tags to associate with the collision volume."
+	item_name(string) readonly: "Item Name" : : "In exports of the full map collisions, this is the item name this collision is for."
+	coll_solid(boolean):      "Collide: Solid"      : 0 : "General collisions, should be used for solid walls, props and the like that do not pass anything through."
+	coll_grating(boolean):    "Collide: Grating"    : 0 : "Grating blocks movement, but does not block 'energy' effects."
+	coll_glass(boolean):      "Collide: Glass"      : 0 : "Glass blocks everything, except for line of sight and Discouragement Beams."
+	coll_bridge(boolean):     "Collide: Bridge"     : 0 : "The area of effect of a Light Bridge. "
+	coll_fizzler(boolean):    "Collide: Fizzler"    : 0 : "The region occupied by an object destroying fizzler (meaning objects could be destroyed here)."
+	coll_temporary(boolean):  "Collide: Temporary"  : 0 : "Indicates a region which will only sometimes be solid. This should be used for the movement region of things like platforms and panels."
+	coll_decoration(boolean): "Collide: Decoration" : 0 : "Prohibits additional decoration from being placed in this area."
+	coll_antlines(boolean):   "Collide: Antlines"   : 0 : "Prohibits antlines from being placed in this area."
 	]
 
 // Entities added to the finished map to pass information to VRAD.
@@ -170,10 +183,10 @@
 	[
 	channel(choices) : "Channel" : "BASE" : "The type of music this contains." = 
 		[	
-    	"base"      : "Main track"
+		"base"      : "Main track"
 		"tbeam"     : "Excursion Funnel"
-    	"BounceGel" : "Repulsion Gel"
-    	"SpeedGel"  : "Propulsion Gel"
+		"BounceGel" : "Repulsion Gel"
+		"SpeedGel"  : "Propulsion Gel"
 		]
 	sync(boolean) : "Sync" : 0 : "For funnels only, synchronise to the base track."
 

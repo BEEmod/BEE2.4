@@ -1,11 +1,14 @@
-attrs>=20.3.0
-mistletoe>=0.7.2
-Pillow>=8.3.2
-pyglet==1.5.18
-PyInstaller>=4.5.1
-pygtrie>=2.4.0
-atomicwrites>=1.4.0
-babel>=2.9.1
-trio>=0.19.0
-versioningit>=0.3.0
-srctools ~= 2.2.0
+attrs >= 21.4.0
+mistletoe >= 0.7.2
+Pillow >= 8.3.2
+pyglet == 1.5.18
+PyInstaller >= 5.2.0
+pygtrie >= 2.4.0
+atomicwrites >= 1.4.0
+babel >= 2.9.1
+trio >= 0.19.0
+outcome >= 1.1.0  # Trio dependency
+versioningit >= 0.3.0
+srctools >= 2.3.4
+rtree >= 0.9.7
+typing_extensions >= 4.1.1

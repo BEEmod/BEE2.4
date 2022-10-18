@@ -1,17 +1,23 @@
 """Adds various traits to instances, based on item classes."""
-from srctools import Entity
-from srctools import VMF
-import srctools.logger
-from precomp.instanceLocs import ITEM_FOR_FILE
-from editoritems import Item, ItemClass
+from typing import List, MutableMapping, Optional, Dict, Set, Union
+from weakref import WeakKeyDictionary
 
-from typing import Optional, Callable, Dict, Set, List
+import attrs
+from srctools import Entity, VMF
+import srctools.logger
+
+from precomp.instanceLocs import ITEM_FOR_FILE
+from precomp.collisions import Collisions
+from editoritems import Item, ItemClass
+from corridor import parse_filename as parse_corr_filename, CORR_TO_ID
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+# Indicates the collision should only go on the main instance.
+SKIP_COLL = '_skip_coll'
 
 # Special case - specific attributes..
-ID_ATTRS = {
+ID_ATTRS: Dict[str, List[Set[str]]] = {
     'ITEM_PLACEMENT_HELPER': [
         {'placement_helper'},
     ],
@@ -38,7 +44,7 @@ ID_ATTRS = {
     ]
 }
 
-CLASS_ATTRS = {
+CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
     ItemClass.FLOOR_BUTTON: [
         {'white', 'weighted', 'floor_button'},
         {'black', 'weighted', 'floor_button'},
@@ -49,8 +55,8 @@ CLASS_ATTRS = {
     ],
     ItemClass.FUNNEL: [
         {'tbeam_emitter'},
-        {'white', 'tbeam_frame'},
-        {'black', 'tbeam_frame'},
+        {'white', 'tbeam_frame', SKIP_COLL},
+        {'black', 'tbeam_frame', SKIP_COLL},
     ],
     ItemClass.CUBE: [
         {'dropperless', 'cube_standard'},
@@ -60,65 +66,65 @@ CLASS_ATTRS = {
         {'dropperless', 'cube_franken'},
     ],
     ItemClass.FIZZLER: [
-        {'fizzler', 'fizzler_base'},
+        {'fizzler', 'fizzler_base', SKIP_COLL},
         {'fizzler', 'fizzler_model'},
     ],
     ItemClass.TRACK_PLATFORM: [
-        {'track_platform', 'plat_bottom_grate'},
-        {'track_platform', 'plat_bottom'},
-        {'track_platform', 'plat_middle'},
-        {'track_platform', 'plat_top'},
-        {'track_platform', 'plat_non_osc'},
-        {'track_platform', 'plat_osc'},
-        {'track_platform', 'plat_single'},
+        {'track_platform', 'track', 'plat_bottom_grate', SKIP_COLL},
+        {'track_platform', 'track', 'plat_bottom', SKIP_COLL},
+        {'track_platform', 'track', 'plat_middle', SKIP_COLL},
+        {'track_platform', 'track', 'plat_top', SKIP_COLL},
+        {'track_platform', 'platform', 'plat_non_osc'},
+        {'track_platform', 'platform', 'plat_osc'},
+        {'track_platform', 'track', 'plat_single', SKIP_COLL},
     ],
     ItemClass.GLASS: [
         {'barrier', 'barrier_128'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_corner'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_straight'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_short'},
-        {'barrier', 'barrier_frame', 'frame_left', 'frame_convex_corner'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_corner'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_straight'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_short'},
-        {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner'},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_corner', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_straight', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_short', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_left', 'frame_convex_corner', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_corner', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_straight', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_short', SKIP_COLL},
+        {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner', SKIP_COLL},
     ],
     ItemClass.DOOR_ENTRY_SP: [
-        {'corridor_1', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_2', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_3', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_4', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_5', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_6', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_7', 'entry_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white', 'preplaced'},
-        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black', 'preplaced'},
-        {'entry_elevator', 'elevator', 'sp_corridor', 'preplaced'},
-        {'exit_elevator', 'elevator', 'sp_corridor', 'preplaced'},
-        {'arrival_departure_transition', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'entry_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'white', 'preplaced', SKIP_COLL},
+        {'corridor_frame', 'entry_corridor', 'sp_corridor', 'black', 'preplaced', SKIP_COLL},
+        {'entry_elevator', 'elevator', 'sp_corridor', 'preplaced', SKIP_COLL},
+        {'exit_elevator', 'elevator', 'sp_corridor', 'preplaced', SKIP_COLL},
+        {'arrival_departure_transition', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_EXIT_SP: [
-        {'corridor_1', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_2', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_3', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_4', 'exit_corridor', 'sp_corridor', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'exit_corridor', 'sp_corridor', 'corridor', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white', 'preplaced', SKIP_COLL},
+        {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_ENTRY_COOP: [
-        {'entry_corridor', 'coop_corridor', 'preplaced'},
+        {'entry_corridor', 'coop_corridor', 'corridor', 'preplaced'},
         set(),  # White/black 'door frames', not used on the entry.
         set(),
-        {'exit_elevator', 'elevator', 'coop_corridor', 'preplaced'},
-        {'arrival_departure_transition', 'preplaced'},
+        {'exit_elevator', 'elevator', 'coop_corridor', 'preplaced', SKIP_COLL},
+        {'arrival_departure_transition', 'preplaced', SKIP_COLL},
     ],
     ItemClass.DOOR_EXIT_COOP: [
-        {'corridor_1', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_2', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_3', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_4', 'exit_corridor', 'coop_corridor', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white', 'preplaced'},
-        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'exit_corridor', 'coop_corridor', 'preplaced'},
+        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'white', 'preplaced', SKIP_COLL},
+        {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black', 'preplaced', SKIP_COLL},
     ],
 
     ItemClass.PAINT_DROPPER: [
@@ -132,25 +138,16 @@ CLASS_ATTRS = {
     # Other classes have no traits - single or no instances.
 }
 
-# Special functions to call on an instance for their item ID (str)
-# or class (enum).
-# Arguments are the instance, trait set, item ID and subtype index.
-TRAIT_ID_FUNC = {}  # type: Dict[str, Callable[[Entity, Set[str], str, int], None]]
-TRAIT_CLS_FUNC = {}  # type: Dict[ItemClass, Callable[[Entity, Set[str], str, int], None]]
 
+@attrs.define
+class TraitInfo:
+    """The info associated for each instance."""
+    item_class: ItemClass = ItemClass.UNCLASSED
+    item_id: Optional[str] = None
+    traits: Set[str] = attrs.Factory(set)
 
-def trait_id_func(target: str):
-    def deco(func):
-        TRAIT_ID_FUNC[target.casefold()] = func
-        return func
-    return deco
-
-
-def trait_cls_func(target: ItemClass):
-    def deco(func):
-        TRAIT_ID_FUNC[target] = func
-        return func
-    return deco
+# Maps entities to their traits.
+ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
 
 
 def get(inst: Entity) -> Set[str]:
@@ -159,10 +156,10 @@ def get(inst: Entity) -> Set[str]:
     Modify to set values.
     """
     try:
-        return inst.traits
-    except AttributeError:
-        inst.traits = set()
-        return inst.traits
+        return ENT_TO_TRAITS[inst].traits
+    except KeyError:
+        info = ENT_TO_TRAITS[inst] = TraitInfo()
+        return info.traits
 
 
 def get_class(inst: Entity) -> Optional[ItemClass]:
@@ -170,7 +167,10 @@ def get_class(inst: Entity) -> Optional[ItemClass]:
 
     It must be the original entity placed by the PeTI.
     """
-    return getattr(inst, 'peti_class', None)
+    try:
+        return ENT_TO_TRAITS[inst].item_class
+    except KeyError:
+        return None
 
 
 def get_item_id(inst: Entity) -> Optional[str]:
@@ -178,20 +178,31 @@ def get_item_id(inst: Entity) -> Optional[str]:
 
     It must be the original entity placed by the PeTI.
     """
-    return getattr(inst, 'peti_item_id', None)
+    try:
+        return ENT_TO_TRAITS[inst].item_id
+    except KeyError:
+        return None
 
 
-def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
-    """Scan through the map, and apply traits to instances."""
+def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
+    """Scan through the map, apply traits to instances, and set initial collisions."""
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()
         if not inst_file:
             continue
-        try:
-            item_id, item_ind = ITEM_FOR_FILE[inst_file]
-        except KeyError:
-            LOGGER.warning('Unknown instance "{}"!', inst['file'])
-            continue
+
+        item_ind: Union[str, int]
+        # Special case, corridors.
+        corr_info = parse_corr_filename(inst_file)
+        if corr_info is not None:
+            corr_mode, corr_dir, item_ind = corr_info
+            item_id = CORR_TO_ID[corr_mode, corr_dir]
+        else:
+            try:
+                item_id, item_ind = ITEM_FOR_FILE[inst_file]
+            except KeyError:
+                LOGGER.warning('Unknown instance "{}"!', inst['file'])
+                continue
 
         # BEE2_xxx special instance, shouldn't be in the original map...
         if isinstance(item_ind, str):
@@ -199,32 +210,29 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item]) -> None:
             continue
 
         try:
-            item_class = id_to_item[item_id.casefold()].cls
+            item = id_to_item[item_id.casefold()]
         except KeyError:  # dict fail
             LOGGER.warning('Unknown item ID <{}>', item_id)
             item_class = ItemClass.UNCLASSED
+            item = None
+        else:
+            item_class = item.cls
 
-        inst.peti_class = item_class
-        inst.peti_item_id = item_id
-        traits = get(inst)
+        info = ENT_TO_TRAITS[inst] = TraitInfo(item_class, item_id)
+
         try:
-            traits |= ID_ATTRS[item_id.upper()][item_ind]
+            info.traits |= ID_ATTRS[item_id.upper()][item_ind]
         except (IndexError, KeyError):
             pass
         try:
-            traits |= CLASS_ATTRS[item_class][item_ind]
+            info.traits |= CLASS_ATTRS[item_class][item_ind]
         except (IndexError, KeyError):
             pass
 
-        try:
-            func = TRAIT_ID_FUNC[item_id.casefold()]
-        except KeyError:
-            pass
-        else:
-            func(inst, traits, item_id, item_ind)
-        try:
-            func = TRAIT_CLS_FUNC[item_class]
-        except KeyError:
-            pass
-        else:
-            func(inst, traits, item_id, item_ind)
+        if SKIP_COLL in info.traits:
+            # Don't add collision, even if it's defined. This is say the tbeam frame instance, or
+            # an elevator - we want the collisions on a different instance.
+            info.traits.remove(SKIP_COLL)
+            # Also skip if no name is set.
+        elif item is not None and inst['targetname'] != '':
+            coll.add_item_coll(item, inst)

@@ -1,13 +1,18 @@
 """Wraps gettext, to localise all UI text."""
+from typing import Callable
+from typing_extensions import ParamSpec
 import gettext as gettext_mod
 import locale
 import logging
 import sys
+import builtins
+import warnings
 
 from srctools.property_parser import PROP_FLAGS_DEFAULT
 import utils
 
 _TRANSLATOR = gettext_mod.NullTranslations()
+P = ParamSpec('P')
 
 
 class DummyTranslations(gettext_mod.NullTranslations):
@@ -65,7 +70,6 @@ def setup(logger: logging.Logger) -> None:
 
     lang_folder = utils.install_path('i18n')
 
-
     for lang in expanded_langs:
         try:
             file = open(lang_folder / (lang + '.mo').format(lang), 'rb')
@@ -89,13 +93,21 @@ def setup(logger: logging.Logger) -> None:
                 )
             _TRANSLATOR = gettext_mod.NullTranslations()
 
-    # Add these functions to builtins, plus _=gettext
-    _TRANSLATOR.install(['gettext', 'ngettext'])
+    def warn_translate(name: str, func: Callable[P, str]):
+        """Raise a deprecation warning when this is used from builtins."""
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
+            """Raise and call the origina."""
+            warnings.warn(
+                f"Translation function {name}() called from builtins!",
+                DeprecationWarning, stacklevel=2,
+            )
+            return func(*args, **kwargs)
+        setattr(builtins, '_', wrapper)
 
-    # Override the global funcs, to more efficiently delegate if people import
-    # later.
-    globals()['gettext'] = _TRANSLATOR.gettext
-    globals()['ngettext'] = _TRANSLATOR.ngettext
+    # Add functions to builtins, but deprecated.
+    warn_translate('_', _TRANSLATOR.gettext)
+    warn_translate('gettext', _TRANSLATOR.gettext)
+    warn_translate('ngettext', _TRANSLATOR.ngettext)
 
     # Some lang-specific overrides..
 

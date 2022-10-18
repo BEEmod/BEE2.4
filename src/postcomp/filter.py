@@ -2,7 +2,7 @@
 from io import BytesIO
 from typing import Dict
 
-from srctools.bsp_transform import Context, trans
+from hammeraddons.bsp_transform import Context, trans
 import srctools.logger
 from srctools.packlist import FileType
 

@@ -1,19 +1,19 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from tkinter import *
+from typing import Callable
+from tkinter import IntVar
 from tkinter import ttk
-
-from typing import Callable, Optional
 import operator
 import itertools
 
-from srctools import Property
 from srctools.logger import get_logger
-from packages import Style, StyleVar
-from app.SubPane import SubPane
-from app import tooltip, TK_ROOT, itemconfig, tk_tools
+import trio
+
+from packages import Style, StyleVar, PackagesSet
+from app import tooltip
 from localisation import ngettext, gettext
-import BEE2_config
+from config.stylevar import State
+import config
 
 
 LOGGER = get_logger(__name__)
@@ -98,14 +98,8 @@ checkbox_other: dict[str, ttk.Checkbutton] = {}
 tk_vars: dict[str, IntVar] = {}
 
 VAR_LIST: list[StyleVar] = []
-STYLES: dict[str, Style] = {}
 
-window: Optional[SubPane] = None
-
-UI = {}
-# Callback triggered whenever we reload vars. This is used to update items
-# to show/hide the defaults.
-_load_cback: Optional[Callable[[], None]] = None
+UI: dict[str, ttk.Label] = {}
 
 
 def mandatory_unlocked() -> bool:
@@ -114,27 +108,6 @@ def mandatory_unlocked() -> bool:
         return tk_vars['UnlockDefault'].get() != 0
     except KeyError:  # Not loaded yet
         return False
-
-
-@BEE2_config.OPTION_SAVE('StyleVar')
-def save_handler() -> Property:
-    """Save variables to configs."""
-    props = Property('', [])
-    for var_id, var in sorted(tk_vars.items()):
-        props[var_id] = str(int(var.get()))
-    return props
-
-
-@BEE2_config.OPTION_LOAD('StyleVar')
-def load_handler(props: Property) -> None:
-    """Load variables from configs."""
-    for prop in props:
-        try:
-            tk_vars[prop.real_name].set(prop.value)
-        except KeyError:
-            LOGGER.warning('No stylevar "{}", skipping.', prop.real_name)
-    if _load_cback is not None:
-        _load_cback()
 
 
 def export_data(chosen_style: Style) -> dict[str, bool]:
@@ -147,7 +120,7 @@ def export_data(chosen_style: Style) -> dict[str, bool]:
     }
 
 
-def make_desc(var: StyleVar) -> str:
+def make_desc(packset: PackagesSet, var: StyleVar) -> str:
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.
@@ -165,13 +138,11 @@ def make_desc(var: StyleVar) -> str:
         desc.append(gettext('Styles: Unstyled'))
     else:
         app_styles = [
-            style
-            for style in
-            STYLES.values()
+            style for style in packset.all_obj(Style)
             if var.applies_to_style(style)
         ]
 
-        if len(app_styles) == len(STYLES):
+        if len(app_styles) == len(packset.all_obj(Style)):
             # i18n: StyleVar which matches all styles.
             desc.append(gettext('Styles: All'))
         else:
@@ -225,66 +196,21 @@ def refresh(selected_style: Style) -> None:
         UI['stylevar_other_none'].grid_remove()
 
 
-def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], None]) -> None:
-    """Create the styleVar pane.
-
-    update_item_vis is the callback fired whenever change defaults changes.
-    """
-    global window, _load_cback
-    _load_cback = update_item_vis
-
-    window = SubPane(
-        TK_ROOT,
-        title=gettext('Style/Item Properties'),
-        name='style',
-        menu_bar=menu_bar,
-        resize_y=True,
-        tool_frame=tool_frame,
-        tool_img='icons/win_stylevar',
-        tool_col=3,
-    )
-
-    UI['nbook'] = nbook = ttk.Notebook(window)
-
-    nbook.grid(row=0, column=0, sticky=NSEW)
-    window.rowconfigure(0, weight=1)
-    window.columnconfigure(0, weight=1)
-    nbook.enable_traversal()
-
-    stylevar_frame = ttk.Frame(nbook)
-    stylevar_frame.rowconfigure(0, weight=1)
-    stylevar_frame.columnconfigure(0, weight=1)
-    nbook.add(stylevar_frame, text=gettext('Styles'))
-
-    canvas = Canvas(stylevar_frame, highlightthickness=0)
-    # need to use a canvas to allow scrolling
-    canvas.grid(sticky='NSEW')
-    window.rowconfigure(0, weight=1)
-
-    UI['style_scroll'] = ttk.Scrollbar(
-        stylevar_frame,
-        orient=VERTICAL,
-        command=canvas.yview,
-        )
-    UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
-    canvas['yscrollcommand'] = UI['style_scroll'].set
-
-    tk_tools.add_mousewheel(canvas, stylevar_frame)
-
-    canvas_frame = ttk.Frame(canvas)
-
-    frame_all = ttk.Labelframe(canvas_frame, text=gettext("All:"))
+async def make_stylevar_pane(
+    frame: ttk.Frame,
+    packset: PackagesSet,
+    update_item_vis: Callable[[], None],
+) -> None:
+    """Construct the stylevar pane."""
+    frame_all = ttk.Labelframe(frame, text=gettext("All:"))
     frame_all.grid(row=0, sticky='EW')
 
-    frm_chosen = ttk.Labelframe(canvas_frame, text=gettext("Selected Style:"))
+    frm_chosen = ttk.Labelframe(frame, text=gettext("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
-    ttk.Separator(
-        canvas_frame,
-        orient=HORIZONTAL,
-        ).grid(row=2, sticky='EW', pady=(10, 5))
+    ttk.Separator(frame, orient='horizontal').grid(row=2, sticky='EW', pady=(10, 5))
 
-    frm_other = ttk.Labelframe(canvas_frame, text=gettext("Other Styles:"))
+    frm_other = ttk.Labelframe(frame, text=gettext("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
     UI['stylevar_chosen_none'] = ttk.Label(
@@ -292,71 +218,83 @@ def make_pane(tool_frame: Frame, menu_bar: Menu, update_item_vis: Callable[[], N
         text=gettext('No Options!'),
         font='TkMenuFont',
         justify='center',
-        )
+    )
     UI['stylevar_other_none'] = ttk.Label(
         frm_other,
         text=gettext('None!'),
         font='TkMenuFont',
         justify='center',
-        )
+    )
+    VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
-    VAR_LIST[:] = sorted(StyleVar.all(), key=operator.attrgetter('id'))
+    async def add_state_syncers(
+        var_id: str,
+        tk_var: IntVar,
+        *checks: ttk.Checkbutton,
+    ) -> None:
+        """Makes functions for syncing stylevar state. """
+        async def apply_state(state: State) -> None:
+            """Applies the given state."""
+            tk_var.set(state.value)
+        await config.APP.set_and_run_ui_callback(State, apply_state, var_id)
+
+        def cmd_func() -> None:
+            """When clicked, store configuration."""
+            config.APP.store_conf(State(tk_var.get() != 0), var_id)
+
+        for check in checks:
+            check['command'] = cmd_func
 
     all_pos = 0
     for all_pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = int_var = IntVar(value=var.default)
-        checkbox_all[var.id] = ttk.Checkbutton(
+        checkbox_all[var.id] = chk = ttk.Checkbutton(
             frame_all,
             variable=int_var,
             text=var.name,
         )
-        checkbox_all[var.id].grid(row=all_pos, column=0, sticky="W", padx=3)
+        chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+        tooltip.add_tooltip(chk, make_desc(packset, var))
 
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
         if var.id == 'UnlockDefault':
-            checkbox_all[var.id]['command'] = lambda: update_item_vis()
+            def on_unlock_default_set() -> None:
+                """Update item filters when this is changed by the user."""
+                config.APP.store_conf(State(unlock_def_var.get() != 0), 'UnlockDefault')
+                update_item_vis()
 
-        tooltip.add_tooltip(checkbox_all[var.id], make_desc(var))
+            async def apply_unlock_default(state: State) -> None:
+                """Update item filters when this is changed by config."""
+                unlock_def_var.set(state.value)
+                update_item_vis()
 
-    for var in VAR_LIST:
-        tk_vars[var.id] = IntVar(value=var.enabled)
-        args = {
-            'variable': tk_vars[var.id],
-            'text': var.name,
-        }
-        desc = make_desc(var)
-        if var.applies_to_all():
-            # Available in all styles - put with the hardcoded variables.
-            all_pos += 1
-
-            checkbox_all[var.id] = check = ttk.Checkbutton(frame_all, **args)
-            check.grid(row=all_pos, column=0, sticky="W", padx=3)
-            tooltip.add_tooltip(check, desc)
+            unlock_def_var = int_var
+            chk['command'] = on_unlock_default_set
+            await config.APP.set_and_run_ui_callback(State, apply_unlock_default, var.id)
         else:
-            # Swap between checkboxes depending on style.
-            checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
-            checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
+            await add_state_syncers(var.id, int_var, chk)
 
-            tooltip.add_tooltip(checkbox_chosen[var.id], desc)
-            tooltip.add_tooltip(checkbox_other[var.id], desc)
+    # The nursery is mainly used so constructing all the checkboxes can be done immediately,
+    # then the UI callbacks are done after.
+    async with trio.open_nursery() as nursery:
+        for var in VAR_LIST:
+            tk_vars[var.id] = int_var = IntVar(value=var.enabled)
+            desc = make_desc(packset, var)
+            if var.applies_to_all():
+                # Available in all styles - put with the hardcoded variables.
+                all_pos += 1
 
-    canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
-    canvas.update_idletasks()
-    canvas.config(
-        scrollregion=canvas.bbox(ALL),
-        width=canvas_frame.winfo_reqwidth(),
-    )
+                checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id], text=var.name)
+                chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+                tooltip.add_tooltip(chk, desc)
+                nursery.start_soon(add_state_syncers, var.id, int_var, chk)
+            else:
+                # Swap between checkboxes depending on style.
+                checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id], text=var.name)
+                checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id], text=var.name)
 
-    if tk_tools.USE_SIZEGRIP:
-        ttk.Sizegrip(
-            window,
-            cursor=tk_tools.Cursors.STRETCH_VERT,
-        ).grid(row=1, column=0)
-
-    canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox(ALL)))
-
-    item_config_frame = ttk.Frame(nbook)
-    nbook.add(item_config_frame, text=gettext('Items'))
-    itemconfig.make_pane(item_config_frame)
+                tooltip.add_tooltip(checkbox_chosen[var.id], desc)
+                tooltip.add_tooltip(checkbox_other[var.id], desc)
+                nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)

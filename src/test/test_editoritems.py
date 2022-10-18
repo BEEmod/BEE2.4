@@ -1,9 +1,8 @@
 """Test Editoritems syntax."""
 from srctools import Vec
 from editoritems import (
-    Item, ItemClass, OccupiedVoxel,
-    CollType, DesiredFacing, FSPath,
-    Sound, Handle, ConnSide, InstCount,
+    Item, ItemClass,
+    OccupiedVoxel, Coord, OccuType, DesiredFacing, FSPath, Sound, Handle, ConnSide, InstCount,
 )
 import pytest
 
@@ -116,10 +115,10 @@ def test_parse_goo() -> None:
     assert len(item.occupy_voxels) == 1
     occupation: OccupiedVoxel
     [occupation] = item.occupy_voxels
-    assert occupation.type is CollType.NOTHING
-    assert occupation.against is CollType.NOTHING
-    assert occupation.pos == Vec(0, 0, 0)
-    assert occupation.normal == Vec(0, 0, 1)
+    assert occupation.type is OccuType.NOTHING
+    assert occupation.against is OccuType.NOTHING
+    assert occupation.pos == Coord(0, 0, 0)
+    assert occupation.normal == Coord(0, 0, 1)
     assert occupation.subpos is None
 
     # Check these are default.

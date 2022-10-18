@@ -8,7 +8,7 @@ import string
 import time
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
-from typing import List, TYPE_CHECKING, Dict, Any
+from typing import List, TYPE_CHECKING, Dict, Any, Optional
 from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
@@ -30,7 +30,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
 
-UI = {}  # Holds all the widgets
+UI: Dict[str, Any] = {}  # Holds all the widgets
 
 menus = {}  # For standalone application, generate menu bars
 
@@ -136,11 +136,11 @@ class P2C:
             LOGGER.warning('Failed parsing puzzle file!', path, exc_info=True)
             props = Property('portal2_puzzle', [])
             title = None
-            desc = _('Failed to parse this puzzle file. It can still be backed up.')
+            desc = gettext('Failed to parse this puzzle file. It can still be backed up.')
         else:
-            props = props.find_key('portal2_puzzle', [])
+            props = props.find_key('portal2_puzzle', or_blank=True)
             title = props['title', None]
-            desc = props['description', _('No description found.')]
+            desc = props['description', gettext('No description found.')]
 
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
@@ -167,16 +167,15 @@ class P2C:
             title=self.title,
         )
 
-    def make_item(self):
+    def make_item(self) -> CheckItem['P2C']:
         """Make a corresponding CheckItem object."""
-        chk = CheckItem(
+        return CheckItem(
             self.title,
-            (_('Coop') if self.is_coop else _('SP')),
+            (gettext('Coop') if self.is_coop else gettext('SP')),
             self.mod_time,
-            hover_text=self.desc
+            hover_text=self.desc,
+            user=self,
         )
-        chk.p2c = self
-        return chk
 
 
 class Date:
@@ -202,7 +201,7 @@ class Date:
             )
 
     # No date = always earlier
-    def __lt__(self, other):
+    def __lt__(self, other: 'Date') -> bool:
         if self.date is None:
             return True
         elif other.date is None:
@@ -210,7 +209,7 @@ class Date:
         else:
             return self.date < other.date
 
-    def __gt__(self, other):
+    def __gt__(self, other: 'Date') -> bool:
         if self.date is None:
             return False
         elif other.date is None:
@@ -218,23 +217,27 @@ class Date:
         else:
             return self.date > other.date
 
-    def __le__(self, other):
+    def __le__(self, other: 'Date') -> bool:
         if self.date is None:
             return other.date is None
         else:
             return self.date <= other.date
 
-    def __ge__(self, other):
+    def __ge__(self, other: 'Date') -> bool:
         if self.date is None:
             return other.date is None
         else:
             return self.date >= other.date
 
-    def __eq__(self, other):
-        return self.date == other.date
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Date):
+            return self.date == other.date
+        return NotImplemented
 
-    def __ne__(self, other):
-        return self.date != other.date
+    def __ne__(self, other) -> bool:
+        if isinstance(other, Date):
+            return self.date != other.date
+        return NotImplemented
 
 
 # Note: All the backup functions use zip files, but also work on FakeZip
@@ -290,7 +293,7 @@ def load_game(game: 'gameMan.Game'):
         refresh_game_details()
 
 
-def find_puzzles(game: 'gameMan.Game'):
+def find_puzzles(game: 'gameMan.Game') -> Optional[str]:
     """Find the path for the p2c files."""
     # The puzzles are located in:
     # <game_folder>/portal2/puzzles/<steam_id>
@@ -310,9 +313,9 @@ def find_puzzles(game: 'gameMan.Game'):
     return None
 
 
-def backup_maps(maps):
+def backup_maps(maps: List[P2C]) -> None:
     """Copy the given maps to the backup."""
-    back_zip = BACKUPS['backup_zip']  # type: ZipFile
+    back_zip: ZipFile = BACKUPS['backup_zip']
 
     # Allow removing old maps when we overwrite objects
     map_dict = {
@@ -347,7 +350,7 @@ def backup_maps(maps):
     refresh_back_details()
 
 
-def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
+def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
     """Perform an automatic backup for the given game.
 
     We do this seperately since we don't need to read the property files.
@@ -392,11 +395,7 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
         for old_name, new_name in reversed(
                 list(zip(back_files, back_files[1:]))
                 ):
-            LOGGER.info(
-                'Moving: {old} -> {new}',
-                old=old_name,
-                new=new_name,
-            )
+            LOGGER.info('Moving: {} -> {}', old_name, new_name)
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)
             try:
@@ -424,15 +423,15 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen):
                 loader.step(AUTO_BACKUP_STAGE)
 
 
-def save_backup():
+def save_backup() -> None:
     """Save the backup file."""
     # We generate it from scratch, since that's the only way to remove
     # files.
     new_zip_data = BytesIO()
     new_zip = ZipFile(new_zip_data, 'w', compression=ZIP_LZMA)
 
-    maps = [
-        item.p2c
+    maps: list[P2C] = [
+        item.user
         for item in
         UI['back_details'].items
     ]
@@ -447,7 +446,7 @@ def save_backup():
     copy_loader.set_length('COPY', len(maps))
 
     with copy_loader:
-        for p2c in maps:  # type: P2C
+        for p2c in maps:
             old_zip = p2c.zip_file
             map_path = p2c.filename + '.p2c'
             scr_path = p2c.filename + '.jpg'
@@ -479,7 +478,7 @@ def save_backup():
         p2c.zip_file = new_zip
 
 
-def restore_maps(maps: List[P2C]):
+def restore_maps(maps: List[P2C]) -> None:
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:
@@ -551,7 +550,7 @@ def refresh_back_details():
 def show_window() -> None:
     window.deiconify()
     window.lift()
-    utils.center_win(window, TK_ROOT)
+    tk_tools.center_win(window, TK_ROOT)
     # Load our game data!
     ui_refresh_game()
     window.update()
@@ -645,7 +644,7 @@ def ui_refresh_game() -> None:
 def ui_backup_sel() -> None:
     """Backup selected maps."""
     backup_maps([
-        item.p2c
+        item.user
         for item in
         UI['game_details'].items
         if item.state
@@ -655,7 +654,7 @@ def ui_backup_sel() -> None:
 def ui_backup_all() -> None:
     """Backup all maps."""
     backup_maps([
-        item.p2c
+        item.user
         for item in
         UI['game_details'].items
     ])
@@ -664,7 +663,7 @@ def ui_backup_all() -> None:
 def ui_restore_sel() -> None:
     """Restore selected maps."""
     restore_maps([
-        item.p2c
+        item.user
         for item in
         UI['back_details'].items
         if item.state
@@ -674,18 +673,16 @@ def ui_restore_sel() -> None:
 def ui_restore_all() -> None:
     """Backup all maps."""
     restore_maps([
-        item.p2c
-        for item in
-        UI['back_details'].items
+        item.user
+        for item in UI['back_details'].items
     ])
 
 
 def ui_delete_backup() -> None:
     """Delete the selected items in the backup."""
     BACKUPS['back'] = [
-        item.p2c
-        for item in
-        UI['back_details'].items
+        item.user
+        for item in UI['back_details'].items
         if not item.state
     ]
 
@@ -699,16 +696,16 @@ def ui_delete_game() -> None:
         LOGGER.warning('No game selected to delete from?')
         return
 
-    game_detail = UI['game_details']  # type: CheckDetails
+    game_detail: CheckDetails[P2C] = UI['game_details']
 
     to_delete = [
-        item.p2c
+        item.user
         for item in
         game_detail.items
         if item.state
     ]
     to_keep = [
-        item.p2c
+        item.user
         for item in
         game_detail.items
         if not item.state
@@ -733,7 +730,7 @@ def ui_delete_game() -> None:
     deleting_loader.set_length('DELETE', len(to_delete))
     try:
         with deleting_loader:
-            for p2c in to_delete:  # type: P2C
+            for p2c in to_delete:
                 scr_path = p2c.filename + '.jpg'
                 map_path = p2c.filename + '.p2c'
                 abs_scr = os.path.join(game_dir, scr_path)
@@ -894,7 +891,9 @@ def init_application() -> None:
     ui_new_backup()
 
     # UI.py isn't present, so we use this callback
-    gameMan.setgame_callback = load_game
+    async def cback(game):
+        load_game(game)
+    gameMan.EVENT_BUS.register(None, gameMan.Game, cback)
 
     gameMan.add_menu_opts(game_menu)
 

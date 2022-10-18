@@ -1,0 +1,31 @@
+[tool.pyright]
+include = [
+	"src/",
+    "hammeraddons/src/",
+	]
+exclude = [
+	"**/__pycache__"
+	]
+venv = "BEE2_39"
+stubPath = "src/"   # Use our module for stubs.
+# We want to do conversions when setting.
+reportPropertyTypeMismatch = false
+pythonVersion = "3.8"
+strictParameterNoneValue = false
+
+[tool.isort]
+sections=["FUTURE", "TYPING", "FRAMEWORK", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+known_framework = ["tkinter", "tkinter.ttk", "tkinter.messagebox"]
+extra_standard_library = ["importlib_resources"]
+known_typing = ["typing", "typing_extensions"]
+no_lines_before = ["TYPING", "FRAMEWORK", "STDLIB"]
+known_third_party = ["hammeraddons"]
+multi_line_output = 5 # hanging grid grouped
+line_length = 80
+lines_after_imports = 2
+use_parentheses = true
+order_by_type = true
+include_trailing_comma = true
+from_first = true
+combine_as_imports = true
+src_paths = ["src"]

@@ -2,16 +2,20 @@ import os
 import sys
 from pathlib import Path
 import contextlib
+
 from babel.messages import Catalog
 import babel.messages.frontend
 import babel.messages.extract
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
+from srctools.fgd import FGD
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 # Injected by PyInstaller.
 workpath: str
 SPECPATH: str
+
+hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 
 # Allow importing utils.
 sys.path.append(SPECPATH)
@@ -21,6 +25,7 @@ import utils
 data_files = [
     ('../BEE2.ico', '.'),
     ('../BEE2.fgd', '.'),
+    ('../hammeraddons.fgd', '.'),
     ('../images/BEE2/*.png', 'images/BEE2/'),
     ('../images/icons/*.png', 'images/icons/'),
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
@@ -87,7 +92,43 @@ def do_localisation() -> None:
     data_files.append((str(i18n / 'en.mo'), 'i18n/'))
 
 
+def build_fgd() -> None:
+    """Export out a copy of the srctools-specific FGD data."""
+    sys.path.append(str(hammeraddons))
+    print('Loading FGD database...')
+    from hammeraddons import unify_fgd, __version__ as version
+    database, base_ent = unify_fgd.load_database(hammeraddons / 'fgd')
+
+    fgd = FGD()
+
+    # HammerAddons tags relevant to P2.
+    fgd_tags = frozenset({
+        'SINCE_HL2', 'SINCE_HLS', 'SINCE_EP1', 'SINCE_EP2', 'SINCE_TF2',
+        'SINCE_P1', 'SINCE_L4D', 'SINCE_L4D2', 'SINCE_ASW', 'SINCE_P2',
+        'P2', 'UNTIL_CSGO', 'VSCRIPT', 'INST_IO'
+    })
+
+    for ent in database:
+        ent.strip_tags(fgd_tags)
+        if ent.classname.startswith('comp_') or ent.classname == "hammer_notes":
+            fgd.entities[ent.classname] = ent
+            ent.helpers = [
+                helper for helper in ent.helpers
+                if not helper.IS_EXTENSION
+            ]
+
+    database.collapse_bases()
+    with open('../hammeraddons.fgd', 'w') as file:
+        file.write(f'// Hammer Addons version {version}\n')
+        file.write(
+            "// These are a minimal copy of HA FGDs for comp_ entities, so they can be collapsed.\n"
+            "// If you want to use Hammer Addons, install that manually, don't use these.\n"
+        )
+        fgd.export(file)
+
+
 do_localisation()
+build_fgd()
 
 
 # Exclude bits of modules we don't need, to decrease package size.
@@ -139,7 +180,6 @@ EXCLUDES = [
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
-    'importlib_resources',  # 3.6 backport.
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
@@ -157,10 +197,12 @@ if utils.WIN:
     lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
     try:
         for dll in lib_path.iterdir():
-            if dll.suffix == '.dll':
+            if dll.suffix == '.dll' and dll.stem.startswith(('av', 'swscale', 'swresample')):
                 binaries.append((str(dll), '.'))
     except FileNotFoundError:
         lib_path.mkdir(exist_ok=True)
+        pass
+    if not binaries:  # Not found.
         raise ValueError(f'FFmpeg dlls should be downloaded into "{lib_path}".')
 
 

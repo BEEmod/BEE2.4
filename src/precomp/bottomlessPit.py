@@ -1,8 +1,8 @@
 """Generates Bottomless Pits."""
-from srctools import Vec, Property, VMF, Solid, Side, Output
+from srctools import Vec, Property, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
-from precomp import brushLoc, options, rand
+from precomp import brushLoc, options, rand, conditions
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -83,11 +83,10 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
     if use_skybox:
         # Add in the actual skybox edges and triggers.
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             file=SETTINGS['skybox'],
             targetname='skybox',
-            angles='0 0 0',
             origin=tele_off,
         )
 
@@ -125,21 +124,19 @@ def make_bottomless_pit(vmf: VMF, max_height):
         if SETTINGS['skybox_ceil'] != '':
             # We dynamically add the ceiling so it resizes to match the map,
             # and lighting won't be too far away.
-            vmf.create_ent(
-                classname='func_instance',
+            conditions.add_inst(
+                vmf,
                 file=SETTINGS['skybox_ceil'],
                 targetname='skybox',
-                angles='0 0 0',
                 origin=tele_off + (0, 0, max_height),
             )
 
         if SETTINGS['targ'] != '':
             # Add in the teleport reference target.
-            vmf.create_ent(
-                classname='func_instance',
+            conditions.add_inst(
+                vmf,
                 file=SETTINGS['targ'],
                 targetname='skybox',
-                angles='0 0 0',
                 origin='0 0 0',
             )
 
@@ -285,8 +282,8 @@ def make_bottomless_pit(vmf: VMF, max_height):
         file = rng.choice(side_types[inst_type])
 
         if file != '':
-            vmf.create_ent(
-                classname='func_instance',
+            conditions.add_inst(
+                vmf,
                 file=file,
                 targetname='goo_side',
                 origin=tele_off + pos,
@@ -297,13 +294,13 @@ def make_bottomless_pit(vmf: VMF, max_height):
         if inst_type is utils.CONN_TYPES.straight:
             file = rng.choice(side_types[inst_type])
             if file != '':
-                vmf.create_ent(
-                    classname='func_instance',
+                conditions.add_inst(
+                    vmf,
                     file=file,
                     targetname='goo_side',
                     origin=tele_off + pos,
                     # Reverse direction
-                    angles=Vec.from_str(angle) + (0, 180, 0),
+                    angles=Angle.from_str(angle) + (0, 180, 0),
                 ).make_unique()
 
 

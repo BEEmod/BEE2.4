@@ -1,17 +1,16 @@
 """Conditions related to specific kinds of entities."""
-from srctools import Property, Vec, VMF, Entity, Angle
+from srctools import Matrix, Property, Vec, VMF, Entity, Angle
 import srctools.logger
 
 from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
-from precomp.conditions import make_result, make_result_setup
 from precomp.template_brush import TEMP_TYPES
 
 COND_MOD_NAME = 'Entities'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
-@make_result('TemplateOverlay')
+@conditions.make_result('TemplateOverlay')
 def res_insert_overlay(vmf: VMF, res: Property):
     """Use a template to insert one or more overlays on a surface.
 
@@ -104,7 +103,7 @@ def res_insert_overlay(vmf: VMF, res: Property):
     return insert_over
 
 
-@make_result('createEntity')
+@conditions.make_result('createEntity')
 def res_create_entity(vmf: VMF, inst: Entity, res: Property):
     """Create an entity.
 
@@ -128,21 +127,8 @@ def res_create_entity(vmf: VMF, inst: Entity, res: Property):
     new_ent['angles'] = Angle.from_str(new_ent['angles']) @ orient
 
 
-@make_result_setup('WaterSplash')
-def res_water_splash_setup(res: Property):
-    parent = res['parent']
-    name = res['name']
-    scale = srctools.conv_float(res['scale', ''], 8.0)
-    pos1 = Vec.from_str(res['position', ''])
-    calc_type = res['type', '']
-    pos2 = res['position2', '']
-    fast_check = srctools.conv_bool(res['fast_check', ''])
-
-    return name, parent, scale, pos1, pos2, calc_type, fast_check
-
-
-@make_result('WaterSplash')
-def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
+@conditions.make_result('WaterSplash')
+def res_water_splash(vmf: VMF,  res: Property) -> conditions.ResultCallable:
     """Creates splashes when something goes in and out of water.
 
     Arguments:
@@ -158,109 +144,105 @@ def res_water_splash(vmf: VMF, inst: Entity, res: Property) -> None:
     - `fast_check`: Check faster for movement. Needed for items which
       move quickly.
     """
-    (
-        name,
-        parent,
-        scale,
-        pos1,
-        pos2,
-        calc_type,
-        fast_check,
-    ) = res.value  # type: str, str, float, Vec, Vec, str, str
+    parent = res['parent']
+    name = res['name']
+    scale = res.float('scale', 8.0)
+    conf_pos1 = res.vec('position')
+    calc_type = res['type', ''].casefold()
+    conf_pos2 = res['position2', '']
+    fast_check = res.bool('fast_check')
 
-    pos1 = pos1.copy()
-    splash_pos = pos1.copy()
+    def make_water_splash(inst: Entity) -> None:
+        """Create the water splash."""
+        pos1 = Vec(conf_pos1)
+        splash_pos = Vec(conf_pos1)
 
-    if calc_type == 'track_platform':
-        lin_off = srctools.conv_int(inst.fixup['$travel_distance'])
-        travel_ang = Angle.from_str(inst.fixup['$travel_direction'])
-        start_pos = srctools.conv_float(inst.fixup['$starting_position'])
-        if start_pos:
-            start_pos = round(start_pos * lin_off)
-            pos1 += Vec(x=-start_pos) @ travel_ang
+        if calc_type == 'track_platform':
+            lin_off = inst.fixup.float('$travel_distance')
+            travel_ang = Angle.from_str(inst.fixup['$travel_direction'])
+            start_pos = inst.fixup.float('$starting_position')
+            if start_pos:
+                start_pos = round(start_pos * lin_off)
+                pos1 += Vec(x=-start_pos) @ travel_ang
 
-        pos2 = Vec(x=lin_off) @ travel_ang + pos1
-    elif calc_type.startswith('piston'):
-        # Use piston-platform offsetting.
-        # The number is the highest offset to move to.
-        max_pist = srctools.conv_int(calc_type.split('_', 2)[1], 4)
-        bottom_pos = srctools.conv_int(inst.fixup['$bottom_level'])
-        top_pos = min(srctools.conv_int(inst.fixup['$top_level']), max_pist)
+            pos2 = Vec(x=lin_off) @ travel_ang + pos1
+        elif calc_type.startswith('piston'):
+            # Use piston-platform offsetting.
+            # The number is the highest offset to move to.
+            max_pist = srctools.conv_int(calc_type.split('_', 2)[1], 4)
+            bottom_pos = inst.fixup.int('$bottom_level')
+            top_pos = min(inst.fixup.int('$top_level'), max_pist)
 
-        pos2 = pos1.copy()
-        pos1 += Vec(z=128 * bottom_pos)
-        pos2 += Vec(z=128 * top_pos)
-        LOGGER.info('Bottom: {}, top: {}', bottom_pos, top_pos)
-    else:
-        # Directly from the given value.
-        pos2 = Vec.from_str(conditions.resolve_value(inst, pos2))
+            pos2 = pos1.copy()
+            pos1 += Vec(z=128 * bottom_pos)
+            pos2 += Vec(z=128 * top_pos)
+            LOGGER.info('Bottom: {}, top: {}', bottom_pos, top_pos)
+        else:
+            # Directly from the given value.
+            pos2 = Vec.from_str(conditions.resolve_value(inst, conf_pos2))
 
-    origin = Vec.from_str(inst['origin'])
-    angles = Angle.from_str(inst['angles'])
-    splash_pos.localise(origin, angles)
-    pos1.localise(origin, angles)
-    pos2.localise(origin, angles)
+        origin = Vec.from_str(inst['origin'])
+        orient = Matrix.from_angstr(inst['angles'])
+        splash_pos.localise(origin, orient)
+        pos1.localise(origin, orient)
+        pos2.localise(origin, orient)
 
-    # Since it's a straight line and you can't go through walls,
-    # if pos1 and pos2 aren't in goo we aren't ever in goo.
+        # Since it's a straight line and you can't go through walls,
+        # if pos1 and pos2 aren't in goo we aren't ever in goo.
 
-    check_pos = [pos1, pos2]
+        check_pos = [pos1, pos2]
 
-    if pos1.z < origin.z:
-        # If embedding in the floor, the positions can both be below the
-        # actual surface. In that case check the origin too.
-        check_pos.append(Vec(pos1.x, pos1.y, origin.z))
+        if pos1.z < origin.z:
+            # If embedding in the floor, the positions can both be below the
+            # actual surface. In that case check the origin too.
+            check_pos.append(Vec(pos1.x, pos1.y, origin.z))
 
-    if pos1.z == pos2.z:
-        # Flat - this won't do anything...
-        return
+        if pos1.z == pos2.z:
+            # Flat - this won't do anything...
+            return
 
-    for pos in check_pos:
-        grid_pos = pos // 128 * 128
-        grid_pos += (64, 64, 64)
+        for pos in check_pos:
+            grid_pos = pos // 128.0 * 128.0
+            grid_pos += (64.0, 64.0, 64.0)
 
-        block = BLOCK_POS['world': pos]
-        if block.is_goo:
-            break
-    else:
-        return  # Not in goo at all
+            block = BLOCK_POS['world': pos]
+            if block.is_goo:
+                break
+        else:
+            return  # Not in goo at all
 
-    water_pos = grid_pos + (0, 0, 32)
+        water_pos = grid_pos + (0.0, 0.0, 32.0)
 
-    # Check if both positions are above or below the water..
-    # that means it won't ever trigger.
-    if max(pos1.z, pos2.z) < water_pos.z - 8:
-        return
-    if min(pos1.z, pos2.z) > water_pos.z + 8:
-        return
+        # Check if both positions are above or below the water..
+        # that means it won't ever trigger.
+        if max(pos1.z, pos2.z) < water_pos.z - 8:
+            return
+        if min(pos1.z, pos2.z) > water_pos.z + 8:
+            return
 
-    # Pass along the water_pos encoded into the targetname.
-    # Restrict the number of characters to allow direct slicing
-    # in the script.
-    enc_data = '_{:09.3f}{}'.format(
-        water_pos.z + 12,
-        'f' if fast_check else 's',
-    )
+        # Pass along the water_pos encoded into the targetname.
+        # Restrict the number of characters to allow direct slicing
+        # in the script.
+        enc_data = f'_{water_pos.z + 12.0:09.3f}{"f" if fast_check else "s"}'
 
-    vmf.create_ent(
-        classname='env_splash',
-        targetname=conditions.local_name(inst, name) + enc_data,
-        parentname=conditions.local_name(inst, parent),
-        origin=splash_pos + (0, 0, 16),
-        scale=scale,
-        vscripts='BEE2/water_splash.nut',
-        thinkfunction='Think',
-        spawnflags='1',  # Trace downward to water surface.
-    )
+        vmf.create_ent(
+            classname='env_splash',
+            targetname=conditions.local_name(inst, name) + enc_data,
+            parentname=conditions.local_name(inst, parent),
+            origin=splash_pos + (0.0, 0.0, 16.0),
+            scale=scale,
+            vscripts='BEE2/water_splash.nut',
+            thinkfunction='Think',
+            spawnflags='1',  # Trace downward to water surface.
+        )
+    return make_water_splash
 
 
-@make_result('FunnelLight')
+@conditions.make_result('FunnelLight')
 def res_make_funnel_light(inst: Entity) -> None:
     """Place a light for Funnel items."""
     oran_on = inst.fixup.bool('$start_reversed')
-    need_blue = need_oran = False
-    name = ''
-    if inst.fixup['$connectioncount_polarity'] != '0':
+    if inst.fixup['$conn_count_b'] != '0':
         import vbsp
         if not vbsp.settings['style_vars']['funnelallowswitchedlights']:
             # Allow disabling adding switchable lights.
@@ -268,13 +250,15 @@ def res_make_funnel_light(inst: Entity) -> None:
         name = conditions.local_name(inst, 'light')
         need_blue = need_oran = True
     else:
+        name = ''
         if oran_on:
             need_oran = True
+            need_blue = False
         else:
             need_blue = True
+            need_oran = False
 
-    loc = Vec(0, 0, -56)
-    loc.localise(Vec.from_str(inst['origin']), Angle.from_str(inst['angles']))
+    loc = Vec(0, 0, -56) @ Angle.from_str(inst['angles']) + Vec.from_str(inst['origin'])
 
     if need_blue:
         inst.map.create_ent(

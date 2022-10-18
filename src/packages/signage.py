@@ -1,22 +1,17 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-
 from io import BytesIO
-from pathlib import Path
-from typing import NamedTuple, Optional, TYPE_CHECKING
+from typing import NamedTuple, Optional
 
 from PIL import Image
-import attr
 
-import utils
-from packages import PakObject, ParseData, ExportData, Style
-from app.img import Handle as ImgHandle
-from srctools.vtf import ImageFormats, VTF
+from srctools.vtf import ImageFormats, VTF, VTFFlags
 from srctools import Property
 import srctools.logger
 
-if TYPE_CHECKING:
-    from app import gameMan  # Prevent circular import
+from packages import PackagesSet, PakObject, ParseData, ExportData, Style
+from app.img import Handle as ImgHandle
+import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 LEGEND_SIZE = (512, 1024)
@@ -56,6 +51,7 @@ class SignageLegend(PakObject):
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'SignageLegend':
+        """Parse a signage legend."""
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
         else:
@@ -70,12 +66,13 @@ class SignageLegend(PakObject):
             ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
             bg, blank,
         )
+
     @staticmethod
     def export(exp_data: ExportData) -> None:
         """This is all performed in Signage."""
 
 
-class Signage(PakObject, allow_mult=True):
+class Signage(PakObject, allow_mult=True, needs_foreground=True):
     """Defines different square signage overlays."""
     def __init__(
         self,
@@ -95,7 +92,7 @@ class Signage(PakObject, allow_mult=True):
         self.sec_id = secondary_id
 
         # The icon the UI uses.
-        self.dnd_icon = None
+        self.dnd_icon: ImgHandle | None = None
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:
@@ -185,7 +182,7 @@ class Signage(PakObject, allow_mult=True):
 
         for tim_id, sign_id in sel_ids:
             try:
-                sign = Signage.by_id(sign_id)
+                sign = exp_data.packset.obj_by_id(Signage, sign_id)
             except KeyError:
                 LOGGER.warning('Signage "{}" does not exist!', sign_id)
                 continue
@@ -199,7 +196,7 @@ class Signage(PakObject, allow_mult=True):
             ]:
                 if sub_id:
                     try:
-                        sub_sign = Signage.by_id(sub_id)
+                        sub_sign = exp_data.packset.obj_by_id(Signage, sub_id)
                     except KeyError:
                         LOGGER.warning(
                             'Signage "{}"\'s {} "{}" '
@@ -219,8 +216,7 @@ class Signage(PakObject, allow_mult=True):
 
         exp_data.vbsp_conf.append(conf)
         exp_data.resources[SIGN_LOC] = build_texture(
-            exp_data.game, exp_data.selected_style,
-            sel_icons,
+            exp_data.packset, exp_data.selected_style, sel_icons,
         )
 
     def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
@@ -248,23 +244,23 @@ class Signage(PakObject, allow_mult=True):
 
 
 def build_texture(
-    game: gameMan.Game,
+    packset: PackagesSet,
     sel_style: Style,
     icons: dict[int, ImgHandle],
 ) -> bytes:
     """Construct the legend texture for the signage."""
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
-    blank: Optional[Image.Image] = None
+    blank_img: Optional[Image.Image] = None
     for style in sel_style.bases:
         try:
-            legend_info = SignageLegend.by_id(style.id)
+            legend_info = packset.obj_by_id(SignageLegend, style.id)
         except KeyError:
             pass
         else:
             overlay = legend_info.overlay.get_pil()
             if legend_info.blank is not None:
-                blank = legend_info.blank.get_pil().convert('RGB')
+                blank_img = legend_info.blank.get_pil().convert('RGB')
             if legend_info.background is not None:
                 legend.paste(legend_info.background.get_pil(), (0, 0))
             break
@@ -279,9 +275,9 @@ def build_texture(
         try:
             ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.ANTIALIAS).convert('RGB')
         except KeyError:
-            if blank is None:
+            if blank_img is None:
                 continue
-            ico = blank
+            ico = blank_img
         legend.paste(ico, (x * CELL_SIZE, y * CELL_SIZE))
 
     if overlay is not None:
@@ -290,7 +286,7 @@ def build_texture(
     vtf = VTF(*LEGEND_SIZE, fmt=ImageFormats.DXT5)
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
-    vtf.flags |= vtf.flags.ANISOTROPIC
+    vtf.flags |= VTFFlags.ANISOTROPIC
 
     buf = BytesIO()
     try:

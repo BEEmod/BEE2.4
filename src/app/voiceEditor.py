@@ -3,7 +3,7 @@ import functools
 import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, Dict, Optional
+from typing import Iterator, List, Tuple, Dict, Optional, Any
 
 from tkinter import *
 from tkinter import font
@@ -13,7 +13,6 @@ from app import img, TK_ROOT
 import srctools.logger
 from app import tk_tools
 from localisation import gettext
-import utils
 from BEE2_config import ConfigFile
 from app.tooltip import add_tooltip
 from srctools import Property
@@ -23,9 +22,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 voice_item = None
 
-UI = {}
-
-TABS = {}
+UI: Dict[str, Any] = {}
+TABS: Dict[str, ttk.Frame] = {}
 
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
@@ -304,7 +302,7 @@ def show(quote_pack):
     add_tabs()
 
     win.deiconify()
-    utils.center_win(win)  # Center inside the parent
+    tk_tools.center_win(win)  # Center inside the parent
     win.lift()
 
 

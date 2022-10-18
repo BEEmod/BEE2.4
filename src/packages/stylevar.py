@@ -5,7 +5,7 @@ from packages import PakObject, Style, ParseData, ExportData
 from srctools import Property, bool_as_int
 
 
-class StyleVar(PakObject, allow_mult=True):
+class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
     """Style specific features which can be enabled or disabled."""
     def __init__(
         self,

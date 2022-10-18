@@ -4,8 +4,8 @@ from typing import Callable
 from srctools import Property, Vec, Entity, Angle
 import srctools
 
-from precomp import conditions, rand
-from precomp.conditions import Condition, RES_EXHAUSTED, make_flag, make_result
+from precomp import collisions, conditions, rand
+from precomp.conditions import Condition, RES_EXHAUSTED, make_flag, make_result, MapInfo
 
 COND_MOD_NAME = 'Randomisation'
 
@@ -14,14 +14,14 @@ COND_MOD_NAME = 'Randomisation'
 def flag_random(res: Property) -> Callable[[Entity], bool]:
     """Randomly is either true or false."""
     if res.has_children():
-        chance = res['chance', '100']
+        chance_str = res['chance', '100']
         seed = res['seed', '']
     else:
-        chance = res.value
+        chance_str = res.value
         seed = ''
 
     # Allow ending with '%' sign
-    chance = srctools.conv_int(chance.rstrip('%'), 100)
+    chance = srctools.conv_int(chance_str.rstrip('%'), 100)
 
     def rand_func(inst: Entity) -> bool:
         """Apply the random chance."""
@@ -30,7 +30,7 @@ def flag_random(res: Property) -> Callable[[Entity], bool]:
 
 
 @make_result('random')
-def res_random(res: Property) -> Callable[[Entity], None]:
+def res_random(coll: collisions.Collisions, info: MapInfo, res: Property) -> conditions.ResultCallable:
     """Randomly choose one of the sub-results to execute.
 
     The `chance` value defines the percentage chance for any result to be
@@ -78,17 +78,11 @@ def res_random(res: Property) -> Callable[[Entity], None]:
             pass
         elif choice.name == 'group':
             for sub_res in choice:
-                if Condition.test_result(
-                    inst,
-                    sub_res,
-                ) is RES_EXHAUSTED:
+                if Condition.test_result(coll, info, inst, sub_res) is RES_EXHAUSTED:
                     sub_res.name = 'nop'
                     sub_res.value = ''
         else:
-            if Condition.test_result(
-                inst,
-                choice,
-            ) is RES_EXHAUSTED:
+            if Condition.test_result(coll, info, inst, choice) is RES_EXHAUSTED:
                 choice.name = 'nop'
                 choice.value = ''
     return apply_random
@@ -159,7 +153,7 @@ def res_rand_num(res: Property) -> Callable[[Entity], None]:
         if is_float:
             inst.fixup[var] = rng.uniform(min_val, max_val)
         else:
-            inst.fixup[var] = rng.randint(min_val, max_val)
+            inst.fixup[var] = rng.randint(round(min_val), round(max_val))
     return randomise
 
 

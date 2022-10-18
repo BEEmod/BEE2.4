@@ -3,9 +3,14 @@ General code used for tkinter portions.
 
 """
 import functools
+import inspect
 import sys
 from enum import Enum
-from typing import overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional, Literal
+from typing import (
+    Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Tuple, Literal,
+)
+from typing_extensions import TypeAlias, Unpack, TypeVarTuple
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -13,32 +18,27 @@ from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
-from app import TK_ROOT
+from idlelib.redirector import WidgetRedirector
+from idlelib.query import Query
+import trio
 
-try:
-    # Python 3.6+
-    # noinspection PyCompatibility
-    from idlelib.redirector import WidgetRedirector
-    from idlelib.query import Query
-except ImportError:
-    # Python 3.5 and below
-    # noinspection PyCompatibility, PyUnresolvedReferences
-    from idlelib.WidgetRedirector import WidgetRedirector
-    Query = None
-
-
+from app import TK_ROOT, background_run
+from config.gen_opts import GenOptions
+import event
+import config
 import utils
 
 
 # Set icons for the application.
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
+PosArgsT = TypeVarTuple('PosArgsT')
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
     TK_ROOT.wm_iconbitmap(default=ICO_PATH)
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
         window.wm_iconbitmap(ICO_PATH)
 
@@ -56,7 +56,7 @@ if utils.WIN:
     LISTBOX_BG_SEL_COLOR = '#0078D7'
     LISTBOX_BG_COLOR = 'white'
 elif utils.MAC:
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """ Call OS-X's specific api for setting the window icon."""
         TK_ROOT.tk.call(
             'tk::mac::iconBitmap',
@@ -76,14 +76,13 @@ else:  # Linux
     from app import img
     app_icon = img.get_app_icon(ICO_PATH)
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]):
+    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
         # Weird argument order for default=True...
         window.wm_iconphoto(True, app_icon)
 
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
-
 
 # Some events differ on different systems, so define them here.
 if utils.MAC:
@@ -192,60 +191,117 @@ elif utils.LINUX:
         STRETCH_VERT = 'bottom_side'
         STRETCH_HORIZ = 'right_side'
         MOVE_ITEM = 'fleur'
-        DESTROY_ITEM = 'x_cursor'
+        DESTROY_ITEM = 'X_cursor'
         INVALID_DRAG = 'circle'
 else:
     raise AssertionError
 
+_cur_update: Optional[trio.Event] = None
+
+
+@TK_ROOT.register
+def _update_complete() -> None:
+    """Set the event, after the event loop has run."""
+    global _cur_update
+    if _cur_update is not None:
+        _cur_update.set()
+        _cur_update = None
+
+
+async def wait_eventloop() -> None:
+    """Wait until the next iteration of the TK event loop.
+
+    This ensures widget dimensions are correct.
+    """
+    global _cur_update
+    if _cur_update is None:
+        _cur_update = trio.Event()
+        TK_ROOT.tk.call('after', 'idle', _update_complete)
+    await _cur_update.wait()
+
+
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, Unpack[PosArgsT]], object],
+    args: Tuple[Unpack[PosArgsT]] = (),
+) -> None:
+    """Bind mousewheel events, which function differently on each platform.
+
+     The delta value is prepended to args, then the function is called.
+     - Windows needs the delta value to be divided by 120.
+     - OS X needs the delta value passed unmodified.
+      - Linux uses Button-4 and Button-5 events instead of
+        a MouseWheel event.
+    """
+    if isinstance(widgets, tk.Misc):
+        widgets = [widgets]
+
+    if utils.WIN:
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
+            func(int(event.delta / -120), *args)
+        for widget in widgets:
+            widget.bind('<MouseWheel>', mousewheel_handler, add=True)
+    elif utils.MAC:
+        def mousewheel_handler(event: tk.Event) -> None:
+            """Handle mousewheel events."""
+            func(-event.delta, *args)
+        for widget in widgets:
+            widget.bind('<MouseWheel>', mousewheel_handler, add=True)
+    elif utils.LINUX:
+        def scroll_up(_: tk.Event) -> None:
+            """Handle scrolling up."""
+            func(-1, *args)
+
+        def scroll_down(_: tk.Event) -> None:
+            """Handle scrolling down."""
+            func(1, *args)
+
+        for widget in widgets:
+            widget.bind('<Button-4>', scroll_up, add=True)
+            widget.bind('<Button-5>', scroll_down, add=True)
+    else:
+        raise AssertionError('Unknown platform ' + sys.platform)
+
 
 @overload
-def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: """..."""
+def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: ...
 @overload
-def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: """..."""
+def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: ...
 def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
     """Add events so scrolling anywhere in a frame will scroll a target.
 
     frames should be the TK objects to bind to - mainly Frame or
     Toplevel objects.
     Set orient to 'x' or 'y'.
-    This is needed since different platforms handle mousewheel events
-    differently:
-     - Windows needs the delta value to be divided by 120.
-     - OS X needs the delta value passed unmodified.
-      - Linux uses Button-4 and Button-5 events instead of
-        a MouseWheel event.
     """
     scroll_func = getattr(target, orient + 'view_scroll')
+    # Call view_scroll(delta, "units").
+    bind_mousewheel(frames, scroll_func, ('units', ))
 
-    if utils.WIN:
-        def mousewheel_handler(event: tk.Event) -> None:
-            """Handle mousewheel events."""
-            scroll_func(int(event.delta / -120), "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
-    elif utils.MAC:
-        def mousewheel_handler(event: tk.Event) -> None:
-            """Handle mousewheel events."""
-            scroll_func(-event.delta, "units")
-        for frame in frames:
-            frame.bind('<MouseWheel>', mousewheel_handler, add=True)
-    elif utils.LINUX:
-        def scroll_up(event: tk.Event) -> None:
-            """Handle scrolling up."""
-            scroll_func(-1, "units")
 
-        def scroll_down(event: tk.Event) -> None:
-            """Handle scrolling down."""
-            scroll_func(1, "units")
+def make_handler(func: Union[
+    Callable[[], Awaitable[object]],
+    Callable[[tk.Event], Awaitable[object]],
+]) -> Callable[[tk.Event], object]:
+    """Given an asyncronous event handler, return a sync function which uses background_run().
 
-        for frame in frames:
-            frame.bind('<Button-4>', scroll_up, add=True)
-            frame.bind('<Button-5>', scroll_down, add=True)
+    This checks the signature of the function to decide whether to pass along the event object.
+    """
+    sig = inspect.signature(func)
+    if len(sig.parameters) == 0:
+        def wrapper(e: tk.Event) -> None:
+            """Discard the event."""
+            background_run(func)  # type: ignore
     else:
-        raise AssertionError('Unknown platform ' + sys.platform)
+        def wrapper(e: tk.Event) -> None:
+            """Pass along the event."""
+            background_run(func, e)  # type: ignore
+    functools.update_wrapper(wrapper, func)
+    return wrapper
 
 
-EventFunc = Callable[[tk.Event], Any]
+EventFunc: TypeAlias = Callable[[tk.Event], object]
 EventFuncT = TypeVar('EventFuncT', bound=EventFunc)
 
 
@@ -266,13 +322,13 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
-    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False):
+    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Optional[Callable]:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
-            def deco_2(func):
+            def deco_2(func2: EventFuncT) -> EventFuncT:
                 """Used as a decorator - must be called second with the function."""
-                bind_func(wid, func, add)
-                return func
+                bind_func(wid, func2, add)
+                return func2
             return deco_2
         else:
             # Normally, call directly
@@ -280,60 +336,99 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
     return functools.update_wrapper(cast(_Binder, deco), bind_func)
 
 if utils.MAC:
-    # On OSX, make left-clicks switch to a rightclick when control is held.
+    # On OSX, make left-clicks switch to a right-click when control is held.
     @_bind_event_handler
-    def bind_leftclick(wid, func, add=False):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held.
-        """
-        def event_handler(e):
+    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+        """On OSX, left-clicks are converted to right-click when control is held."""
+        def event_handler(e: tk.Event) -> None:
+            """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
-            if e.state & 4 == 0:
+            if not isinstance(e.state, int) or e.state & 4 == 0:
                 func(e)
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid, func, add=False):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held."""
-        def event_handler(e):
+    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+        """On OSX, left-clicks are converted to right-click when control is held."""
+        def event_handler(e: tk.Event) -> None:
+            """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
-            if e.state & 4 == 0:
+            if not isinstance(e.state, int) or e.state & 4 == 0:
                 func(e)
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid, func, add=False):
+    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
         wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
     @_bind_event_handler
-    def bind_leftclick(wid, func, add=False):
+    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid, func, add=False):
+    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid, func, add=False):
+    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
 
-def event_cancel(*args, **kwargs) -> str:
+def event_cancel(*args: Any, **kwargs: Any) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
 
 
-def _default_validator(value) -> str:
+def adjust_inside_screen(
+    x: int,
+    y: int,
+    win: Union[tk.Tk, tk.Toplevel],
+    horiz_bound: int = 14,
+    vert_bound: int = 45,
+) -> Tuple[int, int]:
+    """Adjust a window position to ensure it fits inside the screen.
+
+    The new value is returned.
+    """
+    # Allow disabling this adjustment for multi-window setups
+    if not config.APP.get_cur_conf(GenOptions).keep_win_inside:
+        return x, y
+    max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
+    max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
+
+    if x < horiz_bound:
+        x = horiz_bound
+    elif x > max_x:
+        x = max_x
+
+    if y < vert_bound:
+        y = vert_bound
+    elif y > max_y:
+        y = max_y
+    return x, y
+
+
+def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel] = None) -> None:
+    """Center a subwindow to be inside a parent window."""
+    if parent is None:
+        parent = window.nametowidget(window.winfo_parent())
+
+    x = parent.winfo_rootx() + (parent.winfo_width() - window.winfo_width()) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - window.winfo_height()) // 2
+
+    x, y = adjust_inside_screen(x, y, window)
+
+    window.geometry(f'+{x}+{y}')
+
+
+def _default_validator(value: str) -> str:
     if not value.strip():
         raise ValueError("A value must be provided!")
     return value
@@ -353,7 +448,7 @@ class BasicQueryValidator(simpledialog.Dialog):
         self.__initial = initial
         super().__init__(parent, title)
 
-    def body(self, master):
+    def body(self, master: tk.Frame) -> ttk.Entry:
         """Ensure the window icon is changed, and copy code from askstring's internals."""
         super().body(master)
         set_window_icon(self)
@@ -378,7 +473,6 @@ class BasicQueryValidator(simpledialog.Dialog):
         else:
             return True
 
-Query = None
 if Query is not None:
     class QueryValidator(Query):
         """Implement using IDLE's better code for this."""
@@ -399,13 +493,13 @@ if Query is not None:
                 self.showerror(exc.args[0])
                 return None
 else:
-    QueryValidator = BasicQueryValidator
+    QueryValidator = BasicQueryValidator  # type: ignore
 
 
 def prompt(
     title: str, message: str,
-    initialvalue: str='',
-    parent: tk.Misc= TK_ROOT,
+    initialvalue: str = '',
+    parent: tk.Misc = TK_ROOT,
     validator: Callable[[str], str] = _default_validator,
 ) -> Optional[str]:
     """Ask the user to enter a string."""
@@ -428,14 +522,14 @@ class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low, high):
+    def set(self, low: float, high: float) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
             self.grid_remove()
         else:
             self.grid()
-        super(HidingScroll, self).set(low, high)
+        super().set(low, high)
 
 
 class ReadOnlyEntry(ttk.Entry):
@@ -443,22 +537,21 @@ class ReadOnlyEntry(ttk.Entry):
 
     See http://tkinter.unpythonic.net/wiki/ReadOnlyText
     """
-    def __init__(self, master, **opt):
-
-        opt['exportselection'] = 0 # Don't let it write to clipboard
-        opt['takefocus'] = 0 # Ignore when tabbing
+    def __init__(self, master: tk.Misc, **opt: Any) -> None:
+        opt['exportselection'] = 0  # Don't let it write to clipboard
+        opt['takefocus'] = 0  # Ignore when tabbing
         super().__init__(master, **opt)
 
         self.redirector = redir = WidgetRedirector(self)
         # These two TK commands are used for all text operations,
         # so cancelling them stops anything from happening.
-        self.insert = redir.register('insert', event_cancel)
-        self.delete = redir.register('delete', event_cancel)
+        setattr(self, 'insert', redir.register('insert', event_cancel))
+        setattr(self, 'delete', redir.register('delete', event_cancel))
 
 
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice]=None, **kw) -> None:
+    def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -509,10 +602,10 @@ class FileField(ttk.Frame):
     browser: commondialog.Dialog
     def __init__(
         self,
-        master,
-        is_dir: bool=False,
-        loc: str='',
-        callback: Callable[[str], None]=None,
+        master: tk.Misc,
+        is_dir: bool = False,
+        loc: str = '',
+        callback: Callable[[str], None] = None,
     ) -> None:
         """Initialise the field.
 
@@ -572,7 +665,7 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: tk.Event=None) -> None:
+    def browse(self, event: tk.Event = None) -> None:
         """Browse for a file."""
         path = self.browser.show()
         if path:
@@ -616,3 +709,82 @@ class FileField(ttk.Frame):
     def _text_configure(self, e: tk.Event) -> None:
         """Truncate text every time the text widget resizes."""
         self._text_var.set(self._truncate(self._location))
+
+
+EnumT = TypeVar('EnumT')
+
+
+class EnumButton(Generic[EnumT]):
+    """Provides a set of buttons for toggling between enum values.
+
+    The event manager recives an event with this as the context and the value as the arg when
+    changed.
+    """
+    def __init__(
+        self,
+        master: tk.Misc,
+        event_bus: event.EventBus,
+        current: EnumT,
+        *values: Tuple[EnumT, str],
+    ) -> None:
+        self.frame = ttk.Frame(master)
+        self._current = current
+        self.buttons: dict[EnumT, ttk.Button] = {}
+        self.event_bus = event_bus
+
+        for x, (val, label) in enumerate(values):
+            btn = ttk.Button(
+                self.frame, text=label,
+                # Make partial do the method binding.
+                command=functools.partial(EnumButton._select, self, val),
+            )
+            btn.grid(row=0, column=x)
+            self.buttons[val] = btn
+            if val is current:
+                btn.state(['pressed'])
+
+        if current not in self.buttons:
+            raise ValueError(f'Default value {current!r} not present in {list(values)}')
+
+        if len(self.buttons) != len(values):
+            raise ValueError(f'No duplicates allowed, got: {list(values)}')
+
+    def _select(self, value: EnumT) -> None:
+        """Select a specific value."""
+        if value is not self._current:
+            self.buttons[self._current].state(['!pressed'])
+            self._current = value
+            self.buttons[self._current].state(['pressed'])
+            background_run(self.event_bus, self, value)
+
+    @property
+    def current(self) -> EnumT:
+        """Return the currently selected button."""
+        return self._current
+
+    @current.setter
+    def current(self, value: EnumT) -> None:
+        """Change the currently selected button."""
+        self._select(value)
+
+
+class LineHeader(ttk.Frame):
+    """A resizable line, with a title in the middle."""
+    def __init__(self, parent: tk.Misc, title: str) -> None:
+        super().__init__(parent)
+        sep_left = ttk.Separator(self)
+        sep_left.grid(row=0, column=0, sticky='EW')
+        self.columnconfigure(0, weight=1)
+
+        self.title = ttk.Label(
+            self,
+            text=title,
+            width=len(title) + 2,
+            font='TkMenuFont',
+            anchor='center',
+        )
+        self.title.grid(row=0, column=1)
+
+        sep_right = ttk.Separator(self)
+        sep_right.grid(row=0, column=2, sticky='EW')
+        self.columnconfigure(2, weight=1)

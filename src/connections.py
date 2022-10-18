@@ -3,11 +3,12 @@
 This controls how I/O is generated for each item.
 """
 from __future__ import annotations
+
 import sys
 from enum import Enum
-from typing import Dict, Optional, Tuple, Iterable, List
+from typing import Dict, Iterable
 
-from srctools import Output, Vec, Property
+from srctools import Output, Property, Vec
 
 
 class ConnType(Enum):
@@ -59,7 +60,7 @@ class InputType(Enum):
     DAISYCHAIN = 'daisychain'
 
     @property
-    def is_logic(self):
+    def is_logic(self) -> bool:
         """Is this a logic gate?"""
         return self.value in ('and_logic', 'or_logic')
 
@@ -91,7 +92,7 @@ class OutNames(str, Enum):
     OUT_DEACT = 'ON_DEACTIVATED'
 
 
-def _intern_out(out: Optional[Tuple[Optional[str], str]]) -> Optional[Tuple[Optional[str], str]]:
+def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | None:
     if out is None:
         return None
     out_name, output = out
@@ -100,13 +101,22 @@ def _intern_out(out: Optional[Tuple[Optional[str], str]]) -> Optional[Tuple[Opti
     return out_name, output
 
 
+def format_output_name(out_tup: tuple[str | None, str]) -> str:
+    """Convert the output tuple into a nice string."""
+    inst, out = out_tup
+    if inst is not None:
+        return f'{inst} -> {out}'
+    else:
+        return out
+
+
 class Config:
     """Represents a type of item, with inputs and outputs.
 
     This is shared by all items of the same type.
     """
-    output_act: Optional[Tuple[Optional[str], str]]
-    output_deact: Optional[Tuple[Optional[str], str]]
+    output_act: tuple[str | None, str] | None
+    output_deact: tuple[str | None, str] | None
 
     def __init__(
         self,
@@ -125,21 +135,21 @@ class Config:
         sec_disable_cmd: Iterable[Output]=(),
 
         output_type: ConnType=ConnType.DEFAULT,
-        output_act: Optional[Tuple[Optional[str], str]]=None,
-        output_deact: Optional[Tuple[Optional[str], str]]=None,
+        output_act: tuple[str | None, str] | None=None,
+        output_deact: tuple[str | None, str] | None=None,
 
         lock_cmd: Iterable[Output]=(),
         unlock_cmd: Iterable[Output]=(),
-        output_lock: Optional[Tuple[Optional[str], str]]=None,
-        output_unlock: Optional[Tuple[Optional[str], str]]=None,
+        output_lock: tuple[str | None, str] | None=None,
+        output_unlock: tuple[str | None, str] | None=None,
         inf_lock_only: bool=False,
 
-        timer_sound_pos: Optional[Vec]=None,
+        timer_sound_pos: Vec | None=None,
         timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
 
-        timer_start: Optional[List[Tuple[Optional[str], str]]]=None,
-        timer_stop: Optional[List[Tuple[Optional[str], str]]]=None,
+        timer_start: list[tuple[str | None, str]] | None=None,
+        timer_stop: list[tuple[str | None, str]] | None=None,
     ):
         self.id = id
 
@@ -160,7 +170,7 @@ class Config:
         self.disable_cmd = tuple(disable_cmd)
 
         # If no A/B type is set on the input, use this type.
-        # Set to None to indicate no secondary is present.
+        # Set to Default to indicate no secondary is present.
         self.default_dual = default_dual
 
         # Same for secondary items.
@@ -219,18 +229,18 @@ class Config:
         self.output_unlock = output_unlock
 
     @staticmethod
-    def parse(item_id: str, conf: Property):
+    def parse(item_id: str, conf: Property) -> Config:
         """Read the item type info from the given config."""
 
-        def get_outputs(prop_name):
+        def get_outputs(prop_name: str) -> list[Output]:
             """Parse all the outputs with this name."""
-            return [
-                Output.parse(prop)
-                for prop in
-                conf.find_all(prop_name)
-                # Allow blank to indicate no output.
-                if prop.value != ''
-            ]
+            outputs = []
+            for prop in conf.find_all(prop_name):
+                if prop.value != '':
+                    out = Output.parse(prop)
+                    out.output = ''  # Clear this, it's unused.
+                    outputs.append(out)
+            return outputs
 
         enable_cmd = get_outputs('enable_cmd')
         disable_cmd = get_outputs('disable_cmd')
@@ -309,7 +319,7 @@ class Config:
                 item_id, conf['DualType'],
             )) from None
 
-        def get_input(prop_name: str):
+        def get_input(prop_name: str) -> tuple[str | None, str] | None:
             """Parse an input command."""
             try:
                 return Output.parse_name(conf[prop_name])
@@ -409,3 +419,79 @@ class Config:
             self.output_lock,
             self.output_unlock,
         ) = state
+
+    def get_input_blurb(self) -> str:
+        """For development, summarise all input-related configuration."""
+        text = [
+            f'Input type: {self.input_type.value}',
+        ]
+        if self.input_type is InputType.DUAL:
+            text += [
+                f'Default (without A/B item): {self.default_dual.value.title()}',
+                f'Primary Invert: {self.invert_var}',
+                f'Primary Spawn Fire: {self.spawn_fire.value.title()}',
+                f'Secondary Invert: {self.sec_invert_var}',
+                f'Secondary Spawn Fire: {self.sec_spawn_fire.value.title()}',
+            ]
+            primary = 'Primary '
+        else:
+            text += [
+                f'Invert: {self.invert_var}',
+                f'Spawn Fire: {self.spawn_fire.value.title()}',
+            ]
+            primary = ''
+
+        for out in self.enable_cmd:
+            # Slice to strip the beginning "<Output> ".
+            text.append(f'{primary}Enable {str(out)[9:]}')
+        for out in self.disable_cmd:
+            text.append(f'{primary}Disable {str(out)[9:]}')
+        for out in self.sec_enable_cmd:
+            text.append(f'Secondary Enable {str(out)[9:]}')
+        for out in self.sec_disable_cmd:
+            text.append(f'Secondary Disable {str(out)[9:]}')
+
+        # Output, but it goes backwards towards the input item.
+        if self.output_lock is not None:
+            text.append('Button Lock: ' + format_output_name(self.output_lock))
+        if self.output_unlock is not None:
+            text.append('Button Unlock: ' + format_output_name(self.output_unlock))
+
+        return '\n'.join(text)
+
+    def get_output_blurb(self) -> str:
+        """For development, summarise all output-related configuration."""
+        text: list[str] = []
+
+        if self.output_type is not ConnType.DEFAULT:
+            text.append(f'Affinity: {self.output_type.value.title()}')
+
+        if self.output_act is not None:
+            text.append('Activation: ' + format_output_name(self.output_act))
+        if self.output_deact is not None:
+            text.append('Deactivation: ' + format_output_name(self.output_deact))
+
+        if self.timer_start is not None:
+            for out in self.timer_start:
+                text.append('Timer Start: ' + format_output_name(out))
+        if self.timer_stop is not None:
+            for out in self.timer_stop:
+                text.append('Timer Stop: ' + format_output_name(out))
+
+        if self.timer_sound_pos is not None:
+            text += [
+                f'Timer Sound Offset: ({self.timer_sound_pos})',
+                f'Always play ticktock: {self.force_timer_sound}',
+                f'Only lock infinite buttons: {self.inf_lock_only}',
+            ]
+
+        for output in self.timer_done_cmd:
+            text.append(f'Timer Complete: {str(output)[9:]}')
+
+        if self.lock_cmd and self.unlock_cmd:
+            for output in self.lock_cmd:
+                text.append(f'Button Lock {str(output)[9:]}')
+            for output in self.unlock_cmd:
+                text.append(f'Button Unlock {str(output)[9:]}')
+
+        return '\n'.join(text)

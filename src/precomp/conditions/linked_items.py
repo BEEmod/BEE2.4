@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Optional, Callable
 from enum import Enum
 import math
-import attr
 
+import attrs
 from srctools import Property, VMF, Entity
 import srctools.logger
 
@@ -22,7 +22,7 @@ class AntlineHandling(Enum):
     MOVE = 'move'
 
 
-@attr.define
+@attrs.define
 class Config:
     """Configuration for linked items."""
     group: str  # For reporting.
@@ -204,8 +204,8 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                     node.inst.fixup['$next'] = index + 1
 
             if logic_fname:
-                inst_logic = vmf.create_ent(
-                    classname='func_instance',
+                inst_logic = conditions.add_inst(
+                    vmf,
                     targetname=node.inst['targetname'],
                     file=logic_fname,
                     origin=node.pos,
@@ -229,4 +229,5 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                         # Add 45 so the switchover point is at the diagonals
                         link_ang = (link_ang + 45) // 90 * 90
                     node.inst['file'] = conf.scaff_endcap
+                    conditions.ALL_INST.add(conf.scaff_endcap.casefold())
                     node.inst['angles'] = '0 {:.0f} 0'.format(link_ang)

@@ -1,58 +1,54 @@
 """Allows enabling and disabling individual packages.
 """
+from __future__ import annotations
 from typing import Iterable
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 import tkinter as tk
-from app import TK_ROOT
+from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
-from BEE2_config import ConfigFile
+from localisation import gettext
 import packages
 import utils
 
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 
-UI = {}
-
-PACK_CONFIG = ConfigFile('packages.cfg')
-
-pack_items = {}
-
-HEADERS = ['Name']
+list_widget: CheckDetails
+pack_items: list[tuple[packages.Package, CheckItem]] = []
 
 
-def show():
+def show() -> None:
     """Show the manager window."""
     window.deiconify()
     window.lift(TK_ROOT)
     window.grab_set()
-    utils.center_win(window, TK_ROOT)
+    tk_tools.center_win(window, TK_ROOT)
     window.update()
-    UI['details'].refresh()
+    list_widget.refresh()
 
 
 def make_packitems() -> Iterable[CheckItem]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
-    for pack in packages.packages.values():  # type: packages.Package
-        pack_items[pack.id] = item = CheckItem(
+    for pack in packages.LOADED.packages.values():
+        item = CheckItem(
             pack.disp_name,
             hover_text=pack.desc or 'No description!',
             # The clean package can't be disabled!
             lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
             state=pack.enabled
         )
-        item.package = pack
-    return pack_items.values()
+        pack_items.append((pack, item))
+        yield item
 
 
-def apply_changes():
+def apply_changes() -> None:
+    """Enable/disable the new packages."""
     values_changed = any(
-        item.package.enabled != item.state
-        for item in
-        pack_items.values()
+        pack.enabled != item.state
+        for pack, item in
+        pack_items
     )
     if not values_changed:
         # We don't need to do anything!
@@ -61,31 +57,32 @@ def apply_changes():
         return
 
     if messagebox.askokcancel(
-            title=_('BEE2 - Restart Required!'),
-            message=_('Changing enabled packages requires a restart.\nContinue?'),
-            master=window,
-            ):
+        title=gettext('BEE2 - Restart Required!'),
+        message=gettext('Changing enabled packages requires a restart.\nContinue?'),
+        master=window,
+    ):
         window.withdraw()
         window.grab_release()
-        for item in UI['details'].items:
-            pack = item.package
-            if pack.id != packages.CLEAN_PACKAGE:
+        for pack, item in pack_items:
+            if pack.id.casefold() != packages.CLEAN_PACKAGE:
                 pack.enabled = item.state
-        PACK_CONFIG.save_check()
+        packages.PACK_CONFIG.save_check()
         utils.restart_app()
 
 
-def cancel():
+def cancel() -> None:
+    """Abort enabling/disabling packages."""
     window.withdraw()
     window.grab_release()
-    UI['details'].remove_all()
-    UI['details'].add_items(*make_packitems())
+    list_widget.remove_all()
+    list_widget.add_items(*make_packitems())
 
 
-def make_window():
+def make_window() -> None:
     """Initialise the window."""
+    global list_widget
     window.transient(TK_ROOT)
-    window.title(_('BEE2 - Manage Packages'))
+    window.title(gettext('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -95,24 +92,24 @@ def make_window():
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
 
-    UI['details'] = CheckDetails(
+    list_widget = CheckDetails(
         frame,
-        headers=HEADERS,
+        headers=['Name'],
         items=make_packitems(),
     )
 
-    UI['details'].grid(row=0, column=0, columnspan=2, sticky='NSEW')
+    list_widget.grid(row=0, column=0, columnspan=2, sticky='NSEW')
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
     ttk.Button(
         frame,
-        text=_('OK'),
+        text=gettext('OK'),
         command=apply_changes,
     ).grid(row=1, column=0, sticky='W')
 
     ttk.Button(
         frame,
-        text=_('Cancel'),
+        text=gettext('Cancel'),
         command=cancel,
     ).grid(row=1, column=1, sticky='E')

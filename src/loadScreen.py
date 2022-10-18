@@ -12,17 +12,20 @@ import contextlib
 import multiprocessing
 import time
 
-from app import logWindow
-from localisation import gettext
-from BEE2_config import GEN_OPTS
-import utils
+import attrs
 import srctools.logger
+
+import config.gen_opts
+from app import logWindow
+import config
+from localisation import gettext
+import utils
 
 from typing import Set, Tuple, cast, Any, Type
 
 
 # Keep a reference to all loading screens, so we can close them globally.
-_ALL_SCREENS = cast(set, WeakSet())  # type: Set[LoadScreen]
+_ALL_SCREENS = cast(Set['LoadScreen'], WeakSet())
 
 # For each loadscreen ID, record if the cancel button was pressed. We then raise
 # Cancelled upon the next interaction with it to stop operation.
@@ -136,8 +139,8 @@ class LoadScreen:
             command, arg = _PIPE_MAIN_REC.recv()
             if command == 'main_set_compact':
                 # Save the compact state to the config.
-                GEN_OPTS['General']['compact_splash'] = '1' if arg else '0'
-                GEN_OPTS.save_check()
+                conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
+                config.APP.store_conf(attrs.evolve(conf, compact_splash=arg))
             elif command == 'cancel':
                 # Mark this loadscreen as cancelled.
                 _SCREEN_CANCEL_FLAG.add(arg)
@@ -213,7 +216,7 @@ def shutdown() -> None:
 # Initialise the daemon.
 # noinspection PyProtectedMember
 BG_PROC = multiprocessing.Process(
-    target=utils._run_bg_daemon,
+    target=utils.run_bg_daemon,
     args=(
         _PIPE_DAEMON_SEND,
         _PIPE_DAEMON_REC,

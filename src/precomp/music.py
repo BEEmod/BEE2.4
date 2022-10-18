@@ -1,8 +1,8 @@
 """Handles adding music to the level."""
-from typing import Dict, List
+from typing import Set, List
 
 from srctools import VMF, Vec, Property, Output
-from precomp import options
+from precomp import corridor, options, conditions
 from consts import MusicChannel as Channel
 import srctools.logger
 
@@ -13,8 +13,7 @@ def add(
     vmf: VMF,
     loc: Vec,
     conf: Property,
-    voice_attr: Dict[str, str],
-    is_sp: bool,
+    info: corridor.Info,
 ) -> None:
     """Add music to the map."""
     LOGGER.info("Adding Music...")
@@ -60,7 +59,7 @@ def add(
         # looping.
 
         # In either case, we need @music_restart to do that safely.
-        if is_sp or snd_length > 0:
+        if info.is_sp or snd_length > 0:
             music_restart = vmf.create_ent(
                 classname='logic_relay',
                 spawnflags='2',  # Allow fast retrigger.
@@ -86,7 +85,7 @@ def add(
                 Output('OnTrigger', music, 'PlaySound', delay=0.1),
             )
 
-            if is_sp == 'SP':
+            if info.is_sp:
                 # Trigger on level loads.
                 vmf.create_ent(
                     classname='logic_auto',
@@ -129,7 +128,7 @@ def add(
             Channel.SPEED,
             conf.find_key('speedgel', or_blank=True).as_array(),
         )
-        if 'funnel' in voice_attr or 'excursionfunnel' in voice_attr:
+        if info.has_attr('funnel') or info.has_attr('excursionfunnel'):
             make_channel_conf(
                 vmf, loc,
                 Channel.TBEAM,
@@ -137,7 +136,7 @@ def add(
                 conf.bool('sync_funnel'),
             )
 
-        if 'bouncegel' in voice_attr or 'bluegel' in voice_attr:
+        if info.has_attr('bouncegel') or info.has_attr('bluegel'):
             make_channel_conf(
                 vmf, loc,
                 Channel.BOUNCE,
@@ -152,13 +151,11 @@ def add(
 
     if inst:
         # We assume the instance is setup correct.
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             targetname='music',
-            angles='0 0 0',
             origin=loc,
             file=inst,
-            fixup_style='0',
         )
 
 

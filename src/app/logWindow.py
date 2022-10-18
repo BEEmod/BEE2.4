@@ -1,11 +1,18 @@
 """Displays logs for the application.
+
+The implementation is in bg_daemon, to ensure it remains responsive.
 """
 import logging
-import multiprocessing, threading
+import multiprocessing
 from typing import Union
 
 import srctools.logger
-from BEE2_config import GEN_OPTS
+import trio
+import attrs
+
+from config.gen_opts import GenOptions
+import config
+
 
 _PIPE_MAIN_REC, PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
@@ -34,9 +41,10 @@ class TextHandler(logging.Handler):
             record.msg = msg
         _PIPE_MAIN_SEND.send(('log', record.levelname, text))
 
-    def set_visible(self, is_visible: bool):
+    def set_visible(self, is_visible: bool) -> None:
         """Show or hide the window."""
-        GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(is_visible)
+        conf = config.APP.get_cur_conf(GenOptions)
+        config.APP.store_conf(attrs.evolve(conf, show_log_win=is_visible))
         _PIPE_MAIN_SEND.send(('visible', is_visible, None))
 
     def setLevel(self, level: Union[int, str]) -> None:
@@ -50,21 +58,26 @@ HANDLER = TextHandler()
 logging.getLogger().addHandler(HANDLER)
 
 
-def setting_apply_thread() -> None:
-    """Thread to apply setting changes."""
+async def setting_apply() -> None:
+    """Monitor and apply setting changes from the log window."""
     while True:
-        cmd, param = _PIPE_MAIN_REC.recv()
+        # TODO: Ideally use a Trio object for this pipe so it doesn't need to thread.
+        # If cancelled, this is going to continue receiving in an abandoned thread - so the data
+        # is potentially lost. But this should only be cancelled if the app's quitting, so that's
+        # fine.
+        try:
+            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, cancellable=True)
+        except BrokenPipeError:
+            # Pipe failed, we're useless.
+            return
         if cmd == 'level':
             TextHandler.setLevel(HANDLER, param)
-            GEN_OPTS['Debug']['window_log_level'] = param
+            conf = config.APP.get_cur_conf(GenOptions)
+            config.APP.store_conf(attrs.evolve(conf, log_win_level=param))
         elif cmd == 'visible':
-            GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(param)
+            conf = config.APP.get_cur_conf(GenOptions)
+            config.APP.store_conf(attrs.evolve(conf, show_log_win=param))
+        elif cmd == 'quit':
+            return
         else:
             raise ValueError(f'Unknown command {cmd}({param})!')
-
-_setting_thread = threading.Thread(
-    target=setting_apply_thread,
-    name='logwindow_settings_apply',
-    daemon=True,
-)
-_setting_thread.start()

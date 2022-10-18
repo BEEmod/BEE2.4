@@ -3,23 +3,28 @@
 These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
+
+from typing import Union
+from tkinter import filedialog, ttk
 import tkinter as tk
-from tkinter import filedialog
-from tkinter import ttk
-from typing import Optional, Union
-import base64
+import functools
+import io
+import random
 
 from PIL import Image, ImageTk
 from atomicwrites import atomic_write
+import attrs
+import trio
 
-from srctools import Property
+from srctools import bool_as_int
 from srctools.logger import get_logger
 
-from packages import CORRIDOR_COUNTS, CorrDesc
-from app import selector_win, TK_ROOT
+import app
+from app import SubPane, tk_tools, TK_ROOT, corridor_selector
 from app.tooltip import add_tooltip, set_tooltip
-from app import tkMarkdown, SubPane, img, tk_tools
 from localisation import gettext
+from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
+import config
 import BEE2_config
 import utils
 
@@ -30,12 +35,7 @@ LOGGER = get_logger(__name__)
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
-CORRIDOR: dict[str, selector_win.SelectorWin] = {}
-CORRIDOR_DATA: dict[tuple[str, int], CorrDesc] = {}
-
-CORRIDOR_DESC = tkMarkdown.convert('', None)
-
-COMPILE_DEFAULTS = {
+COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
     'Screenshot': {
         'Type': 'AUTO',
         'Loc': '',
@@ -47,11 +47,7 @@ COMPILE_DEFAULTS = {
         'voiceline_priority': '0',
         'packfile_dump_dir': '',
         'packfile_dump_enable': '0',
-    },
-    'Corridor': {
-        'sp_entry': '1',
-        'sp_exit': '1',
-        'coop': '1',
+        'packfile_auto_enable': '1',
     },
     'Counts': {
         'brush': '0',
@@ -72,7 +68,6 @@ PLAYER_MODELS = {
     'SP': gettext('Chell'),
     'PETI': gettext('Bendy'),
 }
-PLAYER_MODEL_ORDER = ['PETI', 'SP', 'ATLAS', 'PBODY']
 PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
 
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
@@ -101,301 +96,125 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
 
 packfile_dump_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable'))
+packfile_auto_enable = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'packfile_auto_enable', True))
 
-default_lrg_icon = img.Handle.builtin('BEE2/corr_generic', selector_win.ICON_SIZE, selector_win.ICON_SIZE)
-default_sml_icon = default_lrg_icon.crop(selector_win.ICON_CROP_SHRINK)
+# vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
+# Checks if vrad_force_full is defined, if it is, sets vrad_compile_type to true and
+# removes vrad_force_full as it is no longer used.
+if COMPILE_CFG.get_bool('General', 'vrad_force_full'):
+    vrad_compile_type = tk.StringVar(
+        value=COMPILE_CFG.get_val('General', 'vrad_compile_type', 'FULL')
+    )
+    COMPILE_CFG.remove_option('General', 'vrad_force_full')
+else:
+    vrad_compile_type = tk.StringVar(
+        value=COMPILE_CFG.get_val('General', 'vrad_compile_type', 'FAST')
+    )
 
-count_brush = tk.IntVar(value=0)
-count_entity = tk.IntVar(value=0)
-count_overlay = tk.IntVar(value=0)
-
-# Controls flash_count()
-count_brush.should_flash = False
-count_entity.should_flash = False
-count_overlay.should_flash = False
-
-# The data for the 3 progress bars -
-# (variable, config_name, default_max, description)
-COUNT_CATEGORIES = [
-    (
-        count_brush, 'brush', 8192,
-        # i18n: Progress bar description
-        gettext(
-            "Brushes form the walls or other parts of the test chamber. If this "
-            "is high, it may help to reduce the size of the map or remove "
-            "intricate shapes."
-        )
-    ),
-    (
-        count_entity, 'entity', 2048,
-        # i18n: Progress bar description
-        gettext(
-            "Entities are the things in the map that have functionality. "
-            "Removing complex moving items will help reduce this. Items have "
-            "their entity count listed in the item description window.\n\nThis "
-            "isn't completely accurate, some entity types are counted here but "
-            "don't affect the ingame limit, while others may generate "
-            "additional entities at runtime."
-        ),
-    ),
-    (
-        count_overlay, 'overlay', 512,
-        # i18n: Progress bar description
-        gettext(
-            "Overlays are smaller images affixed to surfaces, like signs or "
-            "indicator lights. Hiding complex antlines or setting them to "
-            "signage will reduce this."
-        )
-    ),
-]
-
-vrad_light_type = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'vrad_force_full'))
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
-
-@BEE2_config.OPTION_SAVE('CompilerPane')
-def save_handler() -> Property:
-    """Save the compiler pane to the palette.
-
-    Note: We specifically do not save/load the following:
-        - packfile dumping
-        - compile counts
-    This is because these are more system-dependent than map dependent.
-    """
-    corr_prop = Property('corridor', [])
-    props = Property('', [
-        Property('sshot_type', chosen_thumb.get()),
-        Property('sshot_cleanup', str(cleanup_screenshot.get())),
-        Property('spawn_elev', str(start_in_elev.get())),
-        Property('player_model', PLAYER_MODELS_REV[player_model_var.get()]),
-        Property('voiceline_priority', str(VOICE_PRIORITY_VAR.get())),
-        corr_prop,
-    ])
-    for group, win in CORRIDOR.items():
-        corr_prop[group] = win.chosen_id or '<NONE>'
-
-    # Embed the screenshot in so we can load it later.
-    if chosen_thumb.get() == 'CUST':
-        # encodebytes() splits it into multiple lines, which we write
-        # in individual blocks to prevent having a massively long line
-        # in the file.
-        with open(SCREENSHOT_LOC, 'rb') as f:
-            screenshot_data = base64.encodebytes(f.read())
-        props.append(Property(
-            'sshot_data',
-            [
-                Property('b64', data)
-                for data in
-                screenshot_data.decode('ascii').splitlines()
-            ]
-        ))
-
-    return props
+DEFAULT_STATE = CompilePaneState()
 
 
-@BEE2_config.OPTION_LOAD('CompilerPane')
-def load_handler(props: Property) -> None:
-    """Load compiler options from the palette."""
-    chosen_thumb.set(props['sshot_type', chosen_thumb.get()])
-    cleanup_screenshot.set(props.bool('sshot_cleanup', cleanup_screenshot.get()))
+async def apply_state(state: CompilePaneState) -> None:
+    """Apply saved state to the UI and compile config."""
+    chosen_thumb.set(state.sshot_type)
+    cleanup_screenshot.set(state.sshot_cleanup)
 
-    if 'sshot_data' in props:
-        screenshot_parts = b'\n'.join([
-            prop.value.encode('ascii')
-            for prop in
-            props.find_children('sshot_data')
-        ])
-        screenshot_data = base64.decodebytes(screenshot_parts)
+    if state.sshot_type == 'CUST' and state.sshot_cust:
         with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
-            f.write(screenshot_data)
+            f.write(state.sshot_cust)
 
     # Refresh these.
-    set_screen_type()
+    await set_screen_type()
     set_screenshot()
 
-    start_in_elev.set(props.bool('spawn_elev', start_in_elev.get()))
+    start_in_elev.set(state.spawn_elev)
+    player_model_var.set(PLAYER_MODELS[state.player_mdl])
+    VOICE_PRIORITY_VAR.set(state.use_voice_priority)
 
-    try:
-        player_mdl = props['player_model']
-    except LookupError:
-        pass
-    else:
-        player_model_var.set(PLAYER_MODELS[player_mdl])
-        COMPILE_CFG['General']['player_model'] = player_mdl
-
-    VOICE_PRIORITY_VAR.set(props.bool('voiceline_priority', VOICE_PRIORITY_VAR.get()))
-
-    corr_prop = props.find_block('corridor', or_blank=True)
-    for group, win in CORRIDOR.items():
-        try:
-            sel_id = corr_prop[group]
-        except LookupError:
-            "No config option, ok."
-        else:
-            win.sel_item_id(sel_id)
-            COMPILE_CFG['Corridor'][group] = '0' if sel_id == '<NONE>' else sel_id
-
-    COMPILE_CFG.save_check()
-    return None
-
-
-def load_corridors() -> None:
-    """Parse corridors out of the config file."""
-    corridor_conf = COMPILE_CFG['CorridorNames']
-    config = {}
-    for group, length in CORRIDOR_COUNTS.items():
-        for i in range(1, length + 1):
-            config[group, i] = CorrDesc(
-                name=corridor_conf.get('{}_{}_name'.format(group, i), ''),
-                icon=utils.PackagePath.parse(corridor_conf.get('{}_{}_icon'.format(group, i), img.PATH_ERROR), 'special'),
-                desc=corridor_conf.get('{}_{}_desc'.format(group, i), ''),
-            )
-    set_corridors(config)
-
-
-def set_corridors(config: dict[tuple[str, int], CorrDesc]) -> None:
-    """Set the corridor data based on the passed in config."""
-    CORRIDOR_DATA.clear()
-    CORRIDOR_DATA.update(config)
-
-    corridor_conf = COMPILE_CFG['CorridorNames']
-
-    for group, length in CORRIDOR_COUNTS.items():
-        selector = CORRIDOR[group]
-        for item in selector.item_list:
-            if item.name == '<NONE>':
-                continue  # No customisation for this.
-            ind = int(item.name)
-
-            data = config[group, ind]
-
-            corridor_conf['{}_{}_name'.format(group, ind)] = data.name
-            corridor_conf['{}_{}_desc'.format(group, ind)] = data.desc
-            corridor_conf['{}_{}_icon'.format(group, ind)] = str(data.icon)
-
-            # Note: default corridor description
-            desc = data.name or gettext('Corridor')
-            item.longName = item.shortName = item.context_lbl = item.name + ': ' + desc
-
-            if data.icon:
-                item.large_icon = img.Handle.parse_uri(
-                    data.icon,
-                    *selector_win.ICON_SIZE_LRG,
-                )
-                item.icon = None
-            else:
-                item.icon = default_sml_icon
-                item.large_icon = default_lrg_icon
-
-            if data.desc:
-                item.desc = tkMarkdown.convert(data.desc, None)
-            else:
-                item.desc = CORRIDOR_DESC
-
-        selector.refresh()
-        selector.set_disp()
+    COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
+    COMPILE_CFG['General']['player_model'] = state.player_mdl
+    COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
 
     COMPILE_CFG.save_check()
 
 
-def make_corr_wid(corr_name: str, title: str) -> None:
-    """Create the corridor widget and items."""
-    length = CORRIDOR_COUNTS[corr_name]
+class LimitCounter:
+    """Displays the current status of various compiler limits."""
+    def __init__(
+        self,
+        master: ttk.LabelFrame,
+        *,
+        maximum: int,
+        length: int,
+        blurb: str,
+        name: str,
+    ) -> None:
+        self._flasher: Union[trio.CancelScope, None] = None
+        self.var = tk.IntVar()
+        self.max = maximum
+        self.name = name
+        self.blurb = blurb
+        self.cur_count = 0
 
-    CORRIDOR[corr_name] = sel = selector_win.SelectorWin(
-        TK_ROOT,
-        [
-            selector_win.Item(
-                str(i),
-                'INVALID: ' + str(i),
-            )
-            for i in range(1, length + 1)
-        ],
-        save_id='corr_' + corr_name,
-        title=title,
-        none_desc=gettext(
-            'Randomly choose a corridor. '
-            'This is saved in the puzzle data '
-            'and will not change.'
-        ),
-        none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=gettext('Random'),
-        callback=sel_corr_callback,
-        callback_params=[corr_name],
-    )
+        self.bar = ttk.Progressbar(
+            master,
+            maximum=100,
+            variable=self.var,
+            length=length,
+        )
+        # Add tooltip logic.
+        add_tooltip(self.bar)
 
-    chosen_corr = COMPILE_CFG.get_int('Corridor', corr_name)
-    if chosen_corr == 0:
-        sel.sel_item_id('<NONE>')
-    else:
-        sel.sel_item_id(str(chosen_corr))
-
-
-def sel_corr_callback(sel_item: str, corr_name: str) -> None:
-    """Callback for saving the result of selecting a corridor."""
-    COMPILE_CFG['Corridor'][corr_name] = sel_item or '0'
-    COMPILE_CFG.save_check()
-
-
-def flash_count() -> None:
-    """Flash the counter between 0 and 100 when on."""
-    should_cont = False
-
-    for var in (count_brush, count_entity, count_overlay):
-        if not getattr(var, 'should_flash', False):
-            continue  # Abort when it shouldn't be flashing
-
-        if var.get() == 0:
-            var.set(100)
-        else:
-            var.set(0)
-
-        should_cont = True
-
-    if should_cont:
-        TK_ROOT.after(750, flash_count)
-
-
-def refresh_counts(reload: bool = True) -> None:
-    """Set the last-compile limit display."""
-    if reload:
-        COMPILE_CFG.load()
-
-    # Don't re-run the flash function if it's already on.
-    run_flash = not (
-        count_entity.should_flash or
-        count_overlay.should_flash or
-        count_brush.should_flash
-    )
-
-    for bar_var, name, default, tip_blurb in COUNT_CATEGORIES:
-        value = COMPILE_CFG.get_int('Counts', name)
-
-        if name == 'entity':
-            # The in-engine entity limit is different to VBSP's limit
-            # (that one might include prop_static, lights etc).
-            max_value = default
-        else:
-            # Use or to ensure no divide-by-zero occurs..
-            max_value = COMPILE_CFG.get_int('Counts', 'max_' + name) or default
-
+    def update(self, value: int) -> None:
+        """Apply the value to the counter."""
         # If it's hit the limit, make it continuously scroll to draw
         # attention to the bar.
-        if value >= max_value:
-            bar_var.should_flash = True
+        if value >= self.max:
+            if self._flasher is None:
+                app.background_run(self._flash)
         else:
-            bar_var.should_flash = False
-            bar_var.set(100 * value / max_value)
+            if self._flasher is not None:
+                self._flasher.cancel()
+            self._flasher = None
+            self.cur_count = round(100 * value / self.max)
+            self.var.set(self.cur_count)
 
-        set_tooltip(UI['count_' + name], '{}/{} ({:.2%}):\n{}'.format(
+        set_tooltip(self.bar, '{}/{} ({:.2%}):\n{}'.format(
             value,
-            max_value,
-            value / max_value,
-            tip_blurb,
+            self.max,
+            value / self.max,
+            self.blurb,
         ))
 
-    if run_flash:
-        flash_count()
+    async def _flash(self) -> None:
+        """Flash the display."""
+        if self._flasher is not None:
+            self._flasher.cancel()
+        with trio.CancelScope() as self._flasher:
+            while True:
+                self.var.set(100)
+                await trio.sleep(random.uniform(0.5, 0.75))
+                self.var.set(0)
+                await trio.sleep(random.uniform(0.5, 0.75))
+        # noinspection PyUnreachableCode
+        self.var.set(self.cur_count)
+
+
+def refresh_counts(*counters: LimitCounter) -> None:
+    """Set the last-compile limit display."""
+    COMPILE_CFG.load()
+    for limit_counter in counters:
+        value = COMPILE_CFG.get_int('Counts', limit_counter.name)
+
+        # The in-engine entity limit is different to VBSP's limit
+        # (that one might include prop_static, lights etc).
+        max_value = COMPILE_CFG.get_int('Counts', 'max_' + limit_counter.name)
+        if limit_counter.name != 'entity' and max_value != 0:
+            limit_counter.max = max_value
+
+        limit_counter.update(value)
 
 
 def set_pack_dump_dir(path: str) -> None:
@@ -429,13 +248,21 @@ def find_screenshot(e=None) -> None:
     )
     if file_name:
         image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
+        buf = io.BytesIO()
+        image.save(buf, 'png')
+        with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
+            f.write(buf.getvalue())
+
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-        image.save(SCREENSHOT_LOC)
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            sshot_cust=buf.getvalue(),
+        ))
         set_screenshot(image)
-    COMPILE_CFG.save_check()
+        COMPILE_CFG.save_check()
 
 
-def set_screen_type() -> None:
+async def set_screen_type() -> None:
     """Set the type of screenshot used."""
     chosen = chosen_thumb.get()
     COMPILE_CFG['Screenshot']['type'] = chosen
@@ -443,13 +270,13 @@ def set_screen_type() -> None:
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     else:
         UI['thumb_label'].grid_forget()
-    UI['thumb_label'].update_idletasks()
+    await tk_tools.wait_eventloop()
     # Resize the pane to accommodate the shown/hidden image
-    window.geometry('{}x{}'.format(
-        window.winfo_width(),
-        window.winfo_reqheight(),
+    window.geometry(f'{window.winfo_width()}x{window.winfo_reqheight()}')
+    config.APP.store_conf(attrs.evolve(
+        config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        sshot_type=chosen,
     ))
-
     COMPILE_CFG.save_check()
 
 
@@ -485,14 +312,12 @@ def make_setter(section: str, config: str, variable: tk.Variable) -> None:
     variable.trace_add('write', callback)
 
 
-def make_widgets() -> None:
+async def make_widgets(corr: corridor_selector.Selector) -> None:
     """Create the compiler options pane.
 
     """
-    make_setter('General', 'voiceline_priority', VOICE_PRIORITY_VAR)
-    make_setter('General', 'spawn_elev', start_in_elev)
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
-    make_setter('General', 'vrad_force_full', vrad_light_type)
+    make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
     ttk.Label(window, justify='center', text=gettext(
         "Options on this panel can be changed \n"
@@ -507,23 +332,26 @@ def make_widgets() -> None:
 
     nbook.enable_traversal()
 
-    map_frame = ttk.Frame(nbook)
+    map_frame = ttk.Frame(nbook, name='map_settings')
     # note: Tab name
     nbook.add(map_frame, text=gettext('Map Settings'))
-    make_map_widgets(map_frame)
 
-    comp_frame = ttk.Frame(nbook)
+    comp_frame = ttk.Frame(nbook, name='comp_settings')
     # note: Tab name
     nbook.add(comp_frame, text=gettext('Compile Settings'))
-    make_comp_widgets(comp_frame)
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(make_map_widgets, map_frame, corr)
+        nursery.start_soon(make_comp_widgets, comp_frame)
 
 
-def make_comp_widgets(frame: ttk.Frame):
+async def make_comp_widgets(frame: ttk.Frame) -> None:
     """Create widgets for the compiler settings pane.
 
     These are generally things that are aesthetic, and to do with the file and
     compilation process.
     """
+    make_setter("General", "packfile_auto_enable", packfile_auto_enable)
     frame.columnconfigure(0, weight=1)
 
     thumb_frame = ttk.LabelFrame(
@@ -534,12 +362,16 @@ def make_comp_widgets(frame: ttk.Frame):
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
+    def set_screen() -> None:
+        """Event handler when radio buttons are clicked."""
+        app.background_run(set_screen_type)
+
     UI['thumb_auto'] = ttk.Radiobutton(
         thumb_frame,
         text=gettext('Auto'),
         value='AUTO',
         variable=chosen_thumb,
-        command=set_screen_type,
+        command=set_screen,
     )
 
     UI['thumb_peti'] = ttk.Radiobutton(
@@ -547,7 +379,7 @@ def make_comp_widgets(frame: ttk.Frame):
         text=gettext('PeTI'),
         value='PETI',
         variable=chosen_thumb,
-        command=set_screen_type,
+        command=set_screen,
     )
 
     UI['thumb_custom'] = ttk.Radiobutton(
@@ -555,7 +387,7 @@ def make_comp_widgets(frame: ttk.Frame):
         text=gettext('Custom:'),
         value='CUST',
         variable=chosen_thumb,
-        command=set_screen_type,
+        command=set_screen,
     )
 
     UI['thumb_label'] = ttk.Label(
@@ -617,37 +449,63 @@ def make_comp_widgets(frame: ttk.Frame):
     )
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
+    UI['light_none'] = ttk.Radiobutton(
+        vrad_frame,
+        text=gettext('None'),
+        value='NONE',
+        variable=vrad_compile_type,
+    )
+    UI['light_none'].grid(row=0, column=0)
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
         text=gettext('Fast'),
-        value=0,
-        variable=vrad_light_type,
+        value='FAST',
+        variable=vrad_compile_type,
     )
-    UI['light_fast'].grid(row=0, column=0)
+    UI['light_fast'].grid(row=0, column=1)
     UI['light_full'] = ttk.Radiobutton(
         vrad_frame,
         text=gettext('Full'),
-        value=1,
-        variable=vrad_light_type,
+        value='FULL',
+        variable=vrad_compile_type,
     )
-    UI['light_full'].grid(row=0, column=1)
+    UI['light_full'].grid(row=0, column=2)
 
-    light_conf_swap = gettext(
-        "You can hold down Shift during the start of the Lighting stage to invert this "
-        "configuration on the fly."
+    light_conf_swap =  gettext(  # gettext: Info for toggling lighting via a key.
+        "You can hold down Shift during the start of the Lighting stage to "
+        "switch to {} lighting on the fly."
     )
+
+    add_tooltip(UI['light_none'], gettext(
+        "Compile with no lighting whatsoever. This significantly speeds up "
+        "compile times, but there will be no lights, gel will be invisible, "
+        "and the map will run in fullbright. \nWhen publishing, this is ignored."
+    ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
+
     add_tooltip(UI['light_fast'], gettext(
         "Compile with lower-quality, fast lighting. This speeds up compile "
         "times, but does not appear as good. Some shadows may appear "
         "wrong.\nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap)
+    ) + "\n\n" + light_conf_swap.format(gettext("Full")))
     add_tooltip(UI['light_full'], gettext(
         "Compile with high-quality lighting. This looks correct, but takes "
         "longer to compute. Use if you're arranging lights.\nWhen "
         "publishing, this is always used."
-    ) + "\n\n" + light_conf_swap)
+    ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
 
     packfile_enable = ttk.Checkbutton(
+        frame,
+        text=gettext('Enable packing'),
+        variable=packfile_auto_enable,
+    )
+    packfile_enable.grid(row=2, column=0, sticky='ew')
+    add_tooltip(packfile_enable, gettext(
+        "Disable automatically packing resources in the map. This can speed up building and allows "
+        "editing files and running reload commands, but can cause some resources to not work "
+        "correctly. Regardless of this setting, packing is enabled when publishing. "
+    ))
+
+    packfile_dump_enable_chk = ttk.Checkbutton(
         frame,
         text=gettext('Dump packed files to:'),
         variable=packfile_dump_enable,
@@ -656,9 +514,9 @@ def make_comp_widgets(frame: ttk.Frame):
 
     packfile_frame = ttk.LabelFrame(
         frame,
-        labelwidget=packfile_enable,
+        labelwidget=packfile_dump_enable_chk,
     )
-    packfile_frame.grid(row=2, column=0, sticky='ew')
+    packfile_frame.grid(row=3, column=0, sticky='ew')
 
     UI['packfile_filefield'] = packfile_filefield = tk_tools.FileField(
         packfile_frame,
@@ -672,7 +530,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     set_pack_dump_enabled()
 
-    add_tooltip(packfile_enable, gettext(
+    add_tooltip(packfile_dump_enable_chk, gettext(
         "When compiling, dump all files which were packed into the map. "
         "Useful if you're intending to edit maps in Hammer."
     ))
@@ -693,13 +551,22 @@ def make_comp_widgets(frame: ttk.Frame):
         anchor='n',
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
 
-    UI['count_entity'] = ttk.Progressbar(
+    count_entity = LimitCounter(
         count_frame,
-        maximum=100,
-        variable=count_entity,
+        maximum=2048,
         length=120,
+        name='entity',
+        # i18n: Progress bar description
+        blurb=gettext(
+            "Entities are the things in the map that have functionality. "
+            "Removing complex moving items will help reduce this. Items have "
+            "their entity count listed in the item description window.\n\nThis "
+            "isn't completely accurate, some entity types are counted here but "
+            "don't affect the ingame limit, while others may generate "
+            "additional entities at runtime."
+        )
     )
-    UI['count_entity'].grid(
+    count_entity.bar.grid(
         row=1,
         column=0,
         columnspan=3,
@@ -712,21 +579,27 @@ def make_comp_widgets(frame: ttk.Frame):
         text=gettext('Overlay'),
         anchor='center',
     ).grid(row=2, column=0, sticky='ew')
-    UI['count_overlay'] = ttk.Progressbar(
+    count_overlay = LimitCounter(
         count_frame,
-        maximum=100,
-        variable=count_overlay,
+        maximum=512,
         length=50,
+        name='overlay',
+        # i18n: Progress bar description
+        blurb=gettext(
+            "Overlays are smaller images affixed to surfaces, like signs or "
+            "indicator lights. Hiding complex antlines or setting them to "
+            "signage will reduce this."
+        )
     )
-    UI['count_overlay'].grid(row=3, column=0, sticky='ew', padx=5)
+    count_overlay.bar.grid(row=3, column=0, sticky='ew', padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
         'icons/tool_sub',
-        refresh_counts,
+        lambda: refresh_counts(count_brush, count_entity, count_overlay),
     )
     UI['refresh_counts'].grid(row=3, column=1)
-    add_tooltip(UI['refresh_counts'],gettext(
+    add_tooltip(UI['refresh_counts'], gettext(
         "Refresh the compile progress bars. Press after a compile has been "
         "performed to show the new values."
     ))
@@ -736,22 +609,23 @@ def make_comp_widgets(frame: ttk.Frame):
         text=gettext('Brush'),
         anchor='center',
     ).grid(row=2, column=2, sticky=tk.EW)
-    UI['count_brush'] = ttk.Progressbar(
+    count_brush = LimitCounter(
         count_frame,
-        maximum=100,
-        variable=count_brush,
+        maximum=8192,
         length=50,
+        name='brush',
+        blurb=gettext(
+            "Brushes form the walls or other parts of the test chamber. If this "
+            "is high, it may help to reduce the size of the map or remove "
+            "intricate shapes."
+        )
     )
-    UI['count_brush'].grid(row=3, column=2, sticky='ew', padx=5)
+    count_brush.bar.grid(row=3, column=2, sticky='ew', padx=5)
 
-    for wid_name in ('count_overlay', 'count_entity', 'count_brush'):
-        # Add in tooltip logic to the widgets.
-        add_tooltip(UI[wid_name])
-
-    refresh_counts(reload=False)
+    refresh_counts(count_brush, count_entity, count_overlay)
 
 
-def make_map_widgets(frame: ttk.Frame):
+async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -> None:
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.
@@ -766,10 +640,20 @@ def make_map_widgets(frame: ttk.Frame):
     )
     voice_frame.grid(row=1, column=0, sticky='ew')
 
+    def set_voice_priority() -> None:
+        """Called when the voiceline priority is changed."""
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
+        ))
+        COMPILE_CFG['General']['voiceline_priority'] = str(VOICE_PRIORITY_VAR.get())
+        COMPILE_CFG.save_check()
+
     voice_priority = ttk.Checkbutton(
         voice_frame,
         text=gettext("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
+        command=set_voice_priority,
     )
     voice_priority.grid(row=0, column=0)
     add_tooltip(voice_priority, gettext(
@@ -788,17 +672,28 @@ def make_map_widgets(frame: ttk.Frame):
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
+    def elev_changed(state: bool) -> None:
+        """Called when an elevator is selected."""
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            spawn_elev=state,
+        ))
+        COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state)
+        COMPILE_CFG.save_check()
+
     elev_preview = ttk.Radiobutton(
         elev_frame,
         text=gettext('Entry Door'),
         value=0,
         variable=start_in_elev,
+        command=functools.partial(elev_changed, False),
     )
     elev_elevator = ttk.Radiobutton(
         elev_frame,
         text=gettext('Elevator'),
         value=1,
         variable=start_in_elev,
+        command=functools.partial(elev_changed, True),
     )
 
     elev_preview.grid(row=0, column=0, sticky='w')
@@ -816,40 +711,11 @@ def make_map_widgets(frame: ttk.Frame):
         "When previewing in SP, spawn just before the entry door."
     ) + "\n\n" + elev_conf_swap)
 
-    corr_frame = ttk.LabelFrame(
+    ttk.Button(
         frame,
-        width=18,
-        text=gettext('Corridor:'),
-        labelanchor='n',
-    )
-    corr_frame.grid(row=3, column=0, sticky='ew')
-    corr_frame.columnconfigure(1, weight=1)
-
-    make_corr_wid('sp_entry', gettext('Singleplayer Entry Corridor'))  # i18n: corridor selector window title.
-    make_corr_wid('sp_exit', gettext('Singleplayer Exit Corridor'))  # i18n: corridor selector window title.
-    make_corr_wid('coop', gettext('Coop Exit Corridor'))  # i18n: corridor selector window title.
-
-    load_corridors()
-
-    CORRIDOR['sp_entry'].widget(corr_frame).grid(row=0, column=1, sticky='ew')
-    CORRIDOR['sp_exit'].widget(corr_frame).grid(row=1, column=1, sticky='ew')
-    CORRIDOR['coop'].widget(corr_frame).grid(row=2, column=1, sticky='ew')
-
-    ttk.Label(
-        corr_frame,
-        text=gettext('SP Entry:'),
-        anchor='e',
-    ).grid(row=0, column=0, sticky='ew', padx=2)
-    ttk.Label(
-        corr_frame,
-        text=gettext('SP Exit:'),
-        anchor='e',
-    ).grid(row=1, column=0, sticky='ew', padx=2)
-    ttk.Label(
-        corr_frame,
-        text=gettext('Coop Exit:'),
-        anchor='e',
-    ).grid(row=2, column=0, sticky='ew', padx=2)
+        text=gettext('Select Corridors'),
+        command=corr.show,
+    ).grid(row=3, column=0, sticky='ew')
 
     model_frame = ttk.LabelFrame(
         frame,
@@ -868,10 +734,14 @@ def make_map_widgets(frame: ttk.Frame):
     player_mdl.state(['readonly'])
     player_mdl.grid(row=0, column=0, sticky=tk.EW)
 
-    def set_model(e: tk.Event) -> None:
+    def set_model(_: tk.Event) -> None:
         """Save the selected player model."""
-        text = player_model_var.get()
-        COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
+        model = PLAYER_MODELS_REV[player_model_var.get()]
+        config.APP.store_conf(attrs.evolve(
+            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            player_mdl=model,
+        ))
+        COMPILE_CFG['General']['player_model'] = model
         COMPILE_CFG.save()
 
     player_mdl.bind('<<ComboboxSelected>>', set_model)
@@ -879,7 +749,7 @@ def make_map_widgets(frame: ttk.Frame):
     model_frame.columnconfigure(0, weight=1)
 
 
-def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
+async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_selector.Selector) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
@@ -895,7 +765,8 @@ def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    make_widgets()
+    await make_widgets(corr)
+    await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
 def init_application() -> None:
@@ -905,6 +776,8 @@ def init_application() -> None:
     window.title(gettext('Compiler Options - {}').format(utils.BEE_VERSION))
     window.resizable(True, False)
 
-    make_widgets()
+    # TODO load async properly.
+    import trio
+    trio.run(make_widgets)
 
     TK_ROOT.deiconify()

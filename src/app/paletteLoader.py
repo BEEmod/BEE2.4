@@ -7,12 +7,14 @@ import zipfile
 import random
 import io
 from uuid import UUID, uuid4, uuid5
-import utils
 
 import srctools.logger
 from srctools import Property, NoKeyError, KeyValError
 
 from localisation import gettext
+import config
+import consts
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -37,10 +39,6 @@ TRANS_NAMES: dict[str, str] = {
     # i18n: Aperture Tag's palette
     'APTAG': gettext('Aperture Tag'),
 }
-DEFAULT_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')
-UUID_PORTAL2 = uuid5(DEFAULT_NS, 'PORTAL2')
-UUID_EXPORT = uuid5(DEFAULT_NS, 'LAST_EXPORT')
-UUID_BLANK = uuid5(DEFAULT_NS, 'EMPTY')
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
 DEFAULT_PALETTES: dict[str, list[tuple[str, int]]] = {
@@ -209,7 +207,7 @@ class Palette:
         readonly: bool = False,
         group: str = '',
         filename: str = None,
-        settings: Property | None = None,
+        settings: config.Config | None = None,
         uuid: UUID = None,
     ) -> None:
         # Name of the palette
@@ -261,7 +259,7 @@ class Palette:
         trans_name = props['TransName', '']
         if trans_name:
             # Builtin, force a fixed uuid. This is mainly for LAST_EXPORT.
-            uuid = uuid5(DEFAULT_NS, trans_name)
+            uuid = uuid5(consts.PALETTE_NS, trans_name)
         else:
             try:
                 uuid = UUID(hex=props['UUID'])
@@ -269,11 +267,15 @@ class Palette:
                 uuid = uuid4()
                 needs_save = True
 
-        settings: Property | None
+        settings: config.Config | None
         try:
-            settings = props.find_key('Settings')
+            settings_conf = props.find_key('Settings')
         except NoKeyError:
             settings = None
+        else:
+            settings, upgraded_settings = config.APP.parse_kv1(settings_conf)
+            if upgraded_settings:
+                needs_save = True
 
         pal = Palette(
             name,
@@ -318,8 +320,9 @@ class Palette:
             del props['TransName']
 
         if self.settings is not None:
-            self.settings.name = 'Settings'
-            props.append(self.settings.copy())
+            settings_prop = Property('settings', [])
+            settings_prop.extend(config.APP.build_kv1(self.settings))
+            props.append(settings_prop)
 
         # We need to write a new file, determine a valid path.
         # Use a hash to ensure it's a valid path (without '-' if negative)
@@ -350,7 +353,7 @@ class Palette:
 
 def load_palettes() -> Iterator[Palette]:
     """Scan and read in all palettes. Legacy files will be converted in the process."""
-
+    name: str
     # Load our builtin palettes.
     for name, items in DEFAULT_PALETTES.items():
         LOGGER.info('Loading builtin "{}"', name)
@@ -360,7 +363,7 @@ def load_palettes() -> Iterator[Palette]:
             name,
             readonly=True,
             group=GROUP_BUILTIN,
-            uuid=uuid5(DEFAULT_NS, name),
+            uuid=uuid5(consts.PALETTE_NS, name),
         )
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
@@ -372,7 +375,8 @@ def load_palettes() -> Iterator[Palette]:
         try:
             if name.endswith(PAL_EXT):
                 try:
-                    yield Palette.parse(path)
+                    with srctools.logger.context(name):
+                        yield Palette.parse(path)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.

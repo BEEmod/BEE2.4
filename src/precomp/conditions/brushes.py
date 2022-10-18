@@ -5,14 +5,14 @@ from collections import defaultdict
 from random import Random
 
 from srctools import Property, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, to_matrix
+from srctools.math import Vec, Angle, Matrix, Vec_tuple, to_matrix
 import srctools.logger
 
 from precomp import (
-    conditions, tiling, texturing, rand,
+    conditions, tiling, texturing, rand, corridor, collisions,
     instance_traits, brushLoc, faithplate, template_brush,
 )
-import vbsp
+import utils
 import consts
 
 
@@ -77,7 +77,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
 
     - `Pos` and `name` are local to the
       instance, and will set the `origin` and `targetname` respectively.
-    - `Keys` are any other keyvalues to be be set.
+    - `Keys` are any other keyvalues to be set.
     - `Flags` sets additional spawnflags. Multiple values may be
        separated by `+`, and will be added together.
     - `Classname` specifies which entity will be created, as well as
@@ -99,7 +99,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
     des_axis = res['axis', 'z'].casefold()
     reverse = res.bool('reversed')
     door_type = res['classname', 'func_door_rotating']
-    orient = Matrix.from_angle(Angle.from_str(ent['angles']))
+    orient = Matrix.from_angstr(ent['angles'])
 
     axis = round(Vec.with_axes(des_axis, 1) @ orient, 6)
 
@@ -135,12 +135,12 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
             origin=pos.join(' '),
         )
         # Extra stuff to apply to the flags (USE, toggle, etc)
-        spawnflags = sum(map(
+        spawnflags = sum(
             # Add together multiple values
-            srctools.conv_int,
-            res['flags', '0'].split('+')
+            srctools.conv_int(num)
+            for num in res['flags', '0'].split('+')
             # Make the door always non-solid!
-        )) | flag_values.get('solid_flags', 0)
+        ) | flag_values.get('solid_flags', 0)
 
         conditions.set_ent_keys(door_ent, ent, res)
 
@@ -205,7 +205,7 @@ def res_set_texture(inst: Entity, res: Property):
 
     `pos` is the position, relative to the instance (0 0 0 is the floor-surface).
     `dir` is the normal of the texture (pointing out)
-    If `gridPos` is true, the position will be snapped so it aligns with
+    If `gridPos` is true, the position will be snapped, so it aligns with
      the 128 brushes (Useful with fizzler/light strip items).
 
     `tex` is the texture to use.
@@ -326,17 +326,18 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
             tile_grids[axis] = tiling.TileSize.TILE_4x4
 
     solids = vmf.make_prism(point1, point2)
+    center = (point1 + point2) / 2
 
     solids.north.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.N),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['y'])
+    ).get(center, tile_grids['y'])
     solids.south.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.S),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['y'])
+    ).get(center, tile_grids['y'])
     solids.east.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.E),
@@ -346,17 +347,17 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
         texturing.GenCat.NORMAL,
         Vec(Vec.W),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['x'])
+    ).get(center, tile_grids['x'])
     solids.top.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.T),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['z'])
+    ).get(center, tile_grids['z'])
     solids.bottom.mat = texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.B),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['z'])
+    ).get(center, tile_grids['z'])
 
     if res.bool('detail'):
         # Add the brush to a func_detail entity
@@ -369,7 +370,12 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('TemplateBrush')
-def res_import_template(vmf: VMF, res: Property):
+def res_import_template(
+    vmf: VMF,
+    coll: collisions.Collisions,
+    info: corridor.Info,
+    res: Property,
+) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only
@@ -437,6 +443,7 @@ def res_import_template(vmf: VMF, res: Property):
         res = Property('TemplateBrush', [])
 
     force = res['force', ''].casefold().split()
+    conf_force_colour: template_brush.ForceColour
     if 'white' in force:
         conf_force_colour = texturing.Portalable.white
     elif 'black' in force:
@@ -589,8 +596,10 @@ def res_import_template(vmf: VMF, res: Property):
             return
 
         for vis_flag_block in visgroup_instvars:
-            if all(conditions.check_flag(vmf, flag, inst) for flag in vis_flag_block):
+            if all(conditions.check_flag(flag, coll, info, inst) for flag in vis_flag_block):
                 visgroups.add(vis_flag_block.real_name)
+            if utils.DEV_MODE and vis_flag_block.real_name not in template.visgroups:
+                LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_flag_block.real_name)
 
         force_colour = conf_force_colour
         if color_var == '<editor>':
@@ -642,9 +651,10 @@ def res_import_template(vmf: VMF, res: Property):
             template,
             origin,
             orient,
-            targetname=inst['targetname', ''],
+            targetname=inst['targetname'],
             force_type=force_type,
             add_to_map=True,
+            coll=coll,
             additional_visgroups=visgroups,
             bind_tile_pos=bind_tile_pos,
             align_bind=align_bind_overlay,
@@ -658,8 +668,7 @@ def res_import_template(vmf: VMF, res: Property):
 
             move_dir = temp_data.detail['movedir', '']
             if move_dir.startswith('<') and move_dir.endswith('>'):
-                move_dir = Vec.from_str(move_dir) @ orient
-                temp_data.detail['movedir'] = move_dir.to_angle()
+                temp_data.detail['movedir'] = (Vec.from_str(move_dir) @ orient).to_angle()
 
             for out in outputs:
                 out = out.copy()
@@ -691,7 +700,7 @@ def res_antigel(inst: Entity) -> None:
     """Implement the Antigel marker."""
     inst.remove()
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     pos = round(origin - 128 * orient.up(), 6)
     norm = round(orient.up(), 6)
@@ -729,12 +738,12 @@ CHECKPOINT_NEIGHBOURS.remove(Vec(0, 0, 0))
 
 
 @conditions.make_result('CheckpointTrigger')
-def res_checkpoint_trigger(inst: Entity, res: Property) -> None:
+def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Property) -> None:
     """Generate a trigger underneath coop checkpoint items.
 
     """
 
-    if vbsp.GAME_MODE == 'SP':
+    if info.is_sp:
         # We can't have a respawn dropper in singleplayer.
         # Not generating the trigger means it's not going to
         # do anything.
@@ -813,7 +822,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
     - `o`: Cutout Tile (Partial)
     """
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     offset = (res.vec('offset', -48, 48) - (0, 0, 64)) @ orient + origin
 
@@ -898,7 +907,7 @@ def res_add_placement_helper(inst: Entity, res: Property):
     the helper should be added to. If `upDir` is specified, this is the
     direction of the top of the portal.
     """
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     pos = conditions.resolve_offset(inst, res['offset', '0 0 0'], zoff=-64)
     normal = res.vec('normal', 0, 0, 1) @ orient
@@ -1024,7 +1033,7 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
 
 def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
     """Implements SetPanelOptions and CreatePanel."""
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
     normal: Vec = round(props.vec('normal', 0, 0, 1) @ orient, 6)
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
@@ -1049,9 +1058,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         })
 
     tiles_to_uv: dict[tiling.TileDef, set[tuple[int, int]]] = defaultdict(set)
-    for pos in points:
+    for pos in map(Vec, points):
         try:
-            tile, u, v = tiling.find_tile(Vec(pos), normal, force=create)
+            tile, u, v = tiling.find_tile(pos, normal, force=create)
         except KeyError:
             continue
         tiles_to_uv[tile].add((u, v))
@@ -1081,7 +1090,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             bbox_max += off
             for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
                 if pos.as_tuple() not in points:
-                    bevel_world.add((pos[uaxis], pos[vaxis]))
+                    bevel_world.add((int(pos[uaxis]), int(pos[vaxis])))
         # else: No bevels.
     panels: list[tiling.Panel] = []
 
@@ -1131,9 +1140,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.bevels.clear()
             for u, v in bevel_world:
                 # Convert from world points to UV positions.
-                u = (u - tile.pos[uaxis] + 48) // 32
-                v = (v - tile.pos[vaxis] + 48) // 32
-                # Cull outside here, we wont't use them.
+                u = round((u - tile.pos[uaxis] + 48) // 32)
+                v = round((v - tile.pos[vaxis] + 48) // 32)
+                # Cull outside here, we won't use them.
                 if -1 <= u <= 4 and -1 <= v <= 4:
                     panel.bevels.add((u, v))
 
@@ -1174,7 +1183,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         if brush_ent is None:
             brush_ent = vmf.create_ent('')
 
-        old_pos = brush_ent.keys.pop('origin', None)
+        old_pos = brush_ent.pop('origin', None)
 
         conditions.set_ent_keys(brush_ent, inst, props)
         if not brush_ent['classname']:
@@ -1189,7 +1198,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
         else:
             # We want to do some post-processing.
             # Localise any origin value.
-            if 'origin' in brush_ent.keys:
+            if 'origin' in brush_ent:
                 pos = Vec.from_str(brush_ent['origin'])
                 pos.localise(
                     Vec.from_str(inst['origin']),
@@ -1208,12 +1217,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.brush_ent = brush_ent
 
 
-def _fill_norm_rotations() -> dict[
-    tuple[tuple[float, float, float], tuple[float, float, float]],
-    Matrix,
-]:
+def _fill_norm_rotations() -> dict[tuple[Vec_tuple, Vec_tuple], Matrix]:
     """Given a norm->norm rotation, return the angles producing that."""
-    rotations = {}
+    rotations: dict[tuple[Vec_tuple, Vec_tuple], Matrix] = {}
     for norm_ax in 'xyz':
         for norm_mag in [-1, +1]:
             norm = Vec.with_axes(norm_ax, norm_mag)
@@ -1282,5 +1288,5 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         start_tile.bullseye_count = 0
         # Then transfer the targets across.
         for plate in faithplate.PLATES.values():
-            if getattr(plate, 'target', None) is start_tile:
+            if not isinstance(plate, faithplate.StraightPlate) and plate.target is start_tile:
                 plate.target = end_tile

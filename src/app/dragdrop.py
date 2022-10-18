@@ -1,35 +1,46 @@
 """Implements drag/drop logic."""
+from __future__ import annotations
+from enum import Enum
 from collections import defaultdict
 
-import tkinter
-import utils
-from app import sound, img, TK_ROOT, tk_tools
-from enum import Enum
+import trio
 from tkinter import ttk, messagebox
-from srctools.logger import get_logger
 from typing import (
-    Union, Generic, Any, TypeVar,
-    Optional, Callable,
-    List, Tuple, Dict,
-    Iterator, Iterable,
+    Callable, Union, Generic, TypeVar, Protocol, Optional,
+    List, Tuple, Dict, Iterator, Iterable,
 )
+import tkinter
 
-__all__ = ['Manager', 'Slot', 'ItemProto']
+from srctools.logger import get_logger
 
-try:
-    from typing import Protocol
-except ImportError:
-    from typing_extensions import Protocol
+from app import sound, img, TK_ROOT, tk_tools, background_run
+import utils
+import event
 
+__all__ = ['Manager', 'Slot', 'ItemProto', 'ItemGroupProto']
 LOGGER = get_logger(__name__)
 
 
 class ItemProto(Protocol):
     """Protocol draggable items satisfy."""
-    dnd_icon: img.Handle  # Image for the item.
-    dnd_group: Optional[str]  # If set, the group an item belongs to.
-    # If only one item is present for a group, it uses this.
-    dnd_group_icon: Optional[img.Handle]
+    @property
+    def dnd_icon(self) -> img.Handle:
+        """Image for the item."""
+        return img.Handle.error(0, 0)
+
+
+class ItemGroupProto(ItemProto, Protocol):
+    """Additional values required when grouping."""
+    @property
+    def dnd_group(self) -> Optional[str]:
+        """If set, the group an item belongs to."""
+        return None
+
+    @property
+    def dnd_group_icon(self) -> Optional[img.Handle]:
+        """If only one item is present for a group, it uses this."""
+        return None
+
 
 ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
 
@@ -38,14 +49,42 @@ _CANV_TAG = '_BEE2_dragdrop_item'
 
 
 class Event(Enum):
-    """Callbacks that can be registered to be called by the manager."""
+    """Context for manager events. They provide either a relevant slot or None as the argument."""
     # Fires when items are right-clicked on. If one is registered, the gear
     # icon appears.
     CONFIG = 'config'
 
+    # Fired when any slot is modified. This occurs only once if two swap etc.
+    # The parameter is None.
+    MODIFIED = 'modified'
+
+    # Fired when a slot is dropped on itself - allows detecting a left click.
+    REDROPPED = 'redropped'
+
+    # When flexi slots are present, called when they're filled/emptied.
+    FLEXI_FLOW = 'flexi_flow'
+
     # Mouse over or out of the items (including drag item).
     HOVER_ENTER = 'hover_enter'
     HOVER_EXIT = 'hover_exit'
+
+
+class SlotType(Enum):
+    """Kind of slot.
+
+    FLEXI and SOURCE shouldn't be used together, that causes endless duplication.
+    """
+    TARGET = 'target'
+    SOURCE = 'source'
+    FLEXI = 'flexi'
+
+
+class GeoManager(Enum):
+    """Kind of geometry manager used for a slot."""
+    GRID = 'grid'
+    PLACE = 'place'
+    PACK = 'pack'
+    CANVAS = 'canvas'
 
 
 def in_bbox(
@@ -61,184 +100,261 @@ def in_bbox(
     return True
 
 
+class Positioner:
+    """Utility for positioning slots in a grid on a canvas.
+
+    - spacing is the amount added on each side of each slot.
+    - yoff is the offset from the top, the new height is then returned to allow chaining.
+    """
+    def __init__(
+        self,
+        canvas: tkinter.Canvas,
+        width: int,
+        height: int,
+        spacing: int=16 if utils.MAC else 8,
+        yoff: int=0,
+    ) -> None:
+        self.canvas = canvas
+        self.spacing = spacing
+        self.current = 0  # Current x index.
+        self.yoff = yoff + self.spacing
+
+        self.item_width = width + spacing * 2
+        self.item_height = height + spacing * 2
+
+        self.width = canvas.winfo_width()
+        self.height = canvas.winfo_height()
+
+        self.columns = (self.width - spacing) // self.item_width
+        if self.columns < 1:
+            # Can't fit, they're going to stick out.
+            self.columns = 1
+
+    def xpos(self, col: int) -> int:
+        """Return the x offset of a column"""
+        return self.spacing + col * self.item_width
+
+    def ypos(self, row: int) -> int:
+        """Return the y offset of a row."""
+        return self.yoff + row * self.item_height
+
+    def advance_row(self) -> None:
+        """Advance to the next row."""
+        self.current = 0
+        self.yoff += self.item_height
+
+    def resize_canvas(self) -> None:
+        """Set the scroll region of the canvas to fit items.
+
+        This advances a row if the last is nonempty.
+        """
+        if self.current != 0:
+            self.advance_row()
+        self.canvas['scrollregion'] = (
+            0, 0,
+            self.columns * self.item_width + self.spacing,
+            self.yoff,
+        )
+
+    def place_slots(self, slots: Iterable[Slot], tag: str, xoff: int=0) -> None:
+        """Place these slots gradually."""
+        for slot in slots:
+            x = self.xpos(self.current)
+            slot.canvas(self.canvas, x, self.yoff, tag)
+            self.current += 1
+            if self.current >= self.columns:
+                self.advance_row()
+
+
 # noinspection PyProtectedMember
 class Manager(Generic[ItemT]):
     """Manages a set of drag-drop points."""
     def __init__(
         self,
-        master: tkinter.Toplevel,
+        master: Union[tkinter.Tk, tkinter.Toplevel],
         *,
         size: Tuple[int, int]=(64, 64),
-        config_icon: bool=False
+        config_icon: bool=False,
+        pick_flexi_group: Optional[Callable[[int, int], Optional[str]]]=None,
     ):
         """Create a group of drag-drop slots.
 
-        size is the size of each moved image.
-        If config_icon is set, gear icons will be added to each slot to
-        configure items. This indicates the right-click option is available,
-        and makes it easier to press that.
+        - size: This is the size of each moved image.
+        - config_icon: If set, gear icons will be added to each slot to
+          configure items. This indicates the right-click option is available,
+          and makes it easier to press that.
+        - pick_flexi_group: Allows using flexi slots. This is called with a root x/y position,
+          and should return the name of the group to pick a slot from, or None if it should cancel.
         """
         self.width, self.height = size
 
-        self._targets = []  # type: List[Slot[ItemT]]
-        self._sources = []  # type: List[Slot[ItemT]]
+        self._slots: List[Slot[ItemT]] = []
 
         self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
 
         self.config_icon = config_icon
+        self._pick_flexi_group = pick_flexi_group
 
         # If dragging, the item we are dragging.
-        self._cur_drag = None  # type: Optional[ItemT]
+        self._cur_drag: Optional[ItemT] = None
         # While dragging, the place we started at.
-        self._cur_prev_slot = None  # type: Optional[Slot[ItemT]]
+        self._cur_slot: Optional[Slot[ItemT]] = None
 
-        self._callbacks = {
-            event: []
-            for event in Event
-        }  # type: Dict[Event, List[Callable[[Slot], None]]]
+        self.event_bus = event.EventBus()
 
         self._drag_win = drag_win = tkinter.Toplevel(master)
         drag_win.withdraw()
         drag_win.transient(master=master)
         drag_win.wm_overrideredirect(True)
 
-        self._drag_lbl = drag_lbl = tkinter.Label(drag_win)
-        img.apply(drag_lbl, self._img_blank)
-        drag_lbl.grid(row=0, column=0)
+        self._drag_lbl = tkinter.Label(drag_win)
+        self._drag_lbl.grid(row=0, column=0)
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
 
-    def slot(
-        self: 'Manager[ItemT]',
+    @property
+    def cur_slot(self) -> Optional[Slot[ItemT]]:
+        """If dragging, the current slot."""
+        return self._cur_slot
+
+    def slot_target(
+        self,
         parent: tkinter.Misc,
-        *,
-        source: bool,
         label: str='',
-    ) -> 'Slot[ItemT]':
-        """Add a slot to this group.
+    ) -> Slot[ItemT]:
+        """Add a slot to this group, which can have items added/removed.
 
         Parameters:
             - parent: Parent widget for the slot.
-            - source: If True this cannot be edited, and produces
-              copies of the contained item. If False, users can remove
-              items.
             - label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        slot: Slot[ItemT] = Slot(self, parent, source, label)
-        if source:
-            self._sources.append(slot)
-        else:
-            self._targets.append(slot)
-
+        slot: Slot[ItemT] = Slot(self, parent, SlotType.TARGET, label)
+        self._slots.append(slot)
         return slot
 
-    def remove(self, slot: 'Slot[ItemT]') -> None:
+    def slot_source(
+        self,
+        parent: tkinter.Misc,
+        label: str='',
+    ) -> Slot[ItemT]:
+        """Add a readonly slot to this group which the user can fetch copies from.
+
+        Parameters:
+            - parent: Parent widget for the slot.
+            - label: Set to a short string to be displayed in the lower-left.
+              Intended for numbers.
+        """
+        slot: Slot[ItemT] = Slot(self, parent, SlotType.SOURCE, label)
+        self._slots.append(slot)
+        return slot
+
+    def slot_flexi(
+        self,
+        parent: tkinter.Misc,
+        *,
+        label: str='',
+    ) -> Slot[ItemT]:
+        """Add a 'flexible' slot to this group.
+
+        These slots can have items dragged into/out of them, but when present any destroyed items
+        get put into a spare flexi slot. The total number of these should match the number of
+        sources.
+        Parameters:
+            - parent: Parent widget for the slot.
+            - group: The group it's categorised in, should match that returned by the
+              pick_flexi_group() callback.
+            - label: Set to a short string to be displayed in the lower-left.
+              Intended for numbers.
+        """
+        if self._pick_flexi_group is None:
+            raise ValueError('Flexi callback missing!')
+        slot: Slot[ItemT] = Slot(self, parent, SlotType.FLEXI, label)
+        self._slots.append(slot)
+        return slot
+
+    def remove(self, slot: Slot[ItemT]) -> None:
         """Remove the specified slot."""
-        (self._sources if slot.is_source else self._targets).remove(slot)
+        self._slots.remove(slot)
 
     def load_icons(self) -> None:
         """Load in all the item icons."""
+        # Sources are never grouped, both of the other types are.
+
         # Count the number of items in each group to find
         # which should have group icons.
         groups: Dict[Optional[str], int] = defaultdict(int)
-        for slot in self._targets:
-            groups[getattr(slot.contents, 'dnd_group', None)] += 1
+        for slot in self._slots:
+            if not slot.is_source:
+                groups[getattr(slot.contents, 'dnd_group', None)] += 1
 
         groups[None] = 2  # This must always be ungrouped.
 
-        for slot in self._targets:
-            self._display_item(
-                slot._lbl,
-                slot.contents,
-                groups[getattr(slot.contents, 'dnd_group', None)] == 1
-            )
-
-        for slot in self._sources:
-            # These are never grouped.
-            self._display_item(slot._lbl, slot.contents)
+        for slot in self._slots:
+            if slot.is_source:
+                # These are never grouped.
+                self._display_item(slot._lbl, slot.contents)
+            else:
+                self._display_item(
+                    slot._lbl,
+                    slot.contents,
+                    groups[getattr(slot.contents, 'dnd_group', None)] == 1
+                )
 
         if self._cur_drag is not None:
             self._display_item(self._drag_lbl, self._cur_drag)
 
     def unload_icons(self) -> None:
         """Reset all icons to blank. This way they can be destroyed."""
-        for slot in self._sources:
-            img.apply(slot._lbl, self._img_blank)
-        for slot in self._targets:
+        for slot in self._slots:
             img.apply(slot._lbl, self._img_blank)
         img.apply(self._drag_lbl, self._img_blank)
 
-    def sources(self) -> 'Iterator[Slot[ItemT]]':
+    def sources(self) -> Iterator[Slot[ItemT]]:
         """Yield all source slots."""
-        return iter(self._sources)
+        for slot in self._slots:
+            if slot.is_source:
+                yield slot
 
-    def targets(self) -> 'Iterator[Slot[ItemT]]':
+    def targets(self) -> Iterator[Slot[ItemT]]:
         """Yield all target slots."""
-        return iter(self._targets)
+        for slot in self._slots:
+            if slot.is_target:
+                yield slot
+
+    def flexi_slots(self) -> Iterator[Slot[ItemT]]:
+        """Yield all flexible slots."""
+        for slot in self._slots:
+            if slot.is_flexi:
+                yield slot
+
+    def all_slots(self) -> Iterator[Slot[ItemT]]:
+        """Yield all slots."""
+        return iter(self._slots)
 
     def flow_slots(
         self,
         canv: tkinter.Canvas,
-        slots: 'Iterable[Slot[ItemT]]',
+        slots: Iterable[Slot[ItemT]],
         spacing: int=16 if utils.MAC else 8,
-    ) -> None:
+        yoff: int=0,
+        tag: str=_CANV_TAG,
+    ) -> int:
         """Place all the slots in a grid on the provided canvas.
 
-        Any previously added slots will be removed.
-        padding is the amount added on each side of each slot.
+        Any previously added slots with the same tag will be removed.
+        - spacing is the amount added on each side of each slot.
+        - yoff is the offset from the top, the new height is then returned to allow chaining.
         """
-        canv.delete(_CANV_TAG)
-        item_width = self.width + spacing * 2
-        item_height = self.width + spacing * 2
+        canv.delete(tag)
+        pos = Positioner(canv, self.width, self.height, spacing, yoff)
+        pos.place_slots(slots, tag)
+        pos.resize_canvas()
+        return pos.yoff
 
-        col_count = (canv.winfo_width() - spacing) // item_width - 1
-        if col_count < 1:
-            # Oh well, they're going to stick out.
-            col_count = 1
-
-        row = col = 0
-        for slot in slots:
-            if slot._pos_type in ['place', 'pack', 'grid']:
-                raise ValueError("Can't add already positioned slot!")
-
-            obj_id = canv.create_window(
-                spacing + col * item_width,
-                spacing + row * item_height,
-                width=self.width,
-                height=self.height,
-                anchor='nw',
-                window=slot._lbl,
-                tags=[_CANV_TAG],
-            )
-            slot._pos_type = f'_canvas_{obj_id}'
-
-            col += 1
-            if col > col_count:
-                col = 0
-                row += 1
-
-        if col == 0:
-            row -= 1
-
-        canv['scrollregion'] = (
-            0, 0,
-            col_count * item_width + spacing,
-            (row + 1) * item_height + spacing,
-        )
-
-    def reg_callback(self, event: Event, func: Callable[['Slot'], Any]) -> None:
-        """Register a callback."""
-        self._callbacks[event].append(func)
-
-    def _fire_callback(self, event: Event, slot: 'Slot') -> None:
-        """Fire all the registered callbacks."""
-        for cback in self._callbacks[event]:
-            cback(slot)
-
-    def _pos_slot(self, x: float, y: float) -> 'Optional[Slot[ItemT]]':
-        """Find the slot under this X,Y (if any)."""
-        for slot in self._targets:
-            if slot._pos_type is not None:
+    def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
+        """Find the slot under this X,Y (if any). Sources are ignored."""
+        for slot in self._slots:
+            if not slot.is_source and slot.is_visible:
                 lbl = slot._lbl
                 if in_bbox(
                     x, y,
@@ -257,11 +373,12 @@ class Manager(Generic[ItemT]):
         group: bool=False,
     ) -> None:
         """Display the specified item on the given label."""
+        image: img.Handle
         if item is None:
             image = self._img_blank
         elif group:
             try:
-                image = item.dnd_group_icon
+                image = item.dnd_group_icon  # type: ignore
             except AttributeError:
                 image = item.dnd_icon
         else:
@@ -274,7 +391,8 @@ class Manager(Generic[ItemT]):
             # None to do..
             return
         group_slots = [
-            slot for slot in self._targets
+            slot for slot in self._slots
+            if not slot.is_source
             if getattr(slot.contents, 'dnd_group', None) == group
         ]
 
@@ -282,7 +400,7 @@ class Manager(Generic[ItemT]):
         for slot in group_slots:
             self._display_item(slot._lbl, slot.contents, has_group)
 
-    def _start(self, slot: 'Slot[ItemT]', event: tkinter.Event) -> None:
+    def _start(self, slot: Slot[ItemT], event: tkinter.Event) -> None:
         """Start the drag."""
         if slot.contents is None:
             return  # Can't pick up blank...
@@ -297,20 +415,20 @@ class Manager(Generic[ItemT]):
             # If none of this group are present in the targets and we're
             # pulling from the items, we hold a group icon.
             try:
-                group = self._cur_drag.dnd_group
+                group = self._cur_drag.dnd_group  # type: ignore
             except AttributeError:
                 pass
             else:
                 if group is not None:
-                    for other_slot in self._targets:
-                        if getattr(other_slot.contents, 'dnd_group', None) == group:
+                    for other_slot in self._slots:
+                        if other_slot.is_target and getattr(other_slot.contents, 'dnd_group', None) == group:
                             break
                     else:
                         # None present.
                         show_group = True
 
         self._display_item(self._drag_lbl, self._cur_drag, show_group)
-        self._cur_prev_slot = slot
+        self._cur_slot = slot
 
         sound.fx('config')
 
@@ -329,7 +447,7 @@ class Manager(Generic[ItemT]):
 
     def _evt_move(self, event: tkinter.Event) -> None:
         """Reposition the item whenever moving."""
-        if self._cur_drag is None or self._cur_prev_slot is None:
+        if self._cur_drag is None or self._cur_slot is None:
             # We aren't dragging, ignore the event.
             return
 
@@ -342,32 +460,59 @@ class Manager(Generic[ItemT]):
 
         if dest:
             self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
-        elif self._cur_prev_slot.is_source:
+        elif self._cur_slot.is_source:
             self._drag_win['cursor'] = tk_tools.Cursors.INVALID_DRAG
+        elif self._cur_slot.is_flexi:  # If it's a flexi slot, it's going back.
+            self._drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
         else:
             self._drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
 
-    def _evt_stop(self, event: tkinter.Event) -> None:
+    def _evt_stop(self, evt: tkinter.Event) -> None:
         """User released the item."""
-        if self._cur_drag is None or self._cur_prev_slot is None:
+        if self._cur_drag is None or self._cur_slot is None:
             return
-
-        sound.fx('config')
         self._drag_win.grab_release()
         self._drag_win.withdraw()
         self._drag_win.unbind(tk_tools.EVENTS['LEFT_MOVE'])
 
-        dest = self._pos_slot(event.x_root, event.y_root)
+        dest = self._pos_slot(evt.x_root, evt.y_root)
 
-        if dest:
-            # We have a target.
+        if dest is self._cur_slot:
+            assert dest is not None
+            # Dropped on itself, fire special event, put the item back.
             dest.contents = self._cur_drag
-        # No target, and we dragged off an existing target - delete.
-        elif not self._cur_prev_slot.is_source:
+            background_run(self.event_bus, Event.REDROPPED, dest)
+            self._cur_drag = None
+            self._cur_slot = None
+            return
+
+        sound.fx('config')
+
+        if self._cur_slot.is_flexi:
+            # It's a flexi slot, lookup the group and drop.
+            if self._pick_flexi_group is None:
+                raise ValueError('No pick_flexi_group function!')
+            group = self._pick_flexi_group(evt.x_root, evt.y_root)
+            for slot in self._slots:
+                if slot.is_flexi and slot.contents is None and group is not None:
+                    slot.contents = self._cur_drag
+                    slot.flexi_group = group
+                    background_run(self.event_bus, Event.MODIFIED)
+                    break
+            else:
+                LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
+                self._cur_slot.contents = self._cur_drag
+                background_run(self.event_bus, Event.REDROPPED, self._cur_slot)
+        elif dest:  # We have a target.
+            dest.contents = self._cur_drag
+            background_run(self.event_bus, Event.MODIFIED)
+        # No target, and we dragged off an existing target, delete.
+        elif not self._cur_slot.is_source:
+            background_run(self.event_bus, Event.MODIFIED)
             sound.fx('delete')
 
         self._cur_drag = None
-        self._cur_prev_slot = None
+        self._cur_slot = None
 
 
 # noinspection PyProtectedMember
@@ -377,41 +522,49 @@ class Slot(Generic[ItemT]):
     _text_lbl: Optional[tkinter.Label]
     _info_btn: Optional[tkinter.Label]
     # Our main widget.
-    _lbl: tkinter.Label
+    _lbl: ttk.Label
+
+    # Optional ability to highlight a specific slot.
+    _is_highlighted: bool
+
+    flexi_group: str  # If a flexi slot, the group.
 
     # The current thing in the slot.
     _contents: Optional[ItemT]
 
     # The geometry manager used to position this.
-    # Either 'pack', 'place', 'grid', or '_canvas_XX' to indicate
-    # we're on the canvas with ID XX.
-    _pos_type: Optional[str]
+    _pos_type: Optional[GeoManager]
+    # If canvas, the tag and x/y coords.
+    _canv_info: Optional[Tuple[int, int, int]]
 
-    # If true, this can't be changed, and dragging out of it produces a second
-    # reference to the contents.
-    is_source: bool
+    # The kind of slot.
+    type: SlotType
     man: Manager  # Our drag/drop controller.
 
     def __init__(
         self,
         man: Manager,
         parent: tkinter.Misc,
-        is_source: bool,
+        kind: SlotType,
         label: str,
     ) -> None:
         """Internal only, use Manager.slot()."""
-
         self.man = man
-        self.is_source = is_source
+        self.kind = kind
         self._contents = None
         self._pos_type = None
-        self._lbl = tkinter.Label(parent)
+        self._canv_info = None
+        self._lbl = ttk.Label(parent, anchor='center')
+        self._selected = False
+
+        self.flexi_group = ''
+
         img.apply(self._lbl, man._img_blank)
         tk_tools.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
         self._lbl.bind('<Enter>', self._evt_hover_enter)
         self._lbl.bind('<Leave>', self._evt_hover_exit)
-
+        # Bind this not the self variable.
         config_event = self._evt_configure
         tk_tools.bind_rightclick(self._lbl, config_event)
 
@@ -434,7 +587,7 @@ class Slot(Generic[ItemT]):
             img.apply(self._info_btn, img.Handle.builtin('icons/gear', 10, 10))
 
             @tk_tools.bind_leftclick(self._info_btn)
-            def info_button_click(e):
+            def info_button_click(e: tkinter.Event) -> object:
                 """Trigger the callback whenever the gear button was pressed."""
                 config_event(e)
                 # Cancel the event sequence, so it doesn't travel up to the main
@@ -446,6 +599,39 @@ class Slot(Generic[ItemT]):
             self._info_btn = None
 
     @property
+    def is_target(self) -> bool:
+        """Check if this is a target slot."""
+        return self.kind is SlotType.TARGET
+
+    @property
+    def is_source(self) -> bool:
+        """Check if this is a source slot."""
+        return self.kind is SlotType.SOURCE
+
+    @property
+    def is_flexi(self) -> bool:
+        """Check if this is a flexi slot."""
+        return self.kind is SlotType.FLEXI
+
+    @property
+    def is_visible(self) -> bool:
+        """Check if this slot is currently displayed."""
+        return self._pos_type is not None
+
+    @property
+    def highlight(self) -> bool:
+        """Allows setting/getting if the slot has an alternate selection state."""
+        return self._is_highlighted
+
+    @highlight.setter
+    def highlight(self, value: bool) -> None:
+        """Allows setting/getting if the slot has an alternate selection state."""
+        self._is_highlighted = bool(value)
+        self._lbl['background'] = (
+            '#5AD2D2' if self._is_highlighted else ''
+        )
+
+    @property
     def contents(self) -> Optional[ItemT]:
         """Get the item in this slot, or None if empty."""
         return self._contents
@@ -455,15 +641,15 @@ class Slot(Generic[ItemT]):
         """Set the item in this slot."""
         old_cont = self._contents
 
-        if value is not None and not self.is_source:
+        if value is not None and self.is_target:
             # Make sure this isn't already present.
-            for slot in self.man._targets:
-                if slot.contents is value:
+            for slot in self.man._slots:
+                if slot.is_target and slot.contents is value:
                     slot.contents = None
         # Then set us.
         self._contents = value
 
-        if not self.is_source:
+        if self.is_target:
             # Update items in the previous group, so they gain the group icon
             # if only one now exists.
             self.man._group_update(getattr(old_cont, 'dnd_group', None))
@@ -471,6 +657,10 @@ class Slot(Generic[ItemT]):
         else:
             # Source pickers never group items.
             new_group = None
+
+        if self.is_flexi and (old_cont is None) != (value is None):
+            # We're showing/hiding, we need to redraw.
+            background_run(self.man.event_bus, Event.FLEXI_FLOW, self)
 
         if new_group is not None:
             # Update myself and the entire group to get the group
@@ -480,32 +670,64 @@ class Slot(Generic[ItemT]):
             # Just update myself.
             self.man._display_item(self._lbl, value)
 
+    def __repr__(self) -> str:
+        return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
+
     def grid(self, *args, **kwargs) -> None:
         """Grid-position this slot."""
-        self._pos_type = 'grid'
+        self._pos_type = GeoManager.GRID
+        self._canv_info = None
         self._lbl.grid(*args, **kwargs)
 
     def place(self, *args, **kwargs) -> None:
         """Place-position this slot."""
-        self._pos_type = 'place'
+        self._pos_type = GeoManager.PLACE
+        self._canv_info = None
         self._lbl.place(*args, **kwargs)
 
     def pack(self, *args, **kwargs) -> None:
         """Pack-position this slot."""
-        self._pos_type = 'pack'
+        self._pos_type = GeoManager.PACK
+        self._canv_info = None
         self._lbl.pack(*args, **kwargs)
+
+    def canvas(self, canv: tkinter.Canvas, x: int, y: int, tag: str) -> None:
+        """Position this slot on a canvas."""
+        if self._pos_type is not None and self._pos_type is not GeoManager.CANVAS:
+            raise ValueError("Can't add already positioned slot!")
+        obj_id = canv.create_window(
+            x, y,
+            width=self.man.width,
+            height=self.man.height,
+            anchor='nw',
+            window=self._lbl,
+            tags=(tag,),
+        )
+        self._pos_type = GeoManager.CANVAS
+        self._canv_info = (obj_id, x, y)
+
+    def canvas_pos(self, canv: tkinter.Canvas) -> Tuple[int, int]:
+        """If on a canvas, fetch the current x/y position."""
+        if self._canv_info is not None:
+            _, x, y = self._canv_info
+            return x, y
+        raise ValueError('Not on a canvas!')
 
     def hide(self) -> None:
         """Remove this slot from the set position manager."""
         if self._pos_type is None:
             raise ValueError('Not added to a geometry manager yet!')
-        elif self._pos_type.startswith('_canvas_'):
+        elif self._pos_type is GeoManager.CANVAS:
             # Attached via canvas, with an ID as suffix.
-            canv: tkinter.Canvas = self._lbl.winfo_parent()
-            canv.delete(self._pos_type[8:])
+            canv = self._lbl.nametowidget(self._lbl.winfo_parent())
+            assert isinstance(canv, tkinter.Canvas)
+            assert self._canv_info is not None
+            obj_id, _, _ = self._canv_info
+            canv.delete(obj_id)
         else:
-            getattr(self._lbl, self._pos_type + '_forget')()
+            getattr(self._lbl, self._pos_type.value + '_forget')()
         self._pos_type = None
+        self._canv_info = None
 
     def _evt_start(self, event: tkinter.Event) -> None:
         """Start dragging."""
@@ -513,22 +735,33 @@ class Slot(Generic[ItemT]):
 
     def _evt_fastdrag(self, event: tkinter.Event) -> None:
         """Quickly add/remove items by shift-clicking."""
+        if self.is_flexi:  # TODO:
+            return
+
         if self.is_source:
             # Add this item to the first free position.
             item = self.contents
-            for slot in self.man._targets:
+            for slot in self.man._slots:
+                if not slot.is_target:
+                    continue
                 if slot.contents is None:
                     slot.contents = item
                     sound.fx('config')
+                    if self.is_flexi:
+                        self.contents = None
+                    background_run(self.man.event_bus, Event.MODIFIED)
                     return
                 elif slot.contents is item:
                     # It's already on the board, don't change anything.
                     sound.fx('config')
                     return
+            # Failed.
             sound.fx('delete')
+        # Else: target.
         else:
             # Fast-delete this.
             self.contents = None
+            background_run(self.man.event_bus, Event.MODIFIED)
             sound.fx('delete')
 
     def _evt_hover_enter(self, event: tkinter.Event) -> None:
@@ -545,7 +778,7 @@ class Slot(Generic[ItemT]):
                 y=self._lbl.winfo_height() - padding,
                 anchor='se',
             )
-        self.man._fire_callback(Event.HOVER_ENTER, self)
+        background_run(self.man.event_bus, Event.HOVER_ENTER, self)
 
         if self._text_lbl:
             self._text_lbl.place(
@@ -554,7 +787,7 @@ class Slot(Generic[ItemT]):
                 anchor='sw',
             )
 
-    def _evt_hover_exit(self, event: tkinter.Event) -> None:
+    def _evt_hover_exit(self, _: tkinter.Event) -> None:
         """Fired when the cursor stops hovering over the item."""
         self._lbl['relief'] = 'flat'
 
@@ -562,24 +795,35 @@ class Slot(Generic[ItemT]):
             self._info_btn.place_forget()
         if self._text_lbl:
             self._text_lbl.place_forget()
-        self.man._fire_callback(Event.HOVER_EXIT, self)
+        background_run(self.man.event_bus, Event.HOVER_EXIT, self)
 
-    def _evt_configure(self, event: tkinter.Event) -> None:
+    def _evt_configure(self, _: tkinter.Event) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
         if self.contents:
-            self.man._fire_callback(Event.CONFIG, self)
+            background_run(self.man.event_bus, Event.CONFIG, self)
 
 
-def test() -> None:
+async def test() -> None:
     """Test the GUI."""
-    from BEE2_config import GEN_OPTS
-    from packages import find_packages, PACKAGE_SYS
+    import BEE2_config
+    import config
+    import packages
+
+    BEE2_config.GEN_OPTS.load()
+    config.APP.read_file()
 
     # Setup images to read from packages.
     print('Loading packages for images.')
-    GEN_OPTS.load()
-    find_packages(GEN_OPTS['Directories']['package'])
-    img.load_filesystems(PACKAGE_SYS)
+    async with trio.open_nursery() as pack_nursery:
+        for loc in BEE2_config.get_package_locs():
+            pack_nursery.start_soon(
+                packages.find_packages,
+                pack_nursery,
+                packages.LOADED,
+                loc,
+            )
+    background_run(img.init, packages.PACKAGE_SYS)
+    background_run(sound.sound_task)
     print('Done.')
 
     left_frm = ttk.Frame(TK_ROOT)
@@ -611,15 +855,15 @@ def test() -> None:
         def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)
 
-    manager = Manager[TestItem](TK_ROOT, config_icon=True)
+    manager: Manager[TestItem] = Manager(TK_ROOT, config_icon=True)
 
     def func(ev):
-        def call(slot):
+        async def call(slot: Slot[TestItem]) -> None:
             print('Cback: ', ev, slot)
         return call
 
-    for event in Event:
-        manager.reg_callback(event, func(event))
+    for evt in Event:
+        manager.event_bus.register(evt, Slot[TestItem], func(evt))
 
     PAK_CLEAN = 'BEE2_CLEAN_STYLE'
     PAK_ELEM = 'VALVE_TEST_ELEM'
@@ -645,14 +889,16 @@ def test() -> None:
 
     for y in range(8):
         for x in range(4):
-            slot = manager.slot(left_frm, source=False, label=(format(x + 4*y, '02') if y < 3 else ''))
+            slot = manager.slot_target(left_frm, label=(format(x + 4*y, '02') if y < 3 else ''))
             slot.grid(column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
 
+    FLEXI = True
+    right_kind = manager.slot_flexi if FLEXI else manager.slot_source
     for i, item in enumerate(items):
-            slot = manager.slot(right_canv, source=True, label=format(i+1, '02'))
-            slot_src.append(slot)
-            slot.contents = item
+        slot = right_kind(right_canv, label=format(i+1, '02'))
+        slot_src.append(slot)
+        slot.contents = item
 
     def configure(e):
         manager.flow_slots(right_canv, slot_src)
@@ -674,16 +920,21 @@ def test() -> None:
     name_lbl = ttk.Label(TK_ROOT, text='')
     name_lbl.grid(row=3, column=0)
 
-    def enter(slot):
-        if slot.contents is not None:
-            name_lbl['text'] = 'Name: ' + slot.contents.name
+    async def evt_enter(evt_slot: Slot[TestItem]) -> None:
+        if evt_slot.contents is not None:
+            name_lbl['text'] = 'Name: ' + evt_slot.contents.name
 
-    def exit(slot):
+    async def evt_exit(evt_slot: Slot[TestItem]) -> None:
         name_lbl['text'] = ''
 
-    manager.reg_callback(Event.HOVER_ENTER, enter)
-    manager.reg_callback(Event.HOVER_EXIT, exit)
-    manager.reg_callback(Event.CONFIG, lambda slot: messagebox.showinfo('Hello World', str(slot.contents)))
+    async def evt_config(evt_slot: Slot[TestItem]) -> None:
+        messagebox.showinfo('Hello World', str(evt_slot.contents))
+
+    manager.event_bus.register(Event.HOVER_ENTER, Slot[TestItem], evt_enter)
+    manager.event_bus.register(Event.HOVER_EXIT, Slot[TestItem], evt_exit)
+    manager.event_bus.register(Event.CONFIG, Slot[TestItem], evt_config)
 
     TK_ROOT.deiconify()
-    TK_ROOT.mainloop()
+    with trio.CancelScope() as scope:
+        TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
+        await trio.sleep_forever()

@@ -1,11 +1,13 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
 from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
+from uuid import UUID, uuid5
+
+from typing_extensions import Final, Self
 from enum import Enum, EnumMeta
 from srctools import Side
 
 
-T = TypeVar('T')
 __all__ = [
     'MaterialGroup',
 
@@ -19,6 +21,8 @@ __all__ = [
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
     'COUNTER_OR_ON', 'COUNTER_OR_OFF',
     'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG', 'SEL_ICON_CROP_SHRINK',
+    'PALETTE_FORCE_SHOWN', 'PALETTE_NS',
+    'UUID_BLANK', 'UUID_EXPORT', 'UUID_PORTAL2',
 ]
 
 
@@ -51,22 +55,24 @@ class MaterialGroupMeta(EnumMeta):
     _value2member_map_: dict[str, Any]  # Enum defines.
 
     @classmethod
-    def __prepare__(mcs, name: str, bases: tuple[type, ...], **kwargs: Any) -> MutableMapping[str, Any]:
+    def __prepare__(mcs, cls: str, bases: tuple[type, ...], /, **kwd: Any) -> Any:  # type: ignore
         """Override Enum class-dict type.
 
         This makes string-values lowercase when set.
         """
-        namespace = super().__prepare__(name, bases, **kwargs)
+        namespace = super().__prepare__(cls, bases, **kwd)
         return _MaterialGroupNS(cast(MutableMapping[str, Any], namespace))
 
-    def __new__(mcs, cls: type, bases: tuple[type, ...], classdict: _MaterialGroupNS, **kwds: Any) -> EnumMeta:
+    def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwds: Any) -> MaterialGroupMeta:
         """Unpack the dict type back to the original for EnumMeta.
 
         It accesses attributes, so it can't have our wrapper.
         """
-        return super().__new__(mcs, cls, bases, classdict.mapping, **kwds)
+        assert isinstance(namespace, _MaterialGroupNS)
+        # Is always enum._EnumDict, but that's private.
+        return super().__new__(mcs, name, bases, cast(Any, namespace.mapping), **kwds)
 
-    def __contains__(cls, value) -> bool:
+    def __contains__(cls, value: object) -> bool:
         """MaterialGroup can check if strings are equal to a member."""
         if isinstance(value, str):
             return value.casefold() in cls._value2member_map_
@@ -74,12 +80,11 @@ class MaterialGroupMeta(EnumMeta):
             return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
 
-    # Need to ignore types here, EnumMeta does not match type's signature.
-    def __call__(cls: Type[T], value: str, *args, **kwargs) -> T:  # type: ignore
+    def __call__(cls, value: str, *args, **kwargs) -> Self:
         """Find the existing member with this name."""
-        if args or kwargs:
+        if args or kwargs:  # Constructing the enum itself, keep unchanged.
             return super().__call__(value, *args, **kwargs)  # type: ignore
-        return cls.__new__(cls, value.casefold())  # type: ignore
+        return cls.__new__(cls, value.casefold(), *args, **kwargs)  # type: ignore
 
 
 class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
@@ -91,10 +96,21 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
       to any members.
     * str(member) == member.value
     """
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        """Compare case-insensitively."""
         if isinstance(other, Side):
             other = other.mat
-        return self.value == other.casefold()
+        if isinstance(other, str):
+            return self.value == other.casefold()
+        return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        """Compare case-insensitively."""
+        if isinstance(other, Side):
+            other = other.mat
+        if isinstance(other, str):
+            return self.value != other.casefold()
+        return NotImplemented
 
     def __str__(self) -> str:
         return self.value
@@ -173,15 +189,15 @@ class Signage(MaterialGroup):
     """The various square white signs used in the PeTI."""
     EXIT = "signage/signage_exit"
     ARROW = "signage/signage_overlay_arrow"
+    SHAPE_SQUARE = "signage/shape05"
+    SHAPE_CROSS = "signage/shape04"
     SHAPE_DOT = "signage/shape01"
     SHAPE_MOON = "signage/shape02"
-    SHAPE_TRIANGLE = "signage/shape03"
-    SHAPE_CROSS = "signage/shape04"
-    SHAPE_SQUARE = "signage/shape05"
-    SHAPE_CIRCLE = "signage/signage_shape_circle"
-    SHAPE_SINE = "signage/signage_shape_sine"
     SHAPE_SLASH = "signage/signage_shape_slash"
+    SHAPE_TRIANGLE = "signage/shape03"
+    SHAPE_SINE = "signage/signage_shape_sine"
     SHAPE_STAR = "signage/signage_shape_star"
+    SHAPE_CIRCLE = "signage/signage_shape_circle"
     SHAPE_WAVY = "signage/signage_shape_wavy"
 
 
@@ -250,12 +266,21 @@ class MusicChannel(Enum):
 
 # Outputs we need to use to make a math_counter act like
 # the specified logic gate.
-COUNTER_AND_ON = 'OnHitMax'
-COUNTER_AND_OFF = 'OnChangedFromMax'
+COUNTER_AND_ON: Final = 'OnHitMax'
+COUNTER_AND_OFF: Final = 'OnChangedFromMax'
 
-COUNTER_OR_ON = 'OnChangedFromMin'
-COUNTER_OR_OFF = 'OnHitMin'
+COUNTER_OR_ON: Final = 'OnChangedFromMin'
+COUNTER_OR_OFF: Final = 'OnHitMin'
 
-SEL_ICON_SIZE = 96  # Size of the selector win icons
-SEL_ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.
-SEL_ICON_CROP_SHRINK = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.
+SEL_ICON_SIZE: Final = 96  # Size of the selector win icons
+SEL_ICON_SIZE_LRG: Final = (256, 192)  # Size of the larger icon shown in description.
+SEL_ICON_CROP_SHRINK: Final = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.
+
+# Palette UUIDs
+PALETTE_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')
+UUID_PORTAL2 = uuid5(PALETTE_NS, 'PORTAL2')
+UUID_EXPORT = uuid5(PALETTE_NS, 'LAST_EXPORT')
+UUID_BLANK = uuid5(PALETTE_NS, 'EMPTY')
+
+# These may not be hidden.
+PALETTE_FORCE_SHOWN: frozenset[UUID] = frozenset({UUID_PORTAL2})

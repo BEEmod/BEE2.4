@@ -1,13 +1,13 @@
-"""The result used to generate unstationary scaffolds."""
-from typing import Tuple, Optional, Any
+"""Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
+from decimal import Decimal
+from typing import Dict, Tuple, Optional, Any, Union
 from enum import Enum
 import math
 
 from srctools import Vec, Property, VMF
 import srctools.logger
 
-from precomp import instanceLocs, item_chain
-from precomp.conditions import make_result, make_result_setup, RES_EXHAUSTED
+from precomp import instanceLocs, item_chain, conditions
 
 
 class LinkType(Enum):
@@ -65,13 +65,20 @@ def resolve_optional(prop: Property, key: str) -> Optional[str]:
 # The name we give to instances and other parts.
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
-# Store the configs for scaffold items so we can
-# join them up later
-SCAFFOLD_CONFIGS = {}
+# Store the configs for scaffold items, so we can join them up later
+SCAFFOLD_CONFIGS: Dict[str, Tuple[
+    Dict[str, Dict[str, Union[bool, str, Vec, None]]],
+    Dict[str, Dict[str, Optional[str]]],
+]] = {}
 
 
-@make_result_setup('UnstScaffold')
-def res_unst_scaffold_setup(res: Property):
+@conditions.make_result('UnstScaffold')
+def res_old_unst_scaffold(res: Property) -> None:
+    """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
+
+    This has since been swapped to use the LinkedItems result, but this is kept for package
+    compatiblity.
+    """
     group = res['group', 'DEFAULT_GROUP']
 
     if group not in SCAFFOLD_CONFIGS:
@@ -82,7 +89,7 @@ def res_unst_scaffold_setup(res: Property):
         targ_inst, links = SCAFFOLD_CONFIGS[group]
 
     for block in res.find_all("Instance"):
-        conf = {
+        conf: Dict[str, Union[bool, str, Vec, None]] = {
             # If set, adjusts the offset appropriately
             'is_piston': srctools.conv_bool(block['isPiston', '0']),
             'rotate_logic': srctools.conv_bool(block['AlterAng', '1'], True),
@@ -109,8 +116,8 @@ def res_unst_scaffold_setup(res: Property):
             if conf[logic_type + '_rev'] is None:
                 conf[logic_type + '_rev'] = conf[logic_type]
 
-        for inst in instanceLocs.resolve(block['file']):
-            targ_inst[inst] = conf
+        for filename in instanceLocs.resolve(block['file']):
+            targ_inst[filename] = conf
 
     # We need to provide vars to link the tracks and beams.
     for block in res.find_all('LinkEnt'):
@@ -126,175 +133,164 @@ def res_unst_scaffold_setup(res: Property):
             # A '*' name to reference all the ents (set on the start logic)
             'all': block['allVar', None],
         }
-
-    return group  # We look up the group name to find the values.
-
-
-@make_result('UnstScaffold')
-def res_unst_scaffold(vmf: VMF, res: Property):
-    """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
-
-    This has since been swapped to use the LinkedItems result, but this is kept for package
-    compatiblity.
-    """
-    # The instance types we're modifying
-    if res.value not in SCAFFOLD_CONFIGS:
-        # We've already executed this config group
-        return RES_EXHAUSTED
-
     LOGGER.warning(
         'Running legacy scaffold generator for "{}"!'
         'Items should now use the generic LinkedItem config, update your packages!',
         res.value,
     )
-    inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
-    del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
-    # Don't bother typechecking this dict, legacy code.
-    nodes: list[item_chain.Node[dict[str, Any]]] = []
-    for inst in vmf.by_class['func_instance']:
-        try:
-            conf = inst_to_config[inst['file'].casefold()]
-        except KeyError:
-            continue
-        else:
-            nodes.append(item_chain.Node.from_inst(inst, conf))
 
-    # We need to make the link entities unique for each scaffold set,
-    # otherwise the AllVar property won't work.
-    for group_counter, node_list in enumerate(item_chain.chain(nodes, allow_loop=False)):
-        # Set all the instances and properties
-        start_inst = node_list[0].item.inst
-        for vals in LINKS.values():
-            if vals['all'] is not None:
-                start_inst.fixup[vals['all']] = SCAFF_PATTERN.format(
-                    name=vals['name'],
-                    group=group_counter,
-                    index='*',
-                )
+@conditions.meta_cond(priority=Decimal('-250.0001'))
+def legacy_scaffold_link(vmf: VMF) -> None:
+    """Apply the legacy scaffold logic."""
+    if not SCAFFOLD_CONFIGS:
+        return
 
-        should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
+    for inst_to_config, LINKS in SCAFFOLD_CONFIGS.values():
+        # Don't bother typechecking this dict, legacy code.
+        nodes: list[item_chain.Node[dict[str, Any]]] = []
+        for inst in vmf.by_class['func_instance']:
+            try:
+                conf = inst_to_config[inst['file'].casefold()]
+            except KeyError:
+                continue
+            else:
+                nodes.append(item_chain.Node.from_inst(inst, conf))
 
-        # Stash this off to start, so we can find this after items are processed
-        # and the instance names change.
-        for node in node_list:
-            node.conf = inst_to_config[node.inst['file'].casefold()]
+        # We need to make the link entities unique for each scaffold set,
+        # otherwise the AllVar property won't work.
+        for group_counter, node_list in enumerate(item_chain.chain(nodes, allow_loop=False)):
+            # Set all the instances and properties
+            start_inst = node_list[0].item.inst
+            for vals in LINKS.values():
+                if vals['all'] is not None:
+                    start_inst.fixup[vals['all']] = SCAFF_PATTERN.format(
+                        name=vals['name'],
+                        group=group_counter,
+                        index='*',
+                    )
 
-        # Now set each instance in the chain, including first and last
-        for index, node in enumerate(node_list):
-            conf = node.conf
-            orient, offset = get_config(node)
+            should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
 
-            new_file = conf.get('inst_' + orient, '')
-            if new_file:
-                node.inst['file'] = new_file
+            # Stash this off to start, so we can find this after items are processed
+            # and the instance names change.
+            for node in node_list:
+                node.conf = inst_to_config[node.inst['file'].casefold()]
 
-            if node.prev is None:
-                link_type = LinkType.START
-                if node.next is None:
-                    # No connections in either direction, just skip.
-                    # Generate the piston tip if we would have.
-                    if conf['inst_offset'] is not None:
+            # Now set each instance in the chain, including first and last
+            for index, node in enumerate(node_list):
+                conf = node.conf
+                orient, offset = get_config(node)
+
+                new_file = conf.get('inst_' + orient, '')
+                if new_file:
+                    node.inst['file'] = new_file
+
+                if node.prev is None:
+                    link_type = LinkType.START
+                    if node.next is None:
+                        # No connections in either direction, just skip.
+                        # Generate the piston tip if we would have.
+                        if conf['inst_offset'] is not None:
+                            vmf.create_ent(
+                                classname='func_instance',
+                                targetname=node.inst['targetname'],
+                                file=conf['inst_offset'],
+                                origin=offset,
+                                angles=node.inst['angles'],
+                            )
+                        continue
+                elif node.next is None:
+                    link_type = LinkType.END
+                else:
+                    link_type = LinkType.MID
+
+                # Special case - add an extra instance for the ends, pointing
+                # in the direction
+                # of the connected track. This would be the endcap
+                # model.
+                placed_endcap = False
+                if (
+                    orient == 'floor' and
+                    link_type is not LinkType.MID and
+                    conf['inst_end'] is not None
+                ):
+                    if link_type is LinkType.START:
+                        other_node = node.next
+                    else:
+                        other_node = node.prev
+
+                    other_offset = get_config(other_node)[1]
+                    link_dir = other_offset - offset
+
+                    # Compute the horizontal gradient (z / xy dist).
+                    # Don't use endcap if rising more than ~45 degrees, or lowering
+                    # more than ~12 degrees.
+                    horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
+                    if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
+                        link_ang = math.degrees(
+                            math.atan2(link_dir.y, link_dir.x)
+                        )
+                        if not conf['free_rotation']:
+                            # Round to nearest 90 degrees
+                            # Add 45 so the switchover point is at the diagonals
+                            link_ang = (link_ang + 45) // 90 * 90
                         vmf.create_ent(
                             classname='func_instance',
                             targetname=node.inst['targetname'],
-                            file=conf['inst_offset'],
+                            file=conf['inst_end'],
                             origin=offset,
-                            angles=node.inst['angles'],
+                            angles='0 {:.0f} 0'.format(link_ang),
                         )
-                    continue
-            elif node.next is None:
-                link_type = LinkType.END
-            else:
-                link_type = LinkType.MID
+                        # Don't place the offset instance, this replaces that!
+                        placed_endcap = True
 
-            # Special case - add an extra instance for the ends, pointing
-            # in the direction
-            # of the connected track. This would be the endcap
-            # model.
-            placed_endcap = False
-            if (
-                orient == 'floor' and
-                link_type is not LinkType.MID and
-                conf['inst_end'] is not None
-            ):
-                if link_type is LinkType.START:
-                    other_node = node.next
-                else:
-                    other_node = node.prev
-
-                other_offset = get_config(other_node)[1]
-                link_dir = other_offset - offset
-
-                # Compute the horizontal gradient (z / xy dist).
-                # Don't use endcap if rising more than ~45 degrees, or lowering
-                # more than ~12 degrees.
-                horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
-                if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
-                    link_ang = math.degrees(
-                        math.atan2(link_dir.y, link_dir.x)
-                    )
-                    if not conf['free_rotation']:
-                        # Round to nearest 90 degrees
-                        # Add 45 so the switchover point is at the diagonals
-                        link_ang = (link_ang + 45) // 90 * 90
+                if not placed_endcap and conf['inst_offset'] is not None:
+                    # Add an additional rotated entity at the offset.
+                    # This is useful for the piston item.
                     vmf.create_ent(
                         classname='func_instance',
                         targetname=node.inst['targetname'],
-                        file=conf['inst_end'],
+                        file=conf['inst_offset'],
                         origin=offset,
-                        angles='0 {:.0f} 0'.format(link_ang),
+                        angles=node.inst['angles'],
                     )
-                    # Don't place the offset instance, this replaces that!
-                    placed_endcap = True
 
-            if not placed_endcap and conf['inst_offset'] is not None:
-                # Add an additional rotated entity at the offset.
-                # This is useful for the piston item.
-                vmf.create_ent(
+                logic_inst = vmf.create_ent(
                     classname='func_instance',
                     targetname=node.inst['targetname'],
-                    file=conf['inst_offset'],
+                    file=conf.get(
+                        'logic_' + link_type.value + (
+                            '_rev' if
+                            should_reverse
+                            else ''
+                            ),
+                        '',
+                    ),
                     origin=offset,
-                    angles=node.inst['angles'],
+                    angles=(
+                        '0 0 0' if
+                        conf['rotate_logic']
+                        else node.inst['angles']
+                    ),
                 )
 
-            logic_inst = vmf.create_ent(
-                classname='func_instance',
-                targetname=node.inst['targetname'],
-                file=conf.get(
-                    'logic_' + link_type.value + (
-                        '_rev' if
-                        should_reverse
-                        else ''
-                        ),
-                    '',
-                ),
-                origin=offset,
-                angles=(
-                    '0 0 0' if
-                    conf['rotate_logic']
-                    else node.inst['angles']
-                ),
-            )
-
-            # Add the link-values
-            for linkVar, link in LINKS.items():
-                node.inst.fixup[linkVar] = SCAFF_PATTERN.format(
-                    name=link['name'],
-                    group=group_counter,
-                    index=index,
-                )
-                if node.next is not None:
-                    node.inst.fixup[link['next']] = SCAFF_PATTERN.format(
+                # Add the link-values
+                for linkVar, link in LINKS.items():
+                    node.inst.fixup[linkVar] = SCAFF_PATTERN.format(
                         name=link['name'],
                         group=group_counter,
-                        index=index + 1,
+                        index=index,
                     )
+                    if node.next is not None:
+                        node.inst.fixup[link['next']] = SCAFF_PATTERN.format(
+                            name=link['name'],
+                            group=group_counter,
+                            index=index + 1,
+                        )
 
-            for key, val in node.inst.fixup.items():
-                # Copy over fixup values
-                logic_inst.fixup[key] = val
+                for key, val in node.inst.fixup.items():
+                    # Copy over fixup values
+                    logic_inst.fixup[key] = val
 
-    LOGGER.info('Finished Scaffold generation!')
-    return RES_EXHAUSTED
+        LOGGER.info('Finished legacy Scaffold generation!')

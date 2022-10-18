@@ -5,17 +5,17 @@ Headings can
 be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
-from tkinter import ttk
-from tkinter import font
+from __future__ import annotations
+from typing import Generic, Optional, TypeVar, Iterable, Iterator, overload
+from tkinter import ttk, font
 import tkinter as tk
-
 import functools
+
+import attrs
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
 from localisation import gettext
-
-from typing import List, Iterator, Optional
 
 
 UP_ARROW = '\u25B3'
@@ -26,12 +26,10 @@ ROW_HEIGHT = 16
 ROW_PADDING = 2
 
 BODY_FONT = font.nametofont('TkDefaultFont')
+UserT = TypeVar('UserT')
 
 style = ttk.Style()
-style.configure(
-    'CheckDetails.TCheckbutton',
-    background='white',
-)
+style.configure('CheckDetails.TCheckbutton', background='white')
 
 # An event generated when items are all unchecked.
 # Use to disable buttons when needed
@@ -39,30 +37,65 @@ EVENT_NO_CHECKS = '<<NoItemsChecked>>'
 EVENT_HAS_CHECKS = '<<ItemsChecked>>'
 
 
-def truncate(text, width):
+def truncate(text: str, width: int) -> str:
     """Truncate text to fit in the given space."""
     if BODY_FONT.measure(text) < width:
-        return text # No truncation needed!
+        return text  # No truncation needed!
 
     # Chop one character off the end at a time
-    for ind in range(len(text)-1, 0, -1):
+    for ind in reversed(range(len(text))):
         short = text[:ind] + ELLIPSIS
         if BODY_FONT.measure(short) < width:
             return short
     return ELLIPSIS
 
 
-class Item:
-    """Represents one item in a CheckDetails list.
+@attrs.define
+class Header:
+    """Holds widgets for the header."""
+    frame: ttk.Frame
+    label: ttk.Label
+    sorter: ttk.Label
 
-    """
+    def evt_enter(self, _: tk.Event) -> None:
+        """Highlight header when hovering to invite clicks."""
+        self.label['background'] = 'lightblue'
+        self.sorter['background'] = 'lightblue'
+
+    def evt_leave(self, _: tk.Event) -> None:
+        """Reset header after the mouse leaves."""
+        self.label['background'] = ''
+        self.sorter['background'] = ''
+
+
+class Item(Generic[UserT]):
+    """Represents one item in a CheckDetails list."""
+    user: UserT
+    @overload
     def __init__(
-            self,
-            *values,
-            hover_text=None,
-            lock_check=False,
-            state=False
-            ):
+        self: 'Item[None]',
+        *values: str,
+        hover_text: str='',
+        lock_check: bool=False,
+        state: bool=False,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: 'Item[UserT]',
+        *values: str,
+        hover_text: str='',
+        lock_check: bool=False,
+        state: bool=False,
+        user: UserT,
+    ) -> None: ...
+    def __init__(
+        self,
+        *values: str,
+        hover_text: str='',
+        lock_check: bool=False,
+        state: bool=False,
+        user: UserT | None = None,
+    ) -> None:
         """Initialise an item.
         - values are the text to show in each column, in order.
         - hover_text will set text to show in the tooltip. If not defined,
@@ -70,25 +103,24 @@ class Item:
             in the column width.
         - If lock_check is true, this checkbox cannot be changed.
         - state is the initial state of the checkbox.
+        - user can be set to any value.
         """
         self.values = values
-        self.state_var = tk.IntVar(value=bool(state))
-        self.master = None  # type: Optional[CheckDetails]
-        self.check = None  # type: Optional[ttk.Checkbutton]
+        self.state_var = tk.BooleanVar(value=bool(state))
+        self.master: CheckDetails | None = None
+        self.check: ttk.Checkbutton | None = None
         self.locked = lock_check
-        self.hover_text = hover_text
-        self.val_widgets = []
+        self.hover_text = hover_text  # Readonly.
+        self.val_widgets: list[tk.Label] = []
+        if user is not None:
+            self.user = user
 
-    def copy(self):
-        return Item(self.values)
-
-    def make_widgets(self, master: 'CheckDetails'):
+    def make_widgets(self, master: CheckDetails) -> None:
+        """Create the widgets for this item."""
         if self.master is not None:
             # If we let items move between lists, the old widgets will become
             # orphaned!
-            raise ValueError(
-                "Can't move Item objects between lists!"
-            )
+            raise ValueError("Can't move Item objects between lists!")
 
         self.master = master
         self.check = ttk.Checkbutton(
@@ -113,20 +145,14 @@ class Item:
                 anchor=tk.W,
                 background='white',
             )
-            add_tooltip(wid)
-            if self.hover_text:
-                set_tooltip(wid, self.hover_text)
-                wid.hover_override = True
-            else:
-                set_tooltip(wid)
-                wid.hover_override = False
+            add_tooltip(wid, self.hover_text or '')
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
-                wid.bind('<Enter>', self.hover_start, add=True)
-                wid.bind('<Leave>', self.hover_stop, add=True)
-                tk_tools.bind_leftclick(wid, self.row_click, add=True)
-                wid.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.row_unclick, add=True)
+                wid.bind('<Enter>', self.evt_hover_start, add=True)
+                wid.bind('<Leave>', self.evt_hover_stop, add=True)
+                tk_tools.bind_leftclick(wid, self.evt_row_click, add=True)
+                wid.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_row_unclick, add=True)
 
             self.val_widgets.append(wid)
 
@@ -136,19 +162,10 @@ class Item:
             *self.val_widgets
         )
 
-    def place(self, check_width, head_pos, y):
+    def place(self, check_width: int, head_pos: list[tuple[int, int]], y: int) -> None:
         """Position the widgets on the frame."""
-        self.check.place(
-            x=0,
-            y=y,
-            width=check_width,
-            height=ROW_HEIGHT,
-        )
-        for text, widget, (x, width) in zip(
-                self.values,
-                self.val_widgets,
-                head_pos
-                ):
+        self.check.place(x=0, y=y, width=check_width, height=ROW_HEIGHT)
+        for text, widget, (x, width) in zip(self.values, self.val_widgets, head_pos):
             widget.place(
                 x=x+check_width,
                 y=y,
@@ -157,11 +174,11 @@ class Item:
             )
             text = str(text)
             short_text = widget['text'] = truncate(text, width-5)
-            if not widget.hover_override:
+            if not self.hover_text:
                 set_tooltip(widget, text if short_text != text else '')
             x += width
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Remove this from the window."""
         self.check.place_forget()
         for wid in self.val_widgets:
@@ -169,29 +186,41 @@ class Item:
 
     @property
     def state(self) -> bool:
+        """Return whether the checkbox is checked."""
         return self.state_var.get()
 
     @state.setter
-    def state(self, value: bool):
+    def state(self, value: bool) -> None:
         self.state_var.set(value)
         self.master.update_allcheck()
 
-    def hover_start(self, e):
+    def evt_hover_start(self, _: tk.Event) -> None:
+        """Start hovering over the checkbox."""
         self.check.state(['active'])
 
-    def hover_stop(self, e):
+    def evt_hover_stop(self, _: tk.Event) -> None:
+        """Stop hovering over the checkbox."""
         self.check.state(['!active'])
 
-    def row_click(self, e):
+    def evt_row_click(self, _: tk.Event) -> None:
+        """Occurs when the checkbox is clicked."""
         self.state = not self.state
         self.check.state(['pressed'])
 
-    def row_unclick(self, e):
+    def evt_row_unclick(self, _: tk.Event) -> None:
+        """Reset the checkbox when released."""
         self.check.state(['!pressed'])
 
 
-class CheckDetails(ttk.Frame):
-    def __init__(self, parent, items=(), headers=(), add_sizegrip=False):
+class CheckDetails(ttk.Frame, Generic[UserT]):
+    """A widget which displays items in a row with various attributes."""
+    def __init__(
+        self,
+        parent: tk.Misc,
+        items: Iterable[Item[UserT]]=(),
+        headers: Iterable[str]=(),
+        add_sizegrip: bool=False,
+    ) -> None:
         """Initialise a CheckDetails pane.
 
         parent is the parent widget.
@@ -199,15 +228,14 @@ class CheckDetails(ttk.Frame):
         headers is a list of the header strings.
         If add_sizegrip is True, add a sizegrip object between the scrollbars.
         """
-        super(CheckDetails, self).__init__(parent)
+        super().__init__(parent)
 
         self.parent = parent
-        self.headers = list(headers)
-        self.items = []  # type: List[Item]
-        self.sort_ind = None
+        self.items: list[Item[UserT]] = []
+        self.sort_ind: int | None = None
         self.rev_sort = False  # Should we sort in reverse?
 
-        self.head_check_var = tk.IntVar(value=False)
+        self.head_check_var = tk.BooleanVar(value=False)
         self.wid_head_check = ttk.Checkbutton(
             self,
             variable=self.head_check_var,
@@ -219,13 +247,14 @@ class CheckDetails(ttk.Frame):
 
         add_tooltip(self.wid_head_check, gettext("Toggle all checkboxes."))
 
-        def checkbox_enter(e):
+        def checkbox_enter(_: tk.Event) -> None:
             """When hovering over the 'all' checkbox, highlight the others."""
             for item in self.items:
                 item.check.state(['active'])
         self.wid_head_check.bind('<Enter>', checkbox_enter)
 
-        def checkbox_leave(e):
+        def checkbox_leave(_: tk.Event) -> None:
+            """When leaving, reset the checkboxes."""
             for item in self.items:
                 item.check.state(['!active'])
         self.wid_head_check.bind('<Leave>', checkbox_leave)
@@ -238,14 +267,12 @@ class CheckDetails(ttk.Frame):
             showhandle=False,
         )
         self.wid_header.grid(row=0, column=1, sticky='EW')
-        self.wid_head_frames = [0] * len(self.headers)  # type: List[ttk.Frame]
-        self.wid_head_label = [0] * len(self.headers)  # type: List[ttk.Label]
-        self.wid_head_sort = [0] * len(self.headers)  # type: List[ttk.Label]
-        self.make_headers()
+        self.headers: list[Header] = [
+            self._make_header(ind, text)
+            for ind, text in enumerate(headers)
+        ]
 
-        self.wid_canvas = tk.Canvas(
-            self,
-        )
+        self.wid_canvas = tk.Canvas(self)
         self.wid_canvas.grid(row=1, column=0, columnspan=2, sticky='NSEW')
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
@@ -274,7 +301,7 @@ class CheckDetails(ttk.Frame):
         self.wid_frame = tk.Frame(
             self.wid_canvas,
             background='white',
-            border=0
+            border=0,
         )
         self.wid_canvas.create_window(0, 0, window=self.wid_frame, anchor='nw')
 
@@ -295,67 +322,46 @@ class CheckDetails(ttk.Frame):
             self.wid_header,
         )
 
-    def make_headers(self):
+    def _make_header(self, ind: int, text: str) -> Header:
         """Generate the heading widgets."""
+        frame = ttk.Frame(self.wid_header, relief=tk.RAISED)
+        label = ttk.Label(frame, font='TkHeadingFont', text=text)
+        sorter = ttk.Label(frame, font='TkHeadingFont', text='')
+        header = Header(frame, label, sorter)
 
-        for i, head_text in enumerate(self.headers):
-            self.wid_head_frames[i] = header = ttk.Frame(
-                self.wid_header,
-                relief=tk.RAISED,
-            )
+        label.grid(row=0, column=0, sticky='EW')
+        sorter.grid(row=0, column=1, sticky='E')
+        frame.columnconfigure(0, weight=1)
+        self.wid_header.add(frame)
 
-            self.wid_head_label[i] = label = ttk.Label(
-                header,
-                font='TkHeadingFont',
-                text=head_text,
-            )
-            self.wid_head_sort[i] = sorter = ttk.Label(
-                header,
-                font='TkHeadingFont',
-                text='',
-            )
-            label.grid(row=0, column=0, sticky='EW')
-            sorter.grid(row=0, column=1, sticky='E')
-            header.columnconfigure(0, weight=1)
-            self.wid_header.add(header)
+        frame.bind('<Enter>', header.evt_enter)
+        frame.bind('<Leave>', header.evt_leave)
+        tk_tools.bind_leftclick(label, functools.partial(self.sort, ind))
 
-            def header_enter(_, label=label, sorter=sorter):
-                label['background'] = 'lightblue'
-                sorter['background'] = 'lightblue'
+        # Headers can't become smaller than their initial size -
+        # The amount of space to show all the text + arrow
+        frame.update_idletasks()
+        self.wid_header.paneconfig(frame, minsize=frame.winfo_reqwidth())
+        sorter['text'] = ''
+        return header
 
-            def header_leave(_, label=label, sorter=sorter):
-                label['background'] = ''
-                sorter['background'] = ''
-
-            header.bind('<Enter>', header_enter)
-            header.bind('<Leave>', header_leave)
-            tk_tools.bind_leftclick(label, functools.partial(self.sort, i))
-
-            # Headers can't become smaller than their initial size -
-            # The amount of space to show all the text + arrow
-            header.update_idletasks()
-            self.wid_header.paneconfig(
-                header,
-                minsize=header.winfo_reqwidth(),
-            )
-
-            sorter['text'] = ''
-
-    def add_items(self, *items):
+    def add_items(self, *items: Item) -> None:
+        """Add items to the details list."""
         for item in items:
             self.items.append(item)
             item.make_widgets(self)
         self.update_allcheck()
         self.refresh()
 
-    def rem_items(self, *items):
+    def rem_items(self, *items: Item) -> None:
+        """Remove items from the details list."""
         for item in items:
             self.items.remove(item)
             item.destroy()
         self.update_allcheck()
         self.refresh()
 
-    def remove_all(self):
+    def remove_all(self) -> None:
         """Remove all items from the list."""
         for item in self.items:
             item.destroy()
@@ -363,7 +369,7 @@ class CheckDetails(ttk.Frame):
         self.update_allcheck()
         self.refresh()
 
-    def update_allcheck(self):
+    def update_allcheck(self) -> None:
         """Update the 'all' checkbox to match the state of sub-boxes."""
         num_checked = sum(item.state for item in self.items)
         if num_checked == 0:
@@ -381,7 +387,8 @@ class CheckDetails(ttk.Frame):
             self.wid_head_check.state(['alternate'])
             self.event_generate(EVENT_HAS_CHECKS)
 
-    def toggle_allcheck(self):
+    def toggle_allcheck(self) -> None:
+        """The 'all' checkbox was pressed, toggle everything."""
         value = self.head_check_var.get()
         for item in self.items:
             if item.locked:
@@ -395,7 +402,7 @@ class CheckDetails(ttk.Frame):
         else:
             self.event_generate(EVENT_NO_CHECKS)
 
-    def refresh(self, e=None):
+    def refresh(self, _=None) -> None:
         """Reposition the widgets.
 
         Must be called when self.items is changed,
@@ -405,9 +412,8 @@ class CheckDetails(ttk.Frame):
         if not self.winfo_ismapped():
             return
         header_sizes = [
-            (head.winfo_x(), head.winfo_width())
-            for head in
-            self.wid_head_frames
+            (header.frame.winfo_x(), header.frame.winfo_width())
+            for header in self.headers
         ]
 
         self.wid_head_check.update_idletasks()
@@ -475,38 +481,37 @@ class CheckDetails(ttk.Frame):
 
         self.wid_canvas['scrollregion'] = (0, 0, width, height)
 
-    def sort(self, index, e=None):
+    def sort(self, index: int, _: tk.Event) -> None:
         """Click event for headers."""
         if self.sort_ind is not None:
-            self.wid_head_sort[self.sort_ind]['text'] = ''
+            self.headers[self.sort_ind].sorter['text'] = ''
         if self.sort_ind == index:
             self.rev_sort = not self.rev_sort
         else:
             self.rev_sort = False
 
-        self.wid_head_sort[index]['text'] = (
-                UP_ARROW if self.rev_sort else DN_ARROW
-            )
+        self.headers[index].sorter['text'] = UP_ARROW if self.rev_sort else DN_ARROW
         self.sort_ind = index
 
-        self.items.sort(
-            key=lambda item: item.values[index],
-            reverse=self.rev_sort,
-        )
+        self.items.sort(key=lambda item: item.values[index], reverse=self.rev_sort)
         self.refresh()
 
     def checked(self) -> Iterator[Item]:
         """Yields enabled check items."""
-        return (item for item in self.items if item.state_var.get())
+        for item in self.items:
+            if item.state_var.get():
+                yield item
 
     def unchecked(self) -> Iterator[Item]:
         """Yields disabled check items."""
-        return (item for item in self.items if not item.state_var.get())
+        for item in self.items:
+            if not item.state_var.get():
+                yield item
 
 
 if __name__ == '__main__':
     from app import TK_ROOT
-    test_inst = CheckDetails(
+    test_inst = CheckDetails[None](
         parent=TK_ROOT,
         headers=['Name', 'Author', 'Description'],
         items=[

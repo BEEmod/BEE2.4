@@ -69,19 +69,19 @@ CONN_NAMES = {
 
 # The order signs are used in maps.
 SIGN_ORDER = [
+    consts.Signage.SHAPE_SQUARE,
+    consts.Signage.SHAPE_CROSS,
     consts.Signage.SHAPE_DOT,
     consts.Signage.SHAPE_MOON,
-    consts.Signage.SHAPE_TRIANGLE,
-    consts.Signage.SHAPE_CROSS,
-    consts.Signage.SHAPE_SQUARE,
-    consts.Signage.SHAPE_CIRCLE,
-    consts.Signage.SHAPE_SINE,
     consts.Signage.SHAPE_SLASH,
+    consts.Signage.SHAPE_TRIANGLE,
+    consts.Signage.SHAPE_SINE,
     consts.Signage.SHAPE_STAR,
+    consts.Signage.SHAPE_CIRCLE,
     consts.Signage.SHAPE_WAVY
 ]
 
-SIGN_ORDER_LOOKUP = {
+SIGN_ORDER_LOOKUP: Dict[Union[consts.Signage, str], int] = {
     sign: index
     for index, sign in
     enumerate(SIGN_ORDER)
@@ -457,19 +457,23 @@ def calc_connections(
     It also applies frames to shape signage to distinguish repeats.
     """
     # First we want to match targetnames to item types.
-    toggles = {}  # type: Dict[str, Entity]
+    toggles: dict[str, Entity] = {}
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
-    sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
+    sign_shape_overlays: dict[tuple[str, str], list[Entity]] = defaultdict(list)
 
     # Indicator panels
-    panels = {}  # type: Dict[str, Entity]
+    panels: dict[str, Entity] = {}
 
     # We only need to pay attention for TBeams, other items we can
     # just detect any output.
     tbeam_polarity = {OutNames.IN_SEC_ACT, OutNames.IN_SEC_DEACT}
     # Also applies to other items, but not needed for this analysis.
     tbeam_io = {OutNames.IN_ACT, OutNames.IN_DEACT}
+
+    # Corridors have a numeric suffix depending on the corridor index.
+    # That's no longer valid, so we want to strip it.
+    corridors: list[Entity] = []
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
@@ -516,6 +520,9 @@ def calc_connections(
             if item_type.input_type is InputType.DUAL:
                 del inst.fixup[consts.FixupVars.CONN_COUNT]
                 del inst.fixup[consts.FixupVars.CONN_COUNT_TBEAM]
+
+            if 'corridor' in traits:
+                corridors.append(inst)
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
@@ -649,33 +656,14 @@ def calc_connections(
                     frame['material'] = frame_mat
                     frame['renderorder'] = 1  # On top
 
-
-@conditions.make_result('ChangeIOType')
-def res_change_io_type_parse(props: Property):
-    """Switch an item to use different inputs or outputs.
-
-    Must be done before priority level -250.
-    The contents are the same as that allowed in the input BEE2 block in
-    editoritems.
-    """
-    conf = Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
-
-    def change_item(inst: Entity) -> None:
+    # Now we've computed everything, strip numbers.
+    for inst in corridors:
+        old_name = inst['targetname']
+        new_name = inst['targetname'] = old_name.rstrip('0123456789')
         try:
-            item = ITEMS[inst['targetname']]
+            ITEMS[new_name] = ITEMS.pop(old_name)
         except KeyError:
-            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
-
-        item.config = conf
-
-        # Overwrite these as well.
-        item.enable_cmd = conf.enable_cmd
-        item.disable_cmd = conf.disable_cmd
-
-        item.sec_enable_cmd = conf.sec_enable_cmd
-        item.sec_disable_cmd = conf.sec_disable_cmd
-
-    return change_item
+            pass
 
 
 def do_item_optimisation(vmf: VMF) -> None:
@@ -845,6 +833,8 @@ def gen_item_outputs(vmf: VMF) -> None:
         for pan in item.ind_panels:
             pan['file'] = desired_panel_inst
             pan.fixup[consts.FixupVars.TIM_ENABLED] = item.timer is not None
+        if item.ind_panels:
+            conditions.ALL_INST.add(desired_panel_inst.casefold())
 
     logic_auto = vmf.create_ent(
         'logic_auto',
@@ -899,10 +889,10 @@ def add_locking(item: Item) -> None:
     instance_traits.get(item.inst).add('locking_targ')
     instance_traits.get(lock_button.inst).add('locking_btn')
 
-    # Force the item to not have a timer.
-    for pan in item.ind_panels:
+    # Force the button to not have a timer.
+    for pan in lock_button.ind_panels:
         pan.remove()
-    item.ind_panels.clear()
+    lock_button.ind_panels.clear()
 
     for output, input_cmds in [
         (item.config.output_lock, lock_button.config.lock_cmd),
@@ -915,7 +905,7 @@ def add_locking(item: Item) -> None:
             if cmd.target:
                 target = conditions.local_name(lock_button.inst, cmd.target)
             else:
-                target = lock_button.inst
+                target = lock_button.inst['targetname']
             item.add_io_command(
                 output,
                 target,
@@ -1033,9 +1023,8 @@ def add_item_inputs(
         # fire it off.
         if spawn_fire is FeatureMode.ALWAYS:
             if item.is_logic:
-                # Logic gates need to trigger their outputs.
-                # Make this item a logic_auto temporarily, then we'll fix them
-                # them up into an OnMapSpawn output properly at the end.
+                # Logic gates need to trigger their outputs. Make this item a logic_auto
+                # temporarily, then we'll fix them up into an OnMapSpawn output properly at the end.
                 item.inst.clear_keys()
                 item.inst['classname'] = 'logic_auto'
                 dummy_logic_ents.append(item.inst)
@@ -1077,7 +1066,10 @@ def add_item_inputs(
                 for cmd in input_cmds:
                     inp_item.add_io_command(
                         output,
-                        item.inst,
+                        conditions.local_name(
+                            item.inst,
+                            conditions.resolve_value(item.inst, cmd.target),
+                        ) or item.inst,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
                         inst_in=cmd.inst_in,
@@ -1136,41 +1128,19 @@ def add_item_inputs(
         invert_var,
     ))
 
+    invert_lag = 0.0
     if is_inverted:
         enable_cmd, disable_cmd = disable_cmd, enable_cmd
 
-        # Inverted logic items get a short amount of lag, so loops will propagate
-        # over several frames so we don't lock up.
+        # Inverted logic items get a short amount of lag, so loops will just oscillate indefinitely
+        # as time passes instead of infinitely looping.
         if item.inputs and item.outputs:
-            enable_cmd = [
-                Output(
-                    '',
-                    out.target,
-                    out.input,
-                    out.params,
-                    out.delay + 0.01,
-                    times=out.times,
-                    inst_in=out.inst_in,
-                )
-                for out in enable_cmd
-            ]
-            disable_cmd = [
-                Output(
-                    '',
-                    out.target,
-                    out.input,
-                    out.params,
-                    out.delay + 0.01,
-                    times=out.times,
-                    inst_in=out.inst_in,
-                )
-                for out in disable_cmd
-            ]
+            invert_lag = 0.1
 
     needs_counter = len(inputs) > 1
 
-    # If this option is enabled, generate additional logic to fire the disable
-    # output after spawn (but only if it's not triggered normally.)
+    # If this option is enabled, generate additional logic to fire the disabling output after spawn
+    # (but only if it's not triggered normally.)
 
     # We just use a relay to do this.
     # User2 is the real enable input, User1 is the real disable input.
@@ -1300,7 +1270,7 @@ def add_item_inputs(
                         ) or item.inst,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay,
+                        delay=cmd.delay + invert_lag,
                         times=cmd.times,
                     )
                 )
@@ -1321,7 +1291,7 @@ def add_item_inputs(
                         ) or item.inst,
                         conditions.resolve_value(item.inst, cmd.input),
                         conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay,
+                        delay=cmd.delay + invert_lag,
                         times=cmd.times,
                     )
 

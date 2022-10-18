@@ -6,8 +6,10 @@ from PIL import Image, ImageDraw, ImageFont
 import colorsys
 
 from srctools.vtf import VTF, ImageFormats
-from app.itemconfig import ConfigGroup, parse_color
 import srctools.logger
+
+from app.itemconfig import ConfigGroup, parse_color
+from app import img
 
 LOGGER = srctools.logger.get_logger(__name__)
 # The number of cells to show in each row.
@@ -40,12 +42,14 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
         for tim, var in wid.values
     }
 
-    img = Image.new('RGB', (LEGEND_SIZE, LEGEND_SIZE), color=(255, 255, 255))
-    draw = ImageDraw.Draw(img)
+    legend = Image.new('RGB', (LEGEND_SIZE, LEGEND_SIZE), color=(255, 255, 255))
+    draw = ImageDraw.Draw(legend)
 
     # First, calculate the centers of all the cells.
     timer = 3
     cells = []
+    x: float
+    y: float
     for y, row_count in enumerate(COLORIZER_ROWS):
         y -= len(COLORIZER_ROWS) // 2
         for x, tim_val in enumerate(range(timer, timer + row_count)):
@@ -55,23 +59,7 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
         timer += row_count
     assert timer-1 == 30, f'Last cell = {timer-1}'
 
-    # Find a nice font.
-    for filename in [
-        'san fransisco.ttf',
-        'segoeui.ttf',
-        'lucida sans.ttf',
-        'helvetica neue.ttf',
-        'tahoma.ttf',
-        'ubuntu.ttf',
-    ]:
-        try:
-            font = ImageFont.truetype(filename, 36)
-            break
-        except IOError:
-            pass
-    else:
-        LOGGER.warning('Failed to find font, add more OS fonts!')
-        font = ImageFont.load_default()
+    font = img.get_pil_font(36)
 
     for x, y, tim in cells:
         coords = [
@@ -92,7 +80,7 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
         draw.text((x, y), str(tim), fill=txt_color, font=font, anchor='mm')
 
     vtf = VTF(LEGEND_SIZE, LEGEND_SIZE, fmt=ImageFormats.DXT1)
-    vtf.get().copy_from(img.tobytes(), ImageFormats.RGB888)
+    vtf.get().copy_from(legend.tobytes(), ImageFormats.RGB888)
     vtf.clear_mipmaps()
     # Fill the small mipmaps with pure white, so when retracted
     # you don't see anything.

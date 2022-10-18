@@ -4,13 +4,13 @@ from typing import Optional, Set, Iterator
 import srctools
 import utils
 from packages import (
-    PakObject, set_cond_source, ParseData,
+    PackagesSet, PakObject, set_cond_source, ParseData,
     get_config, ExportData, LOGGER, SelitemData,
 )
 from srctools import Property, Vec, NoKeyError
 
 
-class QuotePack(PakObject):
+class QuotePack(PakObject, needs_foreground=True):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
         self,
@@ -60,7 +60,7 @@ class QuotePack(PakObject):
             monitor_data = data.info.find_key('monitor')
         except NoKeyError:
             mon_studio = mon_cam_loc = None
-            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0.0
             mon_studio_actor = ''
             turret_hate = False
         else:
@@ -203,7 +203,7 @@ class QuotePack(PakObject):
         return Property(prop.real_name, children)
 
     @classmethod
-    def post_parse(cls) -> None:
+    async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
 
         def iter_lines(conf: Property) -> Iterator[Property]:
@@ -216,7 +216,7 @@ class QuotePack(PakObject):
                 if group.has_children():
                     yield from group
 
-        for voice in cls.all():
+        for voice in packset.all_obj(cls):
             used: Set[str] = set()
             for quote in iter_lines(voice.config):
                 try:

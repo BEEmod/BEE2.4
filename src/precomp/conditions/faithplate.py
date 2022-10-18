@@ -1,19 +1,13 @@
 """Modify and inspect faith plates."""
-import srctools.logger
-from precomp import faithplate, template_brush
-from precomp.conditions import (
-    make_flag, make_result, make_result_setup,
-    RES_EXHAUSTED,
-)
-from srctools import Property, Entity
+from srctools import Angle, Property, Entity, logger
+from precomp import faithplate, template_brush, conditions
 
 
 COND_MOD_NAME = 'Faith Plates'
+LOGGER = logger.get_logger(__name__, alias='cond.faithplate')
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.faithplate')
 
-
-@make_flag("FaithType")
+@conditions.make_flag("FaithType")
 def flag_faith_type(inst: Entity, flag: Property) -> bool:
     """Determine the type of faith plate used.
 
@@ -44,23 +38,8 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
         return plate is not None
 
 
-@make_result_setup('setFaithAttrs', 'setFaith', 'setFaithAttr')
-def res_set_faith_setup(res: Property) -> tuple:
-    temp_name = res['template', '']
-
-    if temp_name:
-        template = template_brush.get_template(temp_name)
-    else:
-        template = None
-
-    return (
-        template,
-        res.vec('offset'),
-    )
-
-
-@make_result('setFaithAttrs', 'setFaith', 'setFaithAttr')
-def res_set_faith(inst: Entity, res: Property) -> None:
+@conditions.make_result('setFaithAttrs', 'setFaith', 'setFaithAttr')
+def res_set_faith(res: Property) -> conditions.ResultCallable:
     """Modify the `trigger_catapult`s used for `ItemFaithPlate` items.
 
     This can also be used to modify the catapult for bomb-type Gel Droppers.
@@ -69,33 +48,38 @@ def res_set_faith(inst: Entity, res: Property) -> None:
       helper trigger, it will be offset upward.
     - `offset`: Allow shifting the triggers around.
     """
-    """Apply the modification."""
-    try:
-        plate = faithplate.PLATES[inst['targetname']]
-    except KeyError:
-        LOGGER.warning(
-            'No faithplate for item with name "{}"!',
-            inst['targetname'],
-        )
-        return
+    temp_name = res['template', '']
 
-    (
-        template,
-        offset,
-    ) = res.value
-    if template is not None:
-        plate.template = template
+    if temp_name:
+        template = template_brush.get_template(temp_name)
+    else:
+        template = None
+    offset = res.vec('offset')
 
-    if offset is not None:
-        plate.trig_offset = offset.copy().rotate_by_str(inst['angles'])
+    def apply_attrs(inst: Entity) -> None:
+        """Apply the modification."""
+        try:
+            plate = faithplate.PLATES[inst['targetname']]
+        except KeyError:
+            LOGGER.warning(
+                'No faithplate for item with name "{}"!',
+                inst['targetname'],
+            )
+        else:
+            if template is not None:
+                plate.template = template
+
+            if offset is not None:
+                plate.trig_offset = offset @ Angle.from_str(inst['angles'])
+    return apply_attrs
 
 
-@make_result('faithMods')
-def res_faith_mods() -> None:
+@conditions.make_result('faithMods')
+def res_faith_mods() -> object:
     """This result is deprecated.
 
     The functions provided by this have been replaced by other features:
-    - `FaithType` can be used to check the type of a plate.
+    - `FaithType` can be used to check the type of the plate.
     - `setFaithAttrs` can be used to modify the trigger.
     - Use the `comp_kv_setter` entity to add outputs or modify keyvalues
       on the trigger(s).
@@ -105,4 +89,4 @@ def res_faith_mods() -> None:
         'Use "FaithType" and "setFaithAttrs" instead, '
         'along with comp_kv_setter.'
     )
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED

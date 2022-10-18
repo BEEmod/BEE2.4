@@ -12,9 +12,10 @@ import editoritems
 import srctools.logger
 
 from typing import (
-    Optional, Union,
+    Callable, Optional, Union,
     List, Dict, Tuple, TypeVar, Iterable,
 )
+import corridor
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -25,7 +26,7 @@ INSTANCE_FILES: Dict[str, List[str]] = {}
 # Note this is imperfect - two items could reuse the same instance.
 ITEM_FOR_FILE: Dict[str, Tuple[str, Union[int, str]]] = {}
 
-_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
+_RE_DEFS = re.compile(r'\s* (\[ [^][]+] | < [^<>]+ >) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
     \s*<
     \s*([^:]+)
@@ -38,7 +39,7 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES: Dict[str, Dict[str, editoritems.FSPath]] = defaultdict(dict)
+CUST_INST_FILES: Dict[str, Dict[str, str]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
@@ -64,8 +65,6 @@ SPECIAL_INST: Dict[str, str] = {
 
     'coopExit':         '<ITEM_COOP_ENTRY_DOOR:3>',
     'coopEntry':        '<ITEM_COOP_ENTRY_DOOR:0>',
-    'coopEntryUp':      '<ITEM_COOP_ENTRY_DOOR:bee2_vert_up>',
-    'coopEntryDown':    '<ITEM_COOP_ENTRY_DOOR:bee2_vert_down>',
     'spExit':           '<ITEM_ENTRY_DOOR:10>',
     'spEntry':          '<ITEM_ENTRY_DOOR:9>',
 
@@ -77,8 +76,6 @@ SPECIAL_INST: Dict[str, str] = {
     'spExitCorr2':      '<ITEM_EXIT_DOOR:1>',
     'spExitCorr3':      '<ITEM_EXIT_DOOR:2>',
     'spExitCorr4':      '<ITEM_EXIT_DOOR:3>',
-    'spExitCorrUp':     '<ITEM_EXIT_DOOR:bee2_vert_up>',
-    'spExitCorrDown':   '<ITEM_EXIT_DOOR:bee2_vert_down>',
 
     'spEntryCorr':      '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
     'spEntryCorr1':     '<ITEM_ENTRY_DOOR:0>',
@@ -88,16 +85,12 @@ SPECIAL_INST: Dict[str, str] = {
     'spEntryCorr5':     '<ITEM_ENTRY_DOOR:4>',
     'spEntryCorr6':     '<ITEM_ENTRY_DOOR:5>',
     'spEntryCorr7':     '<ITEM_ENTRY_DOOR:6>',
-    'spEntryCorrUp':    '<ITEM_ENTRY_DOOR:bee2_vert_up>',
-    'spEntryCorrDown':  '<ITEM_ENTRY_DOOR:bee2_vert_down>',
 
     'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
     'coopCorr1':    '<ITEM_COOP_EXIT_DOOR:0>',
     'coopCorr2':    '<ITEM_COOP_EXIT_DOOR:1>',
     'coopCorr3':    '<ITEM_COOP_EXIT_DOOR:2>',
     'coopCorr4':    '<ITEM_COOP_EXIT_DOOR:3>',
-    'coopCorrUp':   '<ITEM_COOP_EXIT_DOOR:bee2_vert_up>',
-    'coopCorrDown': '<ITEM_COOP_EXIT_DOOR:bee2_vert_down>',
 
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # Although unused by default, editoritems allows having different instances
@@ -134,7 +127,15 @@ SPECIAL_INST: Dict[str, str] = {
 # The resolved versions of SPECIAL_INST
 INST_SPECIAL: Dict[str, List[str]] = {}
 
-# Gives names to reusable instance fields, so you don't need to remember
+# Categories and prefixes for the corridors, so can update the values after
+CORR_SPECIALS = [
+    (corridor.GameMode.SP, corridor.Direction.ENTRY, 'spentrycorr'),
+    (corridor.GameMode.SP, corridor.Direction.EXIT, 'spexitcorr'),
+    (corridor.GameMode.COOP, corridor.Direction.ENTRY, 'coopentry'),
+    (corridor.GameMode.COOP, corridor.Direction.EXIT, 'coopcorr'),
+]
+
+# Give names to reusable instance fields, so you don't need to remember
 # indexes
 SUBITEMS: Dict[str, Union[int, Tuple[int, ...]]] = {
     # Cube
@@ -218,6 +219,8 @@ SPECIAL_INST_FOLDED = {
 
 def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
+    cust_instances: dict[str, str]
+    EMPTY = editoritems.FSPath()
     for item in items:
         # Extra definitions: key -> filename.
         # Make sure to do this first, so numbered instances are set in
@@ -230,11 +233,14 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
-            str(inst.inst).casefold()
+            '' if inst.inst == EMPTY else str(inst.inst).casefold()
             for inst in item.instances
         ]
         for ind, inst in enumerate(item.instances):
-            ITEM_FOR_FILE[str(inst.inst).casefold()] = (item.id, ind)
+            fname = str(inst.inst).casefold()
+            # Not real instances.
+            if fname != '.' and not fname.startswith('instances/bee2_corridor/'):
+                ITEM_FOR_FILE[fname] = (item.id, ind)
 
     INST_SPECIAL.clear()
     INST_SPECIAL.update({
@@ -242,6 +248,36 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
         for key, val_string in
         SPECIAL_INST.items()
     })
+
+
+def set_chosen_corridor(
+    sel_mode: corridor.GameMode,
+    selected: Dict[corridor.Direction, corridor.Corridor],
+) -> None:
+    """Alter our stored corridor filenames to include the selected corridor.
+
+    If the corridor isn't present it's forced to [], otherwise it holds the single selected.
+    The numbered ones are filled in for those legacy corridors only.
+    """
+    for mode, direction, prefix in CORR_SPECIALS:
+        count = corridor.CORRIDOR_COUNTS[mode, direction]
+        item_id = corridor.CORR_TO_ID[mode, direction]
+        if mode is sel_mode:
+            corr = selected[direction]
+            inst = corr.instance.casefold()
+            INST_SPECIAL[prefix] = [inst]
+            for i in range(1, count + 1):
+                INST_SPECIAL[f'{prefix}{i}'] = [inst] if corr.orig_index == i else []
+            # Update raw item IDs too. Pretend it's repeated for all.
+            ITEM_FOR_FILE[inst] = (item_id, 0)
+            INSTANCE_FILES[item_id.casefold()][:count] = [inst] * count
+        else:  # Not being used.
+            INST_SPECIAL[prefix] = []
+            for i in range(1, count + 1):
+                INST_SPECIAL[f'{prefix}{i}'] = []
+            INSTANCE_FILES[item_id.casefold()][:count] = [''] * count
+    # Clear since these were evaluated before.
+    _resolve.cache_clear()
 
 
 def resolve(path: str, silent: bool=False) -> List[str]:
@@ -281,7 +317,7 @@ def resolve(path: str, silent: bool=False) -> List[str]:
 Default_T = TypeVar('Default_T')
 
 
-def resolve_one(path, default: Default_T='', error=False) -> Union[str, Default_T]:
+def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -301,7 +337,7 @@ def resolve_one(path, default: Default_T='', error=False) -> Union[str, Default_
 
 
 # Cache the return values, since they're constant.
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=100)
 def _resolve(path: str) -> List[str]:
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
@@ -321,10 +357,7 @@ def _resolve(path: str) -> List[str]:
                 try:
                     item_inst = INSTANCE_FILES[item_id]
                 except KeyError:
-                    LOGGER.warning(
-                        '"{}" not a valid item!',
-                        item_id,
-                    )
+                    LOGGER.warning('"{}" is not a valid item!', item_id)
                     return []
                 if subitems:
                     out.extend(get_subitems(subitems, item_inst, item_id))
@@ -337,7 +370,7 @@ def _resolve(path: str) -> List[str]:
                 try:
                     out.extend(INST_SPECIAL[special_name])
                 except KeyError:
-                    LOGGER.warning('"{}" not a valid instance category!', special_name)
+                    LOGGER.warning('"{}" is not a valid instance category!', special_name)
                     continue
             else:
                 raise Exception(group)
@@ -347,9 +380,9 @@ def _resolve(path: str) -> List[str]:
         return [path.casefold()]
 
 
-def get_subitems(comma_list, item_inst, item_id) -> List[str]:
+def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[str]:
     """Pick out the subitems from a list."""
-    output = []
+    output: List[Union[str, int]] = []
     for val in comma_list.split(','):
         folded_value = val.strip().casefold()
         if folded_value.startswith('bee2_'):
@@ -393,23 +426,22 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
 
     # Convert to instance lists
     inst_out = []
-    for ind in output:
+    for inst in output:
         # bee_ instance, already evaluated
-        if isinstance(ind, str):
-            inst_out.append(ind)
+        if isinstance(inst, str):
+            inst_out.append(inst)
             continue
 
         # Only use if it's actually in range
-        if 0 <= ind < len(item_inst):
+        if 0 <= inst < len(item_inst):
             # Skip "" instance blocks
-            if item_inst[ind] != '':
-                inst_out.append(item_inst[ind])
+            if item_inst[inst] != '':
+                inst_out.append(item_inst[inst])
     return inst_out
 
 
-# Copy over the lru_cache() functions to make them easily acessable.
-resolve.cache_info = _resolve.cache_info
-resolve.cache_clear = _resolve.cache_clear
+# Make this publicly accessible.
+resolve_cache_info: Callable[[], object] = _resolve.cache_info
 
 
 def get_cust_inst(item_id: str, inst: str) -> Optional[str]:

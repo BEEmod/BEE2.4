@@ -14,24 +14,25 @@ from zipfile import ZipFile
 from typing import List
 from pathlib import Path
 
+
 import srctools.run
 from srctools import FGD
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
-from srctools.bsp_transform import run_transformations
-from srctools.scripts.plugin import PluginFinder, Source as PluginSource
-from srctools.compiler import __version__ as version_haddons
+
+from hammeraddons.bsp_transform import run_transformations
+from hammeraddons.plugin import PluginFinder, Source as PluginSource
+from hammeraddons import __version__ as version_haddons
+
+import trio
 
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
 # Load our BSP transforms.
 # noinspection PyUnresolvedReferences
-from postcomp import (
-    coop_responses,
-    filter,
-)
+from postcomp import coop_responses, filter
 import utils
 
 
@@ -44,29 +45,30 @@ def load_transforms() -> None:
     if utils.FROZEN:
         # We embedded a copy of all the transforms in this package, which auto-imports the others.
         # noinspection PyUnresolvedReferences
-        from postcomp import transforms
+        from postcomp import transforms  # type: ignore
+        LOGGER.debug('Loading transforms from frozen package: {}', transforms)
     else:
         # We can just delegate to the regular postcompiler finder.
-        try:
-            transform_loc = Path(os.environ['BSP_TRANSFORMS'])
-        except KeyError:
-            transform_loc = utils.install_path('../HammerAddons/transforms/')
+        transform_loc = utils.install_path('hammeraddons/transforms/').resolve()
         if not transform_loc.exists():
             raise ValueError(
-                f'Invalid BSP transforms location "{transform_loc.resolve()}"!\n'
-                'Clone TeamSpen210/HammerAddons next to BEE2.4, or set the '
-                'environment variable BSP_TRANSFORMS to the location.'
+                f'No BSP transforms location "{transform_loc.resolve()}"!\n'
+                'Initialise your submodules!'
             )
-        finder = PluginFinder('postcomp.transforms', [
-            PluginSource(transform_loc, recurse=True),
-        ])
+        finder = PluginFinder('postcomp.transforms', {
+            'builtin': PluginSource('builtin', transform_loc, recursive=True),
+        })
         sys.meta_path.append(finder)
+        LOGGER.debug('Loading transforms from source: {}', transform_loc)
         finder.load_all()
 
 
 def run_vrad(args: List[str]) -> None:
     """Execute the original VRAD."""
-    code = srctools.run.run_compiler(os.path.join(os.getcwd(), "vrad"), args)
+    code = srctools.run.run_compiler(
+        os.path.join(os.getcwd(), 'linux32/vrad' if utils.LINUX else 'vrad'),
+        args,
+    )
     if code == 0:
         LOGGER.info("Done!")
     else:
@@ -74,7 +76,7 @@ def run_vrad(args: List[str]) -> None:
         sys.exit(code)
 
 
-def main(argv: List[str]) -> None:
+async def main(argv: List[str]) -> None:
     """Main VRAD script."""
     LOGGER.info(
         "BEE{} VRAD hook initiallised, srctools v{}, Hammer Addons v{}",
@@ -96,6 +98,7 @@ def main(argv: List[str]) -> None:
             'arguments, with some extra arguments:\n'
             '-force_peti: Force enabling map conversion. \n'
             "-force_hammer: Don't convert the map at all.\n"
+            "-skip_vrad: Don't run the original VRAD after conversion.\n"
             "If not specified, the map name must be \"preview.bsp\" to be "
             "treated as PeTI."
         )
@@ -147,33 +150,45 @@ def main(argv: List[str]) -> None:
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
 
-    # If VBSP marked it as Hammer, trust that.
+    # Hard to determine if the map is PeTI or not, so use VBSP's stashed info.
     if srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_peti']):
         is_peti = True
-        # Detect preview via knowing the bsp name. If we are in preview,
-        # check the config file to see what was specified there.
-        if os.path.basename(path) == "preview.bsp":
-            edit_args = not config.get_bool('General', 'vrad_force_full')
+        # VBSP passed this along.
+        is_preview = srctools.conv_bool(bsp_file.ents.spawn['BEE2_is_preview'])
+        if is_preview:
+            # Checks what the light config was set to.
+            light_args = config.get_val('General', 'vrad_compile_type', 'FAST')
             # If shift is held, reverse.
             if utils.check_shift():
-                LOGGER.info('Shift held, inverting configured lighting option!')
-                edit_args = not edit_args
+                if light_args == 'FAST':
+                    light_args = 'FULL'
+                else:
+                    light_args = 'FAST'
+                LOGGER.info('Shift held, changing configured lighting option to {}!', light_args)
         else:
             # publishing - always force full lighting.
-            edit_args = False
+            light_args = 'FULL'
     else:
-        is_peti = edit_args = False
+        is_peti = False
+        is_preview = False
+        light_args = 'FULL'
 
-    if '-force_peti' in args or '-force_hammer' in args:
+    if '-force_peti' in args or '-force_hammer' in args or '-skip_vrad' in args:
         # we have override commands!
         if '-force_peti' in args:
             LOGGER.warning('OVERRIDE: Applying cheap lighting!')
-            is_peti = edit_args = True
+            is_peti = True
+            light_args = 'FAST'
         else:
             LOGGER.warning('OVERRIDE: Preserving args!')
-            is_peti = edit_args = False
+            is_peti = False
+            light_args = 'FULL'
 
-    LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
+        if '-skip_vrad' in args:
+            LOGGER.warning('OVERRIDE: VRAD will not run!')
+            light_args = 'NONE'
+
+    LOGGER.info('Map status: is_peti={}, is_preview={} light_args={}', is_peti, is_preview, light_args)
     if not is_peti:
         # Skip everything, if the user wants these features install the Hammer Addons postcompiler.
         LOGGER.info("Hammer map detected! Skipping all transforms.")
@@ -209,9 +224,7 @@ def main(argv: List[str]) -> None:
 
     packlist = PackList(fsys)
     LOGGER.info('Reading soundscripts...')
-    packlist.load_soundscript_manifest(
-        str(root_folder / 'bin/bee2/sndscript_cache.vdf')
-    )
+    packlist.load_soundscript_manifest(root_folder / 'bin/bee2/sndscript_cache.dmx')
 
     # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
@@ -220,7 +233,7 @@ def main(argv: List[str]) -> None:
             packlist.load_soundscript(soundscript, always_include=False)
 
     LOGGER.info('Reading particles....')
-    packlist.load_particle_manifest()
+    packlist.load_particle_manifest(root_folder / 'bin/bee2/particle_cache.dmx')
 
     LOGGER.info('Loading transforms...')
     load_transforms()
@@ -229,16 +242,20 @@ def main(argv: List[str]) -> None:
     music.generate(bsp_file.ents, packlist)
 
     LOGGER.info('Run transformations...')
-    run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
+    await run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
-    LOGGER.info('Scanning map for files to pack:')
-    packlist.pack_from_bsp(bsp_file)
-    packlist.pack_fgd(bsp_file.ents, fgd)
-    packlist.eval_dependencies()
-    LOGGER.info('Done!')
+    enable_packing = not is_preview or config.getboolean("General", "packfile_auto_enable", True)
+    if enable_packing:
+        LOGGER.info('Scanning map for files to pack:')
+        packlist.pack_from_bsp(bsp_file)
+        packlist.pack_fgd(bsp_file.ents, fgd)
+        packlist.eval_dependencies()
+        LOGGER.info('Done!')
 
-    packlist.write_soundscript_manifest()
-    packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
+        packlist.write_soundscript_manifest()
+        packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
+    else:
+        LOGGER.warning('Packing disabled!')
 
     # We need to disallow Valve folders.
     pack_whitelist: set[FileSystem] = set()
@@ -264,7 +281,7 @@ def main(argv: List[str]) -> None:
     else:
         dump_loc = None
 
-    if '-no_pack' not in args:
+    if '-no_pack' not in args and enable_packing:
         # Cubemap files packed into the map already.
         existing = set(bsp_file.pakfile.namelist())
 
@@ -287,14 +304,17 @@ def main(argv: List[str]) -> None:
 
     screenshot.modify(config, game.path)
 
-    if edit_args:
+    # VRAD only runs if light_args is not set to "NONE"
+    if light_args == 'FAST':
         LOGGER.info("Forcing Cheap Lighting!")
         run_vrad(fast_args)
-    else:
+    elif light_args == 'FULL':
         LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
         run_vrad(full_args)
+    else:
+        LOGGER.info("Forcing to skip VRAD!")
 
     LOGGER.info("BEE2 VRAD hook finished!")
 
 if __name__ == '__main__':
-    main(sys.argv)
+    trio.run(main, sys.argv)

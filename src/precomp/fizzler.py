@@ -2,15 +2,13 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import Iterator, Callable
-
-import itertools
 from enum import Enum
-import attr
+import itertools
 
-import srctools.logger
+import attrs
 import srctools.vmf
 from srctools.vmf import VMF, Solid, Entity, Side, Output
-from srctools import Property, NoKeyError, Vec, Matrix, Angle
+from srctools import Property, NoKeyError, Vec, Matrix, Angle, logger
 
 import utils
 from precomp import (
@@ -25,7 +23,7 @@ from precomp import (
 import consts
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = logger.get_logger(__name__)
 
 FIZZ_TYPES: dict[str, FizzlerType] = {}
 FIZZLERS: dict[str, Fizzler] = {}
@@ -87,14 +85,14 @@ class FizzInst(Enum):
     BASE = 'base_inst'  # If set, swap the instance to this.
 
 
-@attr.frozen
+@attrs.frozen
 class MatModify:
     """Data for injected material modify controls."""
     name: str
     mat_var: str
 
 
-@attr.frozen
+@attrs.frozen
 class FizzBeam:
     """Configuration for env_beams added across fizzlers."""
     offset: list[Vec]
@@ -106,7 +104,8 @@ class FizzBeam:
 def read_configs(conf: Property) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
-        fizz = FizzlerType.parse(fizz_conf)
+        with logger.context(fizz_conf['id', '??']):
+            fizz = FizzlerType.parse(fizz_conf)
 
         if fizz.id in FIZZ_TYPES:
             raise ValueError('Duplicate fizzler ID "{}"'.format(fizz.id))
@@ -246,11 +245,14 @@ class FizzlerType:
         inst: dict[tuple[FizzInst, bool], list[str]] = {}
         for inst_type, is_static in itertools.product(FizzInst, (False, True)):
             inst_type_name = inst_type.value + ('_static' if is_static else '')
-            inst[inst_type, is_static] = instances = [
-                file
-                for prop in conf.find_all(inst_type_name)
-                for file in instanceLocs.resolve(prop.value)
-            ]
+            instances: list[str] = []
+            inst[inst_type, is_static] = instances
+            for prop in conf.find_all(inst_type_name):
+                resolved = instanceLocs.resolve(prop.value)
+                if prop.value and not resolved:
+                    LOGGER.warning('No instances found using specifier "{}"!', prop.value)
+                instances.extend(resolved)
+
             # Allow specifying weights to bias model locations
             weights = conf[inst_type_name + '_weight', '']
             if weights:
@@ -261,7 +263,7 @@ class FizzlerType:
                     rand.parse_weights(len(instances), weights)
                 ))
             # If static versions aren't given, reuse non-static ones.
-            # We do False, True so it's already been calculated.
+            # We did False before True above, so we know it's already been calculated.
             if not instances and is_static:
                 inst[inst_type, True] = inst[inst_type, False]
 
@@ -283,6 +285,8 @@ class FizzlerType:
             for prop in
             conf.find_all('PackStatic')
         }
+        if pack_lists or pack_lists_static:
+            LOGGER.warning('Packlist definitions are deprecated, use auto packing or comp_pack!')
 
         brushes = [
             FizzlerBrush.parse(prop)
@@ -841,13 +845,13 @@ class FizzlerBrush:
             # Generate the three brushes for fizzlers.
             if round(field_length) <= 128:
                 side_len = field_length / 2
-                center_len = 0
+                center_len = 0.0
             else:
                 # Bugfix - the boundary texture wrapping causes
                 # artifacts to appear at the join, we need to avoid a small
                 # amount of that texture.
                 side_len = 63
-                center_len = field_length - 126
+                center_len = field_length - 126.0
 
             brush_left = vmf.make_prism((
                 origin
@@ -873,6 +877,7 @@ class FizzlerBrush:
             )).solid
             yield brush_right
 
+            brushes: list[tuple[Solid, Vec | None, float]]
             if center_len:
                 brush_center = vmf.make_prism((
                     origin
@@ -887,9 +892,9 @@ class FizzlerBrush:
                 yield brush_center
 
                 brushes = [
-                    (brush_left, field_axis, 64),
+                    (brush_left, field_axis, 64.0),
                     (brush_center, None, center_len),
-                    (brush_right, -field_axis, 64),
+                    (brush_right, -field_axis, 64.0),
                 ]
                 used_tex_func(self.textures[TexGroup.CENTER])
             else:
@@ -979,7 +984,7 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
-def parse_map(vmf: VMF, voice_attrs: dict[str, bool]) -> None:
+def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     """Analyse fizzler instances to assign fizzler types.
 
     Instance traits are required.
@@ -1038,7 +1043,7 @@ def parse_map(vmf: VMF, voice_attrs: dict[str, bool]) -> None:
 
     for name, base_inst in fizz_bases.items():
         models = fizz_models[name]
-        orient = Matrix.from_angle(Angle.from_str(base_inst['angles']))
+        orient = Matrix.from_angstr(base_inst['angles'])
         up_axis = orient.left()
 
         # If upside-down, make it face upright.
@@ -1071,8 +1076,7 @@ def parse_map(vmf: VMF, voice_attrs: dict[str, bool]) -> None:
                 f'("{base_inst["file"]}")!'
             ) from None
 
-        for attr_name in fizz_type.voice_attrs:
-            voice_attrs[attr_name] = True
+        info.set_attr(*fizz_type.voice_attrs)
 
         for model in models:
             pos = Vec.from_str(model['origin'])
@@ -1145,7 +1149,7 @@ def parse_map(vmf: VMF, voice_attrs: dict[str, bool]) -> None:
         fizz_item.shape_signs += relay_item.shape_signs
         fizz_item.ind_panels |= relay_item.ind_panels
 
-        # Remove the relay item so it doesn't get added to the map.
+        # Remove the relay item, so it doesn't get added to the map.
         del connections.ITEMS[relay_item.name]
 
         for conn in list(relay_item.outputs):
@@ -1175,7 +1179,7 @@ def generate_fizzlers(vmf: VMF) -> None:
         # TODO: This needs to use connections to correctly check this.
         is_static = bool(
             fizz.base_inst.fixup.int('$connectioncount', 0) == 0
-            and fizz.base_inst.fixup.bool('$start_enabled', 1)
+            and fizz.base_inst.fixup.bool('$start_enabled', True)
         )
         tile_blacken = conf_tile_blacken and fizz.fizz_type.blocks_portals
 
@@ -1310,25 +1314,26 @@ def generate_fizzlers(vmf: VMF) -> None:
             length = (seg_max - seg_min).mag()
             rng = rand.seed(b'fizz_seg', seg_min, seg_max)
             if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]:
-                min_inst = vmf.create_ent(
+                # Assign to 'min' var so we can share some code.
+                min_inst = conditions.add_inst(
+                    vmf,
                     targetname=get_model_name(seg_ind),
-                    classname='func_instance',
                     file=rng.choice(fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]),
                     origin=(seg_min + seg_max)/2,
                     angles=min_orient,
                 )
             else:
                 # Both side models.
-                min_inst = vmf.create_ent(
+                min_inst = conditions.add_inst(
+                    vmf,
                     targetname=get_model_name(seg_ind),
-                    classname='func_instance',
                     file=rng.choice(model_min),
                     origin=seg_min,
                     angles=min_orient,
                 )
-                max_inst = vmf.create_ent(
+                max_inst = conditions.add_inst(
+                    vmf,
                     targetname=get_model_name(seg_ind),
-                    classname='func_instance',
                     file=rng.choice(model_max),
                     origin=seg_max,
                     angles=max_orient,
@@ -1354,8 +1359,8 @@ def generate_fizzlers(vmf: VMF) -> None:
                 rng = rand.seed(b'fizz_mid', seg_min, seg_max)
                 for dist in range(64, round(length) - 63, 128):
                     mid_pos = seg_min + forward * dist
-                    mid_inst = vmf.create_ent(
-                        classname='func_instance',
+                    mid_inst = conditions.add_inst(
+                        vmf,
                         targetname=fizz_name,
                         angles=min_orient.to_angle(),
                         file=rng.choice(fizz_type.inst[FizzInst.GRID, is_static]),

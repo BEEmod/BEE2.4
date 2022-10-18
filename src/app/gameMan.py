@@ -6,9 +6,10 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
+from typing import Optional, Union, Any, Type, IO, Iterable, Iterator
 from pathlib import Path
-from collections.abc import Iterable, Iterator
 
+import attrs
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -24,7 +25,6 @@ import copy
 import webbrowser
 from atomicwrites import atomic_write
 
-from BEE2_config import ConfigFile, GEN_OPTS
 from srctools import (
     Vec, VPK, Vec_tuple,
     Property,
@@ -33,21 +33,18 @@ from srctools import (
 )
 import srctools.logger
 import srctools.fgd
-from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE
+
+from BEE2_config import ConfigFile
+from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
+from config.gen_opts import GenOptions
 from localisation import gettext
 import loadScreen
+import packages
 import packages.template_brush
 import editoritems
 import utils
-
-from typing import Optional, Union, Any, Type, IO
-
-
-try:
-    from importlib.resources import read_binary as imp_res_read_binary
-except ImportError:
-    # Backport module for before Python 3.7
-    from importlib_resources import read_binary as imp_res_read_binary
+import config
+import event
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -56,9 +53,10 @@ all_games: list[Game] = []
 selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
+EVENT_BUS = event.EventBus()
 
 # Translated text from basemodui.txt.
-TRANS_DATA = {}
+TRANS_DATA: dict[str, str] = {}
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -68,8 +66,8 @@ FILES_TO_BACKUP = [
     ('Windows VRAD', 'bin/vrad',       '.exe'),
     ('OSX VBSP',     'bin/vbsp_osx',   ''),
     ('OSX VRAD',     'bin/vrad_osx',   ''),
-    ('Linux VBSP',   'bin/vbsp_linux', ''),
-    ('Linux VRAD',   'bin/vrad_linux', ''),
+    ('Linux VBSP',   'bin/linux32/vbsp_linux', ''),
+    ('Linux VRAD',   'bin/linux32/vrad_linux', ''),
 ]
 
 _UNLOCK_ITEMS = [
@@ -83,7 +81,7 @@ _UNLOCK_ITEMS = [
 # Material file used for fizzler sides.
 # We use $decal because that ensures it's displayed over brushes,
 # if there's base slabs or the like.
-# We have to use SolidEnergy so it fades out with fizzlers.
+# We have to use SolidEnergy, so it fades out with fizzlers.
 FIZZLER_EDGE_MAT = '''\
 SolidEnergy
 {{
@@ -114,7 +112,7 @@ MaterialModify
 '''
 
 # The location of all the instances in the game directory
-INST_PATH = 'sdk_content/maps/instances/bee2'
+INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
@@ -222,12 +220,6 @@ sp_a5_finale02_stage_end.wav\
 # still_alive_gutair_cover.wav
 # want_you_gone_guitar_cover.wav
 
-# HammerAddons tags relevant to P2.
-FGD_TAGS = frozenset({
-    'SINCE_HL2', 'SINCE_HLS', 'SINCE_EP1', 'SINCE_EP2', 'SINCE_TF2',
-    'SINCE_P1', 'SINCE_L4D', 'SINCE_L4D2', 'SINCE_ASW', 'SINCE_P2',
-    'P2', 'UNTIL_CSGO', 'VSCRIPT', 'INST_IO'
-})
 
 
 def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
@@ -242,11 +234,6 @@ def translate(string: str) -> str:
     This is needed for Valve items, since they translate automatically.
     """
     return TRANS_DATA.get(string, string)
-
-
-def setgame_callback(selected_game):
-    """Callback function run when games are selected."""
-    pass
 
 
 def quit_application():
@@ -287,19 +274,15 @@ def should_backup_app(file: str) -> bool:
         return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
 
 
+@attrs.define(eq=False)
 class Game:
-    def __init__(
-        self,
-        name: str,
-        steam_id: str,
-        folder: str,
-        mod_times: dict[str, int],
-    ) -> None:
-        self.name = name
-        self.steamID = steam_id
-        self.root = folder
-        # The last modified date of packages, so we know whether to copy it over.
-        self.mod_times = mod_times
+    name: str
+    steamID: str
+    root: str
+    # The last modified date of packages, so we know whether to copy it over.
+    mod_times: dict[str, int] = attrs.Factory(dict)
+    # The style last exported to the game.
+    exported_style: Optional[str] = None
 
     @classmethod
     def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
@@ -315,13 +298,15 @@ class Game:
         if not os.path.exists(folder):
             raise ValueError(f'Folder {folder} does not exist for game {gm_id}!')
 
+        exp_style = config.get_val(gm_id, 'exported_style', '') or None
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
             if name.startswith('pack_mod_'):
                 mod_times[name[9:].casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_times)
+        return cls(gm_id, steam_id, folder, mod_times, exp_style)
 
     def save(self) -> None:
         """Write a game into the config page."""
@@ -329,6 +314,8 @@ class Game:
         CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
+        if self.exported_style is not None:
+            CONFIG[self.name]['exported_style'] = self.exported_style
         for pack, mod_time in self.mod_times.items():
             CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
@@ -447,16 +434,16 @@ class Game:
                         )
                     continue
 
-                with atomic_write(info_path, overwrite=True, encoding='utf8') as file:
+                with atomic_write(info_path, overwrite=True, encoding='utf8') as file2:
                     for line in data:
-                        file.write(line)
+                        file2.write(line)
         if not add_line:
             # Restore the original files!
 
-            for name, file, ext in FILES_TO_BACKUP:
-                item_path = self.abs_path(file + ext)
-                backup_path = self.abs_path(file + '_original' + ext)
-                old_version = self.abs_path(file + '_styles' + ext)
+            for name, filename, ext in FILES_TO_BACKUP:
+                item_path = self.abs_path(f"{filename}{ext}")
+                backup_path = self.abs_path(f'{filename}_original{ext}')
+                old_version = self.abs_path(f'{filename}_styles{ext}')
                 if os.path.isfile(old_version):
                     LOGGER.info('Restoring Stylechanger version of "{}"!', name)
                     shutil.copy(old_version, item_path)
@@ -498,15 +485,6 @@ class Game:
                 del data[i:]
                 break
 
-        engine_fgd = srctools.FGD.engine_dbase()
-        engine_fgd.collapse_bases()
-        fgd = srctools.FGD()
-
-        for ent in engine_fgd:
-            if ent.classname.startswith('comp_'):
-                fgd.entities[ent.classname] = ent
-                ent.strip_tags(FGD_TAGS)
-
         with atomic_write(fgd_path, overwrite=True, mode='wb') as file:
             for line in data:
                 file.write(line)
@@ -515,31 +493,37 @@ class Game:
                     b'// BEE 2 EDIT FLAG = 1 \n'
                     b'// Added automatically by BEE2. Set above to "0" to '
                     b'allow editing below text without being overwritten.\n'
+                    b'// You\'ll want to do that if installing Hammer Addons.'
                     b'\n\n'
                 )
                 with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
-                file_str = io.TextIOWrapper(file, encoding='iso-8859-1')
-                fgd.export(file_str)
-                file_str.detach()  # Ensure it doesn't close it itself.
+                file.write(b'\n')
+                try:
+                    with utils.install_path('hammeraddons.fgd').open('rb') as ha_fgd:
+                        shutil.copyfileobj(ha_fgd, file)
+                except FileNotFoundError:
+                    if utils.FROZEN:
+                        raise  # Should be here!
+                    else:
+                        LOGGER.warning('Missing hammeraddons.fgd, build the app at least once!')
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
-        if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+        if config.APP.get_cur_conf(GenOptions).preserve_resources:
             # Skipped always
             return False
 
         # Check lengths, to ensure we re-extract if packages were removed.
-        if len(packages.packages) != len(self.mod_times):
+        if len(packages.LOADED.packages) != len(self.mod_times):
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
-        if any(
+        return any(
             pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
-            packages.packages.items()
-        ):
-            return True
+            packages.LOADED.packages.items()
+        )
 
     def refresh_cache(self, already_copied: set[str]) -> None:
         """Copy over the resource files into this game.
@@ -560,7 +544,7 @@ class Game:
                 start_folder = start_folder.casefold()
 
                 if start_folder == 'instances':
-                    dest = self.abs_path(INST_PATH + '/' + path)
+                    dest = self.abs_path(INST_PATH + '/' + path.casefold())
                 elif start_folder in ('bee2', 'music_samp'):
                     screen_func('RES', start_folder)
                     continue  # Skip app icons and music samples.
@@ -569,10 +553,10 @@ class Game:
                     dest = self.abs_path(os.path.join('bee2', file.path))
 
                 # Already copied from another package.
-                if dest in already_copied:
+                if dest.casefold() in already_copied:
                     screen_func('RES', dest)
                     continue
-                already_copied.add(dest)
+                already_copied.add(dest.casefold())
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
@@ -584,12 +568,12 @@ class Game:
         for path in [INST_PATH, 'bee2']:
             abs_path = self.abs_path(path)
             for dirpath, dirnames, filenames in os.walk(abs_path):
-                for file in filenames:
+                for filename in filenames:
                     # Keep VMX backups, disabled editor models, and the coop
                     # gun instance.
-                    if file.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
+                    if filename.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
                         continue
-                    path = os.path.join(dirpath, file)
+                    path = os.path.join(dirpath, filename)
 
                     if path.casefold() not in already_copied:
                         LOGGER.info('Deleting: {}', path)
@@ -597,7 +581,7 @@ class Game:
 
         # Save the new cache modification date.
         self.mod_times.clear()
-        for pack_id, pack in packages.packages.items():
+        for pack_id, pack in packages.LOADED.packages.items():
             self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
@@ -721,6 +705,7 @@ class Game:
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
+                        packset=packages.LOADED,  # TODO
                         selected_style=style,
                         resources=resources,
                     ))
@@ -825,7 +810,7 @@ class Game:
             self.edit_gameinfo(True)
             export_screen.step('EXP', 'gameinfo')
 
-            if not GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+            if not config.APP.get_cur_conf(GenOptions).preserve_resources:
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
@@ -834,7 +819,7 @@ class Game:
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
             with atomic_write(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), overwrite=True, encoding='utf8') as editor_file:
-                editoritems.Item.export(editor_file, all_items, renderables)
+                editoritems.Item.export(editor_file, all_items, renderables, id_filenames=False)
             export_screen.step('EXP', 'editoritems')
 
             LOGGER.info('Writing Editoritems database...')
@@ -853,12 +838,13 @@ class Game:
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
                 compiler_src = utils.install_path('compiler')
+                comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
                 for comp_file in compiler_src.rglob('*'):
                     # Ignore folders.
                     if comp_file.is_dir():
                         continue
 
-                    dest = self.abs_path('bin' / comp_file.relative_to(compiler_src))
+                    dest = self.abs_path(comp_dest / comp_file.relative_to(compiler_src))
 
                     LOGGER.info('\t* {} -> {}', comp_file, dest)
 
@@ -878,11 +864,13 @@ class Game:
                         export_screen.reset()
                         messagebox.showerror(
                             title=gettext('BEE2 - Export Failed!'),
-                            message=gettext('Copying compiler file {file} failed. '
-                                      'Ensure {game} is not running.').format(
-                                        file=comp_file,
-                                        game=self.name,
-                                    ),
+                            message=gettext(
+                                'Copying compiler file {file} failed. '
+                                'Ensure {game} is not running.'
+                            ).format(
+                                file=comp_file,
+                                game=self.name,
+                            ),
                             master=TK_ROOT,
                         )
                         return False, vpk_success
@@ -907,13 +895,16 @@ class Game:
                 LOGGER.info('Writing {}...', filename)
                 loc = Path(self.abs_path(filename))
                 loc.parent.mkdir(parents=True, exist_ok=True)
-                with loc.open('wb') as f:
-                    f.write(data)
+                with loc.open('wb') as f1:
+                    f1.write(data)
+
+            self.exported_style = style.id
+            save()
 
             if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
                 os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
-                with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
-                    TAG_COOP_INST_VMF.export(f)
+                with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f2:
+                    TAG_COOP_INST_VMF.export(f2)
 
             export_screen.reset()  # Hide loading screen, we're done
             return True, vpk_success
@@ -928,7 +919,7 @@ class Game:
         unused ones.
         """
         # If set, force them all to be present.
-        force_on = GEN_OPTS.get_bool('Debug', 'force_all_editor_models')
+        force_on = config.APP.get_cur_conf(GenOptions).force_all_editor_models
 
         used_models = {
             str(mdl.with_suffix('')).casefold()
@@ -990,14 +981,14 @@ class Game:
                 )
         if fizz_colors:
             os.makedirs(self.abs_path('bee2/materials/bee2/fizz_sides/'), exist_ok=True)
-        for fizz_color, (alpha, fizz_vortex_color) in fizz_colors.items():
+        for fizz_color_vec, (alpha, fizz_vortex_color) in fizz_colors.items():
             file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(
-                round(fizz_color.x * 255),
-                round(fizz_color.y * 255),
-                round(fizz_color.z * 255),
+                round(fizz_color_vec.x * 255),
+                round(fizz_color_vec.y * 255),
+                round(fizz_color_vec.z * 255),
             )
             with open(file_path, 'w') as f:
-                f.write(FIZZLER_EDGE_MAT.format(Vec(fizz_color), fizz_vortex_color))
+                f.write(FIZZLER_EDGE_MAT.format(Vec(fizz_color_vec), fizz_vortex_color))
                 if alpha != 1:
                     # Add the alpha value, but replace 0.5 -> .5 to save a char.
                     f.write('$outputintensity {}\n'.format(format(alpha, 'g').replace('0.', '.')))
@@ -1046,7 +1037,7 @@ class Game:
                 dest_loc = os.path.join(tag_dest, filename)
                 if os.path.isfile(src_loc) and not os.path.exists(dest_loc):
                     shutil.copy(src_loc, dest_loc)
-                copied_files.add(dest_loc)
+                copied_files.add(dest_loc.casefold())
                 export_screen.step('MUS')
 
         if MUSIC_MEL_VPK is not None:
@@ -1056,7 +1047,7 @@ class Game:
                 if not os.path.exists(dest_loc):
                     with open(dest_loc, 'wb') as dest:
                         dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
-                copied_files.add(dest_loc)
+                copied_files.add(dest_loc.casefold())
                 export_screen.step('MUS')
 
         return copied_files
@@ -1131,6 +1122,15 @@ class Game:
             # Dummy translations installed, apply here too.
             for key in TRANS_DATA:
                 TRANS_DATA[key] = gettext(key)
+
+    def get_export_text(self) -> str:
+        """Return the text to use on export button labels."""
+        text = gettext('Export to "{}"...').format(self.name)
+
+        if self.cache_invalid():
+            # Mark that it needs extractions
+            text += ' *'
+        return text
 
 
 def find_steam_info(game_dir):
@@ -1218,9 +1218,10 @@ def make_tag_coop_inst(tag_loc: str):
 
     ent_count = len(vmf.entities)
 
-    def logic_pos():
+    def logic_pos() -> Iterator[Vec]:
         """Put the entities in a nice circle..."""
         while True:
+            ang: float
             for ang in range(0, ent_count):
                 ang *= 360/ent_count
                 yield Vec(16*math.sin(ang), 16*math.cos(ang), 32)
@@ -1265,39 +1266,51 @@ def make_tag_coop_inst(tag_loc: str):
     )
 
 
-def save():
+def app_in_game_error() -> None:
+    """Display a message warning about the issues with placing the BEE folder directly in P2."""
+    messagebox.showerror(
+        message=gettext(
+            "It appears that the BEE2 application was installed directly in a game directory. "
+            "The bee2/ folder name is used for exported resources, so this will cause issues.\n\n"
+            "Move the application folder elsewhere, then re-run."
+        ),
+        parent=TK_ROOT,
+        title='BEE2',
+    )
+    return None
+
+
+def save() -> None:
     for gm in all_games:
         gm.save()
     CONFIG.save_check()
 
 
-def load():
+def load() -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
         if gm != 'DEFAULT':
             try:
-                new_game = Game.parse(
-                    gm,
-                    CONFIG,
-                )
+                new_game = Game.parse(gm, CONFIG)
             except ValueError:
                 LOGGER.warning("Can't parse game: ", exc_info=True)
                 continue
             all_games.append(new_game)
+            LOGGER.info('Load game: {}', new_game)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen.main_loader.suppress()
 
         # Ask the user for Portal 2's location...
-        if not add_game(refresh_menu=False):
+        if not add_game():
             # they cancelled, quit
             quit_application()
         loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
 
-def add_game(e=None, refresh_menu=True):
+def add_game(e=None):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
@@ -1306,12 +1319,14 @@ def add_game(e=None, refresh_menu=True):
         ).format(appname='portal2' + EXE_SUFFIX),
         parent=TK_ROOT,
         title=gettext('BEE2 - Add Game'),
+    )
+    if utils.WIN:
+        exe_loc = filedialog.askopenfilename(
+            title=gettext('Find Game Exe'),
+            filetypes=[(gettext('Executable'), '.exe')]
         )
-    exe_loc = filedialog.askopenfilename(
-        title=gettext('Find Game Exe'),
-        filetypes=[(gettext('Executable'), '.exe')],
-        initialdir='C:',
-        )
+    else:
+        exe_loc = filedialog.askopenfilename(title=gettext('Find Game Binaries'))
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
@@ -1321,7 +1336,7 @@ def add_game(e=None, refresh_menu=True):
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
                 title=gettext('BEE2 - Add Game'),
-                )
+            )
             return False
 
         # Mel doesn't use PeTI, so that won't make much sense...
@@ -1360,9 +1375,9 @@ def add_game(e=None, refresh_menu=True):
             else:
                 break
 
-        new_game = Game(name, gm_id, folder, {})
+        new_game = Game(name, gm_id, folder)
         all_games.append(new_game)
-        if refresh_menu:
+        if game_menu is not None:
             add_menu_opts(game_menu)
         save()
         return True
@@ -1398,12 +1413,8 @@ def remove_game(e=None):
         add_menu_opts(game_menu)
 
 
-def add_menu_opts(menu: Menu, callback=None):
+def add_menu_opts(menu: Menu) -> None:
     """Add the various games to the menu."""
-    global selectedGame_radio, setgame_callback
-    if callback is not None:
-        setgame_callback = callback
-
     for ind in range(menu.index(END), 0, -1):
         # Delete all the old radiobutton
         # Iterate backward to ensure indexes stay the same.
@@ -1420,19 +1431,21 @@ def add_menu_opts(menu: Menu, callback=None):
     setGame()
 
 
-def setGame():
+def setGame() -> None:
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
-    setgame_callback(selected_game)
+    # TODO: make this function async to eliminate.
+    background_run(EVENT_BUS, None, selected_game)
 
 
-def set_game_by_name(name):
-    global selected_game, selectedGame_radio
+def set_game_by_name(name: str) -> None:
+    global selected_game
     for game in all_games:
         if game.name == name:
             selected_game = game
             selectedGame_radio.set(all_games.index(game))
-            setgame_callback(selected_game)
+            # TODO: make this function async too to eliminate.
+            background_run(EVENT_BUS, None, selected_game)
             break
 
 if __name__ == '__main__':
@@ -1441,8 +1454,7 @@ if __name__ == '__main__':
     test_menu = Menu(TK_ROOT)
     dropdown = Menu(test_menu)
     test_menu.add_cascade(menu=dropdown, label='Game')
-    dropdown.game_pos = 0
     TK_ROOT['menu'] = test_menu
 
     load()
-    add_menu_opts(dropdown, setgame_callback)
+    add_menu_opts(dropdown)

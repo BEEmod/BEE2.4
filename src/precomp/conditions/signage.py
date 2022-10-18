@@ -5,7 +5,7 @@ from enum import Enum
 import srctools.logger
 from precomp import tiling, texturing, template_brush, conditions
 import consts
-from srctools import Property, Entity, VMF, Vec, NoKeyError, Matrix, Angle
+from srctools import Property, Entity, VMF, Vec, NoKeyError, Matrix
 from srctools.vmf import make_overlay, Side
 import vbsp
 
@@ -124,7 +124,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         return
 
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     normal = -orient.up()
     forward = -orient.forward()
@@ -145,11 +145,12 @@ def res_signage(vmf: VMF, inst: Entity, res: Property):
         sec_visgroup = 'secondary'
 
     if sign_prim and sign_sec:
-        inst['file'] = res['large_clip', '']
+        inst['file'] = fname = res['large_clip', '']
         inst['origin'] = (prim_pos + sec_pos) / 2
     else:
-        inst['file'] = res['small_clip', '']
+        inst['file'] = fname = res['small_clip', '']
         inst['origin'] = prim_pos if sign_prim else sec_pos
+    conditions.ALL_INST.add(fname.casefold())
 
     brush_faces: List[Side] = []
     tiledef: Optional[tiling.TileDef] = None
@@ -245,8 +246,7 @@ def place_sign(
     rotate: bool=True,
 ) -> Entity:
     """Place the sign into the map."""
-
-    if rotate and normal.z == 0:
+    if rotate and abs(normal.z) < 0.1:
         # On the wall, point upward.
         forward = Vec(0, 0, 1)
 

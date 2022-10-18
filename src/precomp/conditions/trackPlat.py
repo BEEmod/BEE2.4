@@ -1,22 +1,22 @@
 """Conditions relating to track platforms."""
 from typing import Set, Dict, Tuple
 
-import srctools.logger
-from precomp.conditions import (
-    make_result, RES_EXHAUSTED,
-)
 from precomp import instanceLocs, conditions
-from srctools import Vec, Property, Entity, VMF
+from srctools import Matrix, Vec, Property, Entity, VMF, logger
 
 
 COND_MOD_NAME = 'Track Platforms'
+LOGGER = logger.get_logger(__name__, alias='cond.trackPlat')
+FACINGS = {
+    (+1.0, 0.0): 'N',
+    (-1.0, 0.0): 'S',
+    (0.0, +1.0): 'E',
+    (0.0, -1.0): 'W',
+}
 
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.trackPlat')
-
-
-@make_result('trackPlatform')
-def res_track_plat(vmf: VMF, res: Property):
+@conditions.make_result('trackPlatform')
+def res_track_plat(vmf: VMF, res: Property) -> object:
     """Logic specific to Track Platforms.
 
     This allows switching the instances used depending on if the track
@@ -24,7 +24,7 @@ def res_track_plat(vmf: VMF, res: Property):
     targetnames to a useful value. This should be run unconditionally, not
     once per item.
     Values:
-    
+
     * `orig_item`: The "<ITEM_ID>" for the track platform, with angle brackets.
       This is used to determine all the instance filenames.
     * `single_plat`: An instance used for the entire platform, if it's
@@ -66,7 +66,7 @@ def res_track_plat(vmf: VMF, res: Property):
     ))
 
     if not track_instances:
-        return RES_EXHAUSTED
+        return conditions.RES_EXHAUSTED
 
     # Now we loop through all platforms in the map, and then locate their
     # track_set
@@ -74,36 +74,30 @@ def res_track_plat(vmf: VMF, res: Property):
         if plat_inst['file'].casefold() not in platforms:
             continue  # Not a platform!
 
-        LOGGER.debug('Modifying "' + plat_inst['targetname'] + '"!')
+        LOGGER.debug('Modifying "{}"!', plat_inst['targetname'])
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
-        normal = Vec(0, 0, 1).rotate_by_str(
-            plat_inst['angles']
-        )
+        normal = Matrix.from_angstr(plat_inst['angles']).up()
 
         for tr_origin, first_track in track_instances.items():
             if plat_loc == tr_origin:
                 # Check direction
-
-                if normal == Vec(0, 0, 1).rotate(
-                        *Vec.from_str(first_track['angles'])
-                        ):
+                if Vec.dot(normal, Matrix.from_angstr(first_track['angles']).up()) > 0.9:
                     break
         else:
-            raise Exception('Platform "{}" has no track!'.format(
-                plat_inst['targetname']
-            ))
+            raise Exception(f'Platform "{plat_inst["targetname"]}" has no track!')
 
         track_type = first_track['file'].casefold()
         if track_type == inst_single:
             # Track is one block long, use a single-only instance and
             # remove track!
             plat_inst['file'] = single_plat_inst
+            conditions.ALL_INST.add(single_plat_inst.casefold())
             first_track.remove()
             continue  # Next platform
 
-        track_set = set()  # type: Set[Entity]
+        track_set: set[Entity] = set()
         if track_type == inst_top or track_type == inst_middle:
             # search left
             track_scan(
@@ -128,39 +122,23 @@ def res_track_plat(vmf: VMF, res: Property):
             if track_targets == '':
                 track['targetname'] = plat_inst['targetname']
             else:
-                track['targetname'] = (
-                    plat_inst['targetname'] +
-                    '-' +
-                    track_targets + str(ind)
-                )
+                track['targetname'] = f"{plat_inst['targetname']}-{track_targets}{ind}"
 
         # Now figure out which way the track faces:
 
         # The direction of the platform surface
-        facing = Vec(-1, 0, 0).rotate_by_str(plat_inst['angles'])
+        facing = Matrix.from_angstr(plat_inst['angles']).forward(-1)
 
         # The direction horizontal track is offset
-        uaxis = Vec(x=1).rotate_by_str(first_track['angles'])
-        vaxis = Vec(y=1).rotate_by_str(first_track['angles'])
+        orient = Matrix.from_angstr(first_track['angles'])
+        local_facing = round(facing @ orient.transpose(), 3)
+        if local_facing.z != 0:
+            raise ValueError(
+                'Platform facing is not in line with track: \n'
+                f'track={first_track["angles"]}, plat={plat_inst["angles"]}, facing={local_facing}'
+            )
 
-        if uaxis == facing:
-            plat_facing = 'vert'
-            track_facing = 'E'
-        elif uaxis == -facing:
-            plat_facing = 'vert'
-            track_facing = 'W'
-        elif vaxis == facing:
-            plat_facing = 'horiz'
-            track_facing = 'N'
-        elif vaxis == -facing:
-            plat_facing = 'horiz'
-            track_facing = 'S'
-        else:
-            raise ValueError('Facing {} is not U({}) or V({})!'.format(
-                facing,
-                uaxis,
-                vaxis,
-            ))
+        plat_facing = 'vert' if abs(local_facing.y) > 0.5 else 'horiz'
 
         if res.bool('plat_suffix'):
             conditions.add_suffix(plat_inst, '_' + plat_facing)
@@ -171,12 +149,12 @@ def res_track_plat(vmf: VMF, res: Property):
 
         track_var = res['track_var', '']
         if track_var:
-            plat_inst.fixup[track_var] = track_facing
+            plat_inst.fixup[track_var] = FACINGS[local_facing.x, local_facing.y]
 
         for track in track_set:
             track.fixup.update(plat_inst.fixup)
 
-    return RES_EXHAUSTED  # Don't re-run
+    return conditions.RES_EXHAUSTED  # Don't re-run
 
 
 def track_scan(
@@ -193,7 +171,7 @@ def track_scan(
     :param x_dir: The direction to look (-1 or 1)
     """
     track = start_track
-    move_dir = Vec(x_dir*128, 0, 0).rotate_by_str(track['angles'])
+    move_dir = Vec(x_dir*128, 0, 0) @ Matrix.from_angstr(track['angles'])
     while track:
         tr_set.add(track)
 

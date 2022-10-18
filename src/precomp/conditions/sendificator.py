@@ -1,8 +1,10 @@
 """Implement special support """
 from __future__ import annotations
+from collections import defaultdict
+
 from precomp import connections, conditions
 import srctools.logger
-from srctools import Property, Entity, VMF, Vec, Output, Angle, Matrix
+from srctools import Property, Entity, VMF, Vec, Output, Matrix
 
 
 COND_MOD_NAME = None
@@ -10,6 +12,8 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 # Laser name -> offset, normal
 SENDTOR_TARGETS: dict[str, tuple[Vec, Vec]] = {}
+# Laser name -> relays created.
+SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
 
 
 @conditions.make_result('SendificatorLaser')
@@ -26,8 +30,8 @@ def res_sendificator_laser(res: Property):
 @conditions.make_result('Sendificator')
 def res_sendificator(vmf: VMF, inst: Entity):
     """Implement Sendificators."""
-    # For our version, we know which sendtor connects to what laser,
-    # so we can couple the logic together (avoiding @sendtor_mutex).
+    # For our version, we know which Sendificator connects to what laser,
+    # so we can couple the logic together (avoiding `@sendtor_mutex`).
 
     sendtor_name = inst['targetname']
     sendtor = connections.ITEMS[sendtor_name]
@@ -48,7 +52,7 @@ def res_sendificator(vmf: VMF, inst: Entity):
             LOGGER.warning('"{}" is not a Sendificator target!', las_item.name)
             continue
 
-        orient = Matrix.from_angle(Angle.from_str(las_item.inst['angles']))
+        orient = Matrix.from_angstr(las_item.inst['angles'])
 
         targ_offset =  Vec.from_str(las_item.inst['origin']) + targ_offset @ orient
         targ_normal = targ_normal @ orient
@@ -70,9 +74,13 @@ def res_sendificator(vmf: VMF, inst: Entity):
             # it off when inputs are connected, which is annoying.
             las_item.inst.fixup['$start_enabled'] = '1'
             is_on = True
+            # If any other relays were made before, set them off too.
+            for relay in SENDTOR_RELAYS[las_item.name]:
+                relay['StartDisabled'] = False
         else:
             is_on = las_item.inst.fixup.bool('$start_enabled')
 
         relay['StartDisabled'] = not is_on
+        SENDTOR_RELAYS[las_item.name].append(relay)
         las_item.enable_cmd += (Output('', relay_name, 'Enable'),)
         las_item.disable_cmd += (Output('', relay_name, 'Disable'),)

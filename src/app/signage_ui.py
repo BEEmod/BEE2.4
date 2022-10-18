@@ -1,15 +1,16 @@
 """Configures which signs are defined for the Signage item."""
-from typing import Optional, Tuple, List, Dict, overload
-
-from app import dragdrop, img, TK_ROOT
-import srctools.logger
-import utils
-import BEE2_config
-from packages import Signage, Style
+from typing import Optional, Sequence, Tuple, List, Dict
 import tkinter as tk
-from srctools import Property
+import trio
 from tkinter import ttk
-from app import tk_tools
+
+import srctools.logger
+
+from app import dragdrop, img, tk_tools, TK_ROOT
+from config.signage import DEFAULT_IDS, Layout
+from packages import Signage, Style
+from localisation import gettext
+import config
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -18,30 +19,10 @@ window.withdraw()
 
 drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
+# The valid timer indexes for signs.
+SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
-
-DEFAULT_IDS = {
-    3: 'SIGN_NUM_1',
-    4: 'SIGN_NUM_2',
-    5: 'SIGN_NUM_3',
-    6: 'SIGN_NUM_4',
-
-    7: 'SIGN_EXIT',
-    8: 'SIGN_CUBE_DROPPER',
-    9: 'SIGN_BALL_DROPPER',
-    10: 'SIGN_REFLECT_CUBE',
-
-    11: 'SIGN_GOO_TOXIC',
-    12: 'SIGN_TBEAM',
-    13: 'SIGN_TBEAM_POLARITY',
-    14: 'SIGN_LASER_RELAY',
-
-    15: 'SIGN_TURRET',
-    16: 'SIGN_LIGHT_BRIDGE',
-    17: 'SIGN_PAINT_BOUNCE',
-    18: 'SIGN_PAINT_SPEED',
-}
 
 
 def export_data() -> List[Tuple[str, str]]:
@@ -53,43 +34,28 @@ def export_data() -> List[Tuple[str, str]]:
     ]
 
 
-@BEE2_config.OPTION_SAVE('Signage')
-def save_signage() -> Property:
-    """Save the signage info to settings or a palette."""
-    props = Property('Signage', [])
-    for timer, slot in SLOTS_SELECTED.items():
-        props.append(Property(
-            str(timer),
-            '' if slot.contents is None
-            else slot.contents.id,
-        ))
-    return props
-
-
-@BEE2_config.OPTION_LOAD('Signage')
-def load_signage(props: Property) -> None:
-    """Load the signage info from settings or a palette."""
-    for child in props:
+async def apply_config(data: Layout) -> None:
+    """Apply saved signage info to the UI."""
+    for timer in SIGN_IND:
         try:
-            slot = SLOTS_SELECTED[int(child.name)]
-        except (ValueError, TypeError):
-            LOGGER.warning('Non-numeric timer value "{}"!', child.name)
-            continue
+            slot = SLOTS_SELECTED[timer]
         except KeyError:
-            LOGGER.warning('Invalid timer value {}!', child.name)
+            LOGGER.warning('Invalid timer value {}!', timer)
             continue
 
-        if child.value:
+        value = data.signs.get(timer, '')
+        if value:
             try:
-                slot.contents = Signage.by_id(child.value)
+                slot.contents = Signage.by_id(value)
             except KeyError:
-                LOGGER.warning('No signage with id "{}"!', child.value)
+                LOGGER.warning('No signage with id "{}"!', value)
         else:
             slot.contents = None
 
 
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
+    icon: Optional[img.Handle]
     for sign in Signage.all():
         for potential_style in new_style.bases:
             try:
@@ -121,21 +87,20 @@ def style_changed(new_style: Style) -> None:
         drag_man.load_icons()
 
 
-def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
+async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
-
-    If no signages are defined, this returns None.
     """
 
     if not any(Signage.all()):
-        return ttk.Label(master)
+        # There's no signage, disable the configurator. This will be invisible basically.
+        return ttk.Frame(master)
 
     window.resizable(True, True)
-    window.title(_('Configure Signage'))
+    window.title(gettext('Configure Signage'))
 
     frame_selected = ttk.Labelframe(
         window,
-        text=_('Selected'),
+        text=gettext('Selected'),
         relief='raised',
         labelanchor='n',
     )
@@ -149,7 +114,7 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
     frame_preview = ttk.Frame(window, relief='raised', borderwidth=4)
 
     frame_selected.grid(row=0, column=0, sticky='nsew')
-    ttk.Separator(orient='horiz').grid(row=1, column=0, sticky='ew')
+    ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
     name_label.grid(row=2, column=0)
     frame_preview.grid(row=3, column=0, pady=4)
     canv_all.grid(row=0, column=1, rowspan=4, sticky='nsew')
@@ -172,61 +137,56 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         LOGGER.warning('No arrow signage defined!')
         sign_arrow = None
 
-    hover_arrow = False
-    hover_toggle_id = None
-    hover_sign: Optional[Signage] = None
+    hover_scope: Optional[trio.CancelScope] = None
 
-    def hover_toggle() -> None:
-        """Toggle between arrows and dual icons."""
-        nonlocal hover_arrow, hover_toggle_id
-        hover_arrow = not hover_arrow
+    async def on_hover(hovered: dragdrop.Slot[Signage]) -> None:
+        """Show the signage when hovered, then toggle."""
+        nonlocal hover_scope
+        hover_sign = hovered.contents
         if hover_sign is None:
+            await on_leave(hovered)
             return
-        if hover_arrow and sign_arrow:
-            left = hover_sign.dnd_icon
-            right = sign_arrow.dnd_icon
-        else:
-            try:
-                left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
-            except KeyError:
-                left = hover_sign.dnd_icon
-            try:
-                right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
-            except KeyError:
-                right = IMG_BLANK
-        img.apply(preview_left, left)
-        img.apply(preview_right, right)
-        hover_toggle_id = TK_ROOT.after(1000, hover_toggle)
+        if hover_scope is not None:
+            hover_scope.cancel()
 
-    def on_hover(slot: dragdrop.Slot[Signage]) -> None:
-        """Show the signage when hovered."""
-        nonlocal hover_arrow, hover_sign
-        if slot.contents is not None:
-            name_label['text'] = _('Signage: {}').format(slot.contents.name)
-            hover_sign = slot.contents
-            hover_arrow = True
-            hover_toggle()
-        else:
-            on_leave(slot)
+        name_label['text'] = gettext('Signage: {}').format(hover_sign.name)
 
-    def on_leave(slot: dragdrop.Slot[Signage]) -> None:
+        sng_left = hover_sign.dnd_icon
+        sng_right = sign_arrow.dnd_icon if sign_arrow is not None else IMG_BLANK
+        try:
+            dbl_left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+        except KeyError:
+            dbl_left = hover_sign.dnd_icon
+        try:
+            dbl_right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+        except KeyError:
+            dbl_right = IMG_BLANK
+
+        with trio.CancelScope() as hover_scope:
+            while True:
+                img.apply(preview_left, sng_left)
+                img.apply(preview_right, sng_right)
+                await trio.sleep(1.0)
+                img.apply(preview_left, dbl_left)
+                img.apply(preview_right, dbl_right)
+                await trio.sleep(1.0)
+
+    async def on_leave(hovered: dragdrop.Slot[Signage]) -> None:
         """Reset the visible sign when left."""
-        nonlocal hover_toggle_id, hover_sign
+        nonlocal hover_scope
         name_label['text'] = ''
-        hover_sign = None
-        if hover_toggle_id is not None:
-            TK_ROOT.after_cancel(hover_toggle_id)
-            hover_toggle_id = None
+        if hover_scope is not None:
+            hover_scope.cancel()
+            hover_scope = None
         img.apply(preview_left, IMG_BLANK)
         img.apply(preview_right, IMG_BLANK)
 
-    drag_man.reg_callback(dragdrop.Event.HOVER_ENTER, on_hover)
-    drag_man.reg_callback(dragdrop.Event.HOVER_EXIT, on_leave)
+    drag_man.event_bus.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
+    drag_man.event_bus.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
 
-    for i in range(3, 31):
-        SLOTS_SELECTED[i] = slot = drag_man.slot(
+    for i in SIGN_IND:
+        SLOTS_SELECTED[i] = slot = drag_man.slot_target(
             frame_selected,
-            source=False,
             label=f'00:{i:02g}'
         )
         row, col = divmod(i-3, 4)
@@ -241,18 +201,19 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
 
     for sign in sorted(Signage.all(), key=lambda s: s.name):
         if not sign.hidden:
-            slot = drag_man.slot(canv_all, source=True)
+            slot = drag_man.slot_source(canv_all)
             slot.contents = sign
 
     drag_man.flow_slots(canv_all, drag_man.sources())
-
-    canv_all.bind(
-        '<Configure>',
-        lambda e: drag_man.flow_slots(canv_all, drag_man.sources()),
-    )
+    canv_all.bind('<Configure>', lambda e: drag_man.flow_slots(canv_all, drag_man.sources()))
 
     def hide_window() -> None:
         """Hide the window."""
+        # Store off the configured signage.
+        config.APP.store_conf(Layout({
+            timer: slt.contents.id if slt.contents is not None else ''
+            for timer, slt in SLOTS_SELECTED.items()
+        }))
         window.withdraw()
         drag_man.unload_icons()
         img.apply(preview_left, IMG_BLANK)
@@ -262,11 +223,12 @@ def init_widgets(master: ttk.Frame) -> Optional[tk.Widget]:
         """Show the window."""
         drag_man.load_icons()
         window.deiconify()
-        utils.center_win(window, TK_ROOT)
+        tk_tools.center_win(window, TK_ROOT)
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
+    await config.APP.set_and_run_ui_callback(Layout, apply_config)
     return ttk.Button(
         master,
-        text=_('Configure Signage'),
+        text=gettext('Configure Signage'),
         command=show_window,
     )

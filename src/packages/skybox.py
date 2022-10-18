@@ -5,7 +5,7 @@ from packages import (
 )
 
 
-class Skybox(PakObject):
+class Skybox(PakObject, needs_foreground=True):
     """Configures skybox and fog settings."""
     def __init__(
         self,
@@ -62,16 +62,11 @@ class Skybox(PakObject):
             return  # No skybox..
 
         try:
-            skybox = Skybox.by_id(exp_data.selected)  # type: Skybox
+            skybox = exp_data.packset.obj_by_id(Skybox, exp_data.selected)
         except KeyError:
-            raise Exception(
-                "Selected skybox ({}) doesn't exist?".format(exp_data.selected)
-            )
+            raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?")
 
-        exp_data.vbsp_conf.set_key(
-            ('Options', 'Skybox'),
-            skybox.material,
-        )
+        exp_data.vbsp_conf.set_key(('Options', 'Skybox'), skybox.material)
 
         exp_data.vbsp_conf.extend(skybox.config())
 

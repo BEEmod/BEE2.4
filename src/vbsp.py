@@ -18,13 +18,16 @@ from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 from BEE2_config import ConfigFile
 import utils
+import srctools
 import srctools.run
 import srctools.logger
+from precomp.collisions import Collisions
 from precomp import (
     instance_traits,
     brushLoc,
     bottomlessPit,
     instanceLocs,
+    corridor,
     cubes,
     template_brush,
     texturing,
@@ -44,13 +47,23 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, Tuple, Set, Iterable, Optional
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
+from typing_extensions import TypedDict
 
 
-COND_MOD_NAME = 'VBSP'
+class _Settings(TypedDict):
+    """Configuration data extracted from VBSP_config. TODO: Eliminate and make local vars."""
+    textures: Dict[str, Any]
+    options: Dict[str, Any]
+    fog: Dict[str, Any]
+    elevator: Dict[str, str]
+    music_conf: Optional[Property]
 
-# Configuration data extracted from VBSP_config
-settings: Dict[str, Dict[str, Any]] = {
+    style_vars: Dict[str, bool]
+    has_attr: Dict[str, bool]
+    packtrigger: Dict[str, List[str]]
+
+settings: _Settings = {
     "textures":       {},
     "options":        {},
     "fog":            {},
@@ -62,20 +75,21 @@ settings: Dict[str, Dict[str, Any]] = {
     "packtrigger":    defaultdict(list),
 }
 
+COND_MOD_NAME = 'VBSP'
 BEE2_config = ConfigFile('compile.cfg')
-
-GAME_MODE = 'ERR'  # SP or COOP?
-# Are we in preview mode? (Spawn in entry door instead of elevator)
-IS_PREVIEW = 'ERR'  # type: bool
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
-IGNORED_OVERLAYS = set()
+IGNORED_OVERLAYS: Set[Entity] = set()
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, editoritems.Item]]:
+def load_settings() -> Tuple[
+    antlines.AntType, antlines.AntType,
+    Dict[str, editoritems.Item],
+    corridor.ExportedConf,
+]:
     """Load in all our settings from vbsp_config."""
     try:
         with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
@@ -114,8 +128,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
-            settings['style_vars'][
-                var.name.casefold()] = srctools.conv_bool(var.value)
+            settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
     # Load in templates locations.
     template_brush.load_templates('bee2/templates.lst')
@@ -157,6 +170,10 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
 
     # Fizzler data
     fizzler.read_configs(conf)
+
+    # Selected corridors.
+    with open('bee2/corridors.bin', 'rb') as bf:
+        corridor_conf: corridor.ExportedConf = pickle.load(bf)
 
     # Signage items
     from precomp.conditions.signage import load_signs
@@ -205,7 +222,7 @@ def load_settings() -> Tuple[antlines.AntType, antlines.AntType, Dict[str, edito
     })
 
     LOGGER.info("Settings Loaded!")
-    return ant_floor, ant_wall, id_to_item
+    return ant_floor, ant_wall, id_to_item, corridor_conf
 
 
 def load_map(map_path: str) -> VMF:
@@ -220,12 +237,13 @@ def load_map(map_path: str) -> VMF:
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF):
+def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
-        voice_attrs=settings['has_attr'],
         style_vars=settings['style_vars'],
+        coll=coll,
         vmf=vmf,
+        info=info,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
@@ -327,16 +345,17 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(vmf: VMF) -> None:
+def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
     # We don't change the player model in Coop, or if Bendy is selected.
 
-    if GAME_MODE == 'COOP':  # Not in coop..
+    if info.is_coop:  # Not in coop..
         return
 
     loc = options.get(Vec, 'global_ents_loc')
+    assert loc is not None
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -400,7 +419,7 @@ def set_player_model(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(vmf: VMF) -> None:
+def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -424,12 +443,10 @@ def set_player_portalgun(vmf: VMF) -> None:
 
     LOGGER.info('Setting Portalgun:')
 
-    has = settings['has_attr']
-
-    blue_portal = not has['blueportal']
-    oran_portal = not has['orangeportal']
-    has_btn_onoff = has['portalgunonoff']
-    force_portal_man = has_btn_onoff or has['needsportalman']
+    blue_portal = not info.has_attr('blueportal')
+    oran_portal = not info.has_attr('orangeportal')
+    has_btn_onoff = info.has_attr('portalgunonoff')
+    force_portal_man = has_btn_onoff or info.has_attr('needsportalman')
 
     LOGGER.info(
         'Blue: {}, Orange: {!s}',
@@ -438,19 +455,14 @@ def set_player_portalgun(vmf: VMF) -> None:
     )
 
     if blue_portal and oran_portal:
-        has['spawn_dual'] = True
-        has['spawn_single'] = False
-        has['spawn_nogun'] = False
+        info.set_attr('spawn_dual')
     elif blue_portal or oran_portal:
-        has['spawn_dual'] = False
-        has['spawn_single'] = True
-        has['spawn_nogun'] = False
+        info.set_attr('spawn_single')
     else:
-        has['spawn_dual'] = False
-        has['spawn_single'] = False
-        has['spawn_nogun'] = True
+        info.set_attr('spawn_nogun')
 
     ent_pos = options.get(Vec, 'global_pti_ents_loc')
+    assert ent_pos is not None
 
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
 
@@ -462,7 +474,7 @@ def set_player_portalgun(vmf: VMF) -> None:
             origin=ent_pos,
         )
 
-        if GAME_MODE == 'SP':
+        if info.is_sp:
             vmf.create_ent(
                 classname='weapon_portalgun',
                 targetname='__pgun_template',
@@ -514,7 +526,7 @@ def set_player_portalgun(vmf: VMF) -> None:
 
         # Detect the group ID of portals placed in the map, and write to
         # the entities what we determine.
-        if GAME_MODE == 'COOP':
+        if info.is_coop:
             port_ids = (0, 1, 2)
         else:
             port_ids = (0, )
@@ -572,7 +584,7 @@ def set_player_portalgun(vmf: VMF) -> None:
                 '_mark_held_cube()',
             ))
 
-        if GAME_MODE == 'SP':
+        if info.is_sp:
             logic_auto.add_out(Output(
                 'OnMapSpawn',
                 '@portalgun',
@@ -614,22 +626,24 @@ def set_player_portalgun(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(vmf: VMF) -> None:
+def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
-    ).upper() == 'AUTO' and IS_PREVIEW:
+    ).upper() == 'AUTO' and info.is_preview:
+        SSHOT_FNAME = 'instances/bee2/logic/screenshot_logic.vmf'
         vmf.create_ent(
             classname='func_instance',
-            file='instances/bee2/logic/screenshot_logic.vmf',
+            file=SSHOT_FNAME,
             origin=options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
+        conditions.ALL_INST.add(SSHOT_FNAME)
         LOGGER.info('Added Screenshot Logic')
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(vmf: VMF) -> None:
+def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.get(Vec, 'global_ents_loc')
     vmf.create_ent(
@@ -727,7 +741,7 @@ def add_fog_ents(vmf: VMF) -> None:
             only_once=True,
         ))
 
-    if GAME_MODE == 'SP':
+    if info.is_sp:
         logic_auto.add_out(Output(
             'OnMapSpawn',
             '!player',
@@ -752,14 +766,14 @@ def add_fog_ents(vmf: VMF) -> None:
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(vmf: VMF) -> None:
+def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
     LOGGER.info('Elevator type: {}', vid_type.upper())
 
-    if vid_type == 'none' or GAME_MODE == 'COOP':
-        # The style doesn't have an elevator...
+    if vid_type == 'none' or info.is_coop:
+        # No elevator exists!
         return
     elif vid_type == 'bsod':
         # This uses different video shaping!
@@ -795,320 +809,6 @@ def set_elev_videos(vmf: VMF) -> None:
             vscripts=script,
             origin=inst['origin'],
         )
-
-
-def get_map_info(vmf: VMF) -> Set[str]:
-    """Determine various attributes about the map.
-
-    This also set the 'preview in elevator' options and forces
-    a particular entry/exit hallway.
-
-    - SP/COOP status
-    - if in preview mode
-    """
-    global GAME_MODE, IS_PREVIEW
-
-    inst_files = set()  # Get a set of every instance in the map.
-
-    file_coop_entry = instanceLocs.get_special_inst('coopEntry')
-    file_coop_exit = instanceLocs.get_special_inst('coopExit')
-    file_sp_exit = instanceLocs.get_special_inst('spExit')
-    file_sp_entry = instanceLocs.get_special_inst('spEntry')
-
-    # These have multiple instances, so 'in' must be used.
-    # If both frames are set to "", get_special returns None so fix that.
-    file_coop_corr = instanceLocs.get_special_inst('coopCorr')
-    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr')
-    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr')
-    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
-    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
-
-    # Should we force the player to spawn in the elevator?
-    elev_override = BEE2_config.get_bool('General', 'spawn_elev')
-    # If shift is held, this is reversed.
-    if utils.check_shift():
-        LOGGER.info('Shift held, inverting configured elevator/chamber spawn!')
-        elev_override = not elev_override
-
-    if elev_override:
-        # Make conditions set appropriately
-        LOGGER.info('Forcing elevator spawn!')
-        IS_PREVIEW = False
-
-    # Door frames use the same instance for both the entry and exit doors,
-    # and it'd be useful to distinguish between them. Add an instvar to help.
-    door_frames = []
-    entry_origin = Vec(-999, -999, -999)
-    exit_origin = Vec(-999, -999, -999)
-
-    exit_fixup = entry_fixup = None  # Copy the exit/entry fixup to the frame.
-
-    override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
-    override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
-    override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
-
-    # The type of corridor - used to replace doorframes, if needed.
-    # 0-7 = normal, 'up'/'down' = vert up/down
-    entry_corr_type = exit_corr_type = 0
-    entry_corr_name = exit_corr_name = ""
-
-    # The door frame instances
-    entry_door_frame = exit_door_frame = None
-
-    filenames = Counter()
-
-    for item in vmf.by_class['func_instance']:
-        # Loop through all the instances in the map, looking for the entry/exit
-        # doors.
-        # - Read the $no_player_start var to see if we're in preview mode,
-        #   or override the value if specified in compile.cfg
-        # - Determine whether the map is SP or Coop by the
-        #   presence of certain instances.
-        # - Switch the entry/exit corridors to particular ones if specified
-        #   in compile.cfg
-        # Also build a set of all instances, to make a condition check easy
-        # later
-
-        file = item['file'].casefold()
-        filenames[file] += 1
-        if file in file_sp_exit_corr:
-            GAME_MODE = 'SP'
-            # In SP mode the same instance is used for entry and exit door
-            # frames. Use the position of the item to distinguish the two.
-            # We need .rotate() since they could be in the same block.
-            exit_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
-            exit_origin += Vec.from_str(item['origin'])
-            exit_corr_name = item['targetname']
-            exit_fixup = item.fixup
-            exit_corr_type = mod_entryexit(
-                item,
-                'spExitCorr',
-                'SP Exit',
-                elev_override,
-                override_sp_exit,
-                is_exit=True,
-            )
-        elif file in file_sp_entry_corr:
-            GAME_MODE = 'SP'
-            entry_origin = Vec(0, 0, -64) @ Angle.from_str(item['angles'])
-            entry_origin += Vec.from_str(item['origin'])
-            entry_corr_name = item['targetname']
-            entry_fixup = item.fixup
-            entry_corr_type = mod_entryexit(
-                item,
-                'spEntryCorr',
-                'SP Entry',
-                elev_override,
-                override_sp_entry,
-            )
-        elif file in file_coop_corr:
-            GAME_MODE = 'COOP'
-            exit_corr_name = item['targetname']
-            exit_fixup = item.fixup
-            exit_corr_type = mod_entryexit(
-                item,
-                'coopCorr',
-                'Coop Exit',
-                elev_override,
-                override_coop_corr,
-                is_exit=True,
-            )
-        elif file_coop_entry == file:
-            GAME_MODE = 'COOP'
-            entry_corr_name = item['targetname']
-            entry_fixup = item.fixup
-            mod_entryexit(
-                item,
-                'coopCorr',
-                'Coop Spawn',
-                elev_override,
-            )
-        elif file_coop_exit == file:
-            GAME_MODE = 'COOP'
-            # Elevator instances don't get named - fix that...
-            item['targetname'] = 'coop_exit'
-            if elev_override:
-                item.fixup['no_player_start'] = '1'
-        elif file_sp_exit == file or file_sp_entry == file:
-            GAME_MODE = 'SP'
-            if elev_override:
-                item.fixup['no_player_start'] = '1'
-            # Elevator instances don't get named - fix that...
-            item['targetname'] = (
-                'elev_entry' if
-                file_sp_entry == file
-                else 'elev_exit'
-            )
-        elif file in file_sp_door_frame:
-            # We need to inspect origins to determine the entry door type.
-            door_frames.append(item)
-        elif file in file_coop_door_frame:
-            # The coop frame must be the exit door...
-            exit_door_frame = item
-
-        inst_files.add(item['file'])
-
-    LOGGER.debug('Instances present:\n{}', '\n'.join([
-        f'- "{file}": {count}'
-        for file, count in filenames.most_common()
-    ]))
-
-    LOGGER.info("Game Mode: " + GAME_MODE)
-    LOGGER.info("Is Preview: " + str(IS_PREVIEW))
-
-    if GAME_MODE == 'ERR':
-        raise Exception(
-            'Unknown game mode - Map missing exit room!'
-        )
-    if IS_PREVIEW == 'ERR':
-        raise Exception(
-            "Can't determine if preview is enabled "
-            '- Map likely missing entry room!'
-        )
-
-    # Now check the door frames, to allow distinguishing between
-    # the entry and exit frames.
-    for door_frame in door_frames:
-        origin = Vec(0, 0, -64) @ Angle.from_str(door_frame['angles'])
-        # Corridors are placed 64 units below doorframes - reverse that.
-        origin.z -= 64
-        origin += Vec.from_str(door_frame['origin'])
-        if origin == entry_origin:
-            door_frame.fixup['door_type'] = 'entry'
-            entry_door_frame = door_frame
-            if entry_fixup is not None:
-                # Copy the entry-door's fixup values to the frame itself..
-                door_frame.fixup.update(entry_fixup)
-        elif origin == exit_origin:
-            door_frame.fixup['door_type'] = 'exit'
-            exit_door_frame = door_frame
-            if exit_fixup is not None:
-                door_frame.fixup.update(exit_fixup)
-
-    if GAME_MODE == 'COOP':
-        mod_doorframe(
-            exit_door_frame,
-            'ITEM_COOP_EXIT_DOOR',
-            exit_corr_type,
-            exit_corr_name,
-        )
-    else:
-        mod_doorframe(
-            entry_door_frame,
-            'ITEM_ENTRY_DOOR',
-            entry_corr_type,
-            entry_corr_name,
-        )
-        mod_doorframe(
-            exit_door_frame,
-            'ITEM_EXIT_DOOR',
-            exit_corr_type,
-            exit_corr_name,
-        )
-
-    # Return the set of all instances in the map.
-    return inst_files
-
-
-def mod_entryexit(
-    inst: Entity,
-    resolve_name: str,
-    pretty_name: str,
-    elev_override: bool = False,
-    override_corr: int = -1,
-    is_exit: bool = False,
-) -> str:
-    """Modify this entrance or exit.
-
-    This sets IS_PREVIEW, switches to vertical variants, and chooses a
-    particular corridor number.
-    This returns the corridor used - 1-7, 'up', or 'down'.
-    The corridor used is also copied to '$corr_index'.
-    """
-    global IS_PREVIEW
-    normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
-
-    if is_exit:
-        # Swap the normal direction, so the up/down names match the direction
-        # of travel.
-        normal = -normal
-
-    vert_up = instanceLocs.get_special_inst(resolve_name + 'Up')
-    vert_down = instanceLocs.get_special_inst(resolve_name + 'Down')
-    files = instanceLocs.get_special_inst(resolve_name)
-
-    # The coop spawn instance doesn't have no_player_start..
-    if 'no_player_start' in inst.fixup:
-        if elev_override:
-            inst.fixup['no_player_start'] = '1'
-        else:
-            IS_PREVIEW = not srctools.conv_bool(inst.fixup['no_player_start'])
-
-    if normal == (0, 0, 1) and vert_up is not None:
-        LOGGER.info(
-            'Using upward variant for {}',
-            pretty_name,
-        )
-        inst['file'] = vert_up
-        return 'vert_up'
-
-    if normal == (0, 0, -1) and vert_down is not None:
-        LOGGER.info(
-            'Using downward variant for {}',
-            pretty_name,
-        )
-        inst['file'] = vert_down
-        return 'vert_down'
-
-    if override_corr == -1:
-        return '0'  # There aren't any variants (coop spawn room)
-
-    if override_corr == 0:
-        index = files.index(inst['file'].casefold())
-        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = index + 1
-        LOGGER.info(
-            'Using random {} ({})',
-            pretty_name,
-            index + 1,
-        )
-        return str(index)
-    else:
-        LOGGER.info(
-            'Setting {} to {}',
-            pretty_name,
-            override_corr,
-        )
-        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = override_corr
-        inst['file'] = files[override_corr - 1]
-        return str(override_corr - 1)
-
-
-def mod_doorframe(inst: Entity, corr_id, corr_type, corr_name):
-    """Change the instance used by door frames, if desired.
-
-    corr_id is the item ID of the dooor, and corr_type is the
-    return value of mod_entryexit(). corr_name is the name of the corridor.
-    """
-    if inst is None:
-        return  # This doorframe doesn't exist...
-
-    is_white = inst['file'].casefold() in instanceLocs.get_special_inst(
-        'white_frame',
-    )
-
-    inst['targetname'] = corr_name
-
-    replace = instanceLocs.get_cust_inst(
-        # Allow using a custom instance path to replace corridor types:
-        # "frame_1_white", "frame_vert_down_white"
-        corr_id,
-        'frame_{type}_{color}'.format(
-            type=corr_type,
-            color='white' if is_white else 'black',
-        )
-    )
-    if replace is not None:
-        inst['file'] = replace
 
 
 def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
@@ -1273,13 +973,16 @@ Clump = namedtuple('Clump', [
 ])
 
 
-@conditions.make_result_setup('SetAreaTex')
-def cond_force_clump_setup(res: Property):
+@conditions.make_result('SetAreaTex')
+def cond_force_clump(res: Property) -> conditions.ResultCallable:
+    """Force an area to use certain textures.
+
+    This only works in styles using the clumping texture algorithm.
+    """
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
     # Except for white/black walls, all the textures fallback to each other.
-
     white_tex = res['white']
     white_floor = res['whiteFloor', white_tex]
     white_4x4 = res['white4x4', white_tex]
@@ -1302,29 +1005,19 @@ def cond_force_clump_setup(res: Property):
         'black.2x2': res['black2x2', black_floor],
     }
 
-    return point1, point2, tex_data
+    def set_tex(inst: Entity) -> None:
+        """Store off the new textures."""
+        origin = Vec.from_str(inst['origin'])
+        angles = Angle.from_str(inst['angles'])
 
+        min_pos, max_pos = Vec.bbox(point1 @ angles + origin, point2 @ angles + origin)
 
-@conditions.make_result('SetAreaTex')
-def cond_force_clump(inst: Entity, res: Property):
-    """Force an area to use certain textures.
-
-    This only works in styles using the clumping texture algorithm.
-    """
-    point1, point2, tex_data = res.value
-    origin = Vec.from_str(inst['origin'])
-    angles = Angle.from_str(inst['angles'])
-
-    point1 = point1 @ angles + origin
-    point2 = point2 @ angles + origin
-
-    min_pos, max_pos = Vec.bbox(point1, point2)
-
-    PRESET_CLUMPS.append(Clump(
-        min_pos,
-        max_pos,
-        tex_data
-    ))
+        PRESET_CLUMPS.append(Clump(
+            min_pos,
+            max_pos,
+            tex_data
+        ))
+    return set_tex
 
 
 @conditions.meta_cond(priority=-10)
@@ -1400,6 +1093,7 @@ def position_exit_signs(vmf: VMF) -> None:
         file=inst_filename,
         fixup_style='0',  # Prefix
     )
+    conditions.ALL_INST.add(inst_filename.casefold())
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
     if options.get(bool, "remove_exit_signs_dual"):
@@ -1442,6 +1136,7 @@ def change_overlays(vmf: VMF) -> None:
                 angles=over['angles', '0 0 0'],
                 file=sign_inst,
             )
+            conditions.ALL_INST.add(sign_inst.casefold())
             if sign_inst_pack:
                 packing.pack_list(vmf, sign_inst_pack)
             new_inst.fixup['mat'] = sign_type.name.lower()
@@ -1466,17 +1161,11 @@ def change_overlays(vmf: VMF) -> None:
                 over[prop] = val.join(' ')
 
 
-def add_extra_ents(vmf: VMF, game_mode: str) -> None:
+def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the various extra instances to the map."""
     loc = options.get(Vec, 'global_ents_loc')
 
-    music.add(
-        vmf,
-        loc,
-        settings['music_conf'],  # type: ignore
-        settings['has_attr'],
-        game_mode == 'SP',
-    )
+    music.add(vmf, loc, settings['music_conf'], info)
 
     LOGGER.info('Adding global ents...')
 
@@ -1496,7 +1185,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
     # If none are present this doesn't happen...
     vmf.create_ent(
         classname='env_cubemap',
-        cubemapsize=1,  # Make as small as possible..
+        cubemapsize=1,  # Make as small as possible.
         origin=global_ents_pos,
     )
 
@@ -1509,7 +1198,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
         angles='0 0 0',
     )
 
-    if settings['has_attr']['bridge'] or settings['has_attr']['lightbridge']:
+    if info.has_attr('bridge') or info.has_attr('lightbridge'):
         # If we have light bridges, make sure we precache the particle.
         vmf.create_ent(
             classname='info_particle_system',
@@ -1528,6 +1217,7 @@ def add_extra_ents(vmf: VMF, game_mode: str) -> None:
             file=pti_file,
             fixup_style='0',
             )
+        conditions.ALL_INST.add(pti_file.casefold())
 
         has_cave = srctools.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
@@ -1635,7 +1325,10 @@ def run_vbsp(vbsp_args, path, new_path=None) -> None:
     buff = StringIO()
     vbsp_logger.addHandler(logging.StreamHandler(buff))
 
-    code = srctools.run.run_compiler('vbsp', vbsp_args, vbsp_logger)
+    code = srctools.run.run_compiler(
+        'linux32/vbsp' if utils.LINUX else 'vbsp',
+        vbsp_args, vbsp_logger,
+    )
     if code != 0:
         # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
@@ -1809,11 +1502,14 @@ def main() -> None:
     )
     game_dir = ''
 
+    skip_vbsp = False
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
         if a == '-force_peti' or a == '-force_hammer':
             new_args[i] = ''
             old_args[i] = ''
+        elif a == '-skip_vbsp':  # Debug command, for skipping.
+            skip_vbsp = True
         # Strip the entity limit, and the following number
         elif a == '-entity_limit':
             new_args[i] = ''
@@ -1854,10 +1550,22 @@ def main() -> None:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        ant_floor, ant_wall, id_to_item = load_settings()
+        ant_floor, ant_wall, id_to_item, corridor_conf = load_settings()
 
         vmf = load_map(path)
-        instance_traits.set_traits(vmf, id_to_item)
+        coll = Collisions()
+
+        instance_traits.set_traits(vmf, id_to_item, coll)
+        # Must be before corridors!
+        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
+
+        rand.init_seed(vmf)
+
+        info = corridor.analyse_and_modify(
+            vmf, corridor_conf,
+            elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
+            voice_attrs=settings['has_attr'],
+        )
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1870,17 +1578,10 @@ def main() -> None:
             antline_wall=ant_wall,
             antline_floor=ant_floor,
         )
+        change_ents(vmf)
 
-        rand.init_seed(vmf)
-
-        all_inst = get_map_info(vmf)
-
-        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
-
-        fizzler.parse_map(vmf, settings['has_attr'])
-        barriers.parse_map(vmf, settings['has_attr'])
-
-        conditions.init(all_inst)
+        fizzler.parse_map(vmf, info)
+        barriers.parse_map(vmf, info)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
@@ -1889,15 +1590,16 @@ def main() -> None:
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf)
-        add_extra_ents(vmf, GAME_MODE)
+        conditions.check_all(vmf, coll, info)
+        add_extra_ents(vmf, info)
 
-        change_ents(vmf)
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf)
         change_overlays(vmf)
-        barriers.make_barriers(vmf)
         fix_worldspawn(vmf)
+
+        if utils.DEV_MODE:
+            coll.dump(vmf, vis_name='collisions')
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:
@@ -1908,14 +1610,15 @@ def main() -> None:
         # from parameters.
         vmf.spawn['BEE2_is_peti'] = True
         # Set this so VRAD can know.
-        vmf.spawn['BEE2_is_preview'] = IS_PREVIEW
+        vmf.spawn['BEE2_is_preview'] = info.is_preview
 
         save(vmf, new_path)
-        run_vbsp(
-            vbsp_args=new_args,
-            path=path,
-            new_path=new_path,
-        )
+        if not skip_vbsp:
+            run_vbsp(
+                vbsp_args=new_args,
+                path=path,
+                new_path=new_path,
+            )
 
     LOGGER.info("BEE2 VBSP hook finished!")
 

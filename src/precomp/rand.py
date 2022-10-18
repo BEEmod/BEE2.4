@@ -74,7 +74,7 @@ def init_seed(vmf: VMF) -> str:
     return b'|'.join(light_names).decode()  # TODO Remove
 
 
-def seed(name: bytes, *values: str | Entity | Vec | Angle | float | bytes | bytearray) -> Random:
+def seed(name: bytes, *values: str | Entity | Vec | Angle | Matrix | float | bytes | bytearray) -> Random:
     """Initialise a random number generator with these starting arguments.
 
     The name is used to make this unique among other calls, then the arguments

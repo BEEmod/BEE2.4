@@ -14,12 +14,14 @@ import math
 from enum import Enum
 from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
-import attr
 
+import attrs
 from srctools import Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
+
+from plane import Plane
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from precomp.texturing import TileSize, Portalable
 from . import (
@@ -47,33 +49,28 @@ TILE_TEMP: dict[
     dict[Union[str, tuple[int, int, int, bool]], Side]
 ] = {}
 
-NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
-# Specific angles, these ensure the textures align to world once done.
+NORMALS = [Vec(x=+1), Vec(x=-1), Vec(y=+1), Vec(y=-1), Vec(z=+1), Vec(z=-1)]
+# Specific corresponding, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
-NORM_ANGLES = {
-    Vec(x=1).as_tuple(): Matrix.from_angle(Angle(0, 0, 0)),
-    Vec(x=-1).as_tuple(): Matrix.from_angle(Angle(0, 180, 0)),
-    Vec(y=1).as_tuple(): Matrix.from_angle(Angle(0, 90, 0)),
-    Vec(y=-1).as_tuple(): Matrix.from_angle(Angle(0, 270, 0)),
-    Vec(z=1).as_tuple(): Matrix.from_angle(Angle(270, 270,  0)),
-    Vec(z=-1).as_tuple(): Matrix.from_angle(Angle(90, 90, 0)),
-}
-
-NORM_NAMES = {
-    Vec(x=1).as_tuple(): 'east',
-    Vec(x=-1).as_tuple(): 'west',
-    Vec(y=1).as_tuple(): 'north',
-    Vec(y=-1).as_tuple(): 'South',
-    Vec(z=1).as_tuple(): 'up',
-    Vec(z=-1).as_tuple(): 'down',
-}
+NORMAL_ANGLES = [
+    Matrix.from_angle(0.0, 0.0, 0.0),
+    Matrix.from_angle(0.0, 180, 0.0),
+    Matrix.from_angle(0.0, 90., 0.0),
+    Matrix.from_angle(0.0, 270, 0.0),
+    Matrix.from_angle(270, 270, 0.0),
+    Matrix.from_angle(90., 90., 0.0),
+]
+NORMAL_NAMES = dict(zip(
+    map(Vec.as_tuple, NORMALS),
+    ['east', 'west', 'north', 'south', 'up', 'down'],
+))
 # All the tiledefs in the map.
 # Maps a block center, normal -> the tiledef on the side of that block.
 TILES: dict[tuple[tuple[float, float, float], tuple[float, float, float]], TileDef] = {}
 
-# Special key for Tile.SubTile - This is set to 'u' or 'v' to
+# Special key for TileDef.subtile - this is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
-# This isn't a U,V tuple, but pretend it is so we can use it as a key.
+# This isn't a U,V tuple, but pretend it is, so we can use it as a key.
 SUBTILE_FIZZ_KEY: tuple[int, int] = cast(Tuple[int, int], object())
 
 # For each overlay, stores any tiledefs that they're affixed to. We then
@@ -93,7 +90,7 @@ BEVEL_BACK_SCALE = {
 }
 
 # U, V offset -> points on that side.
-# This allows computing the set of bevel orientations from the tiles around it.
+# This allows computing the set of bevel orientations from the surrounding tiles.
 BEVEL_SIDES: list[tuple[int, int, set[tuple[int, int]]]] = [
     (-1, 0, {(-1, y) for y in range(4)}),
     (+1, 0, {(+4, y) for y in range(4)}),
@@ -184,17 +181,17 @@ class TileType(Enum):
     @property
     def as_white(self) -> TileType:
         """Force to the white version."""
-        if self is self.GOO_SIDE:
-            return self.WHITE_4x4
+        if self is TileType.GOO_SIDE:
+            return TileType.WHITE_4x4
         if self.name.startswith('BLACK'):
-            return getattr(self, f'WHITE{self.name[5:]}')
+            return getattr(TileType, f'WHITE{self.name[5:]}')
         return self
 
     @property
     def as_black(self) -> TileType:
         """Force to the black version."""
         if self.is_white:
-            return getattr(self, f'BLACK{self.name[5:]}')
+            return getattr(TileType, f'BLACK{self.name[5:]}')
         return self
 
     @property
@@ -320,7 +317,7 @@ class Pattern:
         self.wall_only = wall_only
         self.tiles = list(tiles)
         tile_u, tile_v = tex.size
-        # Do some sanity checks on values..
+        # Do some sanity checks on values...
         for umin, vmin, umax, vmax in tiles:
             tile_tex = '{} -> {} {} {} {}'.format(tex, umin, vmin, umax, vmax)
             assert 0 <= umin < umax <= 4, tile_tex
@@ -424,7 +421,7 @@ def _make_patterns() -> None:
 _make_patterns()
 
 
-@attr.define(eq=False)
+@attrs.define(eq=False)
 class Panel:
     # noinspection PyUnresolvedReferences
     """Represents a potentially dynamic specially positioned part of a tile.
@@ -453,9 +450,9 @@ class Panel:
     inst: Entity
     pan_type: PanelType
     thickness: int
-    bevels: set[tuple[int, int]] = attr.ib(converter=set)
+    bevels: set[tuple[int, int]] = attrs.field(converter=set)
 
-    points: set[tuple[int, int]] = attr.ib(factory={
+    points: set[tuple[int, int]] = attrs.Factory({
         (x, y)
         for x in range(4)
         for y in range(4)
@@ -464,7 +461,7 @@ class Panel:
     nodraw: bool = False
     seal: bool  = False
     steals_bullseye: bool = False
-    offset: Vec = attr.ib(factory=Vec)
+    offset: Vec = attrs.Factory(Vec)
 
     def same_item(self, inst: Entity) -> bool:
         """Check if the two instances come from the same item.
@@ -508,14 +505,13 @@ class Panel:
         )
         use_bullseye = tile.use_bullseye()
 
-        angles = Angle.from_str(self.inst['angles'])
-        inst_orient = orient = Matrix.from_angle(angles)
+        inst_orient = orient = Matrix.from_angstr(self.inst['angles'])
         if orient.up() != tile.normal:
             # It's not aligned to ourselves, so dump the rotation for our
             # logic.
-            angles = Angle.from_str(
-                conditions.PETI_INST_ANGLE[tile.normal.as_tuple()])
-            orient = Matrix.from_angle(angles)
+            orient = Matrix.from_angstr(
+                conditions.PETI_INST_ANGLE[tile.normal.as_tuple()]
+            )
         front_pos = Vec(0, 0, 64) @ orient + tile.pos
 
         offset = self.offset.copy()
@@ -613,7 +609,7 @@ class Panel:
                 vmf,
                 self.template,
                 # Don't offset these at all. Assume the user knows
-                # where it should go. Similarly always use the instance orient.
+                # where it should go. Similarly, always use the instance orient.
                 Vec.from_str(self.inst['origin']),
                 inst_orient,
                 self.inst['targetname'],
@@ -628,19 +624,15 @@ class Panel:
             all_brushes += template.world
 
         if self.pan_type.is_angled:
-            # Rotate the panel to match the panel shape, by rotating around
-            # its Y axis.
+            # Rotate the panel to match the panel shape, by rotating around its Y axis.
             rotation = Matrix.axis_angle(-orient.left(), self.pan_type.angle)
 
-            # Shift so the rotation axis is 0 0 0, then shift back
-            # to rotate correctly.
+            # Shift so the rotation axis is 0 0 0, then shift back to rotate correctly.
             panel_offset = front_pos - Vec(64, 0, 0) @ orient
 
-            # Rotating like this though will make the brush clip into the
-            # surface it's attached on. We need to clip the hinge edge
-            # so it doesn't do that.
-            # We can just produce any plane that is the correct
-            # orientation and let VBSP sort out the geometry.
+            # Rotating like this though will make the brush clip into the surface it's attached on.
+            # We need to clip the hinge edge, so it doesn't do that. We can just produce any
+            # plane that is the correct orientation and let VBSP sort out the geometry.
 
             front_normal = orient.forward()
             for brush in all_brushes:
@@ -730,8 +722,7 @@ class Panel:
                     snap_to_helper_angles=int(force_helper),
                     radius=64,
                 )
-                # On a flip panel, we don't want to parent so it is
-                # always on the front side.
+                # On a flip panel don't parent. The helper can just stay on the front side.
                 if not is_static:
                     if self.pan_type.is_flip:
                         helper['attach_target_name'] = self.brush_ent[
@@ -779,7 +770,7 @@ class TileDef:
         pos: Vec for the center of the block.
         normal: The direction out of the block, towards the face.
         brush_faces: A list of brush faces which this tiledef has exported.
-          Empty before-hand, but after these are faces to attach antlines to.
+          Empty beforehand, but after these are faces to attach antlines to.
         base_type: TileSize this tile started with.
         override: If set, a specific texture to use and orientation.
           This only applies to .is_tile tiles.
@@ -865,7 +856,7 @@ class TileDef:
     def __repr__(self) -> str:
         return '<{} TileDef @ {} of {}>'.format(
             self.base_type.name,
-            NORM_NAMES.get(self.normal.as_tuple(), self.normal),
+            NORMAL_NAMES.get(self.normal.as_tuple(), self.normal),
             self.pos,
         )
 
@@ -959,7 +950,7 @@ class TileDef:
         self._get_subtiles()[SUBTILE_FIZZ_KEY] = cast(TileType, axis)
 
     def uv_offset(self, u: float, v: float, norm: float) -> Vec:
-        """Return a u/v offset from our position.
+        """Return an u/v offset from our position.
 
         This is used for subtile orientations:
             norm is in the direction of the normal.
@@ -1005,7 +996,7 @@ class TileDef:
                 # Output the split patterns for centered fizzlers.
                 # We need to remove it also so our iteration doesn't choke on it.
                 # 'u' or 'v'
-                split_type: str = tiles.pop(SUBTILE_FIZZ_KEY)
+                split_type = cast(str, tiles.pop(SUBTILE_FIZZ_KEY))
                 patterns = self.calc_patterns(
                     tiles,
                     is_wall,
@@ -1048,7 +1039,7 @@ class TileDef:
                     yield umin, umax, vmin, vmax, pattern.tex, tile_type
 
         # All unfilled spots are single 4x4 tiles, or other objects.
-        for (u, v), tile_type in tiles.items():  # type: ignore  # SUBTILE_FIZZ_KEY
+        for (u, v), tile_type in tiles.items():
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
 
@@ -1625,21 +1616,19 @@ def gen_tile_temp() -> None:
             options.get(str, '_tiling_template_'))
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
-            world, detail, over = template.visgrouped(name)
-            [categories[key]] = world
+            [categories[key]] = template.visgrouped_solids(name)
     except (KeyError, ValueError):
         raise Exception('Bad Tiling Template!')
 
-    for norm_tup, angles in NORM_ANGLES.items():
-        norm = Vec(norm_tup)
+    for norm, orient in zip(NORMALS, NORMAL_ANGLES):
         axis_norm = norm.axis()
 
         temp_part: dict[Union[str, tuple[int, int, int, bool]], Side] = {}
-        TILE_TEMP[norm_tup] = temp_part
+        TILE_TEMP[norm.as_tuple()] = temp_part
 
         for (thickness, bevel), temp in categories.items():
             brush = temp.copy()
-            brush.localise(Vec(), angles)
+            brush.localise(Vec(), orient)
 
             for face in brush:
                 if face.mat == consts.Special.BACKPANELS:
@@ -1763,9 +1752,9 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 break  # Skip to next entity
 
     # Tell the antlines which tiledefs they attach to.
-    for side, segments in side_to_ant_seg.items():
+    for side_id, segments in side_to_ant_seg.items():
         try:
-            tile = face_to_tile[side]
+            tile = face_to_tile[side_id]
         except KeyError:
             continue
         for seg in segments:
@@ -1785,8 +1774,8 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 faces.remove(face)
         over['sides'] = ' '.join(faces)
 
-    # Strip out all the original goo triggers. Ignore ones with names
-    # so we don't touch laserfield trigger here.
+    # Strip out all the original goo triggers. Ignore ones with names, so we don't touch
+    # laserfield triggers here.
     for trig in vmf_file.by_class['trigger_multiple']:
         if trig['wait'] == '0.1' and trig['targetname', ''] == '':
             trig.remove()
@@ -1992,11 +1981,11 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
 
 
 def bevel_split(
-    rect_points: dict[tuple[int, int], bool],
-    tile_pos: dict[tuple[int, int], TileDef],
+    rect_points: Plane[bool],
+    tile_pos: Plane[TileDef],
 ) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
-    for min_u, min_v, max_u, max_v in grid_optim.optimise(rect_points):
+    for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
         u_range = range(min_u, max_u + 1)
         v_range = range(min_v, max_v + 1)
 
@@ -2078,9 +2067,9 @@ def generate_brushes(vmf: VMF) -> None:
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
         # (type, is_antigel, texture) -> (u, v) -> present/absent
-        grid_pos: dict[tuple[TileType, bool, str], dict[tuple[int, int], bool]] = defaultdict(dict)
+        grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
 
-        tile_pos: dict[tuple[int, int], TileDef] = {}
+        tile_pos: Plane[TileDef] = Plane()
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
@@ -2185,7 +2174,7 @@ def generate_brushes(vmf: VMF) -> None:
             over.remove()
 
 
-@attr.define(frozen=False)
+@attrs.define(frozen=False)
 class Tideline:
     """Temporary data used to hold the in-progress tideline overlays."""
     over: Entity
@@ -2317,7 +2306,7 @@ def generate_goo(vmf: VMF) -> None:
     [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])
 
     for ((min_z, max_z), grid) in goo_pos.items():
-        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+        for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):
             bbox_min = Vec(min_x, min_y, min_z) * 128
             bbox_max = Vec(max_x, max_y, max_z) * 128
             prism = vmf.make_prism(
@@ -2341,17 +2330,20 @@ def generate_goo(vmf: VMF) -> None:
     bbox_min = Vec()
 
     for (z, grid) in trig_pos.items():
-        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+        for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):
             bbox_min = Vec(min_x, min_y, z) * 128
             bbox_max = Vec(max_x, max_y, z) * 128
             trig_hurt.solids.append(vmf.make_prism(
                 bbox_min,
-                bbox_max + (128, 128, 77),
+                # 19 units below the surface.
+                bbox_max + (128, 128, 96 - 19),
                 mat=consts.Tools.TRIGGER,
             ).solid)
             trig_phys.solids.append(vmf.make_prism(
                 bbox_min,
-                bbox_max + (128, 128, 26),
+                # 70 units below the surface - 1 unit more than the height of a turret with its
+                # antenna extended. Most likely this is why PeTI uses this particular height.
+                bbox_max + (128, 128, 96 - 70),
                 mat=consts.Tools.TRIGGER,
             ).solid)
 

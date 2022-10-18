@@ -2,32 +2,34 @@
 import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
-from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any
+from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
 import itertools
 import operator
 import random
 import functools
 import math
 
-from srctools import Property
 import srctools.logger
 import trio
 
 import loadScreen
-from app import TK_ROOT
+from app import TK_ROOT, background_run
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
-from app import sound as snd
-import BEE2_config
 import packages
-from app import img
-from app import itemconfig
+from packages.item import ItemVariant, InheritKind
 import utils
 import consts
+from config.gen_opts import GenOptions, AfterExport
+from config.last_sel import LastSelected
+from config.windows import WindowState
+import config
 from localisation import gettext
 from app import (
+    img,
+    itemconfig,
+    sound as snd,
     tk_tools,
     SubPane,
     voiceEditor,
@@ -37,29 +39,30 @@ from app import (
     StyleVarPane,
     CompilerPane,
     item_search,
+    corridor_selector,
     optionWindow,
-    helpMenu,
     backup as backup_win,
     tooltip,
     signage_ui,
     paletteUI,
     music_conf,
 )
+from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
+from app.menu_bar import MenuBar
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Holds the TK Toplevels, frames, widgets and menus
-windows = {}
-frames = {}
-UI = {}
-menus = {}
+windows: Dict[str, Any] = {}  # Toplevel | SubPane
+frames: Dict[str, Union[tk.Frame, ttk.Frame]] = {}
+UI: Dict[str, Any] = {}  # Various widgets.
 
 # These panes.
-skybox_win: SelectorWin
-voice_win: SelectorWin
-style_win: SelectorWin
-elev_win: SelectorWin
+skybox_win: 'SelectorWin[[]]'
+voice_win: 'SelectorWin[[]]'
+style_win: 'SelectorWin[[]]'
+elev_win: 'SelectorWin[[]]'
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -91,6 +94,10 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
+# Piles of global widgets, should be made local...
+frmScroll: ttk.Frame  # Frame holding the item list.
+pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
+
 
 class Item:
     """Represents an item that can appear on the list."""
@@ -100,6 +107,7 @@ class Item:
         'item',
         'def_data',
         'data',
+        'inherit_kind',
         'visual_subtypes',
         'authors',
         'id',
@@ -107,6 +115,8 @@ class Item:
         'pak_name',
         'names',
         ]
+    data: ItemVariant
+    inherit_kind: InheritKind
 
     def __init__(self, item: packages.Item) -> None:
         self.ver_list = sorted(item.versions.keys())
@@ -135,11 +145,13 @@ class Item:
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
 
-        self.data = item.versions[self.selected_ver].styles.get(selected_style, self.def_data)
+        self.load_data()
 
     def load_data(self) -> None:
         """Reload data from the item."""
-        self.data = self.item.versions[self.selected_ver].styles.get(selected_style, self.def_data)
+        vers = self.item.versions[self.selected_ver]
+        self.data = vers.styles.get(selected_style, self.def_data)
+        self.inherit_kind = vers.inherit_kind.get(selected_style, InheritKind.UNSTYLED)
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
@@ -162,12 +174,20 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
+        icon = self._get_raw_icon(subKey, allow_single, single_num)
+        if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
+            return icon
+        if self.inherit_kind is not InheritKind.DEFINED:
+            icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
+        return icon
+
+    def _get_raw_icon(self, subKey, allow_single: bool, single_num: int) -> img.Handle:
+        """Get the raw icon, which may be overlaid if required."""
         icons = self.data.icons
         num_picked = sum(
-            1 for item in
-            pal_picked if
             item.id == self.id
-            )
+            for item in pal_picked
+        )
         if allow_single and self.data.can_group() and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
@@ -239,22 +259,23 @@ class Item:
 
     def refresh_subitems(self) -> None:
         """Call load_data() on all our subitems, so they reload icons and names."""
-        for refresh_cmd, subitem_list in [
-                (flow_preview, pal_picked),
-                (flow_picker, pal_items),
-                ]:
-            for item in subitem_list:
-                if item.id == self.id:
-                    item.load_data()
-            refresh_cmd()
+        for item in pal_picked:
+            if item.id == self.id:
+                item.load_data()
+        flow_preview()
+        for item in pal_items:
+            if item.id == self.id:
+                item.load_data()
+        flow_picker()
 
     def change_version(self, version: str) -> None:
+        """Set the version of this item."""
         item_opts[self.id]['sel_version'] = version
         self.selected_ver = version
         self.load_data()
         self.refresh_subitems()
 
-    def get_version_names(self):
+    def get_version_names(self) -> Tuple[List[str], List[str]]:
         """Get a list of the names and corresponding IDs for the item."""
         # item folders are reused, so we can find duplicates.
         style_obj_ids = {
@@ -415,28 +436,30 @@ class PalItem:
 
 def quit_application() -> None:
     """Do a last-minute save of our config files, and quit the app."""
-    import sys, logging
-    from app import BEE2
+    import app
     LOGGER.info('Shutting down application.')
-    try:
-        BEE2.APP_NURSERY.cancel_scope.cancel()
-    except AttributeError:
-        pass
+    # noinspection PyProtectedMember
+    if app._APP_NURSERY is not None:
+        # noinspection PyProtectedMember
+        app._APP_NURSERY.cancel_scope.cancel()
 
     # If our window isn't actually visible, this is set to nonsense -
     # ignore those values.
     if TK_ROOT.winfo_viewable():
-        GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
-        GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
+        config.APP.store_conf(WindowState(
+            x=TK_ROOT.winfo_rootx(),
+            y=TK_ROOT.winfo_rooty(),
+        ), 'main_window')
 
     try:
-        BEE2_config.write_settings()
+        config.APP.write_file()
     except Exception:
-        pass
+        LOGGER.exception('Saving main conf:')
     try:
         GEN_OPTS.save_check()
     except Exception:
-        pass
+        LOGGER.exception('Saving GEN_OPTS:')
+
     item_opts.save_check()
     CompilerPane.COMPILE_CFG.save_check()
     try:
@@ -447,66 +470,20 @@ def quit_application() -> None:
     snd.clean_sample_folder()
 
     # Destroy the TK windows, finalise logging, then quit.
-    logging.shutdown()
-    TK_ROOT.quit()
     loadScreen.shutdown()
-    sys.exit(0)
 
 gameMan.quit_application = quit_application
 
 
-def load_settings():
-    """Load options from the general config file."""
-    optionWindow.load()
-
-
-@BEE2_config.OPTION_SAVE('LastSelected')
-def save_last_selected() -> Property:
-    """Save the last selected objects."""
-    sel_win = [
-        ('Style', style_win),
-        ('Skybox', skybox_win),
-        ('Voice', voice_win),
-        ('Elevator', elev_win),
-    ]
-    for channel, win in music_conf.WINDOWS.items():
-        sel_win.append(('Music_' + channel.name.title(), win))
-
-    props = Property('', [])
-    for win_name, win in sel_win:
-        props.append(Property(win_name, win.chosen_id or '<NONE>'))
-    return props
-
-
-@BEE2_config.OPTION_LOAD('LastSelected')
-def load_last_selected(props: Property) -> None:
-    """Load the last selected objects."""
-    sel_win = [
-        ('Style', style_win),
-        ('Skybox', skybox_win),
-        ('Voice', voice_win),
-        ('Elevator', elev_win),
-    ]
-    for channel, win in music_conf.WINDOWS.items():
-        sel_win.append(('Music_' + channel.name.title(), win))
-
-    for win_name, win in sel_win:
-        try:
-            win.sel_item_id(props[win_name])
-        except IndexError:
-            pass
-
-
-def load_packages() -> None:
+async def load_packages(packset: packages.PackagesSet) -> None:
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     """
     global skybox_win, voice_win, style_win, elev_win
-    global selected_style
 
-    for item in packages.Item.all():
+    for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
     sky_list: list[selWinItem] = []
@@ -518,52 +495,45 @@ def load_packages() -> None:
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, packages.Skybox.all(), {
+        (sky_list, packages.Skybox, {
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, packages.QuotePack.all(), {
+        (voice_list, packages.QuotePack, {
             'CHAR': 'chars',
             'MONITOR': 'studio',
             'TURRET': 'turret_hate',
         }),
-        (style_list, packages.Style.all(), {
+        (style_list, packages.Style, {
             'VID': 'has_video',
         }),
-        (elev_list, packages.Elevator.all(), {
+        (elev_list, packages.Elevator, {
             'ORIENT': 'has_orient',
         }),
     ]
 
-    for sel_list, obj_list, attrs in obj_types:
-        attr_commands = [
-            # cache the operator.attrgetter funcs
-            (key, operator.attrgetter(value))
-            for key, value in attrs.items()
-        ]
+    for sel_list, obj_type, attrs in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(obj_list, key=operator.attrgetter('selitem_data.name')):
+        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
                 attrs={
-                    key: func(obj)
-                    for key, func in
-                    attr_commands
+                    key: getattr(obj, attr_name)
+                    for key, attr_name in
+                    attrs.items()
                 }
             ))
 
-    music_conf.load_selitems()
-
-    def win_callback(style_id, win_name):
+    def win_callback(sel_id: Optional[str]) -> None:
         """Callback for the selector windows.
 
         This just refreshes if the 'apply selection' option is enabled.
         """
         suggested_refresh()
 
-    def voice_callback(voice_id):
+    def voice_callback(voice_id: Optional[str]) -> None:
         """Special callback for the voice selector window.
 
         The configuration button is disabled when no music is selected.
@@ -582,6 +552,7 @@ def load_packages() -> None:
             pass
         suggested_refresh()
 
+    # Defaults match Clean Style, if not found it uses the first item.
     skybox_win = SelectorWin(
         TK_ROOT,
         sky_list,
@@ -592,9 +563,9 @@ def load_packages() -> None:
             'of sky (seen in some items), the style of bottomless pit (if present), as well as '
             'color of "fog" (seen in larger chambers).'
         ),
+        default_id='BEE2_CLEAN',
         has_none=False,
         callback=win_callback,
-        callback_params=['Skybox'],
         attributes=[
             SelAttr.bool('3D', gettext('3D Skybox'), False),
             SelAttr.color('COLOR', gettext('Fog Color')),
@@ -612,6 +583,7 @@ def load_packages() -> None:
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
         ),
         has_none=True,
+        default_id='BEE2_GLADOS_CLEAN',
         none_desc=gettext('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
             'CHAR': [gettext('<Multiverse Cave only>')],
@@ -628,6 +600,7 @@ def load_packages() -> None:
         TK_ROOT,
         style_list,
         save_id='styles',
+        default_id='BEE2_CLEAN',
         title=gettext('Select Style'),
         desc=gettext(
             'The Style controls many aspects of the map. It decides the materials used for walls, '
@@ -637,7 +610,7 @@ def load_packages() -> None:
         has_none=False,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
-        # things are open..
+        # things are open...
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
@@ -662,38 +635,26 @@ def load_packages() -> None:
         none_name=gettext('Random'),
         none_desc=gettext('Choose a random video.'),
         callback=win_callback,
-        callback_params=['Elevator'],
         attributes=[
             SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
         ]
     )
 
-    # Defaults, which will be reset at the end.
-    selected_style = 'BEE2_CLEAN'
-    style_win.sel_item_id('BEE2_CLEAN')
-
-    voice_win.sel_suggested()
-    skybox_win.sel_suggested()
-    elev_win.sel_suggested()
-    for win in music_conf.WINDOWS.values():
-        win.sel_suggested()
-
 
 def current_style() -> packages.Style:
     """Return the currently selected style."""
-    return packages.Style.by_id(selected_style)
+    return packages.LOADED.obj_by_id(packages.Style, selected_style)
 
 
 def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
-    stylevar_win = StyleVarPane.window
     opt_win = windows['opt']
     pal_win = windows['pal']
     # The x-pos of the right side of the main window
     xpos = min(
         TK_ROOT.winfo_screenwidth()
-        - stylevar_win.winfo_reqwidth(),
+        - itemconfig.window.winfo_reqwidth(),
 
         TK_ROOT.winfo_rootx()
         + TK_ROOT.winfo_reqwidth()
@@ -719,8 +680,8 @@ def reposition_panes() -> None:
     opt_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty()-40,
-        width=stylevar_win.winfo_reqwidth())
-    stylevar_win.move(
+        width=itemconfig.window.winfo_reqwidth())
+    itemconfig.window.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
 
@@ -730,7 +691,7 @@ def reset_panes() -> None:
     reposition_panes()
     windows['pal'].save_conf()
     windows['opt'].save_conf()
-    StyleVarPane.window.save_conf()
+    itemconfig.window.save_conf()
     CompilerPane.window.save_conf()
 
 
@@ -749,11 +710,11 @@ def suggested_refresh() -> None:
             UI['suggested_style'].state(['!disabled'])
 
 
-def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
+def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
-    menus['file'].entryconfigure(menus['file'].export_btn_index, state='disabled')
+    bar.set_export_allowed(False)
     TK_ROOT.update_idletasks()
     try:
         # Convert IntVar to boolean, and only export values in the selected style
@@ -778,12 +739,13 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
             for it_id, section in
             item_opts.items()
         }
+        conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
         success, vpk_success = gameMan.selected_game.export(
             style=chosen_style,
             selected_objects={
                 # Specify the 'chosen item' for each object type
-                packages.Music: music_conf.export_data(),
+                packages.Music: music_conf.export_data(packages.LOADED),
                 packages.Skybox: skybox_win.chosen_id,
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
@@ -794,11 +756,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
 
                 # The others don't have one, so it defaults to None.
             },
-            should_refresh=not GEN_OPTS.get_bool(
-                'General',
-                'preserve_BEE2_resource_dir',
-                False,
-            )
+            should_refresh=not conf.preserve_resources,
         )
 
         if not success:
@@ -822,7 +780,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         # Save the configs since we're writing to disk lots anyway.
         GEN_OPTS.save_check()
         item_opts.save_check()
-        BEE2_config.write_settings()
+        config.APP.write_file()
 
         message = gettext('Selected Items and Style successfully exported!')
         if not vpk_success:
@@ -831,13 +789,10 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
                 'Hammer to ensure editor wall previews are changed.'
             )
 
-        chosen_action = optionWindow.AfterExport(optionWindow.AFTER_EXPORT_ACTION.get())
-        want_launch = optionWindow.LAUNCH_AFTER_EXPORT.get()
-
-        if want_launch or chosen_action is not optionWindow.AfterExport.NORMAL:
+        if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
             do_action = messagebox.askyesno(
                 'BEEMOD2',
-                message + optionWindow.AFTER_EXPORT_TEXT[chosen_action, want_launch],
+                message + optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export],
                 parent=TK_ROOT,
             )
         else:  # No action to do, so just show an OK.
@@ -847,35 +802,39 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI) -> None:
         # Do the desired action - if quit, we don't bother to update UI.
         if do_action:
             # Launch first so quitting doesn't affect this.
-            if want_launch:
+            if conf.launch_after_export:
                 gameMan.selected_game.launch()
 
-            if chosen_action is optionWindow.AfterExport.NORMAL:
+            if conf.after_export is AfterExport.NORMAL:
                 pass
-            elif chosen_action is optionWindow.AfterExport.MINIMISE:
+            elif conf.after_export is AfterExport.MINIMISE:
                 TK_ROOT.iconify()
-            elif chosen_action is optionWindow.AfterExport.QUIT:
+            elif conf.after_export is AfterExport.QUIT:
                 quit_application()
                 # We never return from this.
             else:
-                raise ValueError('Unknown action "{}"'.format(chosen_action))
+                raise ValueError(f'Unknown action "{conf.after_export}"')
 
         # Select the last_export palette, so reloading loads this item selection.
-        pal_ui.select_palette(paletteUI.UUID_EXPORT)
-        pal_ui.update_state()
+        # But leave it at the current palette, if it's unmodified.
+        if pal_ui.selected.pos != pal_data:
+            pal_ui.select_palette(paletteUI.UUID_EXPORT)
+            pal_ui.update_state()
 
-        # Re-set this, so we clear the '*' on buttons if extracting cache.
-        set_game(gameMan.selected_game)
+        # Re-fire this, so we clear the '*' on buttons if extracting cache.
+        background_run(gameMan.EVENT_BUS, None, gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
-    menus['file'].entryconfigure(menus['file'].export_btn_index, state='normal')
+        bar.set_export_allowed(True)
 
 
-def set_disp_name(item, e=None) -> None:
+def set_disp_name(item: PalItem, e=None) -> None:
+    """Callback to display the name of the item."""
     UI['pre_disp_name'].configure(text=item.name)
 
 
 def clear_disp_name(e=None) -> None:
+    """Callback to reset the item name."""
     UI['pre_disp_name'].configure(text='')
 
 
@@ -1032,7 +991,7 @@ def drag_fast(drag_item: PalItem, e: tk.Event) -> None:
     flow_preview()
 
 
-def set_palette(chosen_pal: paletteUI.Palette) -> None:
+async def set_palette(chosen_pal: paletteUI.Palette) -> None:
     """Select a palette."""
     pal_clear()
     for item, sub in chosen_pal.pos:
@@ -1057,7 +1016,8 @@ def set_palette(chosen_pal: paletteUI.Palette) -> None:
         ))
 
     if chosen_pal.settings is not None:
-        BEE2_config.apply_settings(chosen_pal.settings, is_palette=True)
+        LOGGER.info('Settings: {}', chosen_pal.settings)
+        await config.apply_pal_conf(chosen_pal.settings)
 
     flow_preview()
 
@@ -1106,11 +1066,11 @@ def pal_shuffle() -> None:
     flow_preview()
 
 
-# UI functions, each accepts the parent frame to place everything in.
-# initMainWind generates the main frames that hold all the panes to
-# make it easy to move them around if needed
-
-def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
+async def init_option(
+    pane: SubPane.SubPane,
+    pal_ui: paletteUI.PaletteUI,
+    export: Callable[[], object],
+) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
@@ -1132,20 +1092,12 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         command=pal_ui.event_save_as,
     ).grid(row=1, sticky="EW", padx=5)
 
-    ttk.Checkbutton(
-        frame,
-        text=gettext('Save Settings in Palettes'),
-        variable=pal_ui.var_save_settings,
-        command=pal_ui.event_save_settings_changed,
-    ).grid(row=2, sticky="EW", padx=5)
+    pal_ui.make_option_checkbox(frame).grid(row=2, sticky="EW", padx=5)
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
-    UI['pal_export'] = ttk.Button(
-        frame,
-        textvariable=EXPORT_CMD_VAR,
-        command=functools.partial(export_editoritems, pal_ui),
-    )
+    UI['pal_export'] = ttk.Button(frame, textvariable=EXPORT_CMD_VAR, command=export)
+    UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
     props = ttk.Frame(frame, width="50")
@@ -1153,7 +1105,9 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=gettext('Music: '))
-    music_win = music_conf.make_widgets(music_frame, pane)
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
+    music_win = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
@@ -1188,7 +1142,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packages.QuotePack.by_id(voice_win.chosen_id)
+            chosen_voice = packages.LOADED.obj_by_id(packages.QuotePack, voice_win.chosen_id)
         except KeyError:
             pass
         else:
@@ -1211,7 +1165,7 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
         voice_frame,
         command=configure_voice,
         width=8,
-        )
+    )
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
     img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
@@ -1220,21 +1174,21 @@ def init_option(pane: SubPane, pal_ui: paletteUI.PaletteUI) -> None:
     )
 
     if utils.WIN:
-        # On windows, the buttons get inset on the left a bit. Inset everything
+        # On Windows, the buttons get inset on the left a bit. Inset everything
         # else to adjust.
         left_pad = (1, 0)
     else:
-        left_pad = 0
+        left_pad = (0, 0)
 
     # Make all the selector window textboxes
-    style_win.widget(props).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    (await style_win.widget(props)).grid(row=0, column=1, sticky='EW', padx=left_pad)
     # row=1: Suggested.
     voice_frame.grid(row=2, column=1, sticky='EW')
-    skybox_win.widget(props).grid(row=3, column=1, sticky='EW', padx=left_pad)
-    elev_win.widget(props).grid(row=4, column=1, sticky='EW', padx=left_pad)
+    (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
+    (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
     music_frame.grid(row=5, column=0, sticky='EW', columnspan=2)
 
-    voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW', padx=left_pad)
+    (await voice_win.widget(voice_frame)).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if tk_tools.USE_SIZEGRIP:
         sizegrip = ttk.Sizegrip(props, cursor=tk_tools.Cursors.STRETCH_HORIZ)
@@ -1265,7 +1219,7 @@ def flow_preview() -> None:
     UI['pre_sel_line'].lift()
 
 
-def init_preview(f: tk.Frame) -> None:
+def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Generate the preview pane.
 
      This shows the items that will export to the palette.
@@ -1299,7 +1253,7 @@ def init_preview(f: tk.Frame) -> None:
     flow_preview()
 
 
-def init_picker(f: tk.Frame) -> None:
+def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
     ttk.Label(
@@ -1428,113 +1382,45 @@ def init_drag_icon() -> None:
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game: 'gameMan.Game') -> None:
+async def set_game(game: 'gameMan.Game') -> None:
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
     """
-    TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
-    GEN_OPTS['Last_Selected']['game'] = game.name
-    text = gettext('Export to "{}"...').format(game.name)
-
-    if game.cache_invalid():
-        # Mark that it needs extractions
-        text += ' *'
-
-    menus['file'].entryconfigure(
-        menus['file'].export_btn_index,
-        label=text,
-    )
-    EXPORT_CMD_VAR.set(text)
+    TK_ROOT.title(f'BEEMOD {utils.BEE_VERSION} - {game.name}')
+    config.APP.store_conf(LastSelected(game.name), 'game')
+    EXPORT_CMD_VAR.set(game.get_export_text())
 
 
-def init_menu_bar(win: tk.Toplevel, export: Callable[[], None]) -> Tuple[tk.Menu, tk.Menu]:
-    """Create the top menu bar.
-
-    This returns the View and palette menus, for later population.
-    """
-    bar = tk.Menu(win)
-    # Suppress ability to make each menu a separate window - weird old
-    # TK behaviour
-    win.option_add('*tearOff', '0')
-    if utils.MAC:
-        # Name is used to make this the special 'BEE2' menu item
-        file_menu = menus['file'] = tk.Menu(bar, name='apple')
-    else:
-        file_menu = menus['file'] = tk.Menu(bar)
-
-    bar.add_cascade(menu=file_menu, label=gettext('File'))
-
-    # Assign the bar as the main window's menu.
-    # Must be done after creating the apple menu.
-    win['menu'] = bar
-
-    file_menu.add_command(
-        label=gettext("Export"),
-        command=export,
-        accelerator=tk_tools.ACCEL_EXPORT,
-    )
-    file_menu.export_btn_index = 0  # Change this if the menu is reordered
-
-    file_menu.add_command(
-        label=gettext("Add Game"),
-        command=gameMan.add_game,
-    )
-    file_menu.add_command(
-        label=gettext("Uninstall from Selected Game"),
-        command=gameMan.remove_game,
-        )
-    file_menu.add_command(
-        label=gettext("Backup/Restore Puzzles..."),
-        command=backup_win.show_window,
-    )
-    file_menu.add_command(
-        label=gettext("Manage Packages..."),
-        command=packageMan.show,
-    )
-    file_menu.add_separator()
-    file_menu.add_command(
-        label=gettext("Options"),
-        command=optionWindow.show,
-    )
-    if not utils.MAC:
-        file_menu.add_command(
-            label=gettext("Quit"),
-            command=quit_application,
-            )
-    file_menu.add_separator()
-    # Add a set of options to pick the game into the menu system
-    gameMan.add_menu_opts(menus['file'], callback=set_game)
-    gameMan.game_menu = menus['file']
-
-    pal_menu = menus['pal'] = tk.Menu(bar)
-    # Menu name
-    bar.add_cascade(menu=pal_menu, label=gettext('Palette'))
-
-    view_menu = tk.Menu(bar)
-    bar.add_cascade(menu=view_menu, label=gettext('View'))
-
-    helpMenu.make_help_menu(bar)
-
-    return view_menu, pal_menu
+def refresh_palette_icons() -> None:
+    """Refresh all displayed palette icons."""
+    for pal_item in itertools.chain(pal_picked, pal_items):
+        pal_item.load_data()
 
 
 async def init_windows() -> None:
     """Initialise all windows and panes.
 
     """
-    view_menu, pal_menu = init_menu_bar(TK_ROOT, export=lambda: export_editoritems(pal_ui))
+    def export() -> None:
+        """Export the palette, passing the required UI objects."""
+        export_editoritems(pal_ui, menu_bar)
+
+    menu_bar = MenuBar(
+        TK_ROOT,
+        quit_app=quit_application,
+        export=export,
+    )
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
-        )
+    )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
+    gameMan.EVENT_BUS.register(None, gameMan.Game, set_game)
+    # Initialise the above and the menu bar.
+    await gameMan.EVENT_BUS(None, gameMan.Game)
 
-    if utils.MAC:
-        # OS X has a special quit menu item.
-        TK_ROOT.createcommand('tk::mac::Quit', quit_application)
-
-    ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG)
+    ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
@@ -1546,7 +1432,7 @@ async def init_windows() -> None:
     style.configure('BG.TButton', background=ItemsBG)
     style.configure('Preview.TLabel', background='#F4F5F5')
 
-    frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG)
+    frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
     frames['preview'].grid(
         row=0,
         column=3,
@@ -1575,7 +1461,7 @@ async def init_windows() -> None:
         pady=10,
     )
 
-    picker_split_frame = tk.Frame(ui_bg, bg=ItemsBG)
+    picker_split_frame = tk.Frame(ui_bg, bg=ItemsBG, name='picker_split')
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
     ui_bg.columnconfigure(5, weight=1)
 
@@ -1583,6 +1469,7 @@ async def init_windows() -> None:
     # to right
     search_frame = ttk.Frame(
         picker_split_frame,
+        name='searchbar',
         padding=5,
         borderwidth=0,
         relief="raised",
@@ -1602,6 +1489,7 @@ async def init_windows() -> None:
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
+        name='picker',
         padding=5,
         borderwidth=4,
         relief="raised",
@@ -1616,6 +1504,7 @@ async def init_windows() -> None:
 
     frames['toolMenu'] = tk.Frame(
         frames['preview'],
+        name='toolbar',
         bg=ItemsBG,
         width=192,
         height=26,
@@ -1627,7 +1516,7 @@ async def init_windows() -> None:
         TK_ROOT,
         title=gettext('Palettes'),
         name='pal',
-        menu_bar=view_menu,
+        menu_bar=menu_bar.view_menu,
         resize_x=True,
         resize_y=True,
         tool_frame=frames['toolMenu'],
@@ -1635,22 +1524,22 @@ async def init_windows() -> None:
         tool_col=1,
     )
 
-    pal_frame = ttk.Frame(windows['pal'])
+    pal_frame = ttk.Frame(windows['pal'], name='pal_frame')
     pal_frame.grid(row=0, column=0, sticky='NSEW')
     windows['pal'].columnconfigure(0, weight=1)
     windows['pal'].rowconfigure(0, weight=1)
 
     pal_ui = paletteUI.PaletteUI(
-        pal_frame, pal_menu,
+        pal_frame, menu_bar.pal_menu,
         cmd_clear=pal_clear,
         cmd_shuffle=pal_shuffle,
         get_items=lambda: [(it.id, it.subKey) for it in pal_picked],
         set_items=set_palette,
     )
 
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save)
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as)
-    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui))
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save())
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as())
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui, menu_bar))
 
     await trio.sleep(0)
     loader.step('UI', 'palette')
@@ -1664,22 +1553,26 @@ async def init_windows() -> None:
         TK_ROOT,
         title=gettext('Export Options'),
         name='opt',
-        menu_bar=view_menu,
+        menu_bar=menu_bar.view_menu,
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img='icons/win_options',
         tool_col=2,
     )
-    init_option(windows['opt'], pal_ui)
 
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(init_option, windows['opt'], pal_ui, export)
     loader.step('UI', 'options')
 
-    StyleVarPane.make_pane(frames['toolMenu'], view_menu, flow_picker)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, flow_picker)
+    loader.step('UI', 'itemvar')
 
-    loader.step('UI', 'stylevar')
-
-    CompilerPane.make_pane(frames['toolMenu'], view_menu)
-
+    async with trio.open_nursery() as nurs:
+        corridor = corridor_selector.Selector(packages.LOADED)
+        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], menu_bar.view_menu, corridor)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(corridor.refresh)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
@@ -1702,8 +1595,9 @@ async def init_windows() -> None:
 
     # When clicking on any window hide the context window
     tk_tools.bind_leftclick(TK_ROOT, contextWin.hide_context)
-    tk_tools.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    tk_tools.bind_leftclick(itemconfig.window, contextWin.hide_context)
     tk_tools.bind_leftclick(CompilerPane.window, contextWin.hide_context)
+    tk_tools.bind_leftclick(corridor.win, contextWin.hide_context)
     tk_tools.bind_leftclick(windows['opt'], contextWin.hide_context)
     tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
 
@@ -1716,13 +1610,14 @@ async def init_windows() -> None:
     loader.step('UI', 'voiceline')
     contextWin.init_widgets()
     loader.step('UI', 'contextwin')
-    optionWindow.init_widgets()
+    await optionWindow.init_widgets(
+        unhide_palettes=pal_ui.reset_hidden_palettes,
+        reset_all_win=reset_panes,
+    )
     loader.step('UI', 'optionwindow')
     init_drag_icon()
     loader.step('UI', 'drag_icon')
     await trio.sleep(0)
-
-    optionWindow.reset_all_win = reset_panes
 
     # Load to properly apply config settings, then save to ensure
     # the file has any defaults applied.
@@ -1732,7 +1627,7 @@ async def init_windows() -> None:
     TK_ROOT.deiconify()  # show it once we've loaded everything
     windows['pal'].deiconify()
     windows['opt'].deiconify()
-    StyleVarPane.window.deiconify()
+    itemconfig.window.deiconify()
     CompilerPane.window.deiconify()
 
     if utils.MAC:
@@ -1742,48 +1637,55 @@ async def init_windows() -> None:
 
     # Position windows according to remembered settings:
     try:
-        start_x = int(GEN_OPTS['win_state']['main_window_x'])
-        start_y = int(GEN_OPTS['win_state']['main_window_y'])
-    except (ValueError, KeyError):
+        main_win_state = config.APP.get_cur_conf(WindowState, 'main_window')
+    except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
         if TK_ROOT.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50:
             TK_ROOT.geometry(
-                '+' + str(windows['pal'].winfo_reqwidth() + 50) +
-                '+' + str(TK_ROOT.winfo_rooty())
-                )
+                f'+{windows["pal"].winfo_reqwidth() + 50}+{TK_ROOT.winfo_rooty()}'
+            )
         else:
             TK_ROOT.geometry(f'{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
     else:
-        start_x, start_y = utils.adjust_inside_screen(
-            start_x,
-            start_y,
+        start_x, start_y = tk_tools.adjust_inside_screen(
+            main_win_state.x, main_win_state.y,
             win=TK_ROOT,
-            )
+        )
         TK_ROOT.geometry(f'+{start_x}+{start_y}')
-    TK_ROOT.update_idletasks()
+    await tk_tools.wait_eventloop()
 
     # First move to default positions, then load the config.
     # If the config is valid, this will move them to user-defined
     # positions.
     reposition_panes()
-    StyleVarPane.window.load_conf()
+    itemconfig.window.load_conf()
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    def style_select_callback(style_id: str) -> None:
+    async def enable_export() -> None:
+        """Enable exporting only after all packages are loaded."""
+        for cls in packages.OBJ_TYPES.values():
+            await packages.LOADED.ready(cls).wait()
+        UI['pal_export'].state(('!disabled',))
+        menu_bar.set_export_allowed(True)
+
+    background_run(enable_export)
+
+    def style_select_callback(style_id: Optional[str]) -> None:
         """Callback whenever a new style is chosen."""
         global selected_style
+        assert style_id is not None, "Style ID must be provided"
         selected_style = style_id
 
         style_obj = current_style()
-
-        for item in itertools.chain(item_list.values(), pal_picked, pal_items):
-            item.load_data()  # Refresh everything
+        for item in item_list.values():
+            item.load_data()
+        refresh_palette_icons()
 
         # Update variant selectors on the itemconfig pane
-        for func in itemconfig.ITEM_VARIANT_LOAD:
+        for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
             func()
 
         # Disable this if the style doesn't have elevators
@@ -1791,7 +1693,6 @@ async def init_windows() -> None:
 
         signage_ui.style_changed(style_obj)
         item_search.rebuild_database()
-        CompilerPane.set_corridors(style_obj.corridors)
 
         sugg = style_obj.suggested
         win_types = (
@@ -1804,10 +1705,10 @@ async def init_windows() -> None:
             win.set_suggested(sugg_val)
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
+        corridor.load_corridors(packages.LOADED)
+        background_run(corridor.refresh)
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
-    set_palette(pal_ui.selected)
-    # Set_palette needs to run first, so it can fix invalid palette indexes.
-    BEE2_config.read_settings()
+    await set_palette(pal_ui.selected)
     pal_ui.update_state()

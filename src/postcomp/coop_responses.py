@@ -1,8 +1,8 @@
 from typing import Dict, List, Optional
 
 from srctools import Entity
-from srctools.bsp_transform import Context, trans
 import srctools.logger
+from hammeraddons.bsp_transform import Context, trans
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -40,4 +40,3 @@ def generate_coop_responses(ctx: Context) -> None:
 
     if ent is None:
         LOGGER.warning('Response scripts present, but @glados is not!')
-

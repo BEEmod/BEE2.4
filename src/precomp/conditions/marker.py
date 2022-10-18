@@ -1,18 +1,18 @@
 """Conditions that read/write a set of positional markers."""
 from __future__ import annotations
 
-import attr
+import attrs
+from srctools import Property, Entity, Vec, Matrix
+import srctools.logger
 
 from precomp.conditions import make_flag, make_result
-from srctools import Property, Entity, Vec, Matrix, Angle
-import srctools.logger
 
 # TODO: switch to R-tree etc.
 MARKERS: list[Marker] = []
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-@attr.define
+@attrs.define
 class Marker:
     """A marker placed in the map."""
     pos: Vec
@@ -30,7 +30,7 @@ def res_set_marker(inst: Entity, res: Property) -> None:
         * `pos`: The position or offset to use for the marker.
     """
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     try:
         is_global = srctools.conv_bool(inst.fixup.substitute(res['global'], allow_invert=True))
@@ -66,7 +66,7 @@ def flag_check_marker(inst: Entity, flag: Property) -> bool:
           The value is in the form `$src $dest`.
     """
     origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angle(Angle.from_str(inst['angles']))
+    orient = Matrix.from_angstr(inst['angles'])
 
     name = inst.fixup.substitute(flag['name']).casefold()
     if '*' in name:

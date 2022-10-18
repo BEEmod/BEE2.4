@@ -1,18 +1,26 @@
-"""Help menu and associated dialogs."""
-from enum import Enum
-from typing import NamedTuple, Dict
+"""Help menu and associated dialogs.
 
-from tkinter import ttk
+All the URLs we have available here are not directly listed. Instead, we download a file from the
+GitHub repo, which ensures we're able to change them retroactively if the old URL becomes dead for
+whatever reason.
+"""
+import io
+import urllib.request, urllib.error
+from enum import Enum
+from typing import Any, Callable, Dict, cast
+from tkinter import ttk, messagebox
 import tkinter as tk
 import webbrowser
 import functools
 
+from srctools.dmx import Element, NULL
+import attrs
+import srctools.logger
+import trio.to_thread
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
 from localisation import gettext
-import utils
-import srctools
 
 # For version info
 import PIL
@@ -30,55 +38,41 @@ class ResIcon(Enum):
     BUGS = 'menu_github'
     DISCORD = 'menu_discord'
     MUSIC_CHANGER = 'menu_music_changer'
-
     PORTAL2 = 'menu_p2'
-    TAG = 'menu_tag'
-    TWTM = 'menu_twtm'
-    MEL = 'menu_mel'
 
-SEPERATOR = object()
-
-BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
-BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
-DISCORD_SERVER = 'https://discord.gg/EvC8Fku'
-MUSIC_CHANGER = 'https://beemmc.boards.net/'
+@attrs.frozen
+class WebResource:
+    """Definition for the links in the help menu."""
+    name: str
+    url_key: str
+    icon: ResIcon
 
 
-def steam_url(name):
-    """Return the URL to open the given game in Steam."""
-    return 'steam://store/' + utils.STEAM_IDS[name]
+LOGGER = srctools.logger.get_logger(__name__)
+DB_LOCATION = 'https://raw.githubusercontent.com/BEEmod/BEE2.4/master/help_urls.dmx'
+url_data: Element = NULL
 
+# This produces a '-------' instead.
+SEPERATOR = WebResource('', '', ResIcon.NONE)
 
-WebResource = NamedTuple('WebResource', [
-    ('name', str),
-    ('url', str),
-    ('icon', ResIcon),
-])
-Res = WebResource
-
+Res: Callable[[str, str, ResIcon], WebResource] = cast(Any, WebResource)
 WEB_RESOURCES = [
-    Res(gettext('Wiki...'), BEE2_ITEMS_REPO + 'wiki/', ResIcon.BEE2),
-    Res(
-        gettext('Original Items...'),
-        'https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker',
-        ResIcon.PORTAL2,
-    ),
+    Res(gettext('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
+    Res(gettext('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
     # i18n: The chat program.
-    Res(gettext('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
-    Res(gettext("aerond's Music Changer..."), MUSIC_CHANGER, ResIcon.MUSIC_CHANGER),
+    Res(gettext('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
+    Res(gettext("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
+    Res(gettext('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
     SEPERATOR,
-    Res(gettext('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
-    Res(gettext('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
+    Res(gettext('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
+    Res(gettext('Items Repository...'), "repo_items", ResIcon.GITHUB),
+    Res(gettext('Music Repository...'), "repo_music", ResIcon.GITHUB),
     SEPERATOR,
-    Res(gettext('Submit Application Bugs...'), BEE2_REPO + 'issues/new', ResIcon.BUGS),
-    Res(gettext('Submit Item Bugs...'), BEE2_ITEMS_REPO + 'issues/new', ResIcon.BUGS),
-    SEPERATOR,
-    Res(gettext('Portal 2'), steam_url('PORTAL2'), ResIcon.PORTAL2),
-    Res(gettext('Aperture Tag'), steam_url('TAG'), ResIcon.TAG),
-    Res(gettext('Portal Stories: Mel'), steam_url('MEL'), ResIcon.MEL),
-    Res(gettext('Thinking With Time Machine'), steam_url('TWTM'), ResIcon.TWTM),
+    Res(gettext('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
+    Res(gettext('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
+    Res(gettext('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
 ]
-del Res, steam_url
+del Res
 
 # language=Markdown
 CREDITS_TEXT = '''\
@@ -90,11 +84,11 @@ Used software / libraries in the BEE2.4:
 * [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
 * [mistletoe][mistletoe] `{mstle_ver}` by Mi Yu and Contributors
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
-* [TKinter][tcl] `{tk_ver}`/[TTK][tcl] `{ttk_ver}`/[Tcl][tcl] `{tcl_ver}`
+* [TKinter][tcl] /[Tcl][tcl] `{tk_ver}`
 * [Python][python] `{py_ver}`
 * [FFmpeg][ffmpeg] licensed under the [LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html). Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
-[pyglet]: https://bitbucket.org/pyglet/pyglet/wiki/Home
+[pyglet]: https://pyglet.org/
 [avbin]: https://avbin.github.io/AVbin/Home/Home.html
 [pillow]: http://pillow.readthedocs.io
 [perlin_noise]: https://github.com/caseman/noise
@@ -423,9 +417,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '''.format(
     # Inject the running Python version.
     py_ver=platform.python_version(),
-    tk_ver=tk.TkVersion,
-    tcl_ver=tk.TclVersion,
-    ttk_ver=ttk.__version__,
+    tk_ver=TK_ROOT.tk.call('info', 'patchlevel'),
     pyglet_ver=sound.pyglet_version,
     mstle_ver=mistletoe.__version__,
     pygtrie_ver=pygtrie.__version__,
@@ -448,7 +440,7 @@ class Dialog(tk.Toplevel):
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
-        self.bind("<Escape>", self.withdraw)
+        self.bind("<Escape>", lambda e: self.withdraw())
 
         frame = tk.Frame(self, background='white')
         frame.grid(row=0, column=0, sticky='nsew')
@@ -477,7 +469,8 @@ class Dialog(tk.Toplevel):
             row=1, column=0,
         )
 
-    def show(self, e=None):
+    async def show(self) -> None:
+        """Display the help dialog."""
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
         if self.text is not None:
@@ -486,11 +479,63 @@ class Dialog(tk.Toplevel):
             self.text = None
 
         self.deiconify()
-        self.update_idletasks()
-        utils.center_win(self, TK_ROOT)
+        await tk_tools.wait_eventloop()
+        tk_tools.center_win(self, TK_ROOT)
 
 
-def make_help_menu(parent: tk.Menu):
+def load_database() -> Element:
+    """Download the database."""
+    LOGGER.info('Downloading help URLs...')
+    with urllib.request.urlopen(DB_LOCATION) as response:
+        # Read the whole thing, it's tiny and DMX needs to seek.
+        data = response.read()
+    elem, fmt_name, fmt_ver = Element.parse(io.BytesIO(data), unicode=True)
+    if fmt_name != 'bee_urls' or fmt_ver != 1:
+        raise ValueError(f'Unknown version {fmt_name!r} v{fmt_ver}!')
+    return elem
+
+
+async def open_url(url_key: str) -> None:
+    """Load the URL file if required, then open that URL."""
+    global url_data
+    if url_data is NULL:
+        try:
+            url_data = await trio.to_thread.run_sync(load_database)
+        except urllib.error.URLError as exc:
+            LOGGER.error('Failed to download help url file:', exc_info=exc)
+            messagebox.showerror(
+                gettext('BEEMOD2 - Failed to open URL'),
+                gettext('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
+                master=TK_ROOT,
+            )
+            return
+        except (IOError, ValueError) as exc:
+            LOGGER.error('Failed to parse help url file:', exc_info=exc)
+            messagebox.showerror(
+                gettext('BEEMOD2 - Failed to open URL'),
+                gettext('Failed to parse help menu URLs file. Help menu links will not function.'),
+                master=TK_ROOT,
+            )
+            return
+        LOGGER.debug('Help URLs:\n{}', '\n'.join([
+            f'- {attr.name}: {"[...]" if attr.is_array else repr(attr.val_str)}'
+            for attr in url_data.values()
+        ]))
+    # Got and cached URL data, now lookup.
+    try:
+        url = url_data[url_key].val_str
+    except KeyError:
+        LOGGER.warning('Invalid URL key "{}"!', url_key)
+    else:
+        if messagebox.askyesno(
+            gettext('BEEMOD 2 - Open URL'),
+            gettext('Do you wish to open the following URL?\n') + url,
+            master=TK_ROOT,
+        ):
+            webbrowser.open(url)
+
+
+def make_help_menu(parent: tk.Menu) -> None:
     """Create the application 'Help' menu."""
     # Using this name displays this correctly in OS X
     help = tk.Menu(parent, name='help')
@@ -504,10 +549,7 @@ def make_help_menu(parent: tk.Menu):
     }
     icons[ResIcon.NONE] = img.Handle.blank(16, 16)
 
-    credits = Dialog(
-        title=gettext('BEE2 Credits'),
-        text=CREDITS_TEXT,
-    )
+    credit_window = Dialog(title=gettext('BEE2 Credits'), text=CREDITS_TEXT)
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:
@@ -515,7 +557,7 @@ def make_help_menu(parent: tk.Menu):
         else:
             help.add_command(
                 label=res.name,
-                command=functools.partial(webbrowser.open, res.url),
+                command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
                 image=icons[res.icon].get_tk(),
             )
@@ -523,5 +565,5 @@ def make_help_menu(parent: tk.Menu):
     help.add_separator()
     help.add_command(
         label=gettext('Credits...'),
-        command=credits.show,
+        command=functools.partial(background_run, credit_window.show),
     )

@@ -5,10 +5,10 @@ We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
 import logging
-from typing import Optional, Dict, Tuple, List
+from typing import Callable, Optional, Dict, Tuple, List
 
 from tkinter import ttk
-from tkinter.font import Font
+from tkinter.font import Font, families as tk_font_families
 from app import img, TK_ROOT, tk_tools
 import tkinter as tk
 import multiprocessing.connection
@@ -89,23 +89,23 @@ class BaseLoadScreen:
         self.win.bind('<B1-Motion>', self.move_motion)
         self.win.bind('<Escape>', self.cancel)
 
-    def cancel(self, event: tk.Event=None):
+    def cancel(self, event: Optional[tk.Event]=None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
         PIPE_SEND.send(('cancel', self.scr_id))
 
-    def move_start(self, event: tk.Event):
+    def move_start(self, event: tk.Event) -> None:
         """Record offset of mouse on click."""
         self.drag_x = event.x
         self.drag_y = event.y
         self.win['cursor'] = tk_tools.Cursors.MOVE_ITEM
 
-    def move_stop(self, event: tk.Event):
+    def move_stop(self, event: tk.Event) -> None:
         """Clear values when releasing."""
         self.win['cursor'] = tk_tools.Cursors.WAIT
         self.drag_x = self.drag_y = None
 
-    def move_motion(self, event: tk.Event):
+    def move_motion(self, event: tk.Event) -> None:
         """Move the window when moving the mouse."""
         if self.drag_x is None or self.drag_y is None:
             return
@@ -172,7 +172,7 @@ class BaseLoadScreen:
 class LoadScreen(BaseLoadScreen):
     """Normal loading screens."""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         super().__init__(*args)
 
         self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
@@ -229,27 +229,27 @@ class LoadScreen(BaseLoadScreen):
             self.bars[st_id].grid(row=ind * 2 + 3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind * 2 + 2, column=1, sticky="E")
 
-    def reset_stages(self):
+    def reset_stages(self) -> None:
         """Put the stage in the initial state, before maxes are provided."""
         for stage in self.values.keys():
             self.bar_var[stage].set(0)
             self.labels[stage]['text'] = '0/??'
 
-    def update_stage(self, stage):
+    def update_stage(self, stage: str) -> None:
         """Redraw the given stage."""
         max_val = self.maxes[stage]
         if max_val == 0:  # 0/0 sections are skipped automatically.
             self.bar_var[stage].set(1000)
         else:
-            self.bar_var[stage].set(
+            self.bar_var[stage].set(round(
                 1000 * self.values[stage] / max_val
-            )
+            ))
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.values[stage],
             max_val,
         )
 
-    def op_skip_stage(self, stage):
+    def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
@@ -260,12 +260,12 @@ class LoadScreen(BaseLoadScreen):
 class SplashScreen(BaseLoadScreen):
     """The splash screen shown when booting up."""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         super().__init__(*args)
 
         self.is_compact = True
 
-        all_fonts = set(tk.font.families())
+        all_fonts = set(tk_font_families())
 
         for font_family in all_fonts:
             # DIN is the font used by Portal 2's logo,
@@ -475,7 +475,7 @@ class SplashScreen(BaseLoadScreen):
                     font=progress_font,
                 )
 
-    def update_stage(self, stage):
+    def update_stage(self, stage: str) -> None:
         if self.maxes[stage] == 0:
             text = f'{self.names[stage]}: (0/0)'
             self.set_bar(stage, 1)
@@ -489,7 +489,7 @@ class SplashScreen(BaseLoadScreen):
         self.sml_canvas.itemconfig('text_' + stage, text=text)
         self.lrg_canvas.itemconfig('text_' + stage, text=text)
 
-    def set_bar(self, stage, fraction):
+    def set_bar(self, stage: str, fraction: float) -> None:
         """Set a progress bar to this fractional length."""
         for canvas, width, height in self.canvas:
             x1, y1, x2, y2 = canvas.coords('bar_' + stage)
@@ -501,7 +501,7 @@ class SplashScreen(BaseLoadScreen):
                 y2,
             )
 
-    def op_set_length(self, stage, num):
+    def op_set_length(self, stage: str, num: int) -> None:
         """Set the number of items in a stage."""
         self.maxes[stage] = num
         self.update_stage(stage)
@@ -530,10 +530,10 @@ class SplashScreen(BaseLoadScreen):
                 )
             canvas.tag_lower('tick_' + stage, 'bar_' + stage)
 
-    def reset_stages(self):
+    def reset_stages(self) -> None:
         pass
 
-    def op_skip_stage(self, stage):
+    def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
@@ -567,11 +567,11 @@ class SplashScreen(BaseLoadScreen):
             event.y_root - int(canvas['height']) // 2,
         ))
 
-    def compact_button(self, compact: bool, old_width, new_width):
+    def compact_button(self, compact: bool, old_width: int, new_width: int) -> Callable[[tk.Event], None]:
         """Make the event function to set values."""
         offset = old_width - new_width
 
-        def func(event=None):
+        def func(_: tk.Event) -> None:
             """Event handler."""
             self.op_set_is_compact(compact)
             # Snap to where the button is.
@@ -665,9 +665,10 @@ class LogWindow:
             name='level_selector',
             values=translations['level_text'],
             exportselection=False,
-            # On Mac this defaults to being way too wide!
-            width=15 if utils.MAC else None,
         )
+        # On Mac this defaults to being way too wide!
+        if utils.MAC:
+            self.level_selector['width'] = 15
         self.level_selector.state(['readonly'])  # Prevent directly typing in values
         self.level_selector.bind('<<ComboboxSelected>>', self.evt_set_level)
         self.level_selector.current(1)
@@ -754,7 +755,7 @@ def run_background(
     # Pass in various bits of translated text
     # so we don't need to do it here.
     translations: dict,
-):
+) -> None:
     """Runs in the other process, with an end of a pipe for input."""
     global PIPE_REC, PIPE_SEND
     PIPE_SEND = pipe_send
@@ -780,6 +781,7 @@ def run_background(
                     SCREENS[scr_id] = screen
                 elif operation == 'quit_daemon':
                     # Shutdown.
+                    log_pipe_send.send('quit')
                     TK_ROOT.quit()
                     return
                 elif operation == 'set_force_ontop':

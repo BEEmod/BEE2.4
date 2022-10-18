@@ -4,7 +4,7 @@ import abc
 from enum import Enum
 from pathlib import Path
 
-import attr
+import attrs
 
 import srctools.logger
 from precomp import rand
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Algorithms to use.
-GEN_CLASSES: utils.FuncLookup['Generator'] = utils.FuncLookup('Generators')
+GEN_CLASSES: utils.FuncLookup[Type['Generator']] = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
 SPECIAL: 'Generator'
@@ -508,7 +508,7 @@ def load_config(conf: Property):
                         Property('Algorithm', 'RAND'),
                     ])
                 ])
-        textures = {}
+        textures: Dict[str, List[str]] = {}
 
         # First parse the options.
         options = parse_options({
@@ -606,7 +606,7 @@ def load_config(conf: Property):
             algo = options['algorithm']
             gen_cat, gen_orient, gen_portal = gen_key
             try:
-                generator: Type[Generator] = GEN_CLASSES[algo]  # type: ignore
+                generator = GEN_CLASSES[algo]
             except KeyError:
                 raise ValueError('Invalid algorithm "{}" for {}!'.format(
                     algo, gen_key
@@ -765,9 +765,10 @@ class Generator(abc.ABC):
         if antigel is None:
             antigel = grid_loc.as_tuple() in ANTIGEL_LOCS
         if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
+            assert self.orient is not None or self.portal is not None
             # We can't use antigel on bullseye materials, so revert to normal
             # surfaces.
-            return gen(GenCat.NORMAL, self.orient, self.portal).get(loc, tex_name, antigel=True)
+            return GENERATORS[GenCat.NORMAL, self.orient, self.portal].get(loc, tex_name, antigel=True)
 
         # Force blocks inside goo to goo side.
         if self.category is GenCat.NORMAL and self.orient is Orient.WALL and BLOCK_TYPE[grid_loc].is_goo:
@@ -848,7 +849,7 @@ class GenRandom(Generator):
         return rand.seed(b'tex_rand', loc).choice(self.textures[tex_name])
 
 
-@attr.define
+@attrs.define
 class Clump:
     """Represents a region of map, used to create rectangular sections with the same pattern."""
     x1: float

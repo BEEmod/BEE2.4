@@ -1,14 +1,20 @@
 """The package containg all UI code."""
 import tkinter as tk
 from types import TracebackType
-from typing import Type
+from typing import Any, Awaitable, Callable, Optional, Type
+from typing_extensions import TypeVarTuple, Unpack
+
+import config.gen_opts
 import utils
-import trio  # Import first, so it monkeypatch traceback before us.
+import trio  # Import first, so it monkeypatches traceback before us.
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
 TK_ROOT = tk.Tk()
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
+
+# The nursery where UI tasks etc are run in.
+_APP_NURSERY: Optional[trio.Nursery] = None
 
 
 def _run_main_loop(*args, **kwargs) -> None:
@@ -20,7 +26,7 @@ def _run_main_loop(*args, **kwargs) -> None:
 
 _main_loop_running = False
 _orig_mainloop = TK_ROOT.mainloop
-TK_ROOT.mainloop = _run_main_loop
+setattr(TK_ROOT, 'mainloop', _run_main_loop)
 del _run_main_loop
 
 
@@ -28,32 +34,31 @@ del _run_main_loop
 def tk_error(
     exc_type: Type[BaseException],
     exc_value: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: Optional[TracebackType],
 ) -> None:
     """Log TK errors."""
     # The exception is caught inside the TK code.
     # We don't care about that, so try and move the traceback up
     # one level.
     import logging
-    if exc_tb.tb_next:
+    if exc_tb is not None and exc_tb.tb_next:
         exc_tb = exc_tb.tb_next
+
+    logger = logging.getLogger('BEE2')
 
     try:
         on_error(exc_type, exc_value, exc_tb)
     except Exception:
+        logger.exception('Failed to display messagebox:')
         pass
 
-    logger = logging.getLogger('BEE2')
     logger.error(
         msg='Uncaught Tk Exception:',
         exc_info=(exc_type, exc_value, exc_tb),
     )
 
-    try:
-        import BEE2
-        BEE2.APP_NURSERY.cancel_scope.cancel()
-    except Exception:
-        pass
+    if _APP_NURSERY is not None:
+        _APP_NURSERY.cancel_scope.cancel()
 
 TK_ROOT.report_callback_exception = tk_error
 
@@ -101,21 +106,36 @@ def on_error(
         pass
 
     try:
-        from BEE2_config import GEN_OPTS
-        # Try to turn on the logging window for next time..
-        GEN_OPTS.load()
-        GEN_OPTS['Debug']['show_log_win'] = '1'
-        GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
-        GEN_OPTS.save()
+        import config
+        import attrs
+        # Try to turn on the logging window for next time...
+        conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
+        config.APP.store_conf(attrs.evolve(
+            conf,
+            show_log_win=True,
+            log_win_level='DEBUG',
+        ))
+        config.APP.write_file()
     except Exception:
         # Ignore failures...
         pass
 
+
+BGRunArgsT = TypeVarTuple('BGRunArgsT')
+
+
+def background_run(
+    func: Callable[[Unpack[BGRunArgsT]], Awaitable[Any]], /,
+    *args: Unpack[BGRunArgsT],
+    name: Optional[str] = None,
+) -> None:
+    """When the UI is live, begin this specified task."""
+    if _APP_NURSERY is None:
+        raise ValueError('App nursery has not started.')
+    _APP_NURSERY.start_soon(func, *args, name=name)
+
+
 # Various configuration booleans.
-PLAY_SOUND = tk.BooleanVar(value=True, name='OPT_play_sounds')
-KEEP_WIN_INSIDE = tk.BooleanVar(value=True, name='OPT_keep_win_inside')
-FORCE_LOAD_ONTOP = tk.BooleanVar(value=True, name='OPT_force_load_ontop')
-SHOW_LOG_WIN = tk.BooleanVar(value=False, name='OPT_show_log_window')
 LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
 PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
 DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')

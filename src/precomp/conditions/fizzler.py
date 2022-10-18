@@ -1,10 +1,9 @@
 """Results for custom fizzlers."""
-from srctools import Property, Entity, Vec, VMF, Matrix, Angle
+from srctools import Property, Entity, Vec, VMF, Matrix
 import srctools.logger
 
-from precomp.conditions import make_result, make_flag
 from precomp.instanceLocs import resolve_one
-from precomp import connections, fizzler
+from precomp import conditions, connections, fizzler
 
 
 COND_MOD_NAME = 'Fizzlers'
@@ -12,7 +11,7 @@ COND_MOD_NAME = 'Fizzlers'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
-@make_flag('FizzlerType')
+@conditions.make_flag('FizzlerType')
 def flag_fizz_type(inst: Entity, flag: Property):
     """Check if a fizzler is the specified type name."""
     try:
@@ -22,9 +21,9 @@ def flag_fizz_type(inst: Entity, flag: Property):
     return fizz.fizz_type.id.casefold() == flag.value.casefold()
 
 
-@make_result('ChangeFizzlerType')
+@conditions.make_result('ChangeFizzlerType')
 def res_change_fizzler_type(inst: Entity, res: Property):
-    """Change the type of a fizzler. Only valid when run on the base instance."""
+    """Change the type of the fizzler. Only valid when run on the base instance."""
     fizz_name = inst['targetname']
     try:
         fizz = fizzler.FIZZLERS[fizz_name]
@@ -38,7 +37,7 @@ def res_change_fizzler_type(inst: Entity, res: Property):
         raise ValueError('Invalid fizzler type "{}"!', res.value)
 
 
-@make_result('ReshapeFizzler')
+@conditions.make_result('ReshapeFizzler')
 def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     """Convert a fizzler connected via the output to a new shape.
 
@@ -57,7 +56,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     shape_name = shape_inst['targetname']
     shape_item = connections.ITEMS.pop(shape_name)
 
-    shape_orient = Matrix.from_angle(Angle.from_str(shape_inst['angles']))
+    shape_orient = Matrix.from_angstr(shape_inst['angles'])
     up_axis: Vec = round(res.vec('up_axis') @ shape_orient, 6)
 
     for conn in shape_item.outputs:
@@ -79,9 +78,9 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         # We create the fizzler instance, Fizzler object, and Item object
         # matching it.
         # This is hardcoded to use regular Emancipation Fields.
-        base_inst = vmf.create_ent(
+        base_inst = conditions.add_inst(
+            vmf,
             targetname=shape_name,
-            classname='func_instance',
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
             file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>'),
@@ -122,7 +121,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     # Since the fizzler is moved elsewhere, it's the responsibility of
     # the new item to have holes.
     fizz.embedded = False
-    # So tell it whether or not it needs to do so.
+    # Tell the instance whether it needs to do so.
     shape_inst.fixup['$uses_nodraw'] = fizz.fizz_type.nodraw_behind
 
     for seg_prop in res.find_all('Segment'):

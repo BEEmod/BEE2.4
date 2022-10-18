@@ -1,15 +1,13 @@
 import math
 
-from precomp.conditions import make_result, make_result_setup, meta_cond, local_name
-from precomp import instanceLocs, connections, options, faithplate, voice_line
-from srctools import Property, Vec, Entity, VMF, Output
+from precomp import instanceLocs, connections, conditions, options, faithplate, voice_line
+from srctools import Matrix, Property, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Literal
 
 
 COND_MOD_NAME = 'Monitors'
-
 LOGGER = srctools.logger.get_logger(__name__, 'cond.monitor')
 
 
@@ -17,7 +15,7 @@ class Camera(NamedTuple):
     """Generated camera positions."""
     inst: Entity
     cam_pos: Vec
-    cam_angles: Vec
+    cam_angles: Angle
 
 ALL_CAMERAS: List[Camera] = []
 
@@ -40,7 +38,10 @@ def scriptvar_set(
     varname: str,
     value: object='',
     *,
-    mode: str='const',
+    mode: Literal[
+        'const', 'string', 'bool', 'inv_bool', 'name', 'handle', 'keyvalue',
+        'pos', 'ang', 'off', 'dist', 'x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z',
+    ]='const',
     index: int=None,
     angles: object='0 0 0',
 ) -> None:
@@ -58,18 +59,8 @@ def scriptvar_set(
     )
 
 
-@make_result_setup('Monitor')
-def res_monitor_setup(res: Property):
-    """Pre-parse options for monitors."""
-    return (
-        res['bullseye_name', ''],
-        res.vec('bullseye_loc'),
-        res['bullseye_parent', ''],
-    )
-
-
-@make_result('Monitor')
-def res_monitor(inst: Entity, res: Property) -> None:
+@conditions.make_result('Monitor')
+def res_monitor(info: conditions.MapInfo, res: Property) -> conditions.ResultCallable:
     """Result for the monitor component.
 
     Options:
@@ -80,71 +71,54 @@ def res_monitor(inst: Entity, res: Property) -> None:
     The fixup variable $is_breakable is set to True if lasers or turrets
     are present to indicate the func_breakable should be added.
     """
-    global HAS_MONITOR
-    import vbsp
+    conf_bullseye_name = res['bullseye_name', '']
+    bullseye_loc = res.vec('bullseye_loc')
+    bullseye_parent = res['bullseye_parent', '']
 
-    (
-        bullseye_name,
-        bullseye_loc,
-        bullseye_parent,
-    ) = res.value
+    def add_monitor(inst: Entity) -> None:
+        """Adds the monitor to the map."""
+        global HAS_MONITOR
+        HAS_MONITOR = True
 
-    HAS_MONITOR = True
+        has_laser = info.has_attr('laser')
+        # Allow turrets if the monitor is setup to allow it, and the actor should
+        # be shot.
+        needs_turret = conf_bullseye_name and options.get(bool, 'voice_studio_should_shoot')
 
-    has_laser = vbsp.settings['has_attr']['laser']
-    # Allow turrets if the monitor is setup to allow it, and the actor should
-    # be shot.
-    needs_turret = bullseye_name and options.get(bool, 'voice_studio_should_shoot')
+        inst.fixup['$is_breakable'] = has_laser or needs_turret
 
-    inst.fixup['$is_breakable'] = has_laser or needs_turret
-
-    # We need to generate an ai_relationship, which makes turrets hate
-    # a bullseye.
-    if needs_turret:
-        loc = Vec(bullseye_loc)
-        loc.localise(
-            Vec.from_str(inst['origin']),
-            Vec.from_str(inst['angles']),
-        )
-        bullseye_name = local_name(inst, bullseye_name)
-        inst.map.create_ent(
-            classname='npc_bullseye',
-            targetname=bullseye_name,
-            parentname=local_name(inst, bullseye_parent),
-            spawnflags=221186,  # Non-solid, invisible, etc..
-            origin=loc,
-        )
-        relation = inst.map.create_ent(
-            classname='ai_relationship',
-            targetname='@monitor_turr_hate',
-            parentname=bullseye_name,  # When killed, destroy this too.
-            spawnflags=2,  # Notify turrets about monitor locations
-            disposition=1,  # Hate
-            origin=loc,
-            subject='npc_portal_turret_floor',
-            target=bullseye_name,
-        )
-        MONITOR_RELATIONSHIP_ENTS.append(relation)
-
-
-@make_result_setup('Camera')
-def res_camera_setup(res: Property):
-    """Pre-parse the data for cameras."""
-    return {
-        'cam_off': Vec.from_str(res['CamOff', '']),
-        'yaw_off': Vec.from_str(res['YawOff', '']),
-        'pitch_off': Vec.from_str(res['PitchOff', '']),
-
-        'yaw_inst': instanceLocs.resolve_one(res['yawInst', '']),
-        'pitch_inst': instanceLocs.resolve_one(res['pitchInst', '']),
-
-        'yaw_range': srctools.conv_int(res['YawRange', ''], 90),
-        'pitch_range': srctools.conv_int(res['PitchRange', ''], 90),
-    }
+        # We need to generate an ai_relationship, which makes turrets hate
+        # a bullseye.
+        if needs_turret:
+            loc = Vec(bullseye_loc)
+            loc.localise(
+                Vec.from_str(inst['origin']),
+                Angle.from_str(inst['angles']),
+            )
+            bullseye_name = conditions.local_name(inst, conf_bullseye_name)
+            inst.map.create_ent(
+                classname='npc_bullseye',
+                targetname=bullseye_name,
+                parentname=conditions.local_name(inst, bullseye_parent),
+                spawnflags=221186,  # Non-solid, invisible, etc..
+                origin=loc,
+            )
+            relation = inst.map.create_ent(
+                classname='ai_relationship',
+                targetname='@monitor_turr_hate',
+                parentname=bullseye_name,  # When killed, destroy this too.
+                spawnflags=2,  # Notify turrets about monitor locations
+                disposition=1,  # Hate
+                origin=loc,
+                subject='npc_portal_turret_floor',
+                target=bullseye_name,
+            )
+            MONITOR_RELATIONSHIP_ENTS.append(relation)
+    return add_monitor
 
 
-@make_result('Camera')
-def res_camera(inst: Entity, res: Property):
+@conditions.make_result('Camera')
+def res_camera(vmf: VMF, res: Property) -> conditions.ResultCallable:
     """Result for the camera item.
 
     Options:
@@ -158,84 +132,91 @@ def res_camera(inst: Entity, res: Property):
     - yaw_range: How many degrees can the camera rotate from a forward position?
     - pitch_range: How many degrees can the camera rotate up/down?
     """
-    conf = res.value
-    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
-    if normal.z != 0:
-        # Can't be on floor/ceiling!
-        inst.remove()
-        return
-    base_yaw = math.degrees(math.atan2(normal.y, normal.x)) % 360
-    inst['angles'] = '0 {:g} 0'.format(base_yaw)
+    cam_off = Vec.from_str(res['CamOff', ''])
+    yaw_off = Vec.from_str(res['YawOff', ''])
+    pitch_off = Vec.from_str(res['PitchOff', ''])
 
-    base_loc = Vec.from_str(inst['origin'])
+    yaw_inst = instanceLocs.resolve_one(res['yawInst', ''])
+    pitch_inst = instanceLocs.resolve_one(res['pitchInst', ''])
 
-    try:
-        plate = faithplate.PLATES.pop(inst['targetname'])
-    except KeyError:
-        LOGGER.warning(
-            'No faith plate info found for camera {}!',
-            inst['targetname'],
-        )
-        inst.remove()
-        return
+    yaw_range = srctools.conv_int(res['YawRange', ''], 90)
+    pitch_range = srctools.conv_int(res['PitchRange', ''], 90)
 
-    # Remove the triggers.
-    plate.trig.remove()
+    def add_camera(inst: Entity) -> None:
 
-    if isinstance(plate, faithplate.StraightPlate):
-        # Just point straight ahead.
-        target_loc = base_loc + 512 * normal
-        # And remove the helper.
-        plate.helper_trig.remove()
-    else:
-        if isinstance(plate.target, Vec):
-            target_loc = plate.target
+        normal = Vec(z=1) @ Angle.from_str(inst['angles'])
+        if abs(normal.z) > 0.1:
+            # Can't be on floor/ceiling!
+            inst.remove()
+            return
+        base_yaw = math.degrees(math.atan2(normal.y, normal.x)) % 360
+        orient = Matrix.from_yaw(base_yaw)
+        inst['angles'] = orient.to_angle()
+
+        base_loc = Vec.from_str(inst['origin'])
+
+        try:
+            plate = faithplate.PLATES.pop(inst['targetname'])
+        except KeyError:
+            LOGGER.warning(
+                'No faith plate info found for camera {}!',
+                inst['targetname'],
+            )
+            inst.remove()
+            return
+
+        # Remove the triggers.
+        plate.trig.remove()
+
+        if isinstance(plate, faithplate.StraightPlate):
+            # Just point straight ahead.
+            target_loc = base_loc + 512 * normal
+            # And remove the helper.
+            plate.helper_trig.remove()
         else:
-            # We don't particularly care about aiming to the front of angled
-            # panels.
-            target_loc = plate.target.pos + 64 * plate.target.normal
-            # Remove the helper and a bullseye.
-            plate.target.remove_portal_helper()
-            plate.target.bullseye_count -= 1
+            if isinstance(plate.target, Vec):
+                target_loc = plate.target
+            else:
+                # We don't particularly care about aiming to the front of angled
+                # panels.
+                target_loc = plate.target.pos + 64 * plate.target.normal
+                # Remove the helper and a bullseye.
+                plate.target.remove_portal_helper()
+                plate.target.bullseye_count -= 1
 
-    # Move three times to position the camera arms and lens.
-    yaw_pos = Vec(conf['yaw_off']).rotate_by_str(inst['angles'])
-    yaw_pos += base_loc
+        # Move three times to position the camera arms and lens.
+        yaw_pos = yaw_off.copy() @ orient + base_loc
 
-    pitch, yaw, _ = (target_loc - yaw_pos).to_angle()
+        pitch, yaw, _ = (target_loc - yaw_pos).to_angle()
 
-    inst.map.create_ent(
-        classname='func_instance',
-        targetname=inst['targetname'],
-        file=conf['yaw_inst'],
-        angles='0 {:g} 0'.format(yaw),
-        origin=yaw_pos,
-    )
+        conditions.add_inst(
+            vmf,
+            targetname=inst['targetname'],
+            file=yaw_inst,
+            angles=Angle(yaw=yaw),
+            origin=yaw_pos,
+        )
 
-    pitch_pos = Vec(conf['pitch_off'])
-    pitch_pos.rotate(yaw=yaw)
-    pitch_pos.rotate_by_str(inst['angles'])
-    pitch_pos += yaw_pos
+        pitch_pos = (pitch_off.copy() @ Matrix.from_yaw(yaw)) @ orient + yaw_pos
 
-    inst.map.create_ent(
-        classname='func_instance',
-        targetname=inst['targetname'],
-        file=conf['pitch_inst'],
-        angles='{:g} {:g} 0'.format(pitch, yaw),
-        origin=pitch_pos,
-    )
+        conditions.add_inst(
+            vmf,
+            targetname=inst['targetname'],
+            file=pitch_inst,
+            angles=Angle(pitch, yaw),
+            origin=pitch_pos,
+        )
 
-    cam_pos = Vec(conf['cam_off'])
-    cam_pos.rotate(pitch=pitch, yaw=yaw)
-    cam_pos += pitch_pos
+        cam_pos = cam_off.copy() @ Angle(pitch, yaw) + pitch_pos
 
-    # Recompute, since this can be slightly different if the camera is large.
-    cam_angles = (target_loc - cam_pos).to_angle()
+        # Recompute, since this can be slightly different if the camera is large.
+        cam_angles = (target_loc - cam_pos).to_angle()
 
-    ALL_CAMERAS.append(Camera(inst, cam_pos, cam_angles))
+        ALL_CAMERAS.append(Camera(inst, cam_pos, cam_angles))
+    return add_camera
 
 
-@meta_cond(priority=-275)
+@conditions.meta_cond(priority=-275)
 def mon_camera_link(vmf: VMF) -> None:
     """Link cameras to monitors."""
     import vbsp
@@ -243,18 +224,19 @@ def mon_camera_link(vmf: VMF) -> None:
     if not HAS_MONITOR:
         return
 
+    # Arbitrary but consistent.
     ALL_CAMERAS.sort(key=lambda cam: cam.cam_pos)
 
     fog_opt = vbsp.settings['fog']
 
     active_counts = [
-        srctools.conv_int(cam.inst.fixup['$start_enabled', '0'])
+        cam.inst.fixup.bool('$start_enabled')
         for cam in
         ALL_CAMERAS
     ]
 
-    for index, cam in enumerate(ALL_CAMERAS):  # type: int, Camera
-        if srctools.conv_int(cam.inst.fixup['$connectioncount']) == 0:
+    for index, cam in enumerate(ALL_CAMERAS):
+        if cam.inst.fixup.int('$connectioncount') == 0:
             continue
 
         conn_item = connections.ITEMS[cam.inst['targetname']]
@@ -283,7 +265,7 @@ def mon_camera_link(vmf: VMF) -> None:
         if options.get(str, 'voice_studio_inst'):
             # Start at the studio, if it exists.
             start_pos = get_studio_pose()
-            start_angles = '{:g} {:g} 0'.format(
+            start_angles = Angle(
                 options.get(float, 'voice_studio_cam_pitch'),
                 options.get(float, 'voice_studio_cam_yaw'),
             )
@@ -386,11 +368,10 @@ def make_voice_studio(vmf: VMF) -> bool:
     loc = voice_line.get_studio_loc()
 
     if HAS_MONITOR and studio_file:
-        vmf.create_ent(
-            classname='func_instance',
+        conditions.add_inst(
+            vmf,
             file=studio_file,
             origin=loc,
-            angles='0 0 0',
         )
         return True
     else:

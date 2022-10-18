@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, Collection
+from typing import Collection, NoReturn
 
 from srctools import Vec, Property, Entity, conv_bool, VMF
 import srctools.logger
 
-from precomp import options
-from precomp.conditions import make_flag, make_result, RES_EXHAUSTED
+from precomp import options, conditions
 import vbsp
 import utils
 
@@ -19,35 +18,47 @@ COND_MOD_NAME = 'Global Properties'
 BRACE_RE = re.compile(r'([^[]+)\[([0-9]+)]')
 
 
-@make_flag('styleVar')
+def global_bool(val: bool) -> bool:
+    """Raise Unsatisfiable instead of False.
+
+    These are global checks unrelated to the instance, so if they return False,
+    they always will until the global state changes (by some condition succeeding).
+    """
+    if val:
+        return True
+    else:
+        raise conditions.Unsatisfiable
+
+
+@conditions.make_flag('styleVar')
 def flag_stylevar(flag: Property) -> bool:
     """Checks if the given Style Var is true.
 
     Use the NOT flag to invert if needed.
     """
-    return vbsp.settings['style_vars'][flag.value.casefold()]
+    return global_bool(vbsp.settings['style_vars'][flag.value.casefold()])
 
 
-@make_flag('has')
-def flag_voice_has(flag: Property) -> bool:
+@conditions.make_flag('has')
+def flag_voice_has(info: conditions.MapInfo, flag: Property) -> bool:
     """Checks if the given Voice Attribute is present.
 
     Use the NOT flag to invert if needed.
     """
-    return vbsp.settings['has_attr'][flag.value.casefold()]
+    return global_bool(info.has_attr(flag.value))
 
 
-@make_flag('has_music')
-def flag_music() -> bool:
+@conditions.make_flag('has_music')
+def flag_music() -> NoReturn:
     """Checks the selected music ID.
 
     Use `<NONE>` for no music.
     """
     LOGGER.warning('Checking for selected music is no longer possible!')
-    return False
+    raise conditions.Unsatisfiable
 
 
-@make_flag('Game')
+@conditions.make_flag('Game')
 def flag_game(flag: Property) -> bool:
     """Checks which game is being modded.
 
@@ -63,13 +74,13 @@ def flag_game(flag: Property) -> bool:
     - `DEST_AP`
     - `Destroyed Aperture`
     """
-    return options.get(str, 'game_id') == utils.STEAM_IDS.get(
+    return global_bool(options.get(str, 'game_id') == utils.STEAM_IDS.get(
         flag.value.upper(),
         flag.value,
-    )
+    ))
 
 
-@make_flag('has_char')
+@conditions.make_flag('has_char')
 def flag_voice_char(flag: Property) -> bool:
     """Checks to see if the given charcter is present in the voice pack.
 
@@ -83,26 +94,43 @@ def flag_voice_char(flag: Property) -> bool:
     for char in options.get(str, 'voice_char').split(','):
         if targ_char in char.casefold():
             return True
-    return False
+    raise conditions.Unsatisfiable
 
 
-@make_flag('HasCavePortrait')
+@conditions.make_flag('HasCavePortrait')
 def res_cave_portrait() -> bool:
     """Checks to see if the Cave Portrait option is set for the given voice pack.
     """
-    return options.get(int, 'cave_port_skin') is not None
+    return global_bool(options.get(int, 'cave_port_skin') is not None)
 
 
-@make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(flag: Property) -> bool:
+@conditions.make_flag('entryCorridor')
+def res_check_entry_corridor(info: conditions.MapInfo, flag: Property) -> bool:
+    """Check the selected entry corridor matches this filename."""
+    return global_bool(info.corr_entry.instance.casefold() == flag.value.casefold())
+
+
+@conditions.make_flag('exitCorridor')
+def res_check_exit_corridor(info: conditions.MapInfo, flag: Property) -> bool:
+    """Check the selected exit corridor matches this filename."""
+    return global_bool(info.corr_exit.instance.casefold() == flag.value.casefold())
+
+
+@conditions.make_flag('ifMode', 'iscoop', 'gamemode')
+def flag_game_mode(info: conditions.MapInfo, flag: Property) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
     """
-    import vbsp
-    return vbsp.GAME_MODE.casefold() == flag.value.casefold()
+    mode = flag.value.casefold()
+    if mode == 'sp':
+        return global_bool(info.is_sp)
+    elif mode == 'coop':
+        return global_bool(info.is_coop)
+    else:
+        raise ValueError(f'Unknown gamemode "{flag.value}"!')
 
 
-@make_flag('ifPreview', 'preview')
-def flag_is_preview(flag: Property) -> bool:
+@conditions.make_flag('ifPreview', 'preview')
+def flag_is_preview(info: conditions.MapInfo, flag: Property) -> bool:
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -111,45 +139,46 @@ def flag_is_preview(flag: Property) -> bool:
 
     Preview mode is always `False` when publishing.
     """
-    return vbsp.IS_PREVIEW == conv_bool(flag.value, False)
+    expect_preview = conv_bool(flag.value, False)
+    return global_bool(expect_preview == (not info.start_at_elevator))
 
 
-@make_flag('hasExitSignage')
+@conditions.make_flag('hasExitSignage')
 def flag_has_exit_signage(vmf: VMF) -> bool:
     """Check to see if either exit sign is present."""
     for over in vmf.by_class['info_overlay']:
         if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
             return True
-    return False
+    raise conditions.Unsatisfiable
 
 
-@make_result('setOption')
-def res_set_option(res: Property) -> bool:
+@conditions.make_result('setOption')
+def res_set_option(res: Property) -> object:
     """Set a value in the "options" part of VBSP_config.
 
     Each child property will be set.
     """
-    for opt in res.value:
+    for opt in res:
         options.set_opt(opt.name, opt.value)
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@make_result('styleVar')
+@conditions.make_result('styleVar')
 def res_set_style_var(res: Property) -> bool:
     """Set Style Vars.
 
     The value should be a set of `SetTrue` and `SetFalse` keyvalues.
     """
-    for opt in res.value:
+    for opt in res:
         if opt.name == 'settrue':
             vbsp.settings['style_vars'][opt.value.casefold()] = True
         elif opt.name == 'setfalse':
             vbsp.settings['style_vars'][opt.value.casefold()] = False
-    return RES_EXHAUSTED
+    return conditions.RES_EXHAUSTED
 
 
-@make_result('has')
-def res_set_voice_attr(res: Property) -> object:
+@conditions.make_result('has')
+def res_set_voice_attr(info: conditions.MapInfo, res: Property) -> object:
     """Sets a number of Voice Attributes.
 
     Each child property will be set. The value is ignored, but must
@@ -157,17 +186,17 @@ def res_set_voice_attr(res: Property) -> object:
     """
     if res.has_children():
         for opt in res:
-            vbsp.settings['has_attr'][opt.name] = True
+            info.set_attr(opt.name)
     else:
-        vbsp.settings['has_attr'][res.value.casefold()] = True
-    return RES_EXHAUSTED
+        info.set_attr(res.value)
+    return conditions.RES_EXHAUSTED
 
 
 # The set is the set of skins to use. If empty, all are used.
 CACHED_MODELS: dict[str, tuple[set[int], Entity]] = {}
 
 
-@make_result('PreCacheModel')
+@conditions.make_result('PreCacheModel')
 def res_pre_cache_model(vmf: VMF, res: Property) -> None:
     """Precache the given model for switching.
 
@@ -217,9 +246,9 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None
         ent['skinset'] = ''
 
 
-def get_itemconf(inst: Entity, res: Property) -> Optional[str]:
+def get_itemconf(inst: Entity, res: Property) -> str | None:
     """Implement ItemConfig and GetItemConfig shared logic."""
-    timer_delay: Optional[int]
+    timer_delay: int | None
 
     group_id = res['ID']
     wid_name = inst.fixup.substitute(res['Name']).casefold()
@@ -241,7 +270,7 @@ def get_itemconf(inst: Entity, res: Property) -> Optional[str]:
     return options.get_itemconf((group_id, wid_name), None, timer_delay)
 
 
-@make_flag('ItemConfig')
+@conditions.make_flag('ItemConfig')
 def res_match_item_config(inst: Entity, res: Property) -> bool:
     """Check if an Item Config Panel value matches another value.
 
@@ -256,10 +285,10 @@ def res_match_item_config(inst: Entity, res: Property) -> bool:
     if conf is None:  # Doesn't exist
         return False
 
-    return conf == desired_value
+    return global_bool(conf == desired_value)
 
 
-@make_result('GetItemConfig')
+@conditions.make_result('GetItemConfig')
 def res_item_config_to_fixup(inst: Entity, res: Property) -> None:
     """Load a config from the item config panel onto a fixup.
 
