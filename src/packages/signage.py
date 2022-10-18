@@ -132,7 +132,11 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 overlay_path = overlay_tex
                 if not overlay_path.casefold().endswith('.vtf'):
                     overlay_path += '.vtf'
-                img = ImgHandle.file(utils.PackagePath(data.pak_id, overlay_path), 64, 64)
+                # Strip alpha, that's usually used for selfillum.
+                img = ImgHandle.file(
+                    utils.PackagePath(data.pak_id, overlay_path),
+                    64, 64,
+                ).with_alpha_stripped()
 
             styles[sty_id] = SignStyle(
                 world_tex,
