@@ -2,6 +2,9 @@
 
 # Version `<dev>`
 
+### Bugfixes
+* Do not composite signage VTFs with PeTI backgrounds.
+
 ------------------------------------------
 
 # Version 4.42.0
