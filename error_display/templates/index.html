@@ -1,31 +1,14 @@
 <!DOCTYPE HTML>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>BEEmod Compilation Error</title>
-<style>
-	body {
-		/* Todo: grab puzzlemaker BG colour */
-		background-color: rgb(229, 232, 233);
-	}
-	article {
-		margin: 40pt;
-		width: calc(100% - 120pt);
-		padding: 20pt;
-
-		/* Todo: black panel bg */
-		background-color: #222222;
-		color: rgb(201, 211, 207);
-		/* Compile dialog uses FriendsListStatusLine:
-		Univers Std Condensed, weight=&00, tall=14
-		*/
-	}
-</style>
+<link rel="stylesheet" href="{{ url_for('route_error_styles') }}">
 </head>
 
 <body>
 <article>
-	Your map has a leak! Check the area around the red line here, and try removing nearby items.
+	{{ error_text }}
 </article>
 </body>
 </html>

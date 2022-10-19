@@ -44,16 +44,23 @@ app = QuartTrio(
 config = Config()
 config.bind = ["localhost:0"]  # Use localhost, request any free port.
 
-current_error = ''
+current_error = 'Your map has a leak! Check the area around the red line here, and try removing nearby items.'
 
 
 @app.route('/')
-async def route_errorpage() -> str:
+async def route_error_page():
     """Display the current error."""
-    return await quart.render_template('index.html', error=current_error)
+    return await quart.stream_template('index.html', error_text=current_error)
 
 
-async def main(args: List[str]) -> None:
+@app.route('/styles.css')
+async def route_error_styles():
+    """Return the error page stylesheet."""
+    print('Get styles:')
+    return await app.send_static_file('styles.css')
+
+
+async def main() -> None:
     """Start up the server."""
     binds: List[socket.socket]
     async with trio.open_nursery() as nursery:

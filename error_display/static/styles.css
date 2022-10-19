@@ -1,0 +1,16 @@
+body {
+	/* Todo: grab puzzlemaker BG colour */
+	background-color: rgb(229, 232, 233);
+}
+article {
+    margin: 40pt;
+    width: calc(100% - 120pt);
+    padding: 20pt;
+
+    /* Todo: black panel bg */
+    background-color: #222222;
+    color: rgb(201, 211, 207);
+    /* Compile dialog uses FriendsListStatusLine:
+    Univers Std Condensed, weight=&00, tall=14
+    */
+}

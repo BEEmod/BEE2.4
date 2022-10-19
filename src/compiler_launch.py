@@ -17,7 +17,7 @@ else:
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
     if '--errorserver' in sys.argv:
         import error_server
-        trio.run(error_server.main, sys.argv)
+        trio.run(error_server.main)
     else:
         import vbsp
         vbsp.main()
