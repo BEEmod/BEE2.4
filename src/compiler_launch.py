@@ -15,11 +15,14 @@ else:
     app_name = sys.argv.pop(1).casefold()
 
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
-    import vbsp
-    vbsp.main()
+    if '--errorserver' in sys.argv:
+        import error_server
+        trio.run(error_server.main, sys.argv)
+    else:
+        import vbsp
+        vbsp.main()
 elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
     import vrad
-    import trio
     trio.run(vrad.main, sys.argv)
 elif 'original' in app_name:
     sys.exit('Original compilers replaced, verify game cache!')
