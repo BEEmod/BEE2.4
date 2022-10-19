@@ -1,11 +1,11 @@
 """Inject VScript if a user error occurs."""
-from srctools.bsp_transform import Context, trans
+from hammeraddons.bsp_transform import Context, trans
 from utils import COMPILE_USER_ERROR_PAGE
 
 # Repeatedly show the URL whenever the user switches to the page.
 # If it returns true, it has popped up the Steam Overlay.
 # We then trigger the puzzlemaker command to switch in the background, behind the webpage.
-# That pauses, so if you tab back it'll repeat again.
+# That pauses, so if you tab back it'll repeat.
 SCRIPT_TEMPLATE = '''\
 function Think() {
 \tif (ScriptSteamShowURL("%")) SendToConsole("puzzlemaker_show 1");
