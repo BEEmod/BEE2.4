@@ -8,25 +8,41 @@ This has 3 endpoints:
 - /refresh causes it to reload the error from a text file on disk, if a new compile runs.
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
+import argparse
 import socket
+import sys
 from typing import List
-from importlib_resources import files
 
-import quart
 from hypercorn.config import Config
 from hypercorn.trio import serve
 from quart_trio import QuartTrio
+import quart
+import jinja2
 import trio
 
 from srctools.dmx import Element
+import utils
 
 
-app = QuartTrio(__name__)
+parser = argparse.ArgumentParser(description='Error display for BEE2 compilers.')
+parser.add_argument(
+    '--errorserver', help='Required to run the server.',
+    action='store_true',
+    required=True,
+)
+parser.add_argument(
+    '--contentroot', help='Location of the webpage content.',
+    action='store',
+    required=True,
+)
+parsed_args = parser.parse_args(sys.argv[1:])
+
+app = QuartTrio(
+    __name__,
+    root_path=parsed_args.contentroot,
+)
 config = Config()
 config.bind = ["localhost:0"]  # Use localhost, request any free port.
-
-
-TEMPLATE_ERROR = (files(__name__) / 'index.html').read_text('utf8')
 
 current_error = ''
 
@@ -34,7 +50,7 @@ current_error = ''
 @app.route('/')
 async def route_errorpage() -> str:
     """Display the current error."""
-    return await quart.render_template_string(TEMPLATE_ERROR, error=current_error)
+    return await quart.render_template('index.html', error=current_error)
 
 
 async def main(args: List[str]) -> None:
