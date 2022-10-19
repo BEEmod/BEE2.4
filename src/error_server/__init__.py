@@ -48,21 +48,27 @@ current_error = 'Your map has a leak! Check the area around the red line here, a
 
 
 @app.route('/')
-async def route_error_page():
+async def route_error_page() -> str:
     """Display the current error."""
-    return await quart.stream_template('index.html', error_text=current_error)
+    return await quart.render_template('index.html', error_text=current_error)
 
 
 @app.route('/styles.css')
-async def route_error_styles():
+async def route_error_styles() -> quart.Response:
     """Return the error page stylesheet."""
     return await app.send_static_file('styles.css')
 
 
 @app.route('/tile_bg.png')
-async def route_error_bg():
+async def route_error_bg() -> quart.Response:
     """Return the error page background image."""
     return await app.send_static_file('tile_bg.png')
+
+
+@app.route('/script.js')
+async def route_error_script() -> quart.Response:
+    """Return the error page script file."""
+    return await app.send_static_file('script.js')
 
 
 async def main() -> None:
