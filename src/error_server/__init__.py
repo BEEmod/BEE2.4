@@ -56,8 +56,13 @@ async def route_error_page():
 @app.route('/styles.css')
 async def route_error_styles():
     """Return the error page stylesheet."""
-    print('Get styles:')
     return await app.send_static_file('styles.css')
+
+
+@app.route('/tile_bg.png')
+async def route_error_bg():
+    """Return the error page background image."""
+    return await app.send_static_file('tile_bg.png')
 
 
 async def main() -> None:

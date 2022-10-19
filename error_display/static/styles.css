@@ -7,8 +7,12 @@ article {
     width: calc(100% - 120pt);
     padding: 20pt;
 
-    /* Todo: black panel bg */
-    background-color: #222222;
+    /* Replicate black panel background. */
+    box-shadow: inset 0 0 40pt 0 rgba(0, 0, 0, 0.5);
+    background-color: rgb(100, 100, 100);  /* Fallback */
+    background-image: url("tile_bg.png");
+    background-size: 512px 512px;
+    background-repeat: repeat;
     color: rgb(201, 211, 207);
     /* Compile dialog uses FriendsListStatusLine:
     Univers Std Condensed, weight=&00, tall=14
