@@ -28,8 +28,9 @@ window.addEventListener("load", () => {
 		}
 	});
 
-	const scene = new THREE.Scene({background: 0xC9D3CF});  // PeTI BG.
+	const scene = new THREE.Scene();
 	const container = document.querySelector("#render");
+	scene.background = new THREE.Color(0xC9D3CF);  // PeTI BG.
 	const camera = new THREE.PerspectiveCamera( 75, 1.0, 0.01, 100 );
 
 	const mats = new Map();
