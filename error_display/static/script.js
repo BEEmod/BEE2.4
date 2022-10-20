@@ -45,7 +45,12 @@ window.addEventListener("load", () => {
 	const mats = new Map();
 	mats.set("white", new THREE.MeshBasicMaterial({color: 0xFFFFFF}));
 	mats.set("black", new THREE.MeshBasicMaterial({color: 0x83878B}));
-	mats.set("goo", new THREE.MeshBasicMaterial({color: 0x5C6D72}));
+	mats.set("goo", new THREE.MeshBasicMaterial({
+		color: 0x5C6D72,
+		transparent: true,
+		opacity: 0.8,
+		side: THREE.DoubleSide,
+	}));
 	mats.set("back", new THREE.MeshBasicMaterial({color: 0x777777}));
 
 	const renderer = new THREE.WebGLRenderer();
