@@ -7,7 +7,7 @@ from srctools import Vec
 import utils
 
 
-Kind = Literal["white", "black", "goo", "back"]
+Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back"]
 
 
 class SimpleTile(TypedDict):

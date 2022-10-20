@@ -16,6 +16,8 @@ def load_tiledefs(tiles: Iterable[tiling.TileDef], grid: brushLoc.Grid) -> None:
     _simple_tiles.clear()
     tiles_white = _simple_tiles["white"] = []
     tiles_black = _simple_tiles["black"] = []
+    tiles_goo_partial = _simple_tiles["goopartial"] = []
+    tiles_goo_full = _simple_tiles["goofull"] = []
     orients = {
         (0, 0, 1): 'u',
         (0, 0, -1): 'd',
@@ -27,9 +29,20 @@ def load_tiledefs(tiles: Iterable[tiling.TileDef], grid: brushLoc.Grid) -> None:
     for tile in tiles:
         if not tile.base_type.is_tile:
             continue
-        if not grid['world': (tile.pos + 128 * tile.normal)].inside_map:
+        block_type = grid['world': (tile.pos + 128 * tile.normal)]
+        if not block_type.inside_map:
             continue
-        (tiles_white if tile.base_type.is_white else tiles_black).append({
+        # Tint the area underneath goo, by just using two textures with the appropriate tints.
+        if tile.base_type is tiling.TileType.GOO_SIDE:
+            if block_type.is_top and tile.normal.z < 0.9:
+                tile_list = tiles_goo_partial
+            else:
+                tile_list = tiles_goo_full
+        elif tile.base_type.is_white:
+            tile_list = tiles_white
+        else:
+            tile_list = tiles_black
+        tile_list.append({
             'orient': orients[tile.normal.as_tuple()],
             'position': tuple((tile.pos + 64 * tile.normal) / 128),
         })
@@ -37,7 +50,7 @@ def load_tiledefs(tiles: Iterable[tiling.TileDef], grid: brushLoc.Grid) -> None:
     for pos, block in grid.items():
         if block.is_top:  # Both goo and bottomless pits.
             goo_tiles.append({
-                'orient': 'u',
+                'orient': 'd',
                 'position': tuple((pos + (0.5, 0.5, 0.75)).as_tuple()),
             })
 

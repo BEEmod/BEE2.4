@@ -37,11 +37,12 @@ window.addEventListener("load", () => {
 	const loader = new THREE.TextureLoader();
 	mats.set("white", new THREE.MeshToonMaterial({map: loader.load('static/grid3.png')}));
 	mats.set("black", new THREE.MeshToonMaterial({map: loader.load('static/grid3b.png')}));
+	mats.set("goopartial", new THREE.MeshToonMaterial({map: loader.load('static/grid_goo_partial.png')}));
+	mats.set("goofull", new THREE.MeshToonMaterial({map: loader.load('static/grid_goo_full.png')}));
 	mats.set("goo", new THREE.MeshBasicMaterial({
 		color: 0x5C6D72,
 		transparent: true,
 		opacity: 0.8,
-		side: THREE.DoubleSide,
 	}));
 	mats.set("back", new THREE.MeshBasicMaterial({color: 0x777777}));
 
@@ -74,7 +75,7 @@ window.addEventListener("load", () => {
 		orients.set("u", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),-Math.PI/2.0));
 		orients.set("d", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),+Math.PI/2.0));
 
-		for (const kind of ["white", "black", "goo", "back"]) {
+		for (const kind of ["white", "black", "goo", "goopartial", "goofull", "back"]) {
 			const tileList = data.tiles[kind];
 			if (tileList === undefined) {
 				continue;
@@ -107,14 +108,12 @@ window.addEventListener("load", () => {
 		camera.position.set(-5, 3, 5);
 		controls.update();
 
-		function animate() {
-			requestAnimationFrame( animate );
-			controls.update();
-			renderer.render( scene, camera );
-		}
 		console.log("Constructed scene!", scene);
 		container.appendChild(renderer.domElement);
-		animate();
+
+		// No animations, no need to render every frame.
+		controls.addEventListener('change', () => renderer.render(scene, camera));
+		setTimeout(() => renderer.render(scene, camera), 150);
 	}
 
 	fetch("/displaydata")
@@ -139,6 +138,7 @@ window.addEventListener("load", () => {
 		camera.aspect = render_bbox.width / height;
 		camera.updateProjectionMatrix();
 		renderer.setSize( render_bbox.width, height );
+		renderer.render(scene, camera);
 	};
 	window.visualViewport.addEventListener("resize", update);
 	update();
