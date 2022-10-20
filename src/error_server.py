@@ -48,7 +48,7 @@ current_error = ErrorInfo('<strong>No error?</strong>', [])
 async def route_display_errors() -> str:
     """Display the current error."""
     update_deadline()
-    return await quart.render_template('index.html', error_text=current_error.message)
+    return await quart.render_template('index.html.jinja2', error_text=current_error.message)
 
 
 @app.route('/heartbeat', methods=['GET', 'POST', 'HEAD'])

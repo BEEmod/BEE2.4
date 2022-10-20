@@ -7,7 +7,7 @@ body {
     flex-direction: column;
 }
 
-article {
+main {
     margin: 32px;
     display: block;
     padding: 20pt;

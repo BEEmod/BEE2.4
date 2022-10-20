@@ -1,7 +1,7 @@
 window.addEventListener("load", () => {
 	const TILE_SIZE = 64;
 	const PADDING = 96;
-	const article = document.querySelector("article");
+	const content_box = document.querySelector("main");
 	const FREQ = 30 * 1000;
 
 	const fireHeartbeat = () => {
@@ -16,8 +16,8 @@ window.addEventListener("load", () => {
 		const screen_width = document.documentElement.clientWidth - PADDING;
 		const screen_height = document.documentElement.clientHeight - PADDING;
 
-		article.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
-		article.style.height = `${Math.floor(screen_height / TILE_SIZE) * TILE_SIZE}px`;
+		content_box.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
+		content_box.style.height = `${Math.floor(screen_height / TILE_SIZE) * TILE_SIZE}px`;
 	};
 	window.visualViewport.addEventListener("resize", update);
 
