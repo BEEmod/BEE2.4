@@ -1,5 +1,5 @@
 window.addEventListener("load", () => {
-	const TILE_SIZE = 128;
+	const TILE_SIZE = 64;
 	const PADDING = 96;
 	const article = document.querySelector("article");
 	const FREQ = 30 * 1000;
