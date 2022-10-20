@@ -8,13 +8,7 @@ This has 3 endpoints:
 - /refresh causes it to reload the error from a text file on disk, if a new compile runs.
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
-# When our parent dies, stdout and stderr will become unusable. We want to only send specific
-# messages there anyway, so ensure nothing else sends by storing it privately.
-import sys
 import srctools.logger
-
-stdout = sys.stdout
-sys.stdout = sys.stderr = None
 LOGGER = srctools.logger.init_logging('bee2/error_server.log')
 
 
@@ -124,11 +118,10 @@ async def main() -> None:
             LOGGER.info('Current time: ', trio.current_time(), 'Deadline:', TIMEOUT_CANCEL.deadline)
             if len(binds):
                 url, port = binds[0].rsplit(':', 1)
-                stdout.write(f'[BEE2] PORT ALIVE: {port}\n')
                 with srctools.AtomicWriter(SERVER_PORT) as f:
                     f.write(f'{port}\n')
             else:
-                stdout.write('[BEE2] ERROR\n')
+                return # No connection?
             with stop_sleeping:
                 await trio.sleep_forever()
     finally:

@@ -23,6 +23,7 @@ function Think() {
 '''
 
 LOGGER = srctools.logger.get_logger(__name__)
+ASYNC_PORT = trio.Path(SERVER_PORT)
 
 
 @trans('BEE2: User Error')
@@ -41,17 +42,17 @@ async def load_server() -> int:
     """Load the webserver."""
     # We need to boot the web server.
     try:
-        port = int(SERVER_PORT.read_text('utf8'))
+        port = int(await ASYNC_PORT.read_text('utf8'))
     except (FileNotFoundError, ValueError):
         pass
     else:
         LOGGER.debug('Server port file = {}', port)
         # Server appears to be live. Connect to it, so we can make it reload + check it's alive.
         try:
-            urlopen(f'http:/127.0.0.1:{port}/reload', timeout=5.0)
+            urlopen(f'http://127.0.0.1:{port}/reload', timeout=5.0)
         except OSError:  # No response, it's likely dead.
             LOGGER.debug('No response from server.')
-            SERVER_PORT.unlink()  # This is invalid.
+            await ASYNC_PORT.unlink()  # This is invalid.
         else:
             LOGGER.debug('Server responded from localhost:{}', port)
             return port  # This is live and its timeout was just refreshed, good to go.
@@ -62,23 +63,28 @@ async def load_server() -> int:
         args = [sys.executable, sys.argv[0], 'vrad.exe']
     args.append('--errorserver')
 
-    proc: trio.Process = await trio.lowlevel.open_process(
-        args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    # Look for the special key phrase in stdout.
-    output = b''
+    # On Windows, suppress the console window.
+    if utils.WIN:
+        startup_info = subprocess.STARTUPINFO()
+        startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup_info.wShowWindow = subprocess.SW_HIDE
+    else:
+        startup_info = None
+
+    proc: trio.Process = await trio.lowlevel.open_process(args, startupinfo=startup_info)
     LOGGER.debug('Launched server.')
-    while proc.returncode is None:
-        with trio.move_on_after(1):
-            output += await proc.stdout.receive_some()
-            LOGGER.debug('Stdout: {}', output)
-            match = re.search(rb'\[BEE2] PORT ALIVE: ([0-9]+)', output)
-            if match is not None:
-                # Hack, set the return code of the subprocess object, so it thinks the server has
-                # already quit and doesn't try killing it when we exit.
+
+    # Wait for it to boot, and update the ports file.
+    with trio.move_on_after(5.0):
+        while proc.returncode is None:
+            try:
+                port = int(await ASYNC_PORT.read_text('utf8'))
+            except (FileNotFoundError, ValueError):
+                await trio.sleep(0.1)
+                continue
+            else:
+                # Successfully booted. Hack: set the return code of the subprocess.Process object,
+                # so it thinks the server has already quit and doesn't try killing it when we exit.
                 proc._proc.returncode = 0
-                return int(match.group(1))
-    LOGGER.error('Error server:\n{}', output)
+                return port
     raise ValueError('Failed to start error server!')

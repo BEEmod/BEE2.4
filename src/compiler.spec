@@ -111,10 +111,10 @@ for dirpath, dirname, filenames in os.walk(error_display_folder):
         full_path = Path(dirpath, file)
         data_files.append((
             str(full_path),
-            str('error_display' / full_path.relative_to(error_display_folder)),
+            str('error_display' / full_path.relative_to(error_display_folder).parent),
         ))
 
-print(data_files)
+print('DATA:', data_files)
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
