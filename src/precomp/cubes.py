@@ -10,8 +10,8 @@ from typing import NamedTuple, MutableMapping
 
 from precomp import brushLoc, options, packing, conditions
 from precomp.conditions.globals import precache_model
-from precomp.errors import UserError
 from precomp.instanceLocs import resolve as resolve_inst
+from precomp.errors import UserError
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, Property, Vec, Matrix, Angle
 import srctools.logger

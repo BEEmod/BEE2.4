@@ -28,7 +28,6 @@ from precomp import (
     bottomlessPit,
     instanceLocs,
     corridor,
-    cubes,
     template_brush,
     texturing,
     tiling,
@@ -43,8 +42,9 @@ from precomp import (
     voice_line,
     music,
     rand,
+    cubes,
 )
-from precomp.errors import UserError
+from precomp.errors import UserError, load_tiledefs as load_error_tiledefs
 import consts
 import editoritems
 
@@ -1590,6 +1590,8 @@ def main() -> None:
         tiling.analyse_map(vmf, side_to_antline)
 
         del side_to_antline
+        # We have tiles, pass to our error display.
+        load_error_tiledefs(tiling.TILES.values(), brushLoc.POS)
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 

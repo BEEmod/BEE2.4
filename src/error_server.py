@@ -25,7 +25,7 @@ import quart
 import trio
 
 import utils
-from user_errors import ErrorInfo, DATA_LOC, SERVER_PORT
+from user_errors import ErrorInfo, Kind, SimpleTile, DATA_LOC, SERVER_PORT
 
 root_path = utils.install_path('error_display').resolve()
 LOGGER.info('Root path: ', root_path)
@@ -35,13 +35,13 @@ app = QuartTrio(
     root_path=str(root_path),
 )
 config = Config()
-config.bind = ["localhost:0"]  # Use localhost, request any free port.
+config.bind = ["localhost:8080"]  # Use localhost, request any free port.
 DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # This cancel scope is cancelled after no response from the client, to shut us down.
 # It starts with an infinite deadline, to ensure there's time to boot the server.
 TIMEOUT_CANCEL = trio.CancelScope(deadline=math.inf)
 
-current_error = ErrorInfo('<strong>No error?</strong>', [])
+current_error = ErrorInfo('<strong>No error?</strong>', [], {})
 
 
 @app.route('/')
@@ -49,6 +49,15 @@ async def route_display_errors() -> str:
     """Display the current error."""
     update_deadline()
     return await quart.render_template('index.html.jinja2', error_text=current_error.message)
+
+
+@app.route('/displaydata')
+async def route_render_data() -> dict:
+    """Return the geometry for rendering the current error."""
+    return {
+        'tiles': current_error.faces,
+        'points': current_error.points,
+    }
 
 
 @app.route('/heartbeat', methods=['GET', 'POST', 'HEAD'])
@@ -70,6 +79,16 @@ async def route_reload() -> quart.Response:
     return resp
 
 
+@app.route('/static/<path:filename>.js')
+async def route_static_js(filename: str) -> quart.Response:
+    """Ensure javascript is returned with the right MIME type."""
+    return await quart.send_from_directory(
+        directory=app.static_folder,
+        file_name=filename + '.js',
+        mimetype='text/javascript',
+    )
+
+
 def update_deadline() -> None:
     """When interacted with, the deadline is reset into the future."""
     TIMEOUT_CANCEL.deadline = trio.current_time() + DELAY
@@ -86,7 +105,7 @@ def load_info() -> None:
             raise ValueError
     except Exception:
         LOGGER.exception('Failed to load pickle!')
-        current_error = ErrorInfo('Failed to load error!', [])
+        current_error = ErrorInfo('Failed to load error!', [], {})
     else:
         current_error = data
 

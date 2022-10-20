@@ -18,7 +18,7 @@ from user_errors import SERVER_PORT
 # That pauses, so if you tab back it'll repeat.
 SCRIPT_TEMPLATE = '''\
 function Think() {
-\tif (ScriptSteamShowURL("http:/127.0.0.1:%/")) SendToConsole("puzzlemaker_show 1");
+\tif (ScriptSteamShowURL("http://127.0.0.1:%/")) SendToConsole("puzzlemaker_show 1");
 }
 '''
 
@@ -36,6 +36,10 @@ async def start_error_server(ctx: Context) -> None:
         port = await load_server()
         LOGGER.info('Server at port {}', port)
         ctx.add_code(ent, SCRIPT_TEMPLATE.replace('%', str(port)))
+        if not utils.FROZEN:
+            # We're running outside Portal 2, pop it open in regular Chrome.
+            import webbrowser
+            webbrowser.get('chrome').open(f'http://127.0.0.1:{port}/')
 
 
 async def load_server() -> int:

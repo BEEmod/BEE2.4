@@ -1,11 +1,45 @@
 """Handles user errors found, displaying a friendly interface to the user."""
-import base64
+from __future__ import annotations
 import pickle
-from typing import Iterable
+from typing import Dict, Iterable, List, Literal, TYPE_CHECKING
 
 import consts
 from srctools import Vec, VMF, AtomicWriter
-from user_errors import ErrorInfo, DATA_LOC
+from user_errors import ErrorInfo, DATA_LOC, Kind, SimpleTile
+from precomp import tiling, brushLoc
+
+_simple_tiles: Dict[Kind, List[SimpleTile]] = {}
+
+
+def load_tiledefs(tiles: Iterable[tiling.TileDef], grid: brushLoc.Grid) -> None:
+    """Load tiledef info into a simplified tiles list."""
+    _simple_tiles.clear()
+    tiles_white = _simple_tiles["white"] = []
+    tiles_black = _simple_tiles["black"] = []
+    orients = {
+        (0, 0, 1): 'u',
+        (0, 0, -1): 'd',
+        (0, 1, 0): 'n',
+        (0, -1, 0): 's',
+        (1, 0, 0): 'e',
+        (-1, 0, 0): 'w',
+    }
+    for tile in tiles:
+        if not tile.base_type.is_tile:
+            continue
+        if not grid['world': (tile.pos + 128 * tile.normal)].inside_map:
+            continue
+        (tiles_white if tile.base_type.is_white else tiles_black).append({
+            'orient': orients[tile.normal.as_tuple()],
+            'position': tuple(brushLoc.world_to_grid(tile.pos + 64 * tile.normal)),
+        })
+    goo_tiles = _simple_tiles["goo"] = []
+    for pos, block in grid.items():
+        if block.is_top:  # Both goo and bottomless pits.
+            goo_tiles.append({
+                'orient': 'u',
+                'position': tuple((pos + (0, 0, 0.25)).as_tuple()),
+            })
 
 
 class UserError(BaseException):
@@ -23,7 +57,8 @@ class UserError(BaseException):
         """
         self.info = ErrorInfo(
             message.format(*args),
-            list(points),
+            list(map(tuple, points)),
+            _simple_tiles,
         )
 
     def __str__(self) -> str:
