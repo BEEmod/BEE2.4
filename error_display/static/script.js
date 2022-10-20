@@ -12,16 +12,6 @@ window.addEventListener("load", () => {
 
 	let heartbeatID = setInterval(fireHeartbeat, FREQ);
 
-	// Lock the article to use multiples of the tile size.
-	const update = () => {
-		const screen_width = document.documentElement.clientWidth - PADDING;
-		const screen_height = document.documentElement.clientHeight - PADDING;
-
-		content_box.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
-		content_box.style.height = `${Math.floor(screen_height / TILE_SIZE) * TILE_SIZE}px`;
-	};
-	window.visualViewport.addEventListener("resize", update);
-
 	// If the window is hidden (including when the Steam Overlay is closed!!), stop sending
 	// heartbeat messages so the server can die.
 	document.addEventListener("visibilitychange", () => {
@@ -37,9 +27,9 @@ window.addEventListener("load", () => {
 			}
 		}
 	});
-	update();
 
 	const scene = new THREE.Scene({background: 0xC9D3CF});  // PeTI BG.
+	const container = document.querySelector("#render");
 	const camera = new THREE.PerspectiveCamera( 75, 1.0, 0.01, 100 );
 
 	const mats = new Map();
@@ -61,8 +51,6 @@ window.addEventListener("load", () => {
 		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}b.png`)})
 	);
 	const renderer = new THREE.WebGLRenderer();
-	renderer.setSize( 512, 512 );
-
 	const controls = new OrbitControls( camera, renderer.domElement );
 
 	scene.add( new THREE.AmbientLight( 0x888888 ) );
@@ -124,7 +112,7 @@ window.addEventListener("load", () => {
 			renderer.render( scene, camera );
 		}
 		console.log("Constructed scene!", scene);
-		document.querySelector("#render").appendChild(renderer.domElement);
+		container.appendChild(renderer.domElement);
 		animate();
 	}
 
@@ -135,4 +123,22 @@ window.addEventListener("load", () => {
 			console.error(reason);
 			content_box.append('Could not fetch display!');
 	});
+
+	// Lock the article to use multiples of the tile size.
+	const update = () => {
+		const screen_width = document.documentElement.clientWidth - PADDING;
+		const screen_height = document.documentElement.clientHeight - PADDING;
+		const box_height = Math.floor(screen_height / TILE_SIZE) * TILE_SIZE;
+
+		content_box.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
+		content_box.style.height = `${box_height}px`;
+
+		const render_bbox = container.getBoundingClientRect();
+		const height = box_height - render_bbox.y + 16;
+		camera.aspect = render_bbox.width / height;
+		camera.updateProjectionMatrix();
+		renderer.setSize( render_bbox.width, height );
+	};
+	window.visualViewport.addEventListener("resize", update);
+	update();
 });
