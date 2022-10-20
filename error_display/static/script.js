@@ -53,6 +53,13 @@ window.addEventListener("load", () => {
 
 	const controls = new OrbitControls( camera, renderer.domElement );
 
+	scene.add( new THREE.AmbientLight( 0x888888 ) );
+	const lighting = new THREE.DirectionalLight( 0xffffff, 0.5 );
+	scene.add(lighting);
+	lighting.position.set(-20, 50, 20);
+	lighting.target.position.set(5, 0, 5);
+	scene.add(lighting.target);
+
 	function updateScene(data) {
 		console.log("Scene data:", data);
 
