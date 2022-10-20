@@ -21,6 +21,8 @@ window.addEventListener("load", () => {
 	};
 	window.visualViewport.addEventListener("resize", update);
 
+	// If the window is hidden (including when the Steam Overlay is closed!!), stop sending
+	// heartbeat messages so the server can die.
 	document.addEventListener("visibilitychange", () => {
 		if (document.visibilityState === 'visible') {
 			fireHeartbeat(); // Fire immediately, in case there was a long time from the last interval.
