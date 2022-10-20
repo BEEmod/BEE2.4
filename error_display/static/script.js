@@ -43,8 +43,9 @@ window.addEventListener("load", () => {
 	const camera = new THREE.PerspectiveCamera( 75, 1.0, 0.01, 100 );
 
 	const mats = new Map();
-	mats.set("white", new THREE.MeshBasicMaterial({color: 0xFFFFFF}));
-	mats.set("black", new THREE.MeshBasicMaterial({color: 0x83878B}));
+	const loader = new THREE.TextureLoader();
+	mats.set("white", new THREE.MeshToonMaterial({map: loader.load('static/grid3.png')}));
+	mats.set("black", new THREE.MeshToonMaterial({map: loader.load('static/grid3b.png')}));
 	mats.set("goo", new THREE.MeshBasicMaterial({
 		color: 0x5C6D72,
 		transparent: true,
@@ -53,6 +54,12 @@ window.addEventListener("load", () => {
 	}));
 	mats.set("back", new THREE.MeshBasicMaterial({color: 0x777777}));
 
+	const white_mats = [0, 1, 2].map((i) =>
+		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}.png`)})
+	);
+	const black_mats = [0, 1, 2].map((i) =>
+		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}b.png`)})
+	);
 	const renderer = new THREE.WebGLRenderer();
 	renderer.setSize( 512, 512 );
 
@@ -89,15 +96,18 @@ window.addEventListener("load", () => {
 			// const scale = new THREE.Vector3(1, 1, 1);
 			for (let i = 0; i < tileList.length; i++) {
 				const tile = tileList[i];
-				if (!orients.has(tile.orient)) {
-					continue;
-				}
 				// mesh.setMatrixAt(i, mat.compose(
 				// 	new THREE.Vector3(tile.position[0], tile.position[1], tile.position[2]),
 				// 	rot,
 				// 	scale,
 				// ));
-				const mesh = new THREE.Mesh(tile_geo, mats.get(kind));
+				let mat;
+				if ((kind === "black" || kind === "white") && tile.orient !== "u" && tile.orient !== "d") {
+					mat = (kind === "white" ? white_mats : black_mats)[Math.floor(Math.random() * 3)];
+				} else {
+					mat = mats.get(kind);
+				}
+				const mesh = new THREE.Mesh(tile_geo, mat);
 				mesh.position.set(tile.position[0], tile.position[2], -tile.position[1]);
 				mesh.applyQuaternion(orients.get(tile.orient));
 				scene.add(mesh);
@@ -105,13 +115,7 @@ window.addEventListener("load", () => {
 			// mesh.instanceMatrix.needsUpdate = true;
 			// scene.add(mesh);
 		}
-
-		const geometry = new THREE.BoxGeometry( 1, 1, 1 );
-		const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-		const cube = new THREE.Mesh( geometry, material );
-		scene.add( cube );
-
-		camera.position.z = 5;
+		camera.position.set(-5, 3, 5);
 		controls.update();
 
 		function animate() {
