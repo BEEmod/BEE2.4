@@ -60,28 +60,10 @@ def update_deadline() -> None:
 
 
 @app.route('/')
-async def route_error_page() -> str:
+async def route_display_errors() -> str:
     """Display the current error."""
     update_deadline()
     return await quart.render_template('index.html', error_text=current_error)
-
-
-@app.route('/styles.css')
-async def route_error_styles() -> quart.Response:
-    """Return the error page stylesheet."""
-    return await app.send_static_file('styles.css')
-
-
-@app.route('/tile_bg.png')
-async def route_error_bg() -> quart.Response:
-    """Return the error page background image."""
-    return await app.send_static_file('tile_bg.png')
-
-
-@app.route('/script.js')
-async def route_error_script() -> quart.Response:
-    """Return the error page script file."""
-    return await app.send_static_file('script.js')
 
 
 @app.route('/heartbeat', methods=['GET', 'POST', 'HEAD'])
