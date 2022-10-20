@@ -29,7 +29,7 @@ class UserError(BaseException):
     def __str__(self) -> str:
         return 'Error message: ' + self.info.message
 
-    def make_map(self, content_loc: str) -> VMF:
+    def make_map(self) -> VMF:
         """Generate a map which triggers the error each time.
 
         This map is as simple as possible to make compile time quick.
@@ -67,7 +67,6 @@ class UserError(BaseException):
         # if the map is swapped back to. VRAD detects the classname and adds the script.
         vmf.create_ent(
             'bee2_user_error',
-            content_root=base64.urlsafe_b64encode(content_loc.encode('utf8')).decode('utf8'),
             origin="64 64 1",
             angles="0 0 0",
         )

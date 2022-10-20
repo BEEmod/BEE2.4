@@ -118,7 +118,7 @@ def load_settings() -> Tuple[
     if ant_floor is None:
         ant_floor = ant_wall
 
-    # Load in our main configs..
+    # Load in our main configs...
     options.load(conf.find_all('Options'))
     utils.DEV_MODE = options.get(bool, 'dev_mode')
 

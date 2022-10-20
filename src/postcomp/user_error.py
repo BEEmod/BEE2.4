@@ -1,9 +1,10 @@
 """Inject VScript if a user error occurs."""
 import re
 import subprocess
+
+import trio
 import sys
 from urllib.request import urlopen
-import base64
 
 import srctools.logger
 
@@ -25,21 +26,18 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 
 @trans('BEE2: User Error')
-def generate_coop_responses(ctx: Context) -> None:
+async def start_error_server(ctx: Context) -> None:
     """If the map contains the marker entity indicating a user error, inject the VScript."""
     for ent in ctx.vmf.by_class['bee2_user_error']:
         ent['thinkfunction'] = 'Think'
         ent['classname'] = 'info_player_start'
 
-        content_root = base64.urlsafe_b64decode(ent['contentroot'].encode('utf8')).decode('utf8')
-        LOGGER.debug('Error content root: {}', content_root)
-
-        port = load_server(content_root)
+        port = await load_server()
         LOGGER.info('Server at port {}', port)
         ctx.add_code(ent, SCRIPT_TEMPLATE.replace('%', str(port)))
 
 
-def load_server(content_root: str) -> int:
+async def load_server() -> int:
     """Load the webserver."""
     # We need to boot the web server.
     try:
@@ -62,24 +60,25 @@ def load_server(content_root: str) -> int:
         args = [sys.executable]
     else:
         args = [sys.executable, sys.argv[0], 'vrad.exe']
-    args += ['--errordisplay', '--contentroot', content_root]
+    args.append('--errorserver')
 
-    proc = subprocess.Popen(
+    proc: trio.Process = await trio.lowlevel.open_process(
         args,
-        start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
     # Look for the special key phrase in stdout.
-    output = ''
-    while proc.poll() is None:
-        try:
-            out_part, _ = proc.communicate(timeout=0)
-        except subprocess.TimeoutExpired:
-            continue
-        output += out_part
-        match = re.match(r'\[BEE2] PORT ALIVE: ([0-9]+)', output)
-        if match is not None:
-            return int(match.group(1))
+    output = b''
+    LOGGER.debug('Launched server.')
+    while proc.returncode is None:
+        with trio.move_on_after(1):
+            output += await proc.stdout.receive_some()
+            LOGGER.debug('Stdout: {}', output)
+            match = re.search(rb'\[BEE2] PORT ALIVE: ([0-9]+)', output)
+            if match is not None:
+                # Hack, set the return code of the subprocess object, so it thinks the server has
+                # already quit and doesn't try killing it when we exit.
+                proc._proc.returncode = 0
+                return int(match.group(1))
     LOGGER.error('Error server:\n{}', output)
     raise ValueError('Failed to start error server!')

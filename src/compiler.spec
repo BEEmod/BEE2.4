@@ -37,7 +37,6 @@ EXCLUDES = [
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',
-    'http',
 
     # Imported in utils, but not required in compiler.
     'bg_daemon',

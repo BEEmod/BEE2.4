@@ -8,13 +8,20 @@ This has 3 endpoints:
 - /refresh causes it to reload the error from a text file on disk, if a new compile runs.
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
-import argparse
+# When our parent dies, stdout and stderr will become unusable. We want to only send specific
+# messages there anyway, so ensure nothing else sends by storing it privately.
+import sys
+import srctools.logger
+
+stdout = sys.stdout
+sys.stdout = sys.stderr = None
+LOGGER = srctools.logger.init_logging('bee2/error_server.log')
+
+
 import functools
 import http
 import math
 import pickle
-import socket
-import sys
 from typing import List
 
 from hypercorn.config import Config
@@ -25,7 +32,6 @@ import trio
 
 import utils
 from user_errors import ErrorInfo, DATA_LOC, SERVER_PORT
-import srctools
 
 root_path = utils.install_path('error_display').resolve()
 LOGGER.info('Root path: ', root_path)
@@ -73,7 +79,7 @@ async def route_reload() -> quart.Response:
 def update_deadline() -> None:
     """When interacted with, the deadline is reset into the future."""
     TIMEOUT_CANCEL.deadline = trio.current_time() + DELAY
-    print('Reset deadline!')
+    LOGGER.info('Reset deadline!')
 
 
 def load_info() -> None:
@@ -85,7 +91,7 @@ def load_info() -> None:
         if not isinstance(data, ErrorInfo):
             raise ValueError
     except Exception:
-        print('Failed to load pickle!')
+        LOGGER.exception('Failed to load pickle!')
         current_error = ErrorInfo('Failed to load error!', [])
     else:
         current_error = data
@@ -93,14 +99,14 @@ def load_info() -> None:
 
 async def main() -> None:
     """Start up the server."""
-    binds: List[socket.socket]
+    binds: List[str]
     stop_sleeping = trio.CancelScope()
 
     async def timeout_func() -> None:
         """Triggers the server to shut down with this cancel scope."""
         with TIMEOUT_CANCEL:
             await trio.sleep_forever()
-        print('Timeout elapsed.')
+        LOGGER.info('Timeout elapsed.')
         # Allow nursery to exit.
         stop_sleeping.cancel()
 
@@ -115,16 +121,16 @@ async def main() -> None:
             ))
             # Set deadline after app is ready.
             TIMEOUT_CANCEL.deadline = trio.current_time() + DELAY
-            print('Current time: ', trio.current_time(), 'Deadline:', TIMEOUT_CANCEL.deadline)
+            LOGGER.info('Current time: ', trio.current_time(), 'Deadline:', TIMEOUT_CANCEL.deadline)
             if len(binds):
-                url, port = binds[0].getsockname()
-                print(f'[BEE2] PORT ALIVE: {port}')
+                url, port = binds[0].rsplit(':', 1)
+                stdout.write(f'[BEE2] PORT ALIVE: {port}\n')
                 with srctools.AtomicWriter(SERVER_PORT) as f:
                     f.write(f'{port}\n')
             else:
-                print('[BEE2] ERROR')
+                stdout.write('[BEE2] ERROR\n')
             with stop_sleeping:
                 await trio.sleep_forever()
     finally:
         SERVER_PORT.unlink(missing_ok=True)  # We quit, indicate that.
-    print('Shut down successfully.')
+    LOGGER.info('Shut down successfully.')
