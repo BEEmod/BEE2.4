@@ -56,28 +56,30 @@ window.addEventListener("load", () => {
 	function updateScene(data) {
 		console.log("Scene data:", data);
 
-		const tile_geo = new THREE.BoxGeometry(0.5, 0.5, 0.5); //new THREE.PlaneGeometry(1.0, 1.0);
+		const tile_geo = new THREE.PlaneGeometry(1.0, 1.0);
 
-		// const orients = new Map({
-		// 	n: new THREE.Quaternion().setFromAxisAngle(),
-		// 	s: new THREE.Quaternion().setFromAxisAngle(),
-		// 	e: new THREE.Quaternion().setFromAxisAngle(),
-		// 	w: new THREE.Quaternion().setFromAxisAngle(),
-		// 	t: new THREE.Quaternion().setFromAxisAngle(),
-		// 	b: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector(0, 1, 0), 180),
-		// });
+		const orients = new Map();
+		orients.set("n", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+		orients.set("s", new THREE.Quaternion());
+		orients.set("e", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0),Math.PI / 2));
+		orients.set("w", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 3 * Math.PI / 2));
+		orients.set("u", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),-Math.PI/2.0));
+		orients.set("d", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),+Math.PI/2.0));
 
 		for (const kind of ["white", "black", "goo", "back"]) {
 			const tileList = data.tiles[kind];
 			if (tileList === undefined) {
 				continue;
 			}
+			// TODO: Maybe use this for efficiency?
 			// const mesh = new THREE.InstancedMesh(tile_geo, mats.get(kind), tileList.length);
 			// const mat = new THREE.Matrix4();
 			// const scale = new THREE.Vector3(1, 1, 1);
-			// const rot = new THREE.Quaternion();
 			for (let i = 0; i < tileList.length; i++) {
 				const tile = tileList[i];
+				if (!orients.has(tile.orient)) {
+					continue;
+				}
 				// mesh.setMatrixAt(i, mat.compose(
 				// 	new THREE.Vector3(tile.position[0], tile.position[1], tile.position[2]),
 				// 	rot,
@@ -85,6 +87,7 @@ window.addEventListener("load", () => {
 				// ));
 				const mesh = new THREE.Mesh(tile_geo, mats.get(kind));
 				mesh.position.set(tile.position[0], tile.position[2], -tile.position[1]);
+				mesh.applyQuaternion(orients.get(tile.orient));
 				scene.add(mesh);
 			}
 			// mesh.instanceMatrix.needsUpdate = true;

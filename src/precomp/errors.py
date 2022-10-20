@@ -31,14 +31,14 @@ def load_tiledefs(tiles: Iterable[tiling.TileDef], grid: brushLoc.Grid) -> None:
             continue
         (tiles_white if tile.base_type.is_white else tiles_black).append({
             'orient': orients[tile.normal.as_tuple()],
-            'position': tuple(brushLoc.world_to_grid(tile.pos + 64 * tile.normal)),
+            'position': tuple((tile.pos + 64 * tile.normal) / 128),
         })
     goo_tiles = _simple_tiles["goo"] = []
     for pos, block in grid.items():
         if block.is_top:  # Both goo and bottomless pits.
             goo_tiles.append({
                 'orient': 'u',
-                'position': tuple((pos + (0, 0, 0.25)).as_tuple()),
+                'position': tuple((pos + (0.5, 0.5, 0.75)).as_tuple()),
             })
 
 
