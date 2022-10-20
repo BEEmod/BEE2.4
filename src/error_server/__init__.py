@@ -10,6 +10,7 @@ This has 3 endpoints:
 """
 import argparse
 import functools
+import http
 import math
 import socket
 import sys
@@ -87,7 +88,9 @@ async def route_error_script() -> quart.Response:
 async def route_heartbeat() -> quart.Response:
     """This route is continually accessed to keep the server alive while the page is visible."""
     update_deadline()
-    return await quart.make_response()  # Send an empty body, we don't care.
+    resp = await app.make_response(('', http.HTTPStatus.NO_CONTENT))
+    resp.mimetype = 'text/plain'
+    return resp
 
 
 async def main() -> None:
