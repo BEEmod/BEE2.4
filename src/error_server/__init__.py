@@ -23,30 +23,20 @@ from quart_trio import QuartTrio
 import quart
 import trio
 
+import utils
 from user_errors import ErrorInfo, DATA_LOC, SERVER_PORT
 import srctools
 
-
-parser = argparse.ArgumentParser(description='Error display for BEE2 compilers.')
-parser.add_argument(
-    '--errorserver', help='Required to run the server.',
-    action='store_true',
-    required=True,
-)
-parser.add_argument(
-    '--contentroot', help='Location of the webpage content.',
-    action='store',
-    required=True,
-)
-parsed_args = parser.parse_args(sys.argv[1:])
+root_path = utils.install_path('error_display').resolve()
+LOGGER.info('Root path: ', root_path)
 
 app = QuartTrio(
     __name__,
-    root_path=parsed_args.contentroot,
+    root_path=str(root_path),
 )
 config = Config()
 config.bind = ["localhost:0"]  # Use localhost, request any free port.
-DELAY = 5 * 60
+DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # This cancel scope is cancelled after no response from the client, to shut us down.
 # It starts with an infinite deadline, to ensure there's time to boot the server.
 TIMEOUT_CANCEL = trio.CancelScope(deadline=math.inf)
@@ -71,7 +61,7 @@ async def route_heartbeat() -> quart.Response:
 
 
 @app.route('/reload')
-async def route_heartbeat() -> quart.Response:
+async def route_reload() -> quart.Response:
     """Called by our VRAD, to make existing servers reload their data."""
     update_deadline()
     load_info()
