@@ -1,27 +1,11 @@
 """Handles user errors found, displaying a friendly interface to the user."""
+import base64
+import pickle
 from typing import Iterable
 
 import consts
-from srctools import Vec, VMF
-import utils
-
-ERROR_TEMPLATE = '''\
-<!DOCTYPE html>
-<html>
-<head>
-  <title>BEEmod Compilation Error</title>
-  <style>
-  body {
-    background: #fff;
-    color: #000;
-  }
-  </style>
-</head>
-<body>
-%MSG%
-</body>
-</html>
-'''
+from srctools import Vec, VMF, AtomicWriter
+from user_errors import ErrorInfo, DATA_LOC
 
 
 class UserError(BaseException):
@@ -33,23 +17,27 @@ class UserError(BaseException):
     def __init__(self, message: str, *args: object, points: Iterable[Vec]=()) -> None:
         """Specify the info to show to the user.
 
-        * message is a str.format string, using args as the parameters.
+        * message is a str.format() string, using args as the parameters.
         * points is a list of offending map locations, which will be placed
           in a copy of the map for the user to see.
         """
-        self.message = message.format(*args)
-        self.points = list(points)
+        self.info = ErrorInfo(
+            message.format(*args),
+            list(points),
+        )
 
     def __str__(self) -> str:
-        return 'Error message: ' + self.message
+        return 'Error message: ' + self.info.message
 
-    def make_map(self) -> VMF:
+    def make_map(self, content_loc: str) -> VMF:
         """Generate a map which triggers the error each time.
 
         This map is as simple as possible to make compile time quick.
+        The content loc is the location of the web resources.
         """
-        with utils.COMPILE_USER_ERROR_PAGE.open('w') as f:
-            f.write(ERROR_TEMPLATE.replace('%MSG%', self.message))
+        with AtomicWriter(DATA_LOC, is_bytes=True) as f:
+            pickle.dump(self.info, f, pickle.HIGHEST_PROTOCOL)
+
         vmf = VMF()
         vmf.map_ver = 1
         vmf.spawn['skyname'] = 'sky_black_nofog'
@@ -79,6 +67,7 @@ class UserError(BaseException):
         # if the map is swapped back to. VRAD detects the classname and adds the script.
         vmf.create_ent(
             'bee2_user_error',
+            content_root=base64.urlsafe_b64encode(content_loc.encode('utf8')).decode('utf8'),
             origin="64 64 1",
             angles="0 0 0",
         )
