@@ -27,10 +27,11 @@ IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 def export_data() -> List[Tuple[str, str]]:
     """Returns selected items, for Signage.export() to use."""
+    conf: Layout = config.APP.get_cur_conf(Layout)
     return [
-        (str(ind), slot.contents.id)
-        for ind, slot in SLOTS_SELECTED.items()
-        if slot.contents is not None
+        (str(ind), sign_id)
+        for ind in SIGN_IND
+        if (sign_id := conf.signs.get(ind, '')) != ''
     ]
 
 

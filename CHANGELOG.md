@@ -4,6 +4,7 @@
 
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.
+* Fix signage not exporting if the UI was not opened at least once before exporting.
 
 ------------------------------------------
 
