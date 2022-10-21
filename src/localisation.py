@@ -1,5 +1,5 @@
 """Wraps gettext, to localise all UI text."""
-from typing import Callable, Mapping
+from typing import Callable, Dict, Mapping
 from typing_extensions import ParamSpec
 import gettext as gettext_mod
 import locale
@@ -19,7 +19,12 @@ P = ParamSpec('P')
 
 NS_UI = '<BEE2>'  # Our UI translations.
 NS_GAME = '<PORTAL2>'   # Lookup from basemodui.txt
-NS_UNTRANSLATED = '<NOTRANSLATE>'  # Legacy values which don't have translation.
+NS_UNTRANSLATED = '<NOTRANSLATE>'  # Legacy values which don't have translation
+# The prefix for all Valve's editor keys.
+PETI_KEY_PREFIX = 'PORTAL2_PuzzleEditor'
+
+# The currently loaded translations. First is the namespace, then the token -> string.
+TRANSLATIONS: Dict[str, Dict[str, str]] = {}
 
 
 @attrs.frozen(weakref_slot=True, eq=False)
@@ -38,6 +43,14 @@ class TransToken:
     def from_valve(cls, text: str) -> 'TransToken':
         """Make a token for a string that should be looked up in Valve's translation files."""
         return cls(NS_GAME, text.lstrip('#'), text, EmptyMapping)
+
+    @classmethod
+    def untranslated(cls, text: str) -> 'TransToken':
+        """Make a token that is not actually translated at all.
+
+        In this case, the token is the literal text to use.
+        """
+        return cls(NS_UNTRANSLATED, text, text, EmptyMapping)
 
     def format(self, /, **kwargs: str) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
@@ -71,6 +84,49 @@ class TransToken:
             self.namespace, self.token,
             frozenset(self.parameters.items()),
         ))
+
+    def __str__(self) -> str:
+        """Calling str on a token translates it."""
+        if self.namespace == NS_UNTRANSLATED:
+            return self.token
+        try:
+            return TRANSLATIONS[self.namespace][self.token]
+        except KeyError:
+            return self.default
+
+
+def load_basemodui(basemod_loc: str) -> None:
+    """Load basemodui.txt from Portal 2, to provide translations for the default items."""
+    if NS_GAME in TRANSLATIONS:
+        # Already loaded.
+        return
+
+    # Basemod files are encoded in UTF-16.
+    try:
+        basemod_file = open(basemod_loc, encoding='utf16')
+    except FileNotFoundError:
+        return
+
+    trans_data = TRANSLATIONS[NS_GAME] = {}
+
+    with basemod_file:
+        # This file is in keyvalues format, supposedly.
+        # But it's got a bunch of syntax errors - extra quotes,
+        # missing brackets.
+        # The structure doesn't matter, so just process line by line.
+        for line in basemod_file:
+            try:
+                __, key, __, value, __ = line.split('"')
+            except ValueError:
+                continue
+            # Ignore non-puzzlemaker keys.
+            if key.startswith(PETI_KEY_PREFIX):
+                trans_data[key] = value.replace("\\'", "'")
+
+    if gettext('Quit') == '####':
+        # Dummy translations installed, apply here too.
+        for key in trans_data:
+            trans_data[key] = gettext(key)
 
 
 class DummyTranslations(gettext_mod.NullTranslations):

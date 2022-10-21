@@ -37,7 +37,8 @@ import srctools.fgd
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
 from config.gen_opts import GenOptions
-from localisation import gettext
+from localisation import gettext, TransToken
+import localisation
 import loadScreen
 import packages
 import packages.template_brush
@@ -54,9 +55,6 @@ selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
 EVENT_BUS = event.EventBus()
-
-# Translated text from basemodui.txt.
-TRANS_DATA: dict[str, str] = {}
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -233,7 +231,7 @@ def translate(string: str) -> str:
 
     This is needed for Valve items, since they translate automatically.
     """
-    return TRANS_DATA.get(string, string)
+    return localisation.TRANSLATIONS[localisation.NS_GAME].get(string, string)
 
 
 def quit_application():
@@ -1052,76 +1050,37 @@ class Game:
 
         return copied_files
 
-    def init_trans(self):
+    def init_trans(self) -> None:
         """Try and load a copy of basemodui from Portal 2 to translate.
 
         Valve's items use special translation strings which would look ugly
         if we didn't convert them.
         """
         # Already loaded
-        if TRANS_DATA:
+        if localisation.NS_GAME in localisation.TRANSLATIONS:
             return
 
         # Allow overriding.
         try:
             lang = os.environ['BEE2_P2_LANG']
         except KeyError:
-            pass
-        else:
-            self.load_trans(lang)
-            return
+            # We need to first figure out what language is used (if not English),
+            # then load in the file. This is saved in the 'appmanifest'.
+            try:
+                appman_file = open(self.abs_path('../../appmanifest_620.acf'))
+            except FileNotFoundError:
+                # Portal 2 isn't here...
+                return
 
-        # We need to first figure out what language is used (if not English),
-        # then load in the file. This is saved in the 'appmanifest',
+            with appman_file:
+                appman = Property.parse(appman_file, 'appmanifest_620.acf')
+            try:
+                lang = appman.find_key('AppState').find_key('UserConfig')['language']
+            except LookupError:
+                return
 
-        try:
-            appman_file = open(self.abs_path('../../appmanifest_620.acf'))
-        except FileNotFoundError:
-            # Portal 2 isn't here...
-            return
-
-        with appman_file:
-            appman = Property.parse(appman_file, 'appmanifest_620.acf')
-        try:
-            lang = appman.find_key('AppState').find_key('UserConfig')['language']
-        except LookupError:
-            return
-
-        self.load_trans(lang)
-
-    def load_trans(self, lang) -> None:
-        """Actually load the translation."""
-        # Already loaded
-        if TRANS_DATA:
-            return
-
-        basemod_loc = self.abs_path(
-            '../Portal 2/portal2_dlc2/resource/basemodui_' + lang + '.txt'
-        )
-
-        # Basemod files are encoded in UTF-16.
-        try:
-            basemod_file = open(basemod_loc, encoding='utf16')
-        except FileNotFoundError:
-            return
-        with basemod_file:
-            # This file is in keyvalues format, supposedly.
-            # But it's got a bunch of syntax errors - extra quotes,
-            # missing brackets.
-            # The structure doesn't matter, so just process line by line.
-            for line in basemod_file:
-                try:
-                    __, key, __, value, __ = line.split('"')
-                except ValueError:
-                    continue
-                # Ignore non-puzzlemaker keys.
-                if key.startswith('PORTAL2_PuzzleEditor'):
-                    TRANS_DATA[key] = value.replace("\\'", "'")
-
-        if gettext('Quit') == '####':
-            # Dummy translations installed, apply here too.
-            for key in TRANS_DATA:
-                TRANS_DATA[key] = gettext(key)
+        basemod_loc = self.abs_path(f'../Portal 2/portal2_dlc2/resource/basemodui_{lang}.txt')
+        localisation.load_basemodui(basemod_loc)
 
     def get_export_text(self) -> str:
         """Return the text to use on export button labels."""
