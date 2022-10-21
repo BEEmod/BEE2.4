@@ -43,8 +43,8 @@ from precomp import (
     music,
     rand,
     cubes,
+    errors,
 )
-from precomp.errors import UserError, load_tiledefs as load_error_tiledefs
 import consts
 import editoritems
 
@@ -1591,7 +1591,7 @@ def main() -> None:
 
         del side_to_antline
         # We have tiles, pass to our error display.
-        load_error_tiledefs(tiling.TILES.values(), brushLoc.POS)
+        errors.load_tiledefs(tiling.TILES.values(), brushLoc.POS)
 
         texturing.setup(game, vmf, list(tiling.TILES.values()))
 
@@ -1603,6 +1603,8 @@ def main() -> None:
         change_overlays(vmf)
         fix_worldspawn(vmf)
 
+        raise errors.UserError('<p>Something is horribly wrong with this test chamber:</p>')
+
         if utils.DEV_MODE:
             coll.dump(vmf, vis_name='collisions')
 
@@ -1612,11 +1614,11 @@ def main() -> None:
                 out.comma_sep = False
         # Set this so VRAD can know.
         vmf.spawn['BEE2_is_preview'] = info.is_preview
-    except UserError as error:
+    except errors.UserError as error:
         # The user did something wrong, so the map is invalid.
         # Compile a special map which displays the message.
         LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
-        vmf = error.make_map()
+        vmf = errors.make_map(error)
 
         # Flag as preview and errored for VRAD.
         vmf.spawn['BEE2_is_preview'] = True
