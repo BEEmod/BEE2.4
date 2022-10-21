@@ -19,6 +19,7 @@ from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVA
 from srctools.dmx import Element as DMElement
 import srctools.logger
 
+from user_errors import UserError
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
 from . import tiling, texturing, options, rand, collisions
@@ -443,10 +444,8 @@ def load_templates(path: str) -> None:
     with open(path, 'rb') as f:
         dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
     if fmt_name != 'bee_templates' or fmt_ver not in [1]:
-        raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
+        raise UserError('Invalid template file format "{}" v{}', fmt_name, fmt_ver)
     for template in dmx['temp'].iter_elem():
-        if template is None:
-            raise ValueError('Null template!')
         _TEMPLATES[template.name.casefold()] = UnparsedTemplate(
             template.name.upper(),
             template['package'].val_str,
@@ -484,14 +483,17 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     conf_ents = vmf.by_class['bee2_template_conf']
     if len(conf_ents) > 1:
-        raise ValueError(f'Multiple configuration entities in template "{loc.id}"!')
+        raise UserError('Multiple configuration entities in template <var>"{}"</var>!', loc.id)
     elif not conf_ents:
-        raise ValueError(f'No configration entity for template "{loc.id}"!')
+        raise UserError('No configration entity for template <var>"{}"</var>!', loc.id)
     else:
         [conf] = conf_ents
 
     if conf['template_id'].upper() != loc.id:
-        raise ValueError(f'Mismatch in template IDs for {conf["template_id"]} and {loc.id}')
+        raise UserError(
+            'Mismatch in template IDs: <var>"{}"</var> &ne; <var>"{}"</var>!',
+            conf["template_id"], loc.id,
+        )
 
     def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[str]]]:
         """Yield all world/detail solids in the map.
@@ -524,9 +526,10 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         for brushes, is_detail, vis_ids in yield_world_detail():
             visgroups = list(map(visgroup_names.__getitem__, vis_ids))
             if len(visgroups) > 1:
-                raise ValueError(
-                    'Template "{}" has brush with two '
-                    'visgroups! ({})'.format(loc.id, ', '.join(visgroups))
+                raise UserError(
+                    'Template "{}" has brush with two visgroups! ({})',
+                    loc.id,
+                    ', '.join(visgroups)
                 )
             # No visgroup = ''
             visgroup = visgroups[0] if visgroups else ''
@@ -550,9 +553,9 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     for ent in vmf.by_class['info_overlay']:
         visgroups = list(map(visgroup_names.__getitem__, ent.visgroup_ids))
         if len(visgroups) > 1:
-            raise ValueError(
-                'Template "{}" has overlay with two '
-                'visgroups! ({})'.format(loc.id, ', '.join(visgroups))
+            raise UserError(
+                'Template "{}" has overlay with two visgroups! ({})',
+                loc.id, ', '.join(visgroups)
             )
         # No visgroup = ''
         overlay_ents[visgroups[0] if visgroups else ''].append(ent)

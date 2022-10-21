@@ -16,6 +16,7 @@ from corridor import (  # noqa
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
+from user_errors import UserError
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -134,7 +135,7 @@ def analyse_and_modify(
             max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
             poss_corr = conf[corr_mode, corr_dir, corr_orient]
             if not poss_corr:
-                raise ValueError(
+                raise UserError(
                     f'No corridors available for {corr_orient.value} {corr_mode.value} '
                     f'{corr_dir.value.title()}!'
                 )

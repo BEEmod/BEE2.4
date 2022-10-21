@@ -21,6 +21,7 @@ from precomp import (
     conditions, rand,
 )
 import consts
+from user_errors import UserError
 
 
 COND_MOD_NAME = None
@@ -109,7 +110,7 @@ def read_configs(conf: Property) -> None:
             fizz = FizzlerType.parse(fizz_conf)
 
         if fizz.id in FIZZ_TYPES:
-            raise ValueError('Duplicate fizzler ID "{}"'.format(fizz.id))
+            raise UserError('Duplicate fizzler ID "{}"', fizz.id)
 
         FIZZ_TYPES[fizz.id] = fizz
 
@@ -710,7 +711,7 @@ class FizzlerBrush:
         }
 
         if 'classname' not in keys:
-            raise ValueError(f'Fizzler Brush "{conf["name"]}" does not have a classname!')
+            raise UserError('Fizzler Brush "{}" does not have a classname!', conf["name"])
 
         return FizzlerBrush(
             name=conf['name'],
@@ -1065,16 +1066,18 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         try:
             item_id, item_subtype = instanceLocs.ITEM_FOR_FILE[base_inst['file'].casefold()]
         except KeyError:
-            raise ValueError('No item id for "{}"!'.format(
+            raise UserError(
+                'No item id for fizzler instance "{}"!',
                 base_inst['file'],
-            )) from None
+            ) from None
         try:
             fizz_type = fizz_types[item_id, model_skin]
         except KeyError:
             LOGGER.warning('Fizzler types: {}', fizz_types.keys())
-            raise ValueError(
-                f'No fizzler type for {item_id}:{item_subtype} '
-                f'("{base_inst["file"]}")!'
+            raise UserError(
+                'No fizzler type for {} ("{}")!',
+                f'{item_id}:{item_subtype}',
+                base_inst["file"],
             ) from None
 
         info.set_attr(*fizz_type.voice_attrs)
@@ -1234,9 +1237,9 @@ def generate_fizzlers(vmf: VMF) -> None:
         )
 
         if not model_min or not model_max:
-            raise ValueError(
-                'No model specified for one side of "{}"'
-                ' fizzlers'.format(fizz_type.id),
+            raise UserError(
+                'No model specified for one side of "{}" fizzlers',
+                fizz_type.id,
             )
 
         # Define a function to do the model names.
@@ -1260,7 +1263,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 model_index += 1
                 return f'{fizz_name}-{fizz_type.model_name}{model_index:02}'
         else:
-            raise ValueError('Bad ModelName?')
+            raise AssertionError(f'No model name {fizz_type.model_name!r}')
 
         # Generate env_beam pairs.
         for beam in fizz_type.beams:

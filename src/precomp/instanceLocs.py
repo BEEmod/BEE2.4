@@ -16,6 +16,7 @@ from typing import (
     List, Dict, Tuple, TypeVar, Iterable,
 )
 import corridor
+from user_errors import UserError
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -327,11 +328,11 @@ def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[s
     instances = resolve(path)
     if not instances:
         if error:
-            raise ValueError('Path "{}" has no instances!'.format(path))
+            raise UserError('Path "{}" has no instances!', path)
         return default
     if len(instances) > 1:
         if error:
-            raise ValueError('Path "{}" has multiple instances!'.format(path))
+            raise UserError('Path "{}" has multiple instances!', path)
         LOGGER.warning('Path "{}" returned multiple instances', path)
     return instances[0]
 
@@ -350,7 +351,7 @@ def _resolve(path: str) -> List[str]:
                 try:
                     item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
                 except (ValueError, AttributeError):  # None.groups fail
-                    LOGGER.warning('Could not parse instance lookup "{}"!'.format(group))
+                    LOGGER.warning('Could not parse instance lookup "{}"!', group)
                     return []
 
                 item_id = item_id.casefold()

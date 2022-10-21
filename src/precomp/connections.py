@@ -7,7 +7,7 @@ from enum import Enum
 from collections import defaultdict
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
-from srctools import VMF, Entity, Output, Property, conv_bool, Vec, Angle
+from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
 from precomp.antlines import Antline, AntType
 from precomp import (
     instance_traits, instanceLocs,
@@ -20,6 +20,7 @@ import consts
 import srctools.logger
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator, Union
+from user_errors import UserError
 
 
 COND_MOD_NAME = "Item Connections"
@@ -435,10 +436,10 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
             ITEM_TYPES[item.id.casefold()] = item.conn_config
 
     if ITEM_TYPES.get('item_indicator_panel') is None:
-        raise ValueError('No I/O for checkmark panel item type!')
+        raise UserError('No I/O for checkmark panel item type!')
 
     if ITEM_TYPES.get('item_indicator_panel_timer') is None:
-        raise ValueError('No I/O for timer panel item type!')
+        raise UserError('No I/O for timer panel item type!')
 
 
 def calc_connections(
@@ -597,11 +598,11 @@ def calc_connections(
                 try:
                     inp_item = ITEMS[out_name]
                 except KeyError:
-                    raise ValueError('"{}" is not a known instance!'.format(out_name))
+                    raise UserError('"{}" is not a known instance!'.format(out_name))
                 else:
                     input_items.append(inp_item)
                     if inp_item.config is None:
-                        raise ValueError(
+                        raise UserError(
                             'No connections for item "{}", '
                             'but inputs in the map!'.format(
                                 instance_traits.get_item_id(inp_item.inst)
@@ -1254,7 +1255,7 @@ def add_item_inputs(
             return
         else:
             # Should never happen, not other types.
-            raise ValueError('Unknown counter logic type: ' + repr(logic_type))
+            raise UserError('Unknown counter logic type "{}" in item {}!', logic_type, item.config.id)
 
         for output_name, input_cmds in [
             (count_on, enable_cmd),
@@ -1333,7 +1334,7 @@ def add_item_indicators(
         else:
             needs_toggle = has_ant and not has_sign
     else:
-        raise ValueError('Bad switch style ' + repr(inst_type))
+        raise UserError('Bad switch style "{}" in item {}!', inst_type, item.config.id)
 
     first_inst = True
 

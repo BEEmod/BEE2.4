@@ -1,7 +1,6 @@
 """Implement cubes and droppers."""
 from __future__ import annotations
 
-import itertools
 from contextlib import suppress
 from weakref import WeakKeyDictionary
 
@@ -11,10 +10,10 @@ from typing import NamedTuple, MutableMapping
 from precomp import brushLoc, options, packing, conditions
 from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst
-from precomp.errors import UserError
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, Property, Vec, Matrix, Angle
 import srctools.logger
+from user_errors import UserError
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -463,17 +462,19 @@ class CubeType:
         try:
             cube_type = CubeEntType(conf['cubetype'].upper())
         except ValueError:
-            raise ValueError('Bad cube type "{}" for {}'.format(
-                conf['cubetype'], cube_id)
+            raise UserError(
+                'Bad cube type "{}" for {}',
+                conf['cubetype'], cube_id
             ) from None
         except LookupError:
-            raise ValueError('No cube type for "{}"!'.format(cube_id)) from None
+            raise UserError('No cube type for "{}"!', cube_id) from None
 
         try:
             model_swap_meth = ModelSwapMeth(conf['modelswapmeth', 'SETMODEL'].upper())
         except ValueError:
-            raise ValueError('Bad model swapping method "{}" for {}'.format(
-                conf['modelswapmeth'], cube_id)
+            raise UserError(
+                'Bad model swapping method "{}" for {}',
+                conf['modelswapmeth'], cube_id
             ) from None
 
         if cube_type is CubeEntType.franken:
@@ -632,7 +633,7 @@ def parse_conf(conf: Property):
         cube = CubeType.parse(cube_conf)
 
         if cube.id in CUBE_TYPES:
-            raise ValueError(f'Duplicate cube ID "{cube.id}"')
+            raise UserError('Duplicate cube ID "{}"', cube.id)
 
         CUBE_TYPES[cube.id] = cube
 
@@ -640,7 +641,7 @@ def parse_conf(conf: Property):
         dropp = DropperType.parse(dropper_conf)
 
         if dropp.id in DROPPER_TYPES:
-            raise ValueError(f'Duplicate dropper ID "{dropp.id}"')
+            raise UserError('Duplicate dropper ID "{}"', dropp.id)
 
         DROPPER_TYPES[dropp.id] = dropp
 
@@ -648,7 +649,7 @@ def parse_conf(conf: Property):
         addon = CubeAddon.parse(addon_conf)
 
         if addon.id in ADDON_TYPES:
-            raise ValueError(f'Duplicate cube addon ID "{addon.id}"')
+            raise UserError('Duplicate cube addon ID "{}"', addon.id)
 
         ADDON_TYPES[addon.id] = addon
 
@@ -660,7 +661,7 @@ def parse_conf(conf: Property):
     )
 
     # Check we have the Valve cube definitions - if we don't, something's
-    # wrong. However don't error out, in case the user really didn't enable
+    # wrong. However, don't error out, in case the user really didn't enable
     # the droppers.
     for cube_id in VALVE_CUBE_IDS.values():
         if cube_id not in CUBE_TYPES:
@@ -708,7 +709,7 @@ def parse_filter_types(
             if cube_id == 'any':
                 # All cubes.
                 if invert:
-                    raise ValueError("Can't exclude everything!")
+                    raise UserError("Defining a filter that excludes everything is useless.")
                 targ_set |= all_cubes
             elif cube_id == 'companion':
                 for cube in all_cubes:
@@ -922,7 +923,7 @@ def flag_cube_type(inst: Entity, res: Property) -> bool:
     cube_type = res.value
 
     if not cube_type:
-        raise ValueError('No value?')
+        raise UserError('"CubeType" result used but with no type specified!')
 
     if cube_type[0] == '<' and cube_type[-1] == '>':
         # Special checks.
@@ -945,7 +946,7 @@ def flag_cube_type(inst: Entity, res: Property) -> bool:
         elif cube_type == 'cube':
             return inst is pair.cube
         else:
-            raise ValueError(f'Unrecognised value {res.value!r}')
+            raise UserError('Unrecognised value "{}"', res.value)
 
     return pair.cube_type.id == cube_type.upper()
 
@@ -974,7 +975,10 @@ def res_dropper_addon(inst: Entity, res: Property):
     try:
         addon = ADDON_TYPES[res.value]
     except KeyError:
-        raise ValueError(f'Invalid Cube Addon: {res.value!r}')
+        raise UserError(
+            'Unknown Cube Addon: <var>"{}"</code>',
+            res.value,
+        )
 
     try:
         pair = INST_TO_PAIR[inst]
@@ -1013,7 +1017,7 @@ def res_change_cube_type(inst: Entity, res: Property) -> None:
     try:
         pair.cube_type = CUBE_TYPES[res.value]
     except KeyError:
-        raise ValueError(f'Unknown cube type "{res.value}"!')
+        raise UserError('Unknown cube type "{}"!', res.value)
 
 
 @conditions.make_result('CubeFilter')
@@ -1239,12 +1243,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         try:
             cube_type_id = VALVE_CUBE_IDS[cube_type_num]
         except KeyError:
-            raise ValueError(f'Bad cube type "{dropper.fixup["$cube_type"]}"!') from None
+            raise UserError(
+                '<var>$cube_type={}</var> is not a valid cube type value!',
+                dropper.fixup["$cube_type"],
+            ) from None
         try:
             cube_type = CUBE_TYPES[cube_type_id]
         except KeyError:
-            raise ValueError(
-                'No Valve cube type "{}" available!'.format(cube_type_id)
+            raise UserError(
+                'No Valve cube type "{}" available!',
+                cube_type_id
             ) from None
 
         drop_type = inst_to_drop[dropper['file'].casefold()]
