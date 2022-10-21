@@ -1,5 +1,5 @@
 """Wraps gettext, to localise all UI text."""
-from typing import Callable
+from typing import Callable, Mapping
 from typing_extensions import ParamSpec
 import gettext as gettext_mod
 import locale
@@ -8,11 +8,69 @@ import sys
 import builtins
 import warnings
 
+import attrs
 from srctools.property_parser import PROP_FLAGS_DEFAULT
+from srctools import EmptyMapping
+
 import utils
 
 _TRANSLATOR = gettext_mod.NullTranslations()
 P = ParamSpec('P')
+
+NS_UI = '<BEE2>'  # Our UI translations.
+NS_GAME = '<PORTAL2>'   # Lookup from basemodui.txt
+NS_UNTRANSLATED = '<NOTRANSLATE>'  # Legacy values which don't have translation.
+
+
+@attrs.frozen(weakref_slot=True, eq=False)
+class TransToken:
+    """A named section of text that can be translated later on."""
+    # The package name, or a NS_* constant.
+    namespace: str
+    # The token name that will be looked up.
+    token: str
+    # If not in the localisation file, fallback to this.
+    default: str
+    # Keyword arguments passed when formatting.
+    parameters: Mapping[str, str] = EmptyMapping
+
+    @classmethod
+    def from_valve(cls, text: str) -> 'TransToken':
+        """Make a token for a string that should be looked up in Valve's translation files."""
+        return cls(NS_GAME, text.lstrip('#'), text, EmptyMapping)
+
+    def format(self, /, **kwargs: str) -> 'TransToken':
+        """Return a new token with the provided parameters added in."""
+        # Merge parameters if we already had some, otherwise ensure empty parameters
+        # keep using EmptyMapping.
+        if self.parameters and kwargs:
+            params = {**self.parameters, **kwargs}
+        elif kwargs:
+            params = kwargs
+        else:
+            params = self.parameters
+
+        return TransToken(
+            self.namespace,
+            self.token,
+            self.default,
+            params,
+        )
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, TransToken):
+            return (
+                self.namespace == other.namespace and
+                self.token == other.token and
+                self.parameters == other.parameters
+            )
+
+    def __hash__(self) -> int:
+        """Allow hashing the token."""
+        return hash((
+            self.namespace, self.token,
+            frozenset(self.parameters.items()),
+        ))
 
 
 class DummyTranslations(gettext_mod.NullTranslations):
