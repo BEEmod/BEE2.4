@@ -1,6 +1,6 @@
 """Wraps gettext, to localise all UI text."""
 from typing import Callable, Dict, Mapping
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, Final
 import gettext as gettext_mod
 import locale
 import logging
@@ -10,18 +10,19 @@ import warnings
 
 import attrs
 from srctools.property_parser import PROP_FLAGS_DEFAULT
-from srctools import EmptyMapping
+from srctools import EmptyMapping, logger
 
 import utils
 
+LOGGER = logger.get_logger(__name__)
 _TRANSLATOR = gettext_mod.NullTranslations()
 P = ParamSpec('P')
 
-NS_UI = '<BEE2>'  # Our UI translations.
-NS_GAME = '<PORTAL2>'   # Lookup from basemodui.txt
-NS_UNTRANSLATED = '<NOTRANSLATE>'  # Legacy values which don't have translation
+NS_UI: Final = '<BEE2>'  # Our UI translations.
+NS_GAME: Final = '<PORTAL2>'   # Lookup from basemodui.txt
+NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have translation
 # The prefix for all Valve's editor keys.
-PETI_KEY_PREFIX = 'PORTAL2_PuzzleEditor'
+PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 
 # The currently loaded translations. First is the namespace, then the token -> string.
 TRANSLATIONS: Dict[str, Dict[str, str]] = {}
@@ -37,12 +38,39 @@ class TransToken:
     # If not in the localisation file, fallback to this.
     default: str
     # Keyword arguments passed when formatting.
-    parameters: Mapping[str, str] = EmptyMapping
+    # If a blank dict is passed, use EmptyMapping to save memory.
+    parameters: Mapping[str, str] = attrs.field(
+        default=EmptyMapping,
+        converter=lambda m: m or EmptyMapping,
+    )
+
+    @classmethod
+    def parse(cls, text: str, package: str) -> 'TransToken':
+        """Parse a string to find a translation token, if any."""
+        if text.startswith('['):  # [package:token] default
+            try:
+                token, default = text[1:].split(']', 1)
+                default = default.lstrip()  # Allow whitespace between ] and text.
+            except ValueError:
+                LOGGER.warning('Unparsable translation token "{}"!', text)
+            else:
+                if ':' in token:
+                    package, token = token.split(':', 1)
+                return cls(package, token, default)
+        elif text.startswith(PETI_KEY_PREFIX):
+            return cls(NS_GAME, text, text)
+        # No special token, or failed to parse.
+        return cls(NS_UNTRANSLATED, text, text)
+
+    @classmethod
+    def ui(cls, token: str, default: str, /, **kwargs: str) -> 'TransToken':
+        """Make a token for a UI string."""
+        return cls(NS_UI, token, default, kwargs)
 
     @classmethod
     def from_valve(cls, text: str) -> 'TransToken':
         """Make a token for a string that should be looked up in Valve's translation files."""
-        return cls(NS_GAME, text.lstrip('#'), text, EmptyMapping)
+        return cls(NS_GAME, text.lstrip('#'), text)
 
     @classmethod
     def untranslated(cls, text: str) -> 'TransToken':
@@ -50,24 +78,15 @@ class TransToken:
 
         In this case, the token is the literal text to use.
         """
-        return cls(NS_UNTRANSLATED, text, text, EmptyMapping)
+        return cls(NS_UNTRANSLATED, text, text)
 
     def format(self, /, **kwargs: str) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
-        # Merge parameters if we already had some, otherwise ensure empty parameters
-        # keep using EmptyMapping.
-        if self.parameters and kwargs:
-            params = {**self.parameters, **kwargs}
-        elif kwargs:
-            params = kwargs
-        else:
-            params = self.parameters
-
         return TransToken(
             self.namespace,
             self.token,
             self.default,
-            params,
+            {**self.parameters, **kwargs},
         )
 
     def __eq__(self, other) -> bool:
