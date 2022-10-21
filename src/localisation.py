@@ -107,11 +107,16 @@ class TransToken:
     def __str__(self) -> str:
         """Calling str on a token translates it."""
         if self.namespace == NS_UNTRANSLATED:
-            return self.token
-        try:
-            return TRANSLATIONS[self.namespace][self.token]
-        except KeyError:
-            return self.default
+            result = self.token
+        else:
+            try:
+                result = TRANSLATIONS[self.namespace][self.token]
+            except KeyError:
+                result = self.default
+        if self.parameters:
+            return result.format_map(self.parameters)
+        else:
+            return result
 
 
 def load_basemodui(basemod_loc: str) -> None:
