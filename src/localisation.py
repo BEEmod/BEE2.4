@@ -33,10 +33,8 @@ class TransToken:
     """A named section of text that can be translated later on."""
     # The package name, or a NS_* constant.
     namespace: str
-    # The token name that will be looked up.
+    # The token to lookup, or the default if undefined.
     token: str
-    # If not in the localisation file, fallback to this.
-    default: str
     # Keyword arguments passed when formatting.
     # If a blank dict is passed, use EmptyMapping to save memory.
     parameters: Mapping[str, str] = attrs.field(
@@ -45,32 +43,33 @@ class TransToken:
     )
 
     @classmethod
-    def parse(cls, text: str, package: str) -> 'TransToken':
+    def parse(cls, package: str, text: str) -> 'TransToken':
         """Parse a string to find a translation token, if any."""
-        if text.startswith('['):  # [package:token] default
+        if text.startswith('[['):  # "[[package]] default"
             try:
-                token, default = text[1:].split(']', 1)
-                default = default.lstrip()  # Allow whitespace between ] and text.
+                package, token = text[2:].split(']]', 1)
+                token = token.lstrip()  # Allow whitespace between "]" and text.
             except ValueError:
-                LOGGER.warning('Unparsable translation token "{}"!', text)
+                LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
+                return cls(package, text)
             else:
-                if ':' in token:
-                    package, token = token.split(':', 1)
-                return cls(package, token, default)
+                if not package:
+                    package = NS_UNTRANSLATED
+                return cls(package, token)
         elif text.startswith(PETI_KEY_PREFIX):
-            return cls(NS_GAME, text, text)
-        # No special token, or failed to parse.
-        return cls(NS_UNTRANSLATED, text, text)
+            return cls(NS_GAME, text)
+        else:
+            return cls(package, text)
 
     @classmethod
-    def ui(cls, token: str, default: str, /, **kwargs: str) -> 'TransToken':
+    def ui(cls, token: str, /, **kwargs: str) -> 'TransToken':
         """Make a token for a UI string."""
-        return cls(NS_UI, token, default, kwargs)
+        return cls(NS_UI, token, kwargs)
 
     @classmethod
     def from_valve(cls, text: str) -> 'TransToken':
         """Make a token for a string that should be looked up in Valve's translation files."""
-        return cls(NS_GAME, text.lstrip('#'), text)
+        return cls(NS_GAME, text)
 
     @classmethod
     def untranslated(cls, text: str) -> 'TransToken':
@@ -78,14 +77,13 @@ class TransToken:
 
         In this case, the token is the literal text to use.
         """
-        return cls(NS_UNTRANSLATED, text, text)
+        return cls(NS_UNTRANSLATED, text)
 
     def format(self, /, **kwargs: str) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
         return TransToken(
             self.namespace,
             self.token,
-            self.default,
             {**self.parameters, **kwargs},
         )
 
@@ -108,11 +106,13 @@ class TransToken:
         """Calling str on a token translates it."""
         if self.namespace == NS_UNTRANSLATED:
             result = self.token
+        elif self.namespace == NS_UI:
+            result = _TRANSLATOR.gettext(self.token)
         else:
             try:
                 result = TRANSLATIONS[self.namespace][self.token]
             except KeyError:
-                result = self.default
+                result = self.token
         if self.parameters:
             return result.format_map(self.parameters)
         else:
