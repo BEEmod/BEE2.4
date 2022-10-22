@@ -491,6 +491,22 @@ class Panel:
             # The brush entity isn't used.
             if self.brush_ent in vmf.entities:
                 self.brush_ent.remove()
+            # In dev mode, display a visual of this location.
+            if utils.DEV_MODE:
+                try:
+                    [visgroup] = [vis for vis in vmf.vis_tree if vis.name == 'TilePanels']
+                except ValueError:
+                    visgroup = vmf.create_visgroup('TilePanels')
+                panel_trace = vmf.create_ent(
+                    'info_particle_system',
+                    origin=tile.pos,
+                    targetname=self.inst['targetname'],
+                    angles=tile.normal.to_angle(),
+                )
+                panel_trace.comments = tile.format_tiles().replace('\n', ', ')
+                panel_trace.vis_shown = False
+                panel_trace.hidden = True
+                panel_trace.visgroup_ids.add(visgroup.id)
             return
         else:
             # We do use it.
