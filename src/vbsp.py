@@ -61,7 +61,6 @@ class _Settings(TypedDict):
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
-    packtrigger: Dict[str, List[str]]
 
 settings: _Settings = {
     "textures":       {},
@@ -72,7 +71,6 @@ settings: _Settings = {
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
-    "packtrigger":    defaultdict(list),
 }
 
 COND_MOD_NAME = 'VBSP'
