@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-04 13:31+1000\n"
+"POT-Creation-Date: 2022-10-22 15:22+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1223,7 +1223,7 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr ""
 
 #: app/music_conf.py
-msgid "Have no music playing when inside funnels."
+msgid "The regular base track will continue to play normally."
 msgstr ""
 
 #: app/music_conf.py

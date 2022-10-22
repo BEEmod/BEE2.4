@@ -156,7 +156,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         desc=gettext('Set the music used while inside Excursion Funnels.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Have no music playing when inside funnels.'),
+        none_desc=gettext('The regular base track will continue to play normally.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.TBEAM],
         attributes=[

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-10-04 13:31+1000\n"
+"POT-Creation-Date: 2022-10-22 15:22+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -71,7 +71,7 @@ msgstr "Initialisation de l'interface"
 msgid "Better Extended Editor for Portal 2"
 msgstr "Better Extended Editor pour Portal 2"
 
-#: localisation.py:102
+#: localisation.py:114
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
@@ -1372,8 +1372,8 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr "Sélectionne la musique utilisée à l'intérieur d'un Halo d'Excursion"
 
 #: app/music_conf.py:159
-msgid "Have no music playing when inside funnels."
-msgstr "N'a pas de musique pour les Halos d'Excursion"
+msgid "The regular base track will continue to play normally."
+msgstr ""
 
 #: app/music_conf.py:171
 msgid "Select Repulsion Gel Music"
@@ -1879,16 +1879,16 @@ msgstr "Couleur: R={r}, V={g}, B={b}"
 msgid "Suggested"
 msgstr "Suggéré"
 
-#: app/signage_ui.py:99 app/signage_ui.py:232
+#: app/signage_ui.py:100 app/signage_ui.py:233
 msgid "Configure Signage"
 msgstr "Configurer la signalisation"
 
-#: app/signage_ui.py:103
+#: app/signage_ui.py:104
 #, fuzzy
 msgid "Selected"
 msgstr "Style choisi:"
 
-#: app/signage_ui.py:152
+#: app/signage_ui.py:153
 msgid "Signage: {}"
 msgstr "Signalisation: {}"
 

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-04 13:31+1000\n"
+"POT-Creation-Date: 2022-10-22 15:22+1000\n"
 "PO-Revision-Date: 2021-06-07 15:18+0200\n"
 "Last-Translator: \n"
 "Language: pl\n"
@@ -72,7 +72,7 @@ msgstr "Uruchamianie interfejsu"
 msgid "Better Extended Editor for Portal 2"
 msgstr "Better Extended Editor for Portal 2"
 
-#: localisation.py:102
+#: localisation.py:114
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr "__LANG_USE_SANS_SERIF__"
 
@@ -1345,8 +1345,8 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr "Wybierz muzykę graną podczas podróży Tubą Transportową."
 
 #: app/music_conf.py:159
-msgid "Have no music playing when inside funnels."
-msgstr "Nie graj żadnej muzyki podczas podróży Tubą."
+msgid "The regular base track will continue to play normally."
+msgstr ""
 
 #: app/music_conf.py:171
 msgid "Select Repulsion Gel Music"
@@ -1837,15 +1837,15 @@ msgstr "Kolory: R={r}, G={g}, B={b}"
 msgid "Suggested"
 msgstr "Sugerowane"
 
-#: app/signage_ui.py:99 app/signage_ui.py:232
+#: app/signage_ui.py:100 app/signage_ui.py:233
 msgid "Configure Signage"
 msgstr "Konfiguruj symbole"
 
-#: app/signage_ui.py:103
+#: app/signage_ui.py:104
 msgid "Selected"
 msgstr "Wybrane"
 
-#: app/signage_ui.py:152
+#: app/signage_ui.py:153
 msgid "Signage: {}"
 msgstr "Symbol: {}"
 

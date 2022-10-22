@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-04 13:31+1000\n"
+"POT-Creation-Date: 2022-10-22 15:22+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -71,7 +71,7 @@ msgstr "初始化界面"
 msgid "Better Extended Editor for Portal 2"
 msgstr "更棒的传送门2扩展编辑器"
 
-#: localisation.py:102
+#: localisation.py:114
 msgid "__LANG_USE_SANS_SERIF__"
 msgstr ""
 
@@ -1298,8 +1298,8 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr "设置玩家处于牵引光束内部时的音效。"
 
 #: app/music_conf.py:159
-msgid "Have no music playing when inside funnels."
-msgstr "玩家处于牵引光束内部时不播放音效。"
+msgid "The regular base track will continue to play normally."
+msgstr ""
 
 #: app/music_conf.py:171
 msgid "Select Repulsion Gel Music"
@@ -1767,15 +1767,15 @@ msgstr "颜色: R={r}, G={g}, B={b}"
 msgid "Suggested"
 msgstr "建议"
 
-#: app/signage_ui.py:99 app/signage_ui.py:232
+#: app/signage_ui.py:100 app/signage_ui.py:233
 msgid "Configure Signage"
 msgstr "设置指示标志"
 
-#: app/signage_ui.py:103
+#: app/signage_ui.py:104
 msgid "Selected"
 msgstr "所选风格"
 
-#: app/signage_ui.py:152
+#: app/signage_ui.py:153
 msgid "Signage: {}"
 msgstr "指示标志: {}"
 

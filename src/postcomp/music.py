@@ -102,6 +102,14 @@ MUSIC_FUNNEL_MAIN = """\
 \t\t}
 """
 
+# If no funnel music is defined but the map has funnels, we want to preserve the base track.
+MUSIC_FUNNEL_PRESERVEBASE = """\
+\t\t"mixer"
+\t\t\t{
+\t\t\t"mixgroup" "unduckedMusic"
+\t\t\t}
+"""
+
 # The gel operator stack syncronises the music with the base track.
 MUSIC_GEL_STACK = """\
 
@@ -272,6 +280,10 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
     # Add the operators to play the auxiliary sounds..
     if Channel.TBEAM in tracks:
         file.write(MUSIC_FUNNEL_MAIN)
+    elif 'prop_tractor_beam' in bsp.by_class:
+        # We have no funnel music, but we do have a funnel. Force the base track to continue playing.
+        file.write(MUSIC_FUNNEL_PRESERVEBASE)
+
     if Channel.BOUNCE in tracks:
         file.write(MUSIC_GEL_BOUNCE_MAIN)
     if Channel.SPEED in tracks:
