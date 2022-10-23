@@ -22,7 +22,7 @@ from srctools.logger import get_logger
 import app
 from app import SubPane, tk_tools, TK_ROOT, corridor_selector
 from app.tooltip import add_tooltip, set_tooltip
-from localisation import gettext
+from localisation import TransToken, gettext
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -115,6 +115,8 @@ cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old
 
 DEFAULT_STATE = CompilePaneState()
 
+TOK_SCREENSHOT_FILETYPE = TransToken.ui('Image Files')   # note: File type description
+
 
 async def apply_state(state: CompilePaneState) -> None:
     """Apply saved state to the UI and compile config."""
@@ -142,13 +144,15 @@ async def apply_state(state: CompilePaneState) -> None:
 
 class LimitCounter:
     """Displays the current status of various compiler limits."""
+    # i18n: Tooltip format for compiler limit bars.
+    TOOLTIP = TransToken.ui('{count}/{max} ({frac:.2%}):\n{blurb}')
     def __init__(
         self,
         master: ttk.LabelFrame,
         *,
         maximum: int,
         length: int,
-        blurb: str,
+        blurb: TransToken,
         name: str,
     ) -> None:
         self._flasher: Union[trio.CancelScope, None] = None
@@ -181,12 +185,12 @@ class LimitCounter:
             self.cur_count = round(100 * value / self.max)
             self.var.set(self.cur_count)
 
-        set_tooltip(self.bar, '{}/{} ({:.2%}):\n{}'.format(
-            value,
-            self.max,
-            value / self.max,
-            self.blurb,
-        ))
+        set_tooltip(self.bar, str(self.TOOLTIP.format(
+            count=value,
+            max=self.max,
+            frac=value / self.max,
+            blurb=self.blurb,
+        )))
 
     async def _flash(self) -> None:
         """Flash the display."""
@@ -240,11 +244,11 @@ def find_screenshot(e=None) -> None:
     file_name = filedialog.askopenfilename(
         title='Find Screenshot',
         filetypes=[
-            # note: File type description
-            (gettext('Image Files'), '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
-                                     '*.tiff *.tga *.ico *.psd'),
+            (
+                str(TOK_SCREENSHOT_FILETYPE),
+                '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp *.tiff *.tga *.ico *.psd'
+            ),
         ],
-        initialdir='C:',
     )
     if file_name:
         image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
@@ -319,10 +323,12 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
     make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
-    ttk.Label(window, justify='center', text=gettext(
+    TransToken.ui(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
-    )).grid(row=0, column=0, sticky='ew', padx=2, pady=2)
+    ).apply(
+        ttk.Label(window, justify='center')
+    ).grid(row=0, column=0, sticky='ew', padx=2, pady=2)
 
     UI['nbook'] = nbook = ttk.Notebook(window)
 
@@ -354,11 +360,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     make_setter("General", "packfile_auto_enable", packfile_auto_enable)
     frame.columnconfigure(0, weight=1)
 
-    thumb_frame = ttk.LabelFrame(
-        frame,
-        text=gettext('Thumbnail'),
-        labelanchor=tk.N,
-    )
+    thumb_frame = TransToken.ui('Thumbnail').apply(ttk.LabelFrame(frame, labelanchor=tk.N))
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
@@ -366,29 +368,26 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         """Event handler when radio buttons are clicked."""
         app.background_run(set_screen_type)
 
-    UI['thumb_auto'] = ttk.Radiobutton(
+    UI['thumb_auto'] = TransToken.ui('Thumbnail').apply(ttk.Radiobutton(
         thumb_frame,
-        text=gettext('Auto'),
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen,
-    )
+    ))
 
-    UI['thumb_peti'] = ttk.Radiobutton(
+    UI['thumb_peti'] = TransToken.ui('PeTI').apply(ttk.Radiobutton(
         thumb_frame,
-        text=gettext('PeTI'),
         value='PETI',
         variable=chosen_thumb,
         command=set_screen,
-    )
+    ))
 
-    UI['thumb_custom'] = ttk.Radiobutton(
+    UI['thumb_custom'] = TransToken.ui('Custom:').apply(ttk.Radiobutton(
         thumb_frame,
-        text=gettext('Custom:'),
         value='CUST',
         variable=chosen_thumb,
         command=set_screen,
-    )
+    ))
 
     UI['thumb_label'] = ttk.Label(
         thumb_frame,
@@ -397,11 +396,10 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     )
     UI['thumb_label'].bind(tk_tools.EVENTS['LEFT'], find_screenshot)
 
-    UI['thumb_cleanup'] = ttk.Checkbutton(
+    UI['thumb_cleanup'] = TransToken.ui('Cleanup old screenshots').apply(ttk.Checkbutton(
         thumb_frame,
-        text=gettext('Cleanup old screenshots'),
         variable=cleanup_screenshot,
-    )
+    ))
 
     UI['thumb_auto'].grid(row=0, column=0, sticky='W')
     UI['thumb_peti'].grid(row=0, column=1, sticky='W')
@@ -442,36 +440,32 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='ew')
     set_screenshot()  # Load the last saved screenshot
 
-    vrad_frame = ttk.LabelFrame(
+    vrad_frame = TransToken.ui('Lighting:').apply(ttk.LabelFrame(
         frame,
-        text=gettext('Lighting:'),
         labelanchor='n',
-    )
+    ))
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
-    UI['light_none'] = ttk.Radiobutton(
+    UI['light_none'] = TransToken.ui('None').apply(ttk.Radiobutton(
         vrad_frame,
-        text=gettext('None'),
         value='NONE',
         variable=vrad_compile_type,
-    )
+    ))
     UI['light_none'].grid(row=0, column=0)
-    UI['light_fast'] = ttk.Radiobutton(
+    UI['light_fast'] = TransToken.ui('Fast').apply(ttk.Radiobutton(
         vrad_frame,
-        text=gettext('Fast'),
         value='FAST',
         variable=vrad_compile_type,
-    )
+    ))
     UI['light_fast'].grid(row=0, column=1)
-    UI['light_full'] = ttk.Radiobutton(
+    UI['light_full'] = TransToken.ui('Full').apply(ttk.Radiobutton(
         vrad_frame,
-        text=gettext('Full'),
         value='FULL',
         variable=vrad_compile_type,
-    )
+    ))
     UI['light_full'].grid(row=0, column=2)
 
-    light_conf_swap =  gettext(  # gettext: Info for toggling lighting via a key.
+    light_conf_swap = gettext(  # gettext: Info for toggling lighting via a key.
         "You can hold down Shift during the start of the Lighting stage to "
         "switch to {} lighting on the fly."
     )
@@ -493,11 +487,10 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "publishing, this is always used."
     ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
 
-    packfile_enable = ttk.Checkbutton(
+    packfile_enable = TransToken.ui('Enable packing').apply(ttk.Checkbutton(
         frame,
-        text=gettext('Enable packing'),
         variable=packfile_auto_enable,
-    )
+    ))
     packfile_enable.grid(row=2, column=0, sticky='ew')
     add_tooltip(packfile_enable, gettext(
         "Disable automatically packing resources in the map. This can speed up building and allows "
@@ -505,17 +498,13 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "correctly. Regardless of this setting, packing is enabled when publishing. "
     ))
 
-    packfile_dump_enable_chk = ttk.Checkbutton(
+    packfile_dump_enable_chk = TransToken.ui('Dump packed files to:').apply(ttk.Checkbutton(
         frame,
-        text=gettext('Dump packed files to:'),
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
-    )
+    ))
 
-    packfile_frame = ttk.LabelFrame(
-        frame,
-        labelwidget=packfile_dump_enable_chk,
-    )
+    packfile_frame = ttk.LabelFrame(frame, labelwidget=packfile_dump_enable_chk)
     packfile_frame.grid(row=3, column=0, sticky='ew')
 
     UI['packfile_filefield'] = packfile_filefield = tk_tools.FileField(
@@ -535,20 +524,15 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "Useful if you're intending to edit maps in Hammer."
     ))
 
-    count_frame = ttk.LabelFrame(
-        frame,
-        text=gettext('Last Compile:'),
-        labelanchor='n',
-    )
+    count_frame = ttk.LabelFrame(frame, labelanchor='n')
+    TransToken.ui('Last Compile:').apply(count_frame)
 
     count_frame.grid(row=7, column=0, sticky='ew')
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
-    ttk.Label(
-        count_frame,
-        text=gettext('Entity'),
-        anchor='n',
+    TransToken.ui('Entity').apply(
+        ttk.Label(count_frame, anchor='n')
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
 
     count_entity = LimitCounter(
@@ -557,7 +541,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         length=120,
         name='entity',
         # i18n: Progress bar description
-        blurb=gettext(
+        blurb=TransToken.ui(
             "Entities are the things in the map that have functionality. "
             "Removing complex moving items will help reduce this. Items have "
             "their entity count listed in the item description window.\n\nThis "
@@ -574,10 +558,8 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         padx=5,
     )
 
-    ttk.Label(
-        count_frame,
-        text=gettext('Overlay'),
-        anchor='center',
+    TransToken.ui('Overlay').apply(
+        ttk.Label(count_frame, anchor='center')
     ).grid(row=2, column=0, sticky='ew')
     count_overlay = LimitCounter(
         count_frame,
@@ -585,7 +567,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         length=50,
         name='overlay',
         # i18n: Progress bar description
-        blurb=gettext(
+        blurb=TransToken.ui(
             "Overlays are smaller images affixed to surfaces, like signs or "
             "indicator lights. Hiding complex antlines or setting them to "
             "signage will reduce this."
@@ -604,17 +586,15 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "performed to show the new values."
     ))
 
-    ttk.Label(
-        count_frame,
-        text=gettext('Brush'),
-        anchor='center',
+    TransToken.ui('Brush').apply(
+        ttk.Label(count_frame, anchor='center')
     ).grid(row=2, column=2, sticky=tk.EW)
     count_brush = LimitCounter(
         count_frame,
         maximum=8192,
         length=50,
         name='brush',
-        blurb=gettext(
+        blurb=TransToken.ui(
             "Brushes form the walls or other parts of the test chamber. If this "
             "is high, it may help to reduce the size of the map or remove "
             "intricate shapes."
@@ -633,11 +613,8 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
 
     frame.columnconfigure(0, weight=1)
 
-    voice_frame = ttk.LabelFrame(
-        frame,
-        text=gettext('Voicelines:'),
-        labelanchor='nw',
-    )
+    voice_frame = ttk.LabelFrame(frame, labelanchor='nw')
+    TransToken.ui('Voicelines:').apply(voice_frame)
     voice_frame.grid(row=1, column=0, sticky='ew')
 
     def set_voice_priority() -> None:
@@ -651,10 +628,10 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
 
     voice_priority = ttk.Checkbutton(
         voice_frame,
-        text=gettext("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
         command=set_voice_priority,
     )
+    TransToken.ui("Use voiceline priorities").apply(voice_priority)
     voice_priority.grid(row=0, column=0)
     add_tooltip(voice_priority, gettext(
         "Only choose the highest-priority voicelines. This means more generic "
@@ -662,12 +639,8 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         "If disabled any applicable lines will be used."
     ))
 
-    elev_frame = ttk.LabelFrame(
-        frame,
-        text=gettext('Spawn at:'),
-        labelanchor='n',
-    )
-
+    elev_frame = ttk.LabelFrame(frame, labelanchor='n')
+    TransToken.ui('Spawn at:').apply(elev_frame)
     elev_frame.grid(row=2, column=0, sticky='ew')
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
@@ -683,19 +656,19 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
 
     elev_preview = ttk.Radiobutton(
         elev_frame,
-        text=gettext('Entry Door'),
         value=0,
         variable=start_in_elev,
         command=functools.partial(elev_changed, False),
     )
     elev_elevator = ttk.Radiobutton(
         elev_frame,
-        text=gettext('Elevator'),
         value=1,
         variable=start_in_elev,
         command=functools.partial(elev_changed, True),
     )
 
+    TransToken.ui('Entry Door').apply(elev_preview)
+    TransToken.ui('Elevator').apply(elev_elevator)
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
@@ -711,17 +684,12 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         "When previewing in SP, spawn just before the entry door."
     ) + "\n\n" + elev_conf_swap)
 
-    ttk.Button(
-        frame,
-        text=gettext('Select Corridors'),
-        command=corr.show,
+    TransToken.ui('Select Corridors').apply(
+        ttk.Button(frame, command=corr.show)
     ).grid(row=3, column=0, sticky='ew')
 
-    model_frame = ttk.LabelFrame(
-        frame,
-        text=gettext('Player Model (SP):'),
-        labelanchor='n',
-    )
+    model_frame = ttk.LabelFrame(frame, labelanchor='n')
+    TransToken.ui('Player Model (SP):').apply(model_frame)
     model_frame.grid(row=4, column=0, sticky='ew')
     player_mdl = ttk.Combobox(
         model_frame,
