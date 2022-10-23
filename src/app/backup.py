@@ -21,7 +21,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
 from tkinter import filedialog, messagebox, ttk
 from app.tooltip import add_tooltip
-from localisation import TransToken, gettext, ngettext
+from localisation import PluralTransToken, TransToken, gettext
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -46,6 +46,10 @@ HEADERS = [TransToken.ui('Name'), TransToken.ui('Mode'), TransToken.ui('Date')]
 
 TRANS_SP = TransToken.ui('SP')
 TRANS_COOP = TransToken.ui('Coop')
+TRANS_DELETE_DESC = PluralTransToken.ui(
+    'Do you wish to delete {n} map?\n{maps}',
+    'Do you wish to delete {n} maps?\n{maps}',
+)
 
 # The game subfolder where puzzles are located
 PUZZLE_FOLDERS = {
@@ -716,17 +720,12 @@ def ui_delete_game() -> None:
 
     if not to_delete:
         return
-    map_count = len(to_delete)
     if not messagebox.askyesno(
         gettext('Confirm Deletion'),
-        ngettext(
-            'Do you wish to delete {} map?\n',
-            'Do you wish to delete {} maps?\n',
-            map_count,
-        ).format(map_count) + '\n'.join([
-            '{} ({})'.format(map.title, map.filename)
-            for map in to_delete
-        ])
+        str(TRANS_DELETE_DESC.format(
+            n=len(to_delete),
+            maps='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
+        )),
     ):
         return
 

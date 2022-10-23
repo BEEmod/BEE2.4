@@ -291,11 +291,6 @@ def gettext(message: str) -> str:
     return _TRANSLATOR.gettext(message)
 
 
-def ngettext(msg_sing: str, msg_plural: str, count: int) -> str:
-    """Translate the given string, with the count to allow plural forms."""
-    return _TRANSLATOR.ngettext(msg_sing, msg_plural, count)
-
-
 def setup(logger: logging.Logger) -> None:
     """Setup gettext localisations."""
     global _TRANSLATOR
@@ -359,7 +354,6 @@ def setup(logger: logging.Logger) -> None:
     # Add functions to builtins, but deprecated.
     warn_translate('_', _TRANSLATOR.gettext)
     warn_translate('gettext', _TRANSLATOR.gettext)
-    warn_translate('ngettext', _TRANSLATOR.ngettext)
 
     # Some lang-specific overrides..
 

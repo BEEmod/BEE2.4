@@ -17,7 +17,7 @@ utils.fix_cur_directory()
 # prompt.
 LOGGER = srctools.logger.init_logging(main_logger=__name__)
 # This is needed to allow us to import things properly.
-gettext.NullTranslations().install(['gettext', 'ngettext'])
+gettext.NullTranslations().install(['gettext'])
 
 import os
 import sys

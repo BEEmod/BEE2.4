@@ -32,7 +32,7 @@ from consts import (
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from localisation import TransToken, gettext, ngettext
+from localisation import PluralTransToken, TransToken, gettext
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -111,6 +111,8 @@ TRANS_SUGGESTED = TransToken.ui("Suggested")
 TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").format(sugg=TRANS_SUGGESTED)
 # If the item is groupless, use 'Other' for the header.
 TRANS_GROUPLESS = TransToken.ui('Other')
+TRANS_AUTHORS = PluralTransToken.ui('Author: {authors}', 'Authors: {authors}')
+TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 
 
 @attrs.define
@@ -751,7 +753,7 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.sampler = None
 
-        self.prop_author = ttk.Label(self.prop_frm, text="Author")
+        self.prop_author = ttk.Label(self.prop_frm, text="Author: person")
         self.prop_author.grid(row=2, column=0, columnspan=4)
 
         self.prop_desc_frm = ttk.Frame(self.prop_frm, relief="sunken")
@@ -1242,11 +1244,12 @@ class SelectorWin(Generic[CallbackT]):
         """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
-            self.prop_author['text'] = ''
+            TRANS_NO_AUTHORS.apply(self.prop_author)
         else:
-            self.prop_author['text'] = ngettext(
-                'Author: {}', 'Authors: {}', len(item.authors),
-            ).format(', '.join(item.authors))
+            TRANS_AUTHORS.format(
+                authors=', '.join(item.authors),
+                n=len(item.authors),
+            ).apply(self.prop_author)
 
         # We have a large icon, use it.
         icon = item.large_icon if item.large_icon is not None else item.icon
