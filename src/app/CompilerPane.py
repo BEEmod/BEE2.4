@@ -719,7 +719,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_sele
     global window
     window = SubPane.SubPane(
         TK_ROOT,
-        title=gettext('Compile Options'),
+        title=TransToken.ui('Compile Options'),
         name='compiler',
         menu_bar=menu_bar,
         resize_x=True,

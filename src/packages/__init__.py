@@ -53,7 +53,7 @@ class SelitemData:
     large_icon: Optional[img.Handle]  # Larger, landscape icon.
     previews: list[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
-    group: Optional[str]
+    group: str
     sort_key: str
     # The packages used to define this, used for debugging.
     packages: frozenset[str] = attrs.Factory(frozenset)
@@ -67,8 +67,6 @@ class SelitemData:
         group = info['group', '']
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
-        if not group:
-            group = None
         if not short_name:
             short_name = name
 

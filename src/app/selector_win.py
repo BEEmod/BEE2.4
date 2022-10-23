@@ -109,6 +109,9 @@ TRANS_PREVIEW_TITLE = TransToken.ui('Preview - {item}')  # i18n: Preview window.
 TRANS_SUGGESTED = TransToken.ui("Suggested")
 # Labelframe doesn't look good for the suggested display, use box drawing characters instead.
 TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").format(sugg=TRANS_SUGGESTED)
+# If the item is groupless, use 'Other' for the header.
+TRANS_GROUPLESS = TransToken.ui('Other')
+
 
 @attrs.define
 class AttrDef:
@@ -147,7 +150,7 @@ class AttrDef:
 
 class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
-    def __init__(self, win: SelectorWin, title: str, menu: tk.Menu) -> None:
+    def __init__(self, win: SelectorWin, title: TransToken, menu: tk.Menu) -> None:
         self.parent = win
         self._menu = menu  # The rightclick cascade widget.
         self._menu_pos = -1
@@ -237,6 +240,7 @@ class Item:
         'desc',
         'authors',
         'group',
+        'group_id',
         'sort_key',
         'button',
         'snd_sample',
@@ -264,7 +268,8 @@ class Item:
     ) -> None:
         self.name = name
         self.shortName = short_name
-        self.group = group or ''
+        self.group_id = group.strip().casefold()
+        self.group = TransToken.parse(package, group)
         self.longName = long_name or short_name
         self.sort_key = sort_key
         self.package = package
@@ -324,7 +329,7 @@ class Item:
         """Update the context menu whenver this is set."""
         self._context_lbl = value
         if self._selector and self._context_ind:
-            self._selector.context_menus[self.group.casefold()].entryconfigure(
+            self._selector.context_menus[self.group_id].entryconfigure(
                 self._context_ind,
                 label=value,
             )
@@ -377,6 +382,7 @@ class Item:
         item.previews = self.previews.copy()
         item.desc = self.desc.copy()
         item.authors = self.authors.copy()
+        item.group_id = self.group_id
         item.group = self.group
         item.sort_key = self.sort_key
         item.snd_sample = self.snd_sample
@@ -984,8 +990,7 @@ class SelectorWin(Generic[CallbackT]):
         # Sort alphabetically, preferring a sort key if present.
         self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName))
         grouped_items = defaultdict(list)
-        # If the item is groupless, use 'Other' for the header.
-        self.group_names = {'':  gettext('Other')}
+        self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
@@ -1013,7 +1018,7 @@ class SelectorWin(Generic[CallbackT]):
                 # noinspection PyProtectedMember
                 tk_tools.bind_leftclick(item.button, item._on_click)
 
-            group_key = item.group.strip().casefold()
+            group_key = item.group_id
             grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
@@ -1048,7 +1053,8 @@ class SelectorWin(Generic[CallbackT]):
             group = self.group_widgets[group_key]
             self.context_menu.add_cascade(
                 menu=group._menu,
-                label=self.group_names[group_key],
+                # TODO: Dynamically update this.
+                label=str(self.group_names[group_key]),
             )
             # Track the menu's index. The one at the end is the one we just added.
             group._menu_pos = self.context_menu.index('end')
@@ -1339,7 +1345,7 @@ class SelectorWin(Generic[CallbackT]):
             self.save()
             return
 
-        cur_group_name = self.selected.group.casefold()
+        cur_group_name = self.selected.group_id
         cur_group = self.grouped_items[cur_group_name]
         # Force the current group to be visible, so you can see what's
         # happening.
@@ -1604,9 +1610,8 @@ class SelectorWin(Generic[CallbackT]):
         if item._context_ind is None:
             return
         new_font = self.sugg_font if suggested else self.norm_font
-        if item.group:
-            group_key = item.group.casefold()
-            group = self.group_widgets[group_key]
+        if item.group_id:
+            group = self.group_widgets[item.group_id]
             menu = group._menu
 
             # Apply the font to the group header as well, if suggested.

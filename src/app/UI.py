@@ -1514,7 +1514,7 @@ async def init_windows() -> None:
 
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
-        title=gettext('Palettes'),
+        title=TransToken.ui('Palettes'),
         name='pal',
         menu_bar=menu_bar.view_menu,
         resize_x=True,
@@ -1551,7 +1551,7 @@ async def init_windows() -> None:
 
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
-        title=gettext('Export Options'),
+        title=TransToken.ui('Export Options'),
         name='opt',
         menu_bar=menu_bar.view_menu,
         resize_x=True,

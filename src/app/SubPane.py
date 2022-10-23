@@ -45,8 +45,8 @@ class SubPane(tk.Toplevel):
         tool_frame: Union[tk.Frame, ttk.Frame],
         tool_img: str,
         menu_bar: tk.Menu,
-        tool_col: int=0,
-        title: str='',
+        tool_col: int,
+        title: TransToken,
         resize_x: bool=False,
         resize_y: bool=False,
         name: str='',
@@ -79,14 +79,14 @@ class SubPane(tk.Toplevel):
         )
         tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
         menu_bar.add_checkbutton(
-            label=title,
+            label=str(title),  # TODO: Dynamic menus
             variable=self.visible,
             command=self._set_state_from_menu,
         )
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
-        self.title(title)
+        title.apply_win_title(self)
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)
