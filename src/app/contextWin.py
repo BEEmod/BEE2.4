@@ -113,6 +113,7 @@ TRANS_TOOL_CUBE = TransToken.ui(
     '{generic_rot} However when this is set to Reflection Cube, this item can instead rotated on '
     'the floor to face 360 degrees.'
 )
+TRANS_NO_VERSIONS = TransToken.ui('No Alternate Versions')
 
 
 def set_sprite(pos: SPR, sprite: str) -> None:
@@ -228,7 +229,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list[str]:
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         box.state(['disabled'])
-        box['values'] = [gettext('No Alternate Versions')]
+        box['values'] = [str(TRANS_NO_VERSIONS)]
         box.current(0)
     else:
         box.state(['!disabled'])
@@ -558,7 +559,8 @@ def init_widgets() -> None:
             # so it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, text=gettext("More Info>>"), command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, command=show_more_info)
+    TransToken.ui("More Info>>").apply(wid['moreinfo'])
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 

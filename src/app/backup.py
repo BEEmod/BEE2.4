@@ -50,6 +50,9 @@ TRANS_DELETE_DESC = PluralTransToken.ui(
     'Do you wish to delete {n} map?\n{maps}',
     'Do you wish to delete {n} maps?\n{maps}',
 )
+TRANS_OVERWRITE = TransToken.ui(
+    'This map is already in the game directory. Do you wish to overwrite it? ({mapname})'
+)
 
 # The game subfolder where puzzles are located
 PUZZLE_FOLDERS = {
@@ -505,10 +508,8 @@ def restore_maps(maps: List[P2C]) -> None:
                     os.path.isfile(abs_map)
                     ):
                 if not messagebox.askyesno(
-                        title='Overwrite File?',
-                        message=gettext('This map is already in the game directory.'
-                                  'Do you wish to overwrite it? '
-                                  '({})').format(p2c.title),
+                        title=str(TransToken.ui('Overwrite File?')),
+                        message=str(TRANS_OVERWRITE.format(mapname=p2c.title)),
                         parent=window,
                         icon=messagebox.QUESTION,
                         ):
@@ -971,14 +972,14 @@ def init_toplevel() -> None:
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
-    window.title(gettext('Backup/Restore Puzzles'))
+    TransToken.ui('Backup/Restore Puzzles').apply_win_title(window)
 
-    def quit_command():
+    def quit_command() -> None:
+        """Close the window."""
         from BEE2_config import GEN_OPTS
         window.withdraw()
         GEN_OPTS.save_check()
 
-    # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", quit_command)
 
     init()

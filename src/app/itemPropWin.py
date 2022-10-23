@@ -10,7 +10,7 @@ import random
 import utils
 import srctools
 from app import contextWin, gameMan, tk_tools, sound, TK_ROOT
-from localisation import gettext
+from localisation import TransToken
 import srctools.logger
 
 
@@ -35,57 +35,57 @@ class PropTypes(Enum):
         """Check if the user can change this property type."""
         return self.value not in ('none', 'subtype')
 
-# All properties in editoritems, Valve probably isn't going to
-# release a major update so it's fine to hardcode this.
+# All properties in editoritems, Valve probably isn't going to  release a major update so it's
+# fine to hardcode this.
 PROP_TYPES = {
-    'toplevel':                 (PropTypes.PISTON, gettext('Start Position')),
-    'bottomlevel':              (PropTypes.PISTON, gettext('End Position')),
-    'timerdelay':               (PropTypes.TIMER, gettext('Delay \n(0=infinite)')),
-    'angledpanelanimation':     (PropTypes.PANEL, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
-    'paintflowtype':            (PropTypes.GELS,  'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+    'toplevel':    (PropTypes.PISTON, TransToken.ui('Start Position')),
+    'bottomlevel': (PropTypes.PISTON, TransToken.ui('End Position')),
+    'timerdelay':  (PropTypes.TIMER, TransToken.ui('Delay \n(0=infinite)')),
+    'angledpanelanimation': (PropTypes.PANEL, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type')),
+    'paintflowtype':        (PropTypes.GELS,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type')),
 
-    'oscillate':                (PropTypes.OSCILLATE, 'PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
-    'startenabled':             (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_enabled'),
-    'startreversed':            (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_reversed'),
-    'startdeployed':            (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_deployed'),
-    'startactive':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_rail_start_active'),
-    'startopen':                (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_open'),
-    'startlocked':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'),
-    'dropperenabled':           (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled'),
-    'autodrop':                 (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube'),
-    'autorespawn':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube'),
-    'allowstreak':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
+    'oscillate':      (PropTypes.OSCILLATE, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate')),
+    'startenabled':   (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_enabled')),
+    'startreversed':  (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_reversed')),
+    'startdeployed':  (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_deployed')),
+    'startactive':    (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_start_active')),
+    'startopen':      (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_open')),
+    'startlocked':    (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked')),
+    'dropperenabled': (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled')),
+    'autodrop':       (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube')),
+    'autorespawn':    (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube')),
+    'allowstreak':    (PropTypes.CHECKBOX,  TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint')),
 
     # Properties that we don't allow modification of.
-    'timersound': (PropTypes.NONE, 'Timer Sound'),
-    'angledpaneltype': (PropTypes.NONE, 'Angled Panel Type'),
-    'itemfallstraightdown': (PropTypes.NONE, 'Disable Cube Dropper Clips'),
-    'paintexporttype': (PropTypes.NONE, 'Gel Export Type'),
-    'autotrigger': (PropTypes.NONE, 'Automatically Move'),
+    'timersound': (PropTypes.NONE, TransToken.ui('Timer Sound')),
+    'angledpaneltype': (PropTypes.NONE, TransToken.ui('Angled Panel Type')),
+    'itemfallstraightdown': (PropTypes.NONE, TransToken.ui('Disable Cube Dropper Clips')),
+    'paintexporttype': (PropTypes.NONE, TransToken.ui('Gel Export Type')),
+    'autotrigger': (PropTypes.NONE, TransToken.ui('Automatically Move')),
 
-    'connectioncount': (PropTypes.NONE, 'Connection Count'),
-    'connectioncountpolarity': (PropTypes.NONE, 'Polarity Connection Count'),
-    'coopdoor': (PropTypes.NONE, 'Is Coop?'),
-    'portalable': (PropTypes.NONE, 'Flip Panel Portalability'),
-    'speed': (PropTypes.NONE, 'Track Platform Speed'),
-    'startingposition': (PropTypes.NONE, 'Initial Track Platform Position'),
-    'traveldirection': (PropTypes.NONE, 'Track Platform Direction'),
-    'traveldistance': (PropTypes.NONE, 'Track Platform Distance'),
+    'connectioncount': (PropTypes.NONE, TransToken.ui('Connection Count')),
+    'connectioncountpolarity': (PropTypes.NONE, TransToken.ui('Polarity Connection Count')),
+    'coopdoor': (PropTypes.NONE, TransToken.ui('Is Coop?')),
+    'portalable': (PropTypes.NONE, TransToken.ui('Flip Panel Portalability')),
+    'speed': (PropTypes.NONE, TransToken.ui('Track Platform Speed')),
+    'startingposition': (PropTypes.NONE, TransToken.ui('Initial Track Platform Position')),
+    'traveldirection': (PropTypes.NONE, TransToken.ui('Track Platform Direction')),
+    'traveldistance': (PropTypes.NONE, TransToken.ui('Track Platform Distance')),
 
     # Controlled by bottom and top position, not set separately.
-    'startup': (PropTypes.NONE, 'Start Up'),
+    'startup': (PropTypes.NONE, TransToken.ui('Start Up')),
 
     # Faith Plate
-    'verticalalignment': (PropTypes.NONE, 'Vertical Alignment'),
-    'catapultspeed': (PropTypes.NONE, 'Faith Plate Speed'),
-    'targetname': (PropTypes.NONE, 'Faith Target Name'),
+    'verticalalignment': (PropTypes.NONE, TransToken.ui('Vertical Alignment')),
+    'catapultspeed': (PropTypes.NONE, TransToken.ui('Faith Plate Speed')),
+    'targetname': (PropTypes.NONE, TransToken.ui('Faith Target Name')),
 
-    'cubetype': (PropTypes.SUB_TYPE, 'Cube Type'),
-    'hazardtype': (PropTypes.SUB_TYPE, 'Fizzler Type'),
-    'barriertype': (PropTypes.SUB_TYPE, 'Barrier Type'),
-    'buttontype': (PropTypes.SUB_TYPE, 'Button Type'),
-    'painttype': (PropTypes.SUB_TYPE, 'Gel Type'),
-    }
+    'cubetype': (PropTypes.SUB_TYPE, TransToken.ui('Cube Type')),
+    'hazardtype': (PropTypes.SUB_TYPE, TransToken.ui('Fizzler Type')),
+    'barriertype': (PropTypes.SUB_TYPE, TransToken.ui('Barrier Type')),
+    'buttontype': (PropTypes.SUB_TYPE, TransToken.ui('Button Type')),
+    'painttype': (PropTypes.SUB_TYPE, TransToken.ui('Gel Type')),
+}
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift, none, subType
 
@@ -173,6 +173,12 @@ win.wm_attributes('-topmost', True)
 win.withdraw()
 
 
+TRANS_TITLE = TransToken.ui('BEE2 - {item}')
+TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
+TRANS_LABEL = TransToken.untranslated('{name}: ')
+TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
+
+
 def callback(props: dict[str, str]) -> None:
     """Called when the window is closed, to apply properties."""
     pass
@@ -219,10 +225,9 @@ def save_tim(key: str, val: str) -> None:
         widgets[key].set(new_val)
         enable_tim_callback = True
 
-        labels[key]['text'] = (
-            'Timer Delay:\n        ({})'.format(
-                '∞' if new_val == 0 else str(new_val))
-        )
+        TRANS_TIMER_DELAY.format(
+            tim='∞' if new_val == 0 else str(new_val),
+        ).apply(labels[key])
 
         if new_val > values[key]:
             sound.fx_blockable('add')
@@ -351,8 +356,10 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
 
-    labels['noOptions'] = ttk.Label(frame, text=gettext('No Properties available!'))
-    widgets['saveButton'] = ttk.Button(frame, text=gettext('Close'), command=exit_win)
+    labels['noOptions'] = ttk.Label(frame)
+    TransToken.ui('No Properties available!').apply(labels['noOptions'])
+    widgets['saveButton'] = ttk.Button(frame, command=exit_win)
+    TransToken.ui('Close').apply(widgets['saveButton'])
     widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
@@ -361,11 +368,8 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
     widgets['div_h'] = ttk.Separator(frame, orient="horizontal")
 
     for key, (prop_type, prop_name) in PROP_TYPES.items():
-        # Translate property names from Valve's files.
-        if prop_name.startswith('PORTAL2_'):
-            prop_name = gameMan.translate(prop_name) + ':'
-
-        labels[key] = ttk.Label(frame, text=prop_name)
+        labels[key] = ttk.Label(frame)
+        TRANS_LABEL.format(name=prop_name).apply(labels[key])
         if prop_type is PropTypes.CHECKBOX:
             values[key] = tk.IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
@@ -601,15 +605,15 @@ def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: str)
     # playing
     sound.block_fx()
 
-    widgets['titleLabel'].configure(text=gettext('Settings for "{}"').format(item_name))
-    win.title(gettext('BEE2 - {}').format(item_name))
+    TRANS_TITLE.format(item=item_name).apply_win_title(win)
+    TRANS_SUBTITLE.format(item=item_name).apply(widgets['titleLabel'])
     win.deiconify()
     win.lift(parent)
     win.grab_set()
     win.attributes("-topmost", True)
     win.geometry(
-        '+' + str(parent.winfo_rootx() - 30) +
-        '+' + str(parent.winfo_rooty() - win.winfo_reqheight() - 30)
+        f'+{str(parent.winfo_rootx() - 30)}'
+        f'+{str(parent.winfo_rooty() - win.winfo_reqheight() - 30)}'
         )
 
     if contextWin.is_visible():

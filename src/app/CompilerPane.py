@@ -22,7 +22,7 @@ from srctools.logger import get_logger
 import app
 from app import SubPane, tk_tools, TK_ROOT, corridor_selector
 from app.tooltip import add_tooltip, set_tooltip
-from localisation import TransToken, gettext
+from localisation import TransToken
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -110,7 +110,9 @@ cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old
 
 DEFAULT_STATE = CompilePaneState()
 
-TOK_SCREENSHOT_FILETYPE = TransToken.ui('Image Files')   # note: File type description
+TRANS_SCREENSHOT_FILETYPE = TransToken.ui('Image Files')   # note: File type description
+TRANS_TAB_MAP = TransToken.ui('Map Settings')
+TRANS_TAB_COMPILE = TransToken.ui('Compile Settings')
 
 
 async def apply_state(state: CompilePaneState) -> None:
@@ -243,7 +245,7 @@ def find_screenshot(e=None) -> None:
         title='Find Screenshot',
         filetypes=[
             (
-                str(TOK_SCREENSHOT_FILETYPE),
+                str(TRANS_SCREENSHOT_FILETYPE),
                 '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp *.tiff *.tga *.ico *.psd'
             ),
         ],
@@ -337,12 +339,16 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     nbook.enable_traversal()
 
     map_frame = ttk.Frame(nbook, name='map_settings')
-    # note: Tab name
-    nbook.add(map_frame, text=gettext('Map Settings'))
+    nbook.add(map_frame, text='Map')
 
     comp_frame = ttk.Frame(nbook, name='comp_settings')
-    # note: Tab name
-    nbook.add(comp_frame, text=gettext('Compile Settings'))
+    nbook.add(comp_frame, text='Comp')
+
+    @TransToken.apply_global
+    def set_tab_names() -> None:
+        """Set the tab names."""
+        nbook.tab(0, text=str(TRANS_TAB_MAP))
+        nbook.tab(1, text=str(TRANS_TAB_COMPILE))
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(make_map_widgets, map_frame, corr)

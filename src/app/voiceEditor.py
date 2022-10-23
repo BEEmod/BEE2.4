@@ -9,13 +9,15 @@ from tkinter import *
 from tkinter import font
 from tkinter import ttk
 
-from app import img, TK_ROOT
-import srctools.logger
-from app import tk_tools
-from localisation import gettext, TransToken
-from BEE2_config import ConfigFile
-from app.tooltip import add_tooltip
 from srctools import Property
+import srctools.logger
+
+from BEE2_config import ConfigFile
+from localisation import gettext, TransToken
+from packages import QuotePack
+from app.tooltip import add_tooltip
+from app import img, TK_ROOT
+from app import tk_tools
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -218,7 +220,7 @@ def add_tabs():
         notebook.select(current_tab)
 
 
-def show(quote_pack):
+def show(quote_pack: QuotePack):
     """Display the editing window."""
     global voice_item, config, config_mid, config_resp
     if voice_item is not None:
@@ -254,6 +256,7 @@ def show(quote_pack):
 
     for group in quote_data.find_all('quotes', 'group'):
         make_tab(
+            quote_pack.pak_id,
             group,
             config,
             TabTypes.NORM
@@ -269,6 +272,7 @@ def show(quote_pack):
 
     if len(mid_quotes):
         make_tab(
+            quote_pack.pak_id,
             mid_quotes,
             config_mid,
             TabTypes.MIDCHAMBER,
@@ -283,6 +287,7 @@ def show(quote_pack):
 
     if len(responses):
         make_tab(
+            quote_pack.pak_id,
             responses,
             config_resp,
             TabTypes.RESPONSE,
@@ -299,13 +304,13 @@ def show(quote_pack):
     win.lift()
 
 
-def make_tab(group, config: ConfigFile, tab_type):
+def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabTypes) -> None:
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
         group_name = gettext('Mid - Chamber')
         group_id = 'MIDCHAMBER'
-        group_desc = gettext(
+        group_desc = TransToken.ui(
             'Lines played during the actual chamber, '
             'after specific events have occurred.'
         )
@@ -313,13 +318,13 @@ def make_tab(group, config: ConfigFile, tab_type):
         # Note: 'Response' tab header, and description
         group_name = gettext('Responses')
         group_id = None
-        group_desc = gettext(
+        group_desc = TransToken.ui(
             'Lines played in response to certain events in Coop.'
         )
     elif tab_type is TabTypes.NORM:
         group_name = group['name', 'No Name!']
         group_id = group_name.upper()
-        group_desc = group['desc', ''] + ':'
+        group_desc = TransToken.parse(pak_id, group['desc', ''])
     else:
         raise ValueError('Invalid tab type!')
 
@@ -368,14 +373,7 @@ def make_tab(group, config: ConfigFile, tab_type):
             sticky='EW',
             )
 
-    ttk.Label(
-        frame,
-        text=group_desc,
-        ).grid(
-            row=1,
-            column=0,
-            sticky='EW',
-            )
+    group_desc.apply(ttk.Label(frame)).grid(row=1, column=0, sticky='EW')
 
     ttk.Separator(frame, orient=HORIZONTAL).grid(
         row=2,
@@ -395,9 +393,9 @@ def make_tab(group, config: ConfigFile, tab_type):
             reverse=True,
         )
 
-    for quote in sorted_quotes:  # type: Property
+    for quote in sorted_quotes:
         if not quote.has_children():
-            continue # Skip over config commands..
+            continue  # Skip over config commands..
 
         if tab_type is TabTypes.RESPONSE:
             try:
@@ -470,7 +468,7 @@ def make_tab(group, config: ConfigFile, tab_type):
             )
             check.bind("<Enter>", show_trans)
 
-    def configure_canv(e):
+    def configure_canv(e) -> None:
         """Allow resizing the windows."""
         canv['scrollregion'] = (
             4,
@@ -481,8 +479,6 @@ def make_tab(group, config: ConfigFile, tab_type):
         frame['width'] = canv.winfo_reqwidth()
 
     canv.bind('<Configure>', configure_canv)
-
-    return outer_frame
 
 
 def find_lines(quote_block: Property) -> Iterator[Tuple[
