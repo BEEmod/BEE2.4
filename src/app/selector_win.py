@@ -32,7 +32,7 @@ from consts import (
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from localisation import PluralTransToken, TransToken, gettext
+from localisation import TransToken, gettext
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -111,7 +111,7 @@ TRANS_SUGGESTED = TransToken.ui("Suggested")
 TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").format(sugg=TRANS_SUGGESTED)
 # If the item is groupless, use 'Other' for the header.
 TRANS_GROUPLESS = TransToken.ui('Other')
-TRANS_AUTHORS = PluralTransToken.ui('Author: {authors}', 'Authors: {authors}')
+TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 
 

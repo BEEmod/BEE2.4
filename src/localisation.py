@@ -19,6 +19,11 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     import tkinter as tk
     from tkinter import ttk
 
+__all__ = [
+    'TransToken', 'load_basemodui',
+    'gettext', 'setup'
+]
+
 LOGGER = logger.get_logger(__name__)
 _TRANSLATOR = gettext_mod.NullTranslations()
 P = ParamSpec('P')
@@ -83,6 +88,11 @@ class TransToken:
     def ui(cls, token: str, /, **kwargs: str) -> 'TransToken':
         """Make a token for a UI string."""
         return cls(NS_UI, token, kwargs)
+
+    @staticmethod
+    def ui_plural(singular: str, plural: str,  /, **kwargs: str) -> 'PluralTransToken':
+        """Make a plural token for a UI string."""
+        return PluralTransToken(NS_UI, singular, kwargs, token_plural=plural)
 
     @classmethod
     def from_valve(cls, text: str) -> 'TransToken':
@@ -171,29 +181,7 @@ class PluralTransToken(TransToken):
     """
     token_plural: str = attrs.Factory(lambda s: s.token, takes_self=True)
 
-    @classmethod
-    def ui(cls, singular: str, plural: str = '',  /, **kwargs: str) -> 'TransToken':
-        """Make a token for a UI string."""
-        if not plural:
-            plural = singular
-        return cls(NS_UI, singular, kwargs, token_plural=plural)
-
-    @classmethod
-    def untranslated(cls, text: str, plural: str = '') -> 'TransToken':
-        """Make a token that is not actually translated at all."""
-        if not plural:
-            plural = text
-        return cls(NS_UNTRANSLATED, text, token_plural=plural)
-
-    @classmethod
-    def parse(cls, package: str, text: str) -> 'TransToken':
-        """Parse a string to find a translation token, if any."""
-        raise NotImplementedError('Cannot be parsed from files.')
-
-    @classmethod
-    def from_valve(cls, text: str) -> 'TransToken':
-        """Make a token for a string that should be looked up in Valve's translation files."""
-        raise NotImplementedError("Valve's files have no plural translations.")
+    ui = ui_plural = untranslated = from_valve = None  # Cannot construct via these.
 
     def __eq__(self, other) -> bool:
         if isinstance(other, PluralTransToken):

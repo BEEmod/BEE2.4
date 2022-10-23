@@ -21,7 +21,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
 from tkinter import filedialog, messagebox, ttk
 from app.tooltip import add_tooltip
-from localisation import PluralTransToken, TransToken, gettext
+from localisation import TransToken, gettext
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -46,7 +46,7 @@ HEADERS = [TransToken.ui('Name'), TransToken.ui('Mode'), TransToken.ui('Date')]
 
 TRANS_SP = TransToken.ui('SP')
 TRANS_COOP = TransToken.ui('Coop')
-TRANS_DELETE_DESC = PluralTransToken.ui(
+TRANS_DELETE_DESC = TransToken.ui_plural(
     'Do you wish to delete {n} map?\n{maps}',
     'Do you wish to delete {n} maps?\n{maps}',
 )

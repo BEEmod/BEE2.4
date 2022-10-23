@@ -11,7 +11,7 @@ import trio
 
 from packages import Style, StyleVar, PackagesSet
 from app import tooltip
-from localisation import PluralTransToken, TransToken
+from localisation import TransToken
 from config.stylevar import State
 import config
 
@@ -106,7 +106,7 @@ TRANS_DEFAULT = {
     True: TransToken.ui('Default: On'),
 }
 # i18n: Tooltip when specific styles are used
-TRANS_STYLES = PluralTransToken.ui('Style: {styles}', 'Styles: {styles}')
+TRANS_STYLES = TransToken.ui_plural('Style: {styles}', 'Styles: {styles}')
 # i18n: StyleVar which is totally unstyled.
 TRANS_UNSTYLED = TransToken.ui('Styles: Unstyled')
 # i18n: StyleVar which matches all styles.
