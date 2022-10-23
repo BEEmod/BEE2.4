@@ -9,7 +9,7 @@ import srctools.logger
 from app import dragdrop, img, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
-from localisation import gettext
+from localisation import TransToken
 import config
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -23,6 +23,8 @@ SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
 SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
+
+TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
 
 
 def export_data() -> List[Tuple[str, str]]:
@@ -96,14 +98,10 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         return ttk.Frame(master)
 
     window.resizable(True, True)
-    window.title(gettext('Configure Signage'))
+    TransToken.ui('Configure Signage').apply_win_title(window)
 
-    frame_selected = ttk.Labelframe(
-        window,
-        text=gettext('Selected'),
-        relief='raised',
-        labelanchor='n',
-    )
+    frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n')
+    TransToken.ui('Selected').apply(frame_selected)
 
     canv_all = tk.Canvas(window)
 
@@ -149,7 +147,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         if hover_scope is not None:
             hover_scope.cancel()
 
-        name_label['text'] = gettext('Signage: {}').format(hover_sign.name)
+        TRANS_SIGN_NAME.format(name=hover_sign.name).apply(name_label)
 
         sng_left = hover_sign.dnd_icon
         sng_right = sign_arrow.dnd_icon if sign_arrow is not None else IMG_BLANK
@@ -227,8 +225,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
     await config.APP.set_and_run_ui_callback(Layout, apply_config)
-    return ttk.Button(
-        master,
-        text=gettext('Configure Signage'),
-        command=show_window,
-    )
+
+    show_btn = ttk.Button(master, command=show_window)
+    TransToken.ui('Configure Signage').apply(show_btn)
+    return show_btn

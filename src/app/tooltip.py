@@ -130,7 +130,7 @@ def set_tooltip(
 ) -> None:
     """Change the tooltip for a widget."""
     if isinstance(text, str):
-        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning)
+        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
         text = TransToken.untranslated(text)
     DATA[widget] = TooltipData(text, image)
 
@@ -151,6 +151,10 @@ def add_tooltip(
     If show_when_disabled is false, no context menu will be shown if the
     target widget is disabled.
     """
+    if isinstance(text, str):
+        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
+        text = TransToken.untranslated(text)
+
     set_tooltip(targ_widget, text, image)
 
     event_id = None  # The id of the enter event, so we can cancel it.

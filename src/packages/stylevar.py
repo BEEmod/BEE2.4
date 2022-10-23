@@ -1,6 +1,7 @@
 """Style specific features which can be enabled or disabled."""
 from __future__ import annotations
 
+from localisation import TransToken
 from packages import PakObject, Style, ParseData, ExportData
 from srctools import Property, bool_as_int
 
@@ -10,12 +11,13 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
     def __init__(
         self,
         var_id: str,
-        name: str,
+        name: TransToken,
         styles: list[str],
-        unstyled: bool=False,
-        inherit: bool=True,
-        default: bool=False,
-        desc: str='',
+        desc: TransToken,
+        *,
+        unstyled: bool,
+        inherit: bool,
+        default: bool,
     ) -> None:
         self.id = var_id
         self.name = name
@@ -26,9 +28,9 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         self.styles = None if unstyled else styles
 
     @classmethod
-    def unstyled(cls, id: str, name: str, default: bool, desc: str) -> StyleVar:
+    def unstyled(cls, id: str, name: TransToken, default: bool, desc: TransToken) -> StyleVar:
         """For builtin variables, define it as fully unstyled."""
-        return cls(id, name, [], True, False, default, desc)
+        return cls(id, name, [], desc, unstyled=True, inherit=False, default=default)
 
     @property
     def is_unstyled(self) -> bool:
@@ -38,26 +40,26 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
     @classmethod
     async def parse(cls, data: ParseData) -> StyleVar:
         """Parse StyleVars from configs."""
-        name = data.info['name', '']
+        name = TransToken.parse(data.pak_id, data.info['name', ''])
 
         styles = [
             prop.value
             for prop in
             data.info.find_all('Style')
         ]
-        desc = '\n'.join(
+        desc = TransToken.parse(data.pak_id, '\n'.join(
             prop.value
             for prop in
             data.info.find_all('description')
-        )
+        ))
         return cls(
             data.id,
             name,
             styles,
+            desc,
             unstyled=data.info.bool('unstyled'),
             inherit=data.info.bool('inherit', True),
             default=data.info.bool('enabled'),
-            desc=desc,
         )
 
     def add_over(self, override: StyleVar) -> None:
@@ -76,10 +78,10 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         # If they both have descriptions, add them together.
         # Don't do it if they're both identical though.
         # bool(strip()) = has a non-whitespace character
-        stripped_over = override.desc.strip()
-        if stripped_over and stripped_over not in self.desc:
-            if self.desc.strip():
-                self.desc += '\n\n' + override.desc
+        stripped_over = override.desc.token.strip()
+        if stripped_over and stripped_over not in self.desc.token:
+            if self.desc.token.strip():
+                self.desc = TransToken.untranslated('{a}\n\n{b}').format(a=self.desc, b=override.desc)
             else:
                 self.desc = override.desc
 
