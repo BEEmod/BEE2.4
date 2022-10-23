@@ -14,7 +14,7 @@ from config.gen_opts import GenOptions
 import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
-from localisation import gettext
+from localisation import TransToken, gettext
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
@@ -141,10 +141,10 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         callback=selwin_callback,
         callback_params=[MusicChannel.BASE],
         attributes=[
-            SelAttr.bool('SPEED', gettext('Propulsion Gel SFX')),
-            SelAttr.bool('BOUNCE', gettext('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', gettext('Excursion Funnel Music')),
-            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
+            SelAttr.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
+            SelAttr.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
+            SelAttr.bool('TBEAM', TransToken.ui('Excursion Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     )
 
@@ -160,7 +160,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         callback=selwin_callback,
         callback_params=[MusicChannel.TBEAM],
         attributes=[
-            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     )
 

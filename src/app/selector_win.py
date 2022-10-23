@@ -32,7 +32,7 @@ from consts import (
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from localisation import gettext, ngettext
+from localisation import TransToken, gettext, ngettext
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -101,48 +101,42 @@ class AttrTypes(Enum):
 
 AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
+TRANS_BLANK = TransToken.untranslated('')
+TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 
 
 @attrs.define
 class AttrDef:
     """Configuration for attributes shown on selector labels."""
     id: str
-    desc: str
+    desc: TransToken
     default: AttrValues
     type: AttrTypes
 
     label: ttk.Label = attrs.field(init=False)
 
     @classmethod
-    def string(cls, attr_id: str, desc='', default: str='') -> AttrDef:
+    def string(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: str='') -> AttrDef:
         """Alternative constructor for string-type attrs."""
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.STRING)
 
     @classmethod
-    def list(cls, attr_id: str, desc='', default: list=None) -> AttrDef:
+    def list(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: list=None) -> AttrDef:
         """Alternative constructor for list-type attrs."""
         if default is None:
             default = []
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.LIST)
 
     @classmethod
-    def bool(cls, attr_id: str, desc='', default: bool=False) -> AttrDef:
+    def bool(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: bool=False) -> AttrDef:
         """Alternative constructor for bool-type attrs."""
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
 
     @classmethod
-    def color(cls, attr_id: str, desc='', default: Vec=None) -> AttrDef:
+    def color(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: Vec=None) -> AttrDef:
         """Alternative constructor for color-type attrs."""
         if default is None:
             default = Vec(255, 255, 255)
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
@@ -876,7 +870,10 @@ class SelectorWin(Generic[CallbackT]):
             index = 0
             for attr in self.attrs:
                 attr_frame = ttk.Frame(attrs_frame)
-                desc_label = ttk.Label(attr_frame, text=attr.desc)
+                desc_label = ttk.Label(attr_frame)
+                TRANS_ATTR_DESC.format(
+                    desc=attr.desc,
+                ).apply(desc_label)
                 attr.label = ttk.Label(attr_frame)
 
                 if attr.type is AttrTypes.COLOR:

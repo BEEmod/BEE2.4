@@ -25,7 +25,7 @@ from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
 import config
-from localisation import gettext
+from localisation import gettext, TransToken
 from app import (
     img,
     itemconfig,
@@ -567,8 +567,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         has_none=False,
         callback=win_callback,
         attributes=[
-            SelAttr.bool('3D', gettext('3D Skybox'), False),
-            SelAttr.color('COLOR', gettext('Fog Color')),
+            SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
+            SelAttr.color('COLOR', TransToken.ui('Fog Color')),
         ],
     )
 
@@ -590,9 +590,9 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         },
         callback=voice_callback,
         attributes=[
-            SelAttr.list('CHAR', gettext('Characters'), ['??']),
-            SelAttr.bool('TURRET', gettext('Turret Shoot Monitor'), False),
-            SelAttr.bool('MONITOR', gettext('Monitor Visuals'), False),
+            SelAttr.list('CHAR', TransToken.ui('Characters'), ['??']),
+            SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
+            SelAttr.bool('MONITOR', TransToken.ui('Monitor Visuals'), False),
         ],
     )
 
@@ -614,7 +614,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
-            SelAttr.bool('VID', gettext('Elevator Videos'), default=True),
+            SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
         ]
     )
 
@@ -636,7 +636,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         none_desc=gettext('Choose a random video.'),
         callback=win_callback,
         attributes=[
-            SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
+            SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]
     )
 
