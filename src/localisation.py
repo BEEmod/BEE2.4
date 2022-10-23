@@ -1,6 +1,7 @@
 """Wraps gettext, to localise all UI text."""
-from typing import Callable, Dict, Mapping
-from typing_extensions import ParamSpec, Final
+from typing import Callable, Dict, List, Mapping, TYPE_CHECKING, TypeVar, Union
+from typing_extensions import ParamSpec, Final, TypeAlias
+from weakref import WeakKeyDictionary
 import gettext as gettext_mod
 import locale
 import logging
@@ -13,6 +14,10 @@ from srctools.property_parser import PROP_FLAGS_DEFAULT
 from srctools import EmptyMapping, logger
 
 import utils
+
+if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
+    import tkinter as tk
+    from tkinter import ttk
 
 LOGGER = logger.get_logger(__name__)
 _TRANSLATOR = gettext_mod.NullTranslations()
@@ -27,8 +32,16 @@ PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 # The currently loaded translations. First is the namespace, then the token -> string.
 TRANSLATIONS: Dict[str, Dict[str, str]] = {}
 
+TextWidget: TypeAlias = Union[
+    'tk.Label', 'tk.LabelFrame', 'tk.Button', 'tk.Radiobutton', 'tk.Checkbutton',
+    'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
+]
+TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
+_applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
+_langchange_callback: List[Callable[[], object]] = []
 
-@attrs.frozen(weakref_slot=True, eq=False)
+
+@attrs.frozen(eq=False)
 class TransToken:
     """A named section of text that can be translated later on."""
     # The package name, or a NS_* constant.
@@ -37,7 +50,7 @@ class TransToken:
     token: str
     # Keyword arguments passed when formatting.
     # If a blank dict is passed, use EmptyMapping to save memory.
-    parameters: Mapping[str, str] = attrs.field(
+    parameters: Mapping[str, object] = attrs.field(
         default=EmptyMapping,
         converter=lambda m: m or EmptyMapping,
     )
@@ -49,6 +62,9 @@ class TransToken:
             try:
                 package, token = text[2:].split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
+                # Don't allow specifying our special namespaces.
+                if package.startswith('<') or package.endswith('>'):
+                    raise ValueError
             except ValueError:
                 LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
                 return cls(package, text)
@@ -79,7 +95,7 @@ class TransToken:
         """
         return cls(NS_UNTRANSLATED, text)
 
-    def format(self, /, **kwargs: str) -> 'TransToken':
+    def format(self, /, **kwargs: object) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
         return TransToken(
             self.namespace,
@@ -117,6 +133,23 @@ class TransToken:
             return result.format_map(self.parameters)
         else:
             return result
+
+    def apply(self, widget: TextWidgetT) -> TextWidgetT:
+        """Apply this text to the specified label/button/etc."""
+        widget['text'] = str(self)
+        _applied_tokens[widget] = self
+        return widget
+
+    @classmethod
+    def apply_global(cls, func: Callable[[], object], call: bool = True) -> None:
+        """Register a function which is called after translations are reloaded.
+
+        This should be used to re-apply tokens in complicated situations after languages change.
+        If call is true, the function will immediately be called to apply it now.
+        """
+        _langchange_callback.append(func)
+        if call:
+            func()
 
 
 def load_basemodui(basemod_loc: str) -> None:
