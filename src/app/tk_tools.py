@@ -726,7 +726,7 @@ class EnumButton(Generic[EnumT]):
         master: tk.Misc,
         event_bus: event.EventBus,
         current: EnumT,
-        *values: Tuple[EnumT, str],
+        *values: Tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
         self._current = current
@@ -735,10 +735,11 @@ class EnumButton(Generic[EnumT]):
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
-                self.frame, text=label,
+                self.frame,
                 # Make partial do the method binding.
                 command=functools.partial(EnumButton._select, self, val),
             )
+            label.apply(btn)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
             if val is current:
@@ -771,7 +772,7 @@ class EnumButton(Generic[EnumT]):
 
 class LineHeader(ttk.Frame):
     """A resizable line, with a title in the middle."""
-    def __init__(self, parent: tk.Misc, title: str) -> None:
+    def __init__(self, parent: tk.Misc, title: TransToken) -> None:
         super().__init__(parent)
         sep_left = ttk.Separator(self)
         sep_left.grid(row=0, column=0, sticky='EW')
@@ -779,11 +780,10 @@ class LineHeader(ttk.Frame):
 
         self.title = ttk.Label(
             self,
-            text=title,
-            width=len(title) + 2,
             font='TkMenuFont',
             anchor='center',
         )
+        title.apply(self.title)
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(self)

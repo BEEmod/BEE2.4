@@ -105,6 +105,10 @@ TRANS_BLANK = TransToken.untranslated('')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
 TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
+TRANS_PREVIEW_TITLE = TransToken.ui('Preview - {item}')  # i18n: Preview window.
+TRANS_SUGGESTED = TransToken.ui("Suggested")
+# Labelframe doesn't look good for the suggested display, use box drawing characters instead.
+TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").format(sugg=TRANS_SUGGESTED)
 
 @attrs.define
 class AttrDef:
@@ -413,7 +417,7 @@ class PreviewWindow:
     def show(self, parent: SelectorWin, item: Item) -> None:
         """Show the window."""
         self.win.transient(parent.win)
-        self.win.title(gettext('{} Preview').format(item.longName))
+        TRANS_PREVIEW_TITLE.format(item=item.longName).apply_win_title(self.win)
 
         self.parent = parent
         self.index = 0
@@ -780,36 +784,30 @@ class SelectorWin(Generic[CallbackT]):
         )
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
 
-        ttk.Button(
+        TransToken.ui('OK').apply(ttk.Button(
             self.prop_frm,
             name='btn_ok',
-            text=gettext("OK"),
             command=self.save,
-        ).grid(
-            row=6,
-            column=0,
-            padx=(8, 8),
-        )
+        )).grid(row=6, column=0, padx=(8, 8))
 
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
                 name='btn_suggest',
-                text=gettext("Select Suggested"),
                 command=self.sel_suggested,
             )
+            TransToken.ui("Select Suggested").apply(self.prop_reset)
             self.prop_reset.grid(
                 row=6,
                 column=1,
                 sticky='ew',
             )
 
-        ttk.Button(
+        TransToken.ui("Cancel").apply(ttk.Button(
             self.prop_frm,
             name='btn_cancel',
-            text=gettext("Cancel"),
             command=self.exit,
-        ).grid(
+        )).grid(
             row=6,
             column=2,
             padx=(8, 8),
@@ -1517,17 +1515,16 @@ class SelectorWin(Generic[CallbackT]):
                             sugg_lbl = ttk.Label(
                                 self.pal_frame,
                                 name=f'suggest_label_{suggest_ind}',
-                                # Draw lines with box drawing characters
-                                text="\u250E\u2500" + gettext("Suggested") + "\u2500\u2512",
                             )
+                            TRANS_SUGGESTED_MAC.apply(sugg_lbl)
                         else:
                             sugg_lbl = ttk.LabelFrame(
                                 self.pal_frame,
                                 name=f'suggest_label_{suggest_ind}',
-                                text=gettext("Suggested"),
                                 labelanchor='n',
                                 height=50,
                             )
+                            TRANS_SUGGESTED.apply(sugg_lbl)
                         self._suggest_lbl.append(sugg_lbl)
                     suggest_ind += 1
                     sugg_lbl.place(

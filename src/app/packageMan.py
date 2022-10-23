@@ -7,7 +7,7 @@ import tkinter as tk
 from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
-from localisation import gettext
+from localisation import TransToken, gettext
 import packages
 import utils
 
@@ -94,7 +94,7 @@ def make_window() -> None:
 
     list_widget = CheckDetails(
         frame,
-        headers=['Name'],
+        headers=[TransToken.ui('Name')],
         items=make_packitems(),
     )
 

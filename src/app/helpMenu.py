@@ -20,7 +20,7 @@ import trio.to_thread
 
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
-from localisation import gettext
+from localisation import TransToken, gettext
 
 # For version info
 import PIL
@@ -40,10 +40,11 @@ class ResIcon(Enum):
     MUSIC_CHANGER = 'menu_music_changer'
     PORTAL2 = 'menu_p2'
 
+
 @attrs.frozen
 class WebResource:
     """Definition for the links in the help menu."""
-    name: str
+    name: TransToken
     url_key: str
     icon: ResIcon
 
@@ -53,24 +54,24 @@ DB_LOCATION = 'https://raw.githubusercontent.com/BEEmod/BEE2.4/master/help_urls.
 url_data: Element = NULL
 
 # This produces a '-------' instead.
-SEPERATOR = WebResource('', '', ResIcon.NONE)
+SEPERATOR = WebResource(TransToken.untranslated(''), '', ResIcon.NONE)
 
-Res: Callable[[str, str, ResIcon], WebResource] = cast(Any, WebResource)
+Res: Callable[[TransToken, str, ResIcon], WebResource] = cast(Any, WebResource)
 WEB_RESOURCES = [
-    Res(gettext('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
-    Res(gettext('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
+    Res(TransToken.ui('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
+    Res(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
     # i18n: The chat program.
-    Res(gettext('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
-    Res(gettext("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
-    Res(gettext('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
+    Res(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
+    Res(TransToken.ui("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
+    Res(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
     SEPERATOR,
-    Res(gettext('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
-    Res(gettext('Items Repository...'), "repo_items", ResIcon.GITHUB),
-    Res(gettext('Music Repository...'), "repo_music", ResIcon.GITHUB),
+    Res(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
+    Res(TransToken.ui('Items Repository...'), "repo_items", ResIcon.GITHUB),
+    Res(TransToken.ui('Music Repository...'), "repo_music", ResIcon.GITHUB),
     SEPERATOR,
-    Res(gettext('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
-    Res(gettext('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
-    Res(gettext('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
+    Res(TransToken.ui('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
+    Res(TransToken.ui('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
+    Res(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
 ]
 del Res
 
@@ -556,7 +557,7 @@ def make_help_menu(parent: tk.Menu) -> None:
             help.add_separator()
         else:
             help.add_command(
-                label=res.name,
+                label=str(res.name),  # TODO: This needs to be dynamic.
                 command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
                 image=icons[res.icon].get_tk(),

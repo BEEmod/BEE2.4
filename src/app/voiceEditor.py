@@ -100,14 +100,9 @@ def init_widgets():
     trans_frame.rowconfigure(1, weight=1)
     trans_frame.columnconfigure(0, weight=1)
 
-    ttk.Label(
-        trans_frame,
-        text=gettext('Transcript:'),
-        ).grid(
-            row=0,
-            column=0,
-            sticky=W,
-            )
+    TransToken.ui('Transcript:').apply(
+        ttk.Label(trans_frame),
+    ).grid(row=0, column=0, sticky=W)
 
     trans_inner_frame = ttk.Frame(trans_frame, borderwidth=2, relief='sunken')
     trans_inner_frame.grid(row=1, column=0, sticky='NSEW')
@@ -139,11 +134,9 @@ def init_widgets():
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
     UI['trans'].grid(row=0, column=0, sticky='NSEW')
 
-    ttk.Button(
-        win,
-        text=gettext('Save'),
-        command=save,
-        ).grid(row=2, column=0)
+    TransToken.ui('Save').apply(
+        ttk.Button(win, command=save)
+    ).grid(row=2, column=0)
 
     # Don't allow resizing the transcript box to be smaller than the
     # original size.
@@ -215,7 +208,7 @@ def add_tabs():
                 tab,
                 compound=RIGHT,
                 image=img.Handle.builtin('icons/resp_quote', 16, 16),
-                #Note: 'response' tab name, should be short.
+                # i18n: 'response' tab name, should be short.
                 text=gettext('Resp')
                 )
         else:

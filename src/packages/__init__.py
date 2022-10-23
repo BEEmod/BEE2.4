@@ -154,7 +154,7 @@ class ObjData:
     fsys: FileSystem
     info_block: Property = attrs.field(repr=False)
     pak_id: str
-    disp_name: str
+    disp_name: TransToken
 
 
 @attrs.define
@@ -736,7 +736,7 @@ async def parse_object(
     assert object_.id == obj_id, f'{object_!r} -> {object_.id} != "{obj_id}"!'
 
     object_.pak_id = obj_data.pak_id
-    object_.pak_name = obj_data.disp_name
+    object_.pak_name = str(obj_data.disp_name)
     for override_data in packset.overrides[obj_class, obj_id.casefold()]:
         await trio.sleep(0)
         try:
@@ -773,10 +773,11 @@ class Package:
         info: Property,
         path: Path,
     ) -> None:
-        disp_name = info['Name', None]
-        if disp_name is None:
+        try:
+            disp_name = TransToken.parse(pak_id, info['Name'])
+        except LookupError:
             LOGGER.warning('Warning: {} has no display name!', pak_id)
-            disp_name = pak_id.lower()
+            disp_name = TransToken.untranslated(pak_id.lower())
 
         self.id = pak_id
         self.fsys = filesystem

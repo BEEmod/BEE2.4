@@ -259,11 +259,8 @@ async def make_stylevar_pane(
     for all_pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = int_var = IntVar(value=var.default)
-        checkbox_all[var.id] = chk = ttk.Checkbutton(
-            frame_all,
-            variable=int_var,
-            text=var.name,
-        )
+        checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
+        var.name.apply(chk)
         chk.grid(row=all_pos, column=0, sticky="W", padx=3)
         tooltip.add_tooltip(chk, make_desc(packset, var))
 
@@ -296,15 +293,18 @@ async def make_stylevar_pane(
                 # Available in all styles - put with the hardcoded variables.
                 all_pos += 1
 
-                checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id], text=var.name)
+                checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id])
+                var.name.apply(chk)
                 chk.grid(row=all_pos, column=0, sticky="W", padx=3)
                 tooltip.add_tooltip(chk, desc)
                 nursery.start_soon(add_state_syncers, var.id, int_var, chk)
             else:
                 # Swap between checkboxes depending on style.
-                checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id], text=var.name)
-                checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id], text=var.name)
+                checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id])
+                checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id])
 
+                var.name.apply(chk_chose)
+                var.name.apply(chk_other)
                 tooltip.add_tooltip(checkbox_chosen[var.id], desc)
                 tooltip.add_tooltip(checkbox_other[var.id], desc)
                 nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)

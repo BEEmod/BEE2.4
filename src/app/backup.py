@@ -42,7 +42,10 @@ BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')
 # Format for the backup filename
 AUTO_BACKUP_FILE = 'back_{game}{ind}.zip'
 
-HEADERS = ['Name', 'Mode', 'Date']
+HEADERS = [TransToken.ui('Name'), TransToken.ui('Mode'), TransToken.ui('Date')]
+
+TRANS_SP = TransToken.ui('SP')
+TRANS_COOP = TransToken.ui('Coop')
 
 # The game subfolder where puzzles are located
 PUZZLE_FOLDERS = {
@@ -95,8 +98,8 @@ class P2C:
         self,
         filename,
         zip_file,
-        create_time,
-        mod_time,
+        create_time: 'Date',
+        mod_time: 'Date',
         title='<untitled>',
         desc='',
         is_coop=False,
@@ -170,10 +173,10 @@ class P2C:
     def make_item(self) -> CheckItem['P2C']:
         """Make a corresponding CheckItem object."""
         return CheckItem(
-            self.title,
-            (gettext('Coop') if self.is_coop else gettext('SP')),
-            self.mod_time,
-            hover_text=self.desc,
+            TransToken.untranslated(self.title),
+            TRANS_COOP if self.is_coop else TRANS_SP,
+            TransToken.untranslated(str(self.mod_time)),
+            hover_text=TransToken.untranslated(self.desc),
             user=self,
         )
 
@@ -920,10 +923,10 @@ def init_backup_settings() -> None:
     )
     UI['auto_enable'] = enable_check = ttk.Checkbutton(
         frame,
-        text=gettext('Automatic Backup After Export'),
         variable=check_var,
         command=check_callback,
     )
+    TransToken.ui('Automatic Backup After Export').apply(enable_check)
 
     frame['labelwidget'] = enable_check
     frame.grid(row=2, column=0, columnspan=3)
@@ -950,9 +953,8 @@ def init_backup_settings() -> None:
         frame,
     )
     count_frame.grid(row=0, column=1)
-    ttk.Label(
-        count_frame,
-        text=gettext('Keep (Per Game):'),
+    TransToken.ui('Keep (Per Game):').apply(
+        ttk.Label(count_frame)
     ).grid(row=0, column=0)
 
     count = tk_tools.ttk_Spinbox(
@@ -984,35 +986,21 @@ def init_toplevel() -> None:
     init_backup_settings()
 
     # When embedded in the BEE2, use regular buttons and a dropdown!
-    toolbar_frame = ttk.Frame(
-        window,
-    )
-    ttk.Button(
-        toolbar_frame,
-        text=gettext('New Backup'),
-        command=ui_new_backup,
-        width=14,
+    toolbar_frame = ttk.Frame(window)
+    TransToken.ui('New Backup').apply(
+        ttk.Button(toolbar_frame, command=ui_new_backup)
     ).grid(row=0, column=0)
 
-    ttk.Button(
-        toolbar_frame,
-        text=gettext('Open Backup'),
-        command=ui_load_backup,
-        width=13,
+    TransToken.ui('Open Backup').apply(
+        ttk.Button(toolbar_frame, command=ui_load_backup)
     ).grid(row=0, column=1)
 
-    ttk.Button(
-        toolbar_frame,
-        text=gettext('Save Backup'),
-        command=ui_save_backup,
-        width=11,
+    TransToken.ui('Save Backup').apply(
+        ttk.Button(toolbar_frame, command=ui_save_backup)
     ).grid(row=0, column=2)
 
-    ttk.Button(
-        toolbar_frame,
-        text='.. As',
-        command=ui_save_backup_as,
-        width=5,
+    TransToken.ui('.. As').apply(
+        ttk.Button(toolbar_frame, command=ui_save_backup_as)
     ).grid(row=0, column=3)
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')

@@ -8,10 +8,11 @@ import webbrowser
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
-from localisation import gettext
+from localisation import TransToken
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
+TRANS_WEBBROWSER = TransToken.ui('Open "{url}" in the default browser?')
 
 
 class tkRichText(tkinter.Text):
@@ -176,11 +177,11 @@ class tkRichText(tkinter.Text):
 
     def make_link_callback(self, url: str) -> Callable[[tkinter.Event], None]:
         """Create a link callback for the given URL."""
-
-        def callback(e):
+        def callback(e) -> None:
+            """The callback function."""
             if askokcancel(
                 title='BEE2 - Open URL?',
-                message=gettext('Open "{}" in the default browser?').format(url),
+                message=str(TRANS_WEBBROWSER.format(url=url)),
                 parent=self,
             ):
                 webbrowser.open(url)

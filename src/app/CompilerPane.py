@@ -738,7 +738,7 @@ def init_application() -> None:
     """Initialise when standalone."""
     global window
     window = TK_ROOT
-    window.title(gettext('Compiler Options - {}').format(utils.BEE_VERSION))
+    TransToken.ui('Compiler Options - {ver}').format(ver=utils.BEE_VERSION).apply_win_title(window)
     window.resizable(True, False)
 
     # TODO load async properly.

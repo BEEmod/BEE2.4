@@ -105,6 +105,13 @@ class TransToken:
             {**self.parameters, **kwargs},
         )
 
+    def __bool__(self) -> bool:
+        """The boolean value of a token is whether the token is entirely blank.
+
+        In that case it's not going to translate to anything.
+        """
+        return self.token != '' and not self.token.isspace()
+
     def __eq__(self, other) -> bool:
         if isinstance(other, TransToken):
             return (
@@ -122,7 +129,8 @@ class TransToken:
 
     def __str__(self) -> str:
         """Calling str on a token translates it."""
-        if self.namespace == NS_UNTRANSLATED:
+        # If in the untranslated namespace or blank, don't translate.
+        if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token
         elif self.namespace == NS_UI:
             result = _TRANSLATOR.gettext(self.token)

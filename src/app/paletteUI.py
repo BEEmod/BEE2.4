@@ -10,7 +10,7 @@ import srctools.logger
 
 from app.paletteLoader import Palette
 from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
-from localisation import gettext
+from localisation import TransToken, gettext
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
 import config
@@ -25,6 +25,8 @@ ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 __all__ = [
     'PaletteUI', 'Palette', 'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
 ]
+TRANS_DELETE = TransToken.ui("Delete Palette")
+TRANS_HIDE = TransToken.ui("Hide Palette")
 
 
 class PaletteUI:
@@ -61,10 +63,8 @@ class PaletteUI:
 
         f.rowconfigure(1, weight=1)
         f.columnconfigure(0, weight=1)
-        ttk.Button(
-            f,
-            text=gettext('Clear Palette'),
-            command=cmd_clear,
+        TransToken.ui('Clear Palette').apply(
+            ttk.Button(f, command=cmd_clear)
         ).grid(row=0, sticky="EW")
 
         self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
@@ -91,11 +91,8 @@ class PaletteUI:
         scrollbar.grid(row=1, column=1, sticky="NS")
         self.ui_treeview['yscrollcommand'] = scrollbar.set
 
-        self.ui_remove = ttk.Button(
-            f,
-            text=gettext('Delete Palette'),
-            command=self.event_remove,
-        )
+        self.ui_remove = ttk.Button(f, command=self.event_remove)
+        TransToken.ui("Delete Palette").apply(self.ui_remove)
         self.ui_remove.grid(row=2, sticky="EW")
 
         if tk_tools.USE_SIZEGRIP:
@@ -254,7 +251,7 @@ class PaletteUI:
                 self.ui_menu_delete_index,
                 label=gettext('Hide Palette "{}"').format(self.selected.name),
             )
-            self.ui_remove['text'] = gettext('Hide Palette')
+            TRANS_HIDE.apply(self.ui_remove)
 
             self.save_btn_state(('disabled',))
             for ind in self.ui_readonly_indexes:
@@ -264,7 +261,7 @@ class PaletteUI:
                 self.ui_menu_delete_index,
                 label=gettext('Delete Palette "{}"').format(self.selected.name),
             )
-            self.ui_remove['text'] = gettext('Delete Palette')
+            TRANS_DELETE.apply(self.ui_remove)
 
             self.save_btn_state(('!disabled',))
             for ind in self.ui_readonly_indexes:
@@ -279,12 +276,13 @@ class PaletteUI:
 
     def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
         """Create a checkbutton configured to control the save palette in settings option."""
-        return ttk.Checkbutton(
+        check = ttk.Checkbutton(
             frame,
-            text=gettext('Save Settings in Palettes'),
             variable=self.var_save_settings,
             command=self._store_configuration,
         )
+        TransToken.ui('Save Settings in Palettes').apply(check)
+        return check
 
     def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""

@@ -8,7 +8,7 @@ import srctools.logger
 from pygtrie import CharTrie
 
 from app import UI, TK_ROOT
-from localisation import gettext
+from localisation import TransToken
 
 LOGGER = srctools.logger.get_logger(__name__)
 word_to_ids: 'CharTrie[Set[Tuple[str, int]]]' = CharTrie()
@@ -64,7 +64,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
 
     frm.columnconfigure(1, weight=1)
 
-    ttk.Label(frm, text=gettext('Search:')).grid(row=0, column=0)
+    TransToken.ui('Search:').apply(ttk.Label(frm)).grid(row=0, column=0)
 
     search_var = tk.StringVar()
     search_var.trace_add('write', on_type)
