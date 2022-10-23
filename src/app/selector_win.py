@@ -425,7 +425,7 @@ class PreviewWindow:
     def show(self, parent: SelectorWin, item: Item) -> None:
         """Show the window."""
         self.win.transient(parent.win)
-        TRANS_PREVIEW_TITLE.format(item=item.longName).apply_win_title(self.win)
+        TRANS_PREVIEW_TITLE.format(item=item.longName).apply_title(self.win)
 
         self.parent = parent
         self.index = 0
@@ -618,7 +618,7 @@ class SelectorWin(Generic[CallbackT]):
         self.win = tk.Toplevel(parent, name='selwin_' + save_id)
         self.win.withdraw()
         self.win.transient(master=parent)
-        TRANS_WINDOW_TITLE.format(subtitle=title).apply_win_title(self.win)
+        TRANS_WINDOW_TITLE.format(subtitle=title).apply_title(self.win)
 
         # Allow resizing in X and Y.
         self.win.resizable(True, True)

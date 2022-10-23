@@ -972,7 +972,7 @@ def init_toplevel() -> None:
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
-    TransToken.ui('Backup/Restore Puzzles').apply_win_title(window)
+    TransToken.ui('Backup/Restore Puzzles').apply_title(window)
 
     def quit_command() -> None:
         """Close the window."""

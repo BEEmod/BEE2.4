@@ -98,7 +98,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         return ttk.Frame(master)
 
     window.resizable(True, True)
-    TransToken.ui('Configure Signage').apply_win_title(window)
+    TransToken.ui('Configure Signage').apply_title(window)
 
     frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n')
     TransToken.ui('Selected').apply(frame_selected)

@@ -86,7 +86,7 @@ class SubPane(tk.Toplevel):
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
-        title.apply_win_title(self)
+        title.apply_title(self)
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)

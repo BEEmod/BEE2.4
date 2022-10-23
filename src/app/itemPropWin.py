@@ -605,7 +605,7 @@ def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: str)
     # playing
     sound.block_fx()
 
-    TRANS_TITLE.format(item=item_name).apply_win_title(win)
+    TRANS_TITLE.format(item=item_name).apply_title(win)
     TRANS_SUBTITLE.format(item=item_name).apply(widgets['titleLabel'])
     win.deiconify()
     win.lift(parent)

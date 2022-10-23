@@ -344,7 +344,7 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     comp_frame = ttk.Frame(nbook, name='comp_settings')
     nbook.add(comp_frame, text='Comp')
 
-    @TransToken.apply_global
+    @TransToken.add_callback
     def set_tab_names() -> None:
         """Set the tab names."""
         nbook.tab(0, text=str(TRANS_TAB_MAP))
@@ -711,7 +711,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         """Update the combo box when translations change."""
         player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
 
-    TransToken.apply_global(update_model_values, call=True)
+    TransToken.add_callback(update_model_values, call=True)
 
     def set_model(_: tk.Event) -> None:
         """Save the selected player model."""
@@ -752,7 +752,7 @@ def init_application() -> None:
     """Initialise when standalone."""
     global window
     window = TK_ROOT
-    TransToken.ui('Compiler Options - {ver}').format(ver=utils.BEE_VERSION).apply_win_title(window)
+    TransToken.ui('Compiler Options - {ver}').format(ver=utils.BEE_VERSION).apply_title(window)
     window.resizable(True, False)
 
     # TODO load async properly.

@@ -157,12 +157,12 @@ class TransToken:
         _applied_tokens[widget] = self
         return widget
 
-    def apply_win_title(self, win: 'tk.Toplevel') -> None:
+    def apply_title(self, win: 'tk.Toplevel') -> None:
         """Set the title of a window to this token."""
-        self.apply_global(lambda: win.title(str(self)))
+        self.add_callback(lambda: win.title(str(self)))
 
     @classmethod
-    def apply_global(cls, func: Callable[[], object], call: bool = True) -> None:
+    def add_callback(cls, func: Callable[[], object], call: bool = True) -> None:
         """Register a function which is called after translations are reloaded.
 
         This should be used to re-apply tokens in complicated situations after languages change.
