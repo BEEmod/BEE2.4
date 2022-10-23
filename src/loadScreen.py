@@ -42,6 +42,19 @@ class Cancelled(SystemExit):
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+# All tokens used by the subprocess. We translate here before passing it down.
+TRANSLATIONS = {
+    'skip': TransToken.ui('Skipped!'),
+    'version': TransToken.ui('Version: {ver}').format(ver=utils.BEE_VERSION),
+    'cancel': TransToken.ui('Cancel'),
+    'clear': TransToken.ui('Clear'),
+    'copy': TransToken.ui('Copy'),
+    'log_show': TransToken.ui('Show:'),
+    'log_title': TransToken.ui('Logs - {ver}').format(ver=utils.BEE_VERSION),
+    'level_debug': TransToken.ui('Debug messages'),
+    'level_info': TransToken.ui('Default'),
+    'level_warn': TransToken.ui('Warnings Only'),
+}
 
 
 def close_all() -> None:
@@ -57,10 +70,8 @@ def show_main_loader(is_compact: bool) -> None:
 
 
 def set_force_ontop(ontop: bool) -> None:
-    """Set whether or not screens will be forced on top."""
-    # The loadscreen ID is ignored for this, it applies to all of them.
-    # But we know this one exists.
-    main_loader._send_msg('set_force_ontop', ontop)
+    """Set whether screens will be forced on top."""
+    _PIPE_MAIN_SEND.send(('set_force_ontop', None, ontop))
 
 
 @contextlib.contextmanager
@@ -221,6 +232,16 @@ def shutdown() -> None:
     except BrokenPipeError:  # Already quit, don't care.
         pass
 
+
+def _update_translations() -> None:
+    """Update the translations."""
+    _PIPE_MAIN_SEND.send((
+        'update_translations', 0,
+        {key: str(tok) for key, tok in TRANSLATIONS.items()},
+    ))
+
+TransToken.add_callback(_update_translations, call=False)
+
 # Initialise the daemon.
 # noinspection PyProtectedMember
 BG_PROC = multiprocessing.Process(
@@ -230,21 +251,8 @@ BG_PROC = multiprocessing.Process(
         _PIPE_DAEMON_REC,
         logWindow.PIPE_DAEMON_SEND,
         logWindow.PIPE_DAEMON_REC,
-        # Pass translation strings.
-        {
-            'skip': gettext('Skipped!'),
-            'version': gettext('Version: ') + utils.BEE_VERSION,
-            'cancel': gettext('Cancel'),
-            'clear': gettext('Clear'),
-            'copy': gettext('Copy'),
-            'log_show': gettext('Show:'),
-            'log_title': gettext('Logs - {}').format(utils.BEE_VERSION),
-            'level_text': [
-                gettext('Debug messages'),
-                gettext('Default'),
-                gettext('Warnings Only'),
-            ],
-        }
+        # Convert and pass translation strings.
+        {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ),
     name='bg_daemon',
     daemon=True,
