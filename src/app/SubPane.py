@@ -5,7 +5,7 @@ from tkinter import ttk
 
 from app import tooltip, tk_tools, sound
 from app.img import Handle as ImgHandle, apply as apply_img
-from localisation import gettext
+from localisation import TransToken
 from config.windows import WindowState
 import utils
 import config
@@ -17,6 +17,8 @@ import config
 # around the images instead of wasting space.
 style = ttk.Style()
 style.configure('Toolbar.TButton', padding='-20',)
+
+TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
 
 
 def make_tool_button(frame: tk.Misc, img: str, command: Callable[[], Any]) -> ttk.Button:
@@ -75,9 +77,7 @@ class SubPane(tk.Toplevel):
             # Contract the spacing to allow the icons to fit.
             padx=(2 if utils.MAC else (5, 2)),
         )
-        tooltip.add_tooltip(
-            self.tool_button,
-            text=gettext('Hide/Show the "{}" window.').format(title))
+        tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
         menu_bar.add_checkbutton(
             label=title,
             variable=self.visible,

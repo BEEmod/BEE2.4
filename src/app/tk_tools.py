@@ -27,6 +27,7 @@ from config.gen_opts import GenOptions
 import event
 import config
 import utils
+from localisation import TransToken
 
 
 # Set icons for the application.
@@ -648,7 +649,7 @@ class FileField(ttk.Frame):
         self.columnconfigure(0, weight=1)
         bind_leftclick(self.textbox, self.browse)
         # The full location is displayed in a tooltip.
-        add_tooltip(self.textbox, self._location)
+        add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
 
         self.browse_btn = ttk.Button(
@@ -687,7 +688,7 @@ class FileField(ttk.Frame):
         from app import tooltip
         self.callback(path)
         self._location = path
-        tooltip.set_tooltip(self, path)
+        tooltip.set_tooltip(self, TransToken.untranslated(path))
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path: str) -> str:

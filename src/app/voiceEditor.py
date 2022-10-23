@@ -12,7 +12,7 @@ from tkinter import ttk
 from app import img, TK_ROOT
 import srctools.logger
 from app import tk_tools
-from localisation import gettext
+from localisation import gettext, TransToken
 from BEE2_config import ConfigFile
 from app.tooltip import add_tooltip
 from srctools import Property
@@ -29,17 +29,17 @@ QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
 
 
-IMG: Dict[str, Tuple[img.Handle, str]] = {
+IMG: Dict[str, Tuple[img.Handle, TransToken]] = {
     spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
     for spr, ctx in [
-        ('sp', gettext('Singleplayer')),
-        ('coop', gettext('Cooperative')),
-        ('atlas', gettext('ATLAS (SP/Coop)')),
-        ('pbody', gettext('P-Body (SP/Coop)')),
-        ('bendy', gettext('Bendy')),
-        ('chell', gettext('Chell')),
-        ('human', gettext('Human characters (Bendy and Chell)')),
-        ('robot', gettext('AI characters (ATLAS, P-Body, or Coop)')),
+        ('sp', TransToken.ui('Singleplayer')),
+        ('coop', TransToken.ui('Cooperative')),
+        ('atlas', TransToken.ui('ATLAS (SP/Coop)')),
+        ('pbody', TransToken.ui('P-Body (SP/Coop)')),
+        ('bendy', TransToken.ui('Bendy')),
+        ('chell', TransToken.ui('Chell')),
+        ('human', TransToken.ui('Human characters (Bendy and Chell)')),
+        ('robot', TransToken.ui('AI characters (ATLAS, P-Body, or Coop)')),
     ]
 }
 
@@ -411,6 +411,7 @@ def make_tab(group, config: ConfigFile, tab_type):
                 name = RESPONSE_NAMES[quote.name]
             except KeyError:
                 # Convert channels of the form 'death_goo' into 'Death - Goo'.
+                # TODO: Eliminate this, we need to translate all of em.
                 channel, ch_arg = quote.name.split('_', 1)
                 name = channel.title() + ' - ' + ch_arg.title()
                 del channel, ch_arg
@@ -492,7 +493,7 @@ def make_tab(group, config: ConfigFile, tab_type):
 
 
 def find_lines(quote_block: Property) -> Iterator[Tuple[
-    List[Tuple[img.Handle, str]],
+    List[Tuple[img.Handle, TransToken]],
     Property,
     str,
 ]]:
@@ -522,7 +523,7 @@ def find_lines(quote_block: Property) -> Iterator[Tuple[
 
 
 def find_resp_lines(quote_block: Property) -> Iterator[Tuple[
-    List[Tuple[img.Handle, str]],
+    List[Tuple[img.Handle, TransToken]],
     Property,
     str,
 ]]:

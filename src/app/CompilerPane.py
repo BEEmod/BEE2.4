@@ -185,12 +185,12 @@ class LimitCounter:
             self.cur_count = round(100 * value / self.max)
             self.var.set(self.cur_count)
 
-        set_tooltip(self.bar, str(self.TOOLTIP.format(
+        set_tooltip(self.bar, self.TOOLTIP.format(
             count=value,
             max=self.max,
             frac=value / self.max,
             blurb=self.blurb,
-        )))
+        ))
 
     async def _flash(self) -> None:
         """Flash the display."""
@@ -405,32 +405,22 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     UI['thumb_peti'].grid(row=0, column=1, sticky='W')
     UI['thumb_custom'].grid(row=1, column=0, columnspan=2, sticky='NEW')
     UI['thumb_cleanup'].grid(row=3, columnspan=2, sticky='W')
-    add_tooltip(UI['thumb_auto'], gettext(
+    add_tooltip(UI['thumb_auto'], TransToken.ui(
         "Override the map image to use a screenshot automatically taken from "
         "the beginning of a chamber. Press F5 to take a new screenshot. If the "
         "map has not been previewed recently (within the last few hours), the "
         "default PeTI screenshot will be used instead."
     ))
-    add_tooltip(
-        UI['thumb_peti'],
-        gettext("Use the normal editor view for the map preview image.")
-    )
-    custom_tooltip = gettext(
+    add_tooltip(UI['thumb_peti'], TransToken.ui("Use the normal editor view for the map preview image."))
+    custom_tooltip = TransToken.ui(
         "Use a custom image for the map preview image. Click the "
         "screenshot to select.\n"
         "Images will be converted to JPEGs if needed."
     )
-    add_tooltip(
-        UI['thumb_custom'],
-        custom_tooltip,
-    )
+    add_tooltip(UI['thumb_custom'], custom_tooltip)
+    add_tooltip(UI['thumb_label'], custom_tooltip)
 
-    add_tooltip(
-        UI['thumb_label'],
-        custom_tooltip,
-    )
-
-    add_tooltip(UI['thumb_cleanup'], gettext(
+    add_tooltip(UI['thumb_cleanup'], TransToken.ui(
         'Automatically delete unused Automatic screenshots. Disable if you want '
         'to keep things in "portal2/screenshots". '
     ))
@@ -465,34 +455,40 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     ))
     UI['light_full'].grid(row=0, column=2)
 
-    light_conf_swap = gettext(  # gettext: Info for toggling lighting via a key.
+    light_conf_swap = TransToken.ui(  # gettext: Info for toggling lighting via a key.
+        "{desc}\n\n"
         "You can hold down Shift during the start of the Lighting stage to "
-        "switch to {} lighting on the fly."
+        "switch to {keymode} lighting on the fly."
     )
 
-    add_tooltip(UI['light_none'], gettext(
-        "Compile with no lighting whatsoever. This significantly speeds up "
-        "compile times, but there will be no lights, gel will be invisible, "
-        "and the map will run in fullbright. \nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
-
-    add_tooltip(UI['light_fast'], gettext(
-        "Compile with lower-quality, fast lighting. This speeds up compile "
-        "times, but does not appear as good. Some shadows may appear "
-        "wrong.\nWhen publishing, this is ignored."
-    ) + "\n\n" + light_conf_swap.format(gettext("Full")))
-    add_tooltip(UI['light_full'], gettext(
-        "Compile with high-quality lighting. This looks correct, but takes "
-        "longer to compute. Use if you're arranging lights.\nWhen "
-        "publishing, this is always used."
-    ) + "\n\n" + light_conf_swap.format(gettext("Fast")))
+    add_tooltip(UI['light_none'], light_conf_swap.format(
+        desc=TransToken.ui(
+            "Compile with no lighting whatsoever. This significantly speeds up "
+            "compile times, but there will be no lights, gel will be invisible, "
+            "and the map will run in fullbright. \nWhen publishing, this is ignored."
+        ), keymode=TransToken.ui("Fast"),
+    ))
+    add_tooltip(UI['light_fast'], light_conf_swap.format(
+        desc=TransToken.ui(
+            "Compile with lower-quality, fast lighting. This speeds up compile "
+            "times, but does not appear as good. Some shadows may appear "
+            "wrong.\nWhen publishing, this is ignored."
+        ), keymode=TransToken.ui("Full"),
+    ))
+    add_tooltip(UI['light_full'], light_conf_swap.format(
+        desc=TransToken.ui(
+            "Compile with high-quality lighting. This looks correct, but takes "
+            "longer to compute. Use if you're arranging lights.\nWhen "
+            "publishing, this is always used."
+        ), keymode=TransToken.ui("Fast"),
+    ))
 
     packfile_enable = TransToken.ui('Enable packing').apply(ttk.Checkbutton(
         frame,
         variable=packfile_auto_enable,
     ))
     packfile_enable.grid(row=2, column=0, sticky='ew')
-    add_tooltip(packfile_enable, gettext(
+    add_tooltip(packfile_enable, TransToken.ui(
         "Disable automatically packing resources in the map. This can speed up building and allows "
         "editing files and running reload commands, but can cause some resources to not work "
         "correctly. Regardless of this setting, packing is enabled when publishing. "
@@ -519,7 +515,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
 
     set_pack_dump_enabled()
 
-    add_tooltip(packfile_dump_enable_chk, gettext(
+    add_tooltip(packfile_dump_enable_chk, TransToken.ui(
         "When compiling, dump all files which were packed into the map. "
         "Useful if you're intending to edit maps in Hammer."
     ))
@@ -581,7 +577,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         lambda: refresh_counts(count_brush, count_entity, count_overlay),
     )
     UI['refresh_counts'].grid(row=3, column=1)
-    add_tooltip(UI['refresh_counts'], gettext(
+    add_tooltip(UI['refresh_counts'], TransToken.ui(
         "Refresh the compile progress bars. Press after a compile has been "
         "performed to show the new values."
     ))
@@ -633,10 +629,10 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     )
     TransToken.ui("Use voiceline priorities").apply(voice_priority)
     voice_priority.grid(row=0, column=0)
-    add_tooltip(voice_priority, gettext(
+    add_tooltip(voice_priority, TransToken.ui(
         "Only choose the highest-priority voicelines. This means more generic "
-        "lines will can only be chosen if few test elements are in the map. "
-        "If disabled any applicable lines will be used."
+        "lines will only be chosen if few test elements are in the map. "
+        "If disabled a random applicable lines will be used."
     ))
 
     elev_frame = ttk.LabelFrame(frame, labelanchor='n')
@@ -672,17 +668,18 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
-    elev_conf_swap = gettext(
+    elev_conf_swap = TransToken.ui(
+        "{desc}\n\n"
         "You can hold down Shift during the start of the Geometry stage to quickly swap which"
         "location you spawn at on the fly."
     )
-    add_tooltip(elev_elevator, gettext(
+    add_tooltip(elev_elevator, elev_conf_swap.format(desc=TransToken.ui(
         "When previewing in SP, spawn inside the entry elevator. Use this to "
         "examine the entry and exit corridors."
-    ) + "\n\n" + elev_conf_swap)
-    add_tooltip(elev_preview, gettext(
+    )))
+    add_tooltip(elev_preview, elev_conf_swap.format(desc=TransToken.ui(
         "When previewing in SP, spawn just before the entry door."
-    ) + "\n\n" + elev_conf_swap)
+    )))
 
     TransToken.ui('Select Corridors').apply(
         ttk.Button(frame, command=corr.show)

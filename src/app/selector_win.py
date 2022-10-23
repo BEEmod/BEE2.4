@@ -103,8 +103,8 @@ AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
 TRANS_BLANK = TransToken.untranslated('')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
+TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
 TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
-
 
 @attrs.define
 class AttrDef:
@@ -242,8 +242,6 @@ class Item:
         '_context_lbl',
         '_context_ind',
     ]
-    desc: tkMarkdown.MarkdownData
-
     def __init__(
         self,
         name,
@@ -730,10 +728,7 @@ class SelectorWin(Generic[CallbackT]):
                 width=2,
             )
             samp_button.grid(row=0, column=1)
-            add_tooltip(
-                samp_button,
-                gettext("Play a sample of this item."),
-            )
+            add_tooltip(samp_button, TransToken.ui("Play a sample of this item."))
 
             # On start/stop, update the button label.
             self.sampler = sound.SamplePlayer(
@@ -947,7 +942,7 @@ class SelectorWin(Generic[CallbackT]):
         )
         self.disp_btn.pack(side='right')
 
-        add_tooltip(self.display, str(self.description), show_when_disabled=True)
+        add_tooltip(self.display, self.description, show_when_disabled=True)
 
         # Set this property again, which updates the description if we actually
         # are readonly.
@@ -978,10 +973,10 @@ class SelectorWin(Generic[CallbackT]):
 
         if value:
             new_st = ['disabled']
-            set_tooltip(self.display, str(self.readonly_description))
+            set_tooltip(self.display, self.readonly_description)
         else:
             new_st = ['!disabled']
-            set_tooltip(self.display, str(self.description))
+            set_tooltip(self.display, self.description)
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
@@ -1259,6 +1254,9 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
+        item_desc = item.desc
+        if isinstance(item.desc, TransToken):  # Translate now.
+            item_desc = tkMarkdown.MarkdownData.text(str(item.desc))
         if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
@@ -1268,10 +1266,10 @@ class SelectorWin(Generic[CallbackT]):
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 tkMarkdown.MarkdownData.text('\n'),
-                item.desc,
+                item_desc,
             ))
         else:
-            self.prop_desc.set_text(item.desc)
+            self.prop_desc.set_text(item_desc)
 
         self.selected.button.state(('!alternate',))
         self.selected = item
@@ -1307,9 +1305,8 @@ class SelectorWin(Generic[CallbackT]):
             elif attr.type is AttrTypes.COLOR:
                 assert isinstance(val, Vec)
                 img.apply(attr.label, img.Handle.color(val, 16, 16))
-                # Display the full color when hovering..
-                # i18n: Tooltip for colour swatch.
-                set_tooltip(attr.label, gettext('Color: R={r}, G={g}, B={b}').format(
+                # Display the full color when hovering...
+                set_tooltip(attr.label, TRANS_ATTR_COLOR.format(
                     r=int(val.x), g=int(val.y), b=int(val.z),
                 ))
             elif attr.type is AttrTypes.LIST:

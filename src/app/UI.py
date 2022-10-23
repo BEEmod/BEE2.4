@@ -792,7 +792,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
             do_action = messagebox.askyesno(
                 'BEEMOD2',
-                message + optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export],
+                message + str(optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export]),
                 parent=TK_ROOT,
             )
         else:  # No action to do, so just show an OK.

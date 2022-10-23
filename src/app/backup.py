@@ -21,7 +21,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
 from tkinter import filedialog, messagebox, ttk
 from app.tooltip import add_tooltip
-from localisation import gettext, ngettext
+from localisation import TransToken, gettext, ngettext
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -814,10 +814,7 @@ def init() -> None:
         command=ui_refresh_game,
     )
     game_refresh.grid(row=0, column=1, sticky='E')
-    add_tooltip(
-        game_refresh,
-        "Reload the map list.",
-    )
+    add_tooltip(game_refresh, TransToken.ui("Reload the map list."))
     img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
 
     UI['game_title']['textvariable'] = game_name
