@@ -123,13 +123,13 @@ EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
-    ('BACK', 'Backup Original Files'),
-    (backup.AUTO_BACKUP_STAGE, 'Backup Puzzles'),
-    ('EXP', 'Export Configuration'),
-    ('COMP', 'Copy Compiler'),
-    ('RES', 'Copy Resources'),
-    ('MUS', 'Copy Music'),
-    title_text='Exporting',
+    ('BACK', TransToken.ui('Backup Original Files')),
+    (backup.AUTO_BACKUP_STAGE, TransToken.ui('Backup Puzzles')),
+    ('EXP', TransToken.ui('Export Configuration')),
+    ('COMP', TransToken.ui('Copy Compiler')),
+    ('RES', TransToken.ui('Copy Resources')),
+    ('MUS', TransToken.ui('Copy Music')),
+    title_text=TransToken.ui('Exporting'),
 )
 
 EXE_SUFFIX = (

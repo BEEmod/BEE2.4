@@ -18,10 +18,10 @@ import srctools.logger
 import config.gen_opts
 from app import logWindow
 import config
-from localisation import gettext
+from localisation import TransToken, gettext
 import utils
 
-from typing import Set, Tuple, cast, Any, Type
+from typing import Set, Tuple, List, cast, Any, Type
 
 
 # Keep a reference to all loading screens, so we can close them globally.
@@ -96,20 +96,27 @@ class LoadScreen:
 
     def __init__(
         self,
-        *stages: Tuple[str, str],
-        title_text: str,
+        *stages: Tuple[str, TransToken],
+        title_text: TransToken,
         is_splash: bool=False,
     ):
-        self.active = False
-        self._time = 0.0
-        self.stage_ids = {st_id for st_id, title in stages}
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
+        self.active = False
+        self._time = 0.0
+        self.stage_ids: Set[str] = set()
+        self.stage_labels: List[TransToken] = []
+        self.title = title_text
 
+        init: List[Tuple[str, str]] = []
+        for st_id, title in stages:
+            init.append((st_id, str(title)))
+            self.stage_labels.append(title)
+            self.stage_ids.add(st_id)
+
+        # Order the daemon to make this screen. We pass translated text in for the splash screen.
+        self._send_msg('init', is_splash, str(title_text), init)
         _ALL_SCREENS.add(self)
-
-        # Order the daemon to make this screen.
-        self._send_msg('init', is_splash, title_text, stages)
 
     def __enter__(self) -> 'LoadScreen':
         """LoadScreen can be used as a context manager.
@@ -182,7 +189,8 @@ class LoadScreen:
         """Display the loading screen."""
         self.active = True
         self._time = time.perf_counter()
-        self._send_msg('show')
+        # Translate and send these across now.
+        self._send_msg('show', str(self.title), list(map(str, self.stage_labels)))
 
     def reset(self) -> None:
         """Hide the loading screen and reset all the progress bars."""
@@ -207,7 +215,7 @@ class LoadScreen:
 
 
 def shutdown() -> None:
-    """Instruct the daemon process to shutdown."""
+    """Instruct the daemon process to shut down."""
     try:
         _PIPE_MAIN_SEND.send(('quit_daemon', None, None))
     except BrokenPipeError:  # Already quit, don't care.
@@ -244,9 +252,9 @@ BG_PROC = multiprocessing.Process(
 BG_PROC.start()
 
 main_loader = LoadScreen(
-    ('PAK', gettext('Packages')),
-    ('OBJ', gettext('Loading Objects')),
-    ('UI', gettext('Initialising UI')),
-    title_text=gettext('Better Extended Editor for Portal 2'),
+    ('PAK', TransToken.ui('Packages')),
+    ('OBJ', TransToken.ui('Loading Objects')),
+    ('UI', TransToken.ui('Initialising UI')),
+    title_text=TransToken.ui('Better Extended Editor for Portal 2'),
     is_splash=True,
 )

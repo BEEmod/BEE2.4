@@ -50,6 +50,7 @@ BOX_LEVELS = [
 ]
 START = '1.0'  # Row 1, column 0 = first character
 
+
 class BaseLoadScreen:
     """Code common to both loading screen types."""
     def __init__(
@@ -114,8 +115,12 @@ class BaseLoadScreen:
             y=self.win.winfo_y() + (event.y - self.drag_y),
         ))
 
-    def op_show(self) -> None:
+    def op_show(self, title: str, labels: list[str]) -> None:
         """Show the window."""
+        self.win.title(title)
+        for (st_id, _), name in zip(self.stages, labels):
+            self.names[st_id] = name
+
         self.is_shown = True
         self.win.deiconify()
         self.win.lift()
@@ -178,12 +183,13 @@ class LoadScreen(BaseLoadScreen):
         self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
 
-        ttk.Label(
+        self.title_lbl = ttk.Label(
             self.frame,
             text=self.title_text + '...',
             font=("Helvetica", 12, "bold"),
             cursor=tk_tools.Cursors.WAIT,
-        ).grid(row=0, column=0)
+        )
+        self.title_lbl.grid(row=0, column=0)
         ttk.Separator(
             self.frame,
             orient=tk.HORIZONTAL,
@@ -198,16 +204,18 @@ class LoadScreen(BaseLoadScreen):
 
         self.bar_var = {}
         self.bars = {}
+        self.titles = {}
         self.labels = {}
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
             if stage_name:
                 # If stage name is blank, don't add a caption
-                ttk.Label(
+                self.titles[st_id] = ttk.Label(
                     self.frame,
                     text=stage_name + ':',
                     cursor=tk_tools.Cursors.WAIT,
-                ).grid(
+                )
+                self.titles[st_id].grid(
                     row=ind * 2 + 2,
                     columnspan=2,
                     sticky="W",
@@ -248,6 +256,16 @@ class LoadScreen(BaseLoadScreen):
             self.values[stage],
             max_val,
         )
+
+    def op_show(self, title: str, labels: list[str]) -> None:
+        """Show the window."""
+        self.title_text = title
+        self.win.title(title)
+        self.title_lbl['text'] = title + '...',
+        for (st_id, _), name in zip(self.stages, labels):
+            if st_id in self.titles:
+                self.titles[st_id]['text'] = name + ':'
+        super().op_show(title, labels)
 
     def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
@@ -476,6 +494,7 @@ class SplashScreen(BaseLoadScreen):
                 )
 
     def update_stage(self, stage: str) -> None:
+        """Update all the text."""
         if self.maxes[stage] == 0:
             text = f'{self.names[stage]}: (0/0)'
             self.set_bar(stage, 1)
@@ -531,6 +550,7 @@ class SplashScreen(BaseLoadScreen):
             canvas.tag_lower('tick_' + stage, 'bar_' + stage)
 
     def reset_stages(self) -> None:
+        """Reset all stages."""
         pass
 
     def op_skip_stage(self, stage: str) -> None:
