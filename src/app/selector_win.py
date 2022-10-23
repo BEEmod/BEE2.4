@@ -1473,6 +1473,7 @@ class SelectorWin(Generic[CallbackT]):
         """
         self.pal_frame.update_idletasks()
         self.pal_frame['width'] = self.wid_canvas.winfo_width()
+        self.desc_label['wraplength'] = self.win.winfo_width() - 10
 
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
