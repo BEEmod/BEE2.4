@@ -62,7 +62,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    data.text.apply(context_label['text'])
+    data.text.apply(context_label)
     img.apply(context_label, data.img)
 
     window.deiconify()
@@ -131,7 +131,7 @@ def set_tooltip(
     """Change the tooltip for a widget."""
     if isinstance(text, str):
         warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning)
-        text = TransToken.untranslated('')
+        text = TransToken.untranslated(text)
     DATA[widget] = TooltipData(text, image)
 
 

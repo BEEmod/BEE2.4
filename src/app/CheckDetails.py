@@ -15,7 +15,7 @@ import attrs
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
-from localisation import gettext
+from localisation import TransToken, gettext
 
 
 UP_ARROW = '\u25B3'
@@ -75,7 +75,7 @@ class Item(Generic[UserT]):
     def __init__(
         self: 'Item[None]',
         *values: str,
-        hover_text: str='',
+        hover_text: TransToken = TransToken.untranslated(''),
         lock_check: bool=False,
         state: bool=False,
     ) -> None: ...
@@ -83,7 +83,7 @@ class Item(Generic[UserT]):
     def __init__(
         self: 'Item[UserT]',
         *values: str,
-        hover_text: str='',
+        hover_text: TransToken = TransToken.untranslated(''),
         lock_check: bool=False,
         state: bool=False,
         user: UserT,
@@ -91,7 +91,7 @@ class Item(Generic[UserT]):
     def __init__(
         self,
         *values: str,
-        hover_text: str='',
+        hover_text: TransToken = TransToken.untranslated(''),
         lock_check: bool=False,
         state: bool=False,
         user: UserT | None = None,
@@ -145,7 +145,7 @@ class Item(Generic[UserT]):
                 anchor=tk.W,
                 background='white',
             )
-            add_tooltip(wid, self.hover_text or '')
+            add_tooltip(wid, self.hover_text)
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
@@ -245,7 +245,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         )
         self.wid_head_check.grid(row=0, column=0)
 
-        add_tooltip(self.wid_head_check, gettext("Toggle all checkboxes."))
+        add_tooltip(self.wid_head_check, TransToken.ui("Toggle all checkboxes."))
 
         def checkbox_enter(_: tk.Event) -> None:
             """When hovering over the 'all' checkbox, highlight the others."""

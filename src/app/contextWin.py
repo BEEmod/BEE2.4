@@ -399,12 +399,12 @@ def load_item_data() -> None:
         if real_conn_item.force_input:
             # Strip to remove \n if blurb is empty.
             blurb = ('Input force-enabled!\n' + blurb).strip()
-        tooltip.set_tooltip(wid_sprite[SPR.INPUT], blurb)
+        tooltip.set_tooltip(wid_sprite[SPR.INPUT], TransToken.untranslated(blurb))
 
         blurb = real_conn_item.conn_config.get_output_blurb()
         if real_conn_item.force_output:
             blurb = ('Output force-enabled!\n' + blurb).strip()
-        tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], blurb)
+        tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TransToken.untranslated(blurb))
 
 
 def adjust_position(e=None) -> None:
@@ -483,7 +483,7 @@ def init_widgets() -> None:
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky='e')
     tooltip.add_tooltip(
         wid['ent_count'],
-        gettext(
+        TransToken.ui(
             'The number of entities used for this item. The Source engine '
             'limits this to 2048 in total. This provides a guide to how many of '
             'these items can be placed in a map at once.'
@@ -566,6 +566,7 @@ def init_widgets() -> None:
     menu_info.add_command(label='', state='disabled')
 
     def show_item_props() -> None:
+        """Display the item properties pane."""
         sound.fx('expand')
         itemPropWin.show_window(
             selected_item.get_properties(),
@@ -573,15 +574,12 @@ def init_widgets() -> None:
             selected_sub_item.name,
         )
 
-    wid['changedefaults'] = ttk.Button(
-        f,
-        text=gettext("Change Defaults..."),
-        command=show_item_props,
-        )
+    wid['changedefaults'] = ttk.Button(f, command=show_item_props)
+    TransToken.ui("Change Defaults...").apply(wid['changedefaults'])
     wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],
-        gettext('Change the default settings for this item when placed.')
+        TransToken.ui('Change the default settings for this item when placed.')
     )
 
     wid['variant'] = ttk.Combobox(

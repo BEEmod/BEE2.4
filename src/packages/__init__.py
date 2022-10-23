@@ -27,6 +27,10 @@ from typing import (
     NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
     Collection, Iterable, cast,
 )
+
+from localisation import TransToken
+
+
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
     from loadScreen import LoadScreen
@@ -682,7 +686,8 @@ async def parse_package(
                 pack.disp_name,
             )
 
-    pack.desc = '\n'.join(desc)
+    if desc:
+        pack.desc = TransToken.parse(pack.id, '\n'.join(desc))
 
     for template in pack.fsys.walk_folder('templates'):
         await trio.sleep(0)
@@ -778,7 +783,7 @@ class Package:
         self.info = info
         self.path = path
         self.disp_name = disp_name
-        self.desc = ''  # Filled in by parse_package.
+        self.desc = TransToken.ui('No description!')  # Filled in by parse_package.
 
     @property
     def enabled(self) -> bool:

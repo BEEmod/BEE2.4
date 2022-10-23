@@ -628,7 +628,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
             'styles feature these. If set to "None", a random video will be selected each time the '
             'map is played, like in the default PeTI.'
         ),
-        readonly_desc=gettext('This style does not have a elevator video screen.'),
+        readonly_desc=TransToken.ui('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
@@ -1170,7 +1170,7 @@ async def init_option(
     img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
         UI['conf_voice'],
-        gettext('Enable or disable particular voice lines, to prevent them from being added.'),
+        TransToken.ui('Enable or disable particular voice lines, to prevent them from being added.'),
     )
 
     if utils.WIN:
@@ -1587,7 +1587,7 @@ async def init_windows() -> None:
     )
     tooltip.add_tooltip(
         UI['shuffle_pal'],
-        gettext('Fill empty spots in the palette with random items.'),
+        TransToken.ui('Fill empty spots in the palette with random items.'),
     )
 
     # Make scrollbar work globally

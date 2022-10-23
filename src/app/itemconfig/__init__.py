@@ -11,7 +11,7 @@ import attrs
 from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 from config.widgets import WidgetConfig
-from localisation import gettext
+from localisation import TransToken, gettext
 import BEE2_config
 import config
 import utils
@@ -48,8 +48,14 @@ CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 TIMER_NUM = list(map(str, range(3, 31)))
 TIMER_NUM_INF = ['inf', *TIMER_NUM]
 
-INF = '∞'
-
+INF = TransToken.untranslated('∞')
+# This is mainly a cache to save creating a bunch of copies of these tokens.
+TIMER_NUM_TRANS = {
+    num: TransToken.untranslated(num)
+    for num in TIMER_NUM
+}
+TIMER_NUM_TRANS['inf'] = INF
+TRANS_TIM_COLON = TransToken.untranslated('{tim}:')
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
@@ -81,7 +87,7 @@ class Widget:
     group_id: str
     id: str
     name: str
-    tooltip: str
+    tooltip: TransToken
     config: Property
     create_func: SingleCreateFunc
 
@@ -221,7 +227,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             use_inf = is_timer and wid.bool('HasInf')
             wid_id = wid['id'].casefold()
             name = wid['Label', wid_id]
-            tooltip = wid['Tooltip', '']
+            tooltip = TransToken.parse(data.pak_id, wid['Tooltip', ''])
             default_prop = wid.find_key('Default', '')
             values: list[tuple[str, tk.StringVar]]
 
@@ -553,14 +559,11 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
         """Generically make a set of labels."""
         for row, (tim_val, var) in enumerate(values):
-            if tim_val == 'inf':
-                timer_disp = INF
-            else:
-                timer_disp = tim_val
-
+            timer_disp = TIMER_NUM_TRANS[tim_val]
             parent.columnconfigure(1, weight=1)
 
-            label = ttk.Label(parent, text=timer_disp + ':')
+            label = ttk.Label(parent)
+            TRANS_TIM_COLON.format(tim=timer_disp).apply(label)
             label.grid(row=row, column=0)
             widget, update = await widget_func(
                 parent,
@@ -576,14 +579,14 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
 def multi_grid(
     values: List[Tuple[str, tk.StringVar]],
     columns: int = 10,
-) -> Iterator[Tuple[int, int, str, str, tk.StringVar]]:
+) -> Iterator[Tuple[int, int, str, TransToken, tk.StringVar]]:
     """Generate the row and columns needed for a nice layout of widgets."""
     for tim, var in values:
         if tim == 'inf':
             tim_disp = INF
             index = 0
         else:
-            tim_disp = str(tim)
+            tim_disp = TIMER_NUM_TRANS[tim]
             index = int(tim)
         row, column = divmod(index - 1, columns)
         yield row, column, tim, tim_disp, var
