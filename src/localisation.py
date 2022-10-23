@@ -1,5 +1,5 @@
 """Wraps gettext, to localise all UI text."""
-from typing import Callable, Dict, List, Mapping, TYPE_CHECKING, TypeVar, Union
+from typing import Callable, Dict, List, Mapping, TYPE_CHECKING, TypeVar, Union, cast
 from typing_extensions import ParamSpec, Final, TypeAlias
 from weakref import WeakKeyDictionary
 import gettext as gettext_mod
@@ -99,11 +99,7 @@ class TransToken:
 
     def format(self, /, **kwargs: object) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
-        return TransToken(
-            self.namespace,
-            self.token,
-            {**self.parameters, **kwargs},
-        )
+        return attrs.evolve(self, parameters={**self.parameters, **kwargs})
 
     def __bool__(self) -> bool:
         """The boolean value of a token is whether the token is entirely blank.
@@ -119,6 +115,7 @@ class TransToken:
                 self.token == other.token and
                 self.parameters == other.parameters
             )
+        return NotImplemented
 
     def __hash__(self) -> int:
         """Allow hashing the token."""
@@ -164,6 +161,76 @@ class TransToken:
         _langchange_callback.append(func)
         if call:
             func()
+
+
+@attrs.frozen(eq=False)
+class PluralTransToken(TransToken):
+    """A pair of tokens, swapped between depending on the number of items.
+
+    It must be formatted with an "n" parameter.
+    """
+    token_plural: str = attrs.Factory(lambda s: s.token, takes_self=True)
+
+    @classmethod
+    def ui(cls, singular: str, plural: str = '',  /, **kwargs: str) -> 'TransToken':
+        """Make a token for a UI string."""
+        if not plural:
+            plural = singular
+        return cls(NS_UI, singular, kwargs, token_plural=plural)
+
+    @classmethod
+    def untranslated(cls, text: str, plural: str = '') -> 'TransToken':
+        """Make a token that is not actually translated at all."""
+        if not plural:
+            plural = text
+        return cls(NS_UNTRANSLATED, text, token_plural=plural)
+
+    @classmethod
+    def parse(cls, package: str, text: str) -> 'TransToken':
+        """Parse a string to find a translation token, if any."""
+        raise NotImplementedError('Cannot be parsed from files.')
+
+    @classmethod
+    def from_valve(cls, text: str) -> 'TransToken':
+        """Make a token for a string that should be looked up in Valve's translation files."""
+        raise NotImplementedError("Valve's files have no plural translations.")
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, PluralTransToken):
+            return (
+                self.namespace == other.namespace and
+                self.token == other.token and
+                self.token_plural == other.token_plural and
+                self.parameters == other.parameters
+            )
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Allow hashing the token."""
+        return hash((
+            self.namespace, self.token, self.token_plural,
+            frozenset(self.parameters.items()),
+        ))
+
+    def __str__(self) -> str:
+        """Calling str on a token translates it. Plural tokens require an "n" parameter."""
+        try:
+            n = int(cast(str, self.parameters['n']))
+        except KeyError:
+            raise ValueError('Plural token requires "n" parameter!')
+
+        # If in the untranslated namespace or blank, don't translate.
+        if self.namespace == NS_UNTRANSLATED or not self.token:
+            result = self.token if n == 1 else self.token_plural
+        elif self.namespace == NS_UI:
+            result = _TRANSLATOR.ngettext(self.token, self.token_plural, n)
+        else:
+            raise ValueError(f'Namespace "{self.namespace}" is not allowed.')
+
+        if self.parameters:
+            return result.format_map(self.parameters)
+        else:
+            return result
 
 
 def load_basemodui(basemod_loc: str) -> None:

@@ -11,7 +11,7 @@ import trio
 
 from packages import Style, StyleVar, PackagesSet
 from app import tooltip
-from localisation import TransToken, ngettext, gettext
+from localisation import PluralTransToken, TransToken
 from config.stylevar import State
 import config
 
@@ -105,6 +105,8 @@ TRANS_DEFAULT = {
     False: TransToken.ui('Default: Off'),
     True: TransToken.ui('Default: On'),
 }
+# i18n: Tooltip when specific styles are used
+TRANS_STYLES = PluralTransToken.ui('Style: {styles}', 'Styles: {styles}')
 # i18n: StyleVar which is totally unstyled.
 TRANS_UNSTYLED = TransToken.ui('Styles: Unstyled')
 # i18n: StyleVar which matches all styles.
@@ -152,17 +154,16 @@ def make_desc(packset: PackagesSet, var: StyleVar) -> TransToken:
                 for style in
                 app_styles
             )
-            style_desc = TransToken.untranslated(ngettext(
-                # i18n: The styles a StyleVar is allowed for.
-                'Style: {}', 'Styles: {}', len(style_list),
-            ).format(', '.join(style_list)))
+            style_desc = TRANS_STYLES.format(
+                styles=', '.join(style_list),
+                n=len(style_list),
+            )
 
     res = TRANS_TOOLTIP.format(
         desc=var.desc,
         defaults=TRANS_DEFAULT[var.default],
         styles=style_desc,
     )
-    LOGGER.debug('Tooltip: {!r}', res)
     return res
 
 
@@ -223,17 +224,19 @@ async def make_stylevar_pane(
     TransToken.ui("Other Styles:").apply(frm_other)
     frm_other.grid(row=3, sticky='EW')
 
-    UI['stylevar_chosen_none'] = ttk.Label(
-        frm_chosen,
-        text=gettext('No Options!'),
-        font='TkMenuFont',
-        justify='center',
+    UI['stylevar_chosen_none'] = TransToken.ui('No Options!').apply(
+        ttk.Label(
+            frm_chosen,
+            font='TkMenuFont',
+            justify='center',
+        )
     )
-    UI['stylevar_other_none'] = ttk.Label(
-        frm_other,
-        text=gettext('None!'),
-        font='TkMenuFont',
-        justify='center',
+    UI['stylevar_other_none'] = TransToken.ui('None!').apply(
+        ttk.Label(
+            frm_other,
+            font='TkMenuFont',
+            justify='center',
+        )
     )
     VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
