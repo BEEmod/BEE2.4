@@ -63,12 +63,12 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 PLAYER_MODELS = {
-    'ATLAS': gettext('ATLAS'),
-    'PBODY': gettext('P-Body'),
-    'SP': gettext('Chell'),
-    'PETI': gettext('Bendy'),
+    'ATLAS': TransToken.ui('ATLAS'),
+    'PBODY': TransToken.ui('P-Body'),
+    'SP': TransToken.ui('Chell'),
+    'PETI': TransToken.ui('Bendy'),
 }
-PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
+assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
@@ -85,12 +85,7 @@ SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
 VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
-player_model_var = tk.StringVar(
-    value=PLAYER_MODELS.get(
-        COMPILE_CFG.get_val('General', 'player_model', 'PETI'),
-        PLAYER_MODELS['PETI'],
-    )
-)
+player_model_combo: ttk.Combobox
 start_in_elev = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'spawn_elev'))
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
@@ -132,7 +127,10 @@ async def apply_state(state: CompilePaneState) -> None:
     set_screenshot()
 
     start_in_elev.set(state.spawn_elev)
-    player_model_var.set(PLAYER_MODELS[state.player_mdl])
+    try:
+        player_model_combo.current(PLAYER_MODEL_ORDER.index(state.player_mdl))
+    except IndexError:
+        LOGGER.warning('Unknown player model "{}"!', state.player_mdl)
     VOICE_PRIORITY_VAR.set(state.use_voice_priority)
 
     COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
@@ -455,7 +453,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     ))
     UI['light_full'].grid(row=0, column=2)
 
-    light_conf_swap = TransToken.ui(  # gettext: Info for toggling lighting via a key.
+    light_conf_swap = TransToken.ui(  # i18n: Info for toggling lighting via a key.
         "{desc}\n\n"
         "You can hold down Shift during the start of the Lighting stage to "
         "switch to {keymode} lighting on the fly."
@@ -606,7 +604,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
 
     These are things which mainly affect the geometry or gameplay of the map.
     """
-
+    global player_model_combo
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(frame, labelanchor='nw')
@@ -688,20 +686,30 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     model_frame = ttk.LabelFrame(frame, labelanchor='n')
     TransToken.ui('Player Model (SP):').apply(model_frame)
     model_frame.grid(row=4, column=0, sticky='ew')
-    player_mdl = ttk.Combobox(
+
+    player_model_var = tk.StringVar(value=PLAYER_MODELS.get(
+        COMPILE_CFG.get_val('General', 'player_model', 'PETI'),
+        PLAYER_MODELS['PETI'],
+    ))
+    player_model_combo = player_mdl = ttk.Combobox(
         model_frame,
         exportselection=False,
         textvariable=player_model_var,
-        values=[PLAYER_MODELS[mdl] for mdl in PLAYER_MODEL_ORDER],
         width=20,
     )
     # Users can only use the dropdown
     player_mdl.state(['readonly'])
     player_mdl.grid(row=0, column=0, sticky=tk.EW)
 
+    def update_model_values() -> None:
+        """Update the combo box when translations change."""
+        player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
+
+    TransToken.apply_global(update_model_values, call=True)
+
     def set_model(_: tk.Event) -> None:
         """Save the selected player model."""
-        model = PLAYER_MODELS_REV[player_model_var.get()]
+        model = PLAYER_MODEL_ORDER[player_mdl.current()]
         config.APP.store_conf(attrs.evolve(
             config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             player_mdl=model,
