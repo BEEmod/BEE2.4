@@ -103,6 +103,7 @@ AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
 TRANS_BLANK = TransToken.untranslated('')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
+TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
 
 
 @attrs.define
@@ -486,9 +487,9 @@ class SelectorWin(Generic[CallbackT]):
         none_icon: img.Handle = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
         # i18n: 'None' item name.
         none_name: str = gettext("<None>"),
-        title: str = 'BEE2',
-        desc: str = '',
-        readonly_desc: str = '',
+        title: TransToken = TransToken.untranslated('???'),
+        desc: TransToken = TRANS_BLANK,
+        readonly_desc: TransToken = TRANS_BLANK,
         callback: Optional[Callable[Concatenate[Optional[str], CallbackT], None]]=None,
         callback_params: CallbackT.args=(),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
@@ -606,8 +607,8 @@ class SelectorWin(Generic[CallbackT]):
 
         self.win = tk.Toplevel(parent, name='selwin_' + save_id)
         self.win.withdraw()
-        self.win.title("BEE2 - " + title)
         self.win.transient(master=parent)
+        TRANS_WINDOW_TITLE.format(subtitle=title).apply_win_title(self.win)
 
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
@@ -639,19 +640,16 @@ class SelectorWin(Generic[CallbackT]):
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
-        if desc:
-            self.desc_label = ttk.Label(
-                self.win,
-                name='desc_label',
-                text=desc,
-                justify='left',
-                anchor='w',
-                width=5,  # Keep a small width, so this doesn't affect the
-                # initial window size.
-            )
-            self.desc_label.grid(row=0, column=0, sticky='EW')
-        else:
-            self.desc_label = None
+        self.desc_label = ttk.Label(
+            self.win,
+            name='desc_label',
+            justify='left',
+            anchor='w',
+            width=5,  # Keep a small width, so this doesn't affect the
+            # initial window size.
+        )
+        desc.apply(self.desc_label)
+        self.desc_label.grid(row=0, column=0, sticky='EW')
 
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = tk.PanedWindow(
@@ -949,7 +947,7 @@ class SelectorWin(Generic[CallbackT]):
         )
         self.disp_btn.pack(side='right')
 
-        add_tooltip(self.display, self.description, show_when_disabled=True)
+        add_tooltip(self.display, str(self.description), show_when_disabled=True)
 
         # Set this property again, which updates the description if we actually
         # are readonly.
@@ -980,10 +978,10 @@ class SelectorWin(Generic[CallbackT]):
 
         if value:
             new_st = ['disabled']
-            set_tooltip(self.display, self.readonly_description)
+            set_tooltip(self.display, str(self.readonly_description))
         else:
             new_st = ['!disabled']
-            set_tooltip(self.display, self.description)
+            set_tooltip(self.display, str(self.description))
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)

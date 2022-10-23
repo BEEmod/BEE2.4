@@ -557,8 +557,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         TK_ROOT,
         sky_list,
         save_id='skyboxes',
-        title=gettext('Select Skyboxes'),
-        desc=gettext(
+        title=TransToken.ui('Select Skyboxes'),
+        desc=TransToken.ui(
             'The skybox decides what the area outside the chamber is like. It chooses the colour '
             'of sky (seen in some items), the style of bottomless pit (if present), as well as '
             'color of "fog" (seen in larger chambers).'
@@ -576,8 +576,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         TK_ROOT,
         voice_list,
         save_id='voicelines',
-        title=gettext('Select Additional Voice Lines'),
-        desc=gettext(
+        title=TransToken.ui('Select Additional Voice Lines'),
+        desc=TransToken.ui(
             'Voice lines choose which extra voices play as the player enters or exits a chamber. '
             'They are chosen based on which items are present in the map. The additional '
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
@@ -601,8 +601,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         style_list,
         save_id='styles',
         default_id='BEE2_CLEAN',
-        title=gettext('Select Style'),
-        desc=gettext(
+        title=TransToken.ui('Select Style'),
+        desc=TransToken.ui(
             'The Style controls many aspects of the map. It decides the materials used for walls, '
             'the appearance of entrances and exits, the design for most items as well as other '
             'settings.\n\nThe style broadly defines the time period a chamber is set in.'
@@ -622,8 +622,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         TK_ROOT,
         elev_list,
         save_id='elevators',
-        title=gettext('Select Elevator Video'),
-        desc=gettext(
+        title=TransToken.ui('Select Elevator Video'),
+        desc=TransToken.ui(
             'Set the video played on the video screens in modern Aperture elevator rooms. Not all '
             'styles feature these. If set to "None", a random video will be selected each time the '
             'map is played, like in the default PeTI.'

@@ -37,7 +37,9 @@ TextWidget: TypeAlias = Union[
     'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
 ]
 TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
+# Assigns to widget['text'].
 _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
+# For anything else, this is called which will apply tokens.
 _langchange_callback: List[Callable[[], object]] = []
 
 
@@ -139,6 +141,10 @@ class TransToken:
         widget['text'] = str(self)
         _applied_tokens[widget] = self
         return widget
+
+    def apply_win_title(self, win: 'tk.Toplevel') -> None:
+        """Set the title of a window to this token."""
+        self.apply_global(lambda: win.title(str(self)))
 
     @classmethod
     def apply_global(cls, func: Callable[[], object], call: bool = True) -> None:
