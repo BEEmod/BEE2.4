@@ -228,7 +228,7 @@ def show(quote_pack: QuotePack):
 
     voice_item = quote_pack
 
-    win.title(gettext('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
+    TransToken.ui('BEE2 - Configure "{item}"').format(item=voice_item.selitem_data.name).apply_title(win)
     win.grab_set()
     notebook = UI['tabs']
 

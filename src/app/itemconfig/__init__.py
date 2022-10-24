@@ -11,7 +11,7 @@ import attrs
 from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 from config.widgets import WidgetConfig
-from localisation import TransToken, gettext
+from localisation import TransToken
 import BEE2_config
 import config
 import utils
@@ -175,7 +175,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
     def __init__(
         self,
         conf_id: str,
-        group_name: str,
+        group_name: TransToken,
         desc,
         widgets: List[SingleWidget],
         multi_widgets: List[MultiWidget],
@@ -197,9 +197,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         if data.is_override:
             # Override doesn't have a name
-            group_name = ''
+            group_name = TransToken.untranslated('')
         else:
-            group_name = props['Name']
+            group_name = TransToken.parse(data.pak_id, props['Name'])
 
         desc = packages.desc_parse(props, data.id, data.pak_id)
 
@@ -427,7 +427,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
 
 # Special group injected for the stylevar display.
-STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', gettext('Style Properties'), '', [], [])
+STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', TransToken.ui('Style Properties'), '', [], [])
 
 
 async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Callable[[], None]) -> None:
@@ -451,17 +451,27 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
 
     ordered_conf: List[ConfigGroup] = sorted(
         packages.LOADED.all_obj(ConfigGroup),
-        key=lambda grp: grp.name,
+        key=lambda grp: str(grp.name),
     )
     ordered_conf.insert(0, STYLEVAR_GROUP)
     selector = ttk.Combobox(
         window,
         exportselection=False,
         state='readonly',
-        values=[grp.name for grp in ordered_conf],
+        values=[str(grp.name) for grp in ordered_conf],
     )
     selector.grid(row=0, column=0, columnspan=2, sticky='ew')
-    selector.set(STYLEVAR_GROUP.name)
+
+    def update_selector() -> None:
+        """Update translations in the selector box."""
+        old_sel = ordered_conf[selector.current()]
+        # Stylevar always goes at the start.
+        ordered_conf.sort(key=lambda grp: (0 if grp is STYLEVAR_GROUP else 1, str(grp.name)))
+        selector['values'] = [str(grp.name) for grp in ordered_conf]
+        selector.current(ordered_conf.index(old_sel))
+
+    TransToken.add_callback(update_selector, call=False)
+    selector.current(ordered_conf.index(STYLEVAR_GROUP))
 
     # Need to use a canvas to allow scrolling.
     canvas = tk.Canvas(window, highlightthickness=0)
@@ -486,7 +496,8 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     stylevar_frame = ttk.Frame(canvas_frame)
     await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.LOADED, update_item_vis)
 
-    loading_text = ttk.Label(canvas_frame, text=gettext('Loading...'))
+    loading_text = ttk.Label(canvas_frame)
+    TransToken.ui('Loading...').apply(loading_text)
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 

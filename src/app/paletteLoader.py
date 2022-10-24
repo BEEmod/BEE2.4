@@ -11,7 +11,7 @@ from uuid import UUID, uuid4, uuid5
 import srctools.logger
 from srctools import Property, NoKeyError, KeyValError
 
-from localisation import gettext
+from localisation import TransToken
 import config
 import consts
 import utils
@@ -23,21 +23,21 @@ GROUP_BUILTIN = '<BUILTIN>'
 PAL_EXT = '.bee2_palette'
 
 # Allow translating the names of the built-in palettes
-TRANS_NAMES: dict[str, str] = {
+TRANS_NAMES: dict[str, TransToken] = {
     # i18n: Last exported items
-    'LAST_EXPORT': gettext('<Last Export>'),
+    'LAST_EXPORT': TransToken.ui('<Last Export>'),
     # i18n: Empty palette name
-    'EMPTY': gettext('Blank'),
+    'EMPTY': TransToken.ui('Blank'),
 
     # i18n: BEEmod 1 palette.
-    'BEEMOD': gettext('BEEMod'),
+    'BEEMOD': TransToken.ui('BEEMod'),
     # i18n: Default items merged together
-    'P2_COLLAPSED': gettext('Portal 2 Collapsed'),
+    'P2_COLLAPSED': TransToken.ui('Portal 2 Collapsed'),
 
     # i18n: Original Palette
-    'PORTAL2': gettext('Portal 2'),
+    'PORTAL2': TransToken.ui('Portal 2'),
     # i18n: Aperture Tag's palette
-    'APTAG': gettext('Aperture Tag'),
+    'APTAG': TransToken.ui('Aperture Tag'),
 }
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
@@ -211,13 +211,14 @@ class Palette:
         uuid: UUID = None,
     ) -> None:
         # Name of the palette
-        self.name = name
         self.trans_name = trans_name
         if trans_name:
             try:
                 self.name = TRANS_NAMES[trans_name.upper()]
             except KeyError:
                 LOGGER.warning('Unknown translated palette "{}', trans_name)
+        else:
+            self.name = TransToken.untranslated(name)
 
         # Group to show the palette in.
         self.group = group
@@ -301,8 +302,8 @@ class Palette:
         """
         LOGGER.info('Saving "{}"!', self.name)
         props = Property.root(
-            Property('Name', self.name),
-            Property('TransName', self.trans_name),
+            Property('Name', 'name'),
+            Property('TransName', 'trans_name'),
             Property('Group', self.group),
             Property('ReadOnly', srctools.bool_as_int(self.readonly)),
             Property('UUID', self.uuid.hex),
@@ -315,8 +316,10 @@ class Palette:
         # Remove the translated name, in case it's not going to write
         # properly to the file.
         if self.trans_name:
+            props['TransName'] = self.trans_name
             props['Name'] = ''
         else:
+            props['Name'] = self.name.token
             del props['TransName']
 
         if self.settings is not None:

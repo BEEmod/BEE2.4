@@ -249,10 +249,10 @@ def load_basemodui(basemod_loc: str) -> None:
             if key.startswith(PETI_KEY_PREFIX):
                 trans_data[key] = value.replace("\\'", "'")
 
-    if gettext('Quit') == '####':
+    if isinstance(_TRANSLATOR, DummyTranslations):
         # Dummy translations installed, apply here too.
         for key in trans_data:
-            trans_data[key] = gettext(key)
+            trans_data[key] = '#' * len(key)
 
 
 class DummyTranslations(gettext_mod.NullTranslations):
@@ -345,7 +345,7 @@ def setup(logger: logging.Logger) -> None:
 
     # Some lang-specific overrides..
 
-    if gettext('__LANG_USE_SANS_SERIF__') == 'YES':
+    if _TRANSLATOR.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
         # For Japanese/Chinese, we want a 'sans-serif' / gothic font
         # style.
         try:
