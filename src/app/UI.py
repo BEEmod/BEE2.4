@@ -1716,3 +1716,9 @@ async def init_windows() -> None:
     style_select_callback(style_win.chosen_id)
     await set_palette(pal_ui.selected)
     pal_ui.update_state()
+
+    import localisation
+    LOGGER.info('Total tokens: {} norm', len(localisation._applied_tokens))
+    LOGGER.info('Menu tokens: \n{}', '\n'.join([
+        f'- {k!r}: {v!r}' for k, v in localisation._applied_menu_tokens.items()
+    ]))

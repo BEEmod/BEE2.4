@@ -82,7 +82,7 @@ def make_window() -> None:
     """Initialise the window."""
     global list_widget
     window.transient(TK_ROOT)
-    window.title(gettext('BEE2 - Manage Packages'))
+    TransToken.ui('BEE2 - Manage Packages').apply_title(window)
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -102,14 +102,10 @@ def make_window() -> None:
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    ttk.Button(
-        frame,
-        text=gettext('OK'),
-        command=apply_changes,
+    TransToken.ui('OK').apply(
+        ttk.Button(frame, command=apply_changes)
     ).grid(row=1, column=0, sticky='W')
 
-    ttk.Button(
-        frame,
-        text=gettext('Cancel'),
-        command=cancel,
+    TransToken.ui('Cancel').apply(
+        ttk.Button(frame, command=cancel)
     ).grid(row=1, column=1, sticky='E')

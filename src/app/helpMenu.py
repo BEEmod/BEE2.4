@@ -532,9 +532,10 @@ async def open_url(url_key: str) -> None:
 def make_help_menu(parent: tk.Menu) -> None:
     """Create the application 'Help' menu."""
     # Using this name displays this correctly in OS X
-    help = tk.Menu(parent, name='help')
+    help_menu = tk.Menu(parent, name='help')
 
-    parent.add_cascade(menu=help, label=gettext('Help'))
+    parent.add_cascade(menu=help_menu)
+    TransToken.ui('Help').apply_menu(parent)
 
     icons: Dict[ResIcon, img.Handle] = {
         icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
@@ -547,17 +548,15 @@ def make_help_menu(parent: tk.Menu) -> None:
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:
-            help.add_separator()
+            help_menu.add_separator()
         else:
-            help.add_command(
-                label=str(res.name),  # TODO: This needs to be dynamic.
+            help_menu.add_command(
                 command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
                 image=icons[res.icon].get_tk(),
             )
+            res.name.apply_menu(help_menu)
 
-    help.add_separator()
-    help.add_command(
-        label=gettext('Credits...'),
-        command=functools.partial(background_run, credit_window.show),
-    )
+    help_menu.add_separator()
+    help_menu.add_command(command=functools.partial(background_run, credit_window.show))
+    TransToken.ui('Credits...').apply_menu(help_menu)

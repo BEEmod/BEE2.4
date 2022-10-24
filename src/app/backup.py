@@ -566,7 +566,7 @@ def show_window() -> None:
 def ui_load_backup() -> None:
     """Prompt and load in a backup file."""
     file = filedialog.askopenfilename(
-        title=gettext('Load Backup'),
+        title=str(TransToken.ui('Load Backup')),
         filetypes=[(str(TRANS_FILETYPE), '.zip')],
     )
     if not file:
@@ -625,7 +625,7 @@ def ui_save_backup() -> None:
 def ui_save_backup_as() -> None:
     """Prompt for a name, and then save a backup."""
     path = filedialog.asksaveasfilename(
-        title=gettext('Save Backup As'),
+        title=str(TransToken.ui('Save Backup As')),
         filetypes=[(str(TRANS_FILETYPE), '.zip')],
     )
     if not path:
@@ -849,21 +849,29 @@ def init_application() -> None:
         # Name is used to make this the special 'BEE2' menu item
         file_menu = menus['file'] = tk.Menu(bar, name='apple')
     else:
-        file_menu = menus['file'] = tk.Menu(bar)
-    file_menu.add_command(label=gettext('New Backup'), command=ui_new_backup)
-    file_menu.add_command(label=gettext('Open Backup'), command=ui_load_backup)
-    file_menu.add_command(label=gettext('Save Backup'), command=ui_save_backup)
-    file_menu.add_command(label=gettext('Save Backup As'), command=ui_save_backup_as)
+        file_menu = menus['file'] = tk.Menu(bar, name='file')
+
+    file_menu.add_command(command=ui_new_backup)
+    TransToken.ui('New Backup').apply_menu(file_menu)
+    file_menu.add_command(command=ui_load_backup)
+    TransToken.ui('Open Backup').apply_menu(file_menu)
+    file_menu.add_command(command=ui_save_backup)
+    TransToken.ui('Save Backup').apply_menu(file_menu)
+    file_menu.add_command(command=ui_save_backup_as)
+    TransToken.ui('Save Backup As').apply_menu(file_menu)
 
     bar.add_cascade(menu=file_menu, label=gettext('File'))
 
     game_menu = menus['game'] = tk.Menu(bar)
 
-    game_menu.add_command(label=gettext('Add Game'), command=gameMan.add_game)
-    game_menu.add_command(label=gettext('Remove Game'), command=gameMan.remove_game)
+    game_menu.add_command(command=gameMan.add_game)
+    TransToken.ui('Add Game').apply_menu(game_menu)
+    game_menu.add_command(command=gameMan.remove_game)
+    TransToken.ui('Remove Game').apply_menu(game_menu)
     game_menu.add_separator()
 
-    bar.add_cascade(menu=game_menu, label=gettext('Game'))
+    bar.add_cascade(menu=game_menu)
+    TransToken.ui('Game').apply_menu(bar)
     gameMan.game_menu = game_menu
 
     from app import helpMenu

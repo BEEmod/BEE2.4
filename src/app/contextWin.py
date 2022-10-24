@@ -560,9 +560,6 @@ def init_widgets() -> None:
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
-    menu_info = tk.Menu(wid['moreinfo'])
-    menu_info.add_command(label='', state='disabled')
-
     def show_item_props() -> None:
         """Display the item properties pane."""
         sound.fx('expand')
