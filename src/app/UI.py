@@ -523,7 +523,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
     for sel_list, obj_type, attrs in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
+        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name.token')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
@@ -640,7 +640,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         has_none=True,
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=gettext('Random'),
+        none_name=TransToken.ui('Random'),
         none_desc=gettext('Choose a random video.'),
         callback=win_callback,
         attributes=[

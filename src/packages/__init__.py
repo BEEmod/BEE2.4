@@ -46,8 +46,8 @@ PACK_CONFIG = ConfigFile('packages.cfg')
 @attrs.define
 class SelitemData:
     """Options which are displayed on the selector window."""
-    name: str  # Longer full name.
-    short_name: str  # Shorter name for the icon.
+    name: TransToken  # Longer full name.
+    short_name: TransToken  # Shorter name for the icon.
     auth: list[str]  # List of authors.
     icon: Optional[img.Handle]  # Small square icon.
     large_icon: Optional[img.Handle]  # Larger, landscape icon.
@@ -62,12 +62,13 @@ class SelitemData:
     def parse(cls, info: Property, pack_id: str) -> SelitemData:
         """Parse from a property block."""
         auth = sep_values(info['authors', ''])
-        short_name = info['shortName', None]
-        name = info['name']
+        name = TransToken.parse(pack_id, info['name'])
         group = info['group', '']
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
-        if not short_name:
+        try:
+            short_name = TransToken.parse(pack_id, info['shortName'])
+        except LookupError:
             short_name = name
 
         try:

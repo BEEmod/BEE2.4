@@ -255,8 +255,8 @@ class Item:
     def __init__(
         self,
         name,
-        short_name: str,
-        long_name: str | None = None,
+        short_name: TransToken,
+        long_name: TransToken | None = None,
         icon: img.Handle | None=None,
         large_icon: img.Handle | None = None,
         previews: Iterable[img.Handle] = (),
@@ -268,6 +268,7 @@ class Item:
         snd_sample: str | None = None,
         package: str = '',
     ) -> None:
+        # Not a name, actually an ID
         self.name = name
         self.shortName = short_name
         self.group_id = group.strip().casefold()
@@ -275,7 +276,7 @@ class Item:
         self.longName = long_name or short_name
         self.sort_key = sort_key
         self.package = package
-        if len(self.longName) > 20:
+        if len(self.longName.token) > 20:
             self._context_lbl = self.shortName
         else:
             self._context_lbl = self.longName
@@ -322,18 +323,18 @@ class Item:
         return f'<Item:{self.name}>'
 
     @property
-    def context_lbl(self) -> str:
+    def context_lbl(self) -> TransToken:
         """The text displayed on the rightclick menu."""
         return self._context_lbl
 
     @context_lbl.setter
-    def context_lbl(self, value: str) -> None:
+    def context_lbl(self, value: TransToken) -> None:
         """Update the context menu whenver this is set."""
         self._context_lbl = value
-        if self._selector and self._context_ind:
-            self._selector.context_menus[self.group_id].entryconfigure(
+        if self._selector and self._context_ind is not None:
+            self._context_lbl.apply_menu(
+                self._selector.context_menus[self.group_id],
                 self._context_ind,
-                label=value,
             )
 
     @classmethod
@@ -496,7 +497,7 @@ class SelectorWin(Generic[CallbackT]):
         none_attrs=EmptyMapping,
         none_icon: img.Handle = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
         # i18n: 'None' item name.
-        none_name: str = gettext("<None>"),
+        none_name: TransToken = TransToken.ui("<None>"),
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TRANS_BLANK,
         readonly_desc: TransToken = TRANS_BLANK,
@@ -546,7 +547,7 @@ class SelectorWin(Generic[CallbackT]):
         """
         self.noneItem = Item(
             name='<NONE>',
-            short_name='',
+            short_name=TransToken.untranslated(''),
             icon=none_icon,
             desc=none_desc,
             attributes=dict(none_attrs),
@@ -912,6 +913,7 @@ class SelectorWin(Generic[CallbackT]):
         self.set_disp()
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
+        TransToken.add_callback(self._update_translations, call=False)
 
     async def _load_selected(self, selected: LastSelected) -> None:
         """Load a new selected item."""
@@ -990,7 +992,7 @@ class SelectorWin(Generic[CallbackT]):
     def refresh(self) -> None:
         """Rebuild the menus and options based on the item list."""
         # Sort alphabetically, preferring a sort key if present.
-        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName))
+        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName.token))
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
@@ -1013,9 +1015,9 @@ class SelectorWin(Generic[CallbackT]):
                     item.button = ttk.Button(
                         self.pal_frame,
                         name='item_' + item.name,
-                        text=item.shortName,
                         compound='top',
                     )
+                    item.shortName.apply(item.button)
 
                 # noinspection PyProtectedMember
                 tk_tools.bind_leftclick(item.button, item._on_click)
@@ -1034,12 +1036,12 @@ class SelectorWin(Generic[CallbackT]):
                     tk.Menu(self.context_menu) if group_key else self.context_menu,
                 )
             group._menu.add_radiobutton(
-                label=item.context_lbl,
                 command=functools.partial(self.sel_item_id, item.name),
                 variable=self.context_var,
                 value=item.name,
             )
-            item._context_ind = len(grouped_items[group_key]) - 1
+            item.context_lbl.apply_menu(group._menu)
+            item._context_ind = group._menu.index('end')
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(grouped_items)
@@ -1053,11 +1055,8 @@ class SelectorWin(Generic[CallbackT]):
                 # Don't add the ungrouped menu to itself!
                 continue
             group = self.group_widgets[group_key]
-            self.context_menu.add_cascade(
-                menu=group._menu,
-                # TODO: Dynamically update this.
-                label=str(self.group_names[group_key]),
-            )
+            self.context_menu.add_cascade(menu=group._menu)
+            self.group_names[group_key].apply_menu(self.context_menu)
             # Track the menu's index. The one at the end is the one we just added.
             group._menu_pos = self.context_menu.index('end')
         if self.win.winfo_ismapped():
@@ -1114,7 +1113,7 @@ class SelectorWin(Generic[CallbackT]):
             self.chosen_id = self.selected.name
 
         self._suggested_rollover = None  # Discard the rolled over item.
-        self.disp_label.set(self.selected.context_lbl)
+        self.disp_label.set(str(self.selected.context_lbl))
         self.orig_selected = self.selected
         self.context_var.set(self.selected.name)
         return "break"  # stop the entry widget from continuing with this event
@@ -1131,6 +1130,11 @@ class SelectorWin(Generic[CallbackT]):
             self._suggested_rollover = random.choice(self.suggested)
             self.disp_label.set(self._suggested_rollover.context_lbl)
             self.display.after(1000, self._pick_suggested)
+
+    def _update_translations(self) -> None:
+        """Update translations."""
+        # We don't care about updating to the rollover item, it'll swap soon anyway.
+        self.disp_label.set(str(self.selected.context_lbl))
 
     def _icon_clicked(self, _: tk.Event) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
