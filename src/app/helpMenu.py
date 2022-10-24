@@ -429,10 +429,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class Dialog(tk.Toplevel):
     """Show a dialog with a message."""
-    def __init__(self, title: str, text: str):
+    def __init__(self, title: TransToken, text: str):
         super().__init__(TK_ROOT)
         self.withdraw()
-        self.title(title)
+        title.apply_title(self)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
         self.text = text
@@ -550,7 +550,7 @@ def make_help_menu(parent: tk.Menu) -> None:
     }
     icons[ResIcon.NONE] = img.Handle.blank(16, 16)
 
-    credit_window = Dialog(title=gettext('BEE2 Credits'), text=CREDITS_TEXT)
+    credit_window = Dialog(title=TransToken.ui('BEE2 Credits'), text=CREDITS_TEXT)
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:

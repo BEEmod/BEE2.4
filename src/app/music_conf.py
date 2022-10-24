@@ -29,6 +29,8 @@ SEL_ITEMS: Dict[str, SelItem] = {}
 is_collapsed: bool = False
 
 filesystem = FileSystemChain()
+TRANS_BASE_COLL = TransToken.ui('Music:')
+TRANS_BASE_EXP = TransToken.ui('Base:')
 
 
 def load_filesystems(systems: Iterable[FileSystem]):
@@ -207,7 +209,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = True
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
-        base_lbl['text'] = gettext('Music: ')
+        TRANS_BASE_COLL.apply(base_lbl)
         toggle_btn_exit()
 
         # Set all music to the children - so those are used.
@@ -222,7 +224,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = False
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
-        base_lbl['text'] = gettext('Base: ')
+        TRANS_BASE_EXP.apply(base_lbl)
         toggle_btn_exit()
         for wid in exp_widgets:
             wid.grid()
@@ -255,11 +257,12 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         btn.grid(row=row, column=2, sticky='EW')
 
     for row, text in enumerate([
-        gettext('Funnel:'),
-        gettext('Bounce:'),
-        gettext('Speed:'),
+        TransToken.ui('Funnel:'),
+        TransToken.ui('Bounce:'),
+        TransToken.ui('Speed:'),
     ], start=1):
-        label = ttk.Label(frame, text=text)
+        label = ttk.Label(frame)
+        text.apply(label)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 

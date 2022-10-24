@@ -93,13 +93,16 @@ def on_error(
     # Put it onscreen.
     try:
         from tkinter import messagebox
-        from localisation import gettext
+        from localisation import TransToken
         messagebox.showinfo(
-            title=gettext('BEEMOD {} Error!').format(utils.BEE_VERSION),
-            message=gettext(
-                'An error occurred: \n{}\n\n'
+            title=str(
+                TransToken.ui('BEEMOD {version} Error!')
+                .format(version=utils.BEE_VERSION)
+            ),
+            message=str(TransToken.ui(
+                'An error occurred: \n{err}\n\n'
                 'This has been copied to the clipboard.'
-            ).format(err),
+            ).format(err=err)),
             icon=messagebox.ERROR,
         )
     except Exception:

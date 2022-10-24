@@ -456,10 +456,8 @@ def init_widgets() -> None:
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
 
-    ttk.Label(
-        f,
-        text=gettext("Properties:"),
-        anchor="center",
+    TransToken.ui("Properties:").apply(
+        ttk.Label(f, anchor="center")
     ).grid(
         row=0,
         column=0,
@@ -503,11 +501,9 @@ def init_widgets() -> None:
         tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
         tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
 
-    ttk.Label(f, text=gettext("Description:"), anchor="sw").grid(
-        row=5,
-        column=0,
-        sticky="SW",
-    )
+    TransToken.ui("Description:").apply(
+        ttk.Label(f, anchor="sw")
+    ).grid(row=5, column=0, sticky="SW")
 
     spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=5, sticky='w')
