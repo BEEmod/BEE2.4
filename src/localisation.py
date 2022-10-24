@@ -59,10 +59,7 @@ class TransToken:
     token: str
     # Keyword arguments passed when formatting.
     # If a blank dict is passed, use EmptyMapping to save memory.
-    parameters: Mapping[str, object] = attrs.field(
-        default=EmptyMapping,
-        converter=lambda m: m or EmptyMapping,
-    )
+    parameters: Mapping[str, object] = attrs.field(converter=lambda m: m or EmptyMapping)
 
     @classmethod
     def parse(cls, package: str, text: str) -> 'TransToken':
@@ -76,15 +73,15 @@ class TransToken:
                     raise ValueError
             except ValueError:
                 LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
-                return cls(package, text)
+                return cls(package, text, EmptyMapping)
             else:
                 if not package:
                     package = NS_UNTRANSLATED
-                return cls(package, token)
+                return cls(package, token, EmptyMapping)
         elif text.startswith(PETI_KEY_PREFIX):
-            return cls(NS_GAME, text)
+            return cls(NS_GAME, text, EmptyMapping)
         else:
-            return cls(package, text)
+            return cls(package, text, EmptyMapping)
 
     @classmethod
     def ui(cls, token: str, /, **kwargs: str) -> 'TransToken':
@@ -94,12 +91,12 @@ class TransToken:
     @staticmethod
     def ui_plural(singular: str, plural: str,  /, **kwargs: str) -> 'PluralTransToken':
         """Make a plural token for a UI string."""
-        return PluralTransToken(NS_UI, singular, kwargs, token_plural=plural)
+        return PluralTransToken(NS_UI, singular, kwargs, plural)
 
     @classmethod
     def from_valve(cls, text: str) -> 'TransToken':
         """Make a token for a string that should be looked up in Valve's translation files."""
-        return cls(NS_GAME, text)
+        return cls(NS_GAME, text, EmptyMapping)
 
     @classmethod
     def untranslated(cls, text: str) -> 'TransToken':
@@ -107,7 +104,7 @@ class TransToken:
 
         In this case, the token is the literal text to use.
         """
-        return cls(NS_UNTRANSLATED, text)
+        return cls(NS_UNTRANSLATED, text, EmptyMapping)
 
     def format(self, /, **kwargs: object) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
@@ -199,7 +196,7 @@ class PluralTransToken(TransToken):
 
     It must be formatted with an "n" parameter.
     """
-    token_plural: str = attrs.Factory(lambda s: s.token, takes_self=True)
+    token_plural: str
 
     ui = ui_plural = untranslated = from_valve = None  # Cannot construct via these.
 

@@ -25,12 +25,12 @@ def token_constructor() -> None:
 
 def test_token_parse() -> None:
     """Test that the parsing code works correctly."""
-    assert TransToken.parse("SOME_PACKAGE", "Regular text") == TransToken("SOME_PACKAGE", "Regular text")
+    assert TransToken.parse("SOME_PACKAGE", "Regular text") == TransToken("SOME_PACKAGE", "Regular text", EmptyMapping)
 
-    assert TransToken.parse("OWNER", "[[PACKAGE]] The Blah device\n") == TransToken("PACKAGE", "The Blah device\n")
+    assert TransToken.parse("OWNER", "[[PACKAGE]] The Blah device\n") == TransToken("PACKAGE", "The Blah device\n", EmptyMapping)
 
     # Blank = no translation.
-    assert TransToken.parse("OWNER", "[[]] The Blah device\n") == TransToken(NS_UNTRANSLATED, "The Blah device\n")
+    assert TransToken.parse("OWNER", "[[]] The Blah device\n") == TransToken(NS_UNTRANSLATED, "The Blah device\n", EmptyMapping)
 
     # Invalid -> treated as if no syntax is involved.
-    assert TransToken.parse("OWNER", "[[PACKAGE The Blah device\n") == TransToken("OWNER", "[[PACKAGE The Blah device\n")
+    assert TransToken.parse("OWNER", "[[PACKAGE The Blah device\n") == TransToken("OWNER", "[[PACKAGE The Blah device\n", EmptyMapping)
