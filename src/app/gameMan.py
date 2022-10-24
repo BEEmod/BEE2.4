@@ -36,7 +36,7 @@ import srctools.fgd
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
 from config.gen_opts import GenOptions
-from localisation import gettext, TransToken
+from localisation import TransToken
 import localisation
 import loadScreen
 import packages
@@ -130,6 +130,9 @@ export_screen = loadScreen.LoadScreen(
     ('MUS', TransToken.ui('Copy Music')),
     title_text=TransToken.ui('Exporting'),
 )
+
+TRANS_EXPORT_BTN = TransToken.ui('Export to "{game}"...')
+TRANS_EXPORT_BTN_DIRTY = TransToken.ui('Export to "{game}"*...')
 
 EXE_SUFFIX = (
     '.exe' if utils.WIN else
@@ -1079,23 +1082,20 @@ class Game:
         basemod_loc = self.abs_path(f'../Portal 2/portal2_dlc2/resource/basemodui_{lang}.txt')
         localisation.load_basemodui(basemod_loc)
 
-    def get_export_text(self) -> str:
+    def get_export_text(self) -> TransToken:
         """Return the text to use on export button labels."""
-        text = gettext('Export to "{}"...').format(self.name)
-
-        if self.cache_invalid():
-            # Mark that it needs extractions
-            text += ' *'
-        return text
+        return (
+            TRANS_EXPORT_BTN_DIRTY if self.cache_invalid() else TRANS_EXPORT_BTN
+        ).format(game=self.name)
 
 
-def find_steam_info(game_dir):
+def find_steam_info(game_dir) -> tuple[str | None, str | None]:
     """Determine the steam ID and game name of this folder, if it has one.
 
     This only works on Source games!
     """
-    game_id = None
-    name = None
+    game_id: str | None = None
+    name: str | None = None
     found_name = False
     found_id = False
     for folder in os.listdir(game_dir):

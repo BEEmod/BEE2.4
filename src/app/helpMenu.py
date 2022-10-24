@@ -8,7 +8,7 @@ import io
 import urllib.request, urllib.error
 from enum import Enum
 from typing import Any, Callable, Dict, cast
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import tkinter as tk
 import webbrowser
 import functools
@@ -20,7 +20,7 @@ import trio.to_thread
 
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
-from localisation import TransToken, gettext
+from localisation import TransToken
 
 # For version info
 import PIL

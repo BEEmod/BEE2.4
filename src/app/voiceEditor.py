@@ -13,7 +13,7 @@ from srctools import Property
 import srctools.logger
 
 from BEE2_config import ConfigFile
-from localisation import gettext, TransToken
+from localisation import TransToken
 from packages import QuotePack
 from app.tooltip import add_tooltip
 from app import img, TK_ROOT
@@ -46,13 +46,18 @@ IMG: Dict[str, Tuple[img.Handle, TransToken]] = {
 }
 
 
-# Friendly names given to certain response channels.
 RESPONSE_NAMES = {
-    'death_goo': gettext('Death - Toxic Goo'),
-    'death_turret': gettext('Death - Turrets'),
-    'death_crush': gettext('Death - Crusher'),
-    'death_laserfield': gettext('Death - LaserField'),
+    'death_generic': TransToken.ui('Death - Generic'),
+    'death_goo': TransToken.ui('Death - Toxic Goo'),
+    'death_turret': TransToken.ui('Death - Turrets'),
+    'death_crush': TransToken.ui('Death - Crusher'),
+    'death_laserfield': TransToken.ui('Death - LaserField'),
+
+    # TODO: Fill in the other "animations" for these.
+    'taunt_generic': TransToken.ui('Taunts - Generic'),
+    'camera_generic': TransToken.ui('Camera Gesture - Generic'),
 }
+TRANS_NO_NAME = TransToken.ui('No Name!')
 
 config: Optional[ConfigFile] = None
 config_mid: Optional[ConfigFile] = None
@@ -211,8 +216,8 @@ def add_tabs() -> None:
                 compound=RIGHT,
                 image=img.Handle.builtin('icons/resp_quote', 16, 16),
                 # i18n: 'response' tab name, should be short.
-                text=gettext('Resp')
-                )
+                text=str(TransToken.ui('Resp')),
+            )
         else:
             notebook.tab(tab, text=str(tab.nb_text))
 
@@ -404,16 +409,16 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
             try:
                 name = RESPONSE_NAMES[quote.name]
             except KeyError:
-                # Convert channels of the form 'death_goo' into 'Death - Goo'.
-                # TODO: Eliminate this, we need to translate all of em.
-                channel, ch_arg = quote.name.split('_', 1)
-                name = channel.title() + ' - ' + ch_arg.title()
-                del channel, ch_arg
+                LOGGER.warning('No name for response: "{}"', quote.real_name)
+                name = TransToken.untranslated(quote.real_name)
 
             group_id = quote.name
         else:
             # note: default for quote names
-            name = quote['name', gettext('No Name!')]
+            try:
+                name = TransToken.parse(pak_id, quote['name'])
+            except LookupError:
+                name = TRANS_NO_NAME
 
         ttk.Label(
             frame,
@@ -446,11 +451,11 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
 
             line_frame.columnconfigure(len(badges), weight=1)
 
-            check = ttk.Checkbutton(
-                line_frame,
-                # note: default voice line name next to checkbox.
-                text=line['name', gettext('No Name?')],
-            )
+            check = ttk.Checkbutton(line_frame)
+            try:
+                check['text'] = line['name']
+            except LookupError:
+                TRANS_NO_NAME.apply(check)
 
             check.quote_var = IntVar(
                 value=config.get_bool(group_id, line_id, True),

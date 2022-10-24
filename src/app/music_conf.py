@@ -14,7 +14,7 @@ from config.gen_opts import GenOptions
 import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
-from localisation import TransToken, gettext
+from localisation import TransToken
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
@@ -133,13 +133,16 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         for_channel(MusicChannel.BASE),
         save_id='music_base',
         title=TransToken.ui('Select Background Music - Base'),
-        desc=TransToken.ui('This controls the background music used for a map. Expand the dropdown to set '
-                     'tracks for specific test elements.'),
+        desc=TransToken.ui(
+            'This controls the background music used for a map. Expand the dropdown to set tracks '
+            'for specific test elements.'
+        ),
         has_none=True,
         default_id='VALVE_PETI',
         sound_sys=filesystem,
-        none_desc=gettext('Add no music to the map at all. Testing Element-specific music may still '
-                          'be added.'),
+        none_desc=TransToken.ui(
+            'Add no music to the map at all. Testing Element-specific music may still be added.'
+        ),
         callback=selwin_callback,
         callback_params=[MusicChannel.BASE],
         attributes=[
@@ -158,7 +161,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Have no music playing when inside funnels.'),
+        none_desc=TransToken.ui('Have no music playing when inside funnels.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.TBEAM],
         attributes=[
@@ -174,7 +177,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Add no music when jumping on Repulsion Gel.'),
+        none_desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.BOUNCE],
     )
@@ -187,7 +190,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Add no music while running fast.'),
+        none_desc=TransToken.ui('Add no music while running fast.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.SPEED],
     )

@@ -10,7 +10,7 @@ import srctools.logger
 
 from app.paletteLoader import Palette
 from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
-from localisation import TransToken, gettext
+from localisation import TransToken
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
 import config
@@ -353,7 +353,7 @@ class PaletteUI:
         """Rename an existing palette."""
         if self.selected.readonly:
             return
-        name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
+        name = tk_tools.prompt(TransToken.ui("BEE2 - Save Palette"), TransToken.ui("Enter a name:"))
         if name is None:
             # Cancelled...
             return
@@ -373,8 +373,8 @@ class PaletteUI:
         if self.selected.readonly:
             return
         res = tk_tools.prompt(
-            gettext("BEE2 - Change Palette Group"),
-            gettext('Enter the name of the group for this palette, or "" to ungroup.'),
+            TransToken.ui("BEE2 - Change Palette Group"),
+            TransToken.ui('Enter the name of the group for this palette, or "" to ungroup.'),
             validator=lambda x: x,
         )
         if res is not None:

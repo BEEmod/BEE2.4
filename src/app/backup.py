@@ -21,7 +21,7 @@ from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
 from app.tooltip import add_tooltip
-from localisation import TransToken, gettext
+from localisation import TransToken
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -836,9 +836,9 @@ def init_application() -> None:
     from app import gameMan
     global window
     window = TK_ROOT
-    TK_ROOT.title(
-        gettext('BEEMOD {} - Backup / Restore Puzzles').format(utils.BEE_VERSION)
-    )
+    TransToken.ui(
+        'BEEMOD {version} - Backup / Restore Puzzles'
+    ).format(version=utils.BEE_VERSION).apply_title(TK_ROOT)
 
     init()
 
@@ -860,7 +860,8 @@ def init_application() -> None:
     file_menu.add_command(command=ui_save_backup_as)
     TransToken.ui('Save Backup As').apply_menu(file_menu)
 
-    bar.add_cascade(menu=file_menu, label=gettext('File'))
+    bar.add_cascade(menu=file_menu)
+    TransToken.ui('File').apply_menu(bar)
 
     game_menu = menus['game'] = tk.Menu(bar)
 

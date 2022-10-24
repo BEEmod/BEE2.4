@@ -2,12 +2,12 @@
 """
 from __future__ import annotations
 from typing import Iterable
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import tkinter as tk
 from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
-from localisation import TransToken, gettext
+from localisation import TransToken
 import packages
 import utils
 

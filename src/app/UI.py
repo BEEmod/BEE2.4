@@ -1,7 +1,6 @@
 """Main UI module, brings everything together."""
 import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
-from tkinter import messagebox  # simple, standard modal dialogs
 from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
 import itertools
 import operator
@@ -25,7 +24,7 @@ from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
 import config
-from localisation import gettext, TransToken
+from localisation import TransToken
 from app import (
     img,
     itemconfig,
@@ -84,8 +83,6 @@ ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 selected_style = "BEE2_CLEAN"
-# Variable used for export button (changes to include game name)
-EXPORT_CMD_VAR = tk.StringVar(value=gettext('Export...'))
 
 # Maps item IDs to our wrapper for the object.
 item_list: Dict[str, 'Item'] = {}
@@ -105,6 +102,7 @@ TRANS_EXPORTED_NO_VPK = TransToken.ui(
     'Hammer to ensure editor wall previews are changed.'
 ).format(exported=TRANS_EXPORTED)
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
+TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 
 
 class Item:
@@ -592,9 +590,9 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         ),
         has_none=True,
         default_id='BEE2_GLADOS_CLEAN',
-        none_desc=gettext('Add no extra voice lines, only Multiverse Cave if enabled.'),
+        none_desc=TransToken.ui('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
-            'CHAR': [gettext('<Multiverse Cave only>')],
+            'CHAR': [TransToken.ui('<Multiverse Cave only>')],
         },
         callback=voice_callback,
         attributes=[
@@ -641,7 +639,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
         none_name=TransToken.ui('Random'),
-        none_desc=gettext('Choose a random video.'),
+        none_desc=TransToken.ui('Choose a random video.'),
         callback=win_callback,
         attributes=[
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
@@ -1083,32 +1081,36 @@ async def init_option(
     frame.grid(row=0, column=0, sticky='nsew')
     frame.columnconfigure(0, weight=1)
 
-    pal_save = ttk.Button(
-        frame,
-        text=gettext("Save Palette..."),
-        command=pal_ui.event_save,
-    )
+    pal_save = ttk.Button(frame, command=pal_ui.event_save)
+    TransToken.ui("Save Palette...").apply(pal_save)
     pal_save.grid(row=0, sticky="EW", padx=5)
     pal_ui.save_btn_state = pal_save.state
-    ttk.Button(
-        frame,
-        text=gettext("Save Palette As..."),
-        command=pal_ui.event_save_as,
+
+    TransToken.ui("Save Palette As...").apply(
+        ttk.Button(frame, command=pal_ui.event_save_as)
     ).grid(row=1, sticky="EW", padx=5)
 
     pal_ui.make_option_checkbox(frame).grid(row=2, sticky="EW", padx=5)
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
-    UI['pal_export'] = ttk.Button(frame, textvariable=EXPORT_CMD_VAR, command=export)
+    UI['pal_export'] = ttk.Button(frame, command=export)
     UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
+
+    async def game_changed(game: gameMan.Game) -> None:
+        """When the game changes, update this button."""
+        game.get_export_text().apply(UI['pal_export'])
+
+    await gameMan.EVENT_BUS.register_and_prime(None, gameMan.Game, game_changed)
 
     props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=5, sticky="EW")
 
-    music_frame = ttk.Labelframe(props, text=gettext('Music: '))
+    music_frame = ttk.Labelframe(props)
+    TransToken.ui('Music: ').apply(music_frame)
+
     async with trio.open_nursery() as nursery:
         nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
     music_win = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
@@ -1133,15 +1135,12 @@ async def init_option(
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.set_disp()
 
-    UI['suggested_style'] = ttk.Button(
-        props,
-        # '\u2193' is the downward arrow symbol.
-        text=gettext("{arr} Use Suggested {arr}").format(arr='\u2193'),
-        command=suggested_style_set,
-        )
-    UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
-    UI['suggested_style'].bind('<Enter>', suggested_style_mousein)
-    UI['suggested_style'].bind('<Leave>', suggested_style_mouseout)
+    UI['suggested_style'] = sugg_btn =  ttk.Button(props, command=suggested_style_set)
+    # '\u2193' is the downward arrow symbol.
+    TransToken.ui("{down_arrow} Use Suggested {down_arrow}").format(down_arrow='\u2193').apply(sugg_btn)
+    sugg_btn.grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
+    sugg_btn.bind('<Enter>', suggested_style_mousein)
+    sugg_btn.bind('<Leave>', suggested_style_mouseout)
 
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
@@ -1152,16 +1151,16 @@ async def init_option(
         else:
             voiceEditor.show(chosen_voice)
     for ind, name in enumerate([
-            gettext("Style: "),
+            TransToken.ui("Style: "),
             None,
-            gettext("Voice: "),
-            gettext("Skybox: "),
-            gettext("Elev Vid: "),
+            TransToken.ui("Voice: "),
+            TransToken.ui("Skybox: "),
+            TransToken.ui("Elev Vid: "),
             ]):
         if name is None:
             # This is the "Suggested" button!
             continue
-        ttk.Label(props, text=name).grid(row=ind)
+        name.apply(ttk.Label(props)).grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1260,20 +1259,10 @@ def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
 def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
-    ttk.Label(
-        f,
-        text=gettext("All Items: "),
-        anchor="center",
-    ).grid(
-        row=0,
-        column=0,
-        sticky="EW",
-    )
-    UI['picker_frame'] = cframe = ttk.Frame(
-        f,
-        borderwidth=4,
-        relief="sunken",
-        )
+    TransToken.ui("All Items: ").apply(
+        ttk.Label(f, anchor="center")
+    ).grid(row=0, column=0, sticky="EW")
+    UI['picker_frame'] = cframe = ttk.Frame(f, borderwidth=4, relief="sunken")
     cframe.grid(row=1, column=0, sticky="NSEW")
     f.rowconfigure(1, weight=1)
     f.columnconfigure(0, weight=1)
@@ -1391,9 +1380,8 @@ async def set_game(game: 'gameMan.Game') -> None:
 
     This updates the title bar to match, and saves it into the config.
     """
-    TK_ROOT.title(f'BEEMOD {utils.BEE_VERSION} - {game.name}')
+    TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name).apply_title(TK_ROOT)
     config.APP.store_conf(LastSelected(game.name), 'game')
-    EXPORT_CMD_VAR.set(game.get_export_text())
 
 
 def refresh_palette_icons() -> None:
@@ -1716,9 +1704,3 @@ async def init_windows() -> None:
     style_select_callback(style_win.chosen_id)
     await set_palette(pal_ui.selected)
     pal_ui.update_state()
-
-    import localisation
-    LOGGER.info('Total tokens: {} norm', len(localisation._applied_tokens))
-    LOGGER.info('Menu tokens: \n{}', '\n'.join([
-        f'- {k!r}: {v!r}' for k, v in localisation._applied_menu_tokens.items()
-    ]))

@@ -124,6 +124,6 @@ class MenuBar:
 
     async def _game_changed(self, game: 'gameMan.Game') -> None:
         """Callback for when games are changed."""
-        self.file_menu.entryconfigure(self.export_btn_pos, label=game.get_export_text())
+        game.get_export_text().apply_menu(self.file_menu, self.export_btn_pos)
         for i, (label, path_getter) in enumerate(FOLDER_OPTIONS):
             label.format(game=game.name).apply_menu(self.folder_menu, i)

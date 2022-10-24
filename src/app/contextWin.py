@@ -15,7 +15,6 @@ import webbrowser
 
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
 
 from .richTextBox import tkRichText
 from . import (
@@ -26,7 +25,7 @@ import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass
 from editoritems_props import prop_timer_delay
-from localisation import TransToken, gettext
+from localisation import TransToken
 
 LOGGER = srctools.logger.get_logger(__name__)
 

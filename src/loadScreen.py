@@ -18,7 +18,7 @@ import srctools.logger
 import config.gen_opts
 from app import logWindow
 import config
-from localisation import TransToken, gettext
+from localisation import TransToken
 import utils
 
 from typing import Set, Tuple, List, cast, Any, Type

@@ -1,7 +1,6 @@
 """Wraps gettext, to localise all UI text."""
 from typing import (
-    Callable, Dict, Iterable, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union,
-    cast,
+    Callable, Dict, Iterable, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union, cast,
 )
 from typing_extensions import ParamSpec, Final, TypeAlias
 from weakref import WeakKeyDictionary
@@ -9,8 +8,6 @@ import gettext as gettext_mod
 import locale
 import logging
 import sys
-import builtins
-import warnings
 
 import attrs
 from srctools.property_parser import PROP_FLAGS_DEFAULT
@@ -22,10 +19,7 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     import tkinter as tk
     from tkinter import ttk
 
-__all__ = [
-    'TransToken', 'load_basemodui',
-    'gettext', 'setup'
-]
+__all__ = ['TransToken', 'load_basemodui', 'setup']
 
 LOGGER = logger.get_logger(__name__)
 _TRANSLATOR = gettext_mod.NullTranslations()
@@ -332,11 +326,6 @@ class DummyTranslations(gettext_mod.NullTranslations):
     lngettext = ngettext
 
 
-def gettext(message: str) -> str:
-    """Translate the given string."""
-    return _TRANSLATOR.gettext(message)
-
-
 def setup(logger: logging.Logger) -> None:
     """Setup gettext localisations."""
     global _TRANSLATOR
@@ -385,21 +374,6 @@ def setup(logger: logging.Logger) -> None:
                     expanded_langs,
                 )
             _TRANSLATOR = gettext_mod.NullTranslations()
-
-    def warn_translate(name: str, func: Callable[P, str]):
-        """Raise a deprecation warning when this is used from builtins."""
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
-            """Raise and call the origina."""
-            warnings.warn(
-                f"Translation function {name}() called from builtins!",
-                DeprecationWarning, stacklevel=2,
-            )
-            return func(*args, **kwargs)
-        setattr(builtins, '_', wrapper)
-
-    # Add functions to builtins, but deprecated.
-    warn_translate('_', _TRANSLATOR.gettext)
-    warn_translate('gettext', _TRANSLATOR.gettext)
 
     # Some lang-specific overrides..
 

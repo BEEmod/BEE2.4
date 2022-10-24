@@ -14,7 +14,7 @@ from app import (
     tkMarkdown,
 )
 from app.richTextBox import tkRichText
-from localisation import TransToken, gettext
+from localisation import TransToken
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected

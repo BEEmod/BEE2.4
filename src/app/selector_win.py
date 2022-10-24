@@ -32,7 +32,7 @@ from consts import (
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from localisation import TransToken, gettext
+from localisation import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -99,9 +99,11 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list')
 
 
-AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
+# TransToken is str()-ified.
+AttrValues: TypeAlias = Union[str, TransToken, Iterable[Union[str, TransToken]], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
 TRANS_BLANK = TransToken.untranslated('')
+TRANS_COMMA = TransToken.untranslated(', ')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
 TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
@@ -261,7 +263,7 @@ class Item:
         large_icon: img.Handle | None = None,
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
-        desc: tkMarkdown.MarkdownData | str = tkMarkdown.MarkdownData(),
+        desc: tkMarkdown.MarkdownData | TransToken = tkMarkdown.MarkdownData(),
         group: str = '',
         sort_key: str | None = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
@@ -284,11 +286,7 @@ class Item:
         self._icon = icon
         self.large_icon = large_icon
         self.previews = list(previews)
-
-        if isinstance(desc, str):
-            self.desc = tkMarkdown.convert(desc, None)
-        else:
-            self.desc = desc
+        self.desc = desc
 
         self.snd_sample = snd_sample
         self.authors: list[str] = list(authors)
@@ -383,7 +381,7 @@ class Item:
         item.icon = self.icon
         item.large_icon = self.large_icon
         item.previews = self.previews.copy()
-        item.desc = self.desc.copy()
+        item.desc = self.desc.copy() if isinstance(self.desc, tkMarkdown.MarkdownData) else self.desc
         item.authors = self.authors.copy()
         item.group_id = self.group_id
         item.group = self.group
@@ -493,7 +491,7 @@ class SelectorWin(Generic[CallbackT]):
         modal=False,
         default_id: str='<NONE>',
         # i18n: 'None' item description
-        none_desc=gettext('Do not add anything.'),
+        none_desc=TransToken.ui('Do not add anything.'),
         none_attrs=EmptyMapping,
         none_icon: img.Handle = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
         # i18n: 'None' item name.
@@ -871,9 +869,7 @@ class SelectorWin(Generic[CallbackT]):
             for attr in self.attrs:
                 attr_frame = ttk.Frame(attrs_frame)
                 desc_label = ttk.Label(attr_frame)
-                TRANS_ATTR_DESC.format(
-                    desc=attr.desc,
-                ).apply(desc_label)
+                TRANS_ATTR_DESC.format(desc=attr.desc).apply(desc_label)
                 attr.label = ttk.Label(attr_frame)
 
                 if attr.type is AttrTypes.COLOR:
@@ -890,7 +886,7 @@ class SelectorWin(Generic[CallbackT]):
                         index += 1
                     attr_frame.grid(
                         row=index // 2,
-                        column=0, columnspan=2,
+                        column=0, columnspan=3,
                         sticky='w',
                     )
                     index += 2
@@ -1323,10 +1319,15 @@ class SelectorWin(Generic[CallbackT]):
             elif attr.type is AttrTypes.LIST:
                 # Join the values (in alphabetical order)
                 assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
-                attr.label['text'] = ', '.join(sorted(val))
+                TRANS_COMMA.join([
+                    txt if isinstance(txt, TransToken) else TransToken.untranslated(txt)
+                    for txt in val
+                ]).apply(attr.label)
             elif attr.type is AttrTypes.STRING:
                 # Just a string.
-                attr.label['text'] = str(val)
+                if not isinstance(val, TransToken):
+                    val = TransToken.untranslated(val)
+                val.apply(attr.label)
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
 

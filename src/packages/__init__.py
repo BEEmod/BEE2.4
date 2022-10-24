@@ -49,8 +49,8 @@ class SelitemData:
     name: TransToken  # Longer full name.
     short_name: TransToken  # Shorter name for the icon.
     auth: list[str]  # List of authors.
-    icon: Optional[img.Handle]  # Small square icon.
-    large_icon: Optional[img.Handle]  # Larger, landscape icon.
+    icon: img.Handle | None  # Small square icon.
+    large_icon: img.Handle | None  # Larger, landscape icon.
     previews: list[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
     group: str
