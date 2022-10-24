@@ -138,6 +138,8 @@ class TransToken:
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token
+        elif isinstance(_TRANSLATOR, DummyTranslations):
+            return '#' * len(self.token)
         elif self.namespace == NS_UI:
             result = _TRANSLATOR.gettext(self.token)
         else:
@@ -231,6 +233,8 @@ class PluralTransToken(TransToken):
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token if n == 1 else self.token_plural
+        elif isinstance(_TRANSLATOR, DummyTranslations):
+            return '#' * len(self.token)
         elif self.namespace == NS_UI:
             result = _TRANSLATOR.ngettext(self.token, self.token_plural, n)
         else:
@@ -299,11 +303,6 @@ def load_basemodui(basemod_loc: str) -> None:
             # Ignore non-puzzlemaker keys.
             if key.startswith(PETI_KEY_PREFIX):
                 trans_data[key] = value.replace("\\'", "'")
-
-    if isinstance(_TRANSLATOR, DummyTranslations):
-        # Dummy translations installed, apply here too.
-        for key in trans_data:
-            trans_data[key] = '#' * len(key)
 
 
 class DummyTranslations(gettext_mod.NullTranslations):
