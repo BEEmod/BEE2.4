@@ -44,6 +44,8 @@ TextWidget: TypeAlias = Union[
 TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
 # Assigns to widget['text'].
 _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
+# menu -> index -> token.
+_applied_menu_tokens: 'WeakKeyDictionary[tk.Menu, Dict[int, TransToken]]' = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
 _langchange_callback: List[Callable[[], object]] = []
 
@@ -160,6 +162,24 @@ class TransToken:
     def apply_title(self, win: 'tk.Toplevel') -> None:
         """Set the title of a window to this token."""
         self.add_callback(lambda: win.title(str(self)))
+
+    def apply_menu(self, menu: 'tk.Menu', index: Union[str, int] = 'end') -> None:
+        """Apply this text to the item on the specified menu.
+
+        By default, it is applied to the last item.
+        """
+        try:
+            tok_map = _applied_menu_tokens[menu]
+        except KeyError:
+            tok_map = _applied_menu_tokens[menu] = {}
+        ind = menu.index(index)
+        menu.entryconfigure(ind, label=str(self))
+        tok_map[ind] = self
+
+    @classmethod
+    def clear_stored_menu(cls, menu: 'tk.Menu') -> None:
+        """Clear the tokens for the specified menu."""
+        _applied_menu_tokens.pop(menu, None)
 
     @classmethod
     def add_callback(cls, func: Callable[[], object], call: bool = True) -> None:
