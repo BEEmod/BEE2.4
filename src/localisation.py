@@ -6,7 +6,6 @@ from typing_extensions import ParamSpec, Final, TypeAlias
 from weakref import WeakKeyDictionary
 import gettext as gettext_mod
 import locale
-import logging
 import sys
 
 import attrs
@@ -326,9 +325,8 @@ class DummyTranslations(gettext_mod.NullTranslations):
     lngettext = ngettext
 
 
-def setup(logger: logging.Logger) -> None:
-    """Setup gettext localisations."""
-    global _TRANSLATOR
+def setup() -> None:
+    """Setup localisations."""
     # Get the 'en_US' style language code
     lang_code = locale.getdefaultlocale()[0]
 
@@ -339,11 +337,18 @@ def setup(logger: logging.Logger) -> None:
                 lang_code = arg[5:]
                 break
 
+    set_language(lang_code)
+
+
+def set_language(lang_code: str) -> None:
+    """Change the app's language."""
+    global _TRANSLATOR
+
     # Expands single code to parent categories.
     expanded_langs = gettext_mod._expand_lang(lang_code)
 
-    logger.info('Language: {!r}', lang_code)
-    logger.debug('Language codes: {!r}', expanded_langs)
+    LOGGER.info('Language: {!r}', lang_code)
+    LOGGER.debug('Language codes: {!r}', expanded_langs)
 
     # Add these to Property's default flags, so config files can also
     # be localised.
@@ -396,4 +401,12 @@ def setup(logger: logging.Logger) -> None:
             # Note - not fixed-width...
         ]
         for font_name in font_names:
-            font.nametofont(font_name).configure(family='sans-serif')
+
+    # Reload all our localisations.
+    for text_widget, token in _applied_tokens.items():
+        text_widget['text'] = str(token)
+    for menu, menu_map in _applied_menu_tokens.items():
+        for index, token in menu_map.items():
+            menu.entryconfigure(index, label=str(token))
+    for func in _langchange_callback:
+        func()
