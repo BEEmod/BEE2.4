@@ -113,6 +113,7 @@ TRANS_UNSTYLED = TransToken.ui('Styles: Unstyled')
 TRANS_ALL_STYLES = TransToken.ui('Styles: All')
 # i18n: Order of lines in the tooltip.
 TRANS_TOOLTIP = TransToken.ui('{desc}\n{defaults}\n{styles}')
+TRANS_COMMA = TransToken.ui(', ')
 
 
 def mandatory_unlocked() -> bool:
@@ -149,13 +150,12 @@ def make_desc(packset: PackagesSet, var: StyleVar) -> TransToken:
         if len(app_styles) == len(packset.all_obj(Style)):
             style_desc = TRANS_ALL_STYLES
         else:
-            style_list = sorted(
+            style_list = [
                 style.selitem_data.short_name
-                for style in
-                app_styles
-            )
+                for style in app_styles
+            ]
             style_desc = TRANS_STYLES.format(
-                styles=', '.join(style_list),
+                styles=TRANS_COMMA.join(style_list, sort=True),
                 n=len(style_list),
             )
 

@@ -1,5 +1,8 @@
 """Wraps gettext, to localise all UI text."""
-from typing import Callable, Dict, List, Mapping, TYPE_CHECKING, TypeVar, Union, cast
+from typing import (
+    Callable, Dict, Iterable, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union,
+    cast,
+)
 from typing_extensions import ParamSpec, Final, TypeAlias
 from weakref import WeakKeyDictionary
 import gettext as gettext_mod
@@ -93,6 +96,10 @@ class TransToken:
         """Make a plural token for a UI string."""
         return PluralTransToken(NS_UI, singular, kwargs, plural)
 
+    def join(self, children: Iterable['TransToken'], sort: bool=False) -> 'JoinTransToken':
+        """Use this as a separator to join other tokens together."""
+        return JoinTransToken(self.namespace, self.token, self.parameters, list(children), sort)
+
     @classmethod
     def from_valve(cls, text: str) -> 'TransToken':
         """Make a token for a string that should be looked up in Valve's translation files."""
@@ -118,7 +125,7 @@ class TransToken:
         return self.token != '' and not self.token.isspace()
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, TransToken):
+        if type(other) is TransToken:
             return (
                 self.namespace == other.namespace and
                 self.token == other.token and
@@ -200,8 +207,12 @@ class PluralTransToken(TransToken):
 
     ui = ui_plural = untranslated = from_valve = None  # Cannot construct via these.
 
+    def join(self, children: Iterable['TransToken'], sort: bool = False) -> 'JoinTransToken':
+        """Joining is not allowed."""
+        raise NotImplementedError('This is not allowed.')
+
     def __eq__(self, other) -> bool:
-        if isinstance(other, PluralTransToken):
+        if type(other) is PluralTransToken:
             return (
                 self.namespace == other.namespace and
                 self.token == other.token and
@@ -236,6 +247,36 @@ class PluralTransToken(TransToken):
             return result.format_map(self.parameters)
         else:
             return result
+
+
+@attrs.frozen(eq=False)
+class JoinTransToken(TransToken):
+    """A list of tokens which will be joined together to form a list.
+
+    The token is the joining value.
+    """
+    children: Sequence[TransToken]
+    sort: bool
+
+    def __hash__(self) -> int:
+        return hash((self.namespace, self.token, *self.children))
+
+    def __eq__(self, other) -> bool:
+        if type(other) is JoinTransToken:
+            return (
+                self.namespace == other.namespace and
+                self.token == other.token and
+                self.children == other.children
+            )
+        return NotImplemented
+
+    def __str__(self) -> str:
+        """Translate the token."""
+        sep = super().__str__()
+        items = [str(child) for child in self.children]
+        if self.sort:
+            items.sort()
+        return sep.join(items)
 
 
 def load_basemodui(basemod_loc: str) -> None:
