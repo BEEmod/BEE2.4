@@ -34,6 +34,7 @@ from localisation import TransToken
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
 PosArgsT = TypeVarTuple('PosArgsT')
+T = TypeVar('T')
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
@@ -498,7 +499,7 @@ else:
 
 
 def prompt(
-    title: str, message: str,
+    title: TransToken, message: TransToken,
     initialvalue: str = '',
     parent: tk.Misc = TK_ROOT,
     validator: Callable[[str], str] = _default_validator,
@@ -516,7 +517,36 @@ def prompt(
             query_cls = BasicQueryValidator
         else:
             query_cls = QueryValidator
-        return query_cls(parent, title, message, initialvalue, validator).result
+        return query_cls(parent, str(title), str(message), initialvalue, validator).result
+
+
+class _MsgBoxFunc(Generic[T]):
+    """Wrap messagebox functions that take TransToken."""
+    def __init__(self, original: Callable[..., T]) -> None:
+        self.orig = original
+
+    def __call__(
+        self,
+        title: Optional[TransToken]=None,
+        message: Optional[TransToken]=None,
+        parent: tk.Misc=TK_ROOT,
+        **options: Any,
+    ) -> T:
+        if title is not None:
+            title = str(title)
+        if message is not None:
+            message = str(message)
+        return self.orig(title, message, parent=parent, master=TK_ROOT, **options)
+
+
+showinfo       = _MsgBoxFunc(messagebox.showinfo)
+showwarning    = _MsgBoxFunc(messagebox.showwarning)
+showerror      = _MsgBoxFunc(messagebox.showerror)
+askquestion    = _MsgBoxFunc(messagebox.askquestion)
+askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
+askyesno       = _MsgBoxFunc(messagebox.askyesno)
+askyesnocancel = _MsgBoxFunc(messagebox.askyesnocancel)
+askretrycancel = _MsgBoxFunc(messagebox.askretrycancel)
 
 
 class HidingScroll(ttk.Scrollbar):
