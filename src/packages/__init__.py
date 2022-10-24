@@ -476,25 +476,23 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dirs: list[Path], msg: str) -> NoReturn:
+def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     """Show an error message indicating no packages are present."""
-    from tkinter import messagebox
+    from app import tk_tools
     import sys
-    # We don't have a packages directory!
+    # We don't have a package directory!
     if len(pak_dirs) == 1:
-        trailer = str(pak_dirs[0])
+        trailer = TransToken.untranslated(str(pak_dirs[0]))
     else:
-        trailer = (
-            'one of the following locations:\n' +
-            '\n'.join(f' - {fold}' for fold in pak_dirs)
-        )
-    message = (
-        f'{msg}\nGet the packages from '
-        '"https://github.com/BEEmod/BEE2-items" '
-        f'and place them in {trailer}'
-    )
+        trailer = TransToken.ui(
+            'one of the following locations:\n{loc}'
+        ).format(loc='\n'.join(f' - {fold}' for fold in pak_dirs))
+    message = TransToken.ui(
+        '{msg}\nGet the packages from "https://github.com/BEEmod/BEE2-items" and place them in {trailer}'
+    ).format(msg=msg, loc=trailer)
+
     LOGGER.error(message)
-    messagebox.showerror(
+    tk_tools.showerror(
         title='BEE2 - Invalid Packages Directory!',
         message=message,
     )
@@ -517,15 +515,13 @@ async def load_packages(
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
-        no_packages_err(pak_dirs, 'No packages found!')
+        no_packages_err(pak_dirs, TransToken.ui('No packages found!'))
 
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packset.packages:
-        no_packages_err(
-            pak_dirs,
-            'No Clean Style package! This is required for some '
-            'essential resources and objects.'
-        )
+        no_packages_err(pak_dirs, TransToken.ui(
+            'No Clean Style package! This is required for some essential resources and objects.'
+        ))
 
     # Ensure all objects are in the dicts.
     for obj_type in OBJ_TYPES.values():

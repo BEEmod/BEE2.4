@@ -56,10 +56,10 @@ def apply_changes() -> None:
         window.grab_release()
         return
 
-    if messagebox.askokcancel(
-        title=gettext('BEE2 - Restart Required!'),
-        message=gettext('Changing enabled packages requires a restart.\nContinue?'),
-        master=window,
+    if tk_tools.askokcancel(
+        title=TransToken.ui('BEE2 - Restart Required!'),
+        message=TransToken.ui('Changing enabled packages requires a restart.\nContinue?'),
+        parent=window,
     ):
         window.withdraw()
         window.grab_release()

@@ -1,6 +1,8 @@
 """Backup and restore P2C maps.
 
 """
+from tkinter import filedialog, ttk
+import tkinter as tk
 import atexit
 import os
 import shutil
@@ -14,12 +16,10 @@ from zipfile import ZipFile, ZIP_LZMA
 import loadScreen
 import srctools.logger
 from app import tk_tools, img, TK_ROOT
-import tkinter as tk
 import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
-from tkinter import filedialog, messagebox, ttk
 from app.tooltip import add_tooltip
 from localisation import TransToken, gettext
 if TYPE_CHECKING:
@@ -351,16 +351,12 @@ def backup_maps(maps: List[P2C]) -> None:
     for p2c in maps:
         scr_path = p2c.filename + '.jpg'
         map_path = p2c.filename + '.p2c'
-        if (
-                map_path in zip_names(back_zip) or
-                scr_path in zip_names(back_zip)
-                ):
-            if not messagebox.askyesno(
-                    title=str(TRANS_OVERWRITE_TITLE),
-                    message=str(TRANS_OVERWRITE_BACKUP.format(mapname=p2c.title)),
-                    parent=window,
-                    icon=messagebox.QUESTION,
-                    ):
+        if map_path in zip_names(back_zip) or scr_path in zip_names(back_zip):
+            if not tk_tools.askyesno(
+                title=TRANS_OVERWRITE_TITLE,
+                message=TRANS_OVERWRITE_BACKUP.format(mapname=p2c.title),
+                parent=window,
+            ):
                 continue
         new_item = p2c.copy()
         map_dict[p2c.filename] = new_item
@@ -456,10 +452,7 @@ def save_backup() -> None:
     ]
 
     if not maps:
-        messagebox.showerror(
-            gettext('BEE2 Backup'),
-            gettext('No maps were chosen to backup!'),
-        )
+        tk_tools.showerror(TransToken.ui('BEE2 Backup'), TransToken.ui('No maps were chosen to backup!'))
         return
 
     copy_loader.set_length('COPY', len(maps))
@@ -512,19 +505,14 @@ def restore_maps(maps: List[P2C]) -> None:
             map_path = p2c.filename + '.p2c'
             abs_scr = os.path.join(game_dir, scr_path)
             abs_map = os.path.join(game_dir, map_path)
-            if (
-                    os.path.isfile(abs_scr) or
-                    os.path.isfile(abs_map)
-                    ):
-                if not messagebox.askyesno(
-                        title=str(TRANS_OVERWRITE_TITLE),
-                        message=str(TRANS_OVERWRITE_GAME.format(mapname=p2c.title)),
-                        parent=window,
-                        icon=messagebox.QUESTION,
-                        ):
+            if os.path.isfile(abs_scr) or os.path.isfile(abs_map):
+                if not tk_tools.askyesno(
+                    title=TRANS_OVERWRITE_TITLE,
+                    message=TRANS_OVERWRITE_GAME.format(mapname=p2c.title),
+                    parent=window,
+                ):
                     copy_loader.step('COPY')
                     continue
-
             if scr_path in zip_names(back_zip):
                     with zip_open_bin(back_zip, scr_path) as src:
                         with open(abs_scr, 'wb') as dest:
@@ -730,13 +718,10 @@ def ui_delete_game() -> None:
 
     if not to_delete:
         return
-    if not messagebox.askyesno(
-        gettext('Confirm Deletion'),
-        str(TRANS_DELETE_DESC.format(
-            n=len(to_delete),
-            maps='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
-        )),
-    ):
+    if not tk_tools.askyesno(TransToken.ui('Confirm Deletion'), TRANS_DELETE_DESC.format(
+        n=len(to_delete),
+        maps='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
+    )):
         return
 
     deleting_loader.set_length('DELETE', len(to_delete))

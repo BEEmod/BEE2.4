@@ -12,7 +12,6 @@ from pathlib import Path
 import attrs
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
-from tkinter import messagebox  # simple, standard modal dialogs
 
 import os
 import shutil
@@ -767,9 +766,9 @@ class Game:
                             pass
 
                         export_screen.reset()
-                        if messagebox.askokcancel(
-                            title=gettext('BEE2 - Export Failed!'),
-                            message=gettext(
+                        if tk_tools.askokcancel(
+                            title=TransToken.ui('BEE2 - Export Failed!'),
+                            message=TransToken.ui(
                                 'Compiler file {file} missing. '
                                 'Exit Steam applications, then press OK '
                                 'to verify your game cache. You can then '
@@ -777,7 +776,6 @@ class Game:
                             ).format(
                                 file=file + ext,
                             ),
-                            master=TK_ROOT,
                         ):
                             webbrowser.open('steam://validate/' + str(self.steamID))
                         return False, vpk_success
@@ -860,16 +858,15 @@ class Game:
                         # We might not have permissions, if the compiler is currently
                         # running.
                         export_screen.reset()
-                        messagebox.showerror(
-                            title=gettext('BEE2 - Export Failed!'),
-                            message=gettext(
+                        tk_tools.showerror(
+                            title=TransToken.ui('BEE2 - Export Failed!'),
+                            message=TransToken.ui(
                                 'Copying compiler file {file} failed. '
                                 'Ensure {game} is not running.'
                             ).format(
                                 file=comp_file,
                                 game=self.name,
                             ),
-                            master=TK_ROOT,
                         )
                         return False, vpk_success
                     export_screen.step('COMP', str(comp_file))
@@ -1142,12 +1139,12 @@ def scan_music_locs():
             try:
                 make_tag_coop_inst(loc)
             except FileNotFoundError:
-                messagebox.showinfo(
-                    message=gettext('Ap-Tag Coop gun instance not found!\n'
-                              'Coop guns will not work - verify cache to fix.'),
-                    parent=TK_ROOT,
-                    icon=messagebox.ERROR,
-                    title=gettext('BEE2 - Aperture Tag Files Missing'),
+                tk_tools.showerror(
+                    TransToken.ui('BEE2 - Aperture Tag Files Missing'),
+                    TransToken.ui(
+                        'Ap-Tag Coop gun instance not found!\n'
+                        'Coop guns will not work - verify cache to fix.'
+                    ),
                 )
                 MUSIC_TAG_LOC = None
             else:
@@ -1227,14 +1224,13 @@ def make_tag_coop_inst(tag_loc: str):
 
 def app_in_game_error() -> None:
     """Display a message warning about the issues with placing the BEE folder directly in P2."""
-    messagebox.showerror(
-        message=gettext(
+    tk_tools.showerror(
+        TransToken.ui('BEE2'),
+        TransToken.ui(
             "It appears that the BEE2 application was installed directly in a game directory. "
             "The bee2/ folder name is used for exported resources, so this will cause issues.\n\n"
             "Move the application folder elsewhere, then re-run."
         ),
-        parent=TK_ROOT,
-        title='BEE2',
     )
     return None
 
@@ -1271,66 +1267,49 @@ def load() -> None:
 
 def add_game(e=None):
     """Ask for, and load in a game to export to."""
-
-    messagebox.showinfo(
-        message=gettext(
+    title = TransToken.ui('BEE2 - Add Game')
+    tk_tools.showinfo(
+        title,
+        TransToken.ui(
             'Select the folder where the game executable is located ({appname})...'
         ).format(appname='portal2' + EXE_SUFFIX),
-        parent=TK_ROOT,
-        title=gettext('BEE2 - Add Game'),
     )
     if utils.WIN:
         exe_loc = filedialog.askopenfilename(
-            title=gettext('Find Game Exe'),
-            filetypes=[(gettext('Executable'), '.exe')]
+            title=str(TransToken.ui('Find Game Exe')),
+            filetypes=[(str(TransToken.ui('Executable')), '.exe')]
         )
     else:
-        exe_loc = filedialog.askopenfilename(title=gettext('Find Game Binaries'))
+        exe_loc = filedialog.askopenfilename(title=str(TransToken.ui('Find Game Binaries')))
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
-            messagebox.showinfo(
-                message=gettext('This does not appear to be a valid game folder!'),
-                parent=TK_ROOT,
-                icon=messagebox.ERROR,
-                title=gettext('BEE2 - Add Game'),
-            )
+            tk_tools.showerror(title, TransToken.ui(
+                'This does not appear to be a valid game folder!'
+            ))
             return False
 
         # Mel doesn't use PeTI, so that won't make much sense...
         if gm_id == utils.STEAM_IDS['MEL']:
-            messagebox.showinfo(
-                message=gettext("Portal Stories: Mel doesn't have an editor!"),
-                parent=TK_ROOT,
-                icon=messagebox.ERROR,
-                title=gettext('BEE2 - Add Game'),
-            )
+            tk_tools.showerror(title, TransToken.ui(
+                "Portal Stories: Mel doesn't have an editor!"
+            ))
             return False
 
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = tk_tools.prompt(
-                gettext('BEE2 - Add Game'),
-                gettext("Enter the name of this game:"),
+                title,
+                TransToken.ui("Enter the name of this game:"),
                 initialvalue=name,
             )
             if name in invalid_names:
-                messagebox.showinfo(
-                    icon=messagebox.ERROR,
-                    parent=TK_ROOT,
-                    message=gettext('This name is already taken!'),
-                    title=gettext('BEE2 - Add Game'),
-                    )
+                tk_tools.showerror(title, TransToken.ui('This name is already taken!'))
             elif name is None:
                 return False
             elif name == '':
-                messagebox.showinfo(
-                    icon=messagebox.ERROR,
-                    parent=TK_ROOT,
-                    message=gettext('Please enter a name for this game!'),
-                    title=gettext('BEE2 - Add Game'),
-                    )
+                tk_tools.showerror(title, TransToken.ui('Please enter a name for this game!'))
             else:
                 break
 
@@ -1346,17 +1325,16 @@ def remove_game(e=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
-        gettext("\n (BEE2 will quit, this is the last game set!)")
-        if len(all_games) == 1 else
-        ""
+        TransToken.ui(
+            'Are you sure you want to delete "{game}"?\n'
+            '(BEE2 will quit, this is the last game set!)'
+        ) if len(all_games) == 1 else
+        TransToken.ui('Are you sure you want to delete "{game}"?')
     )
-    confirm = messagebox.askyesno(
-        title="BEE2",
-        message=gettext('Are you sure you want to delete "{}"?').format(
-                selected_game.name
-            ) + lastgame_mess,
-        )
-    if confirm:
+    if tk_tools.askyesno(
+        title=TransToken.ui('BEE2 - Remove Game'),
+        message=lastgame_mess.format(game=selected_game.name),
+    ):
         selected_game.edit_gameinfo(add_line=False)
         selected_game.edit_fgd(add_lines=False)
 

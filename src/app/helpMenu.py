@@ -462,13 +462,9 @@ class Dialog(tk.Toplevel):
         scrollbox.grid(row=0, column=1, sticky='ns')
         self.textbox['yscrollcommand'] = scrollbox.set
 
-        ttk.Button(
-            frame,
-            text=gettext('Close'),
-            command=self.withdraw,
-        ).grid(
-            row=1, column=0,
-        )
+        TransToken.ui('Close').apply(
+            ttk.Button(frame, command=self.withdraw)
+        ).grid(row=1, column=0)
 
     async def show(self) -> None:
         """Display the help dialog."""
@@ -504,18 +500,16 @@ async def open_url(url_key: str) -> None:
             url_data = await trio.to_thread.run_sync(load_database)
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
-            messagebox.showerror(
-                gettext('BEEMOD2 - Failed to open URL'),
-                gettext('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
-                master=TK_ROOT,
+            tk_tools.showerror(
+                TransToken.ui('BEEMOD2 - Failed to open URL'),
+                TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
             )
             return
         except (IOError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
-            messagebox.showerror(
-                gettext('BEEMOD2 - Failed to open URL'),
-                gettext('Failed to parse help menu URLs file. Help menu links will not function.'),
-                master=TK_ROOT,
+            tk_tools.showerror(
+                TransToken.ui('BEEMOD2 - Failed to open URL'),
+                TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
             )
             return
         LOGGER.debug('Help URLs:\n{}', '\n'.join([
@@ -528,10 +522,9 @@ async def open_url(url_key: str) -> None:
     except KeyError:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
-        if messagebox.askyesno(
-            gettext('BEEMOD 2 - Open URL'),
-            gettext('Do you wish to open the following URL?\n') + url,
-            master=TK_ROOT,
+        if tk_tools.askyesno(
+            TransToken.ui('BEEMOD 2 - Open URL'),
+            TransToken.ui('Do you wish to open the following URL?\n{url}').format(url=url),
         ):
             webbrowser.open(url)
 

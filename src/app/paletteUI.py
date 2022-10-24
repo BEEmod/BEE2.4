@@ -27,6 +27,7 @@ __all__ = [
 ]
 TRANS_DELETE = TransToken.ui("Delete Palette")
 TRANS_HIDE = TransToken.ui("Hide Palette")
+TRANS_SHOULD_DELETE = TransToken.ui('Are you sure you want to delete "{palette}"?')
 
 
 class PaletteUI:
@@ -305,9 +306,9 @@ class PaletteUI:
             if pal.uuid in PALETTE_FORCE_SHOWN:
                 return  # Disallowed.
             self.hidden_defaults.add(pal.uuid)
-        elif messagebox.askyesno(
-            title='BEE2',
-            message=gettext('Are you sure you want to delete "{}"?').format(pal.name),
+        elif tk_tools.askyesno(
+            title=TransToken.ui('BEE2 - Delete Palette'),
+            message=TRANS_SHOULD_DELETE.format(palette=pal.name),
             parent=TK_ROOT,
         ):
             pal.delete_from_disk()
@@ -332,7 +333,7 @@ class PaletteUI:
 
     def event_save_as(self) -> None:
         """Save the palette with a new name."""
-        name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
+        name = tk_tools.prompt(TransToken.ui("BEE2 - Save Palette"), TransToken.ui("Enter a name:"))
         if name is None:
             # Cancelled...
             return

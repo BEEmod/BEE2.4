@@ -99,6 +99,14 @@ frmScroll: ttk.Frame  # Frame holding the item list.
 pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
 
 
+TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
+TRANS_EXPORTED_NO_VPK = TransToken.ui(
+    '{exported}\n\nWarning: VPK files were not exported, quit Portal 2 and '
+    'Hammer to ensure editor wall previews are changed.'
+).format(exported=TRANS_EXPORTED)
+TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
+
+
 class Item:
     """Represents an item that can appear on the list."""
     __slots__ = [
@@ -782,21 +790,17 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         item_opts.save_check()
         config.APP.write_file()
 
-        message = gettext('Selected Items and Style successfully exported!')
-        if not vpk_success:
-            message += gettext(
-                '\n\nWarning: VPK files were not exported, quit Portal 2 and '
-                'Hammer to ensure editor wall previews are changed.'
-            )
+        message = TRANS_EXPORTED if vpk_success else TRANS_EXPORTED_NO_VPK
 
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
-            do_action = messagebox.askyesno(
-                'BEEMOD2',
-                message + str(optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export]),
-                parent=TK_ROOT,
+            do_action = tk_tools.askyesno(
+                TRANS_EXPORTED_TITLE,
+                optionWindow.AFTER_EXPORT_TEXT[
+                    conf.after_export, conf.launch_after_export,
+                ].format(msg=message),
             )
         else:  # No action to do, so just show an OK.
-            messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
+            tk_tools.showinfo(TRANS_EXPORTED_TITLE, message)
             do_action = False
 
         # Do the desired action - if quit, we don't bother to update UI.

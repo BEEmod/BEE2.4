@@ -26,14 +26,14 @@ AFTER_EXPORT_ACTION = tk.IntVar(name='OPT_after_export_action', value=AfterExpor
 
 # action, launching_game -> suffix on the message box.
 AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
-    (AfterExport.NORMAL, False): TransToken.untranslated(''),
-    (AfterExport.NORMAL, True): TransToken.ui('\nLaunch Game?'),
+    (AfterExport.NORMAL, False): TransToken.untranslated('{msg}'),
+    (AfterExport.NORMAL, True): TransToken.ui('{msg}\nLaunch Game?'),
 
-    (AfterExport.MINIMISE, False): TransToken.ui('\nMinimise BEE2?'),
-    (AfterExport.MINIMISE, True): TransToken.ui('\nLaunch Game and minimise BEE2?'),
+    (AfterExport.MINIMISE, False): TransToken.ui('{msg}\nMinimise BEE2?'),
+    (AfterExport.MINIMISE, True): TransToken.ui('{msg}\nLaunch Game and minimise BEE2?'),
 
-    (AfterExport.QUIT, False): TransToken.ui('\nQuit BEE2?'),
-    (AfterExport.QUIT, True): TransToken.ui('\nLaunch Game and quit BEE2?'),
+    (AfterExport.QUIT, False): TransToken.ui('{msg}\nQuit BEE2?'),
+    (AfterExport.QUIT, True): TransToken.ui('{msg}\nLaunch Game and quit BEE2?'),
 }
 
 # The checkbox variables, along with the GenOptions attribute they control.
@@ -118,7 +118,7 @@ def clear_caches() -> None:
     # Since we've saved, dismiss this window.
     win.withdraw()
 
-    messagebox.showinfo(title=str(TRANS_CACHE_RESET_TITLE), message=str(message))
+    tk_tools.showinfo(TRANS_CACHE_RESET_TITLE, message)
 
 
 def make_checkbox(

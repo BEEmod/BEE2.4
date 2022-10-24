@@ -146,7 +146,7 @@ def init_widgets():
     pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
 
 
-def quote_sort_func(quote):
+def quote_sort_func(quote: Property) -> Decimal:
     """The quotes will be sorted by their priority value."""
     # Use Decimal so any number of decimal points can be used.
     try:
@@ -155,7 +155,7 @@ def quote_sort_func(quote):
         return Decimal('0')
 
 
-def show_trans(e):
+def show_trans(e) -> None:
     """Add the transcript to the list."""
     text = UI['trans']
     text['state'] = 'normal'
@@ -185,7 +185,7 @@ def save():
         win.withdraw()
 
 
-def add_tabs():
+def add_tabs() -> None:
     """Add the tabs to the notebook."""
     notebook = UI['tabs']
     # Save the current tab index so we can restore it after.
@@ -214,7 +214,7 @@ def add_tabs():
                 text=gettext('Resp')
                 )
         else:
-            notebook.tab(tab, text=tab.nb_text)
+            notebook.tab(tab, text=str(tab.nb_text))
 
     if current_tab is not None:
         notebook.select(current_tab)
@@ -308,7 +308,7 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
-        group_name = gettext('Mid - Chamber')
+        group_name = TransToken.ui('Mid - Chamber')
         group_id = 'MIDCHAMBER'
         group_desc = TransToken.ui(
             'Lines played during the actual chamber, '
@@ -316,14 +316,17 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
         )
     elif tab_type is TabTypes.RESPONSE:
         # Note: 'Response' tab header, and description
-        group_name = gettext('Responses')
+        group_name = TransToken.ui('Responses')
         group_id = None
         group_desc = TransToken.ui(
             'Lines played in response to certain events in Coop.'
         )
     elif tab_type is TabTypes.NORM:
-        group_name = group['name', 'No Name!']
-        group_id = group_name.upper()
+        try:
+            group_name = TransToken.parse(pak_id, group['name'])
+        except LookupError:
+            group_name = TransToken.ui('No Name!')
+        group_id = group_name.token.upper()
         group_desc = TransToken.parse(pak_id, group['desc', ''])
     else:
         raise ValueError('Invalid tab type!')
@@ -333,7 +336,7 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
     outer_frame.columnconfigure(0, weight=1)
     outer_frame.rowconfigure(0, weight=1)
 
-    TABS[group_name] = outer_frame
+    TABS[group_name.token] = outer_frame
     # We add this attribute so the refresh() method knows all the
     # tab names
     outer_frame.nb_text = group_name

@@ -94,7 +94,8 @@ def on_error(
     try:
         from tkinter import messagebox
         from localisation import TransToken
-        messagebox.showinfo(
+        # Use directly, so we don't actually need the tk_tools dependency.
+        messagebox.showerror(
             title=str(
                 TransToken.ui('BEEMOD {version} Error!')
                 .format(version=utils.BEE_VERSION)
@@ -103,7 +104,6 @@ def on_error(
                 'An error occurred: \n{err}\n\n'
                 'This has been copied to the clipboard.'
             ).format(err=err)),
-            icon=messagebox.ERROR,
         )
     except Exception:
         pass

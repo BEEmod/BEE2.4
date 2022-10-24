@@ -537,10 +537,10 @@ def init_widgets() -> None:
             try:
                 webbrowser.open_new_tab(url)
             except webbrowser.Error:
-                if messagebox.askyesno(
+                if tk_tools.askyesno(
                     icon="error",
-                    title="BEE2 - Error",
-                    message=gettext(
+                    title=TransToken.ui("BEE2 - Error"),
+                    message=TransToken.ui(
                         'Failed to open a web browser. Do you wish for the URL '
                         'to be copied to the clipboard instead?'
                     ),
