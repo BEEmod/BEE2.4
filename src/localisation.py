@@ -33,6 +33,7 @@ PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 # The currently loaded translations. First is the namespace, then the token -> string.
 TRANSLATIONS: Dict[str, Dict[str, str]] = {}
 
+# Widgets that have a 'text' property.
 TextWidget: TypeAlias = Union[
     'tk.Label', 'tk.LabelFrame', 'tk.Button', 'tk.Radiobutton', 'tk.Checkbutton',
     'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
@@ -106,9 +107,34 @@ class TransToken:
         """
         return cls(NS_UNTRANSLATED, text, EmptyMapping)
 
+    @property
+    def is_game(self) -> bool:
+        """Check if this is a token from basemodui."""
+        return self.namespace == NS_GAME
+
+    @property
+    def is_untranslated(self) -> bool:
+        """Check if this is literal text."""
+        return self.namespace == NS_UNTRANSLATED
+
+    @property
+    def is_ui(self) -> bool:
+        """Check if this is builtin UI text."""
+        return self.namespace == NS_UI
+
     def format(self, /, **kwargs: object) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
         return attrs.evolve(self, parameters={**self.parameters, **kwargs})
+
+    def as_game_token(self) -> str:
+        """Return the value which should be written in files read by the game.
+
+        If this is a Valve token, the raw token is returned so the game can do the translation.
+        In all other cases, we do the translation immediately.
+        """
+        if self.namespace == NS_GAME and not self.parameters:
+            return self.token
+        return str(self)
 
     def __bool__(self) -> bool:
         """The boolean value of a token is whether the token is entirely blank.
@@ -373,33 +399,11 @@ def set_language(lang_code: str) -> None:
         # That's fine if the user's language is actually English.
         else:
             if 'en' not in expanded_langs:
-                logger.warning(
+                LOGGER.warning(
                     "Can't find translation for codes: {!r}!",
                     expanded_langs,
                 )
             _TRANSLATOR = gettext_mod.NullTranslations()
-
-    # Some lang-specific overrides..
-
-    if _TRANSLATOR.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
-        # For Japanese/Chinese, we want a 'sans-serif' / gothic font
-        # style.
-        try:
-            from tkinter import font
-        except ImportError:
-            return
-        font_names = [
-            'TkDefaultFont',
-            'TkHeadingFont',
-            'TkTooltipFont',
-            'TkMenuFont',
-            'TkTextFont',
-            'TkCaptionFont',
-            'TkSmallCaptionFont',
-            'TkIconFont',
-            # Note - not fixed-width...
-        ]
-        for font_name in font_names:
 
     # Reload all our localisations.
     for text_widget, token in _applied_tokens.items():

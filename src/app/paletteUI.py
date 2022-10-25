@@ -153,7 +153,7 @@ class PaletteUI:
 
         menu.add_separator()
         self.ui_menu_palettes_index = menu.index('end') + 1
-        self.update_state()
+        TransToken.add_callback(self.update_state, call=True)
 
     @property
     def selected(self) -> Palette:

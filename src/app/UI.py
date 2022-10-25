@@ -103,6 +103,8 @@ TRANS_EXPORTED_NO_VPK = TransToken.ui(
 ).format(exported=TRANS_EXPORTED)
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
+TRANS_ERROR = TransToken.untranslated('???')
+TRANS_BLANK = TransToken.untranslated('')
 
 
 class Item:
@@ -165,12 +167,16 @@ class Item:
         yield from self.data.tags
         yield from self.data.authors
         try:
-            yield gameMan.translate(self.data.editor.subtypes[subtype].name)
+            name = self.data.editor.subtypes[subtype].name
         except IndexError:
             LOGGER.warning(
                 'No subtype number {} for {} in {} style!',
                 subtype, self.id, selected_style,
             )
+        else:  # Include both the original and translated versions.
+            if not name.is_game:
+                yield name.token
+            yield str(name)
 
     def get_icon(self, subKey, allow_single=False, single_num=1) -> img.Handle:
         """Get an icon for the given subkey.
@@ -307,8 +313,6 @@ class PalItem:
         self.item = item
         self.subKey = sub
         self.id = item.id
-        # Cached translated palette name.
-        self.name = '??'
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
@@ -343,6 +347,18 @@ class PalItem:
 
         # Rightclick does the same as the icon.
         tk_tools.bind_rightclick(self.info_btn, click_func)
+
+    @property
+    def name(self) -> TransToken:
+        """Get the current name for this subtype."""
+        try:
+            return self.item.data.editor.subtypes[self.subKey].name
+        except IndexError:
+            LOGGER.warning(
+                'Item <{}> in <{}> style has mismatched subtype count!',
+                self.id, selected_style,
+            )
+            return TRANS_ERROR
 
     def rollover(self, _: tk.Event) -> None:
         """Show the name of a subitem and info button when moused over."""
@@ -394,14 +410,6 @@ class PalItem:
 
         Call whenever the style changes, so the icons update.
         """
-        try:
-            self.name = gameMan.translate(self.item.data.editor.subtypes[self.subKey].name)
-        except IndexError:
-            LOGGER.warning(
-                'Item <{}> in <{}> style has mismatched subtype count!',
-                self.id, selected_style,
-            )
-            self.name = '???'
         img.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
 
     def clear(self) -> bool:
@@ -832,12 +840,12 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
 
 def set_disp_name(item: PalItem, e=None) -> None:
     """Callback to display the name of the item."""
-    UI['pre_disp_name'].configure(text=item.name)
+    item.name.apply(UI['pre_disp_name'])
 
 
 def clear_disp_name(e=None) -> None:
     """Callback to reset the item name."""
-    UI['pre_disp_name'].configure(text='')
+    TRANS_BLANK.apply(UI['pre_disp_name'])
 
 
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:

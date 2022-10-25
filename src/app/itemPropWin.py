@@ -460,7 +460,7 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
     values['startup'] = DEFAULTS['startup']
 
 
-def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: str) -> None:
+def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: TransToken) -> None:
     """Show the item property changing window."""
     global last_angle
     propList[:] = [key.casefold() for key in used_props]

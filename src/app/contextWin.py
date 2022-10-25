@@ -267,7 +267,7 @@ def load_item_data() -> None:
     wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data.authors)
-    wid['name']['text'] = selected_sub_item.name
+    selected_sub_item.name.apply(wid['name'])
     wid['ent_count']['text'] = item_data.ent_count or '??'
 
     desc = get_description(
