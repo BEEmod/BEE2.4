@@ -635,7 +635,7 @@ class SelectorWin(Generic[CallbackT]):
         # A map from group name -> header widget
         self.group_widgets: dict[str, GroupHeader] = {}
         # A map from folded name -> display name
-        self.group_names: dict[str, str] = {}
+        self.group_names: dict[str, TransToken] = {}
         self.grouped_items: dict[str, list[Item]] = {}
         # A list of casefolded group names in the display order.
         self.group_order: list[str] = []
@@ -1124,7 +1124,7 @@ class SelectorWin(Generic[CallbackT]):
         """Randomly select a suggested item."""
         if self.suggested and (force or self._suggested_rollover is not None):
             self._suggested_rollover = random.choice(self.suggested)
-            self.disp_label.set(self._suggested_rollover.context_lbl)
+            self.disp_label.set(str(self._suggested_rollover.context_lbl))
             self.display.after(1000, self._pick_suggested)
 
     def _update_translations(self) -> None:
@@ -1262,8 +1262,8 @@ class SelectorWin(Generic[CallbackT]):
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
         item_desc = item.desc
-        if isinstance(item.desc, TransToken):  # Translate now.
-            item_desc = tkMarkdown.MarkdownData.text(str(item.desc))
+        if isinstance(item_desc, TransToken):  # Translate now.
+            item_desc = tkMarkdown.MarkdownData.text(str(item_desc))
         if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
@@ -1326,7 +1326,7 @@ class SelectorWin(Generic[CallbackT]):
             elif attr.type is AttrTypes.STRING:
                 # Just a string.
                 if not isinstance(val, TransToken):
-                    val = TransToken.untranslated(val)
+                    val = TransToken.untranslated(str(val))
                 val.apply(attr.label)
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')

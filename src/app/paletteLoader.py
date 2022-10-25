@@ -332,7 +332,7 @@ class Palette:
         # If a conflict occurs, add ' ' and hash again to get a different
         # value.
         if self.filename is None or (self.readonly and not ignore_readonly):
-            hash_src = self.name
+            hash_src = self.name.token
             while True:
                 hash_filename = str(abs(hash(hash_src))) + PAL_EXT
                 if os.path.isfile(hash_filename):

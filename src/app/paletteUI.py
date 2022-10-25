@@ -28,7 +28,7 @@ __all__ = [
 TRANS_DELETE = TransToken.ui("Delete Palette")
 TRANS_HIDE = TransToken.ui("Hide Palette")
 TRANS_SHOULD_DELETE = TransToken.ui('Are you sure you want to delete "{palette}"?')
-
+TRANS_BUILTIN = TransToken.ui('Builtin / Readonly')  # i18n: Palette group title.
 
 class PaletteUI:
     """UI for selecting palettes."""
@@ -187,7 +187,7 @@ class PaletteUI:
 
         for group, palettes in sorted(groups.items(), key=lambda t: (t[0] != paletteLoader.GROUP_BUILTIN, t[0])):
             if group == paletteLoader.GROUP_BUILTIN:
-                group = str(TransToken.ui('Builtin / Readonly'))  # i18n: Palette group title.
+                group = str(TRANS_BUILTIN)
             if group:
                 try:
                     grp_menu = self.ui_group_menus[group]

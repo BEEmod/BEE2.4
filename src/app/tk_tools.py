@@ -532,11 +532,9 @@ class _MsgBoxFunc(Generic[T]):
         parent: tk.Misc=TK_ROOT,
         **options: Any,
     ) -> T:
-        if title is not None:
-            title = str(title)
-        if message is not None:
-            message = str(message)
-        return self.orig(title, message, parent=parent, master=TK_ROOT, **options)
+        disp_title = str(title) if title is not None else None
+        disp_msg = str(message) if message is not None else None
+        return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
 
 
 showinfo       = _MsgBoxFunc(messagebox.showinfo)
@@ -580,7 +578,8 @@ class ReadOnlyEntry(ttk.Entry):
         setattr(self, 'delete', redir.register('delete', event_cancel))
 
 
-class ttk_Spinbox(ttk.Widget, tk.Spinbox):
+# Widget and Spinbox have conflicting identify() definitions, not important.
+class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
     def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
         """Initialise a spinbox.

@@ -693,16 +693,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     TransToken.ui('Player Model (SP):').apply(model_frame)
     model_frame.grid(row=4, column=0, sticky='ew')
 
-    player_model_var = tk.StringVar(value=PLAYER_MODELS.get(
-        COMPILE_CFG.get_val('General', 'player_model', 'PETI'),
-        PLAYER_MODELS['PETI'],
-    ))
-    player_model_combo = player_mdl = ttk.Combobox(
-        model_frame,
-        exportselection=False,
-        textvariable=player_model_var,
-        width=20,
-    )
+    player_model_combo = player_mdl = ttk.Combobox(model_frame, exportselection=False, width=20)
     # Users can only use the dropdown
     player_mdl.state(['readonly'])
     player_mdl.grid(row=0, column=0, sticky=tk.EW)
@@ -712,6 +703,12 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
 
     TransToken.add_callback(update_model_values, call=True)
+    try:
+        start_ind = PLAYER_MODEL_ORDER.index(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
+    except IndexError:
+        LOGGER.warning('Invalid player model "{}"!', COMPILE_CFG['General']['player_model'])
+        start_ind = PLAYER_MODEL_ORDER.index('PETI')
+    player_mdl.current(start_ind)
 
     def set_model(_: tk.Event) -> None:
         """Save the selected player model."""

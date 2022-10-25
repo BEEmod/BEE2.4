@@ -370,16 +370,9 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
     frame.columnconfigure(0, weight=1)
     canv.create_window(0, 0, window=frame, anchor="nw")
 
-    ttk.Label(
-        frame,
-        text=group_name,
-        anchor='center',
-        font='tkHeadingFont',
-        ).grid(
-            row=0,
-            column=0,
-            sticky='EW',
-            )
+    group_name.apply(
+        ttk.Label(frame, anchor='center', font='tkHeadingFont')
+    ).grid(row=0,column=0, sticky='EW')
 
     group_desc.apply(ttk.Label(frame)).grid(row=1, column=0, sticky='EW')
 
@@ -420,14 +413,7 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
             except LookupError:
                 name = TRANS_NO_NAME
 
-        ttk.Label(
-            frame,
-            text=name,
-            font=QUOTE_FONT,
-        ).grid(
-            column=0,
-            sticky=W,
-        )
+        name.apply(ttk.Label(frame, font=QUOTE_FONT)).grid(column=0, sticky=W)
 
         if tab_type is TabTypes.RESPONSE:
             line_iter = find_resp_lines(quote)

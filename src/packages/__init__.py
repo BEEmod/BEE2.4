@@ -493,10 +493,7 @@ def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     ).format(msg=msg, loc=trailer)
 
     LOGGER.error(message)
-    tk_tools.showerror(
-        title='BEE2 - Invalid Packages Directory!',
-        message=message,
-    )
+    tk_tools.showerror(TransToken.ui('BEE2 - Invalid Packages Directory!'), message=message)
     sys.exit()
 
 
