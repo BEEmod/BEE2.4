@@ -1,5 +1,4 @@
 """Test the main config logic."""
-from typing_extensions import Literal, TypeAlias
 import io
 import uuid
 
@@ -8,12 +7,10 @@ import pytest
 
 import config
 
-Triple: TypeAlias = Literal["a", "b", "c"]
-
 
 class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
     """Simple data type, not using IDs."""
-    def __init__(self, value: str, triple: Triple) -> None:
+    def __init__(self, value: str, triple: str) -> None:
         self.value = value
         self.triple = triple
 
@@ -25,7 +22,6 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'DataSingle':
         """Parse keyvalues."""
-        triple: Triple
         if version == 2:
             triple_str = data['triple']
             if triple_str in {"a", "b", "c"}:
@@ -73,7 +69,7 @@ def test_basic_store() -> None:
     'testing testing',
     'multi\nline\nstring',
 ])
-def test_parse_kv1_upgrades(value: str, triple: Triple) -> None:
+def test_parse_kv1_upgrades(value: str, triple: str) -> None:
     """Test parsing Keyvalues1 data, and upgrading old versions."""
     spec = config.ConfigSpec(None)
     spec.register(DataSingle)
@@ -105,7 +101,7 @@ def test_parse_kv1_upgrades(value: str, triple: Triple) -> None:
 
 @pytest.mark.parametrize('triple', ['a', 'b', 'c'])
 @pytest.mark.parametrize('value', ['val1', 'val2'])
-def test_export_kv1_regress(value: str, triple: Triple, file_regression) -> None:
+def test_export_kv1_regress(value: str, triple: str, file_regression) -> None:
     """Test exporting KV1 produces the same result."""
     spec = config.ConfigSpec(None)
     spec.register(DataSingle)
@@ -126,7 +122,7 @@ def test_export_kv1_regress(value: str, triple: Triple, file_regression) -> None
 
 @pytest.mark.parametrize('triple', ['a', 'b', 'c'])
 @pytest.mark.parametrize('value', ['val1', 'val2'])
-def test_export_dmx_regress(value: str, triple: Triple, file_regression) -> None:
+def test_export_dmx_regress(value: str, triple: str, file_regression) -> None:
     """Test exporting DMX produces the same result."""
     spec = config.ConfigSpec(None)
     spec.register(DataSingle)
