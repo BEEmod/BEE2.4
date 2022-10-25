@@ -125,18 +125,18 @@ values: dict[str, tk.Variable | str | float] = {}
 out_values: dict[str, tk.Variable | str | float] = {}
 
 PAINT_OPTS = [
-    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
-    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_medium',
-    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_heavy',
-    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_drip',
-    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_bomb',
+    TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light'),
+    TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_medium'),
+    TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_heavy'),
+    TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_drip'),
+    TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_bomb'),
 ]
 
 PANEL_ANGLES = [
-    (30, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_30'),
-    (45, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_45'),
-    (60, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_60'),
-    (90, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_90'),
+    (30, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_30')),
+    (45, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_45')),
+    (60, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_60')),
+    (90, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_90')),
 ]
 
 DEFAULTS = {  # default values for this item
@@ -400,28 +400,30 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
             frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = tk.StringVar(value=DEFAULTS[key])
-            for pos, (angle, disp_angle) in enumerate(PANEL_ANGLES):
-                ttk.Radiobutton(
+            for pos, (angle, trans_tok) in enumerate(PANEL_ANGLES):
+                radio = ttk.Radiobutton(
                     frm,
                     variable=values[key],
                     value=str(angle),
-                    text=gameMan.translate(disp_angle),
                     command=func_partial(save_angle, key, angle),
-                ).grid(row=0, column=pos)
+                )
+                trans_tok.apply(radio)
+                radio.grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
 
         elif prop_type is PropTypes.GELS:
             frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = tk.IntVar(value=DEFAULTS[key])
-            for pos, text in enumerate(PAINT_OPTS):
-                ttk.Radiobutton(
+            for pos, trans_tok in enumerate(PAINT_OPTS):
+                radio = ttk.Radiobutton(
                     frm,
                     variable=values[key],
                     value=pos,
-                    text=gameMan.translate(text),
                     command=func_partial(save_paint, key, pos),
-                ).grid(row=0, column=pos)
+                )
+                trans_tok.apply(radio)
+                radio.grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
             out_values[key] = str(DEFAULTS[key])
 
@@ -649,4 +651,4 @@ if __name__ == '__main__':
         'paintflowtype': '1',
         'allowstreak': '1'
         }
-    show_window(all_vals, TK_ROOT, "TestItemWithEveryProp")
+    show_window(all_vals, TK_ROOT, TransToken.untranslated("Test Item With Every Prop"))

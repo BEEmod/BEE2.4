@@ -221,19 +221,10 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
-
 def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
     """Load package filesystems into a chain."""
     for system in package_sys:
         res_system.add_sys(system, prefix='resources/')
-
-
-def translate(string: str) -> str:
-    """Translate the string using Portal 2's language files.
-
-    This is needed for Valve items, since they translate automatically.
-    """
-    return localisation.TRANSLATIONS[localisation.NS_GAME].get(string, string)
 
 
 def quit_application():
