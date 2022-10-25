@@ -6,7 +6,7 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
-from typing import Optional, Union, Any, Type, IO, Iterable, Iterator
+from typing import NoReturn, Optional, Union, Any, Type, IO, Iterable, Iterator
 from pathlib import Path
 
 import attrs
@@ -227,7 +227,7 @@ def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
         res_system.add_sys(system, prefix='resources/')
 
 
-def quit_application():
+def quit_application() -> NoReturn:
     """Command run to quit the application.
 
     This is overwritten by UI later.
