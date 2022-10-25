@@ -38,7 +38,7 @@ TextWidget: TypeAlias = Union[
     'tk.Label', 'tk.LabelFrame', 'tk.Button', 'tk.Radiobutton', 'tk.Checkbutton',
     'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
 ]
-TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
+TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget, covariant=True)
 # Assigns to widget['text'].
 _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
 # menu -> index -> token.
@@ -184,7 +184,7 @@ class TransToken:
         _applied_tokens[widget] = self
         return widget
 
-    def apply_title(self, win: 'tk.Toplevel') -> None:
+    def apply_title(self, win: Union['tk.Toplevel', 'tk.Tk']) -> None:
         """Set the title of a window to this token."""
         self.add_callback(lambda: win.title(str(self)))
 
