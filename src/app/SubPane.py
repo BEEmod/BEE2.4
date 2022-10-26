@@ -5,7 +5,7 @@ from tkinter import ttk
 
 from app import tooltip, tk_tools, sound
 from app.img import Handle as ImgHandle, apply as apply_img
-from localisation import gettext
+from localisation import TransToken
 from config.windows import WindowState
 import utils
 import config
@@ -17,6 +17,8 @@ import config
 # around the images instead of wasting space.
 style = ttk.Style()
 style.configure('Toolbar.TButton', padding='-20',)
+
+TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
 
 
 def make_tool_button(frame: tk.Misc, img: str, command: Callable[[], Any]) -> ttk.Button:
@@ -43,8 +45,8 @@ class SubPane(tk.Toplevel):
         tool_frame: Union[tk.Frame, ttk.Frame],
         tool_img: str,
         menu_bar: tk.Menu,
-        tool_col: int=0,
-        title: str='',
+        tool_col: int,
+        title: TransToken,
         resize_x: bool=False,
         resize_y: bool=False,
         name: str='',
@@ -75,18 +77,14 @@ class SubPane(tk.Toplevel):
             # Contract the spacing to allow the icons to fit.
             padx=(2 if utils.MAC else (5, 2)),
         )
-        tooltip.add_tooltip(
-            self.tool_button,
-            text=gettext('Hide/Show the "{}" window.').format(title))
-        menu_bar.add_checkbutton(
-            label=title,
-            variable=self.visible,
-            command=self._set_state_from_menu,
-        )
+        tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
+
+        menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
+        title.apply_menu(menu_bar)
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
-        self.title(title)
+        title.apply_title(self)
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)

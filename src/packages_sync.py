@@ -9,15 +9,12 @@ The destination will be 'Portal 2/bee2_dev/' if that exists, or 'Portal 2/bee2/'
 otherwise.
 """
 import utils
-import gettext
 import srctools.logger
 
 utils.fix_cur_directory()
 # Don't write to a log file, users of this should be able to handle a command
 # prompt.
 LOGGER = srctools.logger.init_logging(main_logger=__name__)
-# This is needed to allow us to import things properly.
-gettext.NullTranslations().install(['gettext', 'ngettext'])
 
 import os
 import sys

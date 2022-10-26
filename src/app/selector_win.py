@@ -5,6 +5,8 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
+
+import copy
 from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
 from typing_extensions import Concatenate, ParamSpec, TypeAlias
 from tkinter import font as tk_font
@@ -32,7 +34,7 @@ from consts import (
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from localisation import gettext, ngettext
+from localisation import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -99,56 +101,63 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list')
 
 
-AttrValues: TypeAlias = Union[str, Iterable[str], bool, Vec]
+# TransToken is str()-ified.
+AttrValues: TypeAlias = Union[str, TransToken, Iterable[Union[str, TransToken]], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
+TRANS_BLANK = TransToken.untranslated('')
+TRANS_COMMA = TransToken.untranslated(', ')
+TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
+TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
+TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
+TRANS_PREVIEW_TITLE = TransToken.ui('Preview - {item}')  # i18n: Preview window.
+TRANS_SUGGESTED = TransToken.ui("Suggested")
+# Labelframe doesn't look good for the suggested display, use box drawing characters instead.
+TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").format(sugg=TRANS_SUGGESTED)
+# If the item is groupless, use 'Other' for the header.
+TRANS_GROUPLESS = TransToken.ui('Other')
+TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
+TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
+TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
 
 
 @attrs.define
 class AttrDef:
     """Configuration for attributes shown on selector labels."""
     id: str
-    desc: str
+    desc: TransToken
     default: AttrValues
     type: AttrTypes
 
     label: ttk.Label = attrs.field(init=False)
 
     @classmethod
-    def string(cls, attr_id: str, desc='', default: str='') -> AttrDef:
+    def string(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: str='') -> AttrDef:
         """Alternative constructor for string-type attrs."""
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.STRING)
 
     @classmethod
-    def list(cls, attr_id: str, desc='', default: list=None) -> AttrDef:
+    def list(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: list=None) -> AttrDef:
         """Alternative constructor for list-type attrs."""
         if default is None:
             default = []
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.LIST)
 
     @classmethod
-    def bool(cls, attr_id: str, desc='', default: bool=False) -> AttrDef:
+    def bool(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: bool=False) -> AttrDef:
         """Alternative constructor for bool-type attrs."""
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
 
     @classmethod
-    def color(cls, attr_id: str, desc='', default: Vec=None) -> AttrDef:
+    def color(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: Vec=None) -> AttrDef:
         """Alternative constructor for color-type attrs."""
         if default is None:
             default = Vec(255, 255, 255)
-        if desc != '' and not desc.endswith(': '):
-            desc += ': '
         return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
 class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
-    def __init__(self, win: SelectorWin, title: str, menu: tk.Menu) -> None:
+    def __init__(self, win: SelectorWin, title: TransToken, menu: tk.Menu) -> None:
         self.parent = win
         self._menu = menu  # The rightclick cascade widget.
         self._menu_pos = -1
@@ -238,6 +247,7 @@ class Item:
         'desc',
         'authors',
         'group',
+        'group_id',
         'sort_key',
         'button',
         'snd_sample',
@@ -247,31 +257,31 @@ class Item:
         '_context_lbl',
         '_context_ind',
     ]
-    desc: tkMarkdown.MarkdownData
-
     def __init__(
         self,
         name,
-        short_name: str,
-        long_name: str | None = None,
+        short_name: TransToken,
+        long_name: TransToken | None = None,
         icon: img.Handle | None=None,
         large_icon: img.Handle | None = None,
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
-        desc: tkMarkdown.MarkdownData | str = tkMarkdown.MarkdownData(),
+        desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.text(''),
         group: str = '',
         sort_key: str | None = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: str | None = None,
         package: str = '',
     ) -> None:
+        # Not a name, actually an ID
         self.name = name
         self.shortName = short_name
-        self.group = group or ''
+        self.group_id = group.strip().casefold()
+        self.group = TransToken.parse(package, group)
         self.longName = long_name or short_name
         self.sort_key = sort_key
         self.package = package
-        if len(self.longName) > 20:
+        if len(self.longName.token) > 20:
             self._context_lbl = self.shortName
         else:
             self._context_lbl = self.longName
@@ -279,11 +289,7 @@ class Item:
         self._icon = icon
         self.large_icon = large_icon
         self.previews = list(previews)
-
-        if isinstance(desc, str):
-            self.desc = tkMarkdown.convert(desc, None)
-        else:
-            self.desc = desc
+        self.desc = desc
 
         self.snd_sample = snd_sample
         self.authors: list[str] = list(authors)
@@ -318,18 +324,18 @@ class Item:
         return f'<Item:{self.name}>'
 
     @property
-    def context_lbl(self) -> str:
+    def context_lbl(self) -> TransToken:
         """The text displayed on the rightclick menu."""
         return self._context_lbl
 
     @context_lbl.setter
-    def context_lbl(self, value: str) -> None:
+    def context_lbl(self, value: TransToken) -> None:
         """Update the context menu whenver this is set."""
         self._context_lbl = value
-        if self._selector and self._context_ind:
-            self._selector.context_menus[self.group.casefold()].entryconfigure(
+        if self._selector and self._context_ind is not None:
+            self._context_lbl.apply_menu(
+                self._selector.context_menus[self.group_id],
                 self._context_ind,
-                label=value,
             )
 
     @classmethod
@@ -378,8 +384,9 @@ class Item:
         item.icon = self.icon
         item.large_icon = self.large_icon
         item.previews = self.previews.copy()
-        item.desc = self.desc.copy()
+        item.desc = copy.copy(self.desc)
         item.authors = self.authors.copy()
+        item.group_id = self.group_id
         item.group = self.group
         item.sort_key = self.sort_key
         item.snd_sample = self.snd_sample
@@ -420,7 +427,7 @@ class PreviewWindow:
     def show(self, parent: SelectorWin, item: Item) -> None:
         """Show the window."""
         self.win.transient(parent.win)
-        self.win.title(gettext('{} Preview').format(item.longName))
+        TRANS_PREVIEW_TITLE.format(item=item.longName).apply_title(self.win)
 
         self.parent = parent
         self.index = 0
@@ -487,14 +494,14 @@ class SelectorWin(Generic[CallbackT]):
         modal=False,
         default_id: str='<NONE>',
         # i18n: 'None' item description
-        none_desc=gettext('Do not add anything.'),
+        none_desc=TransToken.ui('Do not add anything.'),
         none_attrs=EmptyMapping,
         none_icon: img.Handle = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
         # i18n: 'None' item name.
-        none_name: str = gettext("<None>"),
-        title: str = 'BEE2',
-        desc: str = '',
-        readonly_desc: str = '',
+        none_name: TransToken = TransToken.ui("<None>"),
+        title: TransToken = TransToken.untranslated('???'),
+        desc: TransToken = TRANS_BLANK,
+        readonly_desc: TransToken = TRANS_BLANK,
         callback: Optional[Callable[Concatenate[Optional[str], CallbackT], None]]=None,
         callback_params: CallbackT.args=(),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
@@ -541,9 +548,9 @@ class SelectorWin(Generic[CallbackT]):
         """
         self.noneItem = Item(
             name='<NONE>',
-            short_name='',
+            short_name=TransToken.untranslated(''),
             icon=none_icon,
-            desc=none_desc,
+            desc=tkMarkdown.convert(none_desc, None),
             attributes=dict(none_attrs),
         )
         self.noneItem.context_lbl = none_name
@@ -612,8 +619,8 @@ class SelectorWin(Generic[CallbackT]):
 
         self.win = tk.Toplevel(parent, name='selwin_' + save_id)
         self.win.withdraw()
-        self.win.title("BEE2 - " + title)
         self.win.transient(master=parent)
+        TRANS_WINDOW_TITLE.format(subtitle=title).apply_title(self.win)
 
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
@@ -631,7 +638,7 @@ class SelectorWin(Generic[CallbackT]):
         # A map from group name -> header widget
         self.group_widgets: dict[str, GroupHeader] = {}
         # A map from folded name -> display name
-        self.group_names: dict[str, str] = {}
+        self.group_names: dict[str, TransToken] = {}
         self.grouped_items: dict[str, list[Item]] = {}
         # A list of casefolded group names in the display order.
         self.group_order: list[str] = []
@@ -645,19 +652,16 @@ class SelectorWin(Generic[CallbackT]):
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
-        if desc:
-            self.desc_label = ttk.Label(
-                self.win,
-                name='desc_label',
-                text=desc,
-                justify='left',
-                anchor='w',
-                width=5,  # Keep a small width, so this doesn't affect the
-                # initial window size.
-            )
-            self.desc_label.grid(row=0, column=0, sticky='EW')
-        else:
-            self.desc_label = None
+        self.desc_label = ttk.Label(
+            self.win,
+            name='desc_label',
+            justify='left',
+            anchor='w',
+            width=5,  # Keep a small width, so this doesn't affect the
+            # initial window size.
+        )
+        desc.apply(self.desc_label)
+        self.desc_label.grid(row=0, column=0, sticky='EW')
 
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = tk.PanedWindow(
@@ -738,10 +742,7 @@ class SelectorWin(Generic[CallbackT]):
                 width=2,
             )
             samp_button.grid(row=0, column=1)
-            add_tooltip(
-                samp_button,
-                gettext("Play a sample of this item."),
-            )
+            add_tooltip(samp_button, TransToken.ui("Play a sample of this item."))
 
             # On start/stop, update the button label.
             self.sampler = sound.SamplePlayer(
@@ -754,7 +755,7 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.sampler = None
 
-        self.prop_author = ttk.Label(self.prop_frm, text="Author")
+        self.prop_author = ttk.Label(self.prop_frm, text="Author: person")
         self.prop_author.grid(row=2, column=0, columnspan=4)
 
         self.prop_desc_frm = ttk.Frame(self.prop_frm, relief="sunken")
@@ -793,36 +794,30 @@ class SelectorWin(Generic[CallbackT]):
         )
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
 
-        ttk.Button(
+        TransToken.ui('OK').apply(ttk.Button(
             self.prop_frm,
             name='btn_ok',
-            text=gettext("OK"),
             command=self.save,
-        ).grid(
-            row=6,
-            column=0,
-            padx=(8, 8),
-        )
+        )).grid(row=6, column=0, padx=(8, 8))
 
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
                 name='btn_suggest',
-                text=gettext("Select Suggested"),
                 command=self.sel_suggested,
             )
+            TransToken.ui("Select Suggested").apply(self.prop_reset)
             self.prop_reset.grid(
                 row=6,
                 column=1,
                 sticky='ew',
             )
 
-        ttk.Button(
+        TransToken.ui("Cancel").apply(ttk.Button(
             self.prop_frm,
             name='btn_cancel',
-            text=gettext("Cancel"),
             command=self.exit,
-        ).grid(
+        )).grid(
             row=6,
             column=2,
             padx=(8, 8),
@@ -876,7 +871,8 @@ class SelectorWin(Generic[CallbackT]):
             index = 0
             for attr in self.attrs:
                 attr_frame = ttk.Frame(attrs_frame)
-                desc_label = ttk.Label(attr_frame, text=attr.desc)
+                desc_label = ttk.Label(attr_frame)
+                TRANS_ATTR_DESC.format(desc=attr.desc).apply(desc_label)
                 attr.label = ttk.Label(attr_frame)
 
                 if attr.type is AttrTypes.COLOR:
@@ -893,7 +889,7 @@ class SelectorWin(Generic[CallbackT]):
                         index += 1
                     attr_frame.grid(
                         row=index // 2,
-                        column=0, columnspan=2,
+                        column=0, columnspan=3,
                         sticky='w',
                     )
                     index += 2
@@ -916,6 +912,7 @@ class SelectorWin(Generic[CallbackT]):
         self.set_disp()
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
+        TransToken.add_callback(self._update_translations, call=False)
 
     async def _load_selected(self, selected: LastSelected) -> None:
         """Load a new selected item."""
@@ -994,10 +991,9 @@ class SelectorWin(Generic[CallbackT]):
     def refresh(self) -> None:
         """Rebuild the menus and options based on the item list."""
         # Sort alphabetically, preferring a sort key if present.
-        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName))
+        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName.token))
         grouped_items = defaultdict(list)
-        # If the item is groupless, use 'Other' for the header.
-        self.group_names = {'':  gettext('Other')}
+        self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
@@ -1018,14 +1014,14 @@ class SelectorWin(Generic[CallbackT]):
                     item.button = ttk.Button(
                         self.pal_frame,
                         name='item_' + item.name,
-                        text=item.shortName,
                         compound='top',
                     )
+                    item.shortName.apply(item.button)
 
                 # noinspection PyProtectedMember
                 tk_tools.bind_leftclick(item.button, item._on_click)
 
-            group_key = item.group.strip().casefold()
+            group_key = item.group_id
             grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
@@ -1039,12 +1035,12 @@ class SelectorWin(Generic[CallbackT]):
                     tk.Menu(self.context_menu) if group_key else self.context_menu,
                 )
             group._menu.add_radiobutton(
-                label=item.context_lbl,
                 command=functools.partial(self.sel_item_id, item.name),
                 variable=self.context_var,
                 value=item.name,
             )
-            item._context_ind = len(grouped_items[group_key]) - 1
+            item.context_lbl.apply_menu(group._menu)
+            item._context_ind = group._menu.index('end')
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(grouped_items)
@@ -1058,10 +1054,8 @@ class SelectorWin(Generic[CallbackT]):
                 # Don't add the ungrouped menu to itself!
                 continue
             group = self.group_widgets[group_key]
-            self.context_menu.add_cascade(
-                menu=group._menu,
-                label=self.group_names[group_key],
-            )
+            self.context_menu.add_cascade(menu=group._menu)
+            self.group_names[group_key].apply_menu(self.context_menu)
             # Track the menu's index. The one at the end is the one we just added.
             group._menu_pos = self.context_menu.index('end')
         if self.win.winfo_ismapped():
@@ -1118,7 +1112,7 @@ class SelectorWin(Generic[CallbackT]):
             self.chosen_id = self.selected.name
 
         self._suggested_rollover = None  # Discard the rolled over item.
-        self.disp_label.set(self.selected.context_lbl)
+        self.disp_label.set(str(self.selected.context_lbl))
         self.orig_selected = self.selected
         self.context_var.set(self.selected.name)
         return "break"  # stop the entry widget from continuing with this event
@@ -1133,8 +1127,13 @@ class SelectorWin(Generic[CallbackT]):
         """Randomly select a suggested item."""
         if self.suggested and (force or self._suggested_rollover is not None):
             self._suggested_rollover = random.choice(self.suggested)
-            self.disp_label.set(self._suggested_rollover.context_lbl)
+            self.disp_label.set(str(self._suggested_rollover.context_lbl))
             self.display.after(1000, self._pick_suggested)
+
+    def _update_translations(self) -> None:
+        """Update translations."""
+        # We don't care about updating to the rollover item, it'll swap soon anyway.
+        self.disp_label.set(str(self.selected.context_lbl))
 
     def _icon_clicked(self, _: tk.Event) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
@@ -1248,11 +1247,12 @@ class SelectorWin(Generic[CallbackT]):
         """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
-            self.prop_author['text'] = ''
+            TRANS_NO_AUTHORS.apply(self.prop_author)
         else:
-            self.prop_author['text'] = ngettext(
-                'Author: {}', 'Authors: {}', len(item.authors),
-            ).format(', '.join(item.authors))
+            TRANS_AUTHORS.format(
+                authors=', '.join(item.authors),
+                n=len(item.authors),
+            ).apply(self.prop_author)
 
         # We have a large icon, use it.
         icon = item.large_icon if item.large_icon is not None else item.icon
@@ -1267,9 +1267,11 @@ class SelectorWin(Generic[CallbackT]):
         if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
-                text = tkMarkdown.convert('**ID:** *NONE*', None)
+                text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(item='*NONE*'), None)
             else:
-                text = tkMarkdown.convert(f'**ID:** `{item.package}`{":" if item.package else ""}`{item.name}`', None)
+                text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
+                    item=f'`{item.package}`:`{item.name}`' if item.package else f'`{item.name}`',
+                ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 tkMarkdown.MarkdownData.text('\n'),
@@ -1312,18 +1314,22 @@ class SelectorWin(Generic[CallbackT]):
             elif attr.type is AttrTypes.COLOR:
                 assert isinstance(val, Vec)
                 img.apply(attr.label, img.Handle.color(val, 16, 16))
-                # Display the full color when hovering..
-                # i18n: Tooltip for colour swatch.
-                set_tooltip(attr.label, gettext('Color: R={r}, G={g}, B={b}').format(
+                # Display the full color when hovering...
+                set_tooltip(attr.label, TRANS_ATTR_COLOR.format(
                     r=int(val.x), g=int(val.y), b=int(val.z),
                 ))
             elif attr.type is AttrTypes.LIST:
                 # Join the values (in alphabetical order)
                 assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
-                attr.label['text'] = ', '.join(sorted(val))
+                TRANS_COMMA.join([
+                    txt if isinstance(txt, TransToken) else TransToken.untranslated(txt)
+                    for txt in val
+                ]).apply(attr.label)
             elif attr.type is AttrTypes.STRING:
                 # Just a string.
-                attr.label['text'] = str(val)
+                if not isinstance(val, TransToken):
+                    val = TransToken.untranslated(str(val))
+                val.apply(attr.label)
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
 
@@ -1349,7 +1355,7 @@ class SelectorWin(Generic[CallbackT]):
             self.save()
             return
 
-        cur_group_name = self.selected.group.casefold()
+        cur_group_name = self.selected.group_id
         cur_group = self.grouped_items[cur_group_name]
         # Force the current group to be visible, so you can see what's
         # happening.
@@ -1526,17 +1532,16 @@ class SelectorWin(Generic[CallbackT]):
                             sugg_lbl = ttk.Label(
                                 self.pal_frame,
                                 name=f'suggest_label_{suggest_ind}',
-                                # Draw lines with box drawing characters
-                                text="\u250E\u2500" + gettext("Suggested") + "\u2500\u2512",
                             )
+                            TRANS_SUGGESTED_MAC.apply(sugg_lbl)
                         else:
                             sugg_lbl = ttk.LabelFrame(
                                 self.pal_frame,
                                 name=f'suggest_label_{suggest_ind}',
-                                text=gettext("Suggested"),
                                 labelanchor='n',
                                 height=50,
                             )
+                            TRANS_SUGGESTED.apply(sugg_lbl)
                         self._suggest_lbl.append(sugg_lbl)
                     suggest_ind += 1
                     sugg_lbl.place(
@@ -1616,9 +1621,8 @@ class SelectorWin(Generic[CallbackT]):
         if item._context_ind is None:
             return
         new_font = self.sugg_font if suggested else self.norm_font
-        if item.group:
-            group_key = item.group.casefold()
-            group = self.group_widgets[group_key]
+        if item.group_id:
+            group = self.group_widgets[item.group_id]
             menu = group._menu
 
             # Apply the font to the group header as well, if suggested.

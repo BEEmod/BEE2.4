@@ -4,7 +4,6 @@ from functools import lru_cache
 from typing import AsyncIterator, List, Tuple
 
 import tkinter as tk
-from tkinter import ttk
 from srctools import Property, conv_int, logger
 
 from app.itemconfig import UpdateFunc, WidgetLookup, WidgetLookupMulti, multi_grid

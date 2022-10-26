@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 import contextlib
+from typing import Any, Iterable, List, Optional, Tuple, Union, cast
 
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -46,10 +47,17 @@ def do_localisation() -> None:
         msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
 
-    extracted = babel.messages.extract.extract_from_dir(
+    extracted: Iterable[tuple[
+        str, int, Union[str, Tuple[str, ...]], List[str], Optional[str]
+    ]] = cast(Any, babel.messages.extract.extract_from_dir(
         '.',
         comment_tags=['i18n:'],
-    )
+        keywords={
+            **babel.messages.extract.DEFAULT_KEYWORDS,
+            'ui': (1, ),
+            'ui_plural': (1, 2),
+        },
+    ))
     for filename, lineno, message, comments, context in extracted:
         catalog.add(
             message,

@@ -11,7 +11,7 @@ import trio
 
 from packages import Style, StyleVar, PackagesSet
 from app import tooltip
-from localisation import ngettext, gettext
+from localisation import TransToken
 from config.stylevar import State
 import config
 
@@ -24,16 +24,16 @@ LOGGER = get_logger(__name__)
 styleOptions = [
     StyleVar.unstyled(
         id='MultiverseCave',
-        name=gettext('Multiverse Cave'),
+        name=TransToken.ui('Multiverse Cave'),
         default=True,
-        desc=gettext('Play the Workshop Cave Johnson lines on map start.'),
+        desc=TransToken.ui('Play the Workshop Cave Johnson lines on map start.'),
     ),
 
     StyleVar.unstyled(
         id='FixFizzlerBump',
-        name=gettext('Prevent Portal Bump (fizzler)'),
+        name=TransToken.ui('Prevent Portal Bump (fizzler)'),
         default=False,
-        desc=gettext(
+        desc=TransToken.ui(
             'Add portal bumpers to make it more difficult to portal across '
             'fizzler edges. This can prevent placing portals in tight spaces '
             'near fizzlers, or fizzle portals on activation.'
@@ -42,16 +42,16 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='NoMidVoices',
-        name=gettext('Suppress Mid-Chamber Dialogue'),
+        name=TransToken.ui('Suppress Mid-Chamber Dialogue'),
         default=False,
-        desc=gettext('Disable all voicelines other than entry and exit lines.'),
+        desc=TransToken.ui('Disable all voicelines other than entry and exit lines.'),
     ),
 
     StyleVar.unstyled(
         id='UnlockDefault',
-        name=gettext('Unlock Default Items'),
+        name=TransToken.ui('Unlock Default Items'),
         default=False,
-        desc=gettext(
+        desc=TransToken.ui(
             'Allow placing and deleting the mandatory Entry/Exit Doors and '
             'Large Observation Room. Use with caution, this can have weird '
             'results!'
@@ -60,9 +60,9 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='AllowGooMist',
-        name=gettext('Allow Adding Goo Mist'),
+        name=TransToken.ui('Allow Adding Goo Mist'),
         default=True,
-        desc=gettext(
+        desc=TransToken.ui(
             'Add mist particles above Toxic Goo in certain styles. This can '
             'increase the entity count significantly with large, complex goo '
             'pits, so disable if needed.'
@@ -71,9 +71,9 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='FunnelAllowSwitchedLights',
-        name=gettext('Light Reversible Excursion Funnels'),
+        name=TransToken.ui('Light Reversible Excursion Funnels'),
         default=True,
-        desc=gettext(
+        desc=TransToken.ui(
             'Funnels emit a small amount of light. However, if multiple funnels '
             'are near each other and can reverse polarity, this can cause '
             'lighting issues. Disable this to prevent that by disabling '
@@ -83,9 +83,9 @@ styleOptions = [
 
     StyleVar.unstyled(
         id='EnableShapeSignageFrame',
-        name=gettext('Enable Shape Framing'),
+        name=TransToken.ui('Enable Shape Framing'),
         default=True,
-        desc=gettext(
+        desc=TransToken.ui(
             'After 10 shape-type antlines are used, the signs repeat. With this'
             ' enabled, colored frames will be added to distinguish them.'
         ),
@@ -98,8 +98,22 @@ checkbox_other: dict[str, ttk.Checkbutton] = {}
 tk_vars: dict[str, IntVar] = {}
 
 VAR_LIST: list[StyleVar] = []
-
 UI: dict[str, ttk.Label] = {}
+
+TRANS_DEFAULT = {
+    # i18n: StyleVar default value.
+    False: TransToken.ui('Default: Off'),
+    True: TransToken.ui('Default: On'),
+}
+# i18n: Tooltip when specific styles are used
+TRANS_STYLES = TransToken.ui_plural('Style: {styles}', 'Styles: {styles}')
+# i18n: StyleVar which is totally unstyled.
+TRANS_UNSTYLED = TransToken.ui('Styles: Unstyled')
+# i18n: StyleVar which matches all styles.
+TRANS_ALL_STYLES = TransToken.ui('Styles: All')
+# i18n: Order of lines in the tooltip.
+TRANS_TOOLTIP = TransToken.ui('{desc}\n{defaults}\n{styles}')
+TRANS_COMMA = TransToken.ui(', ')
 
 
 def mandatory_unlocked() -> bool:
@@ -120,22 +134,13 @@ def export_data(chosen_style: Style) -> dict[str, bool]:
     }
 
 
-def make_desc(packset: PackagesSet, var: StyleVar) -> str:
+def make_desc(packset: PackagesSet, var: StyleVar) -> TransToken:
     """Generate the description text for a StyleVar.
 
     This adds 'Default: on/off', and which styles it's used in.
     """
-    if var.desc:
-        desc = [var.desc, '']
-    else:
-        desc = []
-
-    # i18n: StyleVar default value.
-    desc.append(gettext('Default: On') if var.default else gettext('Default: Off'))
-
     if var.styles is None:
-        # i18n: StyleVar which is totally unstyled.
-        desc.append(gettext('Styles: Unstyled'))
+        style_desc = TRANS_UNSTYLED
     else:
         app_styles = [
             style for style in packset.all_obj(Style)
@@ -143,20 +148,23 @@ def make_desc(packset: PackagesSet, var: StyleVar) -> str:
         ]
 
         if len(app_styles) == len(packset.all_obj(Style)):
-            # i18n: StyleVar which matches all styles.
-            desc.append(gettext('Styles: All'))
+            style_desc = TRANS_ALL_STYLES
         else:
-            style_list = sorted(
+            style_list = [
                 style.selitem_data.short_name
-                for style in
-                app_styles
+                for style in app_styles
+            ]
+            style_desc = TRANS_STYLES.format(
+                styles=TRANS_COMMA.join(style_list, sort=True),
+                n=len(style_list),
             )
-            desc.append(ngettext(
-                # i18n: The styles a StyleVar is allowed for.
-                'Style: {}', 'Styles: {}', len(style_list),
-            ).format(', '.join(style_list)))
 
-    return '\n'.join(desc)
+    res = TRANS_TOOLTIP.format(
+        desc=var.desc,
+        defaults=TRANS_DEFAULT[var.default],
+        styles=style_desc,
+    )
+    return res
 
 
 def refresh(selected_style: Style) -> None:
@@ -202,28 +210,33 @@ async def make_stylevar_pane(
     update_item_vis: Callable[[], None],
 ) -> None:
     """Construct the stylevar pane."""
-    frame_all = ttk.Labelframe(frame, text=gettext("All:"))
+    frame_all = ttk.Labelframe(frame)
+    TransToken.ui("All:").apply(frame_all)
     frame_all.grid(row=0, sticky='EW')
 
-    frm_chosen = ttk.Labelframe(frame, text=gettext("Selected Style:"))
+    frm_chosen = ttk.Labelframe(frame)
+    TransToken.ui("Selected Style:").apply(frm_chosen)
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(frame, orient='horizontal').grid(row=2, sticky='EW', pady=(10, 5))
 
-    frm_other = ttk.Labelframe(frame, text=gettext("Other Styles:"))
+    frm_other = ttk.Labelframe(frame)
+    TransToken.ui("Other Styles:").apply(frm_other)
     frm_other.grid(row=3, sticky='EW')
 
-    UI['stylevar_chosen_none'] = ttk.Label(
-        frm_chosen,
-        text=gettext('No Options!'),
-        font='TkMenuFont',
-        justify='center',
+    UI['stylevar_chosen_none'] = TransToken.ui('No Options!').apply(
+        ttk.Label(
+            frm_chosen,
+            font='TkMenuFont',
+            justify='center',
+        )
     )
-    UI['stylevar_other_none'] = ttk.Label(
-        frm_other,
-        text=gettext('None!'),
-        font='TkMenuFont',
-        justify='center',
+    UI['stylevar_other_none'] = TransToken.ui('None!').apply(
+        ttk.Label(
+            frm_other,
+            font='TkMenuFont',
+            justify='center',
+        )
     )
     VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
@@ -249,11 +262,8 @@ async def make_stylevar_pane(
     for all_pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = int_var = IntVar(value=var.default)
-        checkbox_all[var.id] = chk = ttk.Checkbutton(
-            frame_all,
-            variable=int_var,
-            text=var.name,
-        )
+        checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
+        var.name.apply(chk)
         chk.grid(row=all_pos, column=0, sticky="W", padx=3)
         tooltip.add_tooltip(chk, make_desc(packset, var))
 
@@ -286,15 +296,18 @@ async def make_stylevar_pane(
                 # Available in all styles - put with the hardcoded variables.
                 all_pos += 1
 
-                checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id], text=var.name)
+                checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id])
+                var.name.apply(chk)
                 chk.grid(row=all_pos, column=0, sticky="W", padx=3)
                 tooltip.add_tooltip(chk, desc)
                 nursery.start_soon(add_state_syncers, var.id, int_var, chk)
             else:
                 # Swap between checkboxes depending on style.
-                checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id], text=var.name)
-                checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id], text=var.name)
+                checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id])
+                checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id])
 
+                var.name.apply(chk_chose)
+                var.name.apply(chk_other)
                 tooltip.add_tooltip(checkbox_chosen[var.id], desc)
                 tooltip.add_tooltip(checkbox_other[var.id], desc)
                 nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)

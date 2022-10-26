@@ -15,7 +15,6 @@ import webbrowser
 
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
 
 from .richTextBox import tkRichText
 from . import (
@@ -26,7 +25,7 @@ import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass
 from editoritems_props import prop_timer_delay
-from localisation import gettext
+from localisation import TransToken
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -77,36 +76,44 @@ class SPR(Enum):
 
 SPRITE_TOOL = {
     # The tooltips associated with each sprite.
-    'rot_0': gettext('This item may not be rotated.'),
-    'rot_4': gettext('This item can be pointed in 4 directions.'),
-    'rot_5': gettext('This item can be positioned on the sides and center.'),
-    'rot_6': gettext('This item can be centered in two directions, plus on the sides.'),
-    'rot_8': gettext('This item can be placed like light strips.'),
-    'rot_36': gettext('This item can be rotated on the floor to face 360 degrees.'),
-    'rot_catapult': gettext('This item is positioned using a catapult trajectory.'),
-    'rot_paint': gettext('This item positions the dropper to hit target locations.'),
+    'rot_0': TransToken.ui('This item may not be rotated.'),
+    'rot_4': TransToken.ui('This item can be pointed in 4 directions.'),
+    'rot_5': TransToken.ui('This item can be positioned on the sides and center.'),
+    'rot_6': TransToken.ui('This item can be centered in two directions, plus on the sides.'),
+    'rot_8': TransToken.ui('This item can be placed like light strips.'),
+    'rot_36': TransToken.ui('This item can be rotated on the floor to face 360 degrees.'),
+    'rot_catapult': TransToken.ui('This item is positioned using a catapult trajectory.'),
+    'rot_paint': TransToken.ui('This item positions the dropper to hit target locations.'),
 
-    'in_none': gettext('This item does not accept any inputs.'),
-    'in_norm': gettext('This item accepts inputs.'),
-    'in_dual': gettext('This item has two input types (A and B), using the Input A and B items.'),
+    'in_none': TransToken.ui('This item does not accept any inputs.'),
+    'in_norm': TransToken.ui('This item accepts inputs.'),
+    'in_dual': TransToken.ui('This item has two input types (A and B), using the Input A and B items.'),
 
-    'out_none': gettext('This item does not output.'),
-    'out_norm': gettext('This item has an output.'),
-    'out_tim': gettext('This item has a timed output.'),
+    'out_none': TransToken.ui('This item does not output.'),
+    'out_norm': TransToken.ui('This item has an output.'),
+    'out_tim': TransToken.ui('This item has a timed output.'),
 
-    'space_none': gettext('This item does not take up any space inside walls.'),
-    'space_embed': gettext('This item takes space inside the wall.'),
+    'space_none': TransToken.ui('This item does not take up any space inside walls.'),
+    'space_embed': TransToken.ui('This item takes space inside the wall.'),
 
-    'surf_none': gettext('This item cannot be placed anywhere...'),
-    'surf_ceil': gettext('This item can only be attached to ceilings.'),
-    'surf_floor': gettext('This item can only be placed on the floor.'),
-    'surf_floor_ceil': gettext('This item can be placed on floors and ceilings.'),
-    'surf_wall': gettext('This item can be placed on walls only.'),
-    'surf_wall_ceil': gettext('This item can be attached to walls and ceilings.'),
-    'surf_wall_floor': gettext('This item can be placed on floors and walls.'),
-    'surf_wall_floor_ceil': gettext('This item can be placed in any orientation.'),
+    'surf_none': TransToken.ui('This item cannot be placed anywhere...'),
+    'surf_ceil': TransToken.ui('This item can only be attached to ceilings.'),
+    'surf_floor': TransToken.ui('This item can only be placed on the floor.'),
+    'surf_floor_ceil': TransToken.ui('This item can be placed on floors and ceilings.'),
+    'surf_wall': TransToken.ui('This item can be placed on walls only.'),
+    'surf_wall_ceil': TransToken.ui('This item can be attached to walls and ceilings.'),
+    'surf_wall_floor': TransToken.ui('This item can be placed on floors and walls.'),
+    'surf_wall_floor_ceil': TransToken.ui('This item can be placed in any orientation.'),
 }
 IMG_ALPHA: img.Handle = img.Handle.blank(64, 64)
+# Special case tooltips
+TRANS_TOOL_TBEAM = TransToken.ui('Excursion Funnels accept a on/off input and a directional input.')
+TRANS_TOOL_CUBE = TransToken.ui(
+    '{generic_rot} However when this is set to Reflection Cube, this item can instead rotated on '
+    'the floor to face 360 degrees.'
+)
+TRANS_NO_VERSIONS = TransToken.ui('No Alternate Versions')
+TRANS_BLANK = TransToken.untranslated('')
 
 
 def set_sprite(pos: SPR, sprite: str) -> None:
@@ -222,7 +229,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list[str]:
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         box.state(['disabled'])
-        box['values'] = [gettext('No Alternate Versions')]
+        box['values'] = [str(TRANS_NO_VERSIONS)]
         box.current(0)
     else:
         box.state(['!disabled'])
@@ -261,7 +268,7 @@ def load_item_data() -> None:
     wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data.authors)
-    wid['name']['text'] = selected_sub_item.name
+    selected_sub_item.name.apply(wid['name'])
     wid['ent_count']['text'] = item_data.ent_count or '??'
 
     desc = get_description(
@@ -284,7 +291,7 @@ def load_item_data() -> None:
             for name, inst in editor.cust_instances.items():
                 inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', (tkMarkdown.TextTag.INDENT, )))
                 inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', (tkMarkdown.TextTag.CODE, )))
-        desc = tkMarkdown.join(desc, tkMarkdown.MarkdownData(inst_desc))
+        desc = tkMarkdown.join(desc, tkMarkdown.SingleMarkdown(inst_desc))
 
     wid['desc'].set_text(desc)
 
@@ -304,9 +311,10 @@ def load_item_data() -> None:
 
     if selected_item.data.url is None:
         wid['moreinfo'].state(['disabled'])
+        tooltip.set_tooltip(wid['moreinfo'], TRANS_BLANK)
     else:
         wid['moreinfo'].state(['!disabled'])
-    tooltip.set_tooltip(wid['moreinfo'], selected_item.data.url)
+        tooltip.set_tooltip(wid['moreinfo'], TransToken.untranslated(selected_item.data.url))
 
     editor = item_data.editor
     has_timer = any(prop.kind is prop_timer_delay for prop in editor.properties.values())
@@ -316,10 +324,7 @@ def load_item_data() -> None:
             set_sprite(SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
-                tooltip.set_tooltip(wid_sprite[SPR.INPUT], gettext(
-                    'Excursion Funnels accept a on/off '
-                    'input and a directional input.'
-                ))
+                tooltip.set_tooltip(wid_sprite[SPR.INPUT], TRANS_TOOL_TBEAM)
         else:
             set_sprite(SPR.INPUT, 'in_norm')
     else:
@@ -364,14 +369,11 @@ def load_item_data() -> None:
         set_sprite(SPR.INPUT, 'in_norm')
         set_sprite(SPR.COLLISION, 'space_embed')
         set_sprite(SPR.OUTPUT, 'out_none')
-        set_sprite(SPR.ROTATION, 'rot_36')
-        tooltip.set_tooltip(
-            wid_sprite[SPR.ROTATION],
-            SPRITE_TOOL['rot_36'] + gettext(
-                'This item can be rotated on the floor to face 360 '
-                'degrees, for Reflection Cubes only.'
-            ),
-        )
+        # This can have 2 handles - the specified one, overridden to 36 on reflection cubes.
+        # Concatenate the two definitions.
+        tooltip.set_tooltip(wid_sprite[SPR.ROTATION], TRANS_TOOL_CUBE.format(
+            generic_rot=SPRITE_TOOL[ROT_TYPES[editor.handle]]
+        ))
 
     if editor.cls is ItemClass.GEL:
         # Reflection or normal gel...
@@ -399,12 +401,12 @@ def load_item_data() -> None:
         if real_conn_item.force_input:
             # Strip to remove \n if blurb is empty.
             blurb = ('Input force-enabled!\n' + blurb).strip()
-        tooltip.set_tooltip(wid_sprite[SPR.INPUT], blurb)
+        tooltip.set_tooltip(wid_sprite[SPR.INPUT], TransToken.untranslated(blurb))
 
         blurb = real_conn_item.conn_config.get_output_blurb()
         if real_conn_item.force_output:
             blurb = ('Output force-enabled!\n' + blurb).strip()
-        tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], blurb)
+        tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TransToken.untranslated(blurb))
 
 
 def adjust_position(e=None) -> None:
@@ -455,10 +457,8 @@ def init_widgets() -> None:
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
 
-    ttk.Label(
-        f,
-        text=gettext("Properties:"),
-        anchor="center",
+    TransToken.ui("Properties:").apply(
+        ttk.Label(f, anchor="center")
     ).grid(
         row=0,
         column=0,
@@ -483,7 +483,7 @@ def init_widgets() -> None:
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky='e')
     tooltip.add_tooltip(
         wid['ent_count'],
-        gettext(
+        TransToken.ui(
             'The number of entities used for this item. The Source engine '
             'limits this to 2048 in total. This provides a guide to how many of '
             'these items can be placed in a map at once.'
@@ -502,11 +502,9 @@ def init_widgets() -> None:
         tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
         tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
 
-    ttk.Label(f, text=gettext("Description:"), anchor="sw").grid(
-        row=5,
-        column=0,
-        sticky="SW",
-    )
+    TransToken.ui("Description:").apply(
+        ttk.Label(f, anchor="sw")
+    ).grid(row=5, column=0, sticky="SW")
 
     spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=5, sticky='w')
@@ -540,10 +538,10 @@ def init_widgets() -> None:
             try:
                 webbrowser.open_new_tab(url)
             except webbrowser.Error:
-                if messagebox.askyesno(
+                if tk_tools.askyesno(
                     icon="error",
-                    title="BEE2 - Error",
-                    message=gettext(
+                    title=TransToken.ui("BEE2 - Error"),
+                    message=TransToken.ui(
                         'Failed to open a web browser. Do you wish for the URL '
                         'to be copied to the clipboard instead?'
                     ),
@@ -558,14 +556,13 @@ def init_widgets() -> None:
             # so it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, text=gettext("More Info>>"), command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, command=show_more_info)
+    TransToken.ui("More Info>>").apply(wid['moreinfo'])
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
-    menu_info = tk.Menu(wid['moreinfo'])
-    menu_info.add_command(label='', state='disabled')
-
     def show_item_props() -> None:
+        """Display the item properties pane."""
         sound.fx('expand')
         itemPropWin.show_window(
             selected_item.get_properties(),
@@ -573,15 +570,12 @@ def init_widgets() -> None:
             selected_sub_item.name,
         )
 
-    wid['changedefaults'] = ttk.Button(
-        f,
-        text=gettext("Change Defaults..."),
-        command=show_item_props,
-        )
+    wid['changedefaults'] = ttk.Button(f, command=show_item_props)
+    TransToken.ui("Change Defaults...").apply(wid['changedefaults'])
     wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],
-        gettext('Change the default settings for this item when placed.')
+        TransToken.ui('Change the default settings for this item when placed.')
     )
 
     wid['variant'] = ttk.Combobox(

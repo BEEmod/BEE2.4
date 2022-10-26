@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-22 15:22+1000\n"
+"POT-Creation-Date: 2022-10-26 13:11+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -14,68 +14,66 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.1\n"
 
-#: loadScreen.py:227
+#: loadScreen.py:47
 msgid "Skipped!"
 msgstr "跳过！"
 
-#: loadScreen.py:228
-msgid "Version: "
+#: loadScreen.py:48
+#, fuzzy
+msgid "Version: {ver}"
 msgstr "版本："
 
-#: app/optionWindow.py:195 app/packageMan.py:113 app/selector_win.py:823
-#: loadScreen.py:229
+#: app/optionWindow.py:211 app/packageMan.py:109 app/selector_win.py:816
+#: loadScreen.py:49
 msgid "Cancel"
 msgstr "取消"
 
-#: app/paletteUI.py:108 loadScreen.py:230
+#: app/paletteUI.py:106 loadScreen.py:50
 msgid "Clear"
 msgstr "清空模板"
 
-#: loadScreen.py:231
+#: loadScreen.py:51
 msgid "Copy"
 msgstr "复制"
 
-#: loadScreen.py:232
+#: loadScreen.py:52
 msgid "Show:"
 msgstr "显示："
 
-#: loadScreen.py:233
-msgid "Logs - {}"
+#: loadScreen.py:53
+#, fuzzy
+msgid "Logs - {ver}"
 msgstr "日志 - {}"
 
-#: loadScreen.py:235
+#: loadScreen.py:54
 msgid "Debug messages"
 msgstr "调试信息"
 
-#: loadScreen.py:236
+#: loadScreen.py:55
 msgid "Default"
 msgstr "默认值"
 
-#: loadScreen.py:237
+#: loadScreen.py:56
 msgid "Warnings Only"
 msgstr "仅记录警告"
 
-#: loadScreen.py:247
+#: loadScreen.py:263
 msgid "Packages"
 msgstr "资源包"
 
-#: loadScreen.py:248
+#: loadScreen.py:264
 msgid "Loading Objects"
 msgstr "正在载入对象"
 
-#: loadScreen.py:249
+#: loadScreen.py:265
 msgid "Initialising UI"
 msgstr "初始化界面"
 
-#: loadScreen.py:250
+#: loadScreen.py:266
 msgid "Better Extended Editor for Portal 2"
 msgstr "更棒的传送门2扩展编辑器"
 
-#: localisation.py:114
-msgid "__LANG_USE_SANS_SERIF__"
-msgstr ""
-
-#: app/CheckDetails.py:248
+#: app/CheckDetails.py:254
 msgid "Toggle all checkboxes."
 msgstr "反选所有复选框"
 
@@ -87,19 +85,34 @@ msgstr "ATLAS（蓝色机器人）"
 msgid "P-Body"
 msgstr "P-Body（橙色机器人）"
 
-#: app/CompilerPane.py:68 app/voiceEditor.py:40
+#: app/CompilerPane.py:68 app/voiceEditor.py:42
 msgid "Chell"
 msgstr "Chell（主角雪儿）"
 
-#: app/CompilerPane.py:69 app/voiceEditor.py:39
+#: app/CompilerPane.py:69 app/voiceEditor.py:41
 msgid "Bendy"
 msgstr "Bendy（纸片人小黑）"
 
-#: app/CompilerPane.py:244
+#: app/CompilerPane.py:113
 msgid "Image Files"
 msgstr "图片文件"
 
-#: app/CompilerPane.py:322
+#: app/CompilerPane.py:114
+msgid "Map Settings"
+msgstr "地图设置"
+
+#: app/CompilerPane.py:115
+msgid "Compile Settings"
+msgstr "编译设置"
+
+#. i18n: Tooltip format for compiler limit bars.
+#: app/CompilerPane.py:148
+msgid ""
+"{count}/{max} ({frac:.2%}):\n"
+"{blurb}"
+msgstr ""
+
+#: app/CompilerPane.py:327
 msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
@@ -107,35 +120,23 @@ msgstr ""
 "修改此面板的选项将立即生效，\n"
 "而无需导出或重新启动游戏。"
 
-#: app/CompilerPane.py:337
-msgid "Map Settings"
-msgstr "地图设置"
-
-#: app/CompilerPane.py:341
-msgid "Compile Settings"
-msgstr "编译设置"
-
-#: app/CompilerPane.py:359
+#: app/CompilerPane.py:373 app/CompilerPane.py:381
 msgid "Thumbnail"
 msgstr "地图预览快照"
 
-#: app/CompilerPane.py:371
-msgid "Auto"
-msgstr "自动获取截图"
-
-#: app/CompilerPane.py:379
+#: app/CompilerPane.py:388
 msgid "PeTI"
 msgstr "编辑器预览图"
 
-#: app/CompilerPane.py:387
+#: app/CompilerPane.py:395
 msgid "Custom:"
 msgstr "自定义预览图"
 
-#: app/CompilerPane.py:402
+#: app/CompilerPane.py:409
 msgid "Cleanup old screenshots"
 msgstr "清理过时的旧截图"
 
-#: app/CompilerPane.py:410
+#: app/CompilerPane.py:418
 msgid ""
 "Override the map image to use a screenshot automatically taken from the "
 "beginning of a chamber. Press F5 to take a new screenshot. If the map has"
@@ -145,11 +146,11 @@ msgstr ""
 "使用实验室开始的自动截图作为地图的介绍图，或者使用F5拍摄的新截图。\n"
 "如果最近几小时内未预览地图，则使用默认的编辑器预览图。"
 
-#: app/CompilerPane.py:418
+#: app/CompilerPane.py:424
 msgid "Use the normal editor view for the map preview image."
 msgstr "使用默认编辑器视图作为地图预览图像。"
 
-#: app/CompilerPane.py:420
+#: app/CompilerPane.py:425
 msgid ""
 "Use a custom image for the map preview image. Click the screenshot to "
 "select.\n"
@@ -158,7 +159,7 @@ msgstr ""
 "将自定义图片用作地图预览图片，点击快照窗口选择图片。\n"
 "如果需要，图片将转换为JPEG格式。"
 
-#: app/CompilerPane.py:435
+#: app/CompilerPane.py:433
 msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
@@ -166,30 +167,32 @@ msgstr ""
 "自动删除未使用的自动截图，如果你想保留这些截图请取消勾选。\n"
 "这些截图将保留在此路径“portal2/screenshots”"
 
-#: app/CompilerPane.py:447
+#: app/CompilerPane.py:443
 msgid "Lighting:"
 msgstr "光影渲染模式"
 
-#: app/CompilerPane.py:454
+#: app/CompilerPane.py:449
 #, fuzzy
 msgid "None"
 msgstr "无！"
 
-#: app/CompilerPane.py:461 app/CompilerPane.py:483 app/CompilerPane.py:494
+#: app/CompilerPane.py:455 app/CompilerPane.py:479 app/CompilerPane.py:493
 msgid "Fast"
 msgstr "最快速度"
 
-#: app/CompilerPane.py:468 app/CompilerPane.py:489
+#: app/CompilerPane.py:461 app/CompilerPane.py:486
 msgid "Full"
 msgstr "最佳画质"
 
-#: app/CompilerPane.py:474
+#: app/CompilerPane.py:468
 msgid ""
+"{desc}\n"
+"\n"
 "You can hold down Shift during the start of the Lighting stage to switch "
-"to {} lighting on the fly."
+"to {keymode} lighting on the fly."
 msgstr ""
 
-#: app/CompilerPane.py:479
+#: app/CompilerPane.py:475
 msgid ""
 "Compile with no lighting whatsoever. This significantly speeds up compile"
 " times, but there will be no lights, gel will be invisible, and the map "
@@ -197,7 +200,7 @@ msgid ""
 "When publishing, this is ignored."
 msgstr ""
 
-#: app/CompilerPane.py:485
+#: app/CompilerPane.py:482
 msgid ""
 "Compile with lower-quality, fast lighting. This speeds up compile times, "
 "but does not appear as good. Some shadows may appear wrong.\n"
@@ -206,7 +209,7 @@ msgstr ""
 "使用低质量的光照以加快渲染，但将导致画面变得糟糕，部分阴影可能会导致失真。\n"
 "发布地图时，这个选项将被忽略。"
 
-#: app/CompilerPane.py:490
+#: app/CompilerPane.py:489
 #, fuzzy
 msgid ""
 "Compile with high-quality lighting. This looks correct, but takes longer "
@@ -217,11 +220,11 @@ msgstr ""
 "如果你希望布置酷炫的光线效果，请使用此选项。\n"
 "发布地图时，将始终使用此选项。"
 
-#: app/CompilerPane.py:498
+#: app/CompilerPane.py:496
 msgid "Enable packing"
 msgstr ""
 
-#: app/CompilerPane.py:502
+#: app/CompilerPane.py:501
 msgid ""
 "Disable automatically packing resources in the map. This can speed up "
 "building and allows editing files and running reload commands, but can "
@@ -229,11 +232,11 @@ msgid ""
 "packing is enabled when publishing. "
 msgstr ""
 
-#: app/CompilerPane.py:510
+#: app/CompilerPane.py:507
 msgid "Dump packed files to:"
 msgstr "转储打包后的文件"
 
-#: app/CompilerPane.py:533
+#: app/CompilerPane.py:528
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
@@ -241,16 +244,16 @@ msgstr ""
 "编译时，转储地图会用到的所有数据包文件，用于Hammer编辑地图。\n"
 "（必须使用全英文路径，并建立新文件夹，转储数据时会清空同名文件夹内原有的内容）"
 
-#: app/CompilerPane.py:540
+#: app/CompilerPane.py:534
 msgid "Last Compile:"
 msgstr "编译数据统计"
 
-#: app/CompilerPane.py:550
+#: app/CompilerPane.py:540
 msgid "Entity"
 msgstr "实体"
 
 #. i18n: Progress bar description
-#: app/CompilerPane.py:560
+#: app/CompilerPane.py:550
 #, fuzzy
 msgid ""
 "Entities are the things in the map that have functionality. Removing "
@@ -265,12 +268,12 @@ msgstr ""
 "项目描述窗口中将统计已使用的实体数量，但并不完全准确，某些实体虽会被统计在内，但不会受到实体数量的限制。\n"
 "（注：地图内的实体数量被限制为2048个，超过这个数量有可能导致游戏崩溃！）"
 
-#: app/CompilerPane.py:579
+#: app/CompilerPane.py:567
 msgid "Overlay"
 msgstr "标记"
 
 #. i18n: Progress bar description
-#: app/CompilerPane.py:588
+#: app/CompilerPane.py:576
 #, fuzzy
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
@@ -280,17 +283,17 @@ msgstr ""
 "标记是地面（或墙面）上较小的图片，例如标志或指示灯。\n"
 "隐藏蚂蚁线或将其设置为标志将有助于升画面渲染性能。"
 
-#: app/CompilerPane.py:602
+#: app/CompilerPane.py:590
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
 msgstr "刷新数据统计。 执行编译后点击，以更新数据。"
 
-#: app/CompilerPane.py:609
+#: app/CompilerPane.py:595
 msgid "Brush"
 msgstr "画刷"
 
-#: app/CompilerPane.py:617
+#: app/CompilerPane.py:603
 msgid ""
 "Brushes form the walls or other parts of the test chamber. If this is "
 "high, it may help to reduce the size of the map or remove intricate "
@@ -300,42 +303,45 @@ msgstr ""
 "大量使用画刷能够帮助缩减地图文件的大小或移除复杂的地图结构。\n"
 "（注：减少复杂的地图结构能有效提升画面渲染性能！）"
 
-#: app/CompilerPane.py:638
+#: app/CompilerPane.py:623
 msgid "Voicelines:"
 msgstr "声线选择"
 
-#: app/CompilerPane.py:654
+#: app/CompilerPane.py:640
 msgid "Use voiceline priorities"
 msgstr "使用高优先级声线"
 
-#: app/CompilerPane.py:659
+#: app/CompilerPane.py:642
+#, fuzzy
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
-"lines will can only be chosen if few test elements are in the map. If "
-"disabled any applicable lines will be used."
+"lines will only be chosen if few test elements are in the map. If "
+"disabled a random applicable lines will be used."
 msgstr ""
 "仅选择优先级最高的声线，这意味着当地图中测试元素很少时，仅能选择通用的声线。\n"
 "如果禁用，将可使用任何可选的声线。"
 
-#: app/CompilerPane.py:667
+#: app/CompilerPane.py:649
 msgid "Spawn at:"
 msgstr "出生位置"
 
-#: app/CompilerPane.py:686
+#: app/CompilerPane.py:676
 msgid "Entry Door"
 msgstr "入口"
 
-#: app/CompilerPane.py:693
+#: app/CompilerPane.py:677
 msgid "Elevator"
 msgstr "电梯"
 
-#: app/CompilerPane.py:702
+#: app/CompilerPane.py:681
 msgid ""
+"{desc}\n"
+"\n"
 "You can hold down Shift during the start of the Geometry stage to quickly"
 " swap whichlocation you spawn at on the fly."
 msgstr ""
 
-#: app/CompilerPane.py:706
+#: app/CompilerPane.py:686
 #, fuzzy
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
@@ -345,27 +351,28 @@ msgstr ""
 "这会禁用到达出口后地图重新开始。\n"
 "使用此选项来检查入口走廊和出口走廊是否令人满意。"
 
-#: app/CompilerPane.py:710
+#: app/CompilerPane.py:690
 #, fuzzy
 msgid "When previewing in SP, spawn just before the entry door."
 msgstr ""
 "单人模式预览地图时，在入口前出生（跳过入口走廊）。\n"
 "当你到达出口时，地图将重新开始。（以便快速检查地图的谜题）"
 
-#: app/CompilerPane.py:716
+#: app/CompilerPane.py:694
 msgid "Select Corridors"
 msgstr ""
 
-#: app/CompilerPane.py:722
+#: app/CompilerPane.py:699
 msgid "Player Model (SP):"
 msgstr "玩家模型（单人模式）"
 
-#: app/CompilerPane.py:757
+#: app/CompilerPane.py:739
 msgid "Compile Options"
 msgstr "编译选项"
 
-#: app/CompilerPane.py:776
-msgid "Compiler Options - {}"
+#: app/CompilerPane.py:758
+#, fuzzy
+msgid "Compiler Options - {ver}"
 msgstr "开发者选项 - {}"
 
 #: app/StyleVarPane.py:27
@@ -450,81 +457,116 @@ msgstr ""
 "启用此功能可以通过添加彩色边框的方式区分它们。"
 
 #. i18n: StyleVar default value.
-#: app/StyleVarPane.py:134
-msgid "Default: On"
-msgstr "默认：开启"
-
-#: app/StyleVarPane.py:134
+#: app/StyleVarPane.py:105
 msgid "Default: Off"
 msgstr "默认：关闭"
 
+#: app/StyleVarPane.py:106
+msgid "Default: On"
+msgstr "默认：开启"
+
+#. i18n: Tooltip when specific styles are used
+#: app/StyleVarPane.py:109
+#, fuzzy
+msgid "Style: {styles}"
+msgid_plural "Styles: {styles}"
+msgstr[0] "风格：{}"
+
 #. i18n: StyleVar which is totally unstyled.
-#: app/StyleVarPane.py:138
+#: app/StyleVarPane.py:111
 msgid "Styles: Unstyled"
 msgstr "风格：无"
 
 #. i18n: StyleVar which matches all styles.
-#: app/StyleVarPane.py:147
+#: app/StyleVarPane.py:113
 msgid "Styles: All"
 msgstr "风格：所有"
 
-#: app/StyleVarPane.py:156
-msgid "Style: {}"
-msgid_plural "Styles: {}"
-msgstr[0] "风格：{}"
+#. i18n: Order of lines in the tooltip.
+#: app/StyleVarPane.py:115
+msgid ""
+"{desc}\n"
+"{defaults}\n"
+"{styles}"
+msgstr ""
 
-#: app/StyleVarPane.py:205
+#: app/StyleVarPane.py:116
+msgid ", "
+msgstr ""
+
+#: app/StyleVarPane.py:214
 msgid "All:"
 msgstr "所有风格："
 
-#: app/StyleVarPane.py:208
+#: app/StyleVarPane.py:218
 msgid "Selected Style:"
 msgstr "所选风格："
 
-#: app/StyleVarPane.py:213
+#: app/StyleVarPane.py:224
 msgid "Other Styles:"
 msgstr "其它风格："
 
-#: app/StyleVarPane.py:218
+#: app/StyleVarPane.py:227
 msgid "No Options!"
 msgstr "没有选项！"
 
-#: app/StyleVarPane.py:224
+#: app/StyleVarPane.py:234
 msgid "None!"
 msgstr "无！"
 
-#: app/SubPane.py:80
-msgid "Hide/Show the \"{}\" window."
+#: app/SubPane.py:21
+#, fuzzy
+msgid "Hide/Show the \"{window}\" window."
 msgstr "隐藏/显示 \"{}\" 窗口。"
 
-#: app/UI.py:88
-msgid "Export..."
-msgstr "导出到..."
+#: app/UI.py:99
+msgid "Selected Items and Style successfully exported!"
+msgstr "所选物品和风格已成功导出！"
 
-#: app/UI.py:560
+#: app/UI.py:100
+#, fuzzy
+msgid ""
+"{exported}\n"
+"\n"
+"Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
+"editor wall previews are changed."
+msgstr ""
+"\n"
+"\n"
+"警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
+
+#: app/UI.py:104
+msgid "BEE2 - Export Complete"
+msgstr ""
+
+#: app/UI.py:105
+msgid "BEEMOD {version} - {game}"
+msgstr ""
+
+#: app/UI.py:574
 msgid "Select Skyboxes"
 msgstr "选择天空布景"
 
-#: app/UI.py:561
+#: app/UI.py:575
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers)."
 msgstr "天空布景决定了实验室外部空间的样子。它选择天空的颜色（在某些项目中可见），底板悬空的风格（如果存在）以及“雾”的颜色（在较大的实验室可见）。"
 
-#: app/UI.py:570
+#: app/UI.py:584
 msgid "3D Skybox"
 msgstr "3D天空布景"
 
-#: app/UI.py:571
+#: app/UI.py:585
 msgid "Fog Color"
 msgstr "迷雾颜色"
 
-#: app/UI.py:579
+#: app/UI.py:593
 msgid "Select Additional Voice Lines"
 msgstr "选择其它语音声线"
 
-#: app/UI.py:580
+#: app/UI.py:594
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -535,31 +577,31 @@ msgstr ""
 "它们会根据地图中存在哪些物品来选择播放哪一段语音。\n"
 "附加的“Cave谈论平行宇宙”的语音在“风格属性”中单独控制。"
 
-#: app/UI.py:587
+#: app/UI.py:601
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr "不添加额外的声线，仅使用Cave关于多元宇宙的谈话。（如果它被勾选）"
 
-#: app/UI.py:589
+#: app/UI.py:603
 msgid "<Multiverse Cave only>"
 msgstr "<仅使用平行宇宙的凯文>"
 
-#: app/UI.py:593
+#: app/UI.py:607
 msgid "Characters"
 msgstr "角色"
 
-#: app/UI.py:594
+#: app/UI.py:608
 msgid "Turret Shoot Monitor"
 msgstr "炮塔会射击显示器"
 
-#: app/UI.py:595
+#: app/UI.py:609
 msgid "Monitor Visuals"
 msgstr "显示器视觉效果"
 
-#: app/UI.py:604
+#: app/UI.py:618
 msgid "Select Style"
 msgstr "选择风格"
 
-#: app/UI.py:605
+#: app/UI.py:619
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -568,15 +610,15 @@ msgid ""
 "The style broadly defines the time period a chamber is set in."
 msgstr "地图的风格决定了墙壁的材质，出入口的外观，大多数物品的外观以及其它设置。"
 
-#: app/UI.py:617
+#: app/UI.py:631
 msgid "Elevator Videos"
 msgstr "电梯间墙壁上播放的影像"
 
-#: app/UI.py:625
+#: app/UI.py:639
 msgid "Select Elevator Video"
 msgstr "选择电梯间播放的影响"
 
-#: app/UI.py:626
+#: app/UI.py:640
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
@@ -585,76 +627,62 @@ msgstr ""
 "设置现代光圈科技电梯间墙壁上播放的影像，并非所有风格都有这个影像。\n"
 "如果设置为无，将在每次载入地图时随机选择影像，就像默认编辑器里的一样。"
 
-#: app/UI.py:631
+#: app/UI.py:645
 msgid "This style does not have a elevator video screen."
 msgstr "这种风格的电梯间没有影像屏幕。"
 
-#: app/UI.py:635
+#: app/UI.py:649
 msgid "Random"
 msgstr "随机"
 
-#: app/UI.py:636
+#: app/UI.py:650
 msgid "Choose a random video."
 msgstr "随机选择一个影像。"
 
-#: app/UI.py:639
+#: app/UI.py:653
 msgid "Multiple Orientations"
 msgstr "多种方向"
 
-#: app/UI.py:785
-msgid "Selected Items and Style successfully exported!"
-msgstr "所选物品和风格已成功导出！"
-
-#: app/UI.py:787
-msgid ""
-"\n"
-"\n"
-"Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
-"editor wall previews are changed."
-msgstr ""
-"\n"
-"\n"
-"警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
-
-#: app/UI.py:1084
+#: app/UI.py:1093
 msgid "Save Palette..."
 msgstr "保存模板..."
 
-#: app/UI.py:1091 app/paletteUI.py:151
+#: app/UI.py:1097 app/paletteUI.py:149
 msgid "Save Palette As..."
 msgstr "另存为模板..."
 
-#: app/UI.py:1107 app/music_conf.py:210
+#: app/UI.py:1120
 msgid "Music: "
 msgstr "音乐选择："
 
-#: app/UI.py:1135
-msgid "{arr} Use Suggested {arr}"
+#: app/UI.py:1148
+#, fuzzy
+msgid "{down_arrow} Use Suggested {down_arrow}"
 msgstr "{arr} 使用推荐配置 {arr}"
 
-#: app/UI.py:1151
+#: app/UI.py:1162
 msgid "Style: "
 msgstr "物品风格"
 
-#: app/UI.py:1153
+#: app/UI.py:1164
 msgid "Voice: "
 msgstr "旁白语音"
 
-#: app/UI.py:1154
+#: app/UI.py:1165
 msgid "Skybox: "
 msgstr "天空布景"
 
-#: app/UI.py:1155
+#: app/UI.py:1166
 msgid "Elev Vid: "
 msgstr "电梯视频"
 
-#: app/UI.py:1173
+#: app/UI.py:1184
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "启用或禁用特定的台词，以防止添加它们。"
 
-#: app/UI.py:1261
+#: app/UI.py:1270
 msgid "All Items: "
 msgstr "所有物品："
 
@@ -670,138 +698,170 @@ msgstr "导出设置"
 msgid "Fill empty spots in the palette with random items."
 msgstr "随机选择物品填充物品栏中的空位。"
 
-#: app/__init__.py:98
-msgid "BEEMOD {} Error!"
+#: app/__init__.py:100
+msgid "BEEMOD {version} Error!"
 msgstr ""
 
-#: app/__init__.py:99
+#: app/__init__.py:103
 msgid ""
 "An error occurred: \n"
-"{}\n"
+"{err}\n"
 "\n"
 "This has been copied to the clipboard."
 msgstr ""
 
-#: app/backup.py:78
-msgid "Copying maps"
-msgstr "正在复制地图..."
+#: app/backup.py:45 app/packageMan.py:97
+#, fuzzy
+msgid "Name"
+msgstr "游戏"
 
-#: app/backup.py:83
-msgid "Loading maps"
-msgstr "正在载入地图..."
+#: app/backup.py:45
+msgid "Mode"
+msgstr ""
 
-#: app/backup.py:88
-msgid "Deleting maps"
-msgstr "正在删除地图..."
+#: app/backup.py:45
+msgid "Date"
+msgstr ""
 
-#: app/backup.py:139
-msgid "Failed to parse this puzzle file. It can still be backed up."
-msgstr "无法解析此谜题文件，但它仍然可以备份。"
-
-#: app/backup.py:143
-msgid "No description found."
-msgstr "找不到描述。"
-
-#: app/backup.py:174 app/corridor_selector.py:137
-msgid "Coop"
-msgstr "合作模式"
-
-#: app/backup.py:174 app/corridor_selector.py:136
+#: app/backup.py:47 app/corridor_selector.py:138
 msgid "SP"
 msgstr "单人模式"
 
-#: app/backup.py:339
-msgid "This filename is already in the backup.Do you wish to overwrite it? ({})"
-msgstr ""
-"已存在同名的备份文件，是否要覆盖它？\n"
-"({})"
+#: app/backup.py:48 app/corridor_selector.py:139
+msgid "Coop"
+msgstr "合作模式"
 
-#: app/backup.py:441
-msgid "BEE2 Backup"
-msgstr "BEE2 备份"
-
-#: app/backup.py:442
-msgid "No maps were chosen to backup!"
-msgstr "请选择要备份的地图！"
-
-#: app/backup.py:502
+#: app/backup.py:49
+#, fuzzy
 msgid ""
-"This map is already in the game directory.Do you wish to overwrite it? "
-"({})"
+"Do you wish to delete {n} map?\n"
+"{maps}"
+msgid_plural ""
+"Do you wish to delete {n} maps?\n"
+"{maps}"
+msgstr[0] "确定要删除 {} 张地图？\n"
+
+#: app/backup.py:53
+#, fuzzy
+msgid ""
+"This map is already in the game directory. Do you wish to overwrite it? "
+"({mapname})"
 msgstr ""
 "游戏目录中已存在同名的地图文件，是否要覆盖它？\n"
 "({})"
 
-#: app/backup.py:564
-msgid "Load Backup"
-msgstr "载入备份"
+#: app/backup.py:56
+#, fuzzy
+msgid ""
+"This filename is already in the backup. Do you wish to overwrite it? "
+"({mapname})"
+msgstr ""
+"已存在同名的备份文件，是否要覆盖它？\n"
+"({})"
 
-#: app/backup.py:565 app/backup.py:624
-msgid "Backup zip"
-msgstr "备份为zip文件"
+#: app/backup.py:59
+msgid "Overwrite File?"
+msgstr ""
 
-#: app/backup.py:598
+#: app/backup.py:60
+msgid "Failed to parse this puzzle file. It can still be backed up."
+msgstr "无法解析此谜题文件，但它仍然可以备份。"
+
+#: app/backup.py:61
+msgid "No description found."
+msgstr "找不到描述。"
+
+#: app/backup.py:62
 msgid "Unsaved Backup"
 msgstr "未保持的备份"
 
-#: app/backup.py:623 app/backup.py:868
+#: app/backup.py:63
+#, fuzzy
+msgid "Backup ZIP archive"
+msgstr "备份为zip文件"
+
+#: app/backup.py:96
+msgid "Copying maps"
+msgstr "正在复制地图..."
+
+#: app/backup.py:101
+msgid "Loading maps"
+msgstr "正在载入地图..."
+
+#: app/backup.py:106
+msgid "Deleting maps"
+msgstr "正在删除地图..."
+
+#: app/backup.py:455
+msgid "BEE2 Backup"
+msgstr "BEE2 备份"
+
+#: app/backup.py:455
+msgid "No maps were chosen to backup!"
+msgstr "请选择要备份的地图！"
+
+#: app/backup.py:569
+msgid "Load Backup"
+msgstr "载入备份"
+
+#: app/backup.py:628 app/backup.py:861
 msgid "Save Backup As"
 msgstr "将备份另存为"
 
-#: app/backup.py:718
+#: app/backup.py:721
 msgid "Confirm Deletion"
 msgstr "确认删除"
 
-#: app/backup.py:719
-msgid "Do you wish to delete {} map?\n"
-msgid_plural "Do you wish to delete {} maps?\n"
-msgstr[0] "确定要删除 {} 张地图？\n"
-
-#: app/backup.py:756
+#: app/backup.py:753
 msgid "Restore:"
 msgstr "还原："
 
-#: app/backup.py:757
+#: app/backup.py:754
 msgid "Backup:"
 msgstr "备份："
 
-#: app/backup.py:794
+#: app/backup.py:787
 msgid "Checked"
 msgstr "已选"
 
-#: app/backup.py:802
+#: app/backup.py:793
 msgid "Delete Checked"
 msgstr "删除已选"
 
-#: app/backup.py:852
-msgid "BEEMOD {} - Backup / Restore Puzzles"
+#: app/backup.py:808
+msgid "Reload the map list."
+msgstr ""
+
+#: app/backup.py:839
+#, fuzzy
+msgid "BEEMOD {version} - Backup / Restore Puzzles"
 msgstr "BEEMOD {} - 备份/恢复 谜题"
 
-#: app/backup.py:865 app/backup.py:995
+#: app/backup.py:855 app/backup.py:987
 msgid "New Backup"
 msgstr "新建备份"
 
-#: app/backup.py:866 app/backup.py:1002
+#: app/backup.py:857 app/backup.py:991
 msgid "Open Backup"
 msgstr "打开备份"
 
-#: app/backup.py:867 app/backup.py:1009
+#: app/backup.py:859 app/backup.py:995
 msgid "Save Backup"
 msgstr "保存备份"
 
-#: app/backup.py:870 app/menu_bar.py:51
+#: app/backup.py:864 app/menu_bar.py:52
 msgid "File"
 msgstr "文件"
 
-#: app/backup.py:874 app/menu_bar.py:66
+#: app/backup.py:869 app/menu_bar.py:64
 msgid "Add Game"
 msgstr "添加游戏"
 
-#: app/backup.py:875
+#: app/backup.py:871
 msgid "Remove Game"
 msgstr "删除游戏"
 
-#: app/backup.py:878
+#: app/backup.py:875
 msgid "Game"
 msgstr "游戏"
 
@@ -809,124 +869,129 @@ msgstr "游戏"
 msgid "Automatic Backup After Export"
 msgstr "导出后自动备份"
 
-#: app/backup.py:958
+#: app/backup.py:953
 msgid "Keep (Per Game):"
 msgstr "保持（每N场游戏）"
 
-#: app/backup.py:976
+#: app/backup.py:972
 msgid "Backup/Restore Puzzles"
 msgstr "备份/恢复 谜题"
 
-#: app/contextWin.py:80
+#: app/backup.py:999
+msgid ".. As"
+msgstr ""
+
+#: app/contextWin.py:79
 msgid "This item may not be rotated."
 msgstr "该物品可能无法旋转。"
 
-#: app/contextWin.py:81
+#: app/contextWin.py:80
 msgid "This item can be pointed in 4 directions."
 msgstr "该物品可以面向4个方向。"
 
-#: app/contextWin.py:82
+#: app/contextWin.py:81
 msgid "This item can be positioned on the sides and center."
 msgstr "该物品可以放在侧面和中间。"
 
-#: app/contextWin.py:83
+#: app/contextWin.py:82
 msgid "This item can be centered in two directions, plus on the sides."
 msgstr "该物品可以向三个方向延伸。"
 
-#: app/contextWin.py:84
+#: app/contextWin.py:83
 msgid "This item can be placed like light strips."
 msgstr "该物品可以像灯条一样放置。"
 
-#: app/contextWin.py:85
+#: app/contextWin.py:84
 msgid "This item can be rotated on the floor to face 360 degrees."
 msgstr "该物品可以在地面上360°旋转。"
 
-#: app/contextWin.py:86
+#: app/contextWin.py:85
 msgid "This item is positioned using a catapult trajectory."
 msgstr "该物品用于定位弹射板的弹道及落点。"
 
-#: app/contextWin.py:87
+#: app/contextWin.py:86
 msgid "This item positions the dropper to hit target locations."
 msgstr "该物品定位物品掉落器击中目标的位置。"
 
-#: app/contextWin.py:89
+#: app/contextWin.py:88
 msgid "This item does not accept any inputs."
 msgstr "该物品不会接收任何输入信号。"
 
-#: app/contextWin.py:90
+#: app/contextWin.py:89
 msgid "This item accepts inputs."
 msgstr "该物品可以接收信号输入以改变状态。"
 
-#: app/contextWin.py:91
+#: app/contextWin.py:90
 msgid "This item has two input types (A and B), using the Input A and B items."
 msgstr "该物品具有两种输入类型（A和B），使用A物品和B物品进行输入。"
 
-#: app/contextWin.py:93
+#: app/contextWin.py:92
 msgid "This item does not output."
 msgstr "该物品不会输出信号。"
 
-#: app/contextWin.py:94
+#: app/contextWin.py:93
 msgid "This item has an output."
 msgstr "该物品可以输出信号。"
 
-#: app/contextWin.py:95
+#: app/contextWin.py:94
 msgid "This item has a timed output."
 msgstr "该物品具有延时输出信号的功能。"
 
-#: app/contextWin.py:97
+#: app/contextWin.py:96
 msgid "This item does not take up any space inside walls."
 msgstr "该物品不会占据墙壁后面的空间。"
 
-#: app/contextWin.py:98
+#: app/contextWin.py:97
 msgid "This item takes space inside the wall."
 msgstr "该物品需要占据墙壁后面的空间。"
 
-#: app/contextWin.py:100
+#: app/contextWin.py:99
 msgid "This item cannot be placed anywhere..."
 msgstr "该物品不能手动放置"
 
-#: app/contextWin.py:101
+#: app/contextWin.py:100
 msgid "This item can only be attached to ceilings."
 msgstr "该物品只能放置在天花板上。"
 
-#: app/contextWin.py:102
+#: app/contextWin.py:101
 msgid "This item can only be placed on the floor."
 msgstr "该物品只能放置在地板上。"
 
-#: app/contextWin.py:103
+#: app/contextWin.py:102
 msgid "This item can be placed on floors and ceilings."
 msgstr "该物品可以放置在地板和天花板上。"
 
-#: app/contextWin.py:104
+#: app/contextWin.py:103
 msgid "This item can be placed on walls only."
 msgstr "该物品只能放置在墙上。"
 
-#: app/contextWin.py:105
+#: app/contextWin.py:104
 msgid "This item can be attached to walls and ceilings."
 msgstr "该物品可以放置在墙壁和天花板上。"
 
-#: app/contextWin.py:106
+#: app/contextWin.py:105
 msgid "This item can be placed on floors and walls."
 msgstr "该物品可以放置在地板和墙壁上。"
 
-#: app/contextWin.py:107
+#: app/contextWin.py:106
 msgid "This item can be placed in any orientation."
 msgstr "该物品可以放置在任何方向。"
 
-#: app/contextWin.py:225
-#, fuzzy
-msgid "No Alternate Versions"
-msgstr "无替代版本！"
-
-#: app/contextWin.py:319
+#: app/contextWin.py:110
 msgid "Excursion Funnels accept a on/off input and a directional input."
 msgstr "牵引光束接受“开/关”控制和“方向”转换控制。"
 
-#: app/contextWin.py:370
+#: app/contextWin.py:111
+#, fuzzy
 msgid ""
-"This item can be rotated on the floor to face 360 degrees, for Reflection"
-" Cubes only."
-msgstr "该物品可以在地面上360°旋转放置。（仅适用于透镜方块）"
+"{generic_rot} However when this is set to Reflection Cube, this item can "
+"instead rotated on the floor to face 360 degrees."
+msgstr "该物品可以在地面上360°旋转。"
+
+#: app/contextWin.py:115
+#, fuzzy
+msgid "No Alternate Versions"
+msgstr "无替代版本！"
 
 #: app/contextWin.py:460
 msgid "Properties:"
@@ -943,82 +1008,122 @@ msgstr "用于此物品的实体数量。起源引擎将其限制为2048。这�
 msgid "Description:"
 msgstr "描述："
 
-#: app/contextWin.py:546
+#: app/contextWin.py:543
+msgid "BEE2 - Error"
+msgstr ""
+
+#: app/contextWin.py:544
 msgid ""
 "Failed to open a web browser. Do you wish for the URL to be copied to the"
 " clipboard instead?"
 msgstr "无法打开浏览器。你希望将网址复制到剪贴板吗？"
 
-#: app/contextWin.py:561
+#: app/contextWin.py:560
 msgid "More Info>>"
 msgstr "更多信息>>"
 
-#: app/contextWin.py:578
+#: app/contextWin.py:574
 msgid "Change Defaults..."
 msgstr "更改默认值..."
 
-#: app/contextWin.py:584
+#: app/contextWin.py:578
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: app/corridor_selector.py:124 app/helpMenu.py:466 app/itemPropWin.py:355
+#: app/corridor_selector.py:124 app/helpMenu.py:465 app/itemPropWin.py:362
 msgid "Close"
 msgstr "关闭"
 
-#: app/corridor_selector.py:141
+#: app/corridor_selector.py:143
 #, fuzzy
 msgid "Entry"
 msgstr "Bendy（纸片人小黑）"
 
-#: app/corridor_selector.py:142
+#: app/corridor_selector.py:144
 msgid "Exit"
 msgstr ""
 
-#: app/corridor_selector.py:146
+#: app/corridor_selector.py:148
 msgid "Flat"
 msgstr ""
 
-#: app/corridor_selector.py:147
+#: app/corridor_selector.py:149
 msgid "Upward"
 msgstr ""
 
-#: app/corridor_selector.py:148
+#: app/corridor_selector.py:150
 msgid "Downward"
 msgstr ""
 
-#: app/corridor_selector.py:179
+#: app/corridor_selector.py:181
 #, fuzzy
 msgid "Selected:"
 msgstr "所选风格"
 
-#: app/corridor_selector.py:180
+#: app/corridor_selector.py:182
 msgid "Unused:"
 msgstr ""
 
-#: app/gameMan.py:773 app/gameMan.py:866
+#: app/gameMan.py:125
+msgid "Backup Original Files"
+msgstr ""
+
+#: app/gameMan.py:126
+#, fuzzy
+msgid "Backup Puzzles"
+msgstr "备份/恢复 谜题"
+
+#: app/gameMan.py:127
+msgid "Export Configuration"
+msgstr ""
+
+#: app/gameMan.py:128
+msgid "Copy Compiler"
+msgstr ""
+
+#: app/gameMan.py:129
+msgid "Copy Resources"
+msgstr ""
+
+#: app/gameMan.py:130
+msgid "Copy Music"
+msgstr ""
+
+#: app/gameMan.py:131
+#, fuzzy
+msgid "Exporting"
+msgstr "导出"
+
+#: app/gameMan.py:134
+#, fuzzy
+msgid "Export to \"{game}\"..."
+msgstr "导出到 \"{}\"..."
+
+#: app/gameMan.py:135
+#, fuzzy
+msgid "Export to \"{game}\"*..."
+msgstr "导出到 \"{}\"..."
+
+#: app/gameMan.py:764 app/gameMan.py:856
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
-#: app/gameMan.py:774
+#: app/gameMan.py:765
 msgid ""
 "Compiler file {file} missing. Exit Steam applications, then press OK to "
 "verify your game cache. You can then export again."
 msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
 
-#: app/gameMan.py:867
+#: app/gameMan.py:857
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
-#: app/gameMan.py:1121 app/menu_bar.py:98
-msgid "Quit"
-msgstr "退出"
+#: app/gameMan.py:1134
+msgid "BEE2 - Aperture Tag Files Missing"
+msgstr "BEE2 - 光圈科技附加文件丢失"
 
-#: app/gameMan.py:1128
-msgid "Export to \"{}\"..."
-msgstr "导出到 \"{}\"..."
-
-#: app/gameMan.py:1187
+#: app/gameMan.py:1135
 msgid ""
 "Ap-Tag Coop gun instance not found!\n"
 "Coop guns will not work - verify cache to fix."
@@ -1026,11 +1131,11 @@ msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
 
-#: app/gameMan.py:1191
-msgid "BEE2 - Aperture Tag Files Missing"
-msgstr "BEE2 - 光圈科技附加文件丢失"
+#: app/gameMan.py:1219
+msgid "BEE2"
+msgstr ""
 
-#: app/gameMan.py:1272
+#: app/gameMan.py:1220
 msgid ""
 "It appears that the BEE2 application was installed directly in a game "
 "directory. The bee2/ folder name is used for exported resources, so this "
@@ -1039,137 +1144,145 @@ msgid ""
 "Move the application folder elsewhere, then re-run."
 msgstr ""
 
-#: app/gameMan.py:1317
-msgid "Select the folder where the game executable is located ({appname})..."
-msgstr "选择游戏可执行文件的路径 {appname}"
-
-#: app/gameMan.py:1321 app/gameMan.py:1338 app/gameMan.py:1348
-#: app/gameMan.py:1355 app/gameMan.py:1364 app/gameMan.py:1373
+#: app/gameMan.py:1261
 msgid "BEE2 - Add Game"
 msgstr "BEE2 - 添加游戏"
 
-#: app/gameMan.py:1325
+#: app/gameMan.py:1264
+msgid "Select the folder where the game executable is located ({appname})..."
+msgstr "选择游戏可执行文件的路径 {appname}"
+
+#: app/gameMan.py:1270
 msgid "Find Game Exe"
 msgstr "查找游戏的exe文件"
 
-#: app/gameMan.py:1326
+#: app/gameMan.py:1271
 msgid "Executable"
 msgstr "可执行文件"
 
-#: app/gameMan.py:1329
+#: app/gameMan.py:1274
 msgid "Find Game Binaries"
 msgstr ""
 
-#: app/gameMan.py:1335
+#: app/gameMan.py:1279
 msgid "This does not appear to be a valid game folder!"
 msgstr "这似乎不是一个有效的游戏文件夹！"
 
-#: app/gameMan.py:1345
+#: app/gameMan.py:1286
 msgid "Portal Stories: Mel doesn't have an editor!"
 msgstr "没有《传送门：梅尔的故事》的编辑器！"
 
-#: app/gameMan.py:1356
+#: app/gameMan.py:1295
 msgid "Enter the name of this game:"
 msgstr "输入此游戏的名称："
 
-#: app/gameMan.py:1363
+#: app/gameMan.py:1299
 msgid "This name is already taken!"
 msgstr "该名称已经存在！"
 
-#: app/gameMan.py:1372
+#: app/gameMan.py:1303
 msgid "Please enter a name for this game!"
 msgstr "请为此游戏创建一个名称！"
 
-#: app/gameMan.py:1390
+#: app/gameMan.py:1319
+#, fuzzy
 msgid ""
-"\n"
-" (BEE2 will quit, this is the last game set!)"
+"Are you sure you want to delete \"{game}\"?\n"
+"(BEE2 will quit, this is the last game set!)"
 msgstr ""
 "\n"
 "（BEE2即将退出，这是最后一次修改游戏的配置！）"
 
-#: app/gameMan.py:1396 app/paletteUI.py:312
-msgid "Are you sure you want to delete \"{}\"?"
+#: app/gameMan.py:1323
+#, fuzzy
+msgid "Are you sure you want to delete \"{game}\"?"
 msgstr "你确定要删除 \"{}\" 吗？"
 
-#: app/helpMenu.py:60
+#: app/gameMan.py:1326
+#, fuzzy
+msgid "BEE2 - Remove Game"
+msgstr "删除游戏"
+
+#: app/helpMenu.py:61
 msgid "Wiki..."
 msgstr "维基百科..."
 
-#: app/helpMenu.py:61
+#: app/helpMenu.py:62
 msgid "Original Items..."
 msgstr "默认物品..."
 
 #. i18n: The chat program.
-#: app/helpMenu.py:63
+#: app/helpMenu.py:64
 msgid "Discord Server..."
 msgstr "Discord服务器..."
 
-#: app/helpMenu.py:64
+#: app/helpMenu.py:65
 msgid "aerond's Music Changer..."
 msgstr "BEEMod音乐转换器..."
 
-#: app/helpMenu.py:65
+#: app/helpMenu.py:66
 msgid "Purchase Portal 2"
 msgstr ""
 
-#: app/helpMenu.py:67
+#: app/helpMenu.py:68
 msgid "Application Repository..."
 msgstr "软件开源代码库..."
 
-#: app/helpMenu.py:68
+#: app/helpMenu.py:69
 msgid "Items Repository..."
 msgstr "物品开源代码库..."
 
-#: app/helpMenu.py:69
+#: app/helpMenu.py:70
 #, fuzzy
 msgid "Music Repository..."
 msgstr "物品开源代码库..."
 
-#: app/helpMenu.py:71
+#: app/helpMenu.py:72
 msgid "Submit Application Bugs..."
 msgstr "反馈程序Bug..."
 
-#: app/helpMenu.py:72
+#: app/helpMenu.py:73
 msgid "Submit Item Bugs..."
 msgstr "反馈物品Bug..."
 
-#: app/helpMenu.py:73
+#: app/helpMenu.py:74
 #, fuzzy
 msgid "Submit Music Bugs..."
 msgstr "反馈物品Bug..."
 
-#: app/helpMenu.py:507 app/helpMenu.py:515
+#: app/helpMenu.py:505 app/helpMenu.py:512
 msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
 
-#: app/helpMenu.py:508
+#: app/helpMenu.py:506
 msgid ""
 "Failed to download list of URLs. Help menu links will not function. Check"
 " your Internet?"
 msgstr ""
 
-#: app/helpMenu.py:516
+#: app/helpMenu.py:513
 msgid "Failed to parse help menu URLs file. Help menu links will not function."
 msgstr ""
 
-#: app/helpMenu.py:531
+#: app/helpMenu.py:527
 msgid "BEEMOD 2 - Open URL"
 msgstr ""
 
-#: app/helpMenu.py:532
-msgid "Do you wish to open the following URL?\n"
+#: app/helpMenu.py:528
+msgid ""
+"Do you wish to open the following URL?\n"
+"{url}"
 msgstr ""
 
-#: app/helpMenu.py:543
+#: app/helpMenu.py:539
 msgid "Help"
 msgstr "帮助"
 
-#: app/helpMenu.py:552
+#: app/helpMenu.py:548
 msgid "BEE2 Credits"
 msgstr "BEE2 声明"
 
-#: app/helpMenu.py:567
+#: app/helpMenu.py:563
 msgid "Credits..."
 msgstr "声明..."
 
@@ -1189,17 +1302,112 @@ msgstr ""
 "延时\n"
 "（0=无限）"
 
-#: app/itemPropWin.py:354
+#: app/itemPropWin.py:60
+msgid "Timer Sound"
+msgstr ""
+
+#: app/itemPropWin.py:61
+msgid "Angled Panel Type"
+msgstr ""
+
+#: app/itemPropWin.py:62
+msgid "Disable Cube Dropper Clips"
+msgstr ""
+
+#: app/itemPropWin.py:63
+msgid "Gel Export Type"
+msgstr ""
+
+#: app/itemPropWin.py:64
+msgid "Automatically Move"
+msgstr ""
+
+#: app/itemPropWin.py:66
+msgid "Connection Count"
+msgstr ""
+
+#: app/itemPropWin.py:67
+msgid "Polarity Connection Count"
+msgstr ""
+
+#: app/itemPropWin.py:68
+msgid "Is Coop?"
+msgstr ""
+
+#: app/itemPropWin.py:69
+msgid "Flip Panel Portalability"
+msgstr ""
+
+#: app/itemPropWin.py:70
+msgid "Track Platform Speed"
+msgstr ""
+
+#: app/itemPropWin.py:71
+msgid "Initial Track Platform Position"
+msgstr ""
+
+#: app/itemPropWin.py:72
+msgid "Track Platform Direction"
+msgstr ""
+
+#: app/itemPropWin.py:73
+msgid "Track Platform Distance"
+msgstr ""
+
+#: app/itemPropWin.py:76
+msgid "Start Up"
+msgstr ""
+
+#: app/itemPropWin.py:79
+msgid "Vertical Alignment"
+msgstr ""
+
+#: app/itemPropWin.py:80
+msgid "Faith Plate Speed"
+msgstr ""
+
+#: app/itemPropWin.py:81
+msgid "Faith Target Name"
+msgstr ""
+
+#: app/itemPropWin.py:83
+msgid "Cube Type"
+msgstr ""
+
+#: app/itemPropWin.py:84
+msgid "Fizzler Type"
+msgstr ""
+
+#: app/itemPropWin.py:85
+msgid "Barrier Type"
+msgstr ""
+
+#: app/itemPropWin.py:86
+msgid "Button Type"
+msgstr ""
+
+#: app/itemPropWin.py:87
+#, fuzzy
+msgid "Gel Type"
+msgstr "选择风格"
+
+#: app/itemPropWin.py:176
+msgid "BEE2 - {item}"
+msgstr ""
+
+#: app/itemPropWin.py:177
+msgid "Settings for \"{item}\""
+msgstr ""
+
+#: app/itemPropWin.py:179
+msgid ""
+"Timer Delay:\n"
+"        ({tim})"
+msgstr ""
+
+#: app/itemPropWin.py:360
 msgid "No Properties available!"
 msgstr "没有可用的属性！"
-
-#: app/itemPropWin.py:604
-msgid "Settings for \"{}\""
-msgstr ""
-
-#: app/itemPropWin.py:605
-msgid "BEE2 - {}"
-msgstr ""
 
 #: app/item_search.py:67
 msgid "Search:"
@@ -1223,43 +1431,57 @@ msgstr "模板列表"
 msgid "Packages Folder"
 msgstr "资源包"
 
-#: app/menu_bar.py:58
+#: app/menu_bar.py:59
 msgid "Export"
 msgstr "导出"
 
-#: app/menu_bar.py:70
+#: app/menu_bar.py:67
 msgid "Uninstall from Selected Game"
 msgstr "删除选中的游戏"
 
-#: app/menu_bar.py:74
+#: app/menu_bar.py:70
 msgid "Backup/Restore Puzzles..."
 msgstr "备份/恢复 谜题..."
 
-#: app/menu_bar.py:79
+#: app/menu_bar.py:74
 msgid "Open Folder..."
 msgstr ""
 
-#: app/menu_bar.py:89
+#: app/menu_bar.py:83
 msgid "Manage Packages..."
 msgstr "管理资源包..."
 
-#: app/menu_bar.py:93
+#: app/menu_bar.py:86
 msgid "Options"
 msgstr "设置"
 
-#: app/menu_bar.py:110
+#: app/menu_bar.py:90
+msgid "Quit"
+msgstr "退出"
+
+#: app/menu_bar.py:100
 msgid "Palette"
 msgstr "模板"
 
-#: app/menu_bar.py:113
+#: app/menu_bar.py:104
 msgid "View"
 msgstr ""
 
-#: app/music_conf.py:133
+#: app/music_conf.py:32
+#, fuzzy
+msgid "Music:"
+msgstr "音乐选择："
+
+#: app/music_conf.py:33
+#, fuzzy
+msgid "Base:"
+msgstr "基础音乐"
+
+#: app/music_conf.py:135
 msgid "Select Background Music - Base"
 msgstr "选择背景音乐 - 基础"
 
-#: app/music_conf.py:134
+#: app/music_conf.py:136
 msgid ""
 "This controls the background music used for a map. Expand the dropdown to"
 " set tracks for specific test elements."
@@ -1267,189 +1489,193 @@ msgstr ""
 "这控制用于地图的背景音乐。\n"
 "展开下拉菜单以设置特定试验元素的声音。"
 
-#: app/music_conf.py:139
+#: app/music_conf.py:143
 msgid ""
 "Add no music to the map at all. Testing Element-specific music may still "
 "be added."
 msgstr "不添在地图内加任何背景音乐。某些特定试验元素的声音仍然可能被添加。"
 
-#: app/music_conf.py:144
+#: app/music_conf.py:149
 msgid "Propulsion Gel SFX"
 msgstr "加速凝胶的音效"
 
-#: app/music_conf.py:145
+#: app/music_conf.py:150
 msgid "Repulsion Gel SFX"
 msgstr "斥力凝胶的音效"
 
-#: app/music_conf.py:146
+#: app/music_conf.py:151
 msgid "Excursion Funnel Music"
 msgstr "牵引光束的音效"
 
-#: app/music_conf.py:147 app/music_conf.py:163
+#: app/music_conf.py:152 app/music_conf.py:172
 msgid "Synced Funnel Music"
 msgstr "同步牵引光束的音效"
 
-#: app/music_conf.py:155
+#: app/music_conf.py:160
 msgid "Select Excursion Funnel Music"
 msgstr "选择牵引光束的音效"
 
-#: app/music_conf.py:156
+#: app/music_conf.py:161
 msgid "Set the music used while inside Excursion Funnels."
 msgstr "设置玩家处于牵引光束内部时的音效。"
 
-#: app/music_conf.py:159
+#: app/music_conf.py:165
 msgid "The regular base track will continue to play normally."
 msgstr ""
 
-#: app/music_conf.py:171
+#: app/music_conf.py:167
+#, fuzzy
+msgid "Have no music playing when inside funnels."
+msgstr "设置玩家处于牵引光束内部时的音效。"
+
+#: app/music_conf.py:180
 msgid "Select Repulsion Gel Music"
 msgstr "选择斥力凝胶的音效"
 
-#: app/music_conf.py:172
+#: app/music_conf.py:181
 msgid "Select the music played when players jump on Repulsion Gel."
 msgstr "选择当玩家跳上斥力凝胶时的音效。"
 
-#: app/music_conf.py:175
+#: app/music_conf.py:184
 msgid "Add no music when jumping on Repulsion Gel."
 msgstr "玩家跳上斥力凝胶时不播放音效。"
 
-#: app/music_conf.py:184
+#: app/music_conf.py:193
 msgid "Select Propulsion Gel Music"
 msgstr "选择加速凝胶的音效"
 
-#: app/music_conf.py:185
+#: app/music_conf.py:194
 msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
 msgstr "选择玩家在加速凝胶上奔跑时的音效。"
 
-#: app/music_conf.py:188
+#: app/music_conf.py:197
 msgid "Add no music while running fast."
 msgstr "玩家在加速凝胶上移动时不播放音效。"
 
-#: app/music_conf.py:225
-msgid "Base: "
-msgstr "基础音乐"
-
-#: app/music_conf.py:258
+#: app/music_conf.py:267
 msgid "Funnel:"
 msgstr "牵引光束"
 
-#: app/music_conf.py:259
+#: app/music_conf.py:268
 msgid "Bounce:"
 msgstr "弹性凝胶"
 
-#: app/music_conf.py:260
+#: app/music_conf.py:269
 msgid "Speed:"
 msgstr "加速凝胶"
 
 #: app/optionWindow.py:30
 #, fuzzy
 msgid ""
-"\n"
+"{msg}\n"
 "Launch Game?"
 msgstr "启动游戏"
 
 #: app/optionWindow.py:32
 #, fuzzy
 msgid ""
-"\n"
+"{msg}\n"
 "Minimise BEE2?"
 msgstr "最小化BEE2"
 
 #: app/optionWindow.py:33
 msgid ""
-"\n"
+"{msg}\n"
 "Launch Game and minimise BEE2?"
 msgstr ""
 
 #: app/optionWindow.py:35
 msgid ""
-"\n"
+"{msg}\n"
 "Quit BEE2?"
 msgstr ""
 
 #: app/optionWindow.py:36
 msgid ""
-"\n"
+"{msg}\n"
 "Launch Game and quit BEE2?"
 msgstr ""
 
-#: app/optionWindow.py:46
+#: app/optionWindow.py:45
 msgid "BEE2 Options"
 msgstr "BEE2 选项"
 
-#: app/optionWindow.py:91
+#: app/optionWindow.py:48
+msgid "General"
+msgstr "常规"
+
+#: app/optionWindow.py:49
+msgid "Windows"
+msgstr "窗口"
+
+#: app/optionWindow.py:50
+msgid "Development"
+msgstr "开发者选项"
+
+#: app/optionWindow.py:51
+msgid "Packages Reset"
+msgstr ""
+
+#: app/optionWindow.py:52
 msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
 msgstr ""
 
-#: app/optionWindow.py:105
-msgid "\"Preserve Game Resources\" has been disabled."
+#: app/optionWindow.py:56
+msgid ""
+"{cache_reset}\n"
+"\n"
+"\"Preserve Game Resources\" has been disabled."
 msgstr ""
 
-#: app/optionWindow.py:113
-msgid "Packages Reset"
-msgstr ""
-
-#: app/optionWindow.py:167
-msgid "General"
-msgstr "常规"
-
-#: app/optionWindow.py:170
-msgid "Windows"
-msgstr "窗口"
-
-#: app/optionWindow.py:173
-msgid "Development"
-msgstr "开发者选项"
-
-#: app/optionWindow.py:194 app/packageMan.py:107 app/selector_win.py:799
+#: app/optionWindow.py:210 app/packageMan.py:105 app/selector_win.py:797
 msgid "OK"
 msgstr "确定"
 
-#: app/optionWindow.py:210
+#: app/optionWindow.py:226
 msgid "After Export:"
 msgstr "导出后："
 
-#: app/optionWindow.py:222
+#: app/optionWindow.py:252
 msgid "Do Nothing"
 msgstr "什么都不做"
 
-#: app/optionWindow.py:228
+#: app/optionWindow.py:253
 msgid "Minimise BEE2"
 msgstr "最小化BEE2"
 
-#: app/optionWindow.py:234
+#: app/optionWindow.py:254
 msgid "Quit BEE2"
 msgstr "退出BEE2"
 
-#: app/optionWindow.py:242
+#: app/optionWindow.py:260
 msgid "After exports, do nothing and keep the BEE2 in focus."
 msgstr "导出后，什么也不做，保持BEE2窗口处于焦点。"
 
-#: app/optionWindow.py:243
+#: app/optionWindow.py:261
 msgid "After exports, minimise to the taskbar/dock."
 msgstr "导出后，最小化到任务栏。"
 
-#: app/optionWindow.py:244
+#: app/optionWindow.py:262
 msgid "After exports, quit the BEE2."
 msgstr "导出后，退出BEE2。"
 
-#: app/optionWindow.py:250
+#: app/optionWindow.py:268
 msgid "Launch Game"
 msgstr "启动游戏"
 
-#: app/optionWindow.py:251
+#: app/optionWindow.py:269
 msgid "After exporting, launch the selected game automatically."
 msgstr "导出后，自动启动目标游戏"
 
-#: app/optionWindow.py:255 app/optionWindow.py:259
+#: app/optionWindow.py:272
 msgid "Play Sounds"
 msgstr "播放音效"
 
-#: app/optionWindow.py:264
+#: app/optionWindow.py:280
 msgid ""
 "Pyglet is either not installed or broken.\n"
 "Sound effects have been disabled."
@@ -1457,113 +1683,113 @@ msgstr ""
 "Pyglet未安装或损坏。\n"
 "音效已被禁用。"
 
-#: app/optionWindow.py:270
+#: app/optionWindow.py:285
 msgid "Show Hidden Palettes"
 msgstr ""
 
-#: app/optionWindow.py:276
+#: app/optionWindow.py:289
 msgid "Show all builtin palettes that you may have hidden."
 msgstr ""
 
-#: app/optionWindow.py:281
+#: app/optionWindow.py:293
 msgid "Reset Package Caches"
 msgstr "重置数据包缓存"
 
-#: app/optionWindow.py:287
+#: app/optionWindow.py:297
 msgid "Force re-extracting all package resources."
 msgstr ""
 
-#: app/optionWindow.py:299
+#: app/optionWindow.py:309
 #, fuzzy
 msgid "Keep loading screens on top"
 msgstr "清理过时的旧截图"
 
-#: app/optionWindow.py:300
+#: app/optionWindow.py:310
 msgid ""
 "Force loading screens to be on top of other windows. Since they don't "
 "appear on the taskbar/dock, they can't be brought to the top easily "
 "again."
 msgstr ""
 
-#: app/optionWindow.py:308
+#: app/optionWindow.py:318
 msgid "Use compact splash screen"
 msgstr ""
 
-#: app/optionWindow.py:309
+#: app/optionWindow.py:319
 msgid "Use an alternate smaller splash screen, which takes up less screen space."
 msgstr ""
 
-#: app/optionWindow.py:316
+#: app/optionWindow.py:326
 msgid "Keep windows inside screen"
 msgstr "保持窗口在屏幕内"
 
-#: app/optionWindow.py:317
+#: app/optionWindow.py:327
 msgid ""
 "Prevent sub-windows from moving outside the screen borders. If you have "
 "multiple monitors, disable this."
 msgstr "防止子窗口移出屏幕边界。 如果您有多台显示器，请禁用此功能。"
 
-#: app/optionWindow.py:325
+#: app/optionWindow.py:333
 msgid "Reset All Window Positions"
 msgstr "重置所有窗口的位置"
 
-#: app/optionWindow.py:338
+#: app/optionWindow.py:345
 msgid "Log missing entity counts"
 msgstr "记录丢失的实体数量"
 
-#: app/optionWindow.py:339
+#: app/optionWindow.py:346
 msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
 msgstr "加载物品时，将缺少实体的物品数量记录在properties.txt文件中。"
 
-#: app/optionWindow.py:346
+#: app/optionWindow.py:353
 msgid "Log when item doesn't have a style"
 msgstr "记录缺失风格的物品"
 
-#: app/optionWindow.py:347
+#: app/optionWindow.py:354
 #, fuzzy
 msgid ""
 "Log items have no applicable version for a particular style. This usually"
 " means it will look very bad."
 msgstr "记录没有当前风格版本的物品。这通常意味着它看起来很违和。"
 
-#: app/optionWindow.py:355
+#: app/optionWindow.py:362
 msgid "Log when item uses parent's style"
 msgstr "记录使用父风格的物品"
 
-#: app/optionWindow.py:356
+#: app/optionWindow.py:363
 msgid ""
 "Log when an item reuses a variant from a parent style (1970s using 1950s "
 "items, for example). This is usually fine, but may need to be fixed."
 msgstr "记录重复使用父风格变体的物品（例如1970s年代使用1950s年代的物品）。这通常没问题，但是可能需要修复。"
 
-#: app/optionWindow.py:364
+#: app/optionWindow.py:371
 msgid "Display item inheritance"
 msgstr ""
 
-#: app/optionWindow.py:365
+#: app/optionWindow.py:372
 msgid ""
 "Add overlays to item icons to display which inherit from parent styles or"
 " have no applicable style."
 msgstr ""
 
-#: app/optionWindow.py:374
+#: app/optionWindow.py:381
 #, fuzzy
 msgid "Development Mode"
 msgstr "开发者选项"
 
-#: app/optionWindow.py:375
+#: app/optionWindow.py:382
 msgid ""
 "Enables displaying additional UI specific for development purposes. "
 "Requires restart to have an effect."
 msgstr ""
 
-#: app/optionWindow.py:383
+#: app/optionWindow.py:390
 msgid "Preserve Game Directories"
 msgstr "保留游戏目录"
 
-#: app/optionWindow.py:385
+#: app/optionWindow.py:392
 #, fuzzy
 msgid ""
 "When exporting, do not copy resources to \n"
@@ -1574,19 +1800,19 @@ msgstr ""
 "当你导出时，不要覆盖写入目录“bee2/”和“sdk_content/maps/bee2/”。\n"
 "除非你正在建造新的内容，但要确定它不会被覆盖写入。"
 
-#: app/optionWindow.py:393
+#: app/optionWindow.py:400
 msgid "Show Log Window"
 msgstr "显示日志窗口"
 
-#: app/optionWindow.py:394
+#: app/optionWindow.py:401
 msgid "Show the log file in real-time."
 msgstr "实时显示日志文件。"
 
-#: app/optionWindow.py:399
+#: app/optionWindow.py:406
 msgid "Force Editor Models"
 msgstr "强制使用编辑器模型"
 
-#: app/optionWindow.py:400
+#: app/optionWindow.py:407
 msgid ""
 "Make all props_map_editor models available for use. Portal 2 has a limit "
 "of 1024 models loaded in memory at once, so we need to disable unused "
@@ -1595,20 +1821,20 @@ msgstr ""
 "使所有props_map_editor模型可用。\n"
 "Portal 2一次最多可将1024个模型加载到内存中，因此我们需要禁用未使用的模型以释放此模型。"
 
-#: app/optionWindow.py:410
+#: app/optionWindow.py:415
 #, fuzzy
-msgid "Dump All objects"
+msgid "Dump All Objects"
 msgstr "反选所有复选框"
 
-#: app/optionWindow.py:416
-msgid "Dump Items list"
-msgstr ""
-
-#: app/optionWindow.py:421
-msgid "Reload Images"
+#: app/optionWindow.py:419
+msgid "Dump Items List"
 msgstr ""
 
 #: app/optionWindow.py:424
+msgid "Reload Images"
+msgstr ""
+
+#: app/optionWindow.py:425
 msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
 
@@ -1658,168 +1884,209 @@ msgstr "传送门2"
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
-#: app/paletteUI.py:66
-msgid "Clear Palette"
-msgstr "清空模板内容"
-
-#: app/paletteUI.py:96 app/paletteUI.py:113 app/paletteUI.py:267
+#: app/paletteUI.py:28 app/paletteUI.py:96
 msgid "Delete Palette"
 msgstr "删除选中模板"
 
-#: app/paletteUI.py:119
-#, fuzzy
-msgid "Change Palette Group..."
-msgstr "另存为模板..."
-
-#: app/paletteUI.py:125
-#, fuzzy
-msgid "Rename Palette..."
-msgstr "保存模板..."
-
-#: app/paletteUI.py:131
-msgid "Fill Palette"
-msgstr "重置模板"
-
-#: app/paletteUI.py:138 app/paletteUI.py:284
-msgid "Save Settings in Palettes"
-msgstr "在模板中保存配置"
-
-#: app/paletteUI.py:145
-msgid "Save Palette"
-msgstr "保存模板"
-
-#: app/paletteUI.py:192
-msgid "Builtin / Readonly"
-msgstr ""
-
-#: app/paletteUI.py:255
-#, fuzzy
-msgid "Hide Palette \"{}\""
-msgstr "删除模板 \"{}\""
-
-#: app/paletteUI.py:257
+#: app/paletteUI.py:29
 #, fuzzy
 msgid "Hide Palette"
 msgstr "保存模板"
 
-#: app/paletteUI.py:265
-msgid "Delete Palette \"{}\""
+#: app/paletteUI.py:30
+#, fuzzy
+msgid "Are you sure you want to delete \"{palette}\"?"
+msgstr "你确定要删除 \"{}\" 吗？"
+
+#: app/paletteUI.py:31
+msgid "Builtin / Readonly"
+msgstr ""
+
+#: app/paletteUI.py:67
+msgid "Clear Palette"
+msgstr "清空模板内容"
+
+#: app/paletteUI.py:117
+#, fuzzy
+msgid "Change Palette Group..."
+msgstr "另存为模板..."
+
+#: app/paletteUI.py:123
+#, fuzzy
+msgid "Rename Palette..."
+msgstr "保存模板..."
+
+#: app/paletteUI.py:129
+msgid "Fill Palette"
+msgstr "重置模板"
+
+#: app/paletteUI.py:136 app/paletteUI.py:285
+msgid "Save Settings in Palettes"
+msgstr "在模板中保存配置"
+
+#: app/paletteUI.py:143
+msgid "Save Palette"
+msgstr "保存模板"
+
+#: app/paletteUI.py:253
+#, fuzzy
+msgid "Hide Palette \"{name}\""
 msgstr "删除模板 \"{}\""
 
-#: app/paletteUI.py:337 app/paletteUI.py:357
+#: app/paletteUI.py:263
+#, fuzzy
+msgid "Delete Palette \"{name}\""
+msgstr "删除模板 \"{}\""
+
+#: app/paletteUI.py:310
+#, fuzzy
+msgid "BEE2 - Delete Palette"
+msgstr "删除选中模板"
+
+#: app/paletteUI.py:336 app/paletteUI.py:356
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - 保存模板"
 
-#: app/paletteUI.py:337 app/paletteUI.py:357
+#: app/paletteUI.py:336 app/paletteUI.py:356
 msgid "Enter a name:"
 msgstr "键入模板名称："
 
-#: app/paletteUI.py:377
+#: app/paletteUI.py:376
 msgid "BEE2 - Change Palette Group"
 msgstr ""
 
-#: app/paletteUI.py:378
+#: app/paletteUI.py:377
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
-#: app/richTextBox.py:183
-msgid "Open \"{}\" in the default browser?"
+#: app/richTextBox.py:16
+#, fuzzy
+msgid "Open \"{url}\" in the default browser?"
 msgstr "在默认浏览器中打开 \"{}\" ？"
 
-#: app/selector_win.py:423
-msgid "{} Preview"
+#: app/selector_win.py:110
+msgid "Color: R={r}, G={g}, B={b}"
+msgstr "颜色: R={r}, G={g}, B={b}"
+
+#. i18n: Tooltip for colour swatch.
+#: app/selector_win.py:111
+msgid "BEE2 - {subtitle}"
+msgstr ""
+
+#. i18n: Window titles.
+#: app/selector_win.py:112
+msgid "Preview - {item}"
+msgstr ""
+
+#. i18n: Preview window.
+#: app/selector_win.py:113
+msgid "Suggested"
+msgstr "建议"
+
+#: app/selector_win.py:117
+msgid "Other"
+msgstr "其它"
+
+#: app/selector_win.py:118
+#, fuzzy
+msgid "Author: {authors}"
+msgid_plural "Authors: {authors}"
+msgstr[0] "作者: {}"
+
+#: app/selector_win.py:119
+msgid "Authors: Unknown"
 msgstr ""
 
 #. i18n: 'None' item description
-#: app/selector_win.py:490
+#: app/selector_win.py:497
 msgid "Do not add anything."
 msgstr "不要添加任何东西。"
 
 #. i18n: 'None' item name.
-#: app/selector_win.py:494
+#: app/selector_win.py:501
 msgid "<None>"
 msgstr "<无>"
 
-#: app/selector_win.py:743
+#: app/selector_win.py:745
 msgid "Play a sample of this item."
 msgstr "播放该物品的示例"
 
-#: app/selector_win.py:811
+#: app/selector_win.py:809
 #, fuzzy
 msgid "Select Suggested"
 msgstr "建议"
 
-#: app/selector_win.py:1000
-msgid "Other"
-msgstr "其它"
+#: app/signage_ui.py:27
+#, fuzzy
+msgid "Signage: {name}"
+msgstr "指示标志: {}"
 
-#: app/selector_win.py:1254
-msgid "Author: {}"
-msgid_plural "Authors: {}"
-msgstr[0] "作者: {}"
-
-#. i18n: Tooltip for colour swatch.
-#: app/selector_win.py:1317
-msgid "Color: R={r}, G={g}, B={b}"
-msgstr "颜色: R={r}, G={g}, B={b}"
-
-#: app/selector_win.py:1529 app/selector_win.py:1535
-msgid "Suggested"
-msgstr "建议"
-
-#: app/signage_ui.py:100 app/signage_ui.py:233
+#: app/signage_ui.py:102 app/signage_ui.py:231
 msgid "Configure Signage"
 msgstr "设置指示标志"
 
-#: app/signage_ui.py:104
+#: app/signage_ui.py:105
 msgid "Selected"
 msgstr "所选风格"
 
-#: app/signage_ui.py:153
-msgid "Signage: {}"
-msgstr "指示标志: {}"
-
-#: app/voiceEditor.py:35
+#: app/voiceEditor.py:37
 msgid "Singleplayer"
 msgstr "单人模式"
 
-#: app/voiceEditor.py:36
+#: app/voiceEditor.py:38
 msgid "Cooperative"
 msgstr "合作模式"
 
-#: app/voiceEditor.py:37
+#: app/voiceEditor.py:39
 msgid "ATLAS (SP/Coop)"
 msgstr ""
 
-#: app/voiceEditor.py:38
+#: app/voiceEditor.py:40
 msgid "P-Body (SP/Coop)"
 msgstr ""
 
-#: app/voiceEditor.py:41
+#: app/voiceEditor.py:43
 msgid "Human characters (Bendy and Chell)"
 msgstr "人物角色（小黑人和雪儿）"
 
-#: app/voiceEditor.py:42
+#: app/voiceEditor.py:44
 msgid "AI characters (ATLAS, P-Body, or Coop)"
 msgstr "AI字符（ATLAS，P-Body或Coop）"
 
-#: app/voiceEditor.py:49
+#: app/voiceEditor.py:50
+#, fuzzy
+msgid "Death - Generic"
+msgstr "致命 - 激光力场"
+
+#: app/voiceEditor.py:51
 msgid "Death - Toxic Goo"
 msgstr "致命 - 剧毒酸液"
 
-#: app/voiceEditor.py:50
+#: app/voiceEditor.py:52
 msgid "Death - Turrets"
 msgstr "致命 - 炮塔"
 
-#: app/voiceEditor.py:51
+#: app/voiceEditor.py:53
 msgid "Death - Crusher"
 msgstr "致命 - 钉板"
 
-#: app/voiceEditor.py:52
+#: app/voiceEditor.py:54
 msgid "Death - LaserField"
 msgstr "致命 - 激光力场"
 
-#: app/voiceEditor.py:105
+#: app/voiceEditor.py:57
+msgid "Taunts - Generic"
+msgstr ""
+
+#: app/voiceEditor.py:58
+msgid "Camera Gesture - Generic"
+msgstr ""
+
+#: app/voiceEditor.py:60 app/voiceEditor.py:333
+msgid "No Name!"
+msgstr "没有名称！"
+
+#: app/voiceEditor.py:110
 msgid "Transcript:"
 msgstr "台词："
 
@@ -1827,56 +2094,87 @@ msgstr "台词："
 msgid "Save"
 msgstr "保存"
 
+#. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py:219
 msgid "Resp"
 msgstr "响应"
 
 #: app/voiceEditor.py:236
-msgid "BEE2 - Configure \"{}\""
+#, fuzzy
+msgid "BEE2 - Configure \"{item}\""
 msgstr "BEE2 - 配置 \"{}\""
 
-#: app/voiceEditor.py:313
+#: app/voiceEditor.py:316
 msgid "Mid - Chamber"
 msgstr "在测试室内"
 
-#: app/voiceEditor.py:315
+#: app/voiceEditor.py:318
 msgid ""
 "Lines played during the actual chamber, after specific events have "
 "occurred."
 msgstr "在测试室内触发特定事件后播放的台词。"
 
-#: app/voiceEditor.py:321
+#: app/voiceEditor.py:324
 msgid "Responses"
 msgstr "回应"
 
-#: app/voiceEditor.py:323
+#: app/voiceEditor.py:326
 msgid "Lines played in response to certain events in Coop."
 msgstr "在合作模式中触发特定事件后播放的台词。"
 
-#: app/voiceEditor.py:421
-msgid "No Name!"
-msgstr "没有名称！"
-
-#: app/voiceEditor.py:457
-msgid "No Name?"
-msgstr "没有名称？"
-
-#: app/itemconfig/__init__.py:424
+#: app/itemconfig/__init__.py:430
 #, fuzzy
 msgid "Style Properties"
 msgstr "风格/物品 属性"
 
-#: app/itemconfig/__init__.py:436
+#: app/itemconfig/__init__.py:442
 msgid "Style/Item Properties"
 msgstr "风格/物品 属性"
 
-#: app/itemconfig/__init__.py:483
+#: app/itemconfig/__init__.py:500
 msgid "Loading..."
 msgstr ""
 
-#: app/itemconfig/color.py:55
+#: app/itemconfig/color.py:18
 msgid "Choose a Color"
 msgstr "选择一种颜色"
+
+#: packages/__init__.py:488
+msgid ""
+"one of the following locations:\n"
+"{loc}"
+msgstr ""
+
+#: packages/__init__.py:491
+msgid ""
+"{msg}\n"
+"Get the packages from \"https://github.com/BEEmod/BEE2-items\" and place "
+"them in {trailer}"
+msgstr ""
+
+#: packages/__init__.py:496
+msgid "BEE2 - Invalid Packages Directory!"
+msgstr ""
+
+#: packages/__init__.py:516
+#, fuzzy
+msgid "No packages found!"
+msgstr "资源包"
+
+#: packages/__init__.py:520
+msgid ""
+"No Clean Style package! This is required for some essential resources and"
+" objects."
+msgstr ""
+
+#: packages/__init__.py:779
+#, fuzzy
+msgid "No description!"
+msgstr "描述："
+
+#: test/test_localisation.py:21
+msgid "Save As"
+msgstr ""
 
 #~ msgid "Door Cameras"
 #~ msgstr "门前摄像机"
@@ -1997,4 +2295,78 @@ msgstr "选择一种颜色"
 
 #~ msgid "Thinking With Time Machine"
 #~ msgstr "传送门：时间机器"
+
+#~ msgid "__LANG_USE_SANS_SERIF__"
+#~ msgstr ""
+
+#~ msgid "Auto"
+#~ msgstr "自动获取截图"
+
+#~ msgid ""
+#~ "You can hold down Shift during the"
+#~ " start of the Lighting stage to "
+#~ "switch to {} lighting on the fly."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You can hold down Shift during the"
+#~ " start of the Geometry stage to "
+#~ "quickly swap whichlocation you spawn at"
+#~ " on the fly."
+#~ msgstr ""
+
+#~ msgid "Export..."
+#~ msgstr "导出到..."
+
+#~ msgid "BEEMOD {} Error!"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An error occurred: \n"
+#~ "{}\n"
+#~ "\n"
+#~ "This has been copied to the clipboard."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This item can be rotated on the"
+#~ " floor to face 360 degrees, for "
+#~ "Reflection Cubes only."
+#~ msgstr "该物品可以在地面上360°旋转放置。（仅适用于透镜方块）"
+
+#~ msgid "Do you wish to open the following URL?\n"
+#~ msgstr ""
+
+#~ msgid "Settings for \"{}\""
+#~ msgstr ""
+
+#~ msgid "BEE2 - {}"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "\n"
+#~ "Launch Game and minimise BEE2?"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "\n"
+#~ "Quit BEE2?"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "\n"
+#~ "Launch Game and quit BEE2?"
+#~ msgstr ""
+
+#~ msgid "\"Preserve Game Resources\" has been disabled."
+#~ msgstr ""
+
+#~ msgid "Dump Items list"
+#~ msgstr ""
+
+#~ msgid "{} Preview"
+#~ msgstr ""
+
+#~ msgid "No Name?"
+#~ msgstr "没有名称？"
 

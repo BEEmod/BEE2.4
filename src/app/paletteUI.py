@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import Awaitable, Callable
 from uuid import UUID
 
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import tkinter as tk
 
 import srctools.logger
 
 from app.paletteLoader import Palette
 from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
-from localisation import gettext
+from localisation import TransToken
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
 import config
@@ -25,7 +25,10 @@ ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 __all__ = [
     'PaletteUI', 'Palette', 'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
 ]
-
+TRANS_DELETE = TransToken.ui("Delete Palette")
+TRANS_HIDE = TransToken.ui("Hide Palette")
+TRANS_SHOULD_DELETE = TransToken.ui('Are you sure you want to delete "{palette}"?')
+TRANS_BUILTIN = TransToken.ui('Builtin / Readonly')  # i18n: Palette group title.
 
 class PaletteUI:
     """UI for selecting palettes."""
@@ -61,10 +64,8 @@ class PaletteUI:
 
         f.rowconfigure(1, weight=1)
         f.columnconfigure(0, weight=1)
-        ttk.Button(
-            f,
-            text=gettext('Clear Palette'),
-            command=cmd_clear,
+        TransToken.ui('Clear Palette').apply(
+            ttk.Button(f, command=cmd_clear)
         ).grid(row=0, sticky="EW")
 
         self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
@@ -91,11 +92,8 @@ class PaletteUI:
         scrollbar.grid(row=1, column=1, sticky="NS")
         self.ui_treeview['yscrollcommand'] = scrollbar.set
 
-        self.ui_remove = ttk.Button(
-            f,
-            text=gettext('Delete Palette'),
-            command=self.event_remove,
-        )
+        self.ui_remove = ttk.Button(f, command=self.event_remove)
+        TransToken.ui("Delete Palette").apply(self.ui_remove)
         self.ui_remove.grid(row=2, sticky="EW")
 
         if tk_tools.USE_SIZEGRIP:
@@ -105,57 +103,57 @@ class PaletteUI:
         self.ui_group_menus: dict[str, tk.Menu] = {}
         self.ui_group_treeids: dict[str, str] = {}
         menu.add_command(
-            label=gettext('Clear'),
+            label=str(TransToken.ui('Clear')),
             command=cmd_clear,
         )
         menu.add_command(
             # Placeholder..
-            label=gettext('Delete Palette'),  # This name is overwritten later
+            label='Delete Palette',  # This name is overwritten later
             command=self.event_remove,
         )
         self.ui_menu_delete_index = menu.index('end')
 
         menu.add_command(
-            label=gettext('Change Palette Group...'),
+            label=str(TransToken.ui('Change Palette Group...')),
             command=self.event_change_group,
         )
         self.ui_readonly_indexes = [menu.index('end')]
 
         menu.add_command(
-            label=gettext('Rename Palette...'),
+            label=str(TransToken.ui('Rename Palette...')),
             command=self.event_rename,
         )
         self.ui_readonly_indexes.append(menu.index('end'))
 
         menu.add_command(
-            label=gettext('Fill Palette'),
+            label=str(TransToken.ui('Fill Palette')),
             command=cmd_shuffle,
         )
 
         menu.add_separator()
 
         menu.add_checkbutton(
-            label=gettext('Save Settings in Palettes'),
+            label=str(TransToken.ui('Save Settings in Palettes')),
             variable=self.var_save_settings,
         )
 
         menu.add_separator()
 
         menu.add_command(
-            label=gettext('Save Palette'),
+            label=str(TransToken.ui('Save Palette')),
             command=self.event_save,
             accelerator=tk_tools.ACCEL_SAVE,
         )
         self.ui_readonly_indexes.append(menu.index('end'))
         menu.add_command(
-            label=gettext('Save Palette As...'),
+            label=str(TransToken.ui('Save Palette As...')),
             command=self.event_save_as,
             accelerator=tk_tools.ACCEL_SAVE_AS,
         )
 
         menu.add_separator()
         self.ui_menu_palettes_index = menu.index('end') + 1
-        self.update_state()
+        TransToken.add_callback(self.update_state, call=True)
 
     @property
     def selected(self) -> Palette:
@@ -189,7 +187,7 @@ class PaletteUI:
 
         for group, palettes in sorted(groups.items(), key=lambda t: (t[0] != paletteLoader.GROUP_BUILTIN, t[0])):
             if group == paletteLoader.GROUP_BUILTIN:
-                group = gettext('Builtin / Readonly')  # i18n: Palette group title.
+                group = str(TRANS_BUILTIN)
             if group:
                 try:
                     grp_menu = self.ui_group_menus[group]
@@ -211,10 +209,10 @@ class PaletteUI:
             else:  # '', directly add.
                 grp_menu = self.ui_menu
                 grp_tree = ''  # Root.
-            for pal in sorted(palettes, key=lambda p: p.name):
+            for pal in sorted(palettes, key=lambda p: str(p.name)):
                 gear_img = ICO_GEAR.get_tk() if pal.settings is not None else ''
                 grp_menu.add_radiobutton(
-                    label=pal.name,
+                    label=str(pal.name),
                     value=pal.uuid.hex,
                     # If we remake the palette menus inside this event handler, it tries
                     # to select the old menu item (likely), so a crash occurs. Delay until
@@ -230,13 +228,13 @@ class PaletteUI:
                     self.ui_treeview.move(pal_id, grp_tree, 99999)
                     self.ui_treeview.item(
                         pal_id,
-                        text=pal.name,
+                        text=str(pal.name),
                         image=gear_img,
                     )
                 else:  # New
                     self.ui_treeview.insert(
                         grp_tree, 'end',
-                        text=pal.name,
+                        text=str(pal.name),
                         iid='pal_' + pal.uuid.hex,
                         image=gear_img,
                         tags=TREE_TAG_PALETTES,
@@ -252,9 +250,9 @@ class PaletteUI:
         if self.selected.readonly:
             self.ui_menu.entryconfigure(
                 self.ui_menu_delete_index,
-                label=gettext('Hide Palette "{}"').format(self.selected.name),
+                label=TransToken.ui('Hide Palette "{name}"').format(name=self.selected.name),
             )
-            self.ui_remove['text'] = gettext('Hide Palette')
+            TRANS_HIDE.apply(self.ui_remove)
 
             self.save_btn_state(('disabled',))
             for ind in self.ui_readonly_indexes:
@@ -262,9 +260,9 @@ class PaletteUI:
         else:
             self.ui_menu.entryconfigure(
                 self.ui_menu_delete_index,
-                label=gettext('Delete Palette "{}"').format(self.selected.name),
+                label=TransToken.ui('Delete Palette "{name}"').format(name=self.selected.name),
             )
-            self.ui_remove['text'] = gettext('Delete Palette')
+            TRANS_DELETE.apply(self.ui_remove)
 
             self.save_btn_state(('!disabled',))
             for ind in self.ui_readonly_indexes:
@@ -279,12 +277,13 @@ class PaletteUI:
 
     def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
         """Create a checkbutton configured to control the save palette in settings option."""
-        return ttk.Checkbutton(
+        check = ttk.Checkbutton(
             frame,
-            text=gettext('Save Settings in Palettes'),
             variable=self.var_save_settings,
             command=self._store_configuration,
         )
+        TransToken.ui('Save Settings in Palettes').apply(check)
+        return check
 
     def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""
@@ -307,9 +306,9 @@ class PaletteUI:
             if pal.uuid in PALETTE_FORCE_SHOWN:
                 return  # Disallowed.
             self.hidden_defaults.add(pal.uuid)
-        elif messagebox.askyesno(
-            title='BEE2',
-            message=gettext('Are you sure you want to delete "{}"?').format(pal.name),
+        elif tk_tools.askyesno(
+            title=TransToken.ui('BEE2 - Delete Palette'),
+            message=TRANS_SHOULD_DELETE.format(palette=pal.name),
             parent=TK_ROOT,
         ):
             pal.delete_from_disk()
@@ -334,7 +333,7 @@ class PaletteUI:
 
     def event_save_as(self) -> None:
         """Save the palette with a new name."""
-        name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
+        name = tk_tools.prompt(TransToken.ui("BEE2 - Save Palette"), TransToken.ui("Enter a name:"))
         if name is None:
             # Cancelled...
             return
@@ -354,11 +353,11 @@ class PaletteUI:
         """Rename an existing palette."""
         if self.selected.readonly:
             return
-        name = tk_tools.prompt(gettext("BEE2 - Save Palette"), gettext("Enter a name:"))
+        name = tk_tools.prompt(TransToken.ui("BEE2 - Save Palette"), TransToken.ui("Enter a name:"))
         if name is None:
             # Cancelled...
             return
-        self.selected.name = name
+        self.selected.name = TransToken.untranslated(name)
         self.update_state()
 
     def select_palette(self, uuid: UUID) -> None:
@@ -374,8 +373,8 @@ class PaletteUI:
         if self.selected.readonly:
             return
         res = tk_tools.prompt(
-            gettext("BEE2 - Change Palette Group"),
-            gettext('Enter the name of the group for this palette, or "" to ungroup.'),
+            TransToken.ui("BEE2 - Change Palette Group"),
+            TransToken.ui('Enter the name of the group for this palette, or "" to ungroup.'),
             validator=lambda x: x,
         )
         if res is not None:

@@ -1,22 +1,22 @@
 """The widgets for the main menu bar."""
 import os
 import tkinter as tk
-from typing import Awaitable, Callable, Iterable, List, Tuple
+from typing import Callable, Iterable, List, Tuple
 from typing_extensions import Final
 from pathlib import Path
 
 import BEE2_config
 import utils
-from localisation import gettext
+from localisation import TransToken
 from app import gameMan, helpMenu, optionWindow, packageMan, tk_tools, backup as backup_win
 
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
-FOLDER_OPTIONS: List[Tuple[str, Callable[['gameMan.Game'], Iterable[Path]]]] = [
-    (gettext('{game} Puzzle Folder'), lambda game: [Path(game.abs_path('portal2/puzzles/'))]),
-    (gettext('{game} Folder'), lambda game: [Path(game.abs_path('.'))]),
-    (gettext('Palettes Folder'), lambda game: [utils.conf_location('palettes')]),
-    (gettext('Packages Folder'), lambda game: BEE2_config.get_package_locs()),
+FOLDER_OPTIONS: List[Tuple[TransToken, Callable[['gameMan.Game'], Iterable[Path]]]] = [
+    (TransToken.ui('{game} Puzzle Folder'), lambda game: [Path(game.abs_path('portal2/puzzles/'))]),
+    (TransToken.ui('{game} Folder'), lambda game: [Path(game.abs_path('.'))]),
+    (TransToken.ui('Palettes Folder'), lambda game: [utils.conf_location('palettes')]),
+    (TransToken.ui('Packages Folder'), lambda game: BEE2_config.get_package_locs()),
 ]
 
 
@@ -34,7 +34,7 @@ class MenuBar:
         """
         self._can_export = False
         self.export_func = export
-        self.bar = bar = tk.Menu(parent)
+        self.bar = bar = tk.Menu(parent, name='main_menu')
         # Suppress ability to make each menu a separate window - weird old
         # TK behaviour
         parent.option_add('*tearOff', '0')
@@ -46,58 +46,48 @@ class MenuBar:
             # Name is used to make this the special 'BEE2' menu item
             self.file_menu = tk.Menu(bar, name='apple')
         else:
-            self.file_menu = tk.Menu(bar)
+            self.file_menu = tk.Menu(bar, name='file')
 
-        bar.add_cascade(menu=self.file_menu, label=gettext('File'))
+        bar.add_cascade(menu=self.file_menu)
+        TransToken.ui('File').apply_menu(bar)
 
         # Assign the bar as the main window's menu.
         # Must be done after creating the apple menu.
         parent['menu'] = bar
 
-        self.file_menu.add_command(
-            label=gettext("Export"),
-            command=export,
-            accelerator=tk_tools.ACCEL_EXPORT,
-        )
+        self.file_menu.add_command(command=export, accelerator=tk_tools.ACCEL_EXPORT)
+        TransToken.ui('Export').apply_menu(self.file_menu)
         self.export_btn_pos = self.file_menu.index('end')
         self.file_menu.entryconfigure(self.export_btn_pos, state='disabled')
 
-        self.file_menu.add_command(
-            label=gettext("Add Game"),
-            command=gameMan.add_game,
-        )
-        self.file_menu.add_command(
-            label=gettext("Uninstall from Selected Game"),
-            command=gameMan.remove_game,
-        )
-        self.file_menu.add_command(
-            label=gettext("Backup/Restore Puzzles..."),
-            command=backup_win.show_window,
-        )
+        self.file_menu.add_command(command=gameMan.add_game)
+        TransToken.ui("Add Game").apply_menu(self.file_menu)
 
-        self.folder_menu = tk.Menu(bar)
-        self.file_menu.add_cascade(menu=self.folder_menu, label=gettext('Open Folder...'))
+        self.file_menu.add_command(command=gameMan.remove_game)
+        TransToken.ui("Uninstall from Selected Game").apply_menu(self.file_menu)
+
+        self.file_menu.add_command(command=backup_win.show_window)
+        TransToken.ui("Backup/Restore Puzzles...").apply_menu(self.file_menu)
+
+        self.folder_menu = tk.Menu(bar, name='folders')
+        self.file_menu.add_cascade(menu=self.folder_menu)
+        TransToken.ui("Open Folder...").apply_menu(self.file_menu)
+
         for label, path_getter in FOLDER_OPTIONS:
-            self.folder_menu.add_command(
-                label=label.format(game=''),
-                command=self._evt_open_dir(path_getter)
-            )
+            self.folder_menu.add_command(command=self._evt_open_dir(path_getter))
+            label.apply_menu(self.folder_menu)
 
         self.file_menu.add_separator()
 
-        self.file_menu.add_command(
-            label=gettext("Manage Packages..."),
-            command=packageMan.show,
-        )
-        self.file_menu.add_command(
-            label=gettext("Options"),
-            command=optionWindow.show,
-        )
+        self.file_menu.add_command(command=packageMan.show,)
+        TransToken.ui("Manage Packages...").apply_menu(self.file_menu)
+
+        self.file_menu.add_command(command=optionWindow.show)
+        TransToken.ui("Options").apply_menu(self.file_menu)
+
         if not utils.MAC:
-            self.file_menu.add_command(
-                label=gettext("Quit"),
-                command=quit_app,
-            )
+            self.file_menu.add_command(command=quit_app)
+            TransToken.ui("Quit").apply_menu(self.file_menu)
 
         self.file_menu.add_separator()
 
@@ -105,12 +95,13 @@ class MenuBar:
         gameMan.add_menu_opts(self.file_menu)
         gameMan.game_menu = self.file_menu
 
-        self.pal_menu = tk.Menu(bar)
-        # Menu name
-        bar.add_cascade(menu=self.pal_menu, label=gettext('Palette'))
+        self.pal_menu = tk.Menu(bar, name='palette')
+        bar.add_cascade(menu=self.pal_menu)
+        TransToken.ui("Palette").apply_menu(bar)
 
-        self.view_menu = tk.Menu(bar)
-        bar.add_cascade(menu=self.view_menu, label=gettext('View'))
+        self.view_menu = tk.Menu(bar, name='view')
+        bar.add_cascade(menu=self.view_menu)
+        TransToken.ui("View").apply_menu(bar)
 
         helpMenu.make_help_menu(bar)
         gameMan.EVENT_BUS.register(None, gameMan.Game, self._game_changed)
@@ -133,6 +124,6 @@ class MenuBar:
 
     async def _game_changed(self, game: 'gameMan.Game') -> None:
         """Callback for when games are changed."""
-        self.file_menu.entryconfigure(self.export_btn_pos, label=game.get_export_text())
+        game.get_export_text().apply_menu(self.file_menu, self.export_btn_pos)
         for i, (label, path_getter) in enumerate(FOLDER_OPTIONS):
-            self.folder_menu.entryconfigure(i, label=label.format(game=game.name))
+            label.format(game=game.name).apply_menu(self.folder_menu, i)

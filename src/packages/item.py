@@ -19,6 +19,7 @@ from srctools.tokenizer import Tokenizer, Token
 import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 import config
+from localisation import TransToken
 from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
@@ -70,7 +71,7 @@ class ItemVariant:
         icons: dict[str, img.Handle],
         ent_count: str='',
         url: str = None,
-        all_name: str=None,
+        all_name: TransToken=None,
         all_icon: FSPath=None,
         source: str='',
     ) -> None:
@@ -158,7 +159,7 @@ class ItemVariant:
         if 'description' in props:
             desc = desc_parse(props, source, pak_id)
         else:
-            desc = self.desc.copy()
+            desc = self.desc
 
         if 'appenddesc' in props:
             desc = tkMarkdown.join(
@@ -236,7 +237,12 @@ class ItemVariant:
                 pal_icon = FSPath(item['icon'])
             except LookupError:
                 pal_icon = None
-            pal_name = item['pal_name', None]  # Name for the palette icon
+
+            try:  # Name for the palette icon
+                pal_name = TransToken.parse(pak_id, item['pal_name'])
+            except LookupError:
+                pal_name = None
+
             try:
                 bee2_icon = img.Handle.parse(
                     item.find_key('BEE2'), pak_id,
@@ -283,8 +289,8 @@ class ItemVariant:
                         else:
                             subtype.models.append(FSPath(prop.value))
 
-            if item['name', None]:
-                subtype.name = item['name']  # Name for the subtype
+            if 'name' in item:  # Name for the subtype
+                subtype.name = TransToken.parse(pak_id, item['name'])
 
             if bee2_icon:
                 if is_extra:
@@ -702,7 +708,6 @@ class Item(PakObject, needs_foreground=True):
 
         for index, subtype in enumerate(new_item.subtypes):
             if index in palette_items:
-
                 if len(palette_items) == 1:
                     # Switch to the 'Grouped' icon and name
                     if item_data.all_name is not None:
@@ -820,7 +825,7 @@ async def parse_item_folder(
                 if tok_type is Token.STRING:
                     if tok_value.casefold() != 'item':
                         raise tok.error('Unknown item option "{}"!', tok_value)
-                    items.append(EditorItem.parse_one(tok))
+                    items.append(EditorItem.parse_one(tok, pak_id))
                 elif tok_type is not Token.NEWLINE:
                     raise tok.error(tok_type)
         return items
@@ -882,6 +887,11 @@ async def parse_item_folder(
     except LookupError:
         all_icon = None
 
+    try:
+        all_name = TransToken.parse(pak_id, props['all_name'])
+    except LookupError:
+        all_name = None
+
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
     source = f'<{pak_id}>/items/{fold}'
@@ -906,7 +916,7 @@ async def parse_item_folder(
             for prop in
             props.find_children('icon')
         },
-        all_name=props['all_name', None],
+        all_name=all_name,
         all_icon=all_icon,
         vbsp_config=lazy_conf.from_file(
             utils.PackagePath(pak_id, config_path),

@@ -27,6 +27,10 @@ from typing import (
     NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
     Collection, Iterable, cast,
 )
+
+from localisation import TransToken
+
+
 if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
     from loadScreen import LoadScreen
@@ -42,14 +46,14 @@ PACK_CONFIG = ConfigFile('packages.cfg')
 @attrs.define
 class SelitemData:
     """Options which are displayed on the selector window."""
-    name: str  # Longer full name.
-    short_name: str  # Shorter name for the icon.
+    name: TransToken  # Longer full name.
+    short_name: TransToken  # Shorter name for the icon.
     auth: list[str]  # List of authors.
-    icon: Optional[img.Handle]  # Small square icon.
-    large_icon: Optional[img.Handle]  # Larger, landscape icon.
+    icon: img.Handle | None  # Small square icon.
+    large_icon: img.Handle | None  # Larger, landscape icon.
     previews: list[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
-    group: Optional[str]
+    group: str
     sort_key: str
     # The packages used to define this, used for debugging.
     packages: frozenset[str] = attrs.Factory(frozenset)
@@ -58,14 +62,13 @@ class SelitemData:
     def parse(cls, info: Property, pack_id: str) -> SelitemData:
         """Parse from a property block."""
         auth = sep_values(info['authors', ''])
-        short_name = info['shortName', None]
-        name = info['name']
+        name = TransToken.parse(pack_id, info['name'])
         group = info['group', '']
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
-        if not group:
-            group = None
-        if not short_name:
+        try:
+            short_name = TransToken.parse(pack_id, info['shortName'])
+        except LookupError:
             short_name = name
 
         try:
@@ -150,7 +153,7 @@ class ObjData:
     fsys: FileSystem
     info_block: Property = attrs.field(repr=False)
     pak_id: str
-    disp_name: str
+    disp_name: TransToken
 
 
 @attrs.define
@@ -474,28 +477,23 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dirs: list[Path], msg: str) -> NoReturn:
+def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     """Show an error message indicating no packages are present."""
-    from tkinter import messagebox
+    from app import tk_tools
     import sys
-    # We don't have a packages directory!
+    # We don't have a package directory!
     if len(pak_dirs) == 1:
-        trailer = str(pak_dirs[0])
+        trailer = TransToken.untranslated(str(pak_dirs[0]))
     else:
-        trailer = (
-            'one of the following locations:\n' +
-            '\n'.join(f' - {fold}' for fold in pak_dirs)
-        )
-    message = (
-        f'{msg}\nGet the packages from '
-        '"https://github.com/BEEmod/BEE2-items" '
-        f'and place them in {trailer}'
-    )
+        trailer = TransToken.ui(
+            'one of the following locations:\n{loc}'
+        ).format(loc='\n'.join(f' - {fold}' for fold in pak_dirs))
+    message = TransToken.ui(
+        '{msg}\nGet the packages from "https://github.com/BEEmod/BEE2-items" and place them in {trailer}'
+    ).format(msg=msg, loc=trailer)
+
     LOGGER.error(message)
-    messagebox.showerror(
-        title='BEE2 - Invalid Packages Directory!',
-        message=message,
-    )
+    tk_tools.showerror(TransToken.ui('BEE2 - Invalid Packages Directory!'), message=message)
     sys.exit()
 
 
@@ -515,15 +513,13 @@ async def load_packages(
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
-        no_packages_err(pak_dirs, 'No packages found!')
+        no_packages_err(pak_dirs, TransToken.ui('No packages found!'))
 
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packset.packages:
-        no_packages_err(
-            pak_dirs,
-            'No Clean Style package! This is required for some '
-            'essential resources and objects.'
-        )
+        no_packages_err(pak_dirs, TransToken.ui(
+            'No Clean Style package! This is required for some essential resources and objects.'
+        ))
 
     # Ensure all objects are in the dicts.
     for obj_type in OBJ_TYPES.values():
@@ -682,7 +678,8 @@ async def parse_package(
                 pack.disp_name,
             )
 
-    pack.desc = '\n'.join(desc)
+    if desc:
+        pack.desc = TransToken.parse(pack.id, '\n'.join(desc))
 
     for template in pack.fsys.walk_folder('templates'):
         await trio.sleep(0)
@@ -731,7 +728,7 @@ async def parse_object(
     assert object_.id == obj_id, f'{object_!r} -> {object_.id} != "{obj_id}"!'
 
     object_.pak_id = obj_data.pak_id
-    object_.pak_name = obj_data.disp_name
+    object_.pak_name = str(obj_data.disp_name)
     for override_data in packset.overrides[obj_class, obj_id.casefold()]:
         await trio.sleep(0)
         try:
@@ -768,17 +765,18 @@ class Package:
         info: Property,
         path: Path,
     ) -> None:
-        disp_name = info['Name', None]
-        if disp_name is None:
+        try:
+            disp_name = TransToken.parse(pak_id, info['Name'])
+        except LookupError:
             LOGGER.warning('Warning: {} has no display name!', pak_id)
-            disp_name = pak_id.lower()
+            disp_name = TransToken.untranslated(pak_id.lower())
 
         self.id = pak_id
         self.fsys = filesystem
         self.info = info
         self.path = path
         self.disp_name = disp_name
-        self.desc = ''  # Filled in by parse_package.
+        self.desc = TransToken.ui('No description!')  # Filled in by parse_package.
 
     @property
     def enabled(self) -> bool:
@@ -1039,8 +1037,8 @@ def desc_parse(
                 lines.append(line.value)
         else:
             lines.append(prop.value)
-
-    return tkMarkdown.convert('\n'.join(lines), pak_id)
+    token = TransToken.parse(pak_id, '\n'.join(lines))
+    return tkMarkdown.convert(token, pak_id)
 
 
 def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:

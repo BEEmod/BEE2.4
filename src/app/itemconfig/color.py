@@ -12,7 +12,10 @@ from app.itemconfig import (
     multi_grid, parse_color, widget_sfx,
 )
 from app.tooltip import add_tooltip
-from localisation import gettext
+from localisation import TransToken
+
+
+TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
 
 
 @WidgetLookup('color', 'colour', 'rgb')
@@ -52,7 +55,7 @@ def make_color_swatch(parent: tk.Widget, var: tk.StringVar, size: int) -> tuple[
         new_color, tk_color = askcolor(
             color=f"#{r:02x}{g:02x}{b:02x}",
             parent=parent.winfo_toplevel(),
-            title=gettext('Choose a Color'),
+            title=str(TRANS_SELECT_TITLE),
         )
         if new_color is not None:
             # On 3.8, these are floats.

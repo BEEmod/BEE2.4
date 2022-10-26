@@ -14,7 +14,7 @@ from app import (
     tkMarkdown,
 )
 from app.richTextBox import tkRichText
-from localisation import gettext
+from localisation import TransToken
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
@@ -121,7 +121,9 @@ class Selector:
         self.wid_desc.grid(row=2, column=0, sticky='nsew')
         frm_right.rowconfigure(2, weight=1)
 
-        ttk.Button(frm_right, text=gettext('Close'), command=self.hide).grid(row=3, column=0)
+        TransToken.ui('Close').apply(
+            ttk.Button(frm_right, command=self.hide)
+        ).grid(row=3, column=0)
 
         self.event_bus = event.EventBus()
 
@@ -133,19 +135,19 @@ class Selector:
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
             button_frm, self.event_bus, conf.last_mode,
-            (GameMode.SP, gettext('SP')),
-            (GameMode.COOP, gettext('Coop')),
+            (GameMode.SP, TransToken.ui('SP')),
+            (GameMode.COOP, TransToken.ui('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
             button_frm, self.event_bus, conf.last_direction,
-            (Direction.ENTRY, gettext('Entry')),
-            (Direction.EXIT, gettext('Exit')),
+            (Direction.ENTRY, TransToken.ui('Entry')),
+            (Direction.EXIT, TransToken.ui('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
             button_frm, self.event_bus, conf.last_orient,
-            (Orient.FLAT, gettext('Flat')),
-            (Orient.UP, gettext('Upward')),
-            (Orient.DN, gettext('Downward')),
+            (Orient.FLAT, TransToken.ui('Flat')),
+            (Orient.UP, TransToken.ui('Upward')),
+            (Orient.DN, TransToken.ui('Downward')),
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
@@ -176,8 +178,8 @@ class Selector:
         reflow: Callable[[], Awaitable[object]] = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
-        self.header_sel = tk_tools.LineHeader(self.canvas, gettext('Selected:'))
-        self.header_unsel = tk_tools.LineHeader(self.canvas, gettext('Unused:'))
+        self.header_sel = tk_tools.LineHeader(self.canvas, TransToken.ui('Selected:'))
+        self.header_unsel = tk_tools.LineHeader(self.canvas, TransToken.ui('Unused:'))
         self.header_sel_win = self.canvas.create_window(
             0, 384,
             anchor='nw',
@@ -420,10 +422,10 @@ class Selector:
                     tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
                     corr.desc,
                     tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                    tkMarkdown.convert('\n'.join([
+                    tkMarkdown.convert(TransToken.untranslated('\n'.join([
                         f'* `{var}`: `{value}`'
                         for var, value in corr.fixups.items()
-                    ]), None)
+                    ])), None)
                 ))
             else:
                 self.wid_desc.set_text(corr.desc)

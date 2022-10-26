@@ -16,7 +16,7 @@ from app import (
     contextWin, gameMan, tk_tools, sound, logWindow, img, UI,
 )
 from config.gen_opts import GenOptions, AfterExport
-from localisation import gettext
+from localisation import TransToken
 import loadScreen
 import config
 
@@ -25,26 +25,37 @@ LOGGER = srctools.logger.get_logger(__name__)
 AFTER_EXPORT_ACTION = tk.IntVar(name='OPT_after_export_action', value=AfterExport.MINIMISE.value)
 
 # action, launching_game -> suffix on the message box.
-AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], str] = {
-    (AfterExport.NORMAL, False): '',
-    (AfterExport.NORMAL, True): gettext('\nLaunch Game?'),
+AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
+    (AfterExport.NORMAL, False): TransToken.untranslated('{msg}'),
+    (AfterExport.NORMAL, True): TransToken.ui('{msg}\nLaunch Game?'),
 
-    (AfterExport.MINIMISE, False): gettext('\nMinimise BEE2?'),
-    (AfterExport.MINIMISE, True): gettext('\nLaunch Game and minimise BEE2?'),
+    (AfterExport.MINIMISE, False): TransToken.ui('{msg}\nMinimise BEE2?'),
+    (AfterExport.MINIMISE, True): TransToken.ui('{msg}\nLaunch Game and minimise BEE2?'),
 
-    (AfterExport.QUIT, False): gettext('\nQuit BEE2?'),
-    (AfterExport.QUIT, True): gettext('\nLaunch Game and quit BEE2?'),
+    (AfterExport.QUIT, False): TransToken.ui('{msg}\nQuit BEE2?'),
+    (AfterExport.QUIT, True): TransToken.ui('{msg}\nLaunch Game and quit BEE2?'),
 }
 
 # The checkbox variables, along with the GenOptions attribute they control.
 VARS: List[Tuple[str, tk.Variable]] = []
 
-
 win = tk.Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
 tk_tools.set_window_icon(win)
-win.title(gettext('BEE2 Options'))
+TransToken.ui('BEE2 Options').apply_title(win)
 win.withdraw()
+
+TRANS_TAB_GEN = TransToken.ui('General')
+TRANS_TAB_WIN = TransToken.ui('Windows')
+TRANS_TAB_DEV = TransToken.ui('Development')
+TRANS_CACHE_RESET_TITLE = TransToken.ui('Packages Reset')
+TRANS_CACHE_RESET = TransToken.ui(
+    'Package cache times have been reset. '
+    'These will now be extracted during the next export.'
+)
+TRANS_CACHE_RESET_AND_NO_PRESERVE = TransToken.ui(
+    '{cache_reset}\n\n"Preserve Game Resources" has been disabled.'
+).format(cache_reset=TRANS_CACHE_RESET)
 
 
 def show() -> None:
@@ -88,11 +99,6 @@ def clear_caches() -> None:
 
      This will force package resources to be extracted again.
      """
-    message = gettext(
-        'Package cache times have been reset. '
-        'These will now be extracted during the next export.'
-    )
-
     for game in gameMan.all_games:
         game.mod_times.clear()
         game.save()
@@ -102,7 +108,9 @@ def clear_caches() -> None:
     conf = config.APP.get_cur_conf(GenOptions)
     if conf.preserve_resources:
         config.APP.store_conf(attrs.evolve(conf, preserve_resources=False))
-        message += '\n\n' + gettext('"Preserve Game Resources" has been disabled.')
+        message = TRANS_CACHE_RESET_AND_NO_PRESERVE
+    else:
+        message = TRANS_CACHE_RESET
 
     gameMan.CONFIG.save_check()
     config.APP.write_file()
@@ -110,16 +118,16 @@ def clear_caches() -> None:
     # Since we've saved, dismiss this window.
     win.withdraw()
 
-    messagebox.showinfo(title=gettext('Packages Reset'), message=message)
+    tk_tools.showinfo(TRANS_CACHE_RESET_TITLE, message)
 
 
 def make_checkbox(
     frame: tk.Misc,
     name: str,
     *,
-    desc: str,
+    desc: TransToken,
     var: tk.BooleanVar = None,
-    tooltip='',
+    tooltip: TransToken = None,
     callback: Optional[Callable[[], object]] = None,
 ) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
@@ -135,12 +143,13 @@ def make_checkbox(
     assert name in GenOptions.__annotations__, list(GenOptions.__annotations__)
 
     VARS.append((name, var))
-    widget = ttk.Checkbutton(frame, variable=var, text=desc)
+    widget = ttk.Checkbutton(frame, variable=var)
+    desc.apply(widget)
 
     if callback is not None:
         widget['command'] = callback
 
-    if tooltip:
+    if tooltip is not None:
         add_tooltip(widget, tooltip)
 
     return widget
@@ -164,13 +173,20 @@ async def init_widgets(
     win.rowconfigure(0, weight=1)
 
     fr_general = ttk.Frame(nbook)
-    nbook.add(fr_general, text=gettext('General'))
+    nbook.add(fr_general)
 
     fr_win = ttk.Frame(nbook)
-    nbook.add(fr_win, text=gettext('Windows'))
+    nbook.add(fr_win)
 
     fr_dev = ttk.Frame(nbook)
-    nbook.add(fr_dev, text=gettext('Development'))
+    nbook.add(fr_dev)
+
+    @TransToken.add_callback
+    def set_tab_names() -> None:
+        """Set the tab names, when translations refresh."""
+        nbook.tab(0, text=str(TRANS_TAB_GEN))
+        nbook.tab(1, text=str(TRANS_TAB_WIN))
+        nbook.tab(2, text=str(TRANS_TAB_DEV))
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
@@ -191,10 +207,9 @@ async def init_widgets(
         win.withdraw()
         load()
 
-    ok_btn = ttk.Button(ok_cancel, text=gettext('OK'), command=ok)
-    cancel_btn = ttk.Button(ok_cancel, text=gettext('Cancel'), command=cancel)
-    ok_btn.grid(row=0, column=0)
-    cancel_btn.grid(row=0, column=1)
+    TransToken.ui('OK').apply(ttk.Button(ok_cancel, command=ok)).grid(row=0, column=0)
+    TransToken.ui('Cancel').apply(ttk.Button(ok_cancel, command=cancel)).grid(row=0, column=1)
+
     win.protocol("WM_DELETE_WINDOW", cancel)
 
     load()  # Load the existing config.
@@ -207,7 +222,8 @@ async def init_gen_tab(
     unhide_palettes: Callable[[], object],
 ) -> None:
     """Make widgets in the 'General' tab."""
-    after_export_frame = ttk.LabelFrame(f, text=gettext('After Export:'))
+    after_export_frame = ttk.LabelFrame(f)
+    TransToken.ui('After Export:').apply(after_export_frame)
     after_export_frame.grid(
         row=0,
         rowspan=4,
@@ -215,76 +231,70 @@ async def init_gen_tab(
         sticky='NS',
         padx=(0, 10),
     )
-    f.rowconfigure(3, weight=1) # Stretch underneath the right column, so it's all aligned to top.
+    f.rowconfigure(3, weight=1)  # Stretch underneath the right column, so it's all aligned to top.
 
     exp_nothing = ttk.Radiobutton(
         after_export_frame,
-        text=gettext('Do Nothing'),
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.NORMAL.value,
     )
     exp_minimise = ttk.Radiobutton(
         after_export_frame,
-        text=gettext('Minimise BEE2'),
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.MINIMISE.value,
     )
     exp_quit = ttk.Radiobutton(
         after_export_frame,
-        text=gettext('Quit BEE2'),
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.QUIT.value,
     )
+
+    TransToken.ui('Do Nothing').apply(exp_nothing)
+    TransToken.ui('Minimise BEE2').apply(exp_minimise)
+    TransToken.ui('Quit BEE2').apply(exp_quit)
+
     exp_nothing.grid(row=0, column=0, sticky='w')
     exp_minimise.grid(row=1, column=0, sticky='w')
     exp_quit.grid(row=2, column=0, sticky='w')
 
-    add_tooltip(exp_nothing, gettext('After exports, do nothing and keep the BEE2 in focus.'))
-    add_tooltip(exp_minimise, gettext('After exports, minimise to the taskbar/dock.'))
-    add_tooltip(exp_quit, gettext('After exports, quit the BEE2.'))
+    add_tooltip(exp_nothing, TransToken.ui('After exports, do nothing and keep the BEE2 in focus.'))
+    add_tooltip(exp_minimise, TransToken.ui('After exports, minimise to the taskbar/dock.'))
+    add_tooltip(exp_quit, TransToken.ui('After exports, quit the BEE2.'))
 
     make_checkbox(
         after_export_frame,
         'launch_after_export',
         var=LAUNCH_AFTER_EXPORT,
-        desc=gettext('Launch Game'),
-        tooltip=gettext('After exporting, launch the selected game automatically.'),
+        desc=TransToken.ui('Launch Game'),
+        tooltip=TransToken.ui('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
+    mute_desc = TransToken.ui('Play Sounds')
     if sound.has_sound():
-        mute = make_checkbox(f, name='play_sounds', desc=gettext('Play Sounds'))
+        mute = make_checkbox(f, name='play_sounds', desc=mute_desc)
     else:
-        mute = ttk.Checkbutton(
-            f,
-            text=gettext('Play Sounds'),
-            state='disabled',
-        )
+        mute = ttk.Checkbutton(f, name='play_sounds', state='disabled')
+        mute_desc.apply(mute)
         add_tooltip(
             mute,
-            gettext('Pyglet is either not installed or broken.\nSound effects have been disabled.')
+            TransToken.ui('Pyglet is either not installed or broken.\nSound effects have been disabled.')
         )
     mute.grid(row=0, column=1, sticky='W')
 
-    reset_palette = ttk.Button(
-        f,
-        text=gettext('Show Hidden Palettes'),
-        command=unhide_palettes,
-    )
+    reset_palette = ttk.Button(f, command=unhide_palettes)
+    TransToken.ui('Show Hidden Palettes').apply(reset_palette)
     reset_palette.grid(row=1, column=1, sticky='W')
     add_tooltip(
         reset_palette,
-        gettext('Show all builtin palettes that you may have hidden.'),
+        TransToken.ui('Show all builtin palettes that you may have hidden.'),
     )
 
-    reset_cache = ttk.Button(
-        f,
-        text=gettext('Reset Package Caches'),
-        command=clear_caches,
-    )
+    reset_cache = ttk.Button(f, command=clear_caches)
+    TransToken.ui('Reset Package Caches').apply(reset_cache)
     reset_cache.grid(row=2, column=1, sticky='W')
     add_tooltip(
         reset_cache,
-        gettext('Force re-extracting all package resources.'),
+        TransToken.ui('Force re-extracting all package resources.'),
     )
 
 
@@ -296,8 +306,8 @@ async def init_win_tab(
 
     make_checkbox(
         f, 'force_load_ontop',
-        desc=gettext('Keep loading screens on top'),
-        tooltip=gettext(
+        desc=TransToken.ui('Keep loading screens on top'),
+        tooltip=TransToken.ui(
             "Force loading screens to be on top of other windows. "
             "Since they don't appear on the taskbar/dock, they can't be "
             "brought to the top easily again."
@@ -305,26 +315,23 @@ async def init_win_tab(
     ).grid(row=0, column=0, sticky='W')
     make_checkbox(
         f, 'compact_splash',
-        desc=gettext('Use compact splash screen'),
-        tooltip=gettext(
+        desc=TransToken.ui('Use compact splash screen'),
+        tooltip=TransToken.ui(
             "Use an alternate smaller splash screen, which takes up less screen space."
         ),
     ).grid(row=0, column=1, sticky='E')
 
     make_checkbox(
         f, 'keep_win_inside',
-        desc=gettext('Keep windows inside screen'),
-        tooltip=gettext(
+        desc=TransToken.ui('Keep windows inside screen'),
+        tooltip=TransToken.ui(
             'Prevent sub-windows from moving outside the screen borders. '
             'If you have multiple monitors, disable this.'
         ),
     ).grid(row=1, column=0, sticky='W')
 
-    ttk.Button(
-        f,
-        text=gettext('Reset All Window Positions'),
-        # Indirect reference to allow UI to set this later
-        command=reset_all_win,
+    TransToken.ui('Reset All Window Positions').apply(
+        ttk.Button(f, command=reset_all_win)
     ).grid(row=1, column=1, sticky='E')
 
 
@@ -335,16 +342,16 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         f, 'log_missing_ent_count',
-        desc=gettext('Log missing entity counts'),
-        tooltip=gettext(
+        desc=TransToken.ui('Log missing entity counts'),
+        tooltip=TransToken.ui(
             'When loading items, log items with missing entity counts in their properties.txt file.'
         ),
     ).grid(row=0, column=0, columnspan=2, sticky='W')
 
     make_checkbox(
         f, 'log_missing_styles',
-        desc=gettext("Log when item doesn't have a style"),
-        tooltip=gettext(
+        desc=TransToken.ui("Log when item doesn't have a style"),
+        tooltip=TransToken.ui(
             'Log items have no applicable version for a particular style. This usually means it '
             'will look very bad.'
         ),
@@ -352,8 +359,8 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         f, 'log_item_fallbacks',
-        desc=gettext("Log when item uses parent's style"),
-        tooltip=gettext(
+        desc=TransToken.ui("Log when item uses parent's style"),
+        tooltip=TransToken.ui(
             'Log when an item reuses a variant from a parent style (1970s using 1950s items, '
             'for example). This is usually fine, but may need to be fixed.'
         ),
@@ -361,8 +368,8 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         f, 'visualise_inheritance',
-        desc=gettext("Display item inheritance"),
-        tooltip=gettext(
+        desc=TransToken.ui("Display item inheritance"),
+        tooltip=TransToken.ui(
             'Add overlays to item icons to display which inherit from parent styles or '
             'have no applicable style.'
         ),
@@ -371,8 +378,8 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     make_checkbox(
         f, 'dev_mode',
         var=DEV_MODE,
-        desc=gettext("Development Mode"),
-        tooltip=gettext(
+        desc=TransToken.ui("Development Mode"),
+        tooltip=TransToken.ui(
             'Enables displaying additional UI specific for '
             'development purposes. Requires restart to have an effect.'
         ),
@@ -380,9 +387,9 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         f, 'preserve_resources',
-        desc=gettext('Preserve Game Directories'),
+        desc=TransToken.ui('Preserve Game Directories'),
         var=PRESERVE_RESOURCES,
-        tooltip=gettext(
+        tooltip=TransToken.ui(
             'When exporting, do not copy resources to \n"bee2/" and "sdk_content/maps/bee2/".\n'
             "Only enable if you're developing new content, to ensure it is not overwritten."
         ),
@@ -390,14 +397,14 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         f, 'show_log_win',
-        desc=gettext('Show Log Window'),
-        tooltip=gettext('Show the log file in real-time.'),
+        desc=TransToken.ui('Show Log Window'),
+        tooltip=TransToken.ui('Show the log file in real-time.'),
     ).grid(row=2, column=2, columnspan=2, sticky='W')
 
     make_checkbox(
         f, 'force_all_editor_models',
-        desc=gettext("Force Editor Models"),
-        tooltip=gettext(
+        desc=TransToken.ui("Force Editor Models"),
+        tooltip=TransToken.ui(
             'Make all props_map_editor models available for use. Portal 2 has a limit of 1024 '
             'models loaded in memory at once, so we need to disable unused ones to free this up.'
         ),
@@ -405,23 +412,17 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     ttk.Separator(orient='horizontal').grid(row=9, column=0, columnspan=3, sticky='EW')
 
-    ttk.Button(
-        f,
-        text=gettext('Dump All objects'),
-        command=report_all_obj,
+    TransToken.ui('Dump All Objects').apply(
+        ttk.Button(f,  command=report_all_obj)
     ).grid(row=10, column=0)
 
-    ttk.Button(
-        f,
-        text=gettext('Dump Items list'),
-        command=report_items,
+    TransToken.ui('Dump Items List').apply(
+        ttk.Button(f, command=report_items)
     ).grid(row=10, column=1)
-    reload_img = ttk.Button(
-        f,
-        text=gettext('Reload Images'),
-        command=img.refresh_all,
-    )
-    add_tooltip(reload_img, gettext(
+
+    reload_img = ttk.Button(f, command=img.refresh_all)
+    TransToken.ui('Reload Images').apply(reload_img)
+    add_tooltip(reload_img, TransToken.ui(
         'Reload all images in the app. Expect the app to freeze momentarily.'
     ))
     reload_img.grid(row=10, column=2)
