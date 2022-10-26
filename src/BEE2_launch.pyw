@@ -80,7 +80,7 @@ if __name__ == '__main__':
     app.DEV_MODE.set(conf.dev_mode)
 
     import localisation
-    localisation.setup()
+    localisation.setup(conf.language)
 
     # Check early on for a common mistake - putting the BEE2 folder directly in Portal 2 means
     # when we export we'll try and overwrite ourselves. Use Steam's appid file as a marker.

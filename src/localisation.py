@@ -11,6 +11,8 @@ import sys
 import attrs
 from srctools import EmptyMapping, logger
 
+from config.gen_opts import GenOptions
+import config
 import utils
 
 if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
@@ -349,10 +351,13 @@ class DummyTranslations(gettext_mod.NullTranslations):
     lngettext = ngettext
 
 
-def setup() -> None:
+def setup(conf_lang: str) -> None:
     """Setup localisations."""
     # Get the 'en_US' style language code
     lang_code = locale.getdefaultlocale()[0]
+
+    if conf_lang:
+        lang_code = conf_lang
 
     # Allow overriding through command line.
     if len(sys.argv) > 1:
@@ -400,6 +405,10 @@ def set_language(lang_code: str) -> None:
                     expanded_langs,
                 )
             _TRANSLATOR = gettext_mod.NullTranslations()
+            lang_code = 'en'
+
+    conf = config.APP.get_cur_conf(GenOptions)
+    config.APP.store_conf(attrs.evolve(conf, language=lang_code))
 
     # Reload all our localisations.
     for text_widget, token in _applied_tokens.items():

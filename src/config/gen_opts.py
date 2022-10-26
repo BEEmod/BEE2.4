@@ -23,7 +23,6 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
     # If the name has a :, the first is the section and the second is the name.
     # Otherwise, it's just the section name and the attr name is the same as the option name.
-
     after_export: AfterExport = AfterExport.NORMAL
     launch_after_export: bool = attrs.field(default=True, metadata={'legacy': 'General:launch_game'})
 
@@ -45,6 +44,8 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     visualise_inheritance: bool = False
     force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+
+    language: str = ''
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
@@ -90,6 +91,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         return GenOptions(
             after_export=after_export,
             log_win_level=data['log_win_level', 'INFO'],
+            language=data['language', ''],
             **{
                 field.name: data.bool(field.name, field.default)
                 for field in gen_opts_bool
@@ -101,6 +103,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         prop = Property('', [
             Property('after_export', str(self.after_export.value)),
             Property('log_win_level', self.log_win_level),
+            Property('language', self.language),
         ])
         for field in gen_opts_bool:
             prop[field.name] = '1' if getattr(self, field.name) else '0'
@@ -119,6 +122,11 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
             res['log_win_level'] = data['log_win_level'].val_str
         except (KeyError, ValueError):
             res['log_win_level'] = 'INFO'
+        try:
+            res['language'] = data['language'].val_str
+        except KeyError:
+            res['language'] = ''
+
         for field in gen_opts_bool:
             try:
                 res[field.name] = data[field.name].val_bool
@@ -130,6 +138,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         """Produce DMX configuration."""
         elem = Element('Options', 'DMElement')
         elem['after_export'] = self.after_export.value
+        elem['language'] = self.language
         for field in gen_opts_bool:
             elem[field.name] = getattr(self, field.name)
         return elem
