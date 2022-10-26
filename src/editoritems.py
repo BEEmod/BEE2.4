@@ -431,8 +431,11 @@ FACE_TYPES: dict[str, FaceType] = {
     for face in FaceType
 }
 OCCU_TYPES: dict[str, OccuType] = {
-    'COLLIDE_' + coll.name: coll
-    for coll in OccuType
+    'COLLIDE_' + name: OccuType[name]
+    for name in [
+        "NOTHING", "SOLID", "GRATING", "GLASS", "BRIDGE", "FIZZLER", "PHYSICS",
+        "ANTLINES", "EVERYTHING",
+    ]
 }
 
 # The defaults, if this is unset.
