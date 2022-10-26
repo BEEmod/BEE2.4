@@ -78,11 +78,9 @@ class SubPane(tk.Toplevel):
             padx=(2 if utils.MAC else (5, 2)),
         )
         tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
-        menu_bar.add_checkbutton(
-            label=str(title),  # TODO: Dynamic menus
-            variable=self.visible,
-            command=self._set_state_from_menu,
-        )
+
+        menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
+        title.apply_menu(menu_bar)
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)

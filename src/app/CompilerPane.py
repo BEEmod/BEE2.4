@@ -323,12 +323,12 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     make_setter('Screenshot', 'del_old', cleanup_screenshot)
     make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
+    reload_lbl = ttk.Label(window, justify='center')
     TransToken.ui(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
-    ).apply(
-        ttk.Label(window, justify='center')
-    ).grid(row=0, column=0, sticky='ew', padx=2, pady=2)
+    ).apply(reload_lbl)
+    reload_lbl.grid(row=0, column=0, sticky='ew', padx=2, pady=2)
 
     UI['nbook'] = nbook = ttk.Notebook(window)
 
@@ -353,6 +353,12 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     async with trio.open_nursery() as nursery:
         nursery.start_soon(make_map_widgets, map_frame, corr)
         nursery.start_soon(make_comp_widgets, comp_frame)
+
+    def update_label(e) -> None:
+        """Force the top label to wrap."""
+        reload_lbl['wraplength'] = window.winfo_width() - 10
+
+    window.bind('<Configure>', update_label, add='+')
 
 
 async def make_comp_widgets(frame: ttk.Frame) -> None:
