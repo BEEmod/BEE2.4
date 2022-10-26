@@ -26,34 +26,10 @@ import srctools.logger
 LOGGER = srctools.logger.get_logger('BEE2')
 APP_NURSERY: trio.Nursery
 
-DEFAULT_SETTINGS = {
-    'Directories': {
-        'package': 'packages/',
-    },
-    'General': {
-        # A token used to indicate the time the current cache/ was extracted.
-        # This tells us whether to copy it to the game folder.
-        'cache_time': '0',
-        # We need this value to detect just removing a package.
-        'cache_pack_count': '0',
-    },
-}
-
 
 async def init_app() -> None:
     """Initialise the application."""
-    GEN_OPTS.load()
-    GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
-    config.APP.read_file()
-    try:
-        conf = config.APP.get_cur_conf(GenOptions)
-    except KeyError:
-        conf = GenOptions()
-        config.APP.store_conf(conf)
-
-    # Special case, load in this early, so it applies.
-    utils.DEV_MODE = conf.dev_mode
-    app.DEV_MODE.set(conf.dev_mode)
+    conf = config.APP.get_cur_conf(GenOptions)
 
     LOGGER.debug('Starting loading screen...')
     loadScreen.main_loader.set_length('UI', 16)

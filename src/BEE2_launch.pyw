@@ -19,6 +19,19 @@ if sys.platform == "darwin":
     sys.modules['pyglet'] = None  # type: ignore
 
 
+DEFAULT_SETTINGS = {
+    'Directories': {
+        'package': 'packages/',
+    },
+    'General': {
+        # A token used to indicate the time the current cache/ was extracted.
+        # This tells us whether to copy it to the game folder.
+        'cache_time': '0',
+        # We need this value to detect just removing a package.
+        'cache_pack_count': '0',
+    },
+}
+
 import srctools.logger
 from app import on_error, TK_ROOT
 import utils
@@ -47,6 +60,24 @@ if __name__ == '__main__':
 
     # Warn if srctools Cython code isn't installed.
     utils.check_cython(LOGGER.warning)
+
+    import app
+    from BEE2_config import GEN_OPTS
+    import config
+    from config.gen_opts import GenOptions
+
+    GEN_OPTS.load()
+    GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
+    config.APP.read_file()
+    try:
+        conf = config.APP.get_cur_conf(GenOptions)
+    except KeyError:
+        conf = GenOptions()
+        config.APP.store_conf(conf)
+
+    # Special case, load in this early, so it applies.
+    utils.DEV_MODE = conf.dev_mode
+    app.DEV_MODE.set(conf.dev_mode)
 
     import localisation
     localisation.setup()
