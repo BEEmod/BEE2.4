@@ -10,7 +10,7 @@ import string
 import time
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
-from typing import List, TYPE_CHECKING, Dict, Any, Optional
+from typing import List, TYPE_CHECKING, Dict, Any, Optional, cast
 from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
@@ -835,7 +835,7 @@ def init_application() -> None:
     """Initialise the standalone application."""
     from app import gameMan
     global window
-    window = TK_ROOT
+    window = cast(tk.Toplevel, TK_ROOT)
     TransToken.ui(
         'BEEMOD {version} - Backup / Restore Puzzles'
     ).format(version=utils.BEE_VERSION).apply_title(TK_ROOT)

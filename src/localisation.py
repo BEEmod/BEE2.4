@@ -39,7 +39,7 @@ TextWidget: TypeAlias = Union[
     'tk.Label', 'tk.LabelFrame', 'tk.Button', 'tk.Radiobutton', 'tk.Checkbutton',
     'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
 ]
-TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget, covariant=True)
+TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
 # Assigns to widget['text'].
 _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
 # menu -> index -> token.

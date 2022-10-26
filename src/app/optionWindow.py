@@ -60,7 +60,7 @@ TRANS_CACHE_RESET_AND_NO_PRESERVE = TransToken.ui(
 
 
 # Callback to load languages when the window opens.
-_load_langs: Callable[[], object] = lambda conf: None
+_load_langs: Callable[[], object] = lambda: None
 
 
 def show() -> None:

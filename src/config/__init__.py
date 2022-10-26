@@ -456,8 +456,8 @@ async def apply_pal_conf(conf: Config) -> None:
 
 
 # Main application configs.
-APP = ConfigSpec(utils.conf_location('config/config.vdf'))
-PALETTE = ConfigSpec(None)
+APP: ConfigSpec = ConfigSpec(utils.conf_location('config/config.vdf'))
+PALETTE: ConfigSpec = ConfigSpec(None)
 
 
 # Import submodules, so they're registered.

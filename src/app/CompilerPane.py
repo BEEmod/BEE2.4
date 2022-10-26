@@ -4,7 +4,7 @@ These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
 
-from typing import Union
+from typing import Union, cast
 from tkinter import filedialog, ttk
 import tkinter as tk
 import functools
@@ -72,7 +72,7 @@ assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
-window: Union[SubPane.SubPane, tk.Tk, None] = None
+window: SubPane.SubPane
 UI: dict[str, tk.Widget] = {}
 
 chosen_thumb = tk.StringVar(
@@ -754,7 +754,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_sele
 def init_application() -> None:
     """Initialise when standalone."""
     global window
-    window = TK_ROOT
+    window = cast(SubPane, TK_ROOT)
     TransToken.ui('Compiler Options - {ver}').format(ver=utils.BEE_VERSION).apply_title(window)
     window.resizable(True, False)
 
