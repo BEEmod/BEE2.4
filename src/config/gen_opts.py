@@ -115,6 +115,10 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
             res['after_export'] = AfterExport(data['after_export'].val_int)
         except (KeyError, ValueError):
             res['after_export'] = AfterExport.NORMAL
+        try:
+            res['log_win_level'] = data['log_win_level'].val_str
+        except (KeyError, ValueError):
+            res['log_win_level'] = 'INFO'
         for field in gen_opts_bool:
             try:
                 res[field.name] = data[field.name].val_bool
