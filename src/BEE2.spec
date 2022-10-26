@@ -93,6 +93,7 @@ def do_localisation() -> None:
 
         data_files.append((str(comp), 'i18n/'))
 
+    # Build out the English translation from the template.
     catalog.locale = 'en'
     with (i18n / 'en.mo').open('wb') as dest:
         write_mo(dest, catalog)

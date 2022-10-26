@@ -10,6 +10,7 @@ from typing import Callable, List, Optional, Tuple, Dict
 import attrs
 import srctools.logger
 
+import localisation
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
@@ -58,10 +59,15 @@ TRANS_CACHE_RESET_AND_NO_PRESERVE = TransToken.ui(
 ).format(cache_reset=TRANS_CACHE_RESET)
 
 
+# Callback to load languages when the window opens.
+_load_langs: Callable[[], object] = lambda conf: None
+
+
 def show() -> None:
     """Display the option window."""
     # Re-apply, so the vars update.
     load()
+    _load_langs()
     win.deiconify()
     contextWin.hide_context()  # Ensure this closes.
     tk_tools.center_win(win)
@@ -222,6 +228,7 @@ async def init_gen_tab(
     unhide_palettes: Callable[[], object],
 ) -> None:
     """Make widgets in the 'General' tab."""
+    global _load_langs
     after_export_frame = ttk.LabelFrame(f)
     TransToken.ui('After Export:').apply(after_export_frame)
     after_export_frame.grid(
@@ -269,6 +276,47 @@ async def init_gen_tab(
         tooltip=TransToken.ui('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
 
+    lang_frm = ttk.Frame(f, name='lang_frm')
+    lang_frm.grid(row=0, column=1, sticky='EW')
+
+    TransToken.ui('Language:').apply(
+        ttk.Label(lang_frm)
+    ).grid(row=0, column=0)
+
+    lang_box = ttk.Combobox(lang_frm, name='language')
+    lang_box.state(['readonly'])
+    lang_frm.columnconfigure(1, weight=1)
+    lang_box.grid(row=0, column=1)
+
+    lang_order: list[localisation.Language] = []
+    lang_code_to_ind: dict[str, int] = {}
+
+    def load_langs() -> None:
+        """Load languages when the window opens."""
+        lang_order.clear()
+        disp_names = []
+        for i, lang in enumerate(localisation.get_languages()):
+            LOGGER.info('Language: {!r}', lang)
+            lang_order.append(lang)
+            disp_names.append(lang.display_name)
+            lang_code_to_ind[lang.lang_code] = i
+
+        lang_box['values'] = disp_names
+        conf = config.APP.get_cur_conf(GenOptions)
+        try:
+            lang_box.current(lang_code_to_ind[conf.language])
+        except KeyError:
+            pass
+
+    _load_langs = load_langs
+
+    def language_changed(e) -> None:
+        """Set the language when the combo box is changed"""
+        if lang_order:
+            localisation.set_language(lang_order[lang_box.current()])
+
+    lang_box.bind('<<ComboboxSelected>>', language_changed)
+
     mute_desc = TransToken.ui('Play Sounds')
     if sound.has_sound():
         mute = make_checkbox(f, name='play_sounds', desc=mute_desc)
@@ -279,11 +327,11 @@ async def init_gen_tab(
             mute,
             TransToken.ui('Pyglet is either not installed or broken.\nSound effects have been disabled.')
         )
-    mute.grid(row=0, column=1, sticky='W')
+    mute.grid(row=1, column=1, sticky='W')
 
     reset_palette = ttk.Button(f, command=unhide_palettes)
     TransToken.ui('Show Hidden Palettes').apply(reset_palette)
-    reset_palette.grid(row=1, column=1, sticky='W')
+    reset_palette.grid(row=2, column=1, sticky='W')
     add_tooltip(
         reset_palette,
         TransToken.ui('Show all builtin palettes that you may have hidden.'),
@@ -291,7 +339,7 @@ async def init_gen_tab(
 
     reset_cache = ttk.Button(f, command=clear_caches)
     TransToken.ui('Reset Package Caches').apply(reset_cache)
-    reset_cache.grid(row=2, column=1, sticky='W')
+    reset_cache.grid(row=3, column=1, sticky='W')
     add_tooltip(
         reset_cache,
         TransToken.ui('Force re-extracting all package resources.'),

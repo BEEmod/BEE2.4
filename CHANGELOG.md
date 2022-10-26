@@ -4,6 +4,7 @@
 
 ### Enhancements
 * If funnel music is disabled, keep the base music playing while inside funnels.
+* Rebuilt localisation system, allowing languages to be changed in the options menu.
 
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-26 13:11+1000\n"
+"POT-Creation-Date: 2022-10-26 14:16+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -67,6 +67,11 @@ msgstr ""
 
 #: loadScreen.py
 msgid "Better Extended Editor for Portal 2"
+msgstr ""
+
+#. i18n: This is displayed in the options menu to switch to this language.
+#: localisation.py localisation.py
+msgid "__LanguageName"
 msgstr ""
 
 #: app/CheckDetails.py
@@ -1424,10 +1429,6 @@ msgid "The regular base track will continue to play normally."
 msgstr ""
 
 #: app/music_conf.py
-msgid "Have no music playing when inside funnels."
-msgstr ""
-
-#: app/music_conf.py
 msgid "Select Repulsion Gel Music"
 msgstr ""
 
@@ -2044,4 +2045,3 @@ msgstr ""
 #: test/test_localisation.py
 msgid "Save As"
 msgstr ""
-

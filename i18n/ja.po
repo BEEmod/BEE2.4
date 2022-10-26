@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-10-26 13:11+1000\n"
+"POT-Creation-Date: 2022-10-26 14:16+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -71,6 +71,11 @@ msgstr ""
 #: loadScreen.py:266
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
+
+#. i18n: This is displayed in the options menu to switch to this language.
+#: localisation.py:405 localisation.py:437
+msgid "__LanguageName"
+msgstr "日本語 (Japanese)"
 
 #: app/CheckDetails.py:254
 msgid "Toggle all checkboxes."
@@ -1415,7 +1420,7 @@ msgstr ""
 msgid "Excursion Funnel Music"
 msgstr ""
 
-#: app/music_conf.py:152 app/music_conf.py:172
+#: app/music_conf.py:152 app/music_conf.py:168
 msgid "Synced Funnel Music"
 msgstr ""
 
@@ -1428,50 +1433,46 @@ msgstr "音楽を選択"
 msgid "Set the music used while inside Excursion Funnels."
 msgstr ""
 
-#: app/music_conf.py:165
+#: app/music_conf.py:164
 msgid "The regular base track will continue to play normally."
 msgstr ""
 
-#: app/music_conf.py:167
-msgid "Have no music playing when inside funnels."
-msgstr ""
-
-#: app/music_conf.py:180
+#: app/music_conf.py:176
 msgid "Select Repulsion Gel Music"
 msgstr ""
 
-#: app/music_conf.py:181
+#: app/music_conf.py:177
 msgid "Select the music played when players jump on Repulsion Gel."
 msgstr ""
 
-#: app/music_conf.py:184
+#: app/music_conf.py:180
 msgid "Add no music when jumping on Repulsion Gel."
 msgstr ""
 
-#: app/music_conf.py:193
+#: app/music_conf.py:189
 #, fuzzy
 msgid "Select Propulsion Gel Music"
 msgstr "音楽を選択"
 
-#: app/music_conf.py:194
+#: app/music_conf.py:190
 msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
 msgstr ""
 
-#: app/music_conf.py:197
+#: app/music_conf.py:193
 msgid "Add no music while running fast."
 msgstr ""
 
-#: app/music_conf.py:267
+#: app/music_conf.py:263
 msgid "Funnel:"
 msgstr ""
 
-#: app/music_conf.py:268
+#: app/music_conf.py:264
 msgid "Bounce:"
 msgstr ""
 
-#: app/music_conf.py:269
+#: app/music_conf.py:265
 msgid "Speed:"
 msgstr ""
 
@@ -2456,4 +2457,7 @@ msgstr ""
 
 #~ msgid "No Name?"
 #~ msgstr "名前ありません？"
+
+#~ msgid "Have no music playing when inside funnels."
+#~ msgstr ""
 

@@ -1,6 +1,7 @@
 """Wraps gettext, to localise all UI text."""
 from typing import (
-    Callable, Dict, Iterable, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union, cast,
+    Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union,
+    cast,
 )
 from typing_extensions import ParamSpec, Final, TypeAlias
 from weakref import WeakKeyDictionary
@@ -22,7 +23,6 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
 __all__ = ['TransToken', 'load_basemodui', 'setup']
 
 LOGGER = logger.get_logger(__name__)
-_TRANSLATOR = gettext_mod.NullTranslations()
 P = ParamSpec('P')
 
 NS_UI: Final = '<BEE2>'  # Our UI translations.
@@ -46,6 +46,44 @@ _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary
 _applied_menu_tokens: 'WeakKeyDictionary[tk.Menu, Dict[int, TransToken]]' = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
 _langchange_callback: List[Callable[[], object]] = []
+
+FOLDER = utils.install_path('i18n')
+
+
+@attrs.frozen
+class Language:
+    """Wrapper around the GNU translator, storing the filename and display name."""
+    display_name: str
+    lang_code: str
+    _gnu: gettext_mod.NullTranslations
+
+
+_TRANSLATOR = Language(
+    '<None>', 'en',
+    gettext_mod.NullTranslations()
+)
+
+
+class DummyTranslations(gettext_mod.NullTranslations):
+    """Dummy form for identifying missing translation entries."""
+
+    def gettext(self, message: str) -> str:
+        """Generate placeholder of the right size."""
+        # We don't want to leave {arr} intact.
+        return ''.join([
+            '#' if s.isalnum() or s in '{}' else s
+            for s in message
+        ])
+
+    def ngettext(self, msgid1: str, msgid2: str, n: int) -> str:
+        """Generate placeholder of the right size for plurals."""
+        return self.gettext(msgid1 if n == 1 else msgid2)
+
+    lgettext = gettext
+    lngettext = ngettext
+
+
+DUMMY = Language('Dummy', 'dummy', DummyTranslations())
 
 
 @attrs.frozen(eq=False)
@@ -165,10 +203,11 @@ class TransToken:
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token
-        elif isinstance(_TRANSLATOR, DummyTranslations):
+        elif _TRANSLATOR is DUMMY:
             return '#' * len(self.token)
         elif self.namespace == NS_UI:
-            result = _TRANSLATOR.gettext(self.token)
+            # noinspection PyProtectedMember
+            result = _TRANSLATOR._gnu.gettext(self.token)
         else:
             try:
                 result = TRANSLATIONS[self.namespace][self.token]
@@ -263,7 +302,8 @@ class PluralTransToken(TransToken):
         elif isinstance(_TRANSLATOR, DummyTranslations):
             return '#' * len(self.token)
         elif self.namespace == NS_UI:
-            result = _TRANSLATOR.ngettext(self.token, self.token_plural, n)
+            # noinspection PyProtectedMember
+            result = _TRANSLATOR._gnu.ngettext(self.token, self.token_plural, n)
         else:
             raise ValueError(f'Namespace "{self.namespace}" is not allowed.')
 
@@ -332,25 +372,6 @@ def load_basemodui(basemod_loc: str) -> None:
                 trans_data[key] = value.replace("\\'", "'")
 
 
-class DummyTranslations(gettext_mod.NullTranslations):
-    """Dummy form for identifying missing translation entries."""
-
-    def gettext(self, message: str) -> str:
-        """Generate placeholder of the right size."""
-        # We don't want to leave {arr} intact.
-        return ''.join([
-            '#' if s.isalnum() or s in '{}' else s
-            for s in message
-        ])
-
-    def ngettext(self, msgid1: str, msgid2: str, n: int) -> str:
-        """Generate placeholder of the right size for plurals."""
-        return self.gettext(msgid1 if n == 1 else msgid2)
-
-    lgettext = gettext
-    lngettext = ngettext
-
-
 def setup(conf_lang: str) -> None:
     """Setup localisations."""
     # Get the 'en_US' style language code
@@ -366,13 +387,6 @@ def setup(conf_lang: str) -> None:
                 lang_code = arg[5:]
                 break
 
-    set_language(lang_code)
-
-
-def set_language(lang_code: str) -> None:
-    """Change the app's language."""
-    global _TRANSLATOR
-
     # Include the generic and specific, if provided.
     expanded_langs = [lang_code.casefold()]
     if '_' in lang_code:
@@ -381,21 +395,21 @@ def set_language(lang_code: str) -> None:
     LOGGER.info('Language: {!r}', lang_code)
     LOGGER.debug('Language codes: {!r}', expanded_langs)
 
-    lang_folder = utils.install_path('i18n')
-
     for lang in expanded_langs:
         try:
-            file = open(lang_folder / (lang + '.mo').format(lang), 'rb')
+            file = open(FOLDER / (lang + '.mo'), 'rb')
         except FileNotFoundError:
             continue
         with file:
-            _TRANSLATOR = gettext_mod.GNUTranslations(file)
-            break
+            translator = gettext_mod.GNUTranslations(file)
+        # i18n: This is displayed in the options menu to switch to this language.
+        language = Language(translator.gettext('__LanguageName'), lang_code, translator)
+        break
     else:
         # To help identify missing translations, replace everything with
         # something noticeable.
         if lang_code == 'dummy':
-            _TRANSLATOR = DummyTranslations()
+            language = DUMMY
         # No translations, fallback to English.
         # That's fine if the user's language is actually English.
         else:
@@ -404,11 +418,37 @@ def set_language(lang_code: str) -> None:
                     "Can't find translation for codes: {!r}!",
                     expanded_langs,
                 )
-            _TRANSLATOR = gettext_mod.NullTranslations()
-            lang_code = 'en'
+            language = Language('English', 'en', gettext_mod.NullTranslations())
+
+    set_language(language)
+
+
+def get_languages() -> Iterator[Language]:
+    """Load all languages we have available."""
+    for filename in FOLDER.iterdir():
+        if filename.suffix != '.mo':  # Ignore POT and PO sources.
+            continue
+        try:
+            with filename.open('rb') as f:
+                translator = gettext_mod.GNUTranslations(f)
+        except (IOError, OSError):
+            LOGGER.warning('Could not parse "{}"', filename, exc_info=True)
+            continue
+        yield Language(
+            # Special case, hardcode this name since this is the template.
+            'English' if filename.stem == 'en' else translator.gettext('__LanguageName'),
+            translator.info().get('Language', filename.stem),
+            translator,
+        )
+
+
+def set_language(lang: Language) -> None:
+    """Change the app's language."""
+    global _TRANSLATOR
+    _TRANSLATOR = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
-    config.APP.store_conf(attrs.evolve(conf, language=lang_code))
+    config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))
 
     # Reload all our localisations.
     for text_widget, token in _applied_tokens.items():
